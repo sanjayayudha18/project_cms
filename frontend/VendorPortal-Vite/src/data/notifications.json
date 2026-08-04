@@ -1,0 +1,110 @@
+[
+  {
+    "id": "NOTIF-001",
+    "timestamp": "2024-01-15T08:00:00Z",
+    "type": "New Assignment",
+    "message": "Anda memiliki order CIT baru: CIT-2024-015 untuk ATM-JKT-005 di kawasan Sudirman, Jakarta",
+    "isRead": false,
+    "vendorId": "vendor-gardanet",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-002",
+    "timestamp": "2024-01-15T07:30:00Z",
+    "type": "Order Status Changed",
+    "message": "Order CIT-2024-003 telah berubah status menjadi Completed",
+    "isRead": false,
+    "vendorId": "vendor-gardanet",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-003",
+    "timestamp": "2024-01-14T16:00:00Z",
+    "type": "Invoice Status Updated",
+    "message": "Invoice INV/GDN/2024/001 telah disetujui (Approved)",
+    "isRead": true,
+    "vendorId": "vendor-gardanet",
+    "relatedRoute": "/invoices"
+  },
+  {
+    "id": "NOTIF-004",
+    "timestamp": "2024-01-14T10:15:00Z",
+    "type": "Schedule Updated",
+    "message": "Jadwal replenishment SCH-2024-003 untuk ATM-JKT-003 telah dikonfirmasi pada 16 Jan 2024",
+    "isRead": true,
+    "vendorId": "vendor-gardanet",
+    "relatedRoute": "/schedule"
+  },
+  {
+    "id": "NOTIF-005",
+    "timestamp": "2024-01-15T09:00:00Z",
+    "type": "New Assignment",
+    "message": "Anda memiliki order CIT baru: CIT-2024-016 untuk ATM-SBY-002 di kawasan Darmo, Surabaya",
+    "isRead": false,
+    "vendorId": "vendor-ssi",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-006",
+    "timestamp": "2024-01-15T06:45:00Z",
+    "type": "Order Status Changed",
+    "message": "Order CIT-2024-011 telah berubah status menjadi In Transit",
+    "isRead": false,
+    "vendorId": "vendor-ssi",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-007",
+    "timestamp": "2024-01-14T14:30:00Z",
+    "type": "Invoice Status Updated",
+    "message": "Invoice INV/SSI/2024/003 terdeteksi mismatch. Silakan periksa detail invoice",
+    "isRead": true,
+    "vendorId": "vendor-ssi",
+    "relatedRoute": "/invoices"
+  },
+  {
+    "id": "NOTIF-008",
+    "timestamp": "2024-01-14T11:00:00Z",
+    "type": "Schedule Updated",
+    "message": "Jadwal replenishment SCH-2024-011 untuk ATM-MDN-001 telah diperbarui ke prioritas High",
+    "isRead": false,
+    "vendorId": "vendor-ssi",
+    "relatedRoute": "/schedule"
+  },
+  {
+    "id": "NOTIF-009",
+    "timestamp": "2024-01-15T08:30:00Z",
+    "type": "New Assignment",
+    "message": "Anda memiliki order CIT baru: CIT-2024-020 untuk ATM-SMG-002 di kawasan Pandanaran, Semarang",
+    "isRead": false,
+    "vendorId": "vendor-g4s",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-010",
+    "timestamp": "2024-01-15T07:00:00Z",
+    "type": "Order Status Changed",
+    "message": "Order CIT-2024-019 telah berubah status menjadi Completed",
+    "isRead": true,
+    "vendorId": "vendor-g4s",
+    "relatedRoute": "/orders"
+  },
+  {
+    "id": "NOTIF-011",
+    "timestamp": "2024-01-14T15:45:00Z",
+    "type": "Invoice Status Updated",
+    "message": "Invoice INV/G4S/2024/002 telah divalidasi (Validated)",
+    "isRead": true,
+    "vendorId": "vendor-g4s",
+    "relatedRoute": "/invoices"
+  },
+  {
+    "id": "NOTIF-012",
+    "timestamp": "2024-01-14T09:30:00Z",
+    "type": "Schedule Updated",
+    "message": "Jadwal replenishment SCH-2024-018 untuk ATM-SMG-001 telah dibatalkan (Cancelled)",
+    "isRead": false,
+    "vendorId": "vendor-g4s",
+    "relatedRoute": "/schedule"
+  }
+]

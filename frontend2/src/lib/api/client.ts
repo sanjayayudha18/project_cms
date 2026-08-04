@@ -1,0 +1,174 @@
+// ─── API Client ───────────────────────────────────────────────────────────────
+// Fetch wrapper with auth header injection and 401 token-refresh retry logic.
+// Works in both stub and real mode — stub interceptor is layered on top (task 6.2).
+
+import { useAuthStore } from "@/lib/auth/store";
+import { apiConfig } from "./config";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface RequestConfig {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+  /** Skip auth header injection (e.g., for login/refresh endpoints) */
+  skipAuth?: boolean;
+}
+
+export interface ApiError {
+  status: number;
+  message: string;
+  details?: unknown;
+}
+
+export interface ApiResponse<T = unknown> {
+  data: T;
+  status: number;
+}
+
+// ─── Request Interceptor ──────────────────────────────────────────────────────
+
+function injectAuthHeader(
+  headers: Record<string, string>,
+  skipAuth: boolean,
+): Record<string, string> {
+  if (skipAuth) return headers;
+
+  const token = useAuthStore.getState().accessToken;
+  if (token) {
+    return { ...headers, Authorization: `Bearer ${token}` };
+  }
+  return headers;
+}
+
+// ─── Response Interceptor (401 retry) ─────────────────────────────────────────
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function handleUnauthorized(config: RequestConfig): Promise<Response | null> {
+  // Prevent concurrent refresh attempts — share the same promise
+  if (!isRefreshing) {
+    isRefreshing = true;
+    refreshPromise = useAuthStore.getState().refreshToken();
+  }
+
+  const refreshed = await refreshPromise;
+  isRefreshing = false;
+  refreshPromise = null;
+
+  if (!refreshed) {
+    // refreshToken() already calls logout() internally on failure
+    return null;
+  }
+
+  // Retry the original request with the new token
+  const retryResponse = await executeRequest(config, true);
+  return retryResponse;
+}
+
+// ─── Core Fetch Execution ─────────────────────────────────────────────────────
+
+async function executeRequest(config: RequestConfig, isRetry = false): Promise<Response> {
+  const url = `${apiConfig.baseURL}${config.path}`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...config.headers,
+  };
+
+  const finalHeaders = injectAuthHeader(headers, config.skipAuth ?? false);
+
+  const fetchOptions: RequestInit = {
+    method: config.method,
+    headers: finalHeaders,
+    body: config.body ? JSON.stringify(config.body) : undefined,
+    credentials: "include",
+  };
+
+  // Stub mode: intercept requests with mock data
+  let response: Response;
+  if (apiConfig.mode === "stub") {
+    const { handleStubRequest } = await import("./stubs/index");
+    const stubResponse = await handleStubRequest(url, fetchOptions);
+    response = stubResponse ?? await fetch(url, fetchOptions);
+  } else {
+    response = await fetch(url, fetchOptions);
+  }
+
+  // 401 handling: attempt refresh + retry once
+  if (response.status === 401 && !isRetry && !config.skipAuth) {
+    const retryResponse = await handleUnauthorized(config);
+    if (retryResponse) return retryResponse;
+
+    // If retry also failed or refresh failed, throw
+    throw createApiError(response);
+  }
+
+  return response;
+}
+
+// ─── Error Factory ────────────────────────────────────────────────────────────
+
+function createApiError(response: Response): ApiError {
+  return {
+    status: response.status,
+    message: response.statusText || "Request failed",
+  };
+}
+
+async function parseApiError(response: Response): Promise<ApiError> {
+  try {
+    const body = (await response.json()) as { message?: string; details?: unknown };
+    return {
+      status: response.status,
+      message: body.message ?? response.statusText ?? "Request failed",
+      details: body.details,
+    };
+  } catch {
+    return createApiError(response);
+  }
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export async function apiClient<T = unknown>(config: RequestConfig): Promise<ApiResponse<T>> {
+  const response = await executeRequest(config);
+
+  if (!response.ok) {
+    throw await parseApiError(response);
+  }
+
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return { data: undefined as T, status: 204 };
+  }
+
+  const data = (await response.json()) as T;
+  return { data, status: response.status };
+}
+
+// ─── Convenience Methods ──────────────────────────────────────────────────────
+
+export const api = {
+  get<T = unknown>(path: string, options?: Partial<RequestConfig>) {
+    return apiClient<T>({ method: "GET", path, ...options });
+  },
+
+  post<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
+    return apiClient<T>({ method: "POST", path, body, ...options });
+  },
+
+  put<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
+    return apiClient<T>({ method: "PUT", path, body, ...options });
+  },
+
+  patch<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
+    return apiClient<T>({ method: "PATCH", path, body, ...options });
+  },
+
+  delete<T = unknown>(path: string, options?: Partial<RequestConfig>) {
+    return apiClient<T>({ method: "DELETE", path, ...options });
+  },
+} as const;

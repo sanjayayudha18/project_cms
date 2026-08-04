@@ -1,0 +1,56 @@
+[
+  {
+    "id": "user-1",
+    "username": "NCR.admin",
+    "password": "password123",
+    "displayName": "Muh. Bahar",
+    "vendorId": "vendor-NCR",
+    "vendorName": "PT NCR",
+    "role": "Vendor"
+  },
+  {
+    "id": "user-2",
+    "username": "gardanet.ops",
+    "password": "password123",
+    "displayName": "Yudha",
+    "vendorId": "vendor-gardanet",
+    "vendorName": "PT Gardanet",
+    "role": "Vendor"
+  },
+  {
+    "id": "user-3",
+    "username": "ssi.admin",
+    "password": "password123",
+    "displayName": "Siti Rahayu",
+    "vendorId": "vendor-ssi",
+    "vendorName": "PT SSI",
+    "role": "Vendor"
+  },
+  {
+    "id": "user-4",
+    "username": "ssi.ops",
+    "password": "password123",
+    "displayName": "Andi Prasetyo",
+    "vendorId": "vendor-ssi",
+    "vendorName": "PT SSI",
+    "role": "Vendor"
+  },
+  {
+    "id": "user-5",
+    "username": "g4s.admin",
+    "password": "password123",
+    "displayName": "Ahmad Wijaya",
+    "vendorId": "vendor-g4s",
+    "vendorName": "PT G4S",
+    "role": "Vendor"
+  },
+  {
+    "id": "user-6",
+    "username": "g4s.ops",
+    "password": "password123",
+    "displayName": "Rina Wulandari",
+    "vendorId": "vendor-g4s",
+    "vendorName": "PT G4S",
+    "role": "Vendor"
+  }
+]

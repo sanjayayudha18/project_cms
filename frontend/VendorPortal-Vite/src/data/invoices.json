@@ -1,0 +1,350 @@
+[
+  {
+    "id": "INV-2024-001",
+    "invoiceNumber": "INV/GDN/2024/001",
+    "period": "January 2024",
+    "totalAmount": 750000000,
+    "lineItemsCount": 3,
+    "validationStatus": "Approved",
+    "vendorId": "vendor-gardanet",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-JKT-001 15 Jan 2024",
+        "invoicedAmount": 250000000,
+        "matchedOrderRef": "CIT-2024-001",
+        "expectedAmount": 250000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-JKT-002 16 Jan 2024",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-2024-002",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Delivery ATM-JKT-003 17 Jan 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-003",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-002",
+    "invoiceNumber": "INV/GDN/2024/002",
+    "period": "January 2024",
+    "totalAmount": 520000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Validated",
+    "vendorId": "vendor-gardanet",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-JKT-004 18 Jan 2024",
+        "invoicedAmount": 275000000,
+        "matchedOrderRef": "CIT-2024-004",
+        "expectedAmount": 275000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-BDG-001 19 Jan 2024",
+        "invoicedAmount": 245000000,
+        "matchedOrderRef": "CIT-2024-005",
+        "expectedAmount": 245000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-003",
+    "invoiceNumber": "INV/GDN/2024/003",
+    "period": "February 2024",
+    "totalAmount": 430000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Mismatch Detected",
+    "vendorId": "vendor-gardanet",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-JKT-001 02 Feb 2024",
+        "invoicedAmount": 260000000,
+        "matchedOrderRef": "CIT-2024-006",
+        "expectedAmount": 250000000,
+        "variance": 10000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "description": "CIT Delivery ATM-BDG-001 03 Feb 2024",
+        "invoicedAmount": 170000000,
+        "matchedOrderRef": "CIT-2024-007",
+        "expectedAmount": 175000000,
+        "variance": -5000000,
+        "matchStatus": "Mismatch"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-004",
+    "invoiceNumber": "INV/GDN/2024/004",
+    "period": "February 2024",
+    "totalAmount": 380000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Uploaded",
+    "vendorId": "vendor-gardanet",
+    "lineItems": [
+      {
+        "description": "CIT Pickup ATM-JKT-002 10 Feb 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-008",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      },
+      {
+        "description": "CIT Delivery ATM-JKT-003 11 Feb 2024",
+        "invoicedAmount": 180000000,
+        "matchedOrderRef": "CIT-2024-009",
+        "expectedAmount": 180000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-005",
+    "invoiceNumber": "INV/SSI/2024/001",
+    "period": "January 2024",
+    "totalAmount": 680000000,
+    "lineItemsCount": 3,
+    "validationStatus": "Approved",
+    "vendorId": "vendor-ssi",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SBY-001 15 Jan 2024",
+        "invoicedAmount": 220000000,
+        "matchedOrderRef": "CIT-2024-010",
+        "expectedAmount": 220000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-SBY-002 16 Jan 2024",
+        "invoicedAmount": 260000000,
+        "matchedOrderRef": "CIT-2024-011",
+        "expectedAmount": 260000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Delivery ATM-SBY-003 17 Jan 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-012",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-006",
+    "invoiceNumber": "INV/SSI/2024/002",
+    "period": "January 2024",
+    "totalAmount": 450000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Validated",
+    "vendorId": "vendor-ssi",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SBY-004 20 Jan 2024",
+        "invoicedAmount": 230000000,
+        "matchedOrderRef": "CIT-2024-013",
+        "expectedAmount": 230000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-MDN-001 21 Jan 2024",
+        "invoicedAmount": 220000000,
+        "matchedOrderRef": "CIT-2024-014",
+        "expectedAmount": 220000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-007",
+    "invoiceNumber": "INV/SSI/2024/003",
+    "period": "February 2024",
+    "totalAmount": 510000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Mismatch Detected",
+    "vendorId": "vendor-ssi",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SBY-001 05 Feb 2024",
+        "invoicedAmount": 280000000,
+        "matchedOrderRef": "CIT-2024-015",
+        "expectedAmount": 270000000,
+        "variance": 10000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "description": "CIT Delivery ATM-MDN-001 06 Feb 2024",
+        "invoicedAmount": 230000000,
+        "matchedOrderRef": "CIT-2024-016",
+        "expectedAmount": 230000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-008",
+    "invoiceNumber": "INV/SSI/2024/004",
+    "period": "February 2024",
+    "totalAmount": 320000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Uploaded",
+    "vendorId": "vendor-ssi",
+    "lineItems": [
+      {
+        "description": "CIT Pickup ATM-SBY-002 12 Feb 2024",
+        "invoicedAmount": 160000000,
+        "matchedOrderRef": "CIT-2024-017",
+        "expectedAmount": 160000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      },
+      {
+        "description": "CIT Delivery ATM-SBY-003 13 Feb 2024",
+        "invoicedAmount": 160000000,
+        "matchedOrderRef": "CIT-2024-018",
+        "expectedAmount": 160000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-009",
+    "invoiceNumber": "INV/G4S/2024/001",
+    "period": "January 2024",
+    "totalAmount": 590000000,
+    "lineItemsCount": 3,
+    "validationStatus": "Approved",
+    "vendorId": "vendor-g4s",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SMG-001 15 Jan 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-019",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-SMG-002 16 Jan 2024",
+        "invoicedAmount": 190000000,
+        "matchedOrderRef": "CIT-2024-020",
+        "expectedAmount": 190000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Delivery ATM-BDG-004 17 Jan 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-021",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-010",
+    "invoiceNumber": "INV/G4S/2024/002",
+    "period": "January 2024",
+    "totalAmount": 410000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Validated",
+    "vendorId": "vendor-g4s",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SMG-003 22 Jan 2024",
+        "invoicedAmount": 210000000,
+        "matchedOrderRef": "CIT-2024-022",
+        "expectedAmount": 210000000,
+        "variance": 0,
+        "matchStatus": "Match"
+      },
+      {
+        "description": "CIT Pickup ATM-BDG-004 23 Jan 2024",
+        "invoicedAmount": 200000000,
+        "matchedOrderRef": "CIT-2024-023",
+        "expectedAmount": 200000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-011",
+    "invoiceNumber": "INV/G4S/2024/003",
+    "period": "February 2024",
+    "totalAmount": 475000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Mismatch Detected",
+    "vendorId": "vendor-g4s",
+    "lineItems": [
+      {
+        "description": "CIT Delivery ATM-SMG-001 04 Feb 2024",
+        "invoicedAmount": 255000000,
+        "matchedOrderRef": "CIT-2024-024",
+        "expectedAmount": 250000000,
+        "variance": 5000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "description": "CIT Delivery ATM-SMG-002 05 Feb 2024",
+        "invoicedAmount": 220000000,
+        "matchedOrderRef": "CIT-2024-025",
+        "expectedAmount": 225000000,
+        "variance": -5000000,
+        "matchStatus": "Mismatch"
+      }
+    ]
+  },
+  {
+    "id": "INV-2024-012",
+    "invoiceNumber": "INV/G4S/2024/004",
+    "period": "February 2024",
+    "totalAmount": 350000000,
+    "lineItemsCount": 2,
+    "validationStatus": "Uploaded",
+    "vendorId": "vendor-g4s",
+    "lineItems": [
+      {
+        "description": "CIT Pickup ATM-BDG-004 14 Feb 2024",
+        "invoicedAmount": 180000000,
+        "matchedOrderRef": "CIT-2024-026",
+        "expectedAmount": 180000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      },
+      {
+        "description": "CIT Delivery ATM-SMG-003 15 Feb 2024",
+        "invoicedAmount": 170000000,
+        "matchedOrderRef": "CIT-2024-027",
+        "expectedAmount": 170000000,
+        "variance": 0,
+        "matchStatus": "Pending"
+      }
+    ]
+  }
+]

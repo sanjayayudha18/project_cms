@@ -1,0 +1,2802 @@
+[
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-02",
+    "beginningBalance": 200000000,
+    "cashIn": 52469228,
+    "cashOut": 80951296,
+    "endingBalance": 171517932,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-03",
+    "beginningBalance": 171517932,
+    "cashIn": 62448193,
+    "cashOut": 89538347,
+    "endingBalance": 144427778,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-04",
+    "beginningBalance": 144427778,
+    "cashIn": 57592436,
+    "cashOut": 89092806,
+    "endingBalance": 112927408,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-05",
+    "beginningBalance": 112927408,
+    "cashIn": 50633484,
+    "cashOut": 63287523,
+    "endingBalance": 100273369,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-06",
+    "beginningBalance": 100273369,
+    "cashIn": 36471851,
+    "cashOut": 66863135,
+    "endingBalance": 69882085,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-07",
+    "beginningBalance": 69882085,
+    "cashIn": 193620909,
+    "cashOut": 103857578,
+    "endingBalance": 159645416,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-08",
+    "beginningBalance": 159645416,
+    "cashIn": 56312096,
+    "cashOut": 88226322,
+    "endingBalance": 127731190,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-09",
+    "beginningBalance": 127731190,
+    "cashIn": 45856602,
+    "cashOut": 68303806,
+    "endingBalance": 105283986,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-10",
+    "beginningBalance": 105283986,
+    "cashIn": 38137162,
+    "cashOut": 99174016,
+    "endingBalance": 44247132,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-11",
+    "beginningBalance": 44247132,
+    "cashIn": 210494722,
+    "cashOut": 96308134,
+    "endingBalance": 158433720,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-12",
+    "beginningBalance": 158433720,
+    "cashIn": 48536361,
+    "cashOut": 69496595,
+    "endingBalance": 137473486,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-13",
+    "beginningBalance": 137473486,
+    "cashIn": 60247358,
+    "cashOut": 58183470,
+    "endingBalance": 139537374,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-14",
+    "beginningBalance": 139537374,
+    "cashIn": 57983060,
+    "cashOut": 102232437,
+    "endingBalance": 95287997,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "date": "2024-01-15",
+    "beginningBalance": 95287997,
+    "cashIn": 59150381,
+    "cashOut": 61522049,
+    "endingBalance": 92916329,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-02",
+    "beginningBalance": 85000000,
+    "cashIn": 31184235,
+    "cashOut": 50015578,
+    "endingBalance": 66168657,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-03",
+    "beginningBalance": 66168657,
+    "cashIn": 25096530,
+    "cashOut": 65666441,
+    "endingBalance": 25598746,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-04",
+    "beginningBalance": 25598746,
+    "cashIn": 171741985,
+    "cashOut": 60284641,
+    "endingBalance": 137056090,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-05",
+    "beginningBalance": 137056090,
+    "cashIn": 23896084,
+    "cashOut": 66547462,
+    "endingBalance": 94404712,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-06",
+    "beginningBalance": 94404712,
+    "cashIn": 22878139,
+    "cashOut": 57025230,
+    "endingBalance": 60257621,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-07",
+    "beginningBalance": 60257621,
+    "cashIn": 37853111,
+    "cashOut": 45632951,
+    "endingBalance": 52477781,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-08",
+    "beginningBalance": 52477781,
+    "cashIn": 172662573,
+    "cashOut": 51197198,
+    "endingBalance": 173943156,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-09",
+    "beginningBalance": 173943156,
+    "cashIn": 37308132,
+    "cashOut": 50837960,
+    "endingBalance": 160413328,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-10",
+    "beginningBalance": 160413328,
+    "cashIn": 38551505,
+    "cashOut": 49991395,
+    "endingBalance": 148973438,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-11",
+    "beginningBalance": 148973438,
+    "cashIn": 22806277,
+    "cashOut": 53057179,
+    "endingBalance": 118722536,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-12",
+    "beginningBalance": 118722536,
+    "cashIn": 32884253,
+    "cashOut": 52466786,
+    "endingBalance": 99140003,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-13",
+    "beginningBalance": 99140003,
+    "cashIn": 29772725,
+    "cashOut": 45359937,
+    "endingBalance": 83552791,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-14",
+    "beginningBalance": 83552791,
+    "cashIn": 26162309,
+    "cashOut": 49642729,
+    "endingBalance": 60072371,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "date": "2024-01-15",
+    "beginningBalance": 60072371,
+    "cashIn": 35256755,
+    "cashOut": 69337658,
+    "endingBalance": 25991468,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-02",
+    "beginningBalance": 320000000,
+    "cashIn": 72069513,
+    "cashOut": 112976526,
+    "endingBalance": 279092987,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-03",
+    "beginningBalance": 279092987,
+    "cashIn": 71689667,
+    "cashOut": 108438434,
+    "endingBalance": 242344220,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-04",
+    "beginningBalance": 242344220,
+    "cashIn": 87621473,
+    "cashOut": 103463224,
+    "endingBalance": 226502469,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-05",
+    "beginningBalance": 226502469,
+    "cashIn": 81753155,
+    "cashOut": 99629630,
+    "endingBalance": 208625994,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-06",
+    "beginningBalance": 208625994,
+    "cashIn": 52738886,
+    "cashOut": 78767367,
+    "endingBalance": 182597513,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-07",
+    "beginningBalance": 182597513,
+    "cashIn": 52721838,
+    "cashOut": 64793112,
+    "endingBalance": 170526239,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-08",
+    "beginningBalance": 170526239,
+    "cashIn": 73795435,
+    "cashOut": 63190930,
+    "endingBalance": 181130744,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-09",
+    "beginningBalance": 181130744,
+    "cashIn": 61587773,
+    "cashOut": 109289777,
+    "endingBalance": 133428740,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-10",
+    "beginningBalance": 133428740,
+    "cashIn": 90358250,
+    "cashOut": 115815537,
+    "endingBalance": 107971453,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-11",
+    "beginningBalance": 107971453,
+    "cashIn": 75076244,
+    "cashOut": 80046181,
+    "endingBalance": 103001516,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-12",
+    "beginningBalance": 103001516,
+    "cashIn": 57688343,
+    "cashOut": 116181795,
+    "endingBalance": 44508064,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-13",
+    "beginningBalance": 44508064,
+    "cashIn": 77604934,
+    "cashOut": 84702744,
+    "endingBalance": 37410254,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-14",
+    "beginningBalance": 37410254,
+    "cashIn": 72626021,
+    "cashOut": 82615617,
+    "endingBalance": 27420658,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "date": "2024-01-15",
+    "beginningBalance": 27420658,
+    "cashIn": 223199599,
+    "cashOut": 92545335,
+    "endingBalance": 158074922,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-02",
+    "beginningBalance": 45000000,
+    "cashIn": 170393089,
+    "cashOut": 59234807,
+    "endingBalance": 156158282,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-03",
+    "beginningBalance": 156158282,
+    "cashIn": 24234504,
+    "cashOut": 68623091,
+    "endingBalance": 111769695,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-04",
+    "beginningBalance": 111769695,
+    "cashIn": 14033573,
+    "cashOut": 64215637,
+    "endingBalance": 61587631,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-05",
+    "beginningBalance": 61587631,
+    "cashIn": 166393570,
+    "cashOut": 60227624,
+    "endingBalance": 167753577,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-06",
+    "beginningBalance": 167753577,
+    "cashIn": 23534207,
+    "cashOut": 52678767,
+    "endingBalance": 138609017,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-07",
+    "beginningBalance": 138609017,
+    "cashIn": 17685750,
+    "cashOut": 45864423,
+    "endingBalance": 110430344,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-08",
+    "beginningBalance": 110430344,
+    "cashIn": 17015699,
+    "cashOut": 65175856,
+    "endingBalance": 62270187,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-09",
+    "beginningBalance": 62270187,
+    "cashIn": 22710208,
+    "cashOut": 55459075,
+    "endingBalance": 29521320,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-10",
+    "beginningBalance": 29521320,
+    "cashIn": 169644622,
+    "cashOut": 51961266,
+    "endingBalance": 147204676,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-11",
+    "beginningBalance": 147204676,
+    "cashIn": 23592067,
+    "cashOut": 61178094,
+    "endingBalance": 109618649,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-12",
+    "beginningBalance": 109618649,
+    "cashIn": 21642143,
+    "cashOut": 44310793,
+    "endingBalance": 86949999,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-13",
+    "beginningBalance": 86949999,
+    "cashIn": 14577808,
+    "cashOut": 62176533,
+    "endingBalance": 39351274,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-14",
+    "beginningBalance": 39351274,
+    "cashIn": 168443572,
+    "cashOut": 52857760,
+    "endingBalance": 154937086,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "date": "2024-01-15",
+    "beginningBalance": 154937086,
+    "cashIn": 14212989,
+    "cashOut": 57206269,
+    "endingBalance": 111943806,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-02",
+    "beginningBalance": 160000000,
+    "cashIn": 40389775,
+    "cashOut": 62908878,
+    "endingBalance": 137480897,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-03",
+    "beginningBalance": 137480897,
+    "cashIn": 31972493,
+    "cashOut": 90335956,
+    "endingBalance": 79117434,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-04",
+    "beginningBalance": 79117434,
+    "cashIn": 51360487,
+    "cashOut": 59057810,
+    "endingBalance": 71420111,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-05",
+    "beginningBalance": 71420111,
+    "cashIn": 51197295,
+    "cashOut": 85088688,
+    "endingBalance": 37528718,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-06",
+    "beginningBalance": 37528718,
+    "cashIn": 186677531,
+    "cashOut": 61109808,
+    "endingBalance": 163096441,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-07",
+    "beginningBalance": 163096441,
+    "cashIn": 46264773,
+    "cashOut": 82215111,
+    "endingBalance": 127146103,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-08",
+    "beginningBalance": 127146103,
+    "cashIn": 39358790,
+    "cashOut": 49979914,
+    "endingBalance": 116524979,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-09",
+    "beginningBalance": 116524979,
+    "cashIn": 31757923,
+    "cashOut": 79733946,
+    "endingBalance": 68548956,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-10",
+    "beginningBalance": 68548956,
+    "cashIn": 179016879,
+    "cashOut": 78761308,
+    "endingBalance": 168804527,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-11",
+    "beginningBalance": 168804527,
+    "cashIn": 48641125,
+    "cashOut": 63632184,
+    "endingBalance": 153813468,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-12",
+    "beginningBalance": 153813468,
+    "cashIn": 33276562,
+    "cashOut": 59552733,
+    "endingBalance": 127537297,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-13",
+    "beginningBalance": 127537297,
+    "cashIn": 28761807,
+    "cashOut": 58945504,
+    "endingBalance": 97353600,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-14",
+    "beginningBalance": 97353600,
+    "cashIn": 33164268,
+    "cashOut": 59187820,
+    "endingBalance": 71330048,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "date": "2024-01-15",
+    "beginningBalance": 71330048,
+    "cashIn": 50340841,
+    "cashOut": 65311371,
+    "endingBalance": 56359518,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-02",
+    "beginningBalance": 110000000,
+    "cashIn": 34994202,
+    "cashOut": 36020001,
+    "endingBalance": 108974201,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-03",
+    "beginningBalance": 108974201,
+    "cashIn": 34541481,
+    "cashOut": 63286247,
+    "endingBalance": 80229435,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-04",
+    "beginningBalance": 80229435,
+    "cashIn": 37090395,
+    "cashOut": 58014297,
+    "endingBalance": 59305533,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-05",
+    "beginningBalance": 59305533,
+    "cashIn": 44135550,
+    "cashOut": 58111916,
+    "endingBalance": 45329167,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-06",
+    "beginningBalance": 45329167,
+    "cashIn": 190550608,
+    "cashOut": 61857910,
+    "endingBalance": 174021865,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-07",
+    "beginningBalance": 174021865,
+    "cashIn": 28883665,
+    "cashOut": 42277184,
+    "endingBalance": 160628346,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-08",
+    "beginningBalance": 160628346,
+    "cashIn": 35443430,
+    "cashOut": 56881526,
+    "endingBalance": 139190250,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-09",
+    "beginningBalance": 139190250,
+    "cashIn": 32427827,
+    "cashOut": 51081259,
+    "endingBalance": 120536818,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-10",
+    "beginningBalance": 120536818,
+    "cashIn": 32815753,
+    "cashOut": 39856036,
+    "endingBalance": 113496535,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-11",
+    "beginningBalance": 113496535,
+    "cashIn": 42396627,
+    "cashOut": 52114185,
+    "endingBalance": 103778977,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-12",
+    "beginningBalance": 103778977,
+    "cashIn": 44030399,
+    "cashOut": 60537981,
+    "endingBalance": 87271395,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-13",
+    "beginningBalance": 87271395,
+    "cashIn": 41087789,
+    "cashOut": 48508209,
+    "endingBalance": 79850975,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-14",
+    "beginningBalance": 79850975,
+    "cashIn": 33752821,
+    "cashOut": 57408537,
+    "endingBalance": 56195259,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "date": "2024-01-15",
+    "beginningBalance": 56195259,
+    "cashIn": 28943038,
+    "cashOut": 42211499,
+    "endingBalance": 42926798,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-02",
+    "beginningBalance": 270000000,
+    "cashIn": 59395458,
+    "cashOut": 85657634,
+    "endingBalance": 243737824,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-03",
+    "beginningBalance": 243737824,
+    "cashIn": 70469194,
+    "cashOut": 58211684,
+    "endingBalance": 255995334,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-04",
+    "beginningBalance": 255995334,
+    "cashIn": 51090514,
+    "cashOut": 86538316,
+    "endingBalance": 220547532,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-05",
+    "beginningBalance": 220547532,
+    "cashIn": 68191655,
+    "cashOut": 82169791,
+    "endingBalance": 206569396,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-06",
+    "beginningBalance": 206569396,
+    "cashIn": 75697721,
+    "cashOut": 52512800,
+    "endingBalance": 229754317,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-07",
+    "beginningBalance": 229754317,
+    "cashIn": 61955679,
+    "cashOut": 83089671,
+    "endingBalance": 208620325,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-08",
+    "beginningBalance": 208620325,
+    "cashIn": 55562107,
+    "cashOut": 92405219,
+    "endingBalance": 171777213,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-09",
+    "beginningBalance": 171777213,
+    "cashIn": 44166950,
+    "cashOut": 69199864,
+    "endingBalance": 146744299,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-10",
+    "beginningBalance": 146744299,
+    "cashIn": 50954832,
+    "cashOut": 61520929,
+    "endingBalance": 136178202,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-11",
+    "beginningBalance": 136178202,
+    "cashIn": 53361766,
+    "cashOut": 77063252,
+    "endingBalance": 112476716,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-12",
+    "beginningBalance": 112476716,
+    "cashIn": 77999253,
+    "cashOut": 71728960,
+    "endingBalance": 118747009,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-13",
+    "beginningBalance": 118747009,
+    "cashIn": 53743569,
+    "cashOut": 71271912,
+    "endingBalance": 101218666,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-14",
+    "beginningBalance": 101218666,
+    "cashIn": 65814729,
+    "cashOut": 83355070,
+    "endingBalance": 83678325,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "date": "2024-01-15",
+    "beginningBalance": 83678325,
+    "cashIn": 73673181,
+    "cashOut": 77277142,
+    "endingBalance": 80074364,
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-02",
+    "beginningBalance": 180000000,
+    "cashIn": 44100641,
+    "cashOut": 81923299,
+    "endingBalance": 142177342,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-03",
+    "beginningBalance": 142177342,
+    "cashIn": 40378193,
+    "cashOut": 88219433,
+    "endingBalance": 94336102,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-04",
+    "beginningBalance": 94336102,
+    "cashIn": 54303993,
+    "cashOut": 64550130,
+    "endingBalance": 84089965,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-05",
+    "beginningBalance": 84089965,
+    "cashIn": 35859477,
+    "cashOut": 61031187,
+    "endingBalance": 58918255,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-06",
+    "beginningBalance": 58918255,
+    "cashIn": 49323960,
+    "cashOut": 60384137,
+    "endingBalance": 47858078,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-07",
+    "beginningBalance": 47858078,
+    "cashIn": 191003251,
+    "cashOut": 107036635,
+    "endingBalance": 131824694,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-08",
+    "beginningBalance": 131824694,
+    "cashIn": 35157099,
+    "cashOut": 72293246,
+    "endingBalance": 94688547,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-09",
+    "beginningBalance": 94688547,
+    "cashIn": 183746464,
+    "cashOut": 108145271,
+    "endingBalance": 170289740,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-10",
+    "beginningBalance": 170289740,
+    "cashIn": 49276103,
+    "cashOut": 107656749,
+    "endingBalance": 111909094,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-11",
+    "beginningBalance": 111909094,
+    "cashIn": 42573559,
+    "cashOut": 64958130,
+    "endingBalance": 89524523,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-12",
+    "beginningBalance": 89524523,
+    "cashIn": 31828390,
+    "cashOut": 64130246,
+    "endingBalance": 57222667,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-13",
+    "beginningBalance": 57222667,
+    "cashIn": 35680349,
+    "cashOut": 61609855,
+    "endingBalance": 31293161,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-14",
+    "beginningBalance": 31293161,
+    "cashIn": 199996883,
+    "cashOut": 99177216,
+    "endingBalance": 132112828,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "date": "2024-01-15",
+    "beginningBalance": 132112828,
+    "cashIn": 47624514,
+    "cashOut": 75763760,
+    "endingBalance": 103973582,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-02",
+    "beginningBalance": 35000000,
+    "cashIn": 174252605,
+    "cashOut": 35347738,
+    "endingBalance": 173904867,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-03",
+    "beginningBalance": 173904867,
+    "cashIn": 27122008,
+    "cashOut": 45588917,
+    "endingBalance": 155437958,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-04",
+    "beginningBalance": 155437958,
+    "cashIn": 19490989,
+    "cashOut": 44102622,
+    "endingBalance": 130826325,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-05",
+    "beginningBalance": 130826325,
+    "cashIn": 18573651,
+    "cashOut": 49187108,
+    "endingBalance": 100212868,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-06",
+    "beginningBalance": 100212868,
+    "cashIn": 25919161,
+    "cashOut": 31936192,
+    "endingBalance": 94195837,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-07",
+    "beginningBalance": 94195837,
+    "cashIn": 30232268,
+    "cashOut": 38030952,
+    "endingBalance": 86397153,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-08",
+    "beginningBalance": 86397153,
+    "cashIn": 21132455,
+    "cashOut": 43166359,
+    "endingBalance": 64363249,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-09",
+    "beginningBalance": 64363249,
+    "cashIn": 31480470,
+    "cashOut": 38949297,
+    "endingBalance": 56894422,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-10",
+    "beginningBalance": 56894422,
+    "cashIn": 24880581,
+    "cashOut": 35861143,
+    "endingBalance": 45913860,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-11",
+    "beginningBalance": 45913860,
+    "cashIn": 27455788,
+    "cashOut": 41685598,
+    "endingBalance": 31684050,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-12",
+    "beginningBalance": 31684050,
+    "cashIn": 181757677,
+    "cashOut": 41727697,
+    "endingBalance": 171714030,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-13",
+    "beginningBalance": 171714030,
+    "cashIn": 23210872,
+    "cashOut": 42021728,
+    "endingBalance": 152903174,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-14",
+    "beginningBalance": 152903174,
+    "cashIn": 19665936,
+    "cashOut": 37866090,
+    "endingBalance": 134703020,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "date": "2024-01-15",
+    "beginningBalance": 134703020,
+    "cashIn": 18318429,
+    "cashOut": 53281462,
+    "endingBalance": 99739987,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-02",
+    "beginningBalance": 250000000,
+    "cashIn": 52810679,
+    "cashOut": 114684670,
+    "endingBalance": 188126009,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-03",
+    "beginningBalance": 188126009,
+    "cashIn": 69985706,
+    "cashOut": 119580046,
+    "endingBalance": 138531669,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-04",
+    "beginningBalance": 138531669,
+    "cashIn": 50904748,
+    "cashOut": 91715725,
+    "endingBalance": 97720692,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-05",
+    "beginningBalance": 97720692,
+    "cashIn": 39489181,
+    "cashOut": 96730602,
+    "endingBalance": 40479271,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-06",
+    "beginningBalance": 40479271,
+    "cashIn": 202896784,
+    "cashOut": 109815950,
+    "endingBalance": 133560105,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-07",
+    "beginningBalance": 133560105,
+    "cashIn": 48799919,
+    "cashOut": 95129661,
+    "endingBalance": 87230363,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-08",
+    "beginningBalance": 87230363,
+    "cashIn": 59585181,
+    "cashOut": 91568357,
+    "endingBalance": 55247187,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-09",
+    "beginningBalance": 55247187,
+    "cashIn": 204923344,
+    "cashOut": 92528888,
+    "endingBalance": 167641643,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-10",
+    "beginningBalance": 167641643,
+    "cashIn": 40933428,
+    "cashOut": 85118068,
+    "endingBalance": 123457003,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-11",
+    "beginningBalance": 123457003,
+    "cashIn": 68581344,
+    "cashOut": 76013832,
+    "endingBalance": 116024515,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-12",
+    "beginningBalance": 116024515,
+    "cashIn": 70201139,
+    "cashOut": 89414758,
+    "endingBalance": 96810896,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-13",
+    "beginningBalance": 96810896,
+    "cashIn": 47857709,
+    "cashOut": 79963174,
+    "endingBalance": 64705431,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-14",
+    "beginningBalance": 64705431,
+    "cashIn": 194123961,
+    "cashOut": 96881757,
+    "endingBalance": 161947635,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "date": "2024-01-15",
+    "beginningBalance": 161947635,
+    "cashIn": 68506085,
+    "cashOut": 72987758,
+    "endingBalance": 157465962,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-02",
+    "beginningBalance": 95000000,
+    "cashIn": 28508524,
+    "cashOut": 66879073,
+    "endingBalance": 56629451,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-03",
+    "beginningBalance": 56629451,
+    "cashIn": 25801635,
+    "cashOut": 45601296,
+    "endingBalance": 36829790,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-04",
+    "beginningBalance": 36829790,
+    "cashIn": 179264526,
+    "cashOut": 75241038,
+    "endingBalance": 140853278,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-05",
+    "beginningBalance": 140853278,
+    "cashIn": 23714481,
+    "cashOut": 63141526,
+    "endingBalance": 101426233,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-06",
+    "beginningBalance": 101426233,
+    "cashIn": 32773110,
+    "cashOut": 69363364,
+    "endingBalance": 64835979,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-07",
+    "beginningBalance": 64835979,
+    "cashIn": 33432891,
+    "cashOut": 70800179,
+    "endingBalance": 27468691,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-08",
+    "beginningBalance": 27468691,
+    "cashIn": 188646367,
+    "cashOut": 77757971,
+    "endingBalance": 138357087,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-09",
+    "beginningBalance": 138357087,
+    "cashIn": 38783157,
+    "cashOut": 50808748,
+    "endingBalance": 126331496,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-10",
+    "beginningBalance": 126331496,
+    "cashIn": 23994805,
+    "cashOut": 75095356,
+    "endingBalance": 75230945,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-11",
+    "beginningBalance": 75230945,
+    "cashIn": 35878625,
+    "cashOut": 83903336,
+    "endingBalance": 27206234,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-12",
+    "beginningBalance": 27206234,
+    "cashIn": 188938627,
+    "cashOut": 77723074,
+    "endingBalance": 138421787,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-13",
+    "beginningBalance": 138421787,
+    "cashIn": 24232912,
+    "cashOut": 83911817,
+    "endingBalance": 78742882,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-14",
+    "beginningBalance": 78742882,
+    "cashIn": 34489293,
+    "cashOut": 80633729,
+    "endingBalance": 32598446,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "date": "2024-01-15",
+    "beginningBalance": 32598446,
+    "cashIn": 173378510,
+    "cashOut": 57487820,
+    "endingBalance": 148489136,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-02",
+    "beginningBalance": 400000000,
+    "cashIn": 75229927,
+    "cashOut": 85061054,
+    "endingBalance": 390168873,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-03",
+    "beginningBalance": 390168873,
+    "cashIn": 94628891,
+    "cashOut": 82805882,
+    "endingBalance": 401991882,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-04",
+    "beginningBalance": 401991882,
+    "cashIn": 88946580,
+    "cashOut": 121322081,
+    "endingBalance": 369616381,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-05",
+    "beginningBalance": 369616381,
+    "cashIn": 61487894,
+    "cashOut": 115249104,
+    "endingBalance": 315855171,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-06",
+    "beginningBalance": 315855171,
+    "cashIn": 56320034,
+    "cashOut": 104779298,
+    "endingBalance": 267395907,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-07",
+    "beginningBalance": 267395907,
+    "cashIn": 60906963,
+    "cashOut": 87004277,
+    "endingBalance": 241298593,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-08",
+    "beginningBalance": 241298593,
+    "cashIn": 56960005,
+    "cashOut": 94083470,
+    "endingBalance": 204175128,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-09",
+    "beginningBalance": 204175128,
+    "cashIn": 76561903,
+    "cashOut": 73221004,
+    "endingBalance": 207516027,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-10",
+    "beginningBalance": 207516027,
+    "cashIn": 78728271,
+    "cashOut": 126637239,
+    "endingBalance": 159607059,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-11",
+    "beginningBalance": 159607059,
+    "cashIn": 83685524,
+    "cashOut": 121581697,
+    "endingBalance": 121710886,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-12",
+    "beginningBalance": 121710886,
+    "cashIn": 99592262,
+    "cashOut": 81062288,
+    "endingBalance": 140240860,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-13",
+    "beginningBalance": 140240860,
+    "cashIn": 77049783,
+    "cashOut": 82575848,
+    "endingBalance": 134714795,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-14",
+    "beginningBalance": 134714795,
+    "cashIn": 87992160,
+    "cashOut": 102394404,
+    "endingBalance": 120312551,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "date": "2024-01-15",
+    "beginningBalance": 120312551,
+    "cashIn": 88466167,
+    "cashOut": 99680209,
+    "endingBalance": 109098509,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-02",
+    "beginningBalance": 55000000,
+    "cashIn": 168609281,
+    "cashOut": 50892492,
+    "endingBalance": 172716789,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-03",
+    "beginningBalance": 172716789,
+    "cashIn": 15408965,
+    "cashOut": 34835196,
+    "endingBalance": 153290558,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-04",
+    "beginningBalance": 153290558,
+    "cashIn": 21883316,
+    "cashOut": 38278262,
+    "endingBalance": 136895612,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-05",
+    "beginningBalance": 136895612,
+    "cashIn": 22897045,
+    "cashOut": 36556361,
+    "endingBalance": 123236296,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-06",
+    "beginningBalance": 123236296,
+    "cashIn": 22094459,
+    "cashOut": 38534106,
+    "endingBalance": 106796649,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-07",
+    "beginningBalance": 106796649,
+    "cashIn": 20188205,
+    "cashOut": 51818431,
+    "endingBalance": 75166423,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-08",
+    "beginningBalance": 75166423,
+    "cashIn": 23381163,
+    "cashOut": 37704922,
+    "endingBalance": 60842664,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-09",
+    "beginningBalance": 60842664,
+    "cashIn": 14106779,
+    "cashOut": 42108060,
+    "endingBalance": 32841383,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-10",
+    "beginningBalance": 32841383,
+    "cashIn": 166316462,
+    "cashOut": 38697743,
+    "endingBalance": 160460102,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-11",
+    "beginningBalance": 160460102,
+    "cashIn": 23685580,
+    "cashOut": 36645494,
+    "endingBalance": 147500188,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-12",
+    "beginningBalance": 147500188,
+    "cashIn": 20974143,
+    "cashOut": 40595147,
+    "endingBalance": 127879184,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-13",
+    "beginningBalance": 127879184,
+    "cashIn": 23072062,
+    "cashOut": 31453309,
+    "endingBalance": 119497937,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-14",
+    "beginningBalance": 119497937,
+    "cashIn": 18230559,
+    "cashOut": 38031702,
+    "endingBalance": 99696794,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "date": "2024-01-15",
+    "beginningBalance": 99696794,
+    "cashIn": 18116014,
+    "cashOut": 51157297,
+    "endingBalance": 66655511,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-02",
+    "beginningBalance": 130000000,
+    "cashIn": 32219390,
+    "cashOut": 60170774,
+    "endingBalance": 102048616,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-03",
+    "beginningBalance": 102048616,
+    "cashIn": 33531238,
+    "cashOut": 50253553,
+    "endingBalance": 85326301,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-04",
+    "beginningBalance": 85326301,
+    "cashIn": 42410160,
+    "cashOut": 39421903,
+    "endingBalance": 88314558,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-05",
+    "beginningBalance": 88314558,
+    "cashIn": 44298481,
+    "cashOut": 42759020,
+    "endingBalance": 89854019,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-06",
+    "beginningBalance": 89854019,
+    "cashIn": 26592889,
+    "cashOut": 45949810,
+    "endingBalance": 70497098,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-07",
+    "beginningBalance": 70497098,
+    "cashIn": 43311857,
+    "cashOut": 42228175,
+    "endingBalance": 71580780,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-08",
+    "beginningBalance": 71580780,
+    "cashIn": 30321884,
+    "cashOut": 59963434,
+    "endingBalance": 41939230,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-09",
+    "beginningBalance": 41939230,
+    "cashIn": 189023982,
+    "cashOut": 70260513,
+    "endingBalance": 160702699,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-10",
+    "beginningBalance": 160702699,
+    "cashIn": 37564683,
+    "cashOut": 40249715,
+    "endingBalance": 158017667,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-11",
+    "beginningBalance": 158017667,
+    "cashIn": 34681053,
+    "cashOut": 48466776,
+    "endingBalance": 144231944,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-12",
+    "beginningBalance": 144231944,
+    "cashIn": 39426646,
+    "cashOut": 42827285,
+    "endingBalance": 140831305,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-13",
+    "beginningBalance": 140831305,
+    "cashIn": 36125550,
+    "cashOut": 51290798,
+    "endingBalance": 125666057,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-14",
+    "beginningBalance": 125666057,
+    "cashIn": 31726160,
+    "cashOut": 48502823,
+    "endingBalance": 108889394,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-MDN-003",
+    "location": "ATM CIMB Asia, Medan",
+    "date": "2024-01-15",
+    "beginningBalance": 108889394,
+    "cashIn": 38293226,
+    "cashOut": 46126743,
+    "endingBalance": 101055877,
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-02",
+    "beginningBalance": 300000000,
+    "cashIn": 59191857,
+    "cashOut": 77835846,
+    "endingBalance": 281356011,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-03",
+    "beginningBalance": 281356011,
+    "cashIn": 74465462,
+    "cashOut": 81304373,
+    "endingBalance": 274517100,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-04",
+    "beginningBalance": 274517100,
+    "cashIn": 82008040,
+    "cashOut": 62451840,
+    "endingBalance": 294073300,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-05",
+    "beginningBalance": 294073300,
+    "cashIn": 48313665,
+    "cashOut": 59664598,
+    "endingBalance": 282722367,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-06",
+    "beginningBalance": 282722367,
+    "cashIn": 50066239,
+    "cashOut": 66129398,
+    "endingBalance": 266659208,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-07",
+    "beginningBalance": 266659208,
+    "cashIn": 53708209,
+    "cashOut": 78268290,
+    "endingBalance": 242099127,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-08",
+    "beginningBalance": 242099127,
+    "cashIn": 62147765,
+    "cashOut": 104334697,
+    "endingBalance": 199912195,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-09",
+    "beginningBalance": 199912195,
+    "cashIn": 83127744,
+    "cashOut": 102895046,
+    "endingBalance": 180144893,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-10",
+    "beginningBalance": 180144893,
+    "cashIn": 48977824,
+    "cashOut": 79769816,
+    "endingBalance": 149352901,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-11",
+    "beginningBalance": 149352901,
+    "cashIn": 49164883,
+    "cashOut": 70215579,
+    "endingBalance": 128302205,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-12",
+    "beginningBalance": 128302205,
+    "cashIn": 49874994,
+    "cashOut": 94462081,
+    "endingBalance": 83715118,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-13",
+    "beginningBalance": 83715118,
+    "cashIn": 76099615,
+    "cashOut": 108571746,
+    "endingBalance": 51242987,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-14",
+    "beginningBalance": 51242987,
+    "cashIn": 78584425,
+    "cashOut": 66108192,
+    "endingBalance": 63719220,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "date": "2024-01-15",
+    "beginningBalance": 63719220,
+    "cashIn": 59633994,
+    "cashOut": 81520183,
+    "endingBalance": 41833031,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-02",
+    "beginningBalance": 70000000,
+    "cashIn": 22518348,
+    "cashOut": 36870880,
+    "endingBalance": 55647468,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-03",
+    "beginningBalance": 55647468,
+    "cashIn": 18330241,
+    "cashOut": 46586669,
+    "endingBalance": 27391040,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-04",
+    "beginningBalance": 27391040,
+    "cashIn": 170863657,
+    "cashOut": 54529599,
+    "endingBalance": 143725098,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-05",
+    "beginningBalance": 143725098,
+    "cashIn": 22706370,
+    "cashOut": 62352670,
+    "endingBalance": 104078798,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-06",
+    "beginningBalance": 104078798,
+    "cashIn": 28610334,
+    "cashOut": 36374840,
+    "endingBalance": 96314292,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-07",
+    "beginningBalance": 96314292,
+    "cashIn": 30779977,
+    "cashOut": 59067225,
+    "endingBalance": 68027044,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-08",
+    "beginningBalance": 68027044,
+    "cashIn": 25405328,
+    "cashOut": 48676677,
+    "endingBalance": 44755695,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-09",
+    "beginningBalance": 44755695,
+    "cashIn": 179882143,
+    "cashOut": 50676875,
+    "endingBalance": 173960963,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-10",
+    "beginningBalance": 173960963,
+    "cashIn": 23873422,
+    "cashOut": 36518016,
+    "endingBalance": 161316369,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-11",
+    "beginningBalance": 161316369,
+    "cashIn": 30164812,
+    "cashOut": 57590119,
+    "endingBalance": 133891062,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-12",
+    "beginningBalance": 133891062,
+    "cashIn": 28952995,
+    "cashOut": 45277849,
+    "endingBalance": 117566208,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-13",
+    "beginningBalance": 117566208,
+    "cashIn": 26613522,
+    "cashOut": 39838215,
+    "endingBalance": 104341515,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-14",
+    "beginningBalance": 104341515,
+    "cashIn": 30219370,
+    "cashOut": 49402568,
+    "endingBalance": 85158317,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "date": "2024-01-15",
+    "beginningBalance": 85158317,
+    "cashIn": 17838620,
+    "cashOut": 63508042,
+    "endingBalance": 39488895,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-02",
+    "beginningBalance": 210000000,
+    "cashIn": 44541193,
+    "cashOut": 81138353,
+    "endingBalance": 173402840,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-03",
+    "beginningBalance": 173402840,
+    "cashIn": 52800813,
+    "cashOut": 78809047,
+    "endingBalance": 147394606,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-04",
+    "beginningBalance": 147394606,
+    "cashIn": 42397676,
+    "cashOut": 73509059,
+    "endingBalance": 116283223,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-05",
+    "beginningBalance": 116283223,
+    "cashIn": 56787019,
+    "cashOut": 66291591,
+    "endingBalance": 106778651,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-06",
+    "beginningBalance": 106778651,
+    "cashIn": 53136811,
+    "cashOut": 72988673,
+    "endingBalance": 86926789,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-07",
+    "beginningBalance": 86926789,
+    "cashIn": 64083772,
+    "cashOut": 75963588,
+    "endingBalance": 75046973,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-08",
+    "beginningBalance": 75046973,
+    "cashIn": 36483369,
+    "cashOut": 71360867,
+    "endingBalance": 40169475,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-09",
+    "beginningBalance": 40169475,
+    "cashIn": 56779333,
+    "cashOut": 50427511,
+    "endingBalance": 46521297,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-10",
+    "beginningBalance": 46521297,
+    "cashIn": 54495980,
+    "cashOut": 67892732,
+    "endingBalance": 33124545,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-11",
+    "beginningBalance": 33124545,
+    "cashIn": 194961417,
+    "cashOut": 82321661,
+    "endingBalance": 145764301,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-12",
+    "beginningBalance": 145764301,
+    "cashIn": 48600695,
+    "cashOut": 51931406,
+    "endingBalance": 142433590,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-13",
+    "beginningBalance": 142433590,
+    "cashIn": 63137039,
+    "cashOut": 87309840,
+    "endingBalance": 118260789,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-14",
+    "beginningBalance": 118260789,
+    "cashIn": 40632514,
+    "cashOut": 67914298,
+    "endingBalance": 90979005,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "date": "2024-01-15",
+    "beginningBalance": 90979005,
+    "cashIn": 62546358,
+    "cashOut": 72774683,
+    "endingBalance": 80750680,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-02",
+    "beginningBalance": 140000000,
+    "cashIn": 35236553,
+    "cashOut": 58849266,
+    "endingBalance": 116387287,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-03",
+    "beginningBalance": 116387287,
+    "cashIn": 49744133,
+    "cashOut": 42233047,
+    "endingBalance": 123898373,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-04",
+    "beginningBalance": 123898373,
+    "cashIn": 39263047,
+    "cashOut": 61220478,
+    "endingBalance": 101940942,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-05",
+    "beginningBalance": 101940942,
+    "cashIn": 28692116,
+    "cashOut": 63913091,
+    "endingBalance": 66719967,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-06",
+    "beginningBalance": 66719967,
+    "cashIn": 51035767,
+    "cashOut": 55629295,
+    "endingBalance": 62126439,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-07",
+    "beginningBalance": 62126439,
+    "cashIn": 33575287,
+    "cashOut": 58551797,
+    "endingBalance": 37149929,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-08",
+    "beginningBalance": 37149929,
+    "cashIn": 189567399,
+    "cashOut": 55568042,
+    "endingBalance": 171149286,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-09",
+    "beginningBalance": 171149286,
+    "cashIn": 40598351,
+    "cashOut": 75716659,
+    "endingBalance": 136030978,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-10",
+    "beginningBalance": 136030978,
+    "cashIn": 50117890,
+    "cashOut": 61889781,
+    "endingBalance": 124259087,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-11",
+    "beginningBalance": 124259087,
+    "cashIn": 36970254,
+    "cashOut": 46745368,
+    "endingBalance": 114483973,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-12",
+    "beginningBalance": 114483973,
+    "cashIn": 29050462,
+    "cashOut": 74687530,
+    "endingBalance": 68846905,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-13",
+    "beginningBalance": 68846905,
+    "cashIn": 37503197,
+    "cashOut": 49020916,
+    "endingBalance": 57329186,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-14",
+    "beginningBalance": 57329186,
+    "cashIn": 43620293,
+    "cashOut": 70367330,
+    "endingBalance": 30582149,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "date": "2024-01-15",
+    "beginningBalance": 30582149,
+    "cashIn": 194632405,
+    "cashOut": 61013948,
+    "endingBalance": 164200606,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-02",
+    "beginningBalance": 350000000,
+    "cashIn": 65325284,
+    "cashOut": 72227058,
+    "endingBalance": 343098226,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-03",
+    "beginningBalance": 343098226,
+    "cashIn": 62339285,
+    "cashOut": 115118589,
+    "endingBalance": 290318922,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-04",
+    "beginningBalance": 290318922,
+    "cashIn": 96725984,
+    "cashOut": 101633672,
+    "endingBalance": 285411234,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-05",
+    "beginningBalance": 285411234,
+    "cashIn": 82586038,
+    "cashOut": 109739934,
+    "endingBalance": 258257338,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-06",
+    "beginningBalance": 258257338,
+    "cashIn": 77107980,
+    "cashOut": 106178716,
+    "endingBalance": 229186602,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-07",
+    "beginningBalance": 229186602,
+    "cashIn": 74958780,
+    "cashOut": 112782048,
+    "endingBalance": 191363334,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-08",
+    "beginningBalance": 191363334,
+    "cashIn": 79214609,
+    "cashOut": 99913213,
+    "endingBalance": 170664730,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-09",
+    "beginningBalance": 170664730,
+    "cashIn": 52873514,
+    "cashOut": 87716742,
+    "endingBalance": 135821502,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-10",
+    "beginningBalance": 135821502,
+    "cashIn": 60668528,
+    "cashOut": 69571225,
+    "endingBalance": 126918805,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-11",
+    "beginningBalance": 126918805,
+    "cashIn": 62908170,
+    "cashOut": 111027792,
+    "endingBalance": 78799183,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-12",
+    "beginningBalance": 78799183,
+    "cashIn": 69921607,
+    "cashOut": 94052584,
+    "endingBalance": 54668206,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-13",
+    "beginningBalance": 54668206,
+    "cashIn": 86309733,
+    "cashOut": 109075444,
+    "endingBalance": 31902495,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-14",
+    "beginningBalance": 31902495,
+    "cashIn": 216894445,
+    "cashOut": 75941519,
+    "endingBalance": 172855421,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-004",
+    "location": "ATM CIMB Gajahmada, Semarang",
+    "date": "2024-01-15",
+    "beginningBalance": 172855421,
+    "cashIn": 69351221,
+    "cashOut": 109205702,
+    "endingBalance": 133000940,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-02",
+    "beginningBalance": 60000000,
+    "cashIn": 167221875,
+    "cashOut": 55090108,
+    "endingBalance": 172131767,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-03",
+    "beginningBalance": 172131767,
+    "cashIn": 20375552,
+    "cashOut": 56443804,
+    "endingBalance": 136063515,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-04",
+    "beginningBalance": 136063515,
+    "cashIn": 19955668,
+    "cashOut": 49681186,
+    "endingBalance": 106337997,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-05",
+    "beginningBalance": 106337997,
+    "cashIn": 15371783,
+    "cashOut": 50439398,
+    "endingBalance": 71270382,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-06",
+    "beginningBalance": 71270382,
+    "cashIn": 14621799,
+    "cashOut": 56634603,
+    "endingBalance": 29257578,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-07",
+    "beginningBalance": 29257578,
+    "cashIn": 169556313,
+    "cashOut": 42946552,
+    "endingBalance": 155867339,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-08",
+    "beginningBalance": 155867339,
+    "cashIn": 14857872,
+    "cashOut": 32616898,
+    "endingBalance": 138108313,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-09",
+    "beginningBalance": 138108313,
+    "cashIn": 18849107,
+    "cashOut": 51728852,
+    "endingBalance": 105228568,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-10",
+    "beginningBalance": 105228568,
+    "cashIn": 17386570,
+    "cashOut": 35247359,
+    "endingBalance": 87367779,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-11",
+    "beginningBalance": 87367779,
+    "cashIn": 18603260,
+    "cashOut": 35549330,
+    "endingBalance": 70421709,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-12",
+    "beginningBalance": 70421709,
+    "cashIn": 16307986,
+    "cashOut": 56285847,
+    "endingBalance": 30443848,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-13",
+    "beginningBalance": 30443848,
+    "cashIn": 168519964,
+    "cashOut": 44036272,
+    "endingBalance": 154927540,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-14",
+    "beginningBalance": 154927540,
+    "cashIn": 20794226,
+    "cashOut": 44818429,
+    "endingBalance": 130903337,
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "atmId": "ATM-SMG-005",
+    "location": "ATM CIMB Majapahit, Semarang",
+    "date": "2024-01-15",
+    "beginningBalance": 130903337,
+    "cashIn": 16076056,
+    "cashOut": 47737978,
+    "endingBalance": 99241415,
+    "vendorId": "vendor-g4s"
+  }
+]

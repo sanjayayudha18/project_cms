@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<!-- saved from url=(0038)https://app.clickup-embedded-html.com/ -->
+<html lang="en-US" dir="ltr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!--<base href="/">--><base href="."><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><link rel="icon" type="image/png" href="https://app-cdn.clickup.com/assets/favicons/favicon-16x16.png" sizes="16x16"><link rel="icon" type="image/png" href="https://app-cdn.clickup.com/assets/favicons/favicon-32x32.png" sizes="32x32"><link rel="stylesheet" href="./styles-EUJ4CZUO.css" crossorigin="anonymous"><style>.cu-embedded-html__container[_ngcontent-ng-c94272347]{display:flow-root;width:100%}</style></head><body data-git-sha="cf5a2c1f65b09b0630f9a90f60476f44f89ee8b2" data-build-version="4.15.1" data-build-time="2026-07-20T21:33:30.868Z" class="artifact-editable"><cu-root ng-version="21.2.17" _nghost-ng-c94272347=""><div _ngcontent-ng-c94272347="" class="cu-embedded-html__container">
+
+
+<!-- skill:chrome -->
+<style>
+/* Credit line — bottom-right */
+.design-ui-credit {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font: 11px/1 system-ui, sans-serif;
+  color: rgba(128,128,128,0.5);
+  pointer-events: none;
+  z-index: 2147483647;
+  transition: opacity 0.4s ease;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+/* Hide chrome on touch devices */
+@media (hover: none) {
+  .design-ui-credit { display: none; }
+}
+
+/* Print fixes */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .design-ui-credit { display: none !important; }
+}
+
+</style>
+<script data-activated="true">
+(function () {
+    // Design-ui pages are single compositions, so the whole body is editable.
+    function markEditable() {
+        document.body.classList.add('artifact-editable');
+    }
+
+    // Credit badge with idle-fade. Hover devices only.
+    function initChromeUI() {
+        if (!matchMedia('(hover: hover)').matches) return;
+
+        var credit = document.createElement('div');
+        credit.className = 'design-ui-credit';
+        credit.setAttribute('aria-hidden', 'true');
+        credit.innerHTML = '\u{1F49C} by ClickUp Brain';
+        document.body.appendChild(credit);
+
+        var timer = null;
+        var fade = function (out) { credit.style.opacity = out ? '0' : ''; };
+        fade(true);
+        var show = function () {
+            fade(false);
+            clearTimeout(timer);
+            timer = setTimeout(function () { fade(true); }, 3000);
+        };
+        document.addEventListener('mousemove', show);
+        show();
+    }
+
+    function init() {
+        markEditable();
+        initChromeUI();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chrome -->
+<!-- skill:libraries -->
+<script src="./chart.umd.min.js.download" integrity="sha384-XcdcwHqIPULERb2yDEM4R0XaQKU3YnDsrTmjACBZyfdVVqjh6xQ4/DCMd7XLcA6Y" crossorigin="anonymous" data-activated="true"></script>
+<script src="./lucide.min.js.download" integrity="sha384-wHFvAtjmgnkA2PJcMsDaCgdipf7X7YV44X/igbLHpvGiq6T5/PvFKl93grpvtbQT" crossorigin="anonymous" data-activated="true"></script>
+<script data-activated="true">document.addEventListener("DOMContentLoaded",()=>lucide.createIcons())</script>
+<!-- /skill:libraries -->
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS — Mockup per Fitur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="./css2" rel="stylesheet">
+<style>
+  :root {
+    --font: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Page chrome (deck) */
+    --deck-bg: oklch(96% 0.008 40);
+    --deck-text: oklch(26% 0.02 32);
+    --deck-muted: oklch(52% 0.016 36);
+    --deck-border: oklch(89% 0.01 40);
+
+    /* Option A — internal (Merah Sirih) */
+    --a-primary: oklch(56% 0.223 27);
+    --a-primary-deep: oklch(47% 0.185 27);
+    --a-tint: oklch(56% 0.223 27 / 0.09);
+    --a-bg: oklch(99.2% 0.004 40);
+    --a-surface: oklch(98.4% 0.006 40);
+    --a-side: oklch(97.6% 0.007 40);
+    --a-border: oklch(91% 0.009 40);
+    --a-text: oklch(26% 0.02 30);
+    --a-muted: oklch(53% 0.016 36);
+
+    /* Option B — vendor (Merah Menyala) */
+    --b-primary: oklch(54% 0.233 27);
+    --b-maroon: oklch(40% 0.155 26);
+    --b-maroon-deep: oklch(30% 0.11 25);
+    --b-bg: oklch(99.4% 0.003 40);
+    --b-side: oklch(98% 0.008 30);
+    --b-border: oklch(91% 0.008 30);
+    --b-text: oklch(25% 0.02 28);
+    --b-muted: oklch(53% 0.015 30);
+
+    /* Semantic (shared, colorblind-safe: always paired with icon/label) */
+    --ok-bg: oklch(92% 0.06 152); --ok-text: oklch(43% 0.11 152);
+    --warn-bg: oklch(92% 0.06 75); --warn-text: oklch(46% 0.11 62);
+    --err-bg: oklch(92% 0.05 27); --err-text: oklch(49% 0.19 27);
+    --info-bg: oklch(92% 0.045 250); --info-text: oklch(48% 0.13 258);
+
+    --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --shadow: 0 10px 40px oklch(30% 0.05 30 / 0.13);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font); background: var(--deck-bg); color: var(--deck-text);
+    line-height: 1.5; -webkit-font-smoothing: antialiased; font-optical-sizing: auto;
+  }
+  h1,h2,h3,h4 { text-wrap: balance; line-height: 1.12; letter-spacing: -0.02em; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Deck header ---------- */
+  .deck-head { max-width: 1200px; margin: 0 auto; padding: var(--s12) var(--s6) var(--s6); }
+  .eyebrow { display:inline-flex; align-items:center; gap:var(--s2); font-size:.72rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--a-primary); margin-bottom:var(--s3); }
+  .eyebrow .dot { width:8px; height:8px; border-radius:50%; background:var(--a-primary); }
+  .deck-head h1 { font-size: clamp(2rem, 4.5vw, 3rem); font-weight: 800; }
+  .deck-head p { color: var(--deck-muted); font-size: 1.08rem; max-width: 68ch; margin-top: var(--s3); }
+
+  /* ---------- Screen frame ---------- */
+  .screen { max-width: 1200px; margin: 0 auto var(--s12); padding: 0 var(--s6); }
+  .screen-label { display:flex; align-items:baseline; gap:var(--s3); margin-bottom:var(--s3); flex-wrap:wrap; }
+  .screen-label .n { font-size:.7rem; font-weight:800; letter-spacing:.08em; color:var(--a-primary); }
+  .screen-label h2 { font-size:1.5rem; font-weight:800; }
+  .screen-label .tag { font-size:.7rem; font-weight:700; padding:3px 10px; border-radius:999px; }
+  .tag.internal { background: var(--a-tint); color: var(--a-primary-deep); }
+  .tag.vendor { background: oklch(54% 0.233 27 / 0.1); color: var(--b-maroon); }
+  .screen-label .cap { color: var(--deck-muted); font-size:.9rem; }
+
+  .frame { border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--deck-border); }
+
+  /* ============ APP SHELL (shared skeleton) ============ */
+  .app { display: grid; grid-template-columns: 210px 1fr; min-height: 560px; font-size: 0.85rem; }
+  .topbar { grid-column: 1 / -1; display:flex; align-items:center; gap:var(--s3); padding: var(--s3) var(--s4); }
+  .logo { width:32px; height:32px; border-radius:var(--r-sm); display:grid; place-items:center; font-weight:800; font-size:.82rem; letter-spacing:-.03em; flex-shrink:0; }
+  .brand { font-weight:800; font-size:.95rem; }
+  .brand span { display:block; font-weight:500; font-size:.7rem; opacity:.72; letter-spacing:0; }
+  .topbar .who { margin-left:auto; display:flex; align-items:center; gap:var(--s2); font-size:.78rem; }
+  .avatar { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:.7rem; }
+
+  .side { padding: var(--s4) var(--s3); display:flex; flex-direction:column; gap:2px; }
+  .side .grp { font-size:.62rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:var(--s3) var(--s3) var(--s1); }
+  .side a { display:flex; align-items:center; gap:var(--s2); padding:var(--s2) var(--s3); border-radius:var(--r-sm); text-decoration:none; font-size:.8rem; font-weight:500; cursor:pointer; transition: background 120ms var(--ease); }
+  .side a i { width:16px; height:16px; }
+  .main { padding: var(--s6); overflow:hidden; }
+
+  /* Internal (A) skin */
+  .skin-a { background: var(--a-bg); }
+  .skin-a .topbar { background: var(--a-surface); border-bottom:1px solid var(--a-border); }
+  .skin-a .logo { background: var(--a-primary); color: oklch(99% 0.01 30); }
+  .skin-a .brand { color: var(--a-text); }
+  .skin-a .who { color: var(--a-muted); }
+  .skin-a .avatar { background: var(--a-tint); color: var(--a-primary-deep); }
+  .skin-a .side { background: var(--a-side); border-right:1px solid var(--a-border); }
+  .skin-a .side .grp { color: var(--a-muted); }
+  .skin-a .side a { color: oklch(44% 0.016 36); }
+  .skin-a .side a:hover { background: var(--a-surface); }
+  .skin-a .side a.active { background: var(--a-tint); color: var(--a-primary-deep); font-weight:700; }
+  .skin-a .main { background: var(--a-bg); }
+
+  /* Vendor (B) skin */
+  .skin-b { background: var(--b-bg); }
+  .skin-b .topbar { background: var(--b-maroon); border-bottom:1px solid var(--b-maroon-deep); }
+  .skin-b .logo { background: oklch(97% 0.012 30); color: var(--b-primary); }
+  .skin-b .brand { color: oklch(97% 0.012 30); }
+  .skin-b .who { color: oklch(90% 0.02 30); }
+  .skin-b .avatar { background: oklch(1 0 0 / 0.18); color: oklch(97% 0.012 30); }
+  .skin-b .side { background: var(--b-side); border-right:1px solid var(--b-border); }
+  .skin-b .side .grp { color: var(--b-muted); }
+  .skin-b .side a { color: oklch(44% 0.015 30); }
+  .skin-b .side a:hover { background: oklch(96% 0.01 30); }
+  .skin-b .side a.active { background: var(--b-primary); color: oklch(98% 0.01 30); font-weight:700; }
+  .skin-b .main { background: var(--b-bg); }
+
+  /* ---------- Content atoms ---------- */
+  .phead { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s4); margin-bottom:var(--s6); flex-wrap:wrap; }
+  .phead h3 { font-size:1.25rem; font-weight:800; }
+  .phead .desc { color:var(--a-muted); font-size:.82rem; margin-top:2px; }
+  .skin-b .phead .desc { color: var(--b-muted); }
+
+  .pill { font-size:.66rem; font-weight:700; padding:4px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .pill.ok { background:var(--ok-bg); color:var(--ok-text); }
+  .pill.warn { background:var(--warn-bg); color:var(--warn-text); }
+  .pill.err { background:var(--err-bg); color:var(--err-text); }
+  .pill.info { background:var(--info-bg); color:var(--info-text); }
+  .pill i { width:11px; height:11px; }
+
+  .btn { border:none; font-family:inherit; font-weight:700; font-size:.78rem; padding:var(--s2) var(--s4); border-radius:var(--r-sm); cursor:pointer; transition: transform 120ms var(--ease), filter 120ms var(--ease); display:inline-flex; align-items:center; gap:6px; }
+  .btn:active { transform: translateY(1px); }
+  .btn i { width:14px; height:14px; }
+  .skin-a .btn-primary { background:var(--a-primary); color:oklch(99% 0.01 30); }
+  .skin-b .btn-primary { background:var(--b-primary); color:oklch(99% 0.01 30); }
+  .btn-primary:hover { filter:brightness(1.07); }
+  .skin-a .btn-ghost { background:transparent; color:var(--a-muted); box-shadow: inset 0 0 0 1px var(--a-border); }
+  .skin-b .btn-ghost { background:transparent; color:var(--b-muted); box-shadow: inset 0 0 0 1px var(--b-border); }
+
+  /* Stat row (not the hero-metric template: compact, inline, labelled) */
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:var(--s3); margin-bottom:var(--s6); }
+  .stat { padding:var(--s3) var(--s4); border-radius:var(--r-md); background:var(--a-surface); border:1px solid var(--a-border); }
+  .skin-b .stat { background:var(--b-side); border-color:var(--b-border); }
+  .stat .k { font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--a-muted); display:flex; align-items:center; gap:5px; }
+  .skin-b .stat .k { color:var(--b-muted); }
+  .stat .k i { width:12px; height:12px; }
+  .stat .v { font-size:1.35rem; font-weight:800; margin-top:4px; letter-spacing:-.02em; }
+  .stat .d { font-size:.7rem; font-weight:600; margin-top:2px; }
+  .stat .d.up { color:var(--ok-text); } .stat .d.down { color:var(--err-text); }
+
+  table.tbl { width:100%; border-collapse:collapse; }
+  .tbl th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; font-weight:700; color:var(--a-muted); padding:var(--s2) var(--s3); border-bottom:1px solid var(--a-border); }
+  .skin-b .tbl th { color:var(--b-muted); border-color:var(--b-border); }
+  .tbl td { padding:var(--s3) var(--s3); border-bottom:1px solid var(--a-border); font-size:.8rem; }
+  .skin-b .tbl td { border-color:var(--b-border); }
+  .tbl tr:last-child td { border-bottom:none; }
+  .tbl td.r { text-align:right; font-weight:600; }
+  .tbl .code { font-family:var(--mono); font-size:.75rem; color:var(--a-muted); }
+  .skin-b .tbl .code { color:var(--b-muted); }
+  .tbl tr.tot td { font-weight:800; border-top:2px solid var(--a-border); }
+
+  .split { display:grid; grid-template-columns: 1.5fr 1fr; gap:var(--s6); align-items:start; }
+  .panel { border:1px solid var(--a-border); border-radius:var(--r-md); overflow:hidden; }
+  .skin-b .panel { border-color:var(--b-border); }
+  .panel .ph { padding:var(--s3) var(--s4); font-weight:700; font-size:.82rem; border-bottom:1px solid var(--a-border); background:var(--a-surface); display:flex; align-items:center; justify-content:space-between; }
+  .skin-b .panel .ph { border-color:var(--b-border); background:var(--b-side); }
+  .panel .pb { padding:var(--s4); }
+
+  .chart-wrap { height: 240px; position: relative; }
+  .bar-legend { display:flex; gap:var(--s4); margin-top:var(--s3); flex-wrap:wrap; }
+  .bar-legend .li { display:flex; align-items:center; gap:6px; font-size:.72rem; color:var(--a-muted); font-weight:600; }
+  .bar-legend .sw { width:11px; height:11px; border-radius:3px; }
+
+  /* Maker-checker timeline */
+  .mc { display:flex; flex-direction:column; gap:var(--s3); }
+  .mc .step { display:flex; gap:var(--s3); align-items:flex-start; }
+  .mc .dot { width:26px; height:26px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; }
+  .mc .dot i { width:14px; height:14px; }
+  .mc .dot.done { background:var(--ok-bg); color:var(--ok-text); }
+  .mc .dot.now { background:var(--warn-bg); color:var(--warn-text); }
+  .mc .dot.wait { background:var(--a-surface); color:var(--a-muted); border:1px solid var(--a-border); }
+  .mc .b .t { font-weight:700; font-size:.82rem; }
+  .mc .b .s { font-size:.72rem; color:var(--a-muted); }
+
+  .field { margin-bottom:var(--s4); }
+  .field label { display:block; font-size:.72rem; font-weight:700; color:var(--a-muted); margin-bottom:5px; }
+  .field .input { padding:var(--s2) var(--s3); border:1px solid var(--a-border); border-radius:var(--r-sm); font-size:.82rem; background:var(--a-bg); color:var(--a-text); }
+  .dropzone { border:1.5px dashed var(--a-border); border-radius:var(--r-md); padding:var(--s8); text-align:center; color:var(--a-muted); }
+  .skin-b .dropzone { border-color:var(--b-border); color:var(--b-muted); }
+  .dropzone i { width:28px; height:28px; margin-bottom:var(--s2); }
+  .dropzone .big { font-weight:700; font-size:.88rem; color:var(--a-text); }
+  .skin-b .dropzone .big { color:var(--b-text); }
+
+  /* progress bars (cash level) */
+  .lvl { height:7px; border-radius:999px; background:var(--a-border); overflow:hidden; min-width:70px; }
+  .lvl > i { display:block; height:100%; border-radius:999px; }
+
+  .panel-only { display:grid; grid-template-columns:1fr 1fr; gap:var(--s6); align-items:start; }
+
+  /* Login mock (vendor B) */
+  .login { display:grid; grid-template-columns: 1.1fr 1fr; min-height:480px; }
+  .login .brandside { background: linear-gradient(160deg, var(--b-maroon) 0%, var(--b-maroon-deep) 100%); color:oklch(97% 0.012 30); padding:var(--s12); display:flex; flex-direction:column; justify-content:space-between; }
+  .login .brandside .lg { width:52px; height:52px; border-radius:12px; background:oklch(97% 0.012 30); color:var(--b-primary); display:grid; place-items:center; font-weight:800; font-size:1.3rem; letter-spacing:-.04em; }
+  .login .brandside h2 { font-size:1.9rem; font-weight:800; margin-top:var(--s6); max-width:16ch; }
+  .login .brandside p { opacity:.82; font-size:.9rem; margin-top:var(--s3); max-width:38ch; }
+  .login .brandside .ft { font-size:.72rem; opacity:.7; }
+  .login .formside { background:var(--b-bg); padding:var(--s12); display:flex; flex-direction:column; justify-content:center; }
+  .login .formside h3 { font-size:1.4rem; font-weight:800; }
+  .login .formside .sub { color:var(--b-muted); font-size:.85rem; margin:var(--s2) 0 var(--s6); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .side { flex-direction:row; overflow-x:auto; border-right:none !important; border-bottom:1px solid var(--a-border); }
+    .side .grp { display:none; }
+    .split, .panel-only, .login { grid-template-columns: 1fr; }
+    .login .brandside { min-height: 200px; }
+  }
+</style>
+
+
+
+  <header class="deck-head">
+    <span class="eyebrow"><span class="dot"></span>Cash Management System · Feature Mockups</span>
+    <h1>Mockup per fitur, sampai titik diskusi kita</h1>
+    <p>Klik menu di sidebar tiap layar buat pindah fitur. Semua angka contoh realistis, warna sesuai keputusan: internal pakai Merah Sirih (aksen), vendor portal pakai Merah Menyala (brand penuh). Status selalu pakai ikon + label, bukan warna doang.</p>
+  </header>
+
+  <!-- ========================================================= -->
+  <!-- SCREEN 1: INTERNAL APP (Option A) — multi-feature SPA     -->
+  <!-- ========================================================= -->
+  <section class="screen">
+    <div class="screen-label">
+      <span class="n">01</span>
+      <h2>Aplikasi Internal</h2>
+      <span class="tag internal">Opsi A · Merah Sirih · LDAP</span>
+      <span class="cap">Operator, admin, finance, app-support. Klik menu untuk ganti fitur.</span>
+    </div>
+    <div class="frame">
+      <div class="app skin-a">
+        <div class="topbar">
+          <div class="logo">CN</div>
+          <div class="brand">Cash Management<span>ATM &amp; CIT · Internal</span></div>
+          <div class="who"><span>Eko M. Juniarto</span><div class="avatar">EJ</div></div>
+        </div>
+        <aside class="side" id="sideA">
+          <span class="grp">Operasi</span>
+          <a data-t="cashflow" class=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="activity" class="lucide lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Cash Flow Monitoring</a>
+          <a data-t="dsr" class=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="file-text" class="lucide lucide-file-text"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>DSR Harian</a>
+          <a data-t="forecast" class="active"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="trending-up" class="lucide lucide-trending-up"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>Forecast &amp; Shortage</a>
+          <a data-t="recon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="scale" class="lucide lucide-scale"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg>Rekonsiliasi Escrow</a>
+          <span class="grp">Finance</span>
+          <a data-t="invoice"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="receipt" class="lucide lucide-receipt"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 17.5v-11"></path></svg>Validasi Invoice</a>
+          <span class="grp">Admin</span>
+          <a data-t="eod"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="moon" class="lucide lucide-moon"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>Monitoring EOD</a>
+        </aside>
+        <main class="main">
+
+          <!-- CASH FLOW MONITORING -->
+          <div class="tabA" data-p="cashflow" hidden="">
+            <div class="phead">
+              <div><h3>Cash Flow Monitoring</h3><div class="desc">Baca dari read replica · basis summary EOD per 00:00 · periode Jul 2026</div></div>
+              <span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="database" class="lucide lucide-database"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>Sumber: EOD H-1</span>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="banknote" class="lucide lucide-banknote"><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>Total Kas Beredar</div><div class="v num">Rp 48,2 M</div><div class="d up">▲ 3,1% vs minggu lalu</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="landmark" class="lucide lucide-landmark"><line x1="3" x2="21" y1="22" y2="22"></line><line x1="6" x2="6" y1="18" y2="11"></line><line x1="10" x2="10" y1="18" y2="11"></line><line x1="14" x2="14" y1="18" y2="11"></line><line x1="18" x2="18" y1="18" y2="11"></line><polygon points="12 2 20 7 4 7"></polygon></svg>Saldo Vault Vendor</div><div class="v num">Rp 21,7 M</div><div class="d down">▼ 1,4%</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="cpu" class="lucide lucide-cpu"><rect width="16" height="16" x="4" y="4" rx="2"></rect><rect width="6" height="6" x="9" y="9" rx="1"></rect><path d="M15 2v2"></path><path d="M15 20v2"></path><path d="M2 15h2"></path><path d="M2 9h2"></path><path d="M20 15h2"></path><path d="M20 9h2"></path><path d="M9 2v2"></path><path d="M9 20v2"></path></svg>Kas di Mesin ATM</div><div class="v num">Rp 26,5 M</div><div class="d up">▲ 5,0%</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="truck" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>Drop CIT Hari Ini</div><div class="v num">Rp 3,9 M</div><div class="d">6 order</div></div>
+            </div>
+            <div class="split">
+              <div class="panel">
+                <div class="ph">Cash Flow Harian per Vendor <span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="calendar" class="lucide lucide-calendar"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>7 hari</span></div>
+                <div class="pb">
+                  <div class="chart-wrap"><canvas id="cfChart" width="486" height="240" style="display: block; box-sizing: border-box; height: 240px; width: 486px;"></canvas></div>
+                  <div class="bar-legend">
+                    <span class="li"><span class="sw" style="background:oklch(56% 0.223 27)"></span>Abacus</span>
+                    <span class="li"><span class="sw" style="background:oklch(70% 0.15 40)"></span>Bijak Jakarta</span>
+                    <span class="li"><span class="sw" style="background:oklch(45% 0.06 40)"></span>Advantage</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="ph">Level Kas per ATM</div>
+                <div class="pb">
+                  <table class="tbl">
+                    <thead><tr><th>ATM</th><th>Level</th><th class="r">Sisa</th></tr></thead>
+                    <tbody>
+                      <tr><td class="code">ATM-00417</td><td><div class="lvl"><i style="width:64%;background:oklch(52% 0.10 150)"></i></div></td><td class="r num">64%</td></tr>
+                      <tr><td class="code">ATM-01120</td><td><div class="lvl"><i style="width:18%;background:oklch(54% 0.19 27)"></i></div></td><td class="r num">18%</td></tr>
+                      <tr><td class="code">ATM-02093</td><td><div class="lvl"><i style="width:9%;background:oklch(54% 0.19 27)"></i></div></td><td class="r num">9%</td></tr>
+                      <tr><td class="code">ATM-00988</td><td><div class="lvl"><i style="width:47%;background:oklch(65% 0.13 75)"></i></div></td><td class="r num">47%</td></tr>
+                      <tr><td class="code">ATM-03150</td><td><div class="lvl"><i style="width:82%;background:oklch(52% 0.10 150)"></i></div></td><td class="r num">82%</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DSR HARIAN -->
+          <div class="tabA" data-p="dsr" hidden="">
+            <div class="phead">
+              <div><h3>DSR Harian</h3><div class="desc">Daily Summary Report dari vendor · saldo akhir 00:00 per vault</div></div>
+              <button class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="upload" class="lucide lucide-upload"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>Upload DSR</button>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="file-check" class="lucide lucide-file-check"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="m9 15 2 2 4-4"></path></svg>DSR Diterima</div><div class="v num">12 / 14</div><div class="d">vault hari ini</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Menunggu</div><div class="v num">2</div><div class="d down">Bijak, Advantage</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="wallet" class="lucide lucide-wallet"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg>Total Saldo 00:00</div><div class="v num">Rp 21,7 M</div><div class="d">14 vault</div></div>
+            </div>
+            <div class="panel">
+              <div class="ph">DSR per Vault · 15 Jul 2026</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>Vendor / Vault</th><th>File</th><th>Saldo Akhir 00:00</th><th class="r">Status</th></tr></thead>
+                  <tbody>
+                    <tr><td>Abacus · Vault Cakung</td><td class="code">dsr_abacus_0715.xlsx</td><td class="num">Rp 8.420.000.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Tervalidasi</span></td></tr>
+                    <tr><td>Abacus · Vault Bekasi</td><td class="code">dsr_abacus_bks.xlsx</td><td class="num">Rp 4.100.000.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Tervalidasi</span></td></tr>
+                    <tr><td>Bijak Jakarta · Vault Pusat</td><td class="code">—</td><td class="num">—</td><td class="r"><span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Menunggu</span></td></tr>
+                    <tr><td>Advantage · Vault Selatan</td><td class="code">—</td><td class="num">—</td><td class="r"><span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Menunggu</span></td></tr>
+                    <tr><td>Abacus · Vault Depok</td><td class="code">dsr_abacus_dpk.xlsx</td><td class="num">Rp 3.250.000.000</td><td class="r"><span class="pill err"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle-alert" class="lucide lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Format salah</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- FORECAST & SHORTAGE -->
+          <div class="tabA" data-p="forecast">
+            <div class="phead">
+              <div><h3>Forecast &amp; Cash Shortage</h3><div class="desc">Proyeksi kebutuhan H+2 · Final Realisasi = rekomendasi DMAA − (saldo DSR + refund H-2)</div></div>
+              <button class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zap" class="lucide lucide-zap"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>Buat Instruksi Replenish</button>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle-alert" class="lucide lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>ATM Berisiko H+2</div><div class="v num">3</div><div class="d down">butuh drop</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="calculator" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"></rect><line x1="8" x2="16" y1="6" y2="6"></line><line x1="16" x2="16" y1="14" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>Total Kebutuhan</div><div class="v num">Rp 1,33 M</div><div class="d">3 ATM</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-check" class="lucide lucide-check-check"><path d="M18 6 7 17l-5-5"></path><path d="m22 10-7.5 7.5L13 16"></path></svg>Cukup s/d H+2</div><div class="v num">211</div><div class="d up">ATM aman</div></div>
+            </div>
+            <div class="panel">
+              <div class="ph">Proyeksi Kebutuhan Kas H+2</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>ATM</th><th>Lokasi</th><th>Sisa Est.</th><th>Rekom. DMAA</th><th>Saldo DSR</th><th>Refund H-2</th><th class="r">Final Realisasi</th></tr></thead>
+                  <tbody>
+                    <tr><td class="code">ATM-01120</td><td>Sudirman</td><td class="num">18%</td><td class="num">Rp 500.000.000</td><td class="num">Rp 40.000.000</td><td class="num">Rp 10.000.000</td><td class="r num">Rp 450.000.000</td></tr>
+                    <tr><td class="code">ATM-02093</td><td>Kuningan</td><td class="num">9%</td><td class="num">Rp 520.000.000</td><td class="num">Rp 25.000.000</td><td class="num">Rp 15.000.000</td><td class="r num">Rp 480.000.000</td></tr>
+                    <tr><td class="code">ATM-00417</td><td>Bintaro</td><td class="num">14%</td><td class="num">Rp 420.000.000</td><td class="num">Rp 20.000.000</td><td class="num">Rp 0</td><td class="r num">Rp 400.000.000</td></tr>
+                    <tr class="tot"><td colspan="6">Total kebutuhan drop</td><td class="r num">Rp 1.330.000.000</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- RECONCILIATION -->
+          <div class="tabA" data-p="recon" hidden="">
+            <div class="phead">
+              <div><h3>Rekonsiliasi Escrow</h3><div class="desc">CMS vs saldo escrow Corebanking · sumber batch file · maker-checker</div></div>
+              <span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Menunggu Approval</span>
+            </div>
+            <div class="split">
+              <div class="panel">
+                <div class="ph">Hasil Rekonsiliasi · 14 Jul 2026 <span class="pill err"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle-alert" class="lucide lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>1 selisih</span></div>
+                <div class="pb" style="padding:0">
+                  <table class="tbl">
+                    <thead><tr><th>ATM</th><th>CMS</th><th>Escrow CB</th><th class="r">Selisih</th></tr></thead>
+                    <tbody>
+                      <tr><td class="code">ATM-00417</td><td class="num">Rp 420,00 jt</td><td class="num">Rp 420,00 jt</td><td class="r num" style="color:var(--ok-text)">Rp 0</td></tr>
+                      <tr><td class="code">ATM-01120</td><td class="num">Rp 385,50 jt</td><td class="num">Rp 385,50 jt</td><td class="r num" style="color:var(--ok-text)">Rp 0</td></tr>
+                      <tr><td class="code">ATM-02093</td><td class="num">Rp 512,25 jt</td><td class="num">Rp 510,00 jt</td><td class="r num" style="color:var(--err-text)">Rp 2,25 jt</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="ph">Alur Maker-Checker</div>
+                <div class="pb">
+                  <div class="mc">
+                    <div class="step"><div class="dot done"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg></div><div class="b"><div class="t">Batch ingest escrow</div><div class="s">Sistem · 00:12</div></div></div>
+                    <div class="step"><div class="dot done"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="user-check" class="lucide lucide-user-check"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="16 11 18 13 22 9"></polyline></svg></div><div class="b"><div class="t">Maker: review selisih</div><div class="s">Bagus N. · 08:40</div></div></div>
+                    <div class="step"><div class="dot now"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="hourglass" class="lucide lucide-hourglass"><path d="M5 22h14"></path><path d="M5 2h14"></path><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path></svg></div><div class="b"><div class="t">Checker: approval</div><div class="s">Menunggu Manager</div></div></div>
+                    <div class="step"><div class="dot wait"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="flag" class="lucide lucide-flag"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" x2="4" y1="22" y2="15"></line></svg></div><div class="b"><div class="t">Tutup rekonsiliasi</div><div class="s">Belum</div></div></div>
+                  </div>
+                  <div style="display:flex; gap:var(--s2); margin-top:var(--s6)">
+                    <button class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Approve</button>
+                    <button class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="x" class="lucide lucide-x"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>Reject</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- INVOICE -->
+          <div class="tabA" data-p="invoice" hidden="">
+            <div class="phead">
+              <div><h3>Validasi Invoice Vendor</h3><div class="desc">Validasi &amp; approve saja · tidak eksekusi pembayaran · dicocokkan ke CIT/replenishment</div></div>
+              <span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="search-check" class="lucide lucide-search-check"><path d="m8 11 2 2 4-4"></path><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Under Review</span>
+            </div>
+            <div class="panel">
+              <div class="ph">Invoice · Periode Jun 2026</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>Invoice</th><th>Vendor</th><th>Order Tercocok</th><th>Tagihan</th><th class="r">Status</th></tr></thead>
+                  <tbody>
+                    <tr><td class="code">INV-2026-0431</td><td>Abacus</td><td class="num">48 / 48</td><td class="num">Rp 148.900.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Cocok</span></td></tr>
+                    <tr><td class="code">INV-2026-0432</td><td>Bijak Jakarta</td><td class="num">31 / 32</td><td class="num">Rp 96.400.000</td><td class="r"><span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="search" class="lucide lucide-search"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Selisih 1</span></td></tr>
+                    <tr><td class="code">INV-2026-0433</td><td>Advantage</td><td class="num">64 / 64</td><td class="num">Rp 203.750.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Cocok</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="display:flex; gap:var(--s2); margin-top:var(--s4)">
+              <button class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-check" class="lucide lucide-check-check"><path d="M18 6 7 17l-5-5"></path><path d="m22 10-7.5 7.5L13 16"></path></svg>Validasi &amp; Setujui</button>
+              <button class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="corner-up-left" class="lucide lucide-corner-up-left"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>Kembalikan ke Vendor</button>
+            </div>
+          </div>
+
+          <!-- EOD MONITORING -->
+          <div class="tabA" data-p="eod" hidden="">
+            <div class="phead">
+              <div><h3>Monitoring End-of-Day</h3><div class="desc">Khusus admin / app-support · status run batch tengah malam · alert email otomatis</div></div>
+              <span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>EOD 15 Jul: Success</span>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="calendar-check" class="lucide lucide-calendar-check"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg>Processing Date</div><div class="v num">15 Jul 2026</div><div class="d up">selesai 00:41</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="timer" class="lucide lucide-timer"><line x1="10" x2="14" y1="2" y2="2"></line><line x1="12" x2="15" y1="14" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg>Durasi Run</div><div class="v num">28 mnt</div><div class="d">mulai 00:13</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="layers" class="lucide lucide-layers"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"></path><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"></path><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"></path></svg>Record Diproses</div><div class="v num">214.860</div><div class="d">DSR + forecast + escrow</div></div>
+              <div class="stat"><div class="k"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="alarm-clock" class="lucide lucide-alarm-clock"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2"></path><path d="M5 3 2 6"></path><path d="m22 6-3-3"></path><path d="M6.38 18.7 4 21"></path><path d="M17.64 18.67 20 21"></path></svg>Deadline Office Hour</div><div class="v num">07:00</div><div class="d up">aman, selisih 6j 19m</div></div>
+            </div>
+            <div class="panel">
+              <div class="ph">Riwayat EOD Run</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>Processing Date</th><th>Mulai</th><th>Selesai</th><th>Record</th><th class="r">Status</th></tr></thead>
+                  <tbody>
+                    <tr><td class="num">15 Jul 2026</td><td class="num">00:13</td><td class="num">00:41</td><td class="num">214.860</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Success</span></td></tr>
+                    <tr><td class="num">14 Jul 2026</td><td class="num">00:12</td><td class="num">00:39</td><td class="num">211.402</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Success</span></td></tr>
+                    <tr><td class="num">13 Jul 2026</td><td class="num">00:14</td><td class="num">02:05</td><td class="num">198.110</td><td class="r"><span class="pill err"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle-alert" class="lucide lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Gagal → retry OK</span></td></tr>
+                    <tr><td class="num">12 Jul 2026</td><td class="num">00:11</td><td class="num">00:37</td><td class="num">205.700</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Success</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel" style="margin-top:var(--s4)">
+              <div class="ph"><span>Email Alert Terkirim</span><span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="mail" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>app-support</span></div>
+              <div class="pb">
+                <div style="font-size:.8rem; color:var(--a-muted)">13 Jul · 01:30 — <strong style="color:var(--err-text)">EOD melewati estimasi</strong>, run masih berjalan &gt; 1 jam. Dikirim ke app-support &amp; admin. Retry otomatis sukses 02:05, alert clear terkirim 02:06.</div>
+              </div>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- SCREEN 2: VENDOR PORTAL LOGIN (Option B)                  -->
+  <!-- ========================================================= -->
+  <section class="screen">
+    <div class="screen-label">
+      <span class="n">02</span>
+      <h2>Vendor Portal · Login</h2>
+      <span class="tag vendor">Opsi B · Merah Menyala · Local Auth</span>
+      <span class="cap">Muka ke luar, brand CIMB kuat dari detik pertama.</span>
+    </div>
+    <div class="frame">
+      <div class="skin-b">
+        <div class="login">
+          <div class="brandside">
+            <div class="lg">CN</div>
+            <div>
+              <h2>Cash Management Vendor Portal</h2>
+              <p>Kelola order CIT, unggah DSR harian, dan pantau status invoice Anda dalam satu tempat.</p>
+            </div>
+            <div class="ft">© 2026 CIMB Niaga · Akses khusus vendor terdaftar</div>
+          </div>
+          <div class="formside">
+            <h3>Masuk ke akun Anda</h3>
+            <p class="sub">Gunakan kredensial vendor yang diberikan oleh CIMB Niaga.</p>
+            <div class="field"><label>Vendor ID / Email</label><div class="input" style="color:var(--b-muted)">ops@advantage-scm.co.id</div></div>
+            <div class="field"><label>Kata Sandi</label><div class="input" style="color:var(--b-muted)">••••••••••••</div></div>
+            <button class="btn btn-primary" style="width:100%; justify-content:center; padding:var(--s3)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="log-in" class="lucide lucide-log-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" x2="3" y1="12" y2="12"></line></svg>Masuk</button>
+            <div style="margin-top:var(--s4); font-size:.76rem; color:var(--b-muted)">Lupa kata sandi? Hubungi app-support CIMB Niaga.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================= -->
+  <!-- SCREEN 3: VENDOR PORTAL APP (Option B)                    -->
+  <!-- ========================================================= -->
+  <section class="screen">
+    <div class="screen-label">
+      <span class="n">03</span>
+      <h2>Vendor Portal</h2>
+      <span class="tag vendor">Opsi B · Merah Menyala</span>
+      <span class="cap">Vendor CIT. Klik menu untuk ganti fitur.</span>
+    </div>
+    <div class="frame">
+      <div class="app skin-b">
+        <div class="topbar">
+          <div class="logo">CN</div>
+          <div class="brand">Vendor Portal<span>PT Advantage SCM</span></div>
+          <div class="who"><span>Ops Advantage</span><div class="avatar">AS</div></div>
+        </div>
+        <aside class="side" id="sideB">
+          <span class="grp">Operasi</span>
+          <a data-t="cit" class=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clipboard-list" class="lucide lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>Order CIT</a>
+          <a data-t="vdsr" class=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="upload" class="lucide lucide-upload"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>Upload DSR</a>
+          <a data-t="vinv" class="active"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="receipt" class="lucide lucide-receipt"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 17.5v-11"></path></svg>Invoice Saya</a>
+        </aside>
+        <main class="main">
+
+          <!-- CIT ORDERS -->
+          <div class="tabB" data-p="cit" hidden="">
+            <div class="phead">
+              <div><h3>Order Pickup / Delivery</h3><div class="desc">Order CIT aktif untuk vault dan mesin dalam kelolaan Anda</div></div>
+              <span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>3 aktif</span>
+            </div>
+            <div class="panel">
+              <div class="ph">Order Hari Ini · 15 Jul 2026</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>Order</th><th>Rute</th><th>Nominal</th><th class="r">Status</th></tr></thead>
+                  <tbody>
+                    <tr><td class="code">CIT-88231</td><td>Vault → Bintaro</td><td class="num">Rp 900.000.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Confirmed</span></td></tr>
+                    <tr><td class="code">CIT-88240</td><td>Vault → Sudirman</td><td class="num">Rp 640.000.000</td><td class="r"><span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="truck" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>In Transit</span></td></tr>
+                    <tr><td class="code">CIT-88255</td><td>Kuningan → Vault</td><td class="num">Rp 210.000.000</td><td class="r"><span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Scheduled</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="display:flex; gap:var(--s2); margin-top:var(--s4)">
+              <button class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="package-check" class="lucide lucide-package-check"><path d="m16 16 2 2 4-4"></path><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"></path><path d="m7.5 4.27 9 5.15"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" x2="12" y1="22" y2="12"></line></svg>Konfirmasi Serah Terima</button>
+              <button class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="file-down" class="lucide lucide-file-down"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>Unduh Bukti</button>
+            </div>
+          </div>
+
+          <!-- VENDOR DSR UPLOAD -->
+          <div class="tabB" data-p="vdsr" hidden="">
+            <div class="phead">
+              <div><h3>Upload DSR Harian</h3><div class="desc">Daily Summary Report per vault · dikirim ke tim ATM M&amp;S CIMB</div></div>
+              <span class="pill warn"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="clock" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>Deadline 06:00</span>
+            </div>
+            <div class="panel-only">
+              <div class="panel">
+                <div class="ph">Unggah File</div>
+                <div class="pb">
+                  <div class="dropzone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="upload-cloud" class="lucide lucide-upload-cloud"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>
+                    <div class="big">Tarik file DSR ke sini</div>
+                    <div style="font-size:.76rem; margin-top:4px">Format .xlsx / .csv · maks 10MB</div>
+                  </div>
+                  <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:var(--s4)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="send" class="lucide lucide-send"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>Kirim DSR</button>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="ph">Riwayat Upload</div>
+                <div class="pb" style="padding:0">
+                  <table class="tbl">
+                    <thead><tr><th>Tanggal</th><th>File</th><th class="r">Status</th></tr></thead>
+                    <tbody>
+                      <tr><td class="num">14 Jul</td><td class="code">dsr_adv_0714.xlsx</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Diterima</span></td></tr>
+                      <tr><td class="num">13 Jul</td><td class="code">dsr_adv_0713.xlsx</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"></path></svg>Diterima</span></td></tr>
+                      <tr><td class="num">12 Jul</td><td class="code">dsr_adv_0712.xlsx</td><td class="r"><span class="pill err"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle-alert" class="lucide lucide-triangle-alert"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Ditolak</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VENDOR INVOICE -->
+          <div class="tabB" data-p="vinv">
+            <div class="phead">
+              <div><h3>Invoice Saya</h3><div class="desc">Status penagihan ke CIMB Niaga · validasi dilakukan tim finance</div></div>
+              <span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="receipt" class="lucide lucide-receipt"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 17.5v-11"></path></svg>Periode Jun 2026</span>
+            </div>
+            <div class="panel">
+              <div class="ph">Daftar Invoice</div>
+              <div class="pb" style="padding:0">
+                <table class="tbl">
+                  <thead><tr><th>Invoice</th><th>Periode</th><th>Tagihan</th><th class="r">Status</th></tr></thead>
+                  <tbody>
+                    <tr><td class="code">INV-2026-0433</td><td>Jun 2026</td><td class="num">Rp 203.750.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-check" class="lucide lucide-check-check"><path d="M18 6 7 17l-5-5"></path><path d="m22 10-7.5 7.5L13 16"></path></svg>Disetujui</span></td></tr>
+                    <tr><td class="code">INV-2026-0421</td><td>Mei 2026</td><td class="num">Rp 187.300.000</td><td class="r"><span class="pill ok"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-check" class="lucide lucide-check-check"><path d="M18 6 7 17l-5-5"></path><path d="m22 10-7.5 7.5L13 16"></path></svg>Disetujui</span></td></tr>
+                    <tr><td class="code">INV-2026-0440</td><td>Jul 2026</td><td class="num">Rp 96.100.000</td><td class="r"><span class="pill info"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="search-check" class="lucide lucide-search-check"><path d="m8 11 2 2 4-4"></path><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Direview</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <script data-activated="true">
+    if (window.lucide) lucide.createIcons();
+
+    // Tab switching for both app shells
+    function wire(sideId, tabClass) {
+      const side = document.getElementById(sideId);
+      side.querySelectorAll('a[data-t]').forEach(a => {
+        a.addEventListener('click', () => {
+          side.querySelectorAll('a').forEach(x => x.classList.remove('active'));
+          a.classList.add('active');
+          const target = a.getAttribute('data-t');
+          document.querySelectorAll('.' + tabClass).forEach(p => {
+            p.hidden = p.getAttribute('data-p') !== target;
+          });
+        });
+      });
+    }
+    wire('sideA', 'tabA');
+    wire('sideB', 'tabB');
+
+    // Cash flow chart
+    const ctx = document.getElementById('cfChart');
+    if (ctx && window.Chart) {
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['9 Jul','10 Jul','11 Jul','12 Jul','13 Jul','14 Jul','15 Jul'],
+          datasets: [
+            { label:'Abacus', data:[3.2,3.8,3.1,4.0,3.6,4.2,3.9], backgroundColor:'oklch(56% 0.223 27)', borderRadius:4, stack:'s' },
+            { label:'Bijak Jakarta', data:[2.1,2.4,2.0,2.6,2.3,2.5,2.4], backgroundColor:'oklch(70% 0.15 40)', borderRadius:4, stack:'s' },
+            { label:'Advantage', data:[1.4,1.6,1.5,1.7,1.5,1.8,1.6], backgroundColor:'oklch(45% 0.06 40)', borderRadius:4, stack:'s' }
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:(c)=> c.dataset.label+': Rp '+c.parsed.y+' M' } } },
+          scales:{
+            x:{ grid:{ display:false }, ticks:{ font:{ family:'Hanken Grotesk', size:11 }, color:'oklch(53% 0.016 36)' } },
+            y:{ grid:{ color:'oklch(91% 0.009 40)' }, ticks:{ font:{ family:'Hanken Grotesk', size:11 }, color:'oklch(53% 0.016 36)', callback:(v)=> 'Rp '+v+'M' } }
+          }
+        }
+      });
+    }
+  </script>
+
+</div><!----><!----></cu-root><script type="importmap">{ "imports": {"./common.js":"./common-2403dc182a.js","./main.js":"./main-f68b4762f6.js","./artifact-editor-runtime.js":"./artifact-editor-runtime-1baad41e9d.js","./startRecording.js":"./startRecording-e2f14c42a9.js","./artifact-editor-chrome.component.js":"./artifact-editor-chrome.component-c4841c6bbc.js","./profiler.js":"./profiler-72c532caef.js","./rolldown-runtime.js":"./rolldown-runtime-2681143a8f.js"} }</script><script src="./polyfills-RMGRH36F.js.download" type="module" crossorigin="anonymous"></script><script src="./main-f68b4762f6.js.download" type="module" crossorigin="anonymous"></script><div class="design-ui-credit" aria-hidden="true" style="">💜 by ClickUp Brain</div></body></html>

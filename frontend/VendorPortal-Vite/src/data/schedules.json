@@ -1,0 +1,182 @@
+[
+  {
+    "id": "SCH-2024-001",
+    "atmId": "ATM-JKT-001",
+    "location": "ATM CIMB Sudirman, Jakarta",
+    "scheduledDate": "2024-01-15",
+    "recommendedAmount": 200000000,
+    "priority": "High",
+    "status": "Executed",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-002",
+    "atmId": "ATM-JKT-002",
+    "location": "ATM CIMB Thamrin, Jakarta",
+    "scheduledDate": "2024-01-15",
+    "recommendedAmount": 150000000,
+    "priority": "Medium",
+    "status": "Executed",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-003",
+    "atmId": "ATM-JKT-003",
+    "location": "ATM CIMB Kuningan, Jakarta",
+    "scheduledDate": "2024-01-16",
+    "recommendedAmount": 175000000,
+    "priority": "High",
+    "status": "Confirmed",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-004",
+    "atmId": "ATM-JKT-004",
+    "location": "ATM CIMB Kelapa Gading, Jakarta",
+    "scheduledDate": "2024-01-17",
+    "recommendedAmount": 120000000,
+    "priority": "Low",
+    "status": "Pending",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-005",
+    "atmId": "ATM-BDG-001",
+    "location": "ATM CIMB Dago, Bandung",
+    "scheduledDate": "2024-01-18",
+    "recommendedAmount": 180000000,
+    "priority": "High",
+    "status": "Pending",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-006",
+    "atmId": "ATM-BDG-002",
+    "location": "ATM CIMB Pasteur, Bandung",
+    "scheduledDate": "2024-01-19",
+    "recommendedAmount": 100000000,
+    "priority": "Medium",
+    "status": "Cancelled",
+    "vendorId": "vendor-gardanet"
+  },
+  {
+    "id": "SCH-2024-007",
+    "atmId": "ATM-SBY-001",
+    "location": "ATM CIMB Tunjungan, Surabaya",
+    "scheduledDate": "2024-01-15",
+    "recommendedAmount": 220000000,
+    "priority": "High",
+    "status": "Executed",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-008",
+    "atmId": "ATM-SBY-002",
+    "location": "ATM CIMB Darmo, Surabaya",
+    "scheduledDate": "2024-01-16",
+    "recommendedAmount": 160000000,
+    "priority": "Medium",
+    "status": "Confirmed",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-009",
+    "atmId": "ATM-SBY-003",
+    "location": "ATM CIMB Gubeng, Surabaya",
+    "scheduledDate": "2024-01-16",
+    "recommendedAmount": 190000000,
+    "priority": "High",
+    "status": "Confirmed",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-010",
+    "atmId": "ATM-SBY-004",
+    "location": "ATM CIMB Rungkut, Surabaya",
+    "scheduledDate": "2024-01-17",
+    "recommendedAmount": 130000000,
+    "priority": "Low",
+    "status": "Pending",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-011",
+    "atmId": "ATM-MDN-001",
+    "location": "ATM CIMB Medan Merdeka, Medan",
+    "scheduledDate": "2024-01-18",
+    "recommendedAmount": 250000000,
+    "priority": "High",
+    "status": "Pending",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-012",
+    "atmId": "ATM-MDN-002",
+    "location": "ATM CIMB Imam Bonjol, Medan",
+    "scheduledDate": "2024-01-20",
+    "recommendedAmount": 140000000,
+    "priority": "Medium",
+    "status": "Cancelled",
+    "vendorId": "vendor-ssi"
+  },
+  {
+    "id": "SCH-2024-013",
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "scheduledDate": "2024-01-15",
+    "recommendedAmount": 210000000,
+    "priority": "High",
+    "status": "Executed",
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "id": "SCH-2024-014",
+    "atmId": "ATM-SMG-002",
+    "location": "ATM CIMB Pandanaran, Semarang",
+    "scheduledDate": "2024-01-16",
+    "recommendedAmount": 170000000,
+    "priority": "Medium",
+    "status": "Confirmed",
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "id": "SCH-2024-015",
+    "atmId": "ATM-SMG-003",
+    "location": "ATM CIMB Pemuda, Semarang",
+    "scheduledDate": "2024-01-17",
+    "recommendedAmount": 145000000,
+    "priority": "High",
+    "status": "Pending",
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "id": "SCH-2024-016",
+    "atmId": "ATM-BDG-003",
+    "location": "ATM CIMB Braga, Bandung",
+    "scheduledDate": "2024-01-18",
+    "recommendedAmount": 185000000,
+    "priority": "Medium",
+    "status": "Pending",
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "id": "SCH-2024-017",
+    "atmId": "ATM-BDG-004",
+    "location": "ATM CIMB Setiabudi, Bandung",
+    "scheduledDate": "2024-01-19",
+    "recommendedAmount": 95000000,
+    "priority": "Low",
+    "status": "Pending",
+    "vendorId": "vendor-g4s"
+  },
+  {
+    "id": "SCH-2024-018",
+    "atmId": "ATM-SMG-001",
+    "location": "ATM CIMB Simpang Lima, Semarang",
+    "scheduledDate": "2024-01-20",
+    "recommendedAmount": 200000000,
+    "priority": "High",
+    "status": "Cancelled",
+    "vendorId": "vendor-g4s"
+  }
+]

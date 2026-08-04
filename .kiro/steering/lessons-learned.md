@@ -166,6 +166,8 @@ Without both, tests either hang or throw. Use `(globalThis as Record<string, unk
 ### OKLCH color contrast verification: inline conversion in property tests
 When verifying WCAG contrast ratios for OKLCH colors (no external lib needed), use the inline conversion pipeline: parse OKLCH string → convert to OKLab (polar→cartesian) → OKLab to linear sRGB (via LMS cube) → clamp → WCAG luminance formula. This avoids adding `culori` or similar dependencies for a test-only concern. The conversion code lives in `cash-flow.property.test.tsx` and can be extracted to a shared test utility if more features need it.
 
+### Pattern: Prefer additive infrastructure over router-swap merges. When adding auth/RBAC/design-tokens to an existing working app, implement them as additive layers (Zustand store, route guard wrapper, CSS tokens file) rather than merging from a different codebase with an incompatible router. react-router-dom v7 supports guards via <RequireAuth> wrapper components — you get 90% of TanStack Router's protection benefits without a full rewrite. Migrate routers only as a deliberate, isolated refactor when features are stable.
+
 ---
 
 ## Notes

@@ -1,16 +1,17 @@
-import { Banknote, Wifi, Route, AlertTriangle } from 'lucide-react';
-import { formatIDR } from '@/lib/formatters';
-import kpiData from '@/data/dashboard-kpi.json';
+import { AlertTriangle, Banknote, Route, Wifi } from "lucide-react";
+import { formatIDRAbbreviated } from "@/lib/utils/formatters";
+import kpiData from "@/data/dashboard-kpi.json";
+import type { DashboardKpi } from "./types";
 
 /**
- * MetricStrip — displays 4 KPI cards in a responsive grid.
+ * MetricStrip — menampilkan 4 kartu KPI dalam grid responsif.
  *
  * Layout:
- * - >1080px: 4-column grid with vertical dividers
- * - 760–1080px: 2×2 grid with border-bottom on first row
- * - <760px: single column with border-bottom separators
+ * - >1080px: 4-column grid dengan divider vertikal
+ * - 760–1080px: 2×2 grid dengan border-bottom pada baris pertama
+ * - <760px: kolom tunggal dengan border-bottom separator
  *
- * @validates Requirements 3.3, 3.4, 3.5, 8.4, 10.3
+ * @validates Requirements 2.2
  */
 
 interface MetricCardData {
@@ -20,30 +21,32 @@ interface MetricCardData {
   meta: string;
 }
 
+const kpi = kpiData as DashboardKpi;
+
 const metrics: MetricCardData[] = [
   {
-    label: 'Managed Cash',
+    label: "Managed Cash",
     icon: <Banknote size={14} />,
-    value: formatIDR(kpiData.managedCash),
-    meta: `↑ ${kpiData.managedCashChange}% from yesterday`,
+    value: formatIDRAbbreviated(kpi.managedCash),
+    meta: `↑ ${kpi.managedCashChange}% dari kemarin`,
   },
   {
-    label: 'ATM Availability',
+    label: "ATM Availability",
     icon: <Wifi size={14} />,
-    value: `${kpiData.atmAvailability}%`,
-    meta: `${kpiData.atmOnline.toLocaleString()} of ${kpiData.atmTotal.toLocaleString()} online`,
+    value: `${kpi.atmAvailability}%`,
+    meta: `${kpi.atmOnline.toLocaleString("id-ID")} dari ${kpi.atmTotal.toLocaleString("id-ID")} online`,
   },
   {
-    label: "Today's Routes",
+    label: "Rute Hari Ini",
     icon: <Route size={14} />,
-    value: `${kpiData.todayRoutes}`,
-    meta: `${kpiData.routesCompleted} completed, ${kpiData.routesActive} active`,
+    value: `${kpi.todayRoutes}`,
+    meta: `${kpi.routesCompleted} selesai, ${kpi.routesActive} aktif`,
   },
   {
-    label: 'Exceptions',
+    label: "Exceptions",
     icon: <AlertTriangle size={14} />,
-    value: `${kpiData.exceptions}`,
-    meta: `${kpiData.exceptionsHigh} high priority before ${kpiData.exceptionsCutoffHour}:00`,
+    value: `${kpi.exceptions}`,
+    meta: `${kpi.exceptionsHigh} prioritas tinggi sebelum ${kpi.exceptionsCutoffHour}:00`,
   },
 ];
 
@@ -86,21 +89,21 @@ function getCardBorderClasses(index: number): string {
 
   // Mobile: border-bottom on all except last
   if (index < 3) {
-    classes.push('border-b border-[var(--n-200)] min-[760px]:border-b-0');
+    classes.push("border-b border-[var(--n-200)] min-[760px]:border-b-0");
   }
 
   // Tablet (2×2): border-bottom on top row (indices 0, 1), border-right on left column (indices 0, 2)
   if (index < 2) {
-    classes.push('min-[760px]:border-b min-[760px]:border-[var(--n-200)] min-[1080px]:border-b-0');
+    classes.push("min-[760px]:border-b min-[760px]:border-[var(--n-200)] min-[1080px]:border-b-0");
   }
   if (index % 2 === 0) {
-    classes.push('min-[760px]:border-r min-[760px]:border-[var(--n-200)] min-[1080px]:border-r-0');
+    classes.push("min-[760px]:border-r min-[760px]:border-[var(--n-200)] min-[1080px]:border-r-0");
   }
 
   // Desktop (4-col): vertical border-right on first 3
   if (index < 3) {
-    classes.push('min-[1080px]:border-r min-[1080px]:border-[var(--n-200)]');
+    classes.push("min-[1080px]:border-r min-[1080px]:border-[var(--n-200)]");
   }
 
-  return classes.join(' ');
+  return classes.join(" ");
 }

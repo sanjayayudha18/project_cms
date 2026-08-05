@@ -9,9 +9,9 @@ import {
 
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
-import { formatIDR } from '@/lib/formatCurrency';
+import { formatIDR } from '@/lib/utils/formatCurrency';
 
-import type { EnrichedCitOrder, CitStatus } from './cit.types';
+import type { EnrichedCitOrder, CitStatus } from './types';
 
 const statusConfig: Record<
   CitStatus,
@@ -38,15 +38,15 @@ const columns: ColumnDef<EnrichedCitOrder, unknown>[] = [
   },
   {
     accessorKey: 'orderDate',
-    header: 'Order Date',
+    header: 'Tanggal Order',
   },
   {
     accessorKey: 'scheduledDate',
-    header: 'Scheduled Date',
+    header: 'Tanggal Jadwal',
   },
   {
     accessorKey: 'amount',
-    header: 'Amount (IDR)',
+    header: 'Jumlah (IDR)',
     meta: { align: 'right' },
     cell: ({ getValue }) => formatIDR(getValue() as number),
   },
@@ -61,22 +61,22 @@ const columns: ColumnDef<EnrichedCitOrder, unknown>[] = [
   },
   {
     accessorKey: 'evidenceUrl',
-    header: 'Evidence',
+    header: 'Bukti',
     enableSorting: false,
     cell: ({ getValue }) => {
       const url = getValue() as string | null;
       if (!url) {
-        return <span className="text-n-400">&mdash;</span>;
+        return <span className="text-[var(--n-400)]">&mdash;</span>;
       }
       return (
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 text-sm text-red-600 hover:text-red-700 underline"
-          aria-label="View evidence (opens in new tab)"
+          className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 text-sm text-[var(--red-600)] hover:text-[var(--red-700)] underline"
+          aria-label="Lihat bukti (buka di tab baru)"
         >
-          View
+          Lihat
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       );
@@ -94,7 +94,7 @@ export function CitTable({ data }: CitTableProps) {
       data={data}
       columns={columns}
       defaultSorting={[{ id: 'scheduledDate', desc: true }]}
-      emptyMessage="No CIT orders match the current filters"
+      emptyMessage="Tidak ada order CIT yang sesuai filter"
     />
   );
 }

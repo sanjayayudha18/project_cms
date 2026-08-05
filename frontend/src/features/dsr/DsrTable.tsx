@@ -1,9 +1,11 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
+
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
-import { formatIDR } from '@/lib/formatCurrency';
-import type { EnrichedDsrRecord } from './dsr.types';
+import { formatIDR } from '@/lib/utils/formatCurrency';
+
+import type { EnrichedDsrRecord } from './types';
 
 const columnHelper = createColumnHelper<EnrichedDsrRecord>();
 
@@ -22,7 +24,7 @@ const columns = [
     cell: (info) => info.getValue(),
   }),
   columnHelper.accessor('location', {
-    header: 'Location',
+    header: 'Lokasi',
     cell: (info) => info.getValue(),
   }),
   columnHelper.accessor('vendorName', {
@@ -30,22 +32,22 @@ const columns = [
     cell: (info) => info.getValue(),
   }),
   columnHelper.accessor('beginningBalance', {
-    header: 'Beginning Balance',
+    header: 'Saldo Awal',
     cell: (info) => formatIDR(info.getValue()),
     meta: { align: 'right' },
   }),
   columnHelper.accessor('cashIn', {
-    header: 'Cash In',
+    header: 'Kas Masuk',
     cell: (info) => formatIDR(info.getValue()),
     meta: { align: 'right' },
   }),
   columnHelper.accessor('cashOut', {
-    header: 'Cash Out',
+    header: 'Kas Keluar',
     cell: (info) => formatIDR(info.getValue()),
     meta: { align: 'right' },
   }),
   columnHelper.accessor('endingBalance', {
-    header: 'Ending Balance',
+    header: 'Saldo Akhir',
     cell: (info) => formatIDR(info.getValue()),
     meta: { align: 'right' },
   }),
@@ -60,15 +62,15 @@ const columns = [
 ];
 
 interface DsrTableProps {
-  data: EnrichedDsrRecord[];
+  readonly data: readonly EnrichedDsrRecord[];
 }
 
 export function DsrTable({ data }: DsrTableProps) {
   return (
     <DataTable
-      data={data}
+      data={data as EnrichedDsrRecord[]}
       columns={columns}
-      emptyMessage="No DSR data available for this date."
+      emptyMessage="Tidak ada data DSR tersedia untuk tanggal ini."
     />
   );
 }

@@ -1,271 +1,295 @@
-import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Menu, PanelLeftClose } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useAuthStore } from "@/lib/auth/store";
+import {
+  type NavGroup,
+  type NavItem,
+  NAV_CONFIG,
+  GROUP_LABELS,
+  filterNavByRoles,
+} from "@/lib/config/navigation";
 
-import { NAV_GROUPS, SETTINGS_NAV } from '@/lib/constants';
-import { formatBadgeCount } from '@/lib/formatters';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
-  mobileOpen: boolean;
-  onMobileClose: () => void;
+  currentPath?: string;
+  onNavigate?: (href: string) => void;
 }
 
-/**
- * Returns current time formatted as "HH:mm WIB".
- */
-function getWibTime(): string {
-  const now = new Date();
-  const wib = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-  const hours = wib.getHours().toString().padStart(2, '0');
-  const minutes = wib.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes} WIB`;
-}
+// ─── Group ordering ───────────────────────────────────────────────────────────
 
-/**
- * Collapsible sidebar navigation.
- * Expanded: 256px with icon + label. Collapsed: 64px icon-only.
- * Transitions within 300ms using transform + opacity (ease-out).
- * Auto-collapses to icon-only rail when viewport < 1024px.
- * Mobile: renders as fixed overlay when mobileOpen is true.
- */
-export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
-  const [currentTime, setCurrentTime] = useState(getWibTime);
+const GROUP_ORDER: NavGroup[] = [
+  "general",
+  "forecasting",
+  "invoice",
+  "cash-count",
+];
 
-  // Update time every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(getWibTime());
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, []);
+// ─── Sidebar Component ────────────────────────────────────────────────────────
 
-  // Auto-collapse on viewport < 1024px
-  useEffect(() => {
-    const mql = window.matchMedia('(max-width: 1023px)');
+export function Sidebar({
+  collapsed,
+  onToggle: _onToggle,
+  currentPath = "/",
+  onNavigate,
+}: SidebarProps) {
+  const user = useAuthStore((s) => s.user);
+  const userRoles = user?.roles ?? [];
 
-    function handleChange(e: MediaQueryListEvent | MediaQueryList) {
-      if (e.matches && !collapsed) {
-        onToggle();
+  const visibleItems = useMemo(
+    () => filterNavByRoles(NAV_CONFIG, userRoles),
+    [userRoles],
+  );
+
+  const groupedItems = useMemo(() => {
+    const groups = new Map<NavGroup, NavItem[]>();
+    for (const group of GROUP_ORDER) {
+      const items = visibleItems.filter((item) => item.group === group);
+      if (items.length > 0) {
+        groups.set(group, items);
       }
     }
+    return groups;
+  }, [visibleItems]);
 
-    // Check on mount
-    handleChange(mql);
+  const flatItems = useMemo(() => {
+    const result: NavItem[] = [];
+    for (const group of GROUP_ORDER) {
+      const items = groupedItems.get(group);
+      if (items) result.push(...items);
+    }
+    return result;
+  }, [groupedItems]);
 
-    mql.addEventListener('change', handleChange);
-    return () => mql.removeEventListener('change', handleChange);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const navRef = useRef<HTMLElement>(null);
 
-  const sidebarContent = (
-    <aside
-      className="
-        flex h-full flex-col border-r border-[var(--n-200)]
-        bg-[var(--n-0)] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-      "
-      style={{ width: collapsed ? 64 : 256 }}
-    >
-      {/* Brand Mark + Toggle */}
-      <div className="flex h-[60px] items-center gap-[var(--space-3)] border-b border-[var(--n-200)] px-[var(--space-2)]">
-        {/* Brand Mark: CN logo */}
-        <div
-          className="flex shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--red-500)] text-[0.875rem] font-bold text-white"
-          style={{ width: 38, height: 38 }}
-          aria-hidden="true"
-        >
-          CN
-        </div>
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (flatItems.length === 0) return;
 
-        {/* Brand text - hidden when collapsed */}
-        <div
-          className="overflow-hidden whitespace-nowrap transition-[opacity,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
-          style={{
-            opacity: collapsed ? 0 : 1,
-            width: collapsed ? 0 : 'auto',
-          }}
-        >
-          <span className="block text-sm font-semibold text-[var(--n-900)]">CodexCash</span>
-          <span className="block text-[0.7rem] text-[var(--n-500)]">ATM &amp; CIT</span>
-        </div>
-
-        {/* Toggle button - pushed to end */}
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="
-            ml-auto flex h-[32px] w-[32px] items-center justify-center
-            rounded-[var(--radius-md)] text-[var(--n-600)]
-            transition-all duration-150 ease-out
-            hover:bg-[var(--n-50)]
-            focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]
-          "
-          style={{
-            opacity: collapsed ? 0 : 1,
-            width: collapsed ? 0 : 32,
-            pointerEvents: collapsed ? 'none' : 'auto',
-          }}
-        >
-          <PanelLeftClose size={18} />
-        </button>
-      </div>
-
-      {/* Expand button shown when collapsed */}
-      {collapsed && (
-        <div className="flex justify-center py-[var(--space-2)]">
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label="Expand sidebar"
-            className="
-              flex h-[32px] w-[32px] items-center justify-center
-              rounded-[var(--radius-md)] text-[var(--n-600)]
-              transition-all duration-150 ease-out
-              hover:bg-[var(--n-50)]
-              focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]
-            "
-          >
-            <Menu size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-[var(--space-1)] overflow-y-auto p-[var(--space-2)]">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col gap-[var(--space-1)]">
-            {!collapsed && (
-              <span className="px-[var(--space-3)] pt-[var(--space-3)] pb-[var(--space-1)] text-[0.7rem] font-[800] uppercase tracking-[0.09em] text-[var(--n-500)]">
-                {group.label}
-              </span>
-            )}
-            {group.items.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={mobileOpen ? onMobileClose : undefined}
-                className={({ isActive }) =>
-                  `
-                  flex h-[44px] items-center gap-[var(--space-3)]
-                  rounded-[var(--radius-md)] px-[var(--space-3)]
-                  transition-all duration-150 ease-out
-                  focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]
-                  ${
-                    isActive
-                      ? 'bg-[var(--red-50)] font-medium text-[var(--red-600)]'
-                      : 'text-[var(--n-600)] hover:bg-[var(--n-50)]'
-                  }
-                `.trim()
-                }
-              >
-                <item.icon
-                  size={20}
-                  className="shrink-0"
-                  aria-hidden="true"
-                />
-                <span
-                  className="
-                    overflow-hidden whitespace-nowrap
-                    transition-[opacity,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-                  "
-                  style={{
-                    opacity: collapsed ? 0 : 1,
-                    width: collapsed ? 0 : 'auto',
-                  }}
-                >
-                  {item.label}
-                </span>
-                {!collapsed && (() => {
-                  const badge = formatBadgeCount(item.badge ?? 0);
-                  if (!badge) return null;
-                  return (
-                    <span className="ml-auto rounded-full bg-[var(--red-50)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--red-600)]">
-                      {badge}
-                    </span>
-                  );
-                })()}
-              </NavLink>
-            ))}
-          </div>
-        ))}
-
-        {/* Settings - separated by divider + spacing */}
-        <div className="mt-auto border-t border-[var(--n-200)] pt-[var(--space-4)]">
-          <NavLink
-            to={SETTINGS_NAV.path}
-            onClick={mobileOpen ? onMobileClose : undefined}
-            className={({ isActive }) =>
-              `
-              flex h-[44px] items-center gap-[var(--space-3)]
-              rounded-[var(--radius-md)] px-[var(--space-3)]
-              transition-all duration-150 ease-out
-              focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]
-              ${
-                isActive
-                  ? 'bg-[var(--red-50)] font-medium text-[var(--red-600)]'
-                  : 'text-[var(--n-600)] hover:bg-[var(--n-50)]'
-              }
-            `.trim()
+      switch (e.key) {
+        case "ArrowDown": {
+          e.preventDefault();
+          setFocusedIndex((prev) => {
+            const next = prev < flatItems.length - 1 ? prev + 1 : 0;
+            focusItemAtIndex(next);
+            return next;
+          });
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          setFocusedIndex((prev) => {
+            const next = prev > 0 ? prev - 1 : flatItems.length - 1;
+            focusItemAtIndex(next);
+            return next;
+          });
+          break;
+        }
+        case "Enter":
+        case " ": {
+          e.preventDefault();
+          if (focusedIndex >= 0 && focusedIndex < flatItems.length) {
+            const item = flatItems[focusedIndex];
+            if (item && !item.disabled) {
+              onNavigate?.(item.href);
             }
-          >
-            <SETTINGS_NAV.icon
-              size={20}
-              className="shrink-0"
-              aria-hidden="true"
-            />
-            <span
-              className="
-                overflow-hidden whitespace-nowrap
-                transition-[opacity,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-              "
-              style={{
-                opacity: collapsed ? 0 : 1,
-                width: collapsed ? 0 : 'auto',
-              }}
-            >
-              {SETTINGS_NAV.label}
-            </span>
-          </NavLink>
-        </div>
-      </nav>
+          }
+          break;
+        }
+      }
+    },
+    [flatItems, focusedIndex, onNavigate],
+  );
 
-      {/* System status note - hidden when collapsed */}
-      {!collapsed && (
-        <div className="border-t border-[var(--n-200)] px-[var(--space-3)] py-[var(--space-3)]">
-          <p className="text-xs text-[var(--n-500)]">
-            All systems operational
-          </p>
-          <p className="text-xs text-[var(--n-500)]">
-            {currentTime}
-          </p>
-        </div>
-      )}
-    </aside>
+  const focusItemAtIndex = (index: number) => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const buttons = nav.querySelectorAll<HTMLElement>("[data-nav-item]");
+    buttons[index]?.focus();
+  };
+
+  const handleItemClick = useCallback(
+    (item: NavItem) => {
+      if (item.disabled) return;
+      onNavigate?.(item.href);
+    },
+    [onNavigate],
   );
 
   return (
-    <>
-      {/* Desktop sidebar - always visible */}
-      <div className="hidden lg:block h-full">
-        {sidebarContent}
-      </div>
+    <nav
+      ref={navRef}
+      className="flex flex-1 flex-col gap-[var(--space-2)] px-[var(--space-3)] py-[var(--space-4)]"
+      aria-label="Menu navigasi"
+      onKeyDown={handleKeyDown}
+    >
+      {GROUP_ORDER.map((group, groupIdx) => {
+        const items = groupedItems.get(group);
+        if (!items) return null;
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-20 lg:hidden">
-          {/* Backdrop */}
+        return (
           <div
-            className="absolute inset-0 bg-black/30"
-            onClick={onMobileClose}
-            aria-hidden="true"
-          />
-          {/* Sidebar panel */}
-          <div className="relative h-full">
-            {sidebarContent}
+            key={group}
+            role="group"
+            aria-label={GROUP_LABELS[group]}
+            className={groupIdx > 0 ? "mt-[var(--space-2)]" : ""}
+          >
+            {/* Group header */}
+            {!collapsed && (
+              <span
+                className="block px-[var(--space-3)] pb-[var(--space-2)] pt-[var(--space-3)] text-[11px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "var(--n-400)" }}
+                aria-hidden="true"
+              >
+                {GROUP_LABELS[group]}
+              </span>
+            )}
+
+            {/* Collapsed: thin divider between groups */}
+            {collapsed && groupIdx > 0 && (
+              <div
+                className="mx-auto mb-[var(--space-2)] w-6"
+                style={{ height: "1px", backgroundColor: "var(--n-200)" }}
+                aria-hidden="true"
+              />
+            )}
+
+            {/* Nav items */}
+            <div className="flex flex-col gap-[2px]">
+              {items.map((item) => {
+                const isActive = currentPath === item.href;
+                const globalIndex = flatItems.indexOf(item);
+
+                return (
+                  <NavItemButton
+                    key={item.id}
+                    item={item}
+                    isActive={isActive}
+                    collapsed={collapsed}
+                    tabIndex={globalIndex === focusedIndex ? 0 : -1}
+                    onClick={() => handleItemClick(item)}
+                    onFocus={() => setFocusedIndex(globalIndex)}
+                  />
+                );
+              })}
+            </div>
           </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── NavItem Button ───────────────────────────────────────────────────────────
+
+interface NavItemButtonProps {
+  item: NavItem;
+  isActive: boolean;
+  collapsed: boolean;
+  tabIndex: number;
+  onClick: () => void;
+  onFocus: () => void;
+}
+
+function NavItemButton({
+  item,
+  isActive,
+  collapsed,
+  tabIndex,
+  onClick,
+  onFocus,
+}: NavItemButtonProps) {
+  const Icon = item.icon;
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        data-nav-item
+        tabIndex={tabIndex}
+        onClick={onClick}
+        onFocus={onFocus}
+        onMouseEnter={() => collapsed && setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        disabled={item.disabled}
+        aria-current={isActive ? "page" : undefined}
+        aria-disabled={item.disabled}
+        className={[
+          "flex w-full items-center gap-[var(--space-3)] rounded-[var(--radius-md)] text-[13px] font-medium",
+          collapsed ? "justify-center h-10 w-10 mx-auto" : "px-[var(--space-3)] py-[var(--space-2)]",
+        ].join(" ")}
+        style={{
+          color: isActive
+            ? "var(--red-600)"
+            : item.disabled
+              ? "var(--n-400)"
+              : "var(--n-600)",
+          backgroundColor: isActive ? "var(--red-50)" : "transparent",
+          cursor: item.disabled ? "not-allowed" : "pointer",
+          borderLeft: isActive && !collapsed ? "3px solid var(--red-500)" : "3px solid transparent",
+        }}
+        onMouseOver={(e) => {
+          if (!isActive && !item.disabled) {
+            e.currentTarget.style.backgroundColor = "var(--n-100)";
+            e.currentTarget.style.color = "var(--n-800)";
+          }
+        }}
+        onMouseOut={(e) => {
+          if (!isActive && !item.disabled) {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "var(--n-600)";
+          }
+        }}
+      >
+        <Icon
+          size={18}
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            color: isActive
+              ? "var(--red-500)"
+              : item.disabled
+                ? "var(--n-300)"
+                : "currentColor",
+          }}
+        />
+        {!collapsed && (
+          <span className="flex flex-1 items-center justify-between truncate">
+            <span>{item.label}</span>
+            {item.disabled && (
+              <span
+                className="rounded-full px-[5px] py-[1px] text-[10px] font-medium"
+                style={{
+                  backgroundColor: "var(--n-100)",
+                  color: "var(--n-400)",
+                }}
+              >
+                Soon
+              </span>
+            )}
+          </span>
+        )}
+      </button>
+
+      {/* Tooltip for collapsed state */}
+      {collapsed && showTooltip && (
+        <div
+          role="tooltip"
+          className="absolute left-full top-1/2 z-50 ml-[var(--space-2)] -translate-y-1/2 whitespace-nowrap rounded-[var(--radius-md)] px-[var(--space-3)] py-[var(--space-1)] text-xs font-medium"
+          style={{
+            backgroundColor: "var(--n-800)",
+            color: "var(--n-0)",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          {item.label}
+          {item.disabled && " (Segera Hadir)"}
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -1,124 +1,186 @@
-import { useState, useCallback } from 'react';
+import { useState, useMemo, Fragment } from 'react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  getExpandedRowModel,
+  createColumnHelper,
+  flexRender,
+  type ExpandedState,
+} from '@tanstack/react-table';
+import { Upload, CheckCircle, AlertTriangle, XCircle, ChevronRight, ChevronDown } from 'lucide-react';
 
-import { WorkflowSteps } from '@/components/ui/WorkflowSteps';
-import { useRole } from '@/context/RoleContext';
-import { useInvoiceData } from './useInvoiceData';
-import type { InvoiceWithVendor } from './useInvoiceData';
-import { InvoiceList } from './InvoiceList';
+import { Badge } from '@/components/ui/Badge';
+import type { BadgeVariant } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { formatIDR } from '@/lib/utils/formatCurrency';
 import { InvoiceDetail } from './InvoiceDetail';
-import type { Invoice } from './invoice.types';
+import type { InvoiceWithVendor, ValidationStatus, Invoice } from './types';
 
-type ValidationStatus = Invoice['validationStatus'];
+import invoicesData from '@/data/invoices.json';
+import vendorsData from '@/data/vendors.json';
 
-function deriveWorkflowSteps(status: ValidationStatus | null) {
-  if (!status) {
-    return [
-      { label: 'Upload', status: 'upcoming' as const },
-      { label: 'Validate', status: 'upcoming' as const },
-      { label: 'Approve', status: 'upcoming' as const },
-    ];
-  }
+// ─── Data Loading ─────────────────────────────────────────────────────────────
 
-  switch (status) {
-    case 'Uploaded':
-      return [
-        { label: 'Upload', status: 'current' as const },
-        { label: 'Validate', status: 'upcoming' as const },
-        { label: 'Approve', status: 'upcoming' as const },
-      ];
-    case 'Validated':
-      return [
-        { label: 'Upload', status: 'completed' as const },
-        { label: 'Validate', status: 'current' as const },
-        { label: 'Approve', status: 'upcoming' as const },
-      ];
-    case 'Approved':
-      return [
-        { label: 'Upload', status: 'completed' as const },
-        { label: 'Validate', status: 'completed' as const },
-        { label: 'Approve', status: 'completed' as const },
-      ];
-    case 'Mismatch Detected':
-      return [
-        { label: 'Upload', status: 'completed' as const },
-        { label: 'Validate', status: 'current' as const },
-        { label: 'Approve', status: 'upcoming' as const },
-      ];
-  }
+const vendorMap = new Map(vendorsData.map((v) => [v.id, v.name]));
+
+function loadInvoices(): InvoiceWithVendor[] {
+  return (invoicesData as Invoice[]).map((invoice) => ({
+    ...invoice,
+    vendorName: vendorMap.get(invoice.vendorId) ?? 'Vendor Tidak Diketahui',
+  }));
 }
 
-export function InvoiceFlow() {
-  const { data: invoices, isLoading, isError } = useInvoiceData();
-  const { role } = useRole();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [localInvoices, setLocalInvoices] = useState<InvoiceWithVendor[] | null>(null);
+// ─── Status Config ────────────────────────────────────────────────────────────
 
-  // Use local state if we've performed an approval, otherwise use query data
-  const displayInvoices = localInvoices ?? invoices ?? [];
+const statusConfig: Record<
+  ValidationStatus,
+  { variant: BadgeVariant; icon: typeof Upload; label: string }
+> = {
+  Uploaded: { variant: 'info', icon: Upload, label: 'Diunggah' },
+  Validated: { variant: 'warning', icon: AlertTriangle, label: 'Tervalidasi' },
+  Approved: { variant: 'success', icon: CheckCircle, label: 'Disetujui' },
+  'Mismatch Detected': { variant: 'danger', icon: XCircle, label: 'Selisih Terdeteksi' },
+};
 
-  const selectedInvoice = displayInvoices.find((inv) => inv.id === selectedId) ?? null;
-  const workflowSteps = deriveWorkflowSteps(selectedInvoice?.validationStatus ?? null);
+// ─── Table Column Definitions ─────────────────────────────────────────────────
 
-  const handleSelect = useCallback((invoiceId: string) => {
-    setSelectedId(invoiceId);
-  }, []);
+const columnHelper = createColumnHelper<InvoiceWithVendor>();
 
-  const handleApprove = useCallback(
-    (invoiceId: string) => {
-      const now = new Date().toISOString();
-      const approverName = role;
-
-      setLocalInvoices((prev) => {
-        const source = prev ?? invoices ?? [];
-        return source.map((inv) =>
-          inv.id === invoiceId
-            ? {
-                ...inv,
-                validationStatus: 'Approved' as const,
-                approverName,
-                approvedAt: now,
-              }
-            : inv,
-        );
-      });
+const columns = [
+  columnHelper.display({
+    id: 'expander',
+    cell: ({ row }) => (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          row.getToggleExpandedHandler()();
+        }}
+        className="p-1 text-[var(--n-500)] hover:text-[var(--n-700)] transition-colors duration-100"
+        aria-label={row.getIsExpanded() ? 'Tutup detail' : 'Buka detail'}
+      >
+        {row.getIsExpanded() ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+      </button>
+    ),
+  }),
+  columnHelper.accessor('id', {
+    header: 'No. Invoice',
+    cell: (info) => (
+      <span className="font-medium text-[var(--n-900)]">{info.getValue()}</span>
+    ),
+  }),
+  columnHelper.accessor('period', {
+    header: 'Periode',
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor('totalAmount', {
+    header: 'Total (Rp)',
+    cell: (info) => (
+      <span className="tabular-nums">{formatIDR(info.getValue())}</span>
+    ),
+  }),
+  columnHelper.accessor('lineItemsCount', {
+    header: 'Jumlah Item',
+    cell: (info) => (
+      <span className="tabular-nums">{info.getValue()}</span>
+    ),
+  }),
+  columnHelper.accessor('validationStatus', {
+    header: 'Status Validasi',
+    cell: (info) => {
+      const config = statusConfig[info.getValue()];
+      return <Badge variant={config.variant} icon={config.icon} label={config.label} />;
     },
-    [invoices, role],
-  );
+  }),
+];
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-[var(--n-500)]">Loading invoices…</p>
-      </div>
-    );
-  }
+// ─── InvoiceFlow Component ────────────────────────────────────────────────────
 
-  if (isError) {
+export function InvoiceFlow() {
+  const invoices = useMemo(() => loadInvoices(), []);
+  const [expanded, setExpanded] = useState<ExpandedState>({});
+
+  const table = useReactTable({
+    data: invoices,
+    columns,
+    state: { expanded },
+    onExpandedChange: setExpanded,
+    getCoreRowModel: getCoreRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getRowCanExpand: () => true,
+  });
+
+  if (invoices.length === 0) {
     return (
-      <div className="p-6">
-        <div className="rounded-md bg-danger-bg p-4 text-sm text-danger-fg">
-          Unable to load invoice data. Please check mock data files.
-        </div>
+      <div className="flex flex-col gap-[var(--space-4)]">
+        <h1 className="text-xl font-semibold text-[var(--n-900)]">Daftar Invoice</h1>
+        <EmptyState message="Tidak ada invoice yang tersedia." />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-xl font-semibold text-[var(--n-900)]">Invoice Flow</h1>
+    <div className="flex flex-col gap-[var(--space-4)]">
+      <h1 className="text-xl font-semibold text-[var(--n-900)]">Daftar Invoice</h1>
 
-      {/* Workflow steps indicator */}
-      <WorkflowSteps steps={workflowSteps} />
-
-      {/* Invoice list */}
-      <InvoiceList data={displayInvoices} onSelect={handleSelect} />
-
-      {/* Invoice detail panel */}
-      {selectedInvoice && (
-        <div className="rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-6 shadow-sm">
-          <InvoiceDetail invoice={selectedInvoice} onApprove={handleApprove} />
-        </div>
-      )}
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    className={`px-4 py-3 text-xs font-medium uppercase tracking-wider text-[var(--n-500)] bg-[var(--n-50)] border-b border-[var(--n-100)] ${
+                      header.id === 'totalAmount' || header.id === 'lineItemsCount'
+                        ? 'text-right'
+                        : 'text-left'
+                    }`}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <Fragment key={row.id}>
+                <tr
+                  className="border-b border-[var(--n-100)] transition-colors duration-100 hover:bg-[var(--red-50)] cursor-pointer"
+                  onClick={row.getToggleExpandedHandler()}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className={`px-4 py-3 ${
+                        cell.column.id === 'totalAmount' || cell.column.id === 'lineItemsCount'
+                          ? 'text-right'
+                          : ''
+                      }`}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+                {row.getIsExpanded() && (
+                  <tr>
+                    <td colSpan={row.getVisibleCells().length} className="p-0">
+                      <InvoiceDetail lineItems={row.original.lineItems} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

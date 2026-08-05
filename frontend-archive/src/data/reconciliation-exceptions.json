@@ -1,0 +1,57 @@
+[
+  {
+    "id": "REC-001",
+    "atmId": "ATM-JKT-008",
+    "lastCountTime": "2026-07-21T08:42:00+07:00",
+    "location": "Cibubur Junction",
+    "countedAmount": 1875000000,
+    "escrowAmount": 2000000000,
+    "difference": -125000000,
+    "severity": "high",
+    "owner": "R. Sanjaya"
+  },
+  {
+    "id": "REC-002",
+    "atmId": "ATM-BDG-003",
+    "lastCountTime": "2026-07-21T09:15:00+07:00",
+    "location": "Cihampelas Walk",
+    "countedAmount": 950000000,
+    "escrowAmount": 1100000000,
+    "difference": -150000000,
+    "severity": "high",
+    "owner": null
+  },
+  {
+    "id": "REC-003",
+    "atmId": "ATM-SBY-002",
+    "lastCountTime": "2026-07-21T07:58:00+07:00",
+    "location": "Galaxy Mall",
+    "countedAmount": 2150000000,
+    "escrowAmount": 2100000000,
+    "difference": 50000000,
+    "severity": "medium",
+    "owner": "A. Pratama"
+  },
+  {
+    "id": "REC-004",
+    "atmId": "ATM-JKT-005",
+    "lastCountTime": "2026-07-21T10:03:00+07:00",
+    "location": "Menteng Square",
+    "countedAmount": 780000000,
+    "escrowAmount": 850000000,
+    "difference": -70000000,
+    "severity": "medium",
+    "owner": "D. Wijaya"
+  },
+  {
+    "id": "REC-005",
+    "atmId": "ATM-SBY-005",
+    "lastCountTime": "2026-07-21T08:22:00+07:00",
+    "location": "Ciputra World",
+    "countedAmount": 1620000000,
+    "escrowAmount": 1800000000,
+    "difference": -180000000,
+    "severity": "high",
+    "owner": null
+  }
+]

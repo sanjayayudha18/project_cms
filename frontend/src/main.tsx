@@ -1,10 +1,64 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import './styles/index.css';
-import App from '@/app/App';
+import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { rootRoute } from "./routes/__root";
+import { authRoute } from "./routes/_auth";
+import { protectedRoute } from "./routes/_protected";
+import { cashCountRoute } from "./routes/cash-count/index";
+import { cashFlowRoute } from "./routes/cash-flow";
+import { citRoute } from "./routes/cit";
+import { dsrDashboardRoute } from "./routes/forecasting/dsr-dashboard";
+import { dsrUploadRoute } from "./routes/forecasting/dsr-upload";
+import { forecastRoute } from "./routes/forecasting/forecast";
+import { forecastingRoute } from "./routes/forecasting/index";
+import { indexRoute } from "./routes/index";
+import { invoiceRoute } from "./routes/invoice/index";
+import { invoiceListRoute } from "./routes/invoice/list";
+import { reconciliationRoute } from "./routes/invoice/reconciliation";
+import { loginRoute } from "./routes/login";
+import { replenishmentRoute } from "./routes/replenishment";
+import "./styles/index.css";
 
-createRoot(document.getElementById('root')!).render(
+// ─── Route Tree ───────────────────────────────────────────────────────────────
+
+const routeTree = rootRoute.addChildren([
+  authRoute.addChildren([loginRoute]),
+  protectedRoute.addChildren([
+    indexRoute,
+    cashFlowRoute,
+    citRoute,
+    replenishmentRoute,
+    forecastingRoute,
+    forecastRoute,
+    dsrUploadRoute,
+    dsrDashboardRoute,
+    invoiceRoute,
+    invoiceListRoute,
+    reconciliationRoute,
+    cashCountRoute,
+  ]),
+]);
+
+// ─── Router Instance ──────────────────────────────────────────────────────────
+
+const router = createRouter({ routeTree });
+
+// Register the router for type safety
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <RouterProvider router={router} />
   </StrictMode>,
 );

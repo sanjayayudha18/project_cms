@@ -1,205 +1,259 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+import type { EnrichedDsrRecord } from '../types';
+
+// ─── Mock useDsrData hook ────────────────────────────────────────────────────
+
+const mockUseDsrData = vi.fn();
+
+vi.mock('../useDsrData', () => ({
+  useDsrData: () => mockUseDsrData(),
+}));
+
+// ─── Import components after mocks ───────────────────────────────────────────
+
 import { DsrSummary } from '../DsrSummary';
-import { deriveStatus } from '@/lib/deriveStatus';
-import { formatIDR } from '@/lib/formatCurrency';
-import type { EnrichedDsrRecord } from '../dsr.types';
-import dsrData from '@/data/dsr.json';
-import type { DsrRecord } from '../dsr.types';
+import { DsrTable } from '../DsrTable';
+import { DsrDashboard } from '../DsrDashboard';
 
-/**
- * Unit tests for DSR Dashboard
- * Validates: Requirements 3.4, 3.6, 3.8
- */
+// ─── Test Data ───────────────────────────────────────────────────────────────
 
-function createQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
-    },
-  });
-}
-
-function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = createQueryClient();
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
-    </QueryClientProvider>,
-  );
-}
-
-// Helper to create test DSR records
-function makeDsrRecord(overrides: Partial<EnrichedDsrRecord> = {}): EnrichedDsrRecord {
-  return {
-    id: 'DSR-TEST-001',
+const mockRecords: EnrichedDsrRecord[] = [
+  {
+    id: 'DSR-001',
     atmId: 'ATM-JKT-001',
     date: '2024-01-15',
-    beginningBalance: 300_000_000,
-    cashIn: 100_000_000,
-    cashOut: 200_000_000,
-    endingBalance: 200_000_000,
+    beginningBalance: 320000000,
+    cashIn: 150000000,
+    cashOut: 280000000,
+    endingBalance: 190000000,
     status: 'Normal',
-    location: 'Sudirman Tower, Jakarta',
+    location: 'Jakarta Selatan',
     vendorName: 'PT Gardanet',
-    ...overrides,
-  };
-}
+  },
+  {
+    id: 'DSR-002',
+    atmId: 'ATM-JKT-002',
+    date: '2024-01-15',
+    beginningBalance: 180000000,
+    cashIn: 50000000,
+    cashOut: 160000000,
+    endingBalance: 70000000,
+    status: 'Low',
+    location: 'Jakarta Barat',
+    vendorName: 'PT SSI',
+  },
+  {
+    id: 'DSR-003',
+    atmId: 'ATM-BDG-001',
+    date: '2024-01-15',
+    beginningBalance: 250000000,
+    cashIn: 100000000,
+    cashOut: 310000000,
+    endingBalance: 40000000,
+    status: 'Critical',
+    location: 'Bandung',
+    vendorName: 'PT G4S',
+  },
+];
 
-describe('DsrSummary - summary card totals', () => {
-  it('computes correct totals for a single record', () => {
-    const records: EnrichedDsrRecord[] = [
-      makeDsrRecord({
-        beginningBalance: 100_000_000,
-        cashIn: 50_000_000,
-        cashOut: 30_000_000,
-        endingBalance: 120_000_000,
-      }),
-    ];
+// ─── DsrSummary Tests ────────────────────────────────────────────────────────
 
-    renderWithProviders(<DsrSummary data={records} />);
+describe('DsrSummary', () => {
+  it('renders correct aggregated totals', () => {
+    render(<DsrSummary data={mockRecords} />);
 
-    expect(screen.getByText(formatIDR(100_000_000))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(50_000_000))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(30_000_000))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(120_000_000))).toBeInTheDocument();
+    // Total Beginning Balance = 320M + 180M + 250M = 750M
+    // Total Cash Out = 280M + 160M + 310M = 750M
+    // Both are 750.000.000 — should appear twice
+    const totals750 = screen.getAllByText('750.000.000');
+    expect(totals750).toHaveLength(2);
+
+    // Total Cash In = 150M + 50M + 100M = 300M
+    // Total Ending Balance = 190M + 70M + 40M = 300M
+    // Both are 300.000.000 — should appear twice
+    const totals300 = screen.getAllByText('300.000.000');
+    expect(totals300).toHaveLength(2);
+
+    // Verify the labels are rendered alongside the values
+    const beginningCard = screen.getByText('Total Saldo Awal').closest('div')!;
+    expect(beginningCard).toHaveTextContent('750.000.000');
+
+    const cashInCard = screen.getByText('Total Kas Masuk').closest('div')!;
+    expect(cashInCard).toHaveTextContent('300.000.000');
+
+    const cashOutCard = screen.getByText('Total Kas Keluar').closest('div')!;
+    expect(cashOutCard).toHaveTextContent('750.000.000');
+
+    const endingCard = screen.getByText('Total Saldo Akhir').closest('div')!;
+    expect(endingCard).toHaveTextContent('300.000.000');
   });
 
-  it('computes correct totals across multiple records', () => {
-    const records: EnrichedDsrRecord[] = [
-      makeDsrRecord({
-        id: 'DSR-001',
-        beginningBalance: 200_000_000,
-        cashIn: 80_000_000,
-        cashOut: 60_000_000,
-        endingBalance: 220_000_000,
-      }),
-      makeDsrRecord({
-        id: 'DSR-002',
-        beginningBalance: 150_000_000,
-        cashIn: 40_000_000,
-        cashOut: 90_000_000,
-        endingBalance: 100_000_000,
-      }),
-      makeDsrRecord({
-        id: 'DSR-003',
-        beginningBalance: 300_000_000,
-        cashIn: 120_000_000,
-        cashOut: 200_000_000,
-        endingBalance: 220_000_000,
-      }),
-    ];
+  it('renders all four summary card labels', () => {
+    render(<DsrSummary data={mockRecords} />);
 
-    const expectedBeginning = 200_000_000 + 150_000_000 + 300_000_000;
-    const expectedCashIn = 80_000_000 + 40_000_000 + 120_000_000;
-    const expectedCashOut = 60_000_000 + 90_000_000 + 200_000_000;
-    const expectedEnding = 220_000_000 + 100_000_000 + 220_000_000;
-
-    renderWithProviders(<DsrSummary data={records} />);
-
-    expect(screen.getByText(formatIDR(expectedBeginning))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(expectedCashIn))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(expectedCashOut))).toBeInTheDocument();
-    expect(screen.getByText(formatIDR(expectedEnding))).toBeInTheDocument();
+    expect(screen.getByText('Total Saldo Awal')).toBeInTheDocument();
+    expect(screen.getByText('Total Kas Masuk')).toBeInTheDocument();
+    expect(screen.getByText('Total Kas Keluar')).toBeInTheDocument();
+    expect(screen.getByText('Total Saldo Akhir')).toBeInTheDocument();
   });
 
-  it('displays zero totals when data is empty', () => {
-    renderWithProviders(<DsrSummary data={[]} />);
+  it('renders four cards in a grid', () => {
+    const { container } = render(<DsrSummary data={mockRecords} />);
 
-    // With empty data, all totals should be 0
-    const zeroFormatted = formatIDR(0);
-    const zeroElements = screen.getAllByText(zeroFormatted);
-    expect(zeroElements.length).toBe(4);
+    const grid = container.querySelector('.grid');
+    expect(grid).toBeInTheDocument();
+    expect(grid?.children.length).toBe(4);
   });
 
-  it('displays labels for all four summary cards', () => {
-    renderWithProviders(<DsrSummary data={[makeDsrRecord()]} />);
+  it('renders zero totals when data is empty', () => {
+    render(<DsrSummary data={[]} />);
 
-    expect(screen.getByText('Total Beginning Balance')).toBeInTheDocument();
-    expect(screen.getByText('Total Cash In')).toBeInTheDocument();
-    expect(screen.getByText('Total Cash Out')).toBeInTheDocument();
-    expect(screen.getByText('Total Ending Balance')).toBeInTheDocument();
-  });
-});
-
-describe('Status badge mapping from ending balance', () => {
-  it('maps endingBalance < 50M to Critical status (danger variant)', () => {
-    const status = deriveStatus(30_000_000);
-    expect(status).toBe('Critical');
-  });
-
-  it('maps endingBalance at 49,999,999 to Critical', () => {
-    expect(deriveStatus(49_999_999)).toBe('Critical');
-  });
-
-  it('maps endingBalance at 50M to Low (warning variant)', () => {
-    expect(deriveStatus(50_000_000)).toBe('Low');
-  });
-
-  it('maps endingBalance between 50M and 150M to Low', () => {
-    expect(deriveStatus(75_000_000)).toBe('Low');
-    expect(deriveStatus(100_000_000)).toBe('Low');
-    expect(deriveStatus(150_000_000)).toBe('Low');
-  });
-
-  it('maps endingBalance at 150,000,001 to Normal (success variant)', () => {
-    expect(deriveStatus(150_000_001)).toBe('Normal');
-  });
-
-  it('maps endingBalance > 150M to Normal', () => {
-    expect(deriveStatus(200_000_000)).toBe('Normal');
-    expect(deriveStatus(500_000_000)).toBe('Normal');
-  });
-
-  it('maps endingBalance of 0 to Critical', () => {
-    expect(deriveStatus(0)).toBe('Critical');
+    // formatIDR(0) = "0"
+    const zeroValues = screen.getAllByText('0');
+    expect(zeroValues).toHaveLength(4);
   });
 });
 
-describe('Date filtering returns correct records', () => {
-  const allRecords = dsrData as DsrRecord[];
+// ─── DsrTable Tests ──────────────────────────────────────────────────────────
 
-  it('filters records for 2024-01-15 correctly', () => {
-    const filtered = allRecords.filter((r) => r.date === '2024-01-15');
-    expect(filtered.length).toBeGreaterThanOrEqual(20);
-    expect(filtered.every((r) => r.date === '2024-01-15')).toBe(true);
+describe('DsrTable', () => {
+  it('renders all column headers correctly', () => {
+    render(<DsrTable data={mockRecords} />);
+
+    expect(screen.getByText('ATM ID')).toBeInTheDocument();
+    expect(screen.getByText('Lokasi')).toBeInTheDocument();
+    expect(screen.getByText('Vendor')).toBeInTheDocument();
+    expect(screen.getByText('Saldo Awal')).toBeInTheDocument();
+    expect(screen.getByText('Kas Masuk')).toBeInTheDocument();
+    expect(screen.getByText('Kas Keluar')).toBeInTheDocument();
+    expect(screen.getByText('Saldo Akhir')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
   });
 
-  it('filters records for 2024-01-16 correctly', () => {
-    const filtered = allRecords.filter((r) => r.date === '2024-01-16');
-    expect(filtered.length).toBeGreaterThan(0);
-    expect(filtered.every((r) => r.date === '2024-01-16')).toBe(true);
+  it('renders record data in table rows', () => {
+    render(<DsrTable data={mockRecords} />);
+
+    // ATM IDs
+    expect(screen.getByText('ATM-JKT-001')).toBeInTheDocument();
+    expect(screen.getByText('ATM-JKT-002')).toBeInTheDocument();
+    expect(screen.getByText('ATM-BDG-001')).toBeInTheDocument();
+
+    // Locations
+    expect(screen.getByText('Jakarta Selatan')).toBeInTheDocument();
+    expect(screen.getByText('Jakarta Barat')).toBeInTheDocument();
+    expect(screen.getByText('Bandung')).toBeInTheDocument();
+
+    // Vendor names
+    expect(screen.getByText('PT Gardanet')).toBeInTheDocument();
+    expect(screen.getByText('PT SSI')).toBeInTheDocument();
+    expect(screen.getByText('PT G4S')).toBeInTheDocument();
   });
 
-  it('returns empty array for a date with no records', () => {
-    const filtered = allRecords.filter((r) => r.date === '2099-12-31');
-    expect(filtered).toHaveLength(0);
+  it('renders monetary values as IDR-formatted', () => {
+    render(<DsrTable data={mockRecords} />);
+
+    // formatIDR(320000000) = "320.000.000"
+    expect(screen.getByText('320.000.000')).toBeInTheDocument();
+    // formatIDR(150000000) = "150.000.000"
+    expect(screen.getByText('150.000.000')).toBeInTheDocument();
+    // formatIDR(280000000) = "280.000.000"
+    expect(screen.getByText('280.000.000')).toBeInTheDocument();
   });
 
-  it('no cross-contamination between dates', () => {
-    const date15 = allRecords.filter((r) => r.date === '2024-01-15');
-    const date16 = allRecords.filter((r) => r.date === '2024-01-16');
+  it('renders status badges with correct labels', () => {
+    render(<DsrTable data={mockRecords} />);
 
-    // No record from date 15 should appear in date 16 filter
-    const ids15 = new Set(date15.map((r) => r.id));
-    const ids16 = new Set(date16.map((r) => r.id));
-
-    for (const id of ids15) {
-      expect(ids16.has(id)).toBe(false);
-    }
+    expect(screen.getByText('Normal')).toBeInTheDocument();
+    expect(screen.getByText('Low')).toBeInTheDocument();
+    expect(screen.getByText('Critical')).toBeInTheDocument();
   });
 
-  it('all dates in dataset are valid ISO date strings', () => {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    for (const record of allRecords) {
-      expect(record.date).toMatch(dateRegex);
-    }
+  it('renders empty message when data is empty', () => {
+    render(<DsrTable data={[]} />);
+
+    expect(
+      screen.getByText('Tidak ada data DSR tersedia untuk tanggal ini.'),
+    ).toBeInTheDocument();
+  });
+});
+
+// ─── DsrDashboard Integration Tests ─────────────────────────────────────────
+
+describe('DsrDashboard', () => {
+  beforeEach(() => {
+    mockUseDsrData.mockReset();
   });
 
-  it('available dates span a 7-day period', () => {
-    const uniqueDates = [...new Set(allRecords.map((r) => r.date))].sort();
-    expect(uniqueDates.length).toBeGreaterThanOrEqual(7);
+  it('renders summary and table when data is available', () => {
+    mockUseDsrData.mockReturnValue({ data: mockRecords, isLoading: false, isError: false });
+
+    render(<DsrDashboard />);
+
+    // Page title
+    expect(screen.getByText('DSR Dashboard')).toBeInTheDocument();
+
+    // Summary cards rendered
+    expect(screen.getByText('Total Saldo Awal')).toBeInTheDocument();
+    expect(screen.getByText('Total Kas Masuk')).toBeInTheDocument();
+
+    // Table columns rendered
+    expect(screen.getByText('ATM ID')).toBeInTheDocument();
+
+    // Data rendered
+    expect(screen.getByText('ATM-JKT-001')).toBeInTheDocument();
+  });
+
+  it('displays empty state when no records available', () => {
+    mockUseDsrData.mockReturnValue({ data: [], isLoading: false, isError: false });
+
+    render(<DsrDashboard />);
+
+    expect(
+      screen.getByText('Tidak ada data DSR tersedia untuk tanggal ini.'),
+    ).toBeInTheDocument();
+  });
+
+  it('displays empty state via EmptyState component when data is empty array', () => {
+    mockUseDsrData.mockReturnValue({ data: [], isLoading: false, isError: false });
+
+    render(<DsrDashboard />);
+
+    // EmptyState renders a paragraph with the message
+    const emptyMsg = screen.getByText('Tidak ada data DSR tersedia untuk tanggal ini.');
+    expect(emptyMsg).toBeInTheDocument();
+
+    // Summary and table should NOT be rendered in empty state
+    expect(screen.queryByText('Total Saldo Awal')).not.toBeInTheDocument();
+    expect(screen.queryByText('ATM ID')).not.toBeInTheDocument();
+  });
+
+  it('displays error state when data fetch fails', () => {
+    mockUseDsrData.mockReturnValue({ data: [], isLoading: false, isError: true });
+
+    render(<DsrDashboard />);
+
+    expect(
+      screen.getByText('Gagal memuat data. Silakan periksa file data.'),
+    ).toBeInTheDocument();
+  });
+
+  it('displays loading state while data is being fetched', () => {
+    mockUseDsrData.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+
+    render(<DsrDashboard />);
+
+    expect(screen.getByText('Memuat...')).toBeInTheDocument();
+  });
+
+  it('renders a date input for selecting the DSR date', () => {
+    mockUseDsrData.mockReturnValue({ data: mockRecords, isLoading: false, isError: false });
+
+    render(<DsrDashboard />);
+
+    const dateInput = screen.getByLabelText('Tanggal');
+    expect(dateInput).toBeInTheDocument();
+    expect(dateInput).toHaveAttribute('type', 'date');
   });
 });

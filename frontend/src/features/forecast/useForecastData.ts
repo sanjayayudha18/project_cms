@@ -4,7 +4,7 @@ import forecastData from '@/data/forecast.json';
 import atmsData from '@/data/atms.json';
 import vendorsData from '@/data/vendors.json';
 
-import type { EnrichedForecastRecord, ForecastRecord } from './forecast.types';
+import type { EnrichedForecastRecord, ForecastRecord } from './types';
 
 const atmMap = new Map(atmsData.map((atm) => [atm.id, atm]));
 const vendorMap = new Map(vendorsData.map((v) => [v.id, v]));

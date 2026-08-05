@@ -5,47 +5,42 @@ import {
   Truck,
   FileCheck,
   type LucideIcon,
-} from 'lucide-react';
-import attentionData from '@/data/attention-items.json';
+} from "lucide-react";
+import attentionData from "@/data/attention-items.json";
+import type { AttentionItem, AttentionCategory } from "./types";
 
-/* ─── Types ─── */
-
-interface AttentionItem {
-  id: string;
-  category: 'danger' | 'warning' | 'info';
-  icon: string;
-  title: string;
-  description: string;
-  time: string;
-}
+/**
+ * AttentionPanel — daftar item yang memerlukan perhatian operator.
+ * Menampilkan ikon berdasarkan kategori (danger/warning/info), judul,
+ * deskripsi, dan timestamp relatif.
+ *
+ * @validates Requirements 2.3
+ */
 
 /* ─── Icon mapping ─── */
 
 const iconMap: Record<string, LucideIcon> = {
-  'triangle-alert': TriangleAlert,
-  'alert-circle': AlertCircle,
+  "triangle-alert": TriangleAlert,
+  "alert-circle": AlertCircle,
   clock: Clock,
   truck: Truck,
-  'file-check': FileCheck,
+  "file-check": FileCheck,
 };
 
 /* ─── Semantic color classes for icon container ─── */
 
-const categoryStyles: Record<
-  AttentionItem['category'],
-  { bg: string; text: string }
-> = {
+const categoryStyles: Record<AttentionCategory, { bg: string; text: string }> = {
   danger: {
-    bg: 'bg-[var(--danger-bg)]',
-    text: 'text-[var(--danger-fg)]',
+    bg: "bg-[var(--danger-bg)]",
+    text: "text-[var(--danger-fg)]",
   },
   warning: {
-    bg: 'bg-[var(--warning-bg)]',
-    text: 'text-[var(--warning-fg)]',
+    bg: "bg-[var(--warning-bg)]",
+    text: "text-[var(--warning-fg)]",
   },
   info: {
-    bg: 'bg-[var(--info-bg)]',
-    text: 'text-[var(--info-fg)]',
+    bg: "bg-[var(--info-bg)]",
+    text: "text-[var(--info-fg)]",
   },
 };
 
@@ -57,16 +52,16 @@ export function AttentionPanel() {
   return (
     <aside
       className="rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-0)] p-5"
-      aria-label="Needs attention"
+      aria-label="Perlu perhatian"
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-[var(--text-lg)] font-semibold text-[var(--n-900)] leading-tight">
-          Needs attention
+        <h2 className="text-lg font-semibold text-[var(--n-900)] leading-tight">
+          Perlu Perhatian
         </h2>
         <span
           className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--n-100)] text-[var(--n-700)] text-xs font-medium"
-          aria-label={`${items.length} items`}
+          aria-label={`${items.length} item`}
         >
           {items.length}
         </span>

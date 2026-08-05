@@ -3,9 +3,9 @@ import { AlertCircle, AlertTriangle, Minus } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
 import { DataTable } from '@/components/ui/DataTable';
-import { formatIDR } from '@/lib/formatCurrency';
+import { formatIDR } from '@/lib/utils/formatCurrency';
 
-import type { EnrichedForecastRecord } from './forecast.types';
+import type { EnrichedForecastRecord } from './types';
 
 const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 
@@ -16,7 +16,7 @@ const columns: ColumnDef<EnrichedForecastRecord, unknown>[] = [
   },
   {
     accessorKey: 'location',
-    header: 'Location',
+    header: 'Lokasi',
   },
   {
     accessorKey: 'vendorName',
@@ -24,31 +24,31 @@ const columns: ColumnDef<EnrichedForecastRecord, unknown>[] = [
   },
   {
     accessorKey: 'currentBalance',
-    header: 'Current Balance',
+    header: 'Saldo Saat Ini',
     meta: { align: 'right' },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
     accessorKey: 'predictedUsageH1',
-    header: 'Predicted H+1',
+    header: 'Prediksi H+1',
     meta: { align: 'right' },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
     accessorKey: 'predictedUsageH2',
-    header: 'Predicted H+2',
+    header: 'Prediksi H+2',
     meta: { align: 'right' },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
     accessorKey: 'recommendedReplenishment',
-    header: 'Recommended Replenishment',
+    header: 'Rekomendasi Pengisian',
     meta: { align: 'right' },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
     accessorKey: 'priority',
-    header: 'Priority',
+    header: 'Prioritas',
     sortingFn: (rowA, rowB) => {
       const a = priorityOrder[rowA.getValue<string>('priority')] ?? 2;
       const b = priorityOrder[rowB.getValue<string>('priority')] ?? 2;
@@ -77,7 +77,7 @@ export function ForecastTable({ data }: ForecastTableProps) {
       data={data}
       columns={columns}
       defaultSorting={[{ id: 'priority', desc: false }]}
-      emptyMessage="No ATMs match the selected priority"
+      emptyMessage="Tidak ada ATM yang sesuai dengan prioritas yang dipilih"
     />
   );
 }

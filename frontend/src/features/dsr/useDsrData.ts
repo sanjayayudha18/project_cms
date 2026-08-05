@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
+
 import dsrData from '@/data/dsr.json';
 import atmsData from '@/data/atms.json';
 import vendorsData from '@/data/vendors.json';
-import type { DsrRecord, EnrichedDsrRecord } from './dsr.types';
 
-const atmMap = new Map(atmsData.map((atm) => [atm.id, atm]));
-const vendorMap = new Map(vendorsData.map((v) => [v.id, v]));
+import type { DsrRecord, EnrichedDsrRecord } from './types';
+
+const atmsMap = new Map(atmsData.map((atm) => [atm.id, atm]));
+const vendorsMap = new Map(vendorsData.map((v) => [v.id, v]));
 
 function enrichRecord(record: DsrRecord): EnrichedDsrRecord {
-  const atm = atmMap.get(record.atmId);
-  const vendor = atm ? vendorMap.get(atm.vendorId) : undefined;
+  const atm = atmsMap.get(record.atmId);
+  const vendor = atm ? vendorsMap.get(atm.vendorId) : undefined;
 
   return {
     ...record,
@@ -23,8 +25,7 @@ export function useDsrData(date: string) {
     queryKey: ['dsr', date],
     queryFn: () => {
       const filtered = (dsrData as DsrRecord[]).filter((r) => r.date === date);
-      return Promise.resolve(filtered.map(enrichRecord));
+      return filtered.map(enrichRecord);
     },
-    staleTime: Infinity,
   });
 }

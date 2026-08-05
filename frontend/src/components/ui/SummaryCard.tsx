@@ -1,4 +1,4 @@
-import { formatIDR } from '@/lib/formatCurrency';
+import { formatIDR } from '@/lib/utils/formatCurrency';
 
 interface SummaryCardProps {
   label: string;
@@ -9,16 +9,14 @@ interface SummaryCardProps {
 /**
  * Metric card displaying a label and formatted value.
  * Supports currency (IDR), plain number, or text formatting.
- *
- * @validates Requirements 3.6, 3.7
  */
 export function SummaryCard({ label, value, format = 'text' }: SummaryCardProps) {
   const formattedValue = formatValue(value, format);
 
   return (
-    <div className="bg-n-0 shadow-sm rounded-lg p-4">
-      <p className="text-sm text-n-600 font-medium">{label}</p>
-      <p className="text-xl font-semibold text-n-900 mt-1 tabular-nums">
+    <div className="bg-[var(--n-0)] shadow-sm rounded-[var(--radius-lg)] p-4">
+      <p className="text-sm text-[var(--n-600)] font-medium">{label}</p>
+      <p className="text-xl font-semibold text-[var(--n-900)] mt-1 tabular-nums">
         {formattedValue}
       </p>
     </div>

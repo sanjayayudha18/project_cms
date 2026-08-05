@@ -1,44 +1,114 @@
-import { CheckCircle2, Info, AlertTriangle } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import {
+  AUTO_DISMISS_MS,
+  type Toast as ToastData,
+  type ToastType,
+  useToastStore,
+} from "@/lib/hooks/useToast";
+import { cn } from "@/lib/utils/cn";
+import { AlertTriangle, CheckCircle, Info, X, XCircle } from "lucide-react";
+import { useEffect, useRef } from "react";
 
-export interface ToastMessage {
-  id: string;
-  text: string;
-  icon?: 'success' | 'info' | 'warning';
-}
+// ─── Icon + Style Mapping ─────────────────────────────────────────────────────
 
-interface ToastProps {
-  message: ToastMessage;
-  visible: boolean;
-}
-
-const iconMap: Record<NonNullable<ToastMessage['icon']>, LucideIcon> = {
-  success: CheckCircle2,
-  info: Info,
-  warning: AlertTriangle,
+const TOAST_CONFIG: Record<
+  ToastType,
+  { icon: typeof CheckCircle; containerClass: string; iconClass: string; label: string }
+> = {
+  success: {
+    icon: CheckCircle,
+    containerClass: "bg-[var(--success-bg)] border-[var(--success-solid)]",
+    iconClass: "text-[var(--success-fg)]",
+    label: "Berhasil",
+  },
+  error: {
+    icon: XCircle,
+    containerClass: "bg-[var(--danger-bg)] border-[var(--danger-fg)]",
+    iconClass: "text-[var(--danger-fg)]",
+    label: "Gagal",
+  },
+  warning: {
+    icon: AlertTriangle,
+    containerClass: "bg-[var(--warning-bg)] border-[var(--warning-solid)]",
+    iconClass: "text-[var(--warning-fg)]",
+    label: "Peringatan",
+  },
+  info: {
+    icon: Info,
+    containerClass: "bg-[var(--info-bg)] border-[var(--info-solid)]",
+    iconClass: "text-[var(--info-fg)]",
+    label: "Informasi",
+  },
 };
 
-export function Toast({ message, visible }: ToastProps) {
-  const Icon = message.icon ? iconMap[message.icon] : null;
+// ─── Single Toast ─────────────────────────────────────────────────────────────
+
+interface ToastItemProps {
+  toast: ToastData;
+  onDismiss: (id: string) => void;
+}
+
+function ToastItem({ toast, onDismiss }: ToastItemProps) {
+  const config = TOAST_CONFIG[toast.type];
+  const Icon = config.icon;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Success, warning, and info toasts auto-dismiss after 5s
+    // Error toasts persist until manually dismissed
+    if (toast.type !== "error") {
+      timerRef.current = setTimeout(() => {
+        onDismiss(toast.id);
+      }, AUTO_DISMISS_MS);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [toast.id, toast.type, onDismiss]);
 
   return (
     <div
-      role="status"
-      aria-live="polite"
-      className={`
-        fixed z-50 flex items-center gap-3 rounded-[var(--radius-lg)] px-4 py-3
-        text-[var(--n-0)] shadow-[var(--shadow-md)]
-        transition-all duration-[220ms] ease-out
-        right-4 bottom-4
-        max-[759px]:right-auto max-[759px]:bottom-4 max-[759px]:left-4 max-[759px]:w-[calc(100%-32px)]
-        ${visible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'}
-      `}
-      style={{ backgroundColor: 'var(--n-900)' }}
+      role="alert"
+      className={cn(
+        "pointer-events-auto flex w-80 items-start gap-3 rounded-[var(--radius-lg)] border p-4 shadow-[var(--shadow-md)]",
+        "animate-[toast-enter_300ms_cubic-bezier(0.22,1,0.36,1)_forwards]",
+        config.containerClass,
+      )}
     >
-      {Icon ? (
-        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-      ) : null}
-      <span className="text-sm font-medium">{message.text}</span>
+      <Icon className={cn("mt-0.5 size-5 shrink-0", config.iconClass)} aria-hidden="true" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[var(--n-900)]">{config.label}</p>
+        <p className="mt-0.5 text-sm text-[var(--n-700)] break-words">{toast.message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onDismiss(toast.id)}
+        className="shrink-0 rounded-[var(--radius-sm)] p-1 text-[var(--n-500)] hover:text-[var(--n-700)] hover:bg-[var(--n-100)] transition-colors duration-150"
+        aria-label="Tutup notifikasi"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Toast Container ──────────────────────────────────────────────────────────
+
+export function ToastContainer() {
+  const toasts = useToastStore((s) => s.toasts);
+  const dismiss = useToastStore((s) => s.dismiss);
+
+  return (
+    <div
+      aria-live="polite"
+      aria-atomic="false"
+      className="pointer-events-none fixed inset-0 z-[9999] flex flex-col items-end gap-3 p-4 pt-4"
+    >
+      {toasts.map((t) => (
+        <ToastItem key={t.id} toast={t} onDismiss={dismiss} />
+      ))}
     </div>
   );
 }

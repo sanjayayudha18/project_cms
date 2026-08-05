@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { TriangleAlert, AlertCircle, Search } from 'lucide-react';
 
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -8,49 +8,50 @@ import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { FilterSelect } from '@/components/ui/FilterSelect';
-import { formatIDRFull, formatDifference } from '@/lib/formatters';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { formatIDRFull, formatDifference } from '@/lib/utils/formatters';
+import { useToast } from '@/lib/hooks/useToast';
 import { filterExceptions } from './reconciliation.utils';
-import type { ReconciliationException } from './reconciliation.utils';
-import { useToast } from '@/context/ToastContext';
+import type { ReconciliationException } from './types';
 import exceptions from '@/data/reconciliation-exceptions.json';
 
 const data = exceptions as ReconciliationException[];
 
 const exceptionTypeOptions = [
-  { value: 'Open exceptions', label: 'Open exceptions' },
-  { value: 'All records', label: 'All records' },
-  { value: 'Resolved', label: 'Resolved' },
+  { value: 'Open exceptions', label: 'Exception terbuka' },
+  { value: 'All records', label: 'Semua catatan' },
+  { value: 'Resolved', label: 'Terselesaikan' },
 ];
 
 const severityOptions = [
-  { value: 'All severity', label: 'All severity' },
-  { value: 'High', label: 'High' },
-  { value: 'Medium', label: 'Medium' },
+  { value: 'All severity', label: 'Semua tingkat' },
+  { value: 'High', label: 'Tinggi' },
+  { value: 'Medium', label: 'Sedang' },
 ];
 
 const columnHelper = createColumnHelper<ReconciliationException>();
 
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
-  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 const columns = [
   columnHelper.accessor('atmId', {
-    header: 'Machine',
+    header: 'Mesin',
     cell: (info) => (
       <div>
-        <span className="font-semibold text-n-900">{info.getValue()}</span>
-        <span className="block text-xs text-n-500">{formatTime(info.row.original.lastCountTime)}</span>
+        <span className="font-semibold text-[var(--n-900)]">{info.getValue()}</span>
+        <span className="block text-xs text-[var(--n-500)]">{formatTime(info.row.original.lastCountTime)}</span>
       </div>
     ),
   }),
   columnHelper.accessor('location', {
-    header: 'Location',
-    cell: (info) => <span className="text-n-800">{info.getValue()}</span>,
+    header: 'Lokasi',
+    cell: (info) => <span className="text-[var(--n-800)]">{info.getValue()}</span>,
   }),
   columnHelper.accessor('countedAmount', {
-    header: 'Counted',
+    header: 'Terhitung',
     meta: { align: 'right' },
     cell: (info) => (
       <span className="tabular-nums">{formatIDRFull(info.getValue())}</span>
@@ -64,7 +65,7 @@ const columns = [
     ),
   }),
   columnHelper.accessor('difference', {
-    header: 'Difference',
+    header: 'Selisih',
     meta: { align: 'right' },
     cell: (info) => {
       const { text, colorClass } = formatDifference(info.getValue());
@@ -72,40 +73,38 @@ const columns = [
     },
   }),
   columnHelper.accessor('severity', {
-    header: 'Severity',
+    header: 'Tingkat',
     cell: (info) => {
       const severity = info.getValue();
       return (
         <Badge
           variant={severity === 'high' ? 'danger' : 'warning'}
           icon={severity === 'high' ? AlertCircle : TriangleAlert}
-          label={severity.charAt(0).toUpperCase() + severity.slice(1)}
+          label={severity === 'high' ? 'Tinggi' : 'Sedang'}
         />
       );
     },
   }),
   columnHelper.accessor('owner', {
-    header: 'Owner',
+    header: 'Penanggung Jawab',
     cell: (info) => {
       const owner = info.getValue();
       return owner ? (
-        <span className="text-n-800">{owner}</span>
+        <span className="text-[var(--n-800)]">{owner}</span>
       ) : (
-        <span className="text-n-400 italic">Unassigned</span>
+        <span className="text-[var(--n-400)] italic">Belum ditugaskan</span>
       );
     },
   }),
-];
+] as ColumnDef<ReconciliationException, unknown>[];
 
 /**
  * Reconciliation screen — financial control exception management.
  * Displays a filterable table of reconciliation exceptions with severity badges,
  * a warning banner for unresolved high-severity items, and action buttons.
- *
- * @validates Requirements 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12, 8.7, 9.5, 12.1, 12.3, 12.4, 12.5, 12.6
  */
 export function ReconciliationScreen() {
-  const { showToast } = useToast();
+  const { toast } = useToast();
   const [exceptionType, setExceptionType] = useState<string | null>('Open exceptions');
   const [severity, setSeverity] = useState<string | null>('All severity');
 
@@ -119,17 +118,30 @@ export function ReconciliationScreen() {
     [],
   );
 
+  if (data.length === 0) {
+    return (
+      <div className="flex flex-col gap-[var(--space-6)]">
+        <PageHeader
+          eyebrow="Kontrol keuangan"
+          title="Rekonsiliasi"
+          description="Bandingkan perhitungan kas fisik dengan catatan escrow dan selesaikan perbedaan sebelum batas waktu akhir hari."
+        />
+        <EmptyState message="Tidak ada exception rekonsiliasi yang tersedia." />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--space-6)]">
       <PageHeader
-        eyebrow="Financial control"
-        title="Reconciliation"
-        description="Compare physical cash counts against escrow records and resolve discrepancies before end-of-day cutoff."
+        eyebrow="Kontrol keuangan"
+        title="Rekonsiliasi"
+        description="Bandingkan perhitungan kas fisik dengan catatan escrow dan selesaikan perbedaan sebelum batas waktu akhir hari."
         actions={
           <>
-            <Button variant="secondary">Audit trail</Button>
-            <Button variant="primary" onClick={() => showToast('Reconciliation initiated', 'success')}>
-              Run reconciliation
+            <Button variant="secondary">Jejak audit</Button>
+            <Button variant="primary" onClick={() => toast({ type: 'success', message: 'Rekonsiliasi dimulai' })}>
+              Jalankan rekonsiliasi
             </Button>
           </>
         }
@@ -137,39 +149,37 @@ export function ReconciliationScreen() {
 
       <NoticeBanner
         icon={TriangleAlert}
-        title="Cutoff at 14:00 WIB"
-        description={`${unresolvedHighCount} high-severity exception${unresolvedHighCount !== 1 ? 's' : ''} remain${unresolvedHighCount === 1 ? 's' : ''} unresolved and require${unresolvedHighCount === 1 ? 's' : ''} operator review.`}
+        title="Batas waktu 14:00 WIB"
+        description={`${unresolvedHighCount} exception tingkat tinggi belum terselesaikan dan memerlukan peninjauan operator.`}
         variant="warning"
       />
 
       <div className="flex flex-wrap items-end gap-4">
         <FilterSelect
-          label="Exception type"
+          label="Tipe exception"
           options={exceptionTypeOptions}
           value={exceptionType}
           onChange={setExceptionType}
-          placeholder="All records"
+          placeholder="Semua catatan"
         />
         <FilterSelect
-          label="Severity"
+          label="Tingkat"
           options={severityOptions}
           value={severity}
           onChange={setSeverity}
-          placeholder="All severity"
+          placeholder="Semua tingkat"
         />
-        <div className="flex items-center gap-2 min-h-[44px] text-sm text-n-500">
+        <div className="flex items-center gap-2 min-h-[44px] text-sm text-[var(--n-500)]">
           <Search className="h-4 w-4" aria-hidden="true" />
-          <span>{filtered.length} exception{filtered.length !== 1 ? 's' : ''}</span>
+          <span>{filtered.length} exception{filtered.length !== 1 ? '' : ''}</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <DataTable
-          data={filtered}
-          columns={columns}
-          emptyMessage="No exceptions match the current filters."
-        />
-      </div>
+      <DataTable
+        data={filtered}
+        columns={columns}
+        emptyMessage="Tidak ada exception yang sesuai dengan filter saat ini."
+      />
     </div>
   );
 }

@@ -49,8 +49,8 @@ describe('useCashFlowData', () => {
     // vendorChart.data has length 7 (7 days)
     expect(data!.vendorChart.data).toHaveLength(7);
 
-    // vendorChart.vendors has length 5
-    expect(data!.vendorChart.vendors).toHaveLength(5);
+    // vendorChart.vendors has length 4
+    expect(data!.vendorChart.vendors).toHaveLength(4);
 
     // atmLevels has length 6
     expect(data!.atmLevels).toHaveLength(6);

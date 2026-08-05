@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react';
 
 import { FilterSelect } from '@/components/ui/FilterSelect';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { compoundFilter } from '@/lib/filters';
+import { compoundFilter } from '@/lib/utils/filters';
 import vendorsData from '@/data/vendors.json';
 
 import { useCitData } from './useCitData';
 import { CitTable } from './CitTable';
 import { CitSummary } from './CitSummary';
-import type { CitStatus } from './cit.types';
+import type { CitStatus } from './types';
 
 const statusOptions: { value: string; label: string }[] = [
   { value: 'Scheduled', label: 'Scheduled' },
@@ -38,7 +38,7 @@ export function CitTracker() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <h1 className="text-xl font-semibold text-n-900">CIT Tracker</h1>
+      <h1 className="text-xl font-semibold text-[var(--n-900)]">CIT Tracker</h1>
 
       <div className="flex flex-wrap items-end gap-4">
         <FilterSelect
@@ -58,7 +58,7 @@ export function CitTracker() {
       <CitSummary data={filteredOrders} />
 
       {filteredOrders.length === 0 ? (
-        <EmptyState message="No CIT orders match the current filters" />
+        <EmptyState message="Tidak ada order CIT yang sesuai filter" />
       ) : (
         <CitTable data={filteredOrders} />
       )}

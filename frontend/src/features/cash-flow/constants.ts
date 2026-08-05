@@ -1,30 +1,38 @@
-import type { VendorConfig } from './types';
+import type { VendorConfig } from "./types";
 
 /**
- * Vendor color palette — distinct OKLCH hues chosen for AA contrast (≥3:1)
- * against chart background (--n-0: oklch(0.992 0.003 29)).
+ * Palet warna vendor — hue OKLCH berbeda dipilih untuk kontras AA (≥3:1)
+ * terhadap latar chart (--n-0: oklch(0.992 0.003 29)).
+ *
+ * Menggunakan nilai OKLCH langsung dari tokens.css karena recharts SVG
+ * tidak dapat me-resolve CSS custom properties di atribut fill.
+ *
+ * --info-solid:    oklch(0.58 0.12 245)
+ * --success-solid: oklch(0.56 0.13 155)
+ * --red-500:       oklch(0.552 0.205 29)
+ * --warning-solid: oklch(0.76 0.15 78)
  */
 export const VENDOR_COLORS: readonly VendorConfig[] = [
-  { name: 'Abacus', color: 'oklch(0.55 0.18 245)' }, // blue
-  { name: 'Bijak Jakarta', color: 'oklch(0.60 0.16 155)' }, // green
-  { name: 'Advantage', color: 'oklch(0.58 0.17 29)' }, // red (brand)
-  { name: 'SSI', color: 'oklch(0.60 0.15 78)' }, // amber
+  { name: "Abacus", color: "oklch(0.58 0.12 245)" }, // --info-solid (blue)
+  { name: "Bijak Jakarta", color: "oklch(0.56 0.13 155)" }, // --success-solid (green)
+  { name: "Advantage", color: "oklch(0.552 0.205 29)" }, // --red-500 (brand)
+  { name: "SSI", color: "oklch(0.76 0.15 78)" }, // --warning-solid (amber)
 ] as const;
 
-/** TanStack Query key for cash flow summary data */
-export const CASH_FLOW_QUERY_KEY = ['cash-flow', 'summary'] as const;
+/** Kunci query TanStack Query untuk data ringkasan cash flow */
+export const CASH_FLOW_QUERY_KEY = ["cash-flow", "summary"] as const;
 
-/** Stale time for cash flow queries — EOD data doesn't change frequently */
-export const CASH_FLOW_STALE_TIME = 5 * 60 * 1000; // 5 minutes
+/** Stale time untuk query cash flow — data EOD tidak sering berubah */
+export const CASH_FLOW_STALE_TIME = 5 * 60 * 1000; // 5 menit
 
-/** Minimum chart container height to prevent compression */
+/** Tinggi minimum container chart untuk mencegah kompresi */
 export const CHART_MIN_HEIGHT = 240;
 
-/** Recharts bar chart internal height */
+/** Tinggi internal bar chart recharts */
 export const CHART_HEIGHT = 280;
 
-/** Maximum bar width in the grouped bar chart */
+/** Lebar bar maksimum dalam grouped bar chart */
 export const CHART_MAX_BAR_SIZE = 32;
 
-/** Bar top radius for rounded corners */
+/** Radius atas bar untuk sudut membulat */
 export const CHART_BAR_RADIUS: [number, number, number, number] = [3, 3, 0, 0];

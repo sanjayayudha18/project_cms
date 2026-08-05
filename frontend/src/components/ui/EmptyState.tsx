@@ -12,8 +12,8 @@ interface EmptyStateProps {
 export function EmptyState({ icon: Icon = Inbox, message }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <Icon className="h-12 w-12 text-n-300 mb-3" aria-hidden="true" />
-      <p className="text-n-500 text-sm">{message}</p>
+      <Icon className="h-12 w-12 text-[var(--n-300)] mb-3" aria-hidden="true" />
+      <p className="text-[var(--n-500)] text-sm">{message}</p>
     </div>
   );
 }

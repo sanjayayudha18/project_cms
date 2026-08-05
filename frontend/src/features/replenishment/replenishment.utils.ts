@@ -1,22 +1,11 @@
-export interface ReplenishmentSchedule {
-  id: string;
-  routeCode: string;
-  region: string;
-  vendor: string;
-  windowStart: string;
-  windowEnd: string;
-  machineCount: number;
-  completionCount: number;
-  status: 'completed' | 'in-transit' | 'scheduled' | 'delayed' | 'pending-vendor';
-  cashValue: number;
-}
+import type { ReplenishmentSchedule } from './types';
 
 const STATUS_PRIORITY: Record<ReplenishmentSchedule['status'], number> = {
-  'delayed': 0,
+  delayed: 0,
   'in-transit': 1,
   'pending-vendor': 2,
-  'scheduled': 3,
-  'completed': 4,
+  scheduled: 3,
+  completed: 4,
 };
 
 /**

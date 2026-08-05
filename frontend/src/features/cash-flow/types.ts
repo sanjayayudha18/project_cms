@@ -1,12 +1,12 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
 
-/** Direction of a trend indicator */
-export type TrendDirection = 'up' | 'down';
+/** Arah indikator tren */
+export type TrendDirection = "up" | "down";
 
-/** Semantic color tier for ATM cash levels */
-export type CashLevelTier = 'success' | 'warning' | 'danger';
+/** Tier warna semantik untuk level kas ATM */
+export type CashLevelTier = "success" | "warning" | "danger";
 
-/** A single KPI stats card data */
+/** Data satu kartu KPI statistik */
 export interface StatsCardData {
   readonly label: string;
   readonly icon: LucideIcon;
@@ -18,26 +18,26 @@ export interface StatsCardData {
   };
 }
 
-/** A single day's cash flow per vendor (chart data point) */
+/** Satu titik data chart — arus kas harian per vendor */
 export interface VendorDayFlow {
   readonly date: string; // ISO date string (YYYY-MM-DD)
-  readonly [vendorName: string]: number | string; // vendor amounts + date key
+  readonly [vendorName: string]: number | string; // jumlah vendor + kunci tanggal
 }
 
-/** Vendor metadata for chart legend and color mapping */
+/** Metadata vendor untuk legenda chart dan pemetaan warna */
 export interface VendorConfig {
   readonly name: string;
-  readonly color: string; // OKLCH color value
+  readonly color: string; // Nilai warna OKLCH dari design tokens
 }
 
-/** A single ATM cash level row */
+/** Satu baris level kas ATM */
 export interface AtmLevel {
   readonly id: string; // e.g. "ATM-00417"
-  readonly label: string; // Display identifier
+  readonly label: string; // Identifier tampilan
   readonly percentage: number; // 0–100
 }
 
-/** Complete data structure returned by useCashFlowData */
+/** Struktur data lengkap dari useCashFlowData */
 export interface CashFlowSummary {
   readonly stats: readonly StatsCardData[];
   readonly vendorChart: {
@@ -47,7 +47,7 @@ export interface CashFlowSummary {
   readonly atmLevels: readonly AtmLevel[];
 }
 
-/** Hook return type wrapping TanStack Query state */
+/** Tipe return hook yang membungkus state TanStack Query */
 export interface UseCashFlowDataReturn {
   readonly data: CashFlowSummary | undefined;
   readonly isLoading: boolean;

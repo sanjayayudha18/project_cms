@@ -4,7 +4,7 @@ import citOrdersData from '@/data/cit-orders.json';
 import atmsData from '@/data/atms.json';
 import vendorsData from '@/data/vendors.json';
 
-import type { CitOrder, EnrichedCitOrder } from './cit.types';
+import type { CitOrder, EnrichedCitOrder } from './types';
 
 const atmsMap = new Map(atmsData.map((atm) => [atm.id, atm]));
 const vendorsMap = new Map(vendorsData.map((v) => [v.id, v]));

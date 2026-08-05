@@ -1,0 +1,66 @@
+# ---------- Go (backend) ----------
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/build/
+/dist/
+
+# Test & coverage
+*.test
+*.out
+coverage.*
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Vendor (uncomment if you don't vendor deps)
+# /vendor/
+
+# ---------- Node / React / Vite (frontend) ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Vite / build caches
+.vite/
+.cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# ---------- Environment & secrets ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- Docker ----------
+# (keep Dockerfile & compose tracked; ignore local overrides)
+docker-compose.override.yml
+
+# ---------- Editors / OS ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Kiro ----------
+# keep specs/steering tracked; ignore local agent scratch if any
+.kiro/**/local/
+
+# ---------- Document ----------
+\archives

@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import {
-  AtmLevelTable,
-  AtmLevelRow,
-  getCashLevelTier,
-} from '../AtmLevelTable';
+import { AtmLevelTable, AtmLevelRow, getCashLevelTier } from '../AtmLevelTable';
 import type { AtmLevel } from '../types';
 
 const mockLevels: AtmLevel[] = [
@@ -56,7 +52,7 @@ describe('AtmLevelRow', () => {
         <tbody>
           <AtmLevelRow atm={atm} />
         </tbody>
-      </table>
+      </table>,
     );
   }
 
@@ -100,7 +96,7 @@ describe('AtmLevelRow', () => {
 
     const progressbar = screen.getByRole('progressbar');
     const fill = progressbar.firstElementChild as HTMLElement;
-    expect(fill).toHaveClass('bg-[oklch(0.560_0.130_155)]');
+    expect(fill).toHaveClass('bg-[var(--success-solid)]');
   });
 
   it('applies danger tier bg class for low percentage', () => {
@@ -108,6 +104,6 @@ describe('AtmLevelRow', () => {
 
     const progressbar = screen.getByRole('progressbar');
     const fill = progressbar.firstElementChild as HTMLElement;
-    expect(fill).toHaveClass('bg-[oklch(0.545_0.205_12)]');
+    expect(fill).toHaveClass('bg-[var(--danger-500)]');
   });
 });

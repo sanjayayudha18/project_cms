@@ -1,13 +1,13 @@
 import { Calendar, Truck } from 'lucide-react';
 
 import { Card } from '@/components/ui/Card';
-import { formatIDR } from '@/lib/formatCurrency';
+import { formatIDR } from '@/lib/utils/formatCurrency';
 
-import type { ScheduleEntry } from './forecast.types';
+import type { ScheduleEntry } from './types';
 
 /**
- * Hardcoded replenishment schedule for next 3 days (H+1, H+2, H+3).
- * Derived from forecast data — ATMs with recommended replenishment > 0.
+ * Data jadwal pengisian ulang untuk 3 hari ke depan (H+1, H+2, H+3).
+ * Diambil dari data forecast — ATM dengan rekomendasi pengisian > 0.
  */
 const scheduleData: ScheduleEntry[] = [
   { id: 'SCH-001', atmId: 'ATM-JKT-001', location: 'Sudirman Plaza', vendorName: 'PT Gardanet', scheduledDate: '2024-01-21', amount: 250000000 },
@@ -68,24 +68,37 @@ function formatDate(iso: string): string {
 export function ScheduleList() {
   const grouped = groupSchedule(scheduleData);
 
+  if (scheduleData.length === 0) {
+    return (
+      <Card>
+        <h3 className="text-lg font-semibold text-[var(--n-900)] mb-4">
+          Jadwal Pengisian (3 Hari ke Depan)
+        </h3>
+        <p className="text-sm text-[var(--n-500)] text-center py-8">
+          Tidak ada jadwal pengisian tersedia.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
-      <h3 className="text-lg font-semibold text-n-900 mb-4">
-        Replenishment Schedule (Next 3 Days)
+      <h3 className="text-lg font-semibold text-[var(--n-900)] mb-4">
+        Jadwal Pengisian (3 Hari ke Depan)
       </h3>
       <div className="space-y-6">
         {grouped.map((group) => (
           <div key={group.vendorName}>
             <div className="flex items-center gap-2 mb-3">
-              <Truck className="h-4 w-4 text-n-500" aria-hidden="true" />
-              <h4 className="text-sm font-semibold text-n-700">{group.vendorName}</h4>
+              <Truck className="h-4 w-4 text-[var(--n-500)]" aria-hidden="true" />
+              <h4 className="text-sm font-semibold text-[var(--n-700)]">{group.vendorName}</h4>
             </div>
             <div className="space-y-3 pl-6">
               {group.dates.map((dateGroup) => (
                 <div key={dateGroup.date}>
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-n-400" aria-hidden="true" />
-                    <span className="text-xs font-medium text-n-600">
+                    <Calendar className="h-3.5 w-3.5 text-[var(--n-400)]" aria-hidden="true" />
+                    <span className="text-xs font-medium text-[var(--n-600)]">
                       {formatDate(dateGroup.date)}
                     </span>
                   </div>
@@ -93,7 +106,7 @@ export function ScheduleList() {
                     {dateGroup.entries.map((entry) => (
                       <li
                         key={entry.id}
-                        className="flex items-center justify-between text-sm text-n-800"
+                        className="flex items-center justify-between text-sm text-[var(--n-800)]"
                       >
                         <span>
                           {entry.atmId} — {entry.location}

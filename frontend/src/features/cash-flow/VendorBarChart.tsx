@@ -7,13 +7,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts';
-import type { VendorDayFlow, VendorConfig } from './types';
-import {
-  CHART_HEIGHT,
-  CHART_MAX_BAR_SIZE,
-  CHART_BAR_RADIUS,
-} from './constants';
+} from "recharts";
+import type { VendorDayFlow, VendorConfig } from "./types";
+import { CHART_HEIGHT, CHART_MAX_BAR_SIZE, CHART_BAR_RADIUS } from "./constants";
 
 interface VendorBarChartProps {
   readonly data: readonly VendorDayFlow[];
@@ -21,21 +17,21 @@ interface VendorBarChartProps {
 }
 
 /**
- * Formats an ISO date string (YYYY-MM-DD) to short format (e.g., "15 Jul").
+ * Memformat string tanggal ISO (YYYY-MM-DD) ke format pendek (misal "15 Jul").
  */
 export function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr);
   const day = date.getUTCDate();
-  const month = date.toLocaleDateString('en-US', {
-    month: 'short',
-    timeZone: 'UTC',
+  const month = date.toLocaleDateString("id-ID", {
+    month: "short",
+    timeZone: "UTC",
   });
   return `${day} ${month}`;
 }
 
 /**
- * Formats a numeric chart value with "M" suffix for millions.
- * Values are already in millions from the mock data.
+ * Memformat nilai numerik chart dengan suffix "M" untuk jutaan.
+ * Nilai sudah dalam satuan juta dari data mock.
  */
 export function formatChartValue(value: number): string {
   return `Rp ${value} M`;
@@ -45,13 +41,10 @@ export function VendorBarChart({ data, vendors }: VendorBarChartProps) {
   return (
     <div
       className="min-h-[240px] w-full"
-      aria-label="Bar chart showing daily cash flow per vendor for the past 7 days"
+      aria-label="Grafik batang menampilkan arus kas harian per vendor selama 7 hari terakhir"
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <BarChart
-          data={[...data]}
-          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-        >
+        <BarChart data={[...data]} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke="oklch(0.908 0.006 29)"
@@ -59,11 +52,11 @@ export function VendorBarChart({ data, vendors }: VendorBarChartProps) {
           />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: 'oklch(0.560 0.009 29)' }}
+            tick={{ fontSize: 12, fill: "oklch(0.56 0.009 29)" }}
             tickFormatter={formatShortDate}
           />
           <YAxis
-            tick={{ fontSize: 12, fill: 'oklch(0.560 0.009 29)' }}
+            tick={{ fontSize: 12, fill: "oklch(0.56 0.009 29)" }}
             tickFormatter={formatChartValue}
           />
           <Tooltip />

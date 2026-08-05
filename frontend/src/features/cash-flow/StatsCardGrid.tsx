@@ -1,5 +1,5 @@
-import type { StatsCardData } from './types';
-import { StatsCard } from './StatsCard';
+import type { StatsCardData } from "./types";
+import { StatsCard } from "./StatsCard";
 
 interface StatsCardGridProps {
   readonly stats: readonly StatsCardData[];

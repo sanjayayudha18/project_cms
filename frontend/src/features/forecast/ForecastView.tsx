@@ -31,9 +31,24 @@ export function ForecastView() {
   if (isError) {
     return (
       <div className="p-6">
-        <div className="bg-danger-bg text-danger-fg rounded-lg p-4 text-sm">
-          Unable to load data. Please check mock data files.
+        <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--danger-bg)] bg-[var(--danger-bg)] p-4 text-sm text-[var(--danger-fg)]">
+          <span aria-hidden="true">⚠</span>
+          <span>Gagal memuat data forecast. Silakan periksa file data.</span>
         </div>
+      </div>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <header>
+          <h1 className="text-xl font-semibold text-[var(--n-900)]">Forecast</h1>
+          <p className="text-sm text-[var(--n-600)] mt-1">
+            Proyeksi kebutuhan kas dan rekomendasi pengisian
+          </p>
+        </header>
+        <EmptyState message="Tidak ada data forecast tersedia." />
       </div>
     );
   }
@@ -41,29 +56,29 @@ export function ForecastView() {
   return (
     <div className="p-6 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-n-900">Forecast View</h1>
-        <p className="text-sm text-n-600 mt-1">
-          Cash demand forecasting and replenishment recommendations
+        <h1 className="text-xl font-semibold text-[var(--n-900)]">Forecast</h1>
+        <p className="text-sm text-[var(--n-600)] mt-1">
+          Proyeksi kebutuhan kas dan rekomendasi pengisian
         </p>
       </header>
 
       <div className="flex flex-wrap items-end gap-4">
         <FilterSelect
-          label="Priority"
+          label="Prioritas"
           options={priorityOptions}
           value={priorityFilter}
           onChange={setPriorityFilter}
-          placeholder="All Priorities"
+          placeholder="Semua Prioritas"
         />
         <SummaryCard
-          label="Total Recommended Replenishment"
+          label="Total Rekomendasi Pengisian"
           value={totalReplenishment}
           format="currency"
         />
       </div>
 
       {filteredRecords.length === 0 ? (
-        <EmptyState message="No ATMs match the selected priority" />
+        <EmptyState message="Tidak ada ATM yang sesuai dengan prioritas yang dipilih" />
       ) : (
         <ForecastTable data={filteredRecords} />
       )}

@@ -1,0 +1,62 @@
+:root {
+  /* Brand Red (hue 29) — full 10-shade scale */
+  --red-50: oklch(0.965 0.018 29);
+  --red-100: oklch(0.925 0.045 29);
+  --red-200: oklch(0.855 0.09 29);
+  --red-300: oklch(0.745 0.14 29);
+  --red-400: oklch(0.64 0.185 29);
+  --red-500: oklch(0.552 0.205 29);
+  --red-600: oklch(0.485 0.193 29);
+  --red-700: oklch(0.41 0.162 29);
+  --red-800: oklch(0.325 0.12 29);
+  --red-900: oklch(0.25 0.082 29);
+
+  /* Neutrals (hue 29, whisper chroma) */
+  --n-0: oklch(0.992 0.003 29);
+  --n-50: oklch(0.975 0.004 29);
+  --n-100: oklch(0.952 0.005 29);
+  --n-200: oklch(0.908 0.006 29);
+  --n-300: oklch(0.845 0.007 29);
+  --n-400: oklch(0.7 0.008 29);
+  --n-500: oklch(0.56 0.009 29);
+  --n-600: oklch(0.448 0.008 29);
+  --n-700: oklch(0.352 0.007 29);
+  --n-800: oklch(0.258 0.006 29);
+  --n-900: oklch(0.178 0.005 29);
+
+  /* Semantic colors */
+  --success-bg: oklch(0.955 0.03 155);
+  --success-fg: oklch(0.48 0.115 155);
+  --success-solid: oklch(0.56 0.13 155);
+  --warning-bg: oklch(0.96 0.055 78);
+  --warning-fg: oklch(0.52 0.115 78);
+  --warning-solid: oklch(0.76 0.15 78);
+  --danger-bg: oklch(0.955 0.035 12);
+  --danger-fg: oklch(0.5 0.195 12);
+  --danger-500: oklch(0.545 0.205 12);
+  --info-bg: oklch(0.955 0.03 245);
+  --info-fg: oklch(0.48 0.11 245);
+  --info-solid: oklch(0.58 0.12 245);
+
+  /* Spacing (4pt scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-18: 72px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Shadows (brand-tinted) */
+  --shadow-sm: 0 1px 2px oklch(0.25 0.02 29 / 0.06);
+  --shadow-md: 0 4px 12px oklch(0.25 0.02 29 / 0.08);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}

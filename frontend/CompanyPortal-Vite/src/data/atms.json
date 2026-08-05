@@ -1,0 +1,22 @@
+[
+  { "id": "ATM-JKT-001", "location": "Sudirman Plaza", "region": "JKT", "vendorId": "V-001" },
+  { "id": "ATM-JKT-002", "location": "Thamrin City", "region": "JKT", "vendorId": "V-001" },
+  { "id": "ATM-JKT-003", "location": "Kuningan Tower", "region": "JKT", "vendorId": "V-002" },
+  { "id": "ATM-JKT-004", "location": "Senayan Park", "region": "JKT", "vendorId": "V-002" },
+  { "id": "ATM-JKT-005", "location": "Menteng Square", "region": "JKT", "vendorId": "V-003" },
+  { "id": "ATM-JKT-006", "location": "Kelapa Gading Mall", "region": "JKT", "vendorId": "V-001" },
+  { "id": "ATM-JKT-007", "location": "Pondok Indah Mall", "region": "JKT", "vendorId": "V-003" },
+  { "id": "ATM-JKT-008", "location": "Cibubur Junction", "region": "JKT", "vendorId": "V-002" },
+  { "id": "ATM-BDG-001", "location": "Dago Plaza", "region": "BDG", "vendorId": "V-001" },
+  { "id": "ATM-BDG-002", "location": "Pasteur Gateway", "region": "BDG", "vendorId": "V-002" },
+  { "id": "ATM-BDG-003", "location": "Cihampelas Walk", "region": "BDG", "vendorId": "V-003" },
+  { "id": "ATM-BDG-004", "location": "Trans Studio Mall", "region": "BDG", "vendorId": "V-001" },
+  { "id": "ATM-BDG-005", "location": "Buah Batu Square", "region": "BDG", "vendorId": "V-002" },
+  { "id": "ATM-BDG-006", "location": "Bandung Indah Plaza", "region": "BDG", "vendorId": "V-003" },
+  { "id": "ATM-SBY-001", "location": "Tunjungan Plaza", "region": "SBY", "vendorId": "V-001" },
+  { "id": "ATM-SBY-002", "location": "Galaxy Mall", "region": "SBY", "vendorId": "V-002" },
+  { "id": "ATM-SBY-003", "location": "Pakuwon Mall", "region": "SBY", "vendorId": "V-003" },
+  { "id": "ATM-SBY-004", "location": "Grand City", "region": "SBY", "vendorId": "V-001" },
+  { "id": "ATM-SBY-005", "location": "Ciputra World", "region": "SBY", "vendorId": "V-002" },
+  { "id": "ATM-SBY-006", "location": "Marvell City", "region": "SBY", "vendorId": "V-003" }
+]

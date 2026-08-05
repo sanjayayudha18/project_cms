@@ -1,0 +1,20 @@
+[
+  { "id": "FC-001", "atmId": "ATM-JKT-001", "currentBalance": 180000000, "predictedUsageH1": 120000000, "predictedUsageH2": 130000000, "recommendedReplenishment": 250000000, "priority": "High" },
+  { "id": "FC-002", "atmId": "ATM-JKT-002", "currentBalance": 40000000, "predictedUsageH1": 150000000, "predictedUsageH2": 160000000, "recommendedReplenishment": 350000000, "priority": "High" },
+  { "id": "FC-003", "atmId": "ATM-JKT-003", "currentBalance": 190000000, "predictedUsageH1": 80000000, "predictedUsageH2": 90000000, "recommendedReplenishment": 0, "priority": "Low" },
+  { "id": "FC-004", "atmId": "ATM-JKT-004", "currentBalance": 90000000, "predictedUsageH1": 110000000, "predictedUsageH2": 100000000, "recommendedReplenishment": 200000000, "priority": "Medium" },
+  { "id": "FC-005", "atmId": "ATM-JKT-005", "currentBalance": 40000000, "predictedUsageH1": 130000000, "predictedUsageH2": 140000000, "recommendedReplenishment": 300000000, "priority": "High" },
+  { "id": "FC-006", "atmId": "ATM-JKT-006", "currentBalance": 210000000, "predictedUsageH1": 90000000, "predictedUsageH2": 85000000, "recommendedReplenishment": 0, "priority": "Low" },
+  { "id": "FC-007", "atmId": "ATM-JKT-007", "currentBalance": 90000000, "predictedUsageH1": 100000000, "predictedUsageH2": 110000000, "recommendedReplenishment": 200000000, "priority": "Medium" },
+  { "id": "FC-008", "atmId": "ATM-BDG-001", "currentBalance": 80000000, "predictedUsageH1": 120000000, "predictedUsageH2": 110000000, "recommendedReplenishment": 250000000, "priority": "High" },
+  { "id": "FC-009", "atmId": "ATM-BDG-002", "currentBalance": 190000000, "predictedUsageH1": 70000000, "predictedUsageH2": 80000000, "recommendedReplenishment": 0, "priority": "Low" },
+  { "id": "FC-010", "atmId": "ATM-BDG-003", "currentBalance": 45000000, "predictedUsageH1": 140000000, "predictedUsageH2": 130000000, "recommendedReplenishment": 300000000, "priority": "High" },
+  { "id": "FC-011", "atmId": "ATM-BDG-004", "currentBalance": 190000000, "predictedUsageH1": 75000000, "predictedUsageH2": 80000000, "recommendedReplenishment": 0, "priority": "Low" },
+  { "id": "FC-012", "atmId": "ATM-BDG-005", "currentBalance": 95000000, "predictedUsageH1": 100000000, "predictedUsageH2": 95000000, "recommendedReplenishment": 200000000, "priority": "Medium" },
+  { "id": "FC-013", "atmId": "ATM-SBY-001", "currentBalance": 80000000, "predictedUsageH1": 130000000, "predictedUsageH2": 120000000, "recommendedReplenishment": 250000000, "priority": "High" },
+  { "id": "FC-014", "atmId": "ATM-SBY-002", "currentBalance": 120000000, "predictedUsageH1": 100000000, "predictedUsageH2": 110000000, "recommendedReplenishment": 200000000, "priority": "Medium" },
+  { "id": "FC-015", "atmId": "ATM-SBY-003", "currentBalance": 40000000, "predictedUsageH1": 150000000, "predictedUsageH2": 140000000, "recommendedReplenishment": 350000000, "priority": "High" },
+  { "id": "FC-016", "atmId": "ATM-SBY-004", "currentBalance": 150000000, "predictedUsageH1": 90000000, "predictedUsageH2": 95000000, "recommendedReplenishment": 150000000, "priority": "Medium" },
+  { "id": "FC-017", "atmId": "ATM-SBY-005", "currentBalance": 140000000, "predictedUsageH1": 80000000, "predictedUsageH2": 75000000, "recommendedReplenishment": 0, "priority": "Low" },
+  { "id": "FC-018", "atmId": "ATM-SBY-006", "currentBalance": 190000000, "predictedUsageH1": 70000000, "predictedUsageH2": 65000000, "recommendedReplenishment": 0, "priority": "Low" }
+]

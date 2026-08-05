@@ -168,6 +168,12 @@ When verifying WCAG contrast ratios for OKLCH colors (no external lib needed), u
 
 ### Pattern: Prefer additive infrastructure over router-swap merges. When adding auth/RBAC/design-tokens to an existing working app, implement them as additive layers (Zustand store, route guard wrapper, CSS tokens file) rather than merging from a different codebase with an incompatible router. react-router-dom v7 supports guards via <RequireAuth> wrapper components — you get 90% of TanStack Router's protection benefits without a full rewrite. Migrate routers only as a deliberate, isolated refactor when features are stable.
 
+### Frontend monorepo Docker pattern: `frontend/` is an orchestration root, not an app root
+The `frontend/` directory contains a `docker-compose.yml` that orchestrates separate app containers. Each sub-app (`CompanyPortal-Vite/`, `VendorPortal-Vite/`) is fully self-contained with its own `Dockerfile`, `nginx.conf`, `package.json`, and `pnpm-lock.yaml`. They build independently — no shared node_modules or build step. When adding a new frontend app:
+1. Create a new folder under `frontend/` with its own Dockerfile + nginx.conf
+2. Add a service entry to `frontend/docker-compose.yml` with a unique port and image name
+3. Image naming convention: `{appname}-vite-fe` (e.g., `userportal-vite-fe`, `vendorportal-vite-fe`)
+
 ---
 
 ## Notes

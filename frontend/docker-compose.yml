@@ -1,0 +1,20 @@
+services:
+  userportal-vite:
+    build:
+      context: ./CompanyPortal-Vite
+      dockerfile: Dockerfile
+    image: companyportal-vite-fe
+    container_name: userportal-vite-fe
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+
+  vendorportal-vite:
+    build:
+      context: ./VendorPortal-Vite
+      dockerfile: Dockerfile
+    image: vendorportal-vite-fe
+    container_name: vendorportal-vite-fe
+    ports:
+      - "3002:80"
+    restart: unless-stopped

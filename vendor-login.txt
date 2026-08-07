@@ -2,3 +2,13 @@ Username	        Password	Vendor
 gardanet.admin	    password123	PT Gardanet
 ssi.admin	        password123	PT SSI
 g4s.admin	        password123	PT G4S
+
+Internal
+john.admin Password123!
+
+# Create hash password in GO 
+
+go run ./cmd/hashpw "Password123!"
+Paste output into migration SQL
+
+$env:PGPASSWORD='1818'; psql -U postgres -h localhost -d cms -c "UPDATE users SET password_hash = '`$2a`$12`$u0QCsCyc03NnHKrlgSNNdO3LxUrn.gaimz4BNB.D0/TDw0WArFq.a' WHERE auth_source = 'local_dev'; UPDATE users SET password_hash = '`$2a`$12`$u0QCsCyc03NnHKrlgSNNdO3LxUrn.gaimz4BNB.D0/TDw0WArFq.a' WHERE username = 'andi.vendor';"

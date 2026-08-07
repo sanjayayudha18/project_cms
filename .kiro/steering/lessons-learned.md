@@ -224,3 +224,21 @@ Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure
 
 ### RateLimiter interface in auth package for testability
 Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.
+
+### Separate docker-compose projects: nginx upstream must use `host.docker.internal`
+Frontend and backend run in **separate** docker-compose projects (`frontend/docker-compose.yml` vs `backend/docker-compose.yml`). They have isolated networks even if both define `cms-net` — Docker prefixes the network name with the project name. Nginx `proxy_pass http://backend:8080` will fail with `host not found in upstream` because the `backend` hostname only exists in the backend's network.
+
+Fix: use variable-based proxy_pass with Docker's internal DNS resolver to avoid crash-on-startup:
+```nginx
+location /api/ {
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $backend_upstream http://host.docker.internal:8080;
+    proxy_pass $backend_upstream;
+    # ... headers
+}
+```
+Key points:
+- `resolver 127.0.0.11` = Docker's embedded DNS
+- `set $variable` makes nginx resolve the upstream at request-time, not startup (prevents crash if backend is down)
+- `host.docker.internal` routes to the host machine where backend exposes its port
+- This applies to ALL frontend nginx.conf files in this project (CompanyPortal + VendorPortal)

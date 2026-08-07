@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/lib/auth/store";
-import type { Role } from "@/lib/auth/store";
+import type { DbRole } from "@/lib/auth/store";
 import { NAV_CONFIG } from "@/lib/config/navigation";
 import * as fc from "fast-check";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -25,20 +25,21 @@ import { requireRoles } from "./_protected";
  * ever access a restricted route's content.
  */
 
-const ALL_ROLES: Role[] = [
-  "Admin",
-  "ATM_Support",
-  "Cash_Management",
-  "Vendor",
-  "WMO",
-  "Finance",
-  "Cash_Count_PIC",
-  "Cash_Count_Lead",
-  "Branch",
-  "Approver",
+const ALL_DB_ROLES: DbRole[] = [
+  "ADMIN",
+  "ADMIN_PARAM",
+  "ATM-USER",
+  "ATM-SPV",
+  "BRANCH-USER",
+  "BRANCH-SPV",
+  "BRANCH-ATM-USER",
+  "BRANCH-ATM-SPV",
+  "VENDOR-USER",
 ];
 
-const NON_ADMIN_ROLES: Role[] = ALL_ROLES.filter((r) => r !== "Admin");
+const NON_ADMIN_ROLES: DbRole[] = ALL_DB_ROLES.filter(
+  (r) => r !== "ADMIN" && r !== "ADMIN_PARAM",
+);
 
 // Protected routes with specific (non-wildcard) role requirements
 const ROLE_RESTRICTED_ROUTES = NAV_CONFIG.filter(
@@ -53,33 +54,30 @@ describe("Route Protection — Property 3: Unauthenticated Route Protection", ()
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      isLoading: false,
+      isAuthLoading: false,
+      error: null,
+      rateLimitRetryAfter: null,
     });
   });
 
   it("beforeLoad throws redirect to /login for any protected route when unauthenticated", () => {
     fc.assert(
       fc.property(arbProtectedRoute, (_route) => {
-        // Set unauthenticated state
         useAuthStore.setState({
           user: null,
           accessToken: null,
           isAuthenticated: false,
-          isLoading: false,
+          isAuthLoading: false,
+          error: null,
+          rateLimitRetryAfter: null,
         });
 
-        // The beforeLoad function should throw a redirect
-        // We access the route options to get the beforeLoad function
-        // Since protectedRoute.beforeLoad accesses the store directly,
-        // we call the logic the same way the router would
-        const { isAuthenticated, isLoading } = useAuthStore.getState();
+        const { isAuthenticated, isAuthLoading } = useAuthStore.getState();
 
         // Simulate what beforeLoad does
-        if (isLoading) return; // would pass through
+        if (isAuthLoading) return;
 
         if (!isAuthenticated) {
-          // This is what the actual code does — throws redirect
-          // We verify the condition that triggers the redirect
           expect(isAuthenticated).toBe(false);
           return;
         }
@@ -94,13 +92,15 @@ describe("Route Protection — Property 3: Unauthenticated Route Protection", ()
   it("requireRoles throws redirect to /login when user is null", () => {
     fc.assert(
       fc.property(
-        fc.uniqueArray(fc.constantFrom(...ALL_ROLES), { minLength: 1 }),
+        fc.subarray(ALL_DB_ROLES, { minLength: 1 }),
         (requiredRoles) => {
           useAuthStore.setState({
             user: null,
             accessToken: null,
             isAuthenticated: true,
-            isLoading: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
           });
 
           // requireRoles should throw redirect when user is null
@@ -120,23 +120,20 @@ describe("Route Protection — Property 4: Unauthorized Route Blocking", () => {
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      isLoading: false,
+      isAuthLoading: false,
+      error: null,
+      rateLimitRetryAfter: null,
     });
   });
 
-  it("requireRoles returns { unauthorized: true } for any role without permission to a route", () => {
-    // For each role-restricted route, generate a user with roles that DON'T include
-    // any of the route's required roles (and exclude Admin which bypasses all checks)
+  it("requireRoles returns { forbidden: true } for any role without permission to a route", () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...ROLE_RESTRICTED_ROUTES),
         arbNonAdminRole,
-        fc.string({ minLength: 1 }),
-        fc.string({ minLength: 1 }),
-        fc.emailAddress(),
-        (navItem, baseRole, userId, fullName, email) => {
+        (navItem, baseRole) => {
           // Get roles that are NOT in the navItem's required roles
-          const routeRoles = navItem.roles.filter((r) => r !== "*") as Role[];
+          const routeRoles = navItem.roles.filter((r) => r !== "*") as DbRole[];
           const unauthorizedRoles = NON_ADMIN_ROLES.filter((r) => !routeRoles.includes(r));
 
           // Skip if there are no unauthorized roles for this route
@@ -147,47 +144,81 @@ describe("Route Protection — Property 4: Unauthorized Route Blocking", () => {
 
           useAuthStore.setState({
             user: {
-              id: userId,
-              fullName: fullName,
-              email: email,
-              roles: [userRole],
-              primaryRole: userRole,
+              id: 1,
+              username: "test.user",
+              fullName: "Test User",
+              email: "test@cimb.local",
+              role: userRole,
+              isKaryawan: true,
+              vendorId: null,
             },
             accessToken: "test-token",
             isAuthenticated: true,
-            isLoading: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
           });
 
           const result = requireRoles(routeRoles)();
-          expect(result).toEqual({ unauthorized: true });
+          expect(result).toEqual({ forbidden: true });
         },
       ),
       { numRuns: 100 },
     );
   });
 
-  it("Admin role always bypasses role checks (never gets unauthorized)", () => {
+  it("ADMIN role always bypasses role checks (never gets forbidden)", () => {
     fc.assert(
       fc.property(
-        fc.uniqueArray(fc.constantFrom(...NON_ADMIN_ROLES), { minLength: 1 }),
-        fc.string({ minLength: 1 }),
-        fc.string({ minLength: 1 }),
-        fc.emailAddress(),
-        (requiredRoles, userId, fullName, email) => {
+        fc.subarray(NON_ADMIN_ROLES, { minLength: 1 }),
+        (requiredRoles) => {
           useAuthStore.setState({
             user: {
-              id: userId,
-              fullName: fullName,
-              email: email,
-              roles: ["Admin"],
-              primaryRole: "Admin",
+              id: 1,
+              username: "admin.user",
+              fullName: "Admin User",
+              email: "admin@cimb.local",
+              role: "ADMIN",
+              isKaryawan: true,
+              vendorId: null,
             },
             accessToken: "test-token",
             isAuthenticated: true,
-            isLoading: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
           });
 
-          // Admin should never get unauthorized, requireRoles returns undefined (allows access)
+          const result = requireRoles(requiredRoles)();
+          expect(result).toBeUndefined();
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+
+  it("ADMIN_PARAM role always bypasses role checks (never gets forbidden)", () => {
+    fc.assert(
+      fc.property(
+        fc.subarray(NON_ADMIN_ROLES, { minLength: 1 }),
+        (requiredRoles) => {
+          useAuthStore.setState({
+            user: {
+              id: 1,
+              username: "param.admin",
+              fullName: "Param Admin",
+              email: "param@cimb.local",
+              role: "ADMIN_PARAM",
+              isKaryawan: true,
+              vendorId: null,
+            },
+            accessToken: "test-token",
+            isAuthenticated: true,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
+          });
+
           const result = requireRoles(requiredRoles)();
           expect(result).toBeUndefined();
         },
@@ -200,29 +231,30 @@ describe("Route Protection — Property 4: Unauthorized Route Blocking", () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...ROLE_RESTRICTED_ROUTES),
-        fc.string({ minLength: 1 }),
-        fc.string({ minLength: 1 }),
-        fc.emailAddress(),
-        (navItem, userId, fullName, email) => {
-          const routeRoles = navItem.roles.filter((r) => r !== "*") as Role[];
+        (navItem) => {
+          const routeRoles = navItem.roles.filter((r) => r !== "*") as DbRole[];
 
           // Skip routes with no specific roles
           if (routeRoles.length === 0) return;
 
           // Give user a role that IS in the route's required roles
-          const authorizedRole = routeRoles[0] as Role;
+          const authorizedRole = routeRoles[0] as DbRole;
 
           useAuthStore.setState({
             user: {
-              id: userId,
-              fullName: fullName,
-              email: email,
-              roles: [authorizedRole],
-              primaryRole: authorizedRole,
+              id: 1,
+              username: "authorized.user",
+              fullName: "Authorized User",
+              email: "auth@cimb.local",
+              role: authorizedRole,
+              isKaryawan: authorizedRole !== "VENDOR-USER",
+              vendorId: authorizedRole === "VENDOR-USER" ? 1 : null,
             },
             accessToken: "test-token",
             isAuthenticated: true,
-            isLoading: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
           });
 
           // User with matching role should pass through (undefined return)

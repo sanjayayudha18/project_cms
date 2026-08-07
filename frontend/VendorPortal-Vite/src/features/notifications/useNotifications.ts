@@ -11,7 +11,7 @@ export function useNotifications() {
     queryKey: ['notifications', vendorId],
     queryFn: () => {
       const allNotifications = notificationsData as Notification[];
-      return allNotifications.filter((n) => n.vendorId === vendorId);
+      return allNotifications.filter((n) => n.vendorId === String(vendorId));
     },
     enabled: !!vendorId,
   });

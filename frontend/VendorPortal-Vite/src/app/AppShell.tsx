@@ -112,13 +112,13 @@ export function AppShell() {
           </button>
 
           <span className="font-semibold text-sm truncate max-w-[300px]">
-            {user ? truncate(user.vendorName, 30) : ''}
+            Vendor Portal
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-sm hidden sm:inline">
-            {user ? truncate(user.displayName, 20) : ''}
+            {user ? truncate(user.fullName, 20) : ''}
           </span>
           <button
             type="button"

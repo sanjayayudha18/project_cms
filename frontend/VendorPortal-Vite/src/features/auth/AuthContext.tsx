@@ -1,117 +1,270 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import type { AuthState, JwtPayload, VendorUser } from '@/lib/types';
+import type { AuthState, AuthUser } from '@/lib/types';
 import { queryClient } from '@/lib/queryClient';
-import vendorsData from '@/data/vendors.json';
+
+// ─── API Config ───────────────────────────────────────────────────────────────
+
+const AUTH_API_BASE = '/api/v1/auth';
+
+// ─── Backend Response Types ───────────────────────────────────────────────────
+
+interface LoginSuccessResponse {
+  access_token: string;
+  user: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+    role: 'VENDOR-USER';
+    is_karyawan: boolean;
+    vendor_id: number | null;
+  };
+}
+
+interface ApiErrorResponse {
+  error: string;
+  message: string;
+  details?: Array<{ field: string; message: string }>;
+}
+
+// ─── Context Types ────────────────────────────────────────────────────────────
 
 export interface AuthContextValue {
   readonly state: AuthState;
   login(username: string, password: string): Promise<void>;
-  logout(): void;
+  logout(): Promise<void>;
+  refreshToken(): Promise<boolean>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-function encodeJwt(payload: JwtPayload): string {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const body = btoa(JSON.stringify(payload));
-  const signature = btoa('simulated-signature');
-  return `${header}.${body}.${signature}`;
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function decodeJwtPayload(token: string): JwtPayload | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const body = parts[1];
-    if (!body) return null;
-    const payload = JSON.parse(atob(body)) as JwtPayload;
-    if (!payload.vendor_id) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function buildUserFromPayload(payload: JwtPayload): VendorUser {
+function mapUserResponse(raw: LoginSuccessResponse['user']): AuthUser {
   return {
-    id: payload.sub,
-    username: '', // Not stored in JWT
-    displayName: payload.display_name,
-    vendorId: payload.vendor_id,
-    vendorName: payload.vendor_name,
-    role: payload.role,
+    id: raw.id,
+    username: raw.username,
+    fullName: raw.full_name,
+    email: raw.email,
+    role: raw.role,
+    isKaryawan: raw.is_karyawan,
+    vendorId: raw.vendor_id,
   };
 }
+
+// ─── Single-flight refresh ────────────────────────────────────────────────────
+
+let refreshPromise: Promise<boolean> | null = null;
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 interface AuthProviderProps {
   readonly children: ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<VendorUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+
+  // ─── Initialize: attempt token refresh on mount ─────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (cancelled) return;
+
+        if (response.ok) {
+          const data = (await response.json()) as LoginSuccessResponse;
+          setAccessToken(data.access_token);
+          setUser(mapUserResponse(data.user));
+        }
+      } catch {
+        // No refresh token available — user is not authenticated
+      } finally {
+        if (!cancelled) {
+          setIsAuthLoading(false);
+        }
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ─── Login ──────────────────────────────────────────────────────────────────
 
   const login = useCallback(async (username: string, password: string) => {
-    // Simulate async network call
-    await Promise.resolve();
+    setError(null);
+    setRateLimitRetryAfter(null);
 
-    const matchedUser = vendorsData.find(
-      (u) => u.username === username && u.password === password,
-    );
+    try {
+      const response = await fetch(`${AUTH_API_BASE}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Portal-Type': 'vendor',
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include',
+      });
 
-    if (!matchedUser) {
-      throw new Error('Username atau password salah');
+      if (response.ok) {
+        const data = (await response.json()) as LoginSuccessResponse;
+        setAccessToken(data.access_token);
+        setUser(mapUserResponse(data.user));
+        setError(null);
+        setRateLimitRetryAfter(null);
+        return;
+      }
+
+      // Handle error responses
+      switch (response.status) {
+        case 401: {
+          setError('Username atau password salah');
+          throw new Error('Username atau password salah');
+        }
+        case 403: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          if (body?.error === 'account_inactive') {
+            setError('Akun tidak aktif');
+            throw new Error('Akun tidak aktif');
+          } else if (body?.error === 'portal_mismatch') {
+            setError('Akun tidak memiliki akses ke portal ini');
+            throw new Error('Akun tidak memiliki akses ke portal ini');
+          } else {
+            const msg = body?.message ?? 'Akses ditolak';
+            setError(msg);
+            throw new Error(msg);
+          }
+        }
+        case 422: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          const msg = body?.message ?? 'Validasi gagal';
+          setError(msg);
+          throw new Error(msg);
+        }
+        case 429: {
+          const retryAfter = response.headers.get('Retry-After');
+          const seconds = retryAfter ? Number.parseInt(retryAfter, 10) : null;
+          const retryValue = Number.isFinite(seconds) ? seconds : null;
+          setError('Terlalu banyak percobaan login');
+          setRateLimitRetryAfter(retryValue);
+          throw new Error('Terlalu banyak percobaan login');
+        }
+        case 503: {
+          setError('Layanan sedang tidak tersedia');
+          throw new Error('Layanan sedang tidak tersedia');
+        }
+        default: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          const msg = body?.message ?? 'Terjadi kesalahan. Silakan coba lagi.';
+          setError(msg);
+          throw new Error(msg);
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'Failed to fetch') {
+        throw err;
+      }
+      // Network error
+      const msg = 'Gagal terhubung ke server. Silakan coba lagi.';
+      setError(msg);
+      throw new Error(msg);
     }
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload: JwtPayload = {
-      sub: matchedUser.id,
-      auth_source: 'local',
-      role: 'Vendor',
-      vendor_id: matchedUser.vendorId,
-      vendor_name: matchedUser.vendorName,
-      display_name: matchedUser.displayName,
-      exp: now + 3600, // 1 hour expiry
-      iat: now,
-    };
-
-    const jwt = encodeJwt(payload);
-
-    // Decode and validate the JWT contains vendor_id
-    const decoded = decodeJwtPayload(jwt);
-    if (!decoded?.vendor_id) {
-      throw new Error('Sesi tidak valid. Silakan login kembali.');
-    }
-
-    const vendorUser = buildUserFromPayload(decoded);
-    setToken(jwt);
-    setUser(vendorUser);
   }, []);
 
-  const logout = useCallback(() => {
-    setToken(null);
+  // ─── Logout ─────────────────────────────────────────────────────────────────
+
+  const logout = useCallback(async () => {
+    setAccessToken(null);
     setUser(null);
+    setError(null);
+    setRateLimitRetryAfter(null);
     queryClient.clear();
+
+    try {
+      await fetch(`${AUTH_API_BASE}/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Intentionally ignore — local state is already cleared
+    }
   }, []);
+
+  // ─── Refresh Token ──────────────────────────────────────────────────────────
+
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    // Single-flight: reuse existing refresh if in progress
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          setAccessToken(null);
+          setUser(null);
+          return false;
+        }
+
+        const data = (await response.json()) as LoginSuccessResponse;
+        setAccessToken(data.access_token);
+        setUser(mapUserResponse(data.user));
+        return true;
+      } catch {
+        setAccessToken(null);
+        setUser(null);
+        return false;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  }, []);
+
+  // ─── State ──────────────────────────────────────────────────────────────────
 
   const state: AuthState = useMemo(
     () => ({
-      token,
       user,
-      isAuthenticated: token !== null && user !== null,
+      isAuthenticated: accessToken !== null && user !== null,
+      isAuthLoading,
+      error,
+      rateLimitRetryAfter,
     }),
-    [token, user],
+    [accessToken, user, isAuthLoading, error, rateLimitRetryAfter],
   );
 
   const value: AuthContextValue = useMemo(
-    () => ({ state, login, logout }),
-    [state, login, logout],
+    () => ({ state, login, logout, refreshToken }),
+    [state, login, logout, refreshToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

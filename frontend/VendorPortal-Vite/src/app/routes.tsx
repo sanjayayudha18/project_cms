@@ -11,9 +11,15 @@ import { NotificationsPage } from '@/features/notifications/NotificationsPage';
 import { NotFound } from '@/components/NotFound';
 
 export const router = createBrowserRouter([
-  // Root redirect to /orders
+  // Root redirect to /dashboard
   {
     path: '/',
+    element: <Navigate to="/dashboard" replace />,
+  },
+
+  // Dashboard redirect to /orders (vendor default view)
+  {
+    path: '/dashboard',
     element: <Navigate to="/orders" replace />,
   },
 

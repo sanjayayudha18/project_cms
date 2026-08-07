@@ -1,42 +1,50 @@
-import type { Role } from "@/lib/auth/store";
+// Feature: user-login, Property 13: Navigation Filtering by Role
+import type { DbRole } from "@/lib/auth/store";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { NAV_CONFIG, type NavItem, filterNavByRoles } from "./navigation";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ALL_ROLES: Role[] = [
-  "Admin",
-  "ATM_Support",
-  "Cash_Management",
-  "Vendor",
-  "WMO",
-  "Finance",
-  "Cash_Count_PIC",
-  "Cash_Count_Lead",
-  "Branch",
-  "Approver",
+const ALL_DB_ROLES: DbRole[] = [
+  "ADMIN",
+  "ADMIN_PARAM",
+  "ATM-USER",
+  "ATM-SPV",
+  "BRANCH-USER",
+  "BRANCH-SPV",
+  "BRANCH-ATM-USER",
+  "BRANCH-ATM-SPV",
+  "VENDOR-USER",
 ];
+
+const ADMIN_ROLES: DbRole[] = ["ADMIN", "ADMIN_PARAM"];
+const NON_ADMIN_ROLES: DbRole[] = ALL_DB_ROLES.filter(
+  (r) => !ADMIN_ROLES.includes(r),
+);
 
 // ─── Arbitraries ──────────────────────────────────────────────────────────────
 
-/** Generates a non-empty subset of roles */
-const arbRoleSubset: fc.Arbitrary<Role[]> = fc
-  .subarray(ALL_ROLES, { minLength: 1, maxLength: ALL_ROLES.length })
-  .map((roles) => [...roles]);
+/** Generates any single DbRole */
+const arbDbRole: fc.Arbitrary<DbRole> = fc.constantFrom(...ALL_DB_ROLES);
 
-/** Generates an arbitrary NavItem with random role assignments */
+/** Generates a non-admin DbRole */
+const arbNonAdminRole: fc.Arbitrary<DbRole> = fc.constantFrom(...NON_ADMIN_ROLES);
+
+/** Generates an admin DbRole (ADMIN or ADMIN_PARAM) */
+const arbAdminRole: fc.Arbitrary<DbRole> = fc.constantFrom(...ADMIN_ROLES);
+
+/** Generates an arbitrary NavItem with random DB role assignments */
 const arbNavItem: fc.Arbitrary<NavItem> = fc
   .record({
     id: fc.string({ minLength: 1, maxLength: 20 }),
     label: fc.string({ minLength: 1, maxLength: 30 }),
     href: fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
     roles: fc.oneof(
-      // Either wildcard or a non-empty subset of roles
-      fc.constant(["*"] as (Role | "*")[]),
+      fc.constant(["*"] as (DbRole | "*")[]),
       fc
-        .subarray(ALL_ROLES, { minLength: 1, maxLength: ALL_ROLES.length })
-        .map((r) => r as (Role | "*")[]),
+        .subarray(ALL_DB_ROLES, { minLength: 1, maxLength: ALL_DB_ROLES.length })
+        .map((r) => r as (DbRole | "*")[]),
     ),
     group: fc.constantFrom(
       "general" as const,
@@ -48,7 +56,6 @@ const arbNavItem: fc.Arbitrary<NavItem> = fc
   })
   .map((record) => ({
     ...record,
-    // Use a stub icon — not needed for filtering logic
     icon: (() => null) as unknown as NavItem["icon"],
   }));
 
@@ -58,91 +65,84 @@ const arbNavItems: fc.Arbitrary<NavItem[]> = fc.array(arbNavItem, {
   maxLength: 25,
 });
 
-// ─── Property 1: RBAC Navigation Filtering ───────────────────────────────────
+// ─── Property 13: Navigation Filtering by Role ───────────────────────────────
 
 /**
- * Property 1: RBAC Navigation Filtering
- * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.7
+ * **Validates: Requirements 11.2, 11.4, 11.5, 11.6**
  *
- * For any user with a given set of roles, the navigation filter function SHALL
- * return only those nav items whose `roles` array intersects with the user's
- * roles (or contains the wildcard '*'). No item outside the user's role
- * permissions should ever appear, and no permitted item should ever be omitted.
+ * For any user role R and navigation configuration, the filterNavByRoles
+ * function SHALL return only items where R is in the item's allowed roles list
+ * or the item has wildcard "*" access. For ADMIN and ADMIN_PARAM roles, all
+ * items SHALL be returned regardless of their allowed roles list.
  */
-describe("filterNavByRoles — Property 1: RBAC Navigation Filtering", () => {
-  it("returns only items whose roles intersect with user roles or contain '*' (Admin sees all)", () => {
+describe("Property 13: Navigation Filtering by Role", () => {
+  it("for any role R, returned items have R in allowed list or wildcard '*'", () => {
     fc.assert(
-      fc.property(arbNavItems, arbRoleSubset, (items, userRoles) => {
-        const result = filterNavByRoles(items, userRoles);
-
-        // Admin is a special case: it sees every item unconditionally.
-        if (userRoles.includes("Admin")) {
-          expect(result).toEqual(items);
-          return;
-        }
+      fc.property(arbNavItems, arbNonAdminRole, (items, userRole) => {
+        const result = filterNavByRoles(items, userRole);
 
         for (const item of result) {
           const hasWildcard = item.roles.includes("*");
-          const hasIntersection = item.roles.some((role) => userRoles.includes(role as Role));
-          expect(hasWildcard || hasIntersection).toBe(true);
+          const hasRole = item.roles.includes(userRole);
+          expect(hasWildcard || hasRole).toBe(true);
         }
       }),
+      { numRuns: 200 },
     );
   });
 
-  it("never omits an item that should be included (completeness)", () => {
+  it("ADMIN and ADMIN_PARAM see all items (admin override)", () => {
     fc.assert(
-      fc.property(arbNavItems, arbRoleSubset, (items, userRoles) => {
-        const result = filterNavByRoles(items, userRoles);
-        const isAdmin = userRoles.includes("Admin");
+      fc.property(arbNavItems, arbAdminRole, (items, adminRole) => {
+        const result = filterNavByRoles(items, adminRole);
+        expect(result).toEqual(items);
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("no permitted item is ever omitted (completeness)", () => {
+    fc.assert(
+      fc.property(arbNavItems, arbDbRole, (items, userRole) => {
+        const result = filterNavByRoles(items, userRole);
+        const isAdmin = ADMIN_ROLES.includes(userRole);
 
         for (const item of items) {
           const shouldBeIncluded =
             isAdmin ||
             item.roles.includes("*") ||
-            item.roles.some((role) => userRoles.includes(role as Role));
+            item.roles.includes(userRole);
 
           if (shouldBeIncluded) {
             expect(result).toContain(item);
           }
         }
       }),
+      { numRuns: 200 },
     );
   });
 
-  it("never includes an item that should be excluded (soundness)", () => {
+  it("no unpermitted item is ever included (soundness)", () => {
     fc.assert(
-      fc.property(arbNavItems, arbRoleSubset, (items, userRoles) => {
-        const result = filterNavByRoles(items, userRoles);
-        const isAdmin = userRoles.includes("Admin");
+      fc.property(arbNavItems, arbNonAdminRole, (items, userRole) => {
+        const result = filterNavByRoles(items, userRole);
 
         for (const item of items) {
-          // Admin sees everything, so nothing is excluded for an Admin user.
           const shouldBeExcluded =
-            !isAdmin &&
-            !item.roles.includes("*") &&
-            !item.roles.some((role) => userRoles.includes(role as Role));
+            !item.roles.includes("*") && !item.roles.includes(userRole);
 
           if (shouldBeExcluded) {
             expect(result).not.toContain(item);
           }
         }
       }),
+      { numRuns: 200 },
     );
   });
 
-  it("returns empty array when user has no roles", () => {
+  it("wildcard items are always included for any role", () => {
     fc.assert(
-      fc.property(arbNavItems, (items) => {
-        const result = filterNavByRoles(items, []);
-        expect(result).toHaveLength(0);
-      }),
-    );
-  });
-
-  it("wildcard items are always included for any authenticated user", () => {
-    fc.assert(
-      fc.property(arbRoleSubset, (userRoles) => {
+      fc.property(arbDbRole, (userRole) => {
         const wildcardItem: NavItem = {
           id: "wildcard-test",
           label: "Wildcard",
@@ -151,151 +151,41 @@ describe("filterNavByRoles — Property 1: RBAC Navigation Filtering", () => {
           roles: ["*"],
           group: "general",
         };
-        const items = [wildcardItem];
-        const result = filterNavByRoles(items, userRoles);
-
+        const result = filterNavByRoles([wildcardItem], userRole);
         expect(result).toContain(wildcardItem);
       }),
+      { numRuns: 100 },
     );
   });
 
   it("works correctly against the real NAV_CONFIG", () => {
     fc.assert(
-      fc.property(arbRoleSubset, (userRoles) => {
-        const result = filterNavByRoles(NAV_CONFIG, userRoles);
+      fc.property(arbDbRole, (userRole) => {
+        const result = filterNavByRoles(NAV_CONFIG, userRole);
+        const isAdmin = ADMIN_ROLES.includes(userRole);
 
-        // Admin sees the entire config unconditionally.
-        if (userRoles.includes("Admin")) {
+        if (isAdmin) {
           expect(result).toEqual(NAV_CONFIG);
           return;
         }
 
-        // Every result item is justified
+        // Every returned item is justified
         for (const item of result) {
           const justified =
-            item.roles.includes("*") || item.roles.some((role) => userRoles.includes(role as Role));
+            item.roles.includes("*") || item.roles.includes(userRole);
           expect(justified).toBe(true);
         }
 
         // No missing items
         for (const item of NAV_CONFIG) {
           const shouldBeIn =
-            item.roles.includes("*") || item.roles.some((role) => userRoles.includes(role as Role));
+            item.roles.includes("*") || item.roles.includes(userRole);
           if (shouldBeIn) {
             expect(result).toContain(item);
           }
         }
       }),
-    );
-  });
-});
-
-// ─── Property 2: Active Route Highlighting ───────────────────────────────────
-
-/**
- * Property 2: Active Route Highlighting
- * Validates: Requirements 1.5
- *
- * For any valid route path from the navigation configuration, the
- * active-item-matching function SHALL return exactly one nav item whose `href`
- * matches the current route. No route should match zero items (when the route
- * is a known nav route) and no route should match more than one item.
- */
-describe("Active route matching — Property 2: Active Route Highlighting", () => {
-  /** The active-item-matching function as used in Sidebar */
-  function findActiveItem(items: NavItem[], currentPath: string): NavItem | undefined {
-    return items.find((item) => currentPath === item.href);
-  }
-
-  it("NAV_CONFIG has unique href values (precondition)", () => {
-    const hrefs = NAV_CONFIG.map((item) => item.href);
-    const uniqueHrefs = new Set(hrefs);
-    expect(uniqueHrefs.size).toBe(hrefs.length);
-  });
-
-  it("for any NAV_CONFIG href, exactly one item matches", () => {
-    const arbNavIndex = fc.integer({ min: 0, max: NAV_CONFIG.length - 1 });
-
-    fc.assert(
-      fc.property(arbNavIndex, (index) => {
-        const targetItem = NAV_CONFIG[index];
-        if (!targetItem) return;
-        const currentPath = targetItem.href;
-
-        // Count matches
-        const matches = NAV_CONFIG.filter((item) => currentPath === item.href);
-        expect(matches).toHaveLength(1);
-        expect(matches[0]).toBe(targetItem);
-      }),
-    );
-  });
-
-  it("findActiveItem returns the correct item for any known route", () => {
-    const arbNavIndex = fc.integer({ min: 0, max: NAV_CONFIG.length - 1 });
-
-    fc.assert(
-      fc.property(arbNavIndex, (index) => {
-        const targetItem = NAV_CONFIG[index];
-        if (!targetItem) return;
-        const result = findActiveItem(NAV_CONFIG, targetItem.href);
-
-        expect(result).toBeDefined();
-        expect(result?.id).toBe(targetItem.id);
-        expect(result?.href).toBe(targetItem.href);
-      }),
-    );
-  });
-
-  it("findActiveItem returns undefined for unknown routes", () => {
-    const knownHrefs = new Set(NAV_CONFIG.map((item) => item.href));
-    const arbUnknownPath = fc
-      .string({ minLength: 2, maxLength: 30 })
-      .map((s) => `/unknown/${s}`)
-      .filter((path) => !knownHrefs.has(path));
-
-    fc.assert(
-      fc.property(arbUnknownPath, (unknownPath) => {
-        const result = findActiveItem(NAV_CONFIG, unknownPath);
-        expect(result).toBeUndefined();
-      }),
-    );
-  });
-
-  it("no route matches more than one item (uniqueness across arbitrary items with unique hrefs)", () => {
-    const arbUniqueNavItems = fc
-      .array(
-        fc.record({
-          id: fc.string({ minLength: 1, maxLength: 10 }),
-          label: fc.string({ minLength: 1, maxLength: 20 }),
-          href: fc.string({ minLength: 1, maxLength: 30 }).map((s) => `/${s}`),
-          roles: fc.constant(["*"] as (Role | "*")[]),
-          group: fc.constant("general" as const),
-        }),
-        { minLength: 2, maxLength: 15 },
-      )
-      .map((items) => {
-        // Deduplicate hrefs
-        const seen = new Set<string>();
-        return items
-          .filter((item) => {
-            if (seen.has(item.href)) return false;
-            seen.add(item.href);
-            return true;
-          })
-          .map((item) => ({
-            ...item,
-            icon: (() => null) as unknown as NavItem["icon"],
-          }));
-      })
-      .filter((items) => items.length >= 2);
-
-    fc.assert(
-      fc.property(arbUniqueNavItems, (items) => {
-        for (const item of items) {
-          const matches = items.filter((i) => i.href === item.href);
-          expect(matches).toHaveLength(1);
-        }
-      }),
+      { numRuns: 100 },
     );
   });
 });

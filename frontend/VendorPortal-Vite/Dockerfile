@@ -1,6 +1,6 @@
 # Stage 1: Install dependencies and build
-FROM node:20-alpine AS builder
-RUN npm install -g pnpm@9
+FROM node:22-alpine AS builder
+RUN corepack enable && corepack install --global pnpm@11.9.0
 WORKDIR /app
 COPY pnpm-lock.yaml package.json ./
 RUN pnpm install --frozen-lockfile

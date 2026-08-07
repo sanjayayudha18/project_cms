@@ -2,8 +2,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, apiClient } from "./client";
 
-// Force the real-backend code path so the fetch mocks below are exercised
-// instead of the stub interceptor (test env resolves mode to "stub" by default).
+// Mock config to provide baseURL
 vi.mock("./config", () => ({
   apiConfig: { mode: "real", baseURL: "/api/v1", stubLatency: { min: 200, max: 800 } },
 }));
@@ -18,7 +17,9 @@ beforeEach(() => {
     user: null,
     accessToken: null,
     isAuthenticated: false,
-    isLoading: false,
+    isAuthLoading: false,
+    error: null,
+    rateLimitRetryAfter: null,
   });
 });
 
@@ -48,7 +49,7 @@ function unauthorizedResponse(): Response {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("API Client - Auth Header Injection", () => {
-  it("injects Authorization header when access token is present", async () => {
+  it("injects Authorization: Bearer header when access token is present", async () => {
     useAuthStore.setState({ accessToken: "test-jwt-token" });
     mockFetch.mockResolvedValueOnce(jsonResponse({ ok: true }));
 
@@ -131,7 +132,7 @@ describe("API Client - Request Methods", () => {
   });
 });
 
-describe("API Client - 401 Retry Logic", () => {
+describe("API Client - 401 Single-Flight Refresh", () => {
   it("retries request after successful token refresh", async () => {
     useAuthStore.setState({ accessToken: "expired-token" });
 
@@ -140,13 +141,15 @@ describe("API Client - 401 Retry Logic", () => {
     // Refresh token call succeeds
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
-        accessToken: "new-token",
+        access_token: "new-token",
         user: {
-          id: "1",
-          fullName: "User",
-          email: "u@test.com",
-          roles: ["Admin"],
-          primaryRole: "Admin",
+          id: 1,
+          username: "john.admin",
+          full_name: "John Admin",
+          email: "john@cimb.local",
+          role: "ADMIN",
+          is_karyawan: true,
+          vendor_id: null,
         },
       }),
     );
@@ -166,7 +169,7 @@ describe("API Client - 401 Retry Logic", () => {
     // Mock window.location for logout redirect
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
-      value: { ...originalLocation, href: "/" },
+      value: { ...originalLocation, href: "/", pathname: "/", search: "" },
       writable: true,
       configurable: true,
     });

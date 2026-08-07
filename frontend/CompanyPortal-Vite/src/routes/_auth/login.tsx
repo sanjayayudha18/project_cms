@@ -9,7 +9,7 @@ import { z } from "zod";
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Wajib diisi").email("Format email tidak valid"),
+  username: z.string().min(1, "Wajib diisi"),
   password: z.string().min(1, "Wajib diisi"),
 });
 
@@ -28,20 +28,22 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { username: "", password: "" },
   });
 
-  const emailField = register("email");
+  const usernameField = register("username");
   const passwordField = register("password");
 
   const onSubmit = async (data: LoginFormData) => {
     setLoginError(null);
-    const result = await login(data);
+    await login(data.username, data.password);
 
-    if (result.success) {
+    // Check store for errors after login attempt
+    const state = useAuthStore.getState();
+    if (state.error) {
+      setLoginError(state.error);
+    } else if (state.isAuthenticated) {
       router.navigate({ to: "/" });
-    } else {
-      setLoginError("Kredensial tidak valid");
     }
   };
 
@@ -94,36 +96,36 @@ export function LoginPage() {
         className="flex flex-col gap-[var(--space-6)]"
       >
         <div className="flex flex-col gap-[var(--space-4)]">
-          {/* Email */}
+          {/* Username */}
           <fieldset className="flex flex-col gap-[6px]">
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="text-[13px] font-medium"
               style={{ color: "var(--n-700)" }}
             >
-              Email
+              Username
             </label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="anda@cimb.co.id"
+              id="username"
+              type="text"
+              autoComplete="username"
+              placeholder="Username"
               className="h-10 w-full rounded-[var(--radius-md)] border px-[var(--space-3)] text-sm outline-none"
               style={{
-                borderColor: errors.email ? "var(--danger-500)" : "var(--n-300)",
+                borderColor: errors.username ? "var(--danger-500)" : "var(--n-300)",
                 backgroundColor: "var(--n-0)",
                 color: "var(--n-800)",
               }}
-              {...emailField}
-              onFocus={(e) => applyFocusRing(e.currentTarget, Boolean(errors.email))}
+              {...usernameField}
+              onFocus={(e) => applyFocusRing(e.currentTarget, Boolean(errors.username))}
               onBlur={(e) => {
-                emailField.onBlur(e);
-                clearFocusRing(e.currentTarget, Boolean(errors.email));
+                usernameField.onBlur(e);
+                clearFocusRing(e.currentTarget, Boolean(errors.username));
               }}
             />
-            {errors.email && (
+            {errors.username && (
               <p className="text-xs" style={{ color: "var(--danger-fg)" }}>
-                {errors.email.message}
+                {errors.username.message}
               </p>
             )}
           </fieldset>

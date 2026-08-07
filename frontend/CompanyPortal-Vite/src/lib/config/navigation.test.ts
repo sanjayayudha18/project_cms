@@ -1,5 +1,6 @@
 import { LayoutDashboard } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import type { DbRole } from "@/lib/auth/store";
 import { GROUP_LABELS, NAV_CONFIG, type NavItem, filterNavByRoles } from "./navigation";
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@ function makeItem(overrides: Partial<NavItem> = {}): NavItem {
     label: "Test",
     icon: LayoutDashboard,
     href: "/test",
-    roles: ["Admin"],
+    roles: ["ADMIN"],
     group: "general",
     ...overrides,
   };
@@ -19,68 +20,62 @@ function makeItem(overrides: Partial<NavItem> = {}): NavItem {
 // ─── filterNavByRoles ─────────────────────────────────────────────────────────
 
 describe("filterNavByRoles", () => {
-  it("returns empty array when user has no roles", () => {
-    const items: NavItem[] = [makeItem({ roles: ["*"] })];
-    expect(filterNavByRoles(items, [])).toEqual([]);
-  });
-
   it("returns all wildcard items for any authenticated user", () => {
     const items: NavItem[] = [
       makeItem({ id: "a", roles: ["*"] }),
-      makeItem({ id: "b", roles: ["Admin"] }),
+      makeItem({ id: "b", roles: ["ADMIN"] }),
     ];
-    const result = filterNavByRoles(items, ["Vendor"]);
+    const result = filterNavByRoles(items, "VENDOR-USER");
     expect(result.map((i) => i.id)).toEqual(["a"]);
   });
 
-  it("includes items matching any of user roles", () => {
+  it("includes items matching user role", () => {
     const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["Admin", "WMO"] }),
-      makeItem({ id: "b", roles: ["Finance"] }),
+      makeItem({ id: "a", roles: ["ATM-USER", "ATM-SPV"] }),
+      makeItem({ id: "b", roles: ["BRANCH-USER"] }),
     ];
-    const result = filterNavByRoles(items, ["WMO"]);
+    const result = filterNavByRoles(items, "ATM-SPV");
     expect(result.map((i) => i.id)).toEqual(["a"]);
   });
 
-  it("includes items when user has multiple non-admin roles", () => {
+  it("ADMIN sees all items regardless of role restrictions", () => {
     const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["WMO"] }),
-      makeItem({ id: "b", roles: ["Finance"] }),
-      makeItem({ id: "c", roles: ["Vendor"] }),
+      makeItem({ id: "a", roles: ["BRANCH-USER"] }),
+      makeItem({ id: "b", roles: ["VENDOR-USER"] }),
+      makeItem({ id: "c", roles: ["ATM-SPV"] }),
     ];
-    const result = filterNavByRoles(items, ["WMO", "Finance"]);
-    expect(result.map((i) => i.id)).toEqual(["a", "b"]);
-  });
-
-  it("returns all items when user is Admin (Admin sees everything)", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["Admin"] }),
-      makeItem({ id: "b", roles: ["Finance"] }),
-      makeItem({ id: "c", roles: ["Vendor"] }),
-    ];
-    const result = filterNavByRoles(items, ["Admin", "Finance"]);
+    const result = filterNavByRoles(items, "ADMIN");
     expect(result.map((i) => i.id)).toEqual(["a", "b", "c"]);
   });
 
-  it("returns empty array when no items match", () => {
+  it("ADMIN_PARAM sees all items regardless of role restrictions", () => {
     const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["Admin"] }),
-      makeItem({ id: "b", roles: ["Finance"] }),
+      makeItem({ id: "a", roles: ["BRANCH-USER"] }),
+      makeItem({ id: "b", roles: ["VENDOR-USER"] }),
     ];
-    const result = filterNavByRoles(items, ["Vendor"]);
+    const result = filterNavByRoles(items, "ADMIN_PARAM");
+    expect(result.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("returns empty array when no items match user role", () => {
+    const items: NavItem[] = [
+      makeItem({ id: "a", roles: ["ADMIN"] }),
+      makeItem({ id: "b", roles: ["BRANCH-USER"] }),
+    ];
+    const result = filterNavByRoles(items, "VENDOR-USER");
     expect(result).toEqual([]);
   });
 
   it("returns empty array when items array is empty", () => {
-    expect(filterNavByRoles([], ["Admin"])).toEqual([]);
+    expect(filterNavByRoles([], "ADMIN")).toEqual([]);
   });
 
   it("preserves disabled items in output (filtering is role-based only)", () => {
     const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["Admin"], disabled: true }),
-      makeItem({ id: "b", roles: ["Admin"], disabled: false }),
+      makeItem({ id: "a", roles: ["ATM-USER"], disabled: true }),
+      makeItem({ id: "b", roles: ["ATM-USER"], disabled: false }),
     ];
-    const result = filterNavByRoles(items, ["Admin"]);
+    const result = filterNavByRoles(items, "ATM-USER");
     expect(result).toHaveLength(2);
     expect(result[0]?.disabled).toBe(true);
   });
@@ -88,11 +83,22 @@ describe("filterNavByRoles", () => {
   it("handles wildcard mixed with specific roles", () => {
     const items: NavItem[] = [
       makeItem({ id: "dashboard", roles: ["*"] }),
-      makeItem({ id: "settings", roles: ["Admin"] }),
-      makeItem({ id: "upload", roles: ["Vendor", "ATM_Support"] }),
+      makeItem({ id: "settings", roles: ["ADMIN"] }),
+      makeItem({ id: "upload", roles: ["VENDOR-USER", "ATM-USER"] }),
     ];
-    const result = filterNavByRoles(items, ["ATM_Support"]);
+    const result = filterNavByRoles(items, "ATM-USER");
     expect(result.map((i) => i.id)).toEqual(["dashboard", "upload"]);
+  });
+
+  it("VENDOR-USER only sees items with VENDOR-USER or wildcard", () => {
+    const items: NavItem[] = [
+      makeItem({ id: "dashboard", roles: ["*"] }),
+      makeItem({ id: "dsr-upload", roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"] }),
+      makeItem({ id: "settings", roles: ["ADMIN"] }),
+      makeItem({ id: "forecast", roles: ["ATM-USER", "ATM-SPV"] }),
+    ];
+    const result = filterNavByRoles(items, "VENDOR-USER");
+    expect(result.map((i) => i.id)).toEqual(["dashboard", "dsr-upload"]);
   });
 });
 
@@ -123,9 +129,29 @@ describe("NAV_CONFIG", () => {
     expect(dashboard?.roles).toContain("*");
   });
 
-  it("settings is restricted to Admin only", () => {
+  it("settings is restricted to ADMIN only", () => {
     const settings = NAV_CONFIG.find((i) => i.id === "settings");
-    expect(settings?.roles).toEqual(["Admin"]);
+    expect(settings?.roles).toEqual(["ADMIN"]);
+  });
+
+  it("all roles in NAV_CONFIG are valid DbRole or wildcard", () => {
+    const validRoles: (DbRole | "*")[] = [
+      "*",
+      "ADMIN",
+      "ADMIN_PARAM",
+      "ATM-USER",
+      "ATM-SPV",
+      "BRANCH-USER",
+      "BRANCH-SPV",
+      "BRANCH-ATM-USER",
+      "BRANCH-ATM-SPV",
+      "VENDOR-USER",
+    ];
+    for (const item of NAV_CONFIG) {
+      for (const role of item.roles) {
+        expect(validRoles).toContain(role);
+      }
+    }
   });
 });
 

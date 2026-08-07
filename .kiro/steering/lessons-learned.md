@@ -174,6 +174,29 @@ The `frontend/` directory contains a `docker-compose.yml` that orchestrates sepa
 2. Add a service entry to `frontend/docker-compose.yml` with a unique port and image name
 3. Image naming convention: `{appname}-vite-fe` (e.g., `userportal-vite-fe`, `vendorportal-vite-fe`)
 
+### pnpm major upgrade + Docker: lockfile version mismatch breaks `--frozen-lockfile`
+When upgrading pnpm across major versions (e.g., 9→11), the lockfile format changes (lockfileVersion `9.0` → `10.0`). pnpm 11 reads v9 lockfiles locally in backward-compat mode, but `--frozen-lockfile` in a fresh Docker container may reject the mismatch. Fix:
+1. Run `pnpm install` locally to regenerate `pnpm-lock.yaml` at the new lockfile version
+2. Commit the updated lockfile
+3. Restore `--frozen-lockfile` in the Dockerfile
+
+Also: `corepack prepare` and `corepack install --global` can both fail in `node:22-alpine` for pnpm 11.x. Use `npm install -g pnpm@<exact-version>` in Dockerfiles for reliable installs.
+
+### pnpm 11 Docker builds: must COPY `pnpm-workspace.yaml` before `pnpm install`
+pnpm 11 no longer reads config from `package.json#pnpm`. All settings (including `allowBuilds` for postinstall scripts) moved to `pnpm-workspace.yaml`. In Dockerfiles, the COPY line before `pnpm install` MUST include `pnpm-workspace.yaml`:
+```dockerfile
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+```
+Without it, pnpm sees no build allowlist and fails with `ERR_PNPM_IGNORED_BUILDS` for packages like `@biomejs/biome` and `esbuild`. The `pnpm.onlyBuiltDependencies` field in `package.json` does nothing in pnpm 11 — use `allowBuilds` in `pnpm-workspace.yaml` instead.
+
+### Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b`
+The root `tsconfig.json` references `tsconfig.app.json`, `tsconfig.node.json`, AND `tsconfig.test.json`. Running `tsc -b` (which the `pnpm build` script does via `tsc -b && vite build`) compiles all three — including test files that may have type errors irrelevant to production. In Docker, override the build command:
+```dockerfile
+RUN pnpm tsc -b tsconfig.app.json && pnpm vite build
+```
+This type-checks only production source code. Test type errors should be caught in CI test steps, not during Docker image builds.
+
 ---
 
 ## Notes
@@ -182,3 +205,22 @@ The `frontend/` directory contains a `docker-compose.yml` that orchestrates sepa
 - Remove patterns that are no longer relevant
 - Update patterns as the project evolves
 - Focus on what's unique to this project
+
+### DB constraint evolution for dev/prod split: add a new enum value, don't relax existing ones
+When a DB schema has strict CHECK constraints designed for production (e.g., `auth_source IN ('ldap', 'local')` with business rules like "internal users must be 'ldap'"), don't change existing rows to a different allowed value or loosen the constraint. Instead, add a new enum value (`'local_dev'`) with its own constraint branch. Benefits:
+- Production constraint remains untouched and enforceable
+- Migration to production is clear: stop using `local_dev`, switch to `ldap`
+- Down migration is straightforward: revert the new value, restore original state
+- No risk of accidentally shipping dev-mode data to production
+
+Applied in: `user-login` spec, Requirement 1 — added `auth_source='local_dev'` rather than changing internal users to `auth_source='local'`.
+
+### Spec task dependency graph format: use `{ id, tasks }` objects, not bare arrays
+The Kiro task management tools expect the Task Dependency Graph `waves` field to be an array of objects with `{ "id": N, "tasks": ["1.1", "1.2", ...] }` — referencing sub-task IDs as strings. Bare arrays like `[["1"], ["2"]]` or numeric arrays like `[[1], [2]]` cause parse failures (`Cannot read properties of undefined (reading 'map')`). When creating tasks.md, always use the object format:
+```json
+{ "waves": [{ "id": 0, "tasks": ["1.1", "1.2"] }, { "id": 1, "tasks": ["1.3"] }] }
+```
+Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure about format.
+
+### RateLimiter interface in auth package for testability
+Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.

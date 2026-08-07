@@ -75,7 +75,9 @@ describe("API Client — Property 18: Auth Header Injection", () => {
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      isLoading: false,
+      isAuthLoading: false,
+      error: null,
+      rateLimitRetryAfter: null,
     });
   });
 

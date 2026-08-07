@@ -19,14 +19,14 @@ export const rootRoute = createRootRoute({
 
 function RootComponent() {
   const initialize = useAuthStore((s) => s.initialize);
-  const isLoading = useAuthStore((s) => s.isLoading);
+  const isAuthLoading = useAuthStore((s) => s.isAuthLoading);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
   // Show a loading indicator while checking auth state
-  if (isLoading) {
+  if (isAuthLoading) {
     return (
       <div
         className="flex min-h-screen items-center justify-center"

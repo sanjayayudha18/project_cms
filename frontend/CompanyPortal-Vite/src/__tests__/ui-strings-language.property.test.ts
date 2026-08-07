@@ -182,7 +182,7 @@ function extractJsxStringLiterals(content: string): string[] {
   let match: RegExpExecArray | null;
 
   while ((match = jsxTextRegex.exec(withoutComments)) !== null) {
-    const text = match[1].trim();
+    const text = match[1]?.trim();
     if (!text || text.length <= 1 || /^\s*$/.test(text)) continue;
     // Skip if it looks like code: contains =, ;, (), [], or template literals
     if (/[=;()\[\]`$]/.test(text)) continue;
@@ -197,7 +197,7 @@ function extractJsxStringLiterals(content: string): string[] {
   const attrRegex =
     /(?:label|title|description|message|placeholder|eyebrow)\s*=\s*"([^"]+)"/g;
   while ((match = attrRegex.exec(withoutComments)) !== null) {
-    const text = match[1].trim();
+    const text = match[1]?.trim();
     if (text && text.length > 1) {
       strings.push(text);
     }
@@ -318,7 +318,9 @@ describe("Property 11: UI Strings Language Compliance", () => {
 
     fc.assert(
       fc.property(fileIndex, (idx) => {
-        const { file, content } = fileContents[idx];
+        const entry = fileContents[idx];
+        if (!entry) return;
+        const { file, content } = entry;
         const strings = extractJsxStringLiterals(content);
         const relPath = path.relative(FEATURES_DIR, file);
 
@@ -385,7 +387,9 @@ describe("Property 11: UI Strings Language Compliance", () => {
 
     fc.assert(
       fc.property(fileIndex, (idx) => {
-        const { file, content } = fileContents[idx];
+        const entry = fileContents[idx];
+        if (!entry) return;
+        const { file, content } = entry;
         const strings = extractJsxStringLiterals(content);
         const relPath = path.relative(FEATURES_DIR, file);
 

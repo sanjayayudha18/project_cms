@@ -43,14 +43,18 @@ describe("AppShell", () => {
     // Header is guarded by `{user && ...}` in AppShell, so provide a user.
     useAuthStore.setState({
       user: {
-        id: "1",
+        id: 1,
+        username: "test.user",
         fullName: "Test User",
         email: "t@t.com",
-        roles: ["Admin"],
-        primaryRole: "Admin",
+        role: "ADMIN",
+        isKaryawan: true,
+        vendorId: null,
       },
       isAuthenticated: true,
-      isLoading: false,
+      isAuthLoading: false,
+      error: null,
+      rateLimitRetryAfter: null,
     });
   });
 

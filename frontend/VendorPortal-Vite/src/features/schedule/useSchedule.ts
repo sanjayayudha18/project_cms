@@ -11,7 +11,7 @@ export function useSchedule() {
     queryKey: ['schedules', vendorId],
     queryFn: () => {
       const allSchedules = schedulesData as ReplenishmentSchedule[];
-      return allSchedules.filter((s) => s.vendorId === vendorId);
+      return allSchedules.filter((s) => s.vendorId === String(vendorId));
     },
     enabled: !!vendorId,
   });

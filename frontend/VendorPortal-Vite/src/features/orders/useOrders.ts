@@ -11,7 +11,7 @@ export function useOrders() {
     queryKey: ['orders', vendorId],
     queryFn: () => {
       const allOrders = ordersData as CITOrder[];
-      return allOrders.filter((o) => o.vendorId === vendorId);
+      return allOrders.filter((o) => o.vendorId === String(vendorId));
     },
     enabled: !!vendorId,
   });

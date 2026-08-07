@@ -11,7 +11,7 @@ export function useDsr(date?: string) {
     queryKey: ['dsr', vendorId, date],
     queryFn: () => {
       const allRecords = dsrData as DsrRecord[];
-      let filtered = allRecords.filter((r) => r.vendorId === vendorId);
+      let filtered = allRecords.filter((r) => r.vendorId === String(vendorId));
 
       if (date) {
         filtered = filtered.filter((r) => r.date === date);

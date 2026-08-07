@@ -2,225 +2,290 @@ import { create } from "zustand";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type Role =
-  | "Admin"
-  | "ATM_Support"
-  | "Cash_Management"
-  | "Vendor"
-  | "WMO"
-  | "Finance"
-  | "Cash_Count_PIC"
-  | "Cash_Count_Lead"
-  | "Branch"
-  | "Approver";
+export type DbRole =
+  | "ADMIN"
+  | "ADMIN_PARAM"
+  | "ATM-USER"
+  | "ATM-SPV"
+  | "BRANCH-USER"
+  | "BRANCH-SPV"
+  | "BRANCH-ATM-USER"
+  | "BRANCH-ATM-SPV"
+  | "VENDOR-USER";
 
 export interface AuthUser {
-  id: string;
+  id: number;
+  username: string;
   fullName: string;
   email: string;
-  roles: Role[];
-  primaryRole: Role;
+  role: DbRole;
+  isKaryawan: boolean;
+  vendorId: number | null;
 }
 
 export interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  isAuthLoading: boolean;
+  error: string | null;
+  rateLimitRetryAfter: number | null;
 }
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export type LoginResult = { success: true; user: AuthUser } | { success: false; error: string };
 
 export interface AuthActions {
-  login: (credentials: LoginCredentials) => Promise<LoginResult>;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   initialize: () => Promise<void>;
+  clearError: () => void;
 }
 
-// ─── Role-Permission Mapping ──────────────────────────────────────────────────
+export type AuthStore = AuthState & AuthActions;
 
-export const ROLE_NAV_PERMISSIONS: Record<Role, string[]> = {
-  Admin: ["*"],
-  ATM_Support: ["dashboard", "forecasting/*"],
-  Cash_Management: ["dashboard", "forecasting/*"],
-  Vendor: ["dashboard", "dsr-upload", "fill-instruction-download", "invoice-upload"],
-  WMO: ["dashboard", "invoice/*"],
-  Finance: ["dashboard", "invoice/*"],
-  Cash_Count_PIC: ["dashboard", "cash-count/*"],
-  Cash_Count_Lead: ["dashboard", "cash-count/*"],
-  Branch: ["dashboard", "forecasting/h2-projection"],
-  Approver: ["dashboard", "forecasting/*", "invoice/*", "cash-count/*"],
-};
-
-// ─── API Endpoints (placeholder — will be wired to real API client later) ─────
+// ─── API Endpoints ────────────────────────────────────────────────────────────
 
 const AUTH_API_BASE = "/api/v1/auth";
 
-async function postLogin(
-  credentials: LoginCredentials,
-): Promise<{ user: AuthUser; accessToken: string } | { error: string }> {
-  try {
-    const { apiConfig } = await import("@/lib/api/config");
+// ─── Single-flight refresh ────────────────────────────────────────────────────
 
-    if (apiConfig.mode === "stub") {
-      const { handleStubRequest } = await import("@/lib/api/stubs/index");
-      const stubResponse = await handleStubRequest(`${apiConfig.baseURL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
+let refreshPromise: Promise<boolean> | null = null;
 
-      if (stubResponse && stubResponse.ok) {
-        return (await stubResponse.json()) as { user: AuthUser; accessToken: string };
-      }
-      return { error: "Kredensial tidak valid" };
-    }
+// ─── Backend response types ───────────────────────────────────────────────────
 
-    const response = await fetch(`${AUTH_API_BASE}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(credentials),
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        message?: string;
-      } | null;
-      return { error: body?.message ?? "Kredensial tidak valid" };
-    }
-
-    return (await response.json()) as { user: AuthUser; accessToken: string };
-  } catch {
-    return { error: "Gagal terhubung ke server. Silakan coba lagi." };
-  }
+interface LoginSuccessResponse {
+  access_token: string;
+  user: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+    role: DbRole;
+    is_karyawan: boolean;
+    vendor_id: number | null;
+  };
 }
 
-async function postRefreshToken(): Promise<{
-  accessToken: string;
-  user: AuthUser;
-} | null> {
-  try {
-    const { apiConfig } = await import("@/lib/api/config");
+interface ApiErrorResponse {
+  error: string;
+  message: string;
+  details?: Array<{ field: string; message: string }>;
+}
 
-    // In stub mode, refresh only works if already authenticated (simulates no existing session on first boot)
-    if (apiConfig.mode === "stub") {
-      return null;
-    }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-    const response = await fetch(`${AUTH_API_BASE}/refresh`, {
-      method: "POST",
-      credentials: "include",
-    });
-
-    if (!response.ok) return null;
-
-    return (await response.json()) as { accessToken: string; user: AuthUser };
-  } catch {
-    return null;
-  }
+function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {
+  return {
+    id: raw.id,
+    username: raw.username,
+    fullName: raw.full_name,
+    email: raw.email,
+    role: raw.role,
+    isKaryawan: raw.is_karyawan,
+    vendorId: raw.vendor_id,
+  };
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export type AuthStore = AuthState & AuthActions;
-
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set, _get) => ({
   user: null,
   accessToken: null,
   isAuthenticated: false,
-  isLoading: true,
+  isAuthLoading: true,
+  error: null,
+  rateLimitRetryAfter: null,
 
-  login: async (credentials) => {
-    const result = await postLogin(credentials);
+  login: async (username: string, password: string) => {
+    set({ error: null, rateLimitRetryAfter: null });
 
-    if ("error" in result) {
-      return { success: false, error: result.error };
+    try {
+      const response = await fetch(`${AUTH_API_BASE}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Portal-Type": "company",
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as LoginSuccessResponse;
+        set({
+          user: mapUserResponse(data.user),
+          accessToken: data.access_token,
+          isAuthenticated: true,
+          isAuthLoading: false,
+          error: null,
+          rateLimitRetryAfter: null,
+        });
+        return;
+      }
+
+      // Handle error responses
+      switch (response.status) {
+        case 401: {
+          set({ error: "Username atau password salah" });
+          return;
+        }
+        case 403: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          if (body?.error === "account_inactive") {
+            set({ error: "Akun tidak aktif" });
+          } else if (body?.error === "portal_mismatch") {
+            set({ error: "Akun tidak memiliki akses ke portal ini" });
+          } else {
+            set({ error: body?.message ?? "Akses ditolak" });
+          }
+          return;
+        }
+        case 422: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          if (body?.details && body.details.length > 0) {
+            const messages = body.details.map((d) => `${d.field}: ${d.message}`).join("; ");
+            set({ error: messages });
+          } else {
+            set({ error: body?.message ?? "Validasi gagal" });
+          }
+          return;
+        }
+        case 429: {
+          const retryAfter = response.headers.get("Retry-After");
+          const seconds = retryAfter ? Number.parseInt(retryAfter, 10) : null;
+          set({
+            error: "Terlalu banyak percobaan login",
+            rateLimitRetryAfter: Number.isFinite(seconds) ? seconds : null,
+          });
+          return;
+        }
+        case 503: {
+          set({ error: "Layanan sedang tidak tersedia" });
+          return;
+        }
+        default: {
+          const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
+          set({ error: body?.message ?? "Terjadi kesalahan. Silakan coba lagi." });
+        }
+      }
+    } catch {
+      set({ error: "Gagal terhubung ke server. Silakan coba lagi." });
     }
-
-    set({
-      user: result.user,
-      accessToken: result.accessToken,
-      isAuthenticated: true,
-      isLoading: false,
-    });
-
-    return { success: true, user: result.user };
   },
 
-  logout: () => {
+  logout: async () => {
     set({
       user: null,
       accessToken: null,
       isAuthenticated: false,
-      isLoading: false,
+      isAuthLoading: false,
+      error: null,
+      rateLimitRetryAfter: null,
     });
 
-    fetch(`${AUTH_API_BASE}/logout`, {
-      method: "POST",
-      credentials: "include",
-    }).catch(() => {
+    try {
+      await fetch(`${AUTH_API_BASE}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
       // Intentionally ignore — local state is already cleared
-    });
+    }
 
     window.location.href = "/login";
   },
 
   refreshToken: async () => {
-    const result = await postRefreshToken();
-
-    if (!result) {
-      const { logout } = get();
-      logout();
-      return false;
+    // Single-flight: if a refresh is already in progress, return its promise
+    if (refreshPromise) {
+      return refreshPromise;
     }
 
-    set({
-      user: result.user,
-      accessToken: result.accessToken,
-      isAuthenticated: true,
-      isLoading: false,
-    });
-
-    return true;
-  },
-
-  initialize: async () => {
-    set({ isLoading: true });
-
-    try {
-      const result = await postRefreshToken();
-
-      if (result) {
-        set({
-          user: result.user,
-          accessToken: result.accessToken,
-          isAuthenticated: true,
-          isLoading: false,
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/refresh`, {
+          method: "POST",
+          credentials: "include",
         });
-      } else {
-        // No valid session — just set unauthenticated (don't call logout which hard-redirects)
+
+        if (!response.ok) {
+          // Refresh failed — clear state and redirect
+          set({
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
+          });
+          const currentPath = window.location.pathname + window.location.search;
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          return false;
+        }
+
+        const data = (await response.json()) as LoginSuccessResponse;
+        set({
+          user: mapUserResponse(data.user),
+          accessToken: data.access_token,
+          isAuthenticated: true,
+          isAuthLoading: false,
+        });
+        return true;
+      } catch {
         set({
           user: null,
           accessToken: null,
           isAuthenticated: false,
-          isLoading: false,
+          isAuthLoading: false,
+          error: null,
+          rateLimitRetryAfter: null,
+        });
+        const currentPath = window.location.pathname + window.location.search;
+        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+        return false;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  },
+
+  initialize: async () => {
+    set({ isAuthLoading: true });
+
+    try {
+      const response = await fetch(`${AUTH_API_BASE}/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as LoginSuccessResponse;
+        set({
+          user: mapUserResponse(data.user),
+          accessToken: data.access_token,
+          isAuthenticated: true,
+          isAuthLoading: false,
+        });
+      } else {
+        set({
+          user: null,
+          accessToken: null,
+          isAuthenticated: false,
+          isAuthLoading: false,
         });
       }
     } catch {
-      // Network error or backend unavailable — treat as unauthenticated
       set({
         user: null,
         accessToken: null,
         isAuthenticated: false,
-        isLoading: false,
+        isAuthLoading: false,
       });
     }
+  },
+
+  clearError: () => {
+    set({ error: null, rateLimitRetryAfter: null });
   },
 }));

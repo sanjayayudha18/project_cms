@@ -14,11 +14,13 @@ import type { AuthUser } from "../../auth/store";
 // Approver	Beranda, all Forecasting + Invoice + Cash Count 
 
 const MOCK_USER: AuthUser = {
-  id: "usr-001",
+  id: 1,
+  username: "yudha.rangga",
   fullName: "Yudha Rangga",
   email: "Raden.Yudha@cimb.co.id",
-  roles: ["Admin"],
-  primaryRole: "Admin",
+  role: "ADMIN",
+  isKaryawan: true,
+  vendorId: null,
 };
 
 const MOCK_ACCESS_TOKEN =

@@ -1,6 +1,5 @@
 // ─── API Client ───────────────────────────────────────────────────────────────
-// Fetch wrapper with auth header injection and 401 token-refresh retry logic.
-// Works in both stub and real mode — stub interceptor is layered on top (task 6.2).
+// Fetch wrapper with Bearer token injection and 401 single-flight refresh retry.
 
 import { useAuthStore } from "@/lib/auth/store";
 import { apiConfig } from "./config";
@@ -87,15 +86,7 @@ async function executeRequest(config: RequestConfig, isRetry = false): Promise<R
     credentials: "include",
   };
 
-  // Stub mode: intercept requests with mock data
-  let response: Response;
-  if (apiConfig.mode === "stub") {
-    const { handleStubRequest } = await import("./stubs/index");
-    const stubResponse = await handleStubRequest(url, fetchOptions);
-    response = stubResponse ?? await fetch(url, fetchOptions);
-  } else {
-    response = await fetch(url, fetchOptions);
-  }
+  const response = await fetch(url, fetchOptions);
 
   // 401 handling: attempt refresh + retry once
   if (response.status === 401 && !isRetry && !config.skipAuth) {

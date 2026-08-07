@@ -109,7 +109,7 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                 {user.fullName}
               </span>
               <span className="text-[11px]" style={{ color: "var(--n-500)" }}>
-                {user.primaryRole}
+                {user.role}
               </span>
             </div>
 
@@ -141,7 +141,7 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                   {user.fullName}
                 </span>
                 <span className="text-xs" style={{ color: "var(--n-500)" }}>
-                  {user.primaryRole}
+                  {user.role}
                 </span>
               </div>
 
@@ -155,7 +155,7 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                   style={{ backgroundColor: "var(--red-50)", color: "var(--red-700)" }}
                   data-testid="header-role-badge"
                 >
-                  {user.primaryRole}
+                  {user.role}
                 </span>
                 <span className="text-xs" style={{ color: "var(--n-500)" }}>{user.email}</span>
               </div>

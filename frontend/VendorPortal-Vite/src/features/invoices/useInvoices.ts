@@ -11,7 +11,7 @@ export function useInvoices() {
     queryKey: ['invoices', vendorId],
     queryFn: () => {
       const allInvoices = invoicesData as Invoice[];
-      return allInvoices.filter((inv) => inv.vendorId === vendorId);
+      return allInvoices.filter((inv) => inv.vendorId === String(vendorId));
     },
     enabled: !!vendorId,
   });

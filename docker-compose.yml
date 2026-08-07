@@ -1,0 +1,72 @@
+services:
+  # ─── Backend API ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: cms-backend-api
+    container_name: cms-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=dev-secret-key-minimum-32-bytes-long!!
+      - DATABASE_URL=postgres://postgres:1818@host.docker.internal:5432/cms?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - PORT=8080
+      - ACCESS_TOKEN_EXPIRY=15m
+      - REFRESH_TOKEN_EXPIRY=168h
+      - RATE_LIMIT_USERNAME=5
+      - RATE_LIMIT_IP=20
+      - RATE_LIMIT_WINDOW=15m
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cms-net
+
+  # ─── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cms-redis
+    ports:
+
+    
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - cms-net
+
+  # ─── CompanyPortal Frontend ────────────────────────────────────────────────
+  userportal:
+    build:
+      context: ./frontend/CompanyPortal-Vite
+      dockerfile: Dockerfile
+    image: companyportal-vite-fe
+    container_name: userportal-vite-fe
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - cms-net
+
+  # ─── VendorPortal Frontend ─────────────────────────────────────────────────
+  vendorportal:
+    build:
+      context: ./frontend/VendorPortal-Vite
+      dockerfile: Dockerfile
+    image: vendorportal-vite-fe
+    container_name: vendorportal-vite-fe
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - cms-net
+
+networks:
+  cms-net:
+    driver: bridge

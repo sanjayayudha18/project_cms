@@ -1,11 +1,11 @@
 # Stage 1: Build
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN npm install -g pnpm@11.20.0
 WORKDIR /app
-COPY pnpm-lock.yaml package.json ./
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm build
+RUN pnpm tsc -b tsconfig.app.json && pnpm vite build
 
 # Stage 2: Serve
 FROM nginx:alpine

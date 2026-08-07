@@ -35,11 +35,11 @@ export function Sidebar({
   onNavigate,
 }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
-  const userRoles = user?.roles ?? [];
+  const userRole = user?.role ?? null;
 
   const visibleItems = useMemo(
-    () => filterNavByRoles(NAV_CONFIG, userRoles),
-    [userRoles],
+    () => (userRole ? filterNavByRoles(NAV_CONFIG, userRole) : []),
+    [userRole],
   );
 
   const groupedItems = useMemo(() => {

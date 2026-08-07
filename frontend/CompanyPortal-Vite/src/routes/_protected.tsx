@@ -1,27 +1,32 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuthStore } from "@/lib/auth/store";
-import type { Role } from "@/lib/auth/store";
-import { Navigate, Outlet, createRoute, redirect, useRouter } from "@tanstack/react-router";
+import type { DbRole } from "@/lib/auth/store";
+import { Navigate, Outlet, createRoute, redirect } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 
 /**
  * Protected layout — wraps all authenticated routes with AppShell + route guard.
  *
- * beforeLoad checks:
- * 1. Is user authenticated? If not → redirect to /login
- * 2. Does user have the required role for this route? If not → render Unauthorized page
+ * beforeLoad checks (in order):
+ * 1. isAuthLoading → allow through (component handles loading state)
+ * 2. Not authenticated → redirect to /login?redirect={currentPath}
+ * 3. Role check delegated to child routes via requireRoles()
  */
 export const protectedRoute = createRoute({
   id: "_protected",
   getParentRoute: () => rootRoute,
-  beforeLoad: () => {
-    const { isAuthenticated, isLoading } = useAuthStore.getState();
+  beforeLoad: ({ location }) => {
+    const { isAuthenticated, isAuthLoading } = useAuthStore.getState();
 
-    // If still loading auth state, allow through (component will handle loading)
-    if (isLoading) return;
+    // Step 1: If still loading auth state, allow through (component handles loading)
+    if (isAuthLoading) return;
 
+    // Step 2: If unauthenticated, redirect to login with the original path preserved
     if (!isAuthenticated) {
-      throw redirect({ to: "/login" });
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.pathname },
+      });
     }
   },
   component: ProtectedLayout,
@@ -29,13 +34,18 @@ export const protectedRoute = createRoute({
 
 function ProtectedLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
+  const isAuthLoading = useAuthStore((s) => s.isAuthLoading);
+  const currentPath = window.location.pathname;
 
-  // Double-check: if auth resolved as unauthenticated, redirect
-  if (!isLoading && !isAuthenticated) {
-    return <Navigate to="/login" />;
+  // Step 1: If auth is still loading, show nothing (prevents flash)
+  if (isAuthLoading) return null;
+
+  // Step 2: If auth resolved as unauthenticated, redirect with path preserved
+  if (!isAuthenticated) {
+    return <Navigate to="/login" search={{ redirect: currentPath }} />;
   }
 
+  // Auth is resolved and user is authenticated → render AppShell within 1 cycle
   return (
     <AppShell>
       <Outlet />
@@ -43,66 +53,19 @@ function ProtectedLayout() {
   );
 }
 
-// ─── Unauthorized Page ────────────────────────────────────────────────────────
-
-export function UnauthorizedPage() {
-  const router = useRouter();
-
-  return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-[var(--space-4)] text-center">
-      <div
-        className="flex h-16 w-16 items-center justify-center rounded-full"
-        style={{ backgroundColor: "var(--danger-bg)" }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ color: "var(--danger-fg)" }}
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-        </svg>
-      </div>
-
-      <h1 className="text-xl font-semibold" style={{ color: "var(--n-900)" }}>
-        Akses Tidak Diizinkan
-      </h1>
-
-      <p className="max-w-[400px] text-sm" style={{ color: "var(--n-600)" }}>
-        Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi administrator jika
-        Anda memerlukan akses.
-      </p>
-
-      <button
-        type="button"
-        onClick={() => router.navigate({ to: "/" })}
-        className="mt-[var(--space-2)] inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] px-[var(--space-4)] py-[var(--space-2)] text-sm font-medium transition-colors duration-200"
-        style={{
-          color: "var(--red-600)",
-          backgroundColor: "var(--red-50)",
-        }}
-      >
-        Kembali ke Beranda
-      </button>
-    </div>
-  );
-}
-
 // ─── RBAC Helper ──────────────────────────────────────────────────────────────
 
 /**
- * Creates a beforeLoad guard that checks user roles against required roles.
+ * Creates a beforeLoad guard that checks user role against required roles.
  * Use in child routes that need role-specific access control.
+ *
+ * Behavior:
+ * - If user is not authenticated → redirect to /login
+ * - If user role is ADMIN or ADMIN_PARAM → bypass role check (access granted)
+ * - If user role is in allowedRoles → access granted
+ * - Otherwise → return { forbidden: true } to signal component to show 403 page
  */
-export function requireRoles(requiredRoles: Role[]) {
+export function requireRoles(allowedRoles: DbRole[]) {
   return () => {
     const { user } = useAuthStore.getState();
 
@@ -110,14 +73,14 @@ export function requireRoles(requiredRoles: Role[]) {
       throw redirect({ to: "/login" });
     }
 
-    // Admin bypasses all role checks
-    if (user.roles.includes("Admin")) return;
+    // ADMIN and ADMIN_PARAM bypass all role checks
+    if (user.role === "ADMIN" || user.role === "ADMIN_PARAM") return;
 
-    const hasRequiredRole = requiredRoles.some((role) => user.roles.includes(role));
+    const hasRequiredRole = allowedRoles.includes(user.role);
 
     if (!hasRequiredRole) {
-      // We'll signal to the component to show unauthorized
-      return { unauthorized: true };
+      // Signal to the route component to show 403 Forbidden page
+      return { forbidden: true };
     }
   };
 }

@@ -21,7 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 
-import type { Role } from "@/lib/auth/store";
+import type { DbRole } from "@/lib/auth/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   href: string;
-  roles: (Role | "*")[];
+  roles: (DbRole | "*")[];
   group: NavGroup;
   disabled?: boolean;
 }
@@ -63,7 +63,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Cash Flow Monitoring",
     icon: Activity,
     href: "/cash-flow",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "general",
   },
   {
@@ -71,7 +71,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "CIT Tracker",
     icon: Truck,
     href: "/cit",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "general",
   },
   {
@@ -79,7 +79,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pengisian Ulang",
     icon: Truck,
     href: "/replenishment",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "general",
   },
   {
@@ -87,7 +87,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pengaturan",
     icon: Settings,
     href: "/settings",
-    roles: ["Admin"],
+    roles: ["ADMIN"],
     group: "general",
   },
 
@@ -97,7 +97,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Unggah DSR",
     icon: Upload,
     href: "/forecasting/dsr-upload",
-    roles: ["Vendor", "ATM_Support"],
+    roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"],
     group: "forecasting",
   },
   {
@@ -105,7 +105,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "DSR Dashboard",
     icon: BarChart3,
     href: "/forecasting/dsr-dashboard",
-    roles: ["ATM_Support", "Cash_Management", "Vendor"],
+    roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
     group: "forecasting",
   },
   {
@@ -113,7 +113,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Forecasting",
     icon: TrendingUp,
     href: "/forecasting/forecast",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "forecasting",
   },
   {
@@ -121,7 +121,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Instruksi Pengisian",
     icon: FileText,
     href: "/forecasting/fill-instruction",
-    roles: ["ATM_Support", "Cash_Management", "Vendor"],
+    roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
     group: "forecasting",
     disabled: true,
   },
@@ -130,7 +130,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Validasi Pengisian",
     icon: CheckCircle,
     href: "/forecasting/fill-validation",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "forecasting",
     disabled: true,
   },
@@ -139,7 +139,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Cash Supply",
     icon: Calculator,
     href: "/forecasting/cash-supply",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "forecasting",
     disabled: true,
   },
@@ -148,7 +148,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Proyeksi H+2",
     icon: TrendingUp,
     href: "/forecasting/h2-projection",
-    roles: ["ATM_Support", "Cash_Management", "Branch"],
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-USER", "BRANCH-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
     group: "forecasting",
     disabled: true,
   },
@@ -157,7 +157,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Kalender Libur",
     icon: Calendar,
     href: "/forecasting/holiday-calendar",
-    roles: ["ATM_Support", "Cash_Management"],
+    roles: ["ATM-USER", "ATM-SPV"],
     group: "forecasting",
     disabled: true,
   },
@@ -168,7 +168,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Daftar Invoice",
     icon: FileText,
     href: "/invoice/list",
-    roles: ["WMO", "Finance", "Vendor"],
+    roles: ["BRANCH-USER", "BRANCH-SPV", "VENDOR-USER"],
     group: "invoice",
   },
   {
@@ -176,7 +176,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Unggah Invoice",
     icon: Receipt,
     href: "/invoice/upload",
-    roles: ["Vendor", "WMO"],
+    roles: ["VENDOR-USER", "BRANCH-USER"],
     group: "invoice",
     disabled: true,
   },
@@ -185,7 +185,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Rekonsiliasi",
     icon: GitCompare,
     href: "/invoice/reconciliation",
-    roles: ["WMO", "Finance"],
+    roles: ["BRANCH-USER", "BRANCH-SPV"],
     group: "invoice",
     disabled: false,
   },
@@ -194,7 +194,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Perhitungan Beban",
     icon: Calculator,
     href: "/invoice/charge-calculation",
-    roles: ["WMO", "Finance"],
+    roles: ["BRANCH-USER", "BRANCH-SPV"],
     group: "invoice",
     disabled: true,
   },
@@ -203,7 +203,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pembuatan Dokumen",
     icon: FileOutput,
     href: "/invoice/documents",
-    roles: ["WMO", "Finance"],
+    roles: ["BRANCH-USER", "BRANCH-SPV"],
     group: "invoice",
     disabled: true,
   },
@@ -214,7 +214,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Penjadwalan",
     icon: CalendarDays,
     href: "/cash-count/scheduling",
-    roles: ["Cash_Count_Lead", "Cash_Count_PIC"],
+    roles: ["BRANCH-ATM-SPV", "BRANCH-ATM-USER"],
     group: "cash-count",
     disabled: true,
   },
@@ -223,7 +223,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Analisis Tier Saldo",
     icon: BarChart3,
     href: "/cash-count/tier-analysis",
-    roles: ["Cash_Count_Lead"],
+    roles: ["BRANCH-ATM-SPV"],
     group: "cash-count",
     disabled: true,
   },
@@ -232,7 +232,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pelaksanaan (BA)",
     icon: ClipboardCheck,
     href: "/cash-count/execution",
-    roles: ["Cash_Count_PIC"],
+    roles: ["BRANCH-ATM-USER"],
     group: "cash-count",
     disabled: true,
   },
@@ -241,7 +241,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Checklist",
     icon: ListChecks,
     href: "/cash-count/checklists",
-    roles: ["Cash_Count_PIC"],
+    roles: ["BRANCH-ATM-USER"],
     group: "cash-count",
     disabled: true,
   },
@@ -250,7 +250,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Rekonsiliasi",
     icon: Scale,
     href: "/cash-count/reconciliation",
-    roles: ["Cash_Count_Lead", "Cash_Count_PIC"],
+    roles: ["BRANCH-ATM-SPV", "BRANCH-ATM-USER"],
     group: "cash-count",
     disabled: true,
   },
@@ -259,7 +259,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Rekapitulasi",
     icon: Table,
     href: "/cash-count/recapitulation",
-    roles: ["Cash_Count_Lead"],
+    roles: ["BRANCH-ATM-SPV"],
     group: "cash-count",
     disabled: true,
   },
@@ -268,19 +268,17 @@ export const NAV_CONFIG: NavItem[] = [
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 /**
- * Filters navigation items based on user roles.
+ * Filters navigation items based on user role.
  * Items with `roles: ['*']` are visible to all authenticated users.
- * Users with the 'Admin' role see all navigation items.
- * Items are included if the user has at least one matching role.
+ * Users with 'ADMIN' or 'ADMIN_PARAM' role see all navigation items.
+ * Items are included if the user's role is in the item's allowed list.
  */
-export function filterNavByRoles(items: NavItem[], userRoles: Role[]): NavItem[] {
-  if (userRoles.length === 0) return [];
-
-  // Admin sees everything
-  if (userRoles.includes("Admin")) return items;
+export function filterNavByRoles(items: NavItem[], userRole: DbRole): NavItem[] {
+  // ADMIN and ADMIN_PARAM see everything
+  if (userRole === "ADMIN" || userRole === "ADMIN_PARAM") return items;
 
   return items.filter((item) => {
     if (item.roles.includes("*")) return true;
-    return item.roles.some((role) => userRoles.includes(role as Role));
+    return item.roles.includes(userRole);
   });
 }

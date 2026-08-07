@@ -1,5 +1,29 @@
 // Shared TypeScript interfaces and types for the Vendor Portal
 
+// ─── Auth Types ───────────────────────────────────────────────────────────────
+
+export type DbRole = "VENDOR-USER";
+
+export interface AuthUser {
+  readonly id: number;
+  readonly username: string;
+  readonly fullName: string;
+  readonly email: string;
+  readonly role: DbRole;
+  readonly isKaryawan: boolean;
+  readonly vendorId: number | null;
+}
+
+export interface AuthState {
+  readonly user: AuthUser | null;
+  readonly isAuthenticated: boolean;
+  readonly isAuthLoading: boolean;
+  readonly error: string | null;
+  readonly rateLimitRetryAfter: number | null;
+}
+
+// ─── Legacy VendorUser (kept for backward compat during transition) ───────────
+
 export interface VendorUser {
   readonly id: string;
   readonly username: string;
@@ -7,12 +31,6 @@ export interface VendorUser {
   readonly vendorId: string;
   readonly vendorName: string;
   readonly role: 'Vendor';
-}
-
-export interface AuthState {
-  readonly token: string | null;
-  readonly user: VendorUser | null;
-  readonly isAuthenticated: boolean;
 }
 
 export interface JwtPayload {
@@ -25,6 +43,8 @@ export interface JwtPayload {
   readonly exp: number;
   readonly iat: number;
 }
+
+// ─── Domain Types ─────────────────────────────────────────────────────────────
 
 export interface CITOrder {
   readonly id: string;

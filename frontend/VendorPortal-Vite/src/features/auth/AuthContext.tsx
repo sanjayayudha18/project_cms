@@ -22,7 +22,7 @@ interface LoginSuccessResponse {
     username: string;
     full_name: string;
     email: string;
-    role: 'VENDOR-USER';
+    role: string; // Intentionally broad — backend may return any role during refresh
     is_karyawan: boolean;
     vendor_id: number | null;
   };
@@ -53,7 +53,7 @@ function mapUserResponse(raw: LoginSuccessResponse['user']): AuthUser {
     username: raw.username,
     fullName: raw.full_name,
     email: raw.email,
-    role: raw.role,
+    role: raw.role as AuthUser['role'],
     isKaryawan: raw.is_karyawan,
     vendorId: raw.vendor_id,
   };

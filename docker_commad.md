@@ -3,6 +3,10 @@
 cd frontend
 docker compose up -d --build
 
+docker compose build --no-cache 
+&& 
+docker compose up -d
+
 # docker compose
 
 - Stop the old combined stack (from project root)

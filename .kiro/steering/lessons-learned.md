@@ -236,6 +236,21 @@ Apply this guard in **both** the `initialize()` path (first page load) and the `
 
 **Long-term fix:** Backend should validate `X-Portal-Type` header on the refresh endpoint, or use separate cookie names/paths per portal.
 
+### Literal types in API response interfaces cause dead-code elimination of runtime guards
+When a response interface types a field as a literal (e.g., `role: 'VENDOR-USER'`), esbuild/Vite's production bundler can determine that a runtime check like `if (data.user.role !== 'VENDOR-USER')` is always `false` and eliminate the entire `if` block as dead code. The guard compiles away and never runs in production.
+
+**Fix:** Type API response fields that need runtime validation as `string` (or a union of all possible backend values), not as a single literal. The narrowing/validation happens explicitly in code, not implicitly via types:
+```typescript
+// BAD — bundler may eliminate the guard
+interface Response { role: 'VENDOR-USER' }
+if (data.user.role !== 'VENDOR-USER') { return; } // dead code in prod
+
+// GOOD — bundler preserves the guard
+interface Response { role: string }
+if (data.user.role !== 'VENDOR-USER') { return; } // always runs
+```
+After validation passes, use `as AuthUser['role']` to narrow back to the domain type. This pattern applies to any API response field where you need a runtime guard that the bundler must not optimize away.
+
 ### Separate docker-compose projects: nginx upstream must use `host.docker.internal`
 Frontend and backend run in **separate** docker-compose projects (`frontend/docker-compose.yml` vs `backend/docker-compose.yml`). They have isolated networks even if both define `cms-net` — Docker prefixes the network name with the project name. Nginx `proxy_pass http://backend:8080` will fail with `host not found in upstream` because the `backend` hostname only exists in the backend's network.
 

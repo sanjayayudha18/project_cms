@@ -1,4 +1,4 @@
-name: CMS-BE-Group  # Groups everything cleanly
+name: CMS-Backend  # Groups everything cleanly
 
 services:
   # ─── Backend API ───────────────────────────────────────────────────────────

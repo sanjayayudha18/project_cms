@@ -1,4 +1,4 @@
-name: CMS-FE-Group  # Groups everything cleanly
+name: CMS-frontEnd  # Groups everything cleanly
 
 services:
   # ─── CompanyPortal Frontend ────────────────────────────────────────────────

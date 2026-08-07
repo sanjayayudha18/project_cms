@@ -1,3 +1,16 @@
+# Connections
+
+Alurnya:
+
+1. docker-compose.yml → set env var DATABASE_URL
+2. config.go  → baca + validasi env var
+3. main.go → pgxpool.New(ctx, cfg.DatabaseURL) buat connection pool, ping, lalu pass dbPool ke repository layer
+
+Kalau mau ganti DB credentials / host, edit di 
+docker-compose.yml
+
+ environment section, atau .env file kalau pakai env_file:.
+
 # Credential
 
 admin

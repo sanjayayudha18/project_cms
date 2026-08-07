@@ -92,6 +92,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (response.ok) {
           const data = (await response.json()) as LoginSuccessResponse;
+
+          // Guard: only accept VENDOR-USER role on the vendor portal.
+          // If a company/internal user's refresh token is present (shared
+          // cookie on localhost), reject it so they can't access vendor portal.
+          if (data.user.role !== 'VENDOR-USER') {
+            return;
+          }
+
           setAccessToken(data.access_token);
           setUser(mapUserResponse(data.user));
         }
@@ -234,6 +242,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         const data = (await response.json()) as LoginSuccessResponse;
+
+        // Guard: reject non-vendor users on token refresh
+        if (data.user.role !== 'VENDOR-USER') {
+          setAccessToken(null);
+          setUser(null);
+          return false;
+        }
+
         setAccessToken(data.access_token);
         setUser(mapUserResponse(data.user));
         return true;

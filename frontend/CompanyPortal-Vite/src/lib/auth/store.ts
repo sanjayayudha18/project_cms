@@ -208,7 +208,6 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         });
 
         if (!response.ok) {
-          // Refresh failed — clear state and redirect
           set({
             user: null,
             accessToken: null,
@@ -223,6 +222,22 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         }
 
         const data = (await response.json()) as LoginSuccessResponse;
+
+        // Guard: reject VENDOR-USER on company portal refresh
+        if (data.user.role === "VENDOR-USER") {
+          set({
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isAuthLoading: false,
+            error: null,
+            rateLimitRetryAfter: null,
+          });
+          const currentPath = window.location.pathname + window.location.search;
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          return false;
+        }
+
         set({
           user: mapUserResponse(data.user),
           accessToken: data.access_token,
@@ -261,6 +276,20 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
 
       if (response.ok) {
         const data = (await response.json()) as LoginSuccessResponse;
+
+        // Guard: reject VENDOR-USER on the company portal.
+        // Prevents cross-portal session leakage when both portals
+        // share the same refresh token cookie on localhost.
+        if (data.user.role === "VENDOR-USER") {
+          set({
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isAuthLoading: false,
+          });
+          return;
+        }
+
         set({
           user: mapUserResponse(data.user),
           accessToken: data.access_token,

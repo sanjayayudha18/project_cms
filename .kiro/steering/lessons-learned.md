@@ -225,6 +225,17 @@ Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure
 ### RateLimiter interface in auth package for testability
 Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.
 
+### Cross-portal cookie leakage: guard role in both `initialize` and `refreshToken`
+Both frontend portals (CompanyPortal on :3001, VendorPortal on :3002) share the same `localhost` domain, so HTTP-only refresh token cookies set by one portal are sent by the browser to the other. The backend `/api/v1/auth/refresh` endpoint doesn't enforce portal-type scoping.
+
+**Fix pattern (defense-in-depth at frontend):** After every successful refresh response, check `data.user.role` against the portal's allowed role(s) before setting `isAuthenticated = true`:
+- VendorPortal: reject if `role !== 'VENDOR-USER'`
+- CompanyPortal: reject if `role === 'VENDOR-USER'`
+
+Apply this guard in **both** the `initialize()` path (first page load) and the `refreshToken()` path (token renewal mid-session). Without both, one path will still leak.
+
+**Long-term fix:** Backend should validate `X-Portal-Type` header on the refresh endpoint, or use separate cookie names/paths per portal.
+
 ### Separate docker-compose projects: nginx upstream must use `host.docker.internal`
 Frontend and backend run in **separate** docker-compose projects (`frontend/docker-compose.yml` vs `backend/docker-compose.yml`). They have isolated networks even if both define `cms-net` — Docker prefixes the network name with the project name. Nginx `proxy_pass http://backend:8080` will fail with `host not found in upstream` because the `backend` hostname only exists in the backend's network.
 

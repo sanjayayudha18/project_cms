@@ -1,8 +1,10 @@
+name: CMS-BE-Group  # Groups everything cleanly
+
 services:
   # ─── Backend API ───────────────────────────────────────────────────────────
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     image: cms-backend-api
     container_name: cms-backend
@@ -30,39 +32,7 @@ services:
     image: redis:7-alpine
     container_name: cms-redis
     ports:
-
-    
       - "6379:6379"
-    restart: unless-stopped
-    networks:
-      - cms-net
-
-  # ─── CompanyPortal Frontend ────────────────────────────────────────────────
-  userportal:
-    build:
-      context: ./frontend/CompanyPortal-Vite
-      dockerfile: Dockerfile
-    image: companyportal-vite-fe
-    container_name: userportal-vite-fe
-    ports:
-      - "3001:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - cms-net
-
-  # ─── VendorPortal Frontend ─────────────────────────────────────────────────
-  vendorportal:
-    build:
-      context: ./frontend/VendorPortal-Vite
-      dockerfile: Dockerfile
-    image: vendorportal-vite-fe
-    container_name: vendorportal-vite-fe
-    ports:
-      - "3002:80"
-    depends_on:
-      - backend
     restart: unless-stopped
     networks:
       - cms-net

@@ -22,9 +22,9 @@ user:app_user
 pass:1818
 
 # Access
-psql -h localhost -p 5432 -U postgres -d crown_db
+psql -h localhost -p 5432 -U postgres -d cms
 
-psql -h localhost -p 5432 -U app_user -d crown_db
+psql -h localhost -p 5432 -U app_user -d cms
 
 # Create DB
 
@@ -37,7 +37,15 @@ CREATE DATABASE crown_db;
 
 # Create Table
 
-psql -h localhost -p 5432 -U postgres -d crown_db -v ON_ERROR_STOP=1 -f "backend\migrations\001_create_roles_vendors_users.sql"
+psql -h localhost -p 5432 -U postgres -d cms -v ON_ERROR_STOP=1 -f "backend\migrations\001_create_roles_vendors_users.sql"
+
+# Check Table
+
+psql -U postgres -d cms
+\dt
+
+# Drop Table
+ psql -U postgres -d cms -c "DROP TABLE IF EXISTS atms, currency, denoms;"
 
 # Inject seed
 

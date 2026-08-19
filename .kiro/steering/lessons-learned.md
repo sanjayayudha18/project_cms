@@ -268,3 +268,37 @@ Key points:
 - `set $variable` makes nginx resolve the upstream at request-time, not startup (prevents crash if backend is down)
 - `host.docker.internal` routes to the host machine where backend exposes its port
 - This applies to ALL frontend nginx.conf files in this project (CompanyPortal + VendorPortal)
+
+### Python PostgreSQL driver on Windows: use `psycopg` v3, keyword params, and override libpq config paths
+
+**Root cause:** On this Windows dev machine, `psycopg2` (and `psycopg[binary]` which also uses `libpq` internally) throws `'utf-8' codec can't decode byte 0xab in position 113` during `connect()`. The error happens because `libpq` (the C library that both drivers use) automatically reads configuration files from `%APPDATA%\postgresql\` on Windows. If the `%APPDATA%` path contains characters valid in Windows-1252 but invalid in UTF-8 (common with non-ASCII Windows usernames or OneDrive paths), `libpq` crashes during its config file lookup — before it even attempts the TCP connection.
+
+**Three fixes applied together (all required):**
+
+1. **Use `psycopg[binary]>=3.2.10` instead of `psycopg2-binary`** — psycopg2-binary has no pre-built wheels for Python 3.13+/3.14 on Windows. The build fails because it needs `pg_config` and C compiler. `psycopg[binary]` v3 ships wheels reliably.
+
+2. **Use keyword params, not a DSN string** — avoids any chance of encoding corruption in the connection string itself:
+```python
+conn = psycopg.connect(
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", "5432")),
+    dbname=os.getenv("DB_NAME", "cms"),
+    user=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASS", "postgres"),
+    autocommit=False,
+)
+```
+
+3. **Override libpq config file paths before connecting** — stops libpq from scanning `%APPDATA%` paths that contain non-UTF-8 bytes:
+```python
+os.environ.setdefault("PGSERVICEFILE", "NUL")
+os.environ.setdefault("PGPASSFILE", "NUL")
+os.environ.setdefault("PGSYSCONFDIR", ".")
+```
+
+**Also:** use `python-dotenv` + a `.env` file for DB credentials instead of `set` commands, so devs don't need to set env vars manually each session.
+
+This applies to ALL Python scheduler scripts in this project (`scheduler/dmaa/`, `scheduler/itm/`, and any future ETL scripts).
+
+### `machine_type` means different things in `itm_cashpos` vs `atms`
+The `itm_cashpos` table uses denomination-based classification: `ATM100K` (dispenses 100K only), `ATM50K` (50K only), `CRM` (recycler). The `atms` master table uses functional classification: `ATM`, `CRM`, `CDM`. These are NOT interchangeable — a single physical terminal in `atms` with `machine_type='ATM'` may appear as `ATM100K` or `ATM50K` in `itm_cashpos` depending on its cassette configuration. When joining across these tables, match on `terminal_id`, never on `machine_type`. When building UI that surfaces both (e.g., ATM Profile showing replenishment history), display the `itm_cashpos.machine_type` as "denomination config" and `atms.machine_type` as "device type."

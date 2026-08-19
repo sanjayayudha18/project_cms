@@ -73,3 +73,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT USAGE, SELECT ON SEQUENCES TO app_user;
+
+* create db
+psql -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -f "C:\Users\RB Yudha Rangga\OneDrive\Documents\Development\CMS2\backend\migrations\create_db_cms.sql"       
+
+* create table
+psql -h localhost -p 5432 -U postgres -d cms -v ON_ERROR_STOP=1 -f "C:\Users\RB Yudha Rangga\OneDrive\Documents\Development\CMS2\backend\migrations\002_cms_tables.sql"

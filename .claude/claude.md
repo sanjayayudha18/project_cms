@@ -16,7 +16,7 @@
 
 * * *
 ## 1\. Overview
-*   **Name**: Cash Management System (CMS) — ATM & CIT
+*   **Name**: CROWN THE Cash Management System
 *   **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
 *   **Stage**: Greenfield, vibe-coded with AI.
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.

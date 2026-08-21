@@ -32,13 +32,29 @@ load_dotenv(Path(__file__).parent / ".env")
 INPUT_DIR = Path(
     os.getenv(
         "ITM_INPUT_DIR",
-        r"C:\Users\RB Yudha Rangga\OneDrive\Documents\Development\CMS2\FTP_DATA\ITM",
+        r"C:\Users\RB Yudha Rangga\OneDrive\Documents\Development\CMS2\FTP_DATA\ITM\atm_replenish",
     )
 )
-BACKUP_DIR = INPUT_DIR / "backup"
+BACKUP_DIR = INPUT_DIR / "backups"
 LOG_DIR = INPUT_DIR / "logs"
 
-FILE_PATTERN = "ATM_Cashpos_*.csv"
+FILE_PATTERN = "ATM_Replenish_*.csv"
+
+# Full + abbreviated month names (English + Indonesian)
+_MONTH_MAP: dict[str, int] = {
+    "january": 1, "januari": 1, "jan": 1,
+    "february": 2, "februari": 2, "feb": 2,
+    "march": 3, "maret": 3, "mar": 3,
+    "april": 4, "apr": 4,
+    "may": 5, "mei": 5,
+    "june": 6, "juni": 6, "jun": 6,
+    "july": 7, "juli": 7, "jul": 7,
+    "august": 8, "agustus": 8, "agu": 8, "aug": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oktober": 10, "oct": 10, "okt": 10,
+    "november": 11, "nov": 11,
+    "december": 12, "desember": 12, "dec": 12, "des": 12,
+}
 
 # =============================================================================
 # LOGGING
@@ -111,20 +127,21 @@ def parse_decimal(raw: str) -> Decimal:
 
 def extract_file_date(filename: str) -> date | None:
     """
-    Extract the business date from filename like 'ATM_Cashpos_19_April_2026.csv'.
+    Extract the business date from filename like:
+      'ATM_Replenish_21_Agu_2026.csv' or 'ATM_Cashpos_19_April_2026.csv'
     Returns None if parsing fails.
     """
-    # Remove extension and prefix
-    stem = Path(filename).stem  # ATM_Cashpos_19_April_2026
+    stem = Path(filename).stem  # ATM_Replenish_21_Agu_2026
     parts = stem.split("_")
-    # Expected: ['ATM', 'Cashpos', '19', 'April', '2026']
+    # Expected: ['ATM', 'Replenish'|'Cashpos', day, month, year]
     if len(parts) >= 5:
         try:
             day = int(parts[2])
-            month_str = parts[3]
+            month = _MONTH_MAP.get(parts[3].lower())
             year = int(parts[4])
-            dt = datetime.strptime(f"{day} {month_str} {year}", "%d %B %Y")
-            return dt.date()
+            if month is None:
+                return None
+            return date(year, month, day)
         except (ValueError, IndexError):
             pass
     return None

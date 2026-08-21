@@ -191,11 +191,42 @@ RUN pnpm install --frozen-lockfile
 Without it, pnpm sees no build allowlist and fails with `ERR_PNPM_IGNORED_BUILDS` for packages like `@biomejs/biome` and `esbuild`. The `pnpm.onlyBuiltDependencies` field in `package.json` does nothing in pnpm 11 — use `allowBuilds` in `pnpm-workspace.yaml` instead.
 
 ### Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b`
-The root `tsconfig.json` references `tsconfig.app.json`, `tsconfig.node.json`, AND `tsconfig.test.json`. Running `tsc -b` (which the `pnpm build` script does via `tsc -b && vite build`) compiles all three — including test files that may have type errors irrelevant to production. In Docker, override the build command:
+
+**Root cause:** The root `tsconfig.json` uses project references to compose three configs:
+```json
+{ "references": [
+  { "path": "./tsconfig.app.json" },   // production source
+  { "path": "./tsconfig.node.json" },  // vite config
+  { "path": "./tsconfig.test.json" }   // test files
+]}
+```
+The `package.json` build script is `"build": "tsc -b && vite build"`. Running bare `tsc -b` resolves the root `tsconfig.json` and compiles ALL referenced projects — including `tsconfig.test.json`. Test files commonly have `noUncheckedIndexedAccess` violations (`Object is possibly 'undefined'`), stale type references (renamed interfaces), and missing Vite client types (`import.meta.env`). These are harmless for tests (Vitest doesn't type-check at runtime) but fatal for Docker builds.
+
+**Symptoms:**
+- `docker compose build` fails with exit code 2
+- Errors are exclusively in `*.test.ts`, `*.test.tsx`, `*.property.test.ts` files
+- Error types: `TS2532` (possibly undefined), `TS2322` (type mismatch), `TS2339` (property does not exist), `TS18048` (possibly undefined)
+- Local `pnpm build` may also fail, but devs often don't notice because they run `pnpm dev` (which skips tsc)
+
+**Fix — Dockerfile build command:**
 ```dockerfile
+# DON'T: RUN pnpm build
+# DO:
 RUN pnpm tsc -b tsconfig.app.json && pnpm vite build
 ```
-This type-checks only production source code. Test type errors should be caught in CI test steps, not during Docker image builds.
+
+**Why this works:** `tsconfig.app.json` already has explicit excludes for test files:
+```json
+"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test/**"]
+```
+Targeting it directly skips the test project reference entirely.
+
+**When this applies:**
+- Any frontend Dockerfile in this project (CompanyPortal, VendorPortal, future portals)
+- After adding new test files with type errors
+- After changing domain interfaces (tests break first, app source stays clean)
+
+**Complementary fix for CI:** Run `tsc -b` (full) in the CI lint/test step so test type errors are caught — just not during image builds.
 
 ---
 
@@ -299,6 +330,18 @@ os.environ.setdefault("PGSYSCONFDIR", ".")
 **Also:** use `python-dotenv` + a `.env` file for DB credentials instead of `set` commands, so devs don't need to set env vars manually each session.
 
 This applies to ALL Python scheduler scripts in this project (`scheduler/dmaa/`, `scheduler/itm/`, and any future ETL scripts).
+
+### Docker build cache: always use `--no-cache` after frontend navigation/route changes
+Docker's layer caching can serve stale JS bundles even after `docker compose up --build`. The `COPY . .` layer is fingerprinted by file metadata, and Docker BuildKit may reuse cached layers if it doesn't detect meaningful changes (especially on Windows with OneDrive). After adding new routes, navigation items, or any frontend structural change:
+```bash
+docker compose build --no-cache userportal
+docker compose up -d userportal
+```
+To verify the build contains the expected code:
+```bash
+docker exec userportal-vite-fe grep -l "atm-portal" /usr/share/nginx/html/assets/*.js
+```
+If grep returns nothing, the build used stale source. This is especially insidious because nginx's `Cache-Control: no-cache` on HTML is working correctly — the problem is the JS bundle itself was built from old source inside Docker.
 
 ### `machine_type` means different things in `itm_cashpos` vs `atms`
 The `itm_cashpos` table uses denomination-based classification: `ATM100K` (dispenses 100K only), `ATM50K` (50K only), `CRM` (recycler). The `atms` master table uses functional classification: `ATM`, `CRM`, `CDM`. These are NOT interchangeable — a single physical terminal in `atms` with `machine_type='ATM'` may appear as `ATM100K` or `ATM50K` in `itm_cashpos` depending on its cassette configuration. When joining across these tables, match on `terminal_id`, never on `machine_type`. When building UI that surfaces both (e.g., ATM Profile showing replenishment history), display the `itm_cashpos.machine_type` as "denomination config" and `atms.machine_type` as "device type."

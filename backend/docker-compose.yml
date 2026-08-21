@@ -1,4 +1,4 @@
-name: CMS-Backend  # Groups everything cleanly
+name: CMS-Backend
 
 services:
   # ─── Backend API ───────────────────────────────────────────────────────────
@@ -10,20 +10,18 @@ services:
     container_name: cms-backend
     ports:
       - "8080:8080"
-    environment:
-      - JWT_SECRET=dev-secret-key-minimum-32-bytes-long!!
-      - DATABASE_URL=postgres://postgres:1818@host.docker.internal:5432/cms?sslmode=disable
-      - REDIS_URL=redis://redis:6379
-      - PORT=8080
-      - ACCESS_TOKEN_EXPIRY=15m
-      - REFRESH_TOKEN_EXPIRY=168h
-      - RATE_LIMIT_USERNAME=5
-      - RATE_LIMIT_IP=20
-      - RATE_LIMIT_WINDOW=15m
+    env_file:
+      - .env
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - cms-net
 
@@ -34,6 +32,12 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - cms-net
 

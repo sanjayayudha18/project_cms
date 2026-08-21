@@ -1,4 +1,4 @@
-name: CMS-frontEnd  # Groups everything cleanly
+name: CMS-frontEnd
 
 services:
   # ─── CompanyPortal Frontend ────────────────────────────────────────────────
@@ -11,6 +11,12 @@ services:
     ports:
       - "3001:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - cms-net
 
@@ -24,9 +30,16 @@ services:
     ports:
       - "3002:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - cms-net
 
 networks:
   cms-net:
-    driver: bridge
+    external: true
+    name: cms-backend_cms-net

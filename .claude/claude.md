@@ -1,4 +1,4 @@
-# PROJECT_CONTEXT.md — CMS ATM & CIT
+# PROJECT_CONTEXT.md — CMS ATM & CIT (CLAUDE)
 
 # PROJECT\_CONTEXT.md — Cash Management System (CMS) for ATM & CIT
 > **AI: READ THIS FIRST, EVERY SESSION.** Single source of truth. If your work conflicts with this, STOP and ask. Never invent endpoints, tables, columns, env vars, or modules.

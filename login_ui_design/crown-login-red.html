@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- skill:chrome -->
+<style>
+/* Credit line — bottom-right */
+.design-ui-credit {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font: 11px/1 system-ui, sans-serif;
+  color: rgba(128,128,128,0.5);
+  pointer-events: none;
+  z-index: 2147483647;
+  transition: opacity 0.4s ease;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+/* Hide chrome on touch devices */
+@media (hover: none) {
+  .design-ui-credit { display: none; }
+}
+
+/* Print fixes */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .design-ui-credit { display: none !important; }
+}
+
+</style>
+<script>
+(function () {
+    // Design-ui pages are single compositions, so the whole body is editable.
+    function markEditable() {
+        document.body.classList.add('artifact-editable');
+    }
+
+    // Credit badge with idle-fade. Hover devices only.
+    function initChromeUI() {
+        if (!matchMedia('(hover: hover)').matches) return;
+
+        var credit = document.createElement('div');
+        credit.className = 'design-ui-credit';
+        credit.setAttribute('aria-hidden', 'true');
+        credit.innerHTML = '\u{1F49C} by ClickUp Brain';
+        document.body.appendChild(credit);
+
+        var timer = null;
+        var fade = function (out) { credit.style.opacity = out ? '0' : ''; };
+        fade(true);
+        var show = function () {
+            fade(false);
+            clearTimeout(timer);
+            timer = setTimeout(function () { fade(true); }, 3000);
+        };
+        document.addEventListener('mousemove', show);
+        show();
+    }
+
+    function init() {
+        markEditable();
+        initChromeUI();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chrome -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Vendor sign in · CROWN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+
+  :root{
+    /* CROWN chrome tokens */
+    --chrome-deep:#63131A;
+    --chrome:#8A1A22;
+    --chrome-fg:#F3E9E8;
+
+    /* derived wells + lines, same hue family */
+    --well:#4E0F16;
+    --well-hover:#5A1219;
+    --line:#7E2229;
+    --line-strong:#9C3A40;
+    --fg-dim:#DCB8B8;
+    --fg-muted:#B98F90;
+
+    --primary:#E4142A; --primary-hover:#F4384A; --primary-fg:#FFFCFB;
+    --success:#7ADFA6;
+    --warning:#F2C46B;
+    --info:#A9C4F0;
+    --danger:#FF9AA2;
+
+    --font-sans:"Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+    --space-2xs:4px; --space-xs:8px; --space-sm:12px; --space-md:16px;
+    --space-lg:24px; --space-xl:32px; --space-2xl:48px; --space-3xl:72px;
+
+    --ease-out:cubic-bezier(.16,1,.3,1);
+  }
+
+  @supports (color: oklch(0% 0 0)){
+    :root{
+      --chrome-deep:oklch(30% .11 25);
+      --chrome:oklch(40% .155 26);
+      --chrome-fg:oklch(94% .012 30);
+      --well:oklch(24.5% .088 25);
+      --well-hover:oklch(27.5% .098 25);
+      --line:oklch(38% .105 25);
+      --line-strong:oklch(47% .12 25);
+      --fg-dim:oklch(82% .045 27);
+      --fg-muted:oklch(68% .05 27);
+      --primary:oklch(56% .223 27);
+      --primary-hover:oklch(63% .215 27);
+      --primary-fg:oklch(99% .004 40);
+      --success:oklch(84% .11 155);
+      --warning:oklch(86% .10 80);
+      --info:oklch(82% .07 255);
+      --danger:oklch(80% .12 20);
+    }
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--chrome-deep); color:var(--chrome-fg);
+    font-family:var(--font-sans);
+    font-size:1rem; font-weight:350; line-height:1.58; letter-spacing:.008em;
+    -webkit-font-smoothing:antialiased;
+    font-optical-sizing:auto;
+    min-height:100dvh;
+  }
+  input,button{font:inherit;color:inherit}
+  input[type=checkbox]{accent-color:var(--primary)}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  p{margin:0;text-wrap:pretty}
+
+  *{scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:999px;border:3px solid var(--chrome-deep)}
+
+  input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
+    -webkit-text-fill-color:var(--chrome-fg);
+    -webkit-box-shadow:0 0 0 1000px var(--well) inset;
+    caret-color:var(--chrome-fg);
+    transition:background-color 9999s ease-out 0s;
+  }
+
+  :focus-visible{outline:2px solid var(--fg-dim);outline-offset:2px;border-radius:2px}
+
+  /* ---------- shell ---------- */
+  .shell{
+    min-height:100dvh;
+    display:grid;
+    grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);
+  }
+
+  .pitch{
+    position:relative;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:var(--space-2xl) clamp(24px,5.5vw,96px);
+  }
+  .pitch-inner{width:100%;max-width:34rem;position:relative}
+
+  /* ---------- brand ---------- */
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:var(--space-3xl)}
+  .brand svg{display:block;color:var(--chrome-fg)}
+  .brand-word{font-size:1.0625rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin-left:2px}
+  .brand-div{width:1px;height:18px;background:var(--line-strong);margin-inline:var(--space-sm)}
+  .brand-sub{font-size:.6875rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim)}
+
+  /* ---------- headline ---------- */
+  .display{
+    font-size:clamp(2.1rem,5vw,3.1rem);line-height:1.06;font-weight:800;letter-spacing:-.034em;
+    margin-left:-.035em;
+  }
+  .lead{
+    margin-top:var(--space-md);
+    color:var(--fg-dim);max-width:44ch;
+  }
+  .lead b{color:var(--chrome-fg);font-weight:600}
+  .lead .num{font-family:var(--font-mono);font-weight:500;font-size:.9375rem}
+
+  .eod{
+    margin-top:var(--space-lg);
+    display:inline-flex;align-items:center;gap:var(--space-xs);
+    font-size:.75rem;font-weight:500;color:var(--fg-dim);letter-spacing:.01em;
+  }
+  .eod .stamp{font-family:var(--font-mono);font-weight:400;color:var(--chrome-fg)}
+  .eod svg{color:var(--success);flex:none}
+
+  /* ---------- form ---------- */
+  form{margin-top:var(--space-xl);max-width:23rem}
+  .field + .field{margin-top:var(--space-md)}
+  label{
+    display:block;
+    font-size:.6875rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--fg-dim);margin-bottom:6px;
+  }
+  label .req{color:var(--danger);font-weight:700;margin-left:3px}
+  .control{position:relative;display:flex;align-items:center}
+  input[type=text],input[type=password]{
+    width:100%;min-height:44px;padding:10px var(--space-sm);
+    background:var(--well);
+    border:1px solid var(--line);border-radius:4px;
+    letter-spacing:.01em;
+    transition:border-color 120ms var(--ease-out),background-color 120ms var(--ease-out),box-shadow 120ms var(--ease-out);
+  }
+  #cid{font-family:var(--font-mono);font-weight:400;letter-spacing:.02em}
+  input::placeholder{color:var(--fg-muted);letter-spacing:0}
+  input:hover:not(:disabled){border-color:var(--line-strong);background:var(--well-hover)}
+  input:focus{outline:none;border-color:var(--fg-dim);box-shadow:0 0 0 3px rgba(243,233,232,.12)}
+  input:disabled{color:var(--fg-muted);cursor:not-allowed;opacity:.7}
+  .field[data-invalid=true] input{border-color:var(--danger)}
+  .has-toggle input{padding-right:44px}
+
+  .reveal{
+    position:absolute;right:4px;width:36px;height:36px;
+    display:grid;place-items:center;
+    background:none;border:0;border-radius:4px;cursor:pointer;color:var(--fg-muted);
+    transition:color 120ms var(--ease-out),background-color 120ms var(--ease-out);
+  }
+  .reveal:hover{color:var(--chrome-fg);background:var(--well-hover)}
+
+  .msg{
+    display:none;align-items:flex-start;gap:6px;
+    margin-top:6px;font-size:.75rem;font-weight:500;color:var(--danger);letter-spacing:.01em;
+  }
+  .field[data-invalid=true] .msg{display:flex}
+  .msg svg{flex:none;margin-top:2px}
+  .msg code{font-family:var(--font-mono)}
+
+  .hint{
+    display:none;align-items:center;gap:6px;
+    margin-top:6px;font-size:.75rem;font-weight:500;color:var(--info);letter-spacing:.01em;
+  }
+  .hint[data-on=true]{display:flex}
+
+  .row{
+    display:flex;align-items:center;justify-content:space-between;gap:var(--space-md);
+    margin-top:var(--space-md);
+  }
+  .remember{display:flex;align-items:center;gap:var(--space-xs);font-size:.875rem;color:var(--fg-dim);cursor:pointer}
+  .remember input{width:16px;height:16px;margin:0}
+  .link{
+    color:var(--chrome-fg);font-size:.875rem;font-weight:600;text-decoration:none;
+    border-bottom:1px solid rgba(243,233,232,.35);
+  }
+  .link:hover{border-bottom-color:var(--chrome-fg)}
+
+  .submit{
+    margin-top:var(--space-lg);width:100%;min-height:44px;
+    display:inline-flex;align-items:center;justify-content:center;gap:var(--space-xs);
+    background:var(--primary);color:var(--primary-fg);
+    border:1px solid transparent;border-radius:4px;
+    font-weight:600;letter-spacing:.01em;cursor:pointer;
+    transition:background-color 120ms var(--ease-out),transform 120ms var(--ease-out);
+  }
+  .submit:hover:not(:disabled){background:var(--primary-hover)}
+  .submit:active:not(:disabled){transform:translateY(1px)}
+  .submit:disabled{background:var(--well);color:var(--fg-muted);border-color:var(--line);cursor:not-allowed}
+  .submit[data-state=loading]{cursor:progress}
+  .submit[data-state=success]{background:var(--success);color:var(--chrome-deep)}
+  .submit .spin{animation:spin 800ms linear infinite;display:none}
+  .submit[data-state=loading] .spin{display:block}
+  .submit .tick{display:none}
+  .submit[data-state=success] .tick{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .after{
+    margin-top:var(--space-sm);min-height:1.05rem;
+    font-size:.75rem;font-weight:500;color:var(--success);letter-spacing:.01em;
+    opacity:0;transform:translateY(-3px);
+    transition:opacity 200ms var(--ease-out),transform 200ms var(--ease-out);
+  }
+  .after[data-on=true]{opacity:1;transform:none}
+
+  /* ---------- footer ---------- */
+  .meta{
+    margin-top:var(--space-3xl);padding-top:var(--space-md);
+    border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-sm) var(--space-lg);
+    font-size:.75rem;color:var(--fg-muted);letter-spacing:.01em;
+  }
+  .meta .env{
+    font-family:var(--font-mono);font-size:.6875rem;font-weight:500;
+    color:var(--fg-dim);background:var(--well);
+    border:1px solid var(--line);border-radius:999px;padding:2px 10px;letter-spacing:.02em;
+  }
+  .meta a{color:var(--fg-dim);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+  .meta a:hover{color:var(--chrome-fg)}
+
+  /* ---------- artwork panel ---------- */
+  .art{
+    position:relative;overflow:hidden;
+    background:var(--well);
+    border-left:1px solid var(--line);
+    display:flex;
+  }
+  .art img{
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    object-fit:cover;object-position:52% 46%;
+    display:block;
+    opacity:0;transform:scale(1.03);
+    transition:opacity 700ms var(--ease-out),transform 900ms var(--ease-out);
+  }
+  .art img.ready{opacity:1;transform:none}
+
+  /* skeleton while the artwork loads */
+  .art-skel{
+    position:absolute;inset:0;
+    background:linear-gradient(100deg,var(--well) 20%,var(--well-hover) 42%,var(--well) 64%);
+    background-size:220% 100%;
+    animation:sweep 1900ms linear infinite;
+  }
+  .art.loaded .art-skel{display:none}
+  @keyframes sweep{from{background-position:180% 0}to{background-position:-80% 0}}
+
+  /* legibility scrim behind the caption only */
+  .art::after{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+    background:linear-gradient(to top,#3D0B11 0%,rgba(61,11,17,.72) 42%,rgba(61,11,17,0) 100%);
+    pointer-events:none;
+  }
+  .art-copy{
+    position:relative;align-self:flex-end;z-index:1;
+    padding:clamp(24px,3vw,48px);max-width:34rem;
+  }
+  .art-eyebrow{
+    font-size:.6875rem;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--fg-dim);
+  }
+  .art-copy h2{
+    margin-top:var(--space-xs);
+    font-size:1.375rem;font-weight:600;letter-spacing:-.02em;line-height:1.28;
+  }
+  .art-copy p{margin-top:var(--space-xs);font-size:.875rem;color:var(--fg-dim);max-width:38ch}
+  .legend{
+    margin-top:var(--space-md);display:flex;flex-wrap:wrap;gap:var(--space-xs) var(--space-lg);
+    font-size:.75rem;color:var(--fg-dim);
+  }
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend .n{font-family:var(--font-mono);font-weight:500;color:var(--chrome-fg);font-variant-numeric:tabular-nums}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1100px){
+    .shell{grid-template-columns:1fr}
+    .art{order:-1;min-height:44vh;border-left:0;border-bottom:1px solid var(--line)}
+    .art img{object-position:50% 44%}
+    .pitch{padding-block:var(--space-2xl)}
+    .brand{margin-bottom:var(--space-xl)}
+    .meta{margin-top:var(--space-2xl)}
+  }
+  @media (max-width:640px){
+    .art{min-height:32vh}
+    .art-copy h2{font-size:1.125rem}
+    .art-copy p,.legend{display:none}
+    .pitch{justify-content:flex-start;padding:var(--space-lg)}
+    form,.lead{max-width:none}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+    .art img{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ============ identity + form ============ -->
+  <section class="pitch">
+    <div class="pitch-inner">
+
+      <div class="brand">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2 18h20"/><path d="M3 8l4.5 4L12 4l4.5 8L21 8l-1.4 7H4.4L3 8z"/>
+        </svg>
+        <span class="brand-word">Crown</span>
+        <span class="brand-div"></span>
+        <span class="brand-sub">Cash Management System</span>
+      </div>
+
+      <h1 class="display">Every rupiah<br>accounted for.</h1>
+
+      <p class="lead">
+        ATM replenishment, cash-in-transit escort, and overnight reconciliation across
+        <b class="num">4.212</b> <b>terminals</b> and six vendors.
+      </p>
+
+      <p class="eod">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        EOD complete · <span class="stamp">20 Aug 2026, 06:14 WIB</span>
+      </p>
+
+      <form id="loginForm" novalidate>
+        <div class="field" id="f-cid" data-invalid="false">
+          <label for="cid">Corporate ID <span class="req" aria-hidden="true">*</span></label>
+          <div class="control">
+            <input id="cid" name="cid" type="text" inputmode="numeric" autocomplete="username"
+                   placeholder="7004182" aria-describedby="e-cid" spellcheck="false">
+          </div>
+          <p class="msg" id="e-cid">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <span>Use your 7-digit corporate ID, format <code>7004182</code>.</span>
+          </p>
+        </div>
+
+        <div class="field" id="f-pwd" data-invalid="false">
+          <label for="pwd">Password <span class="req" aria-hidden="true">*</span></label>
+          <div class="control has-toggle">
+            <input id="pwd" name="pwd" type="password" autocomplete="current-password"
+                   placeholder="••••••••" aria-describedby="e-pwd caps">
+            <button class="reveal" type="button" id="reveal" aria-label="Show password" aria-pressed="false">
+              <svg id="eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.87 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.87 0"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="msg" id="e-pwd">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <span>Enter your password. Five wrong attempts locks the account for 30 minutes.</span>
+          </p>
+          <p class="hint" id="caps" data-on="false">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 8 6-6 6 6"/><path d="M6 14h12"/><path d="M6 20h12"/></svg>
+            Caps Lock is on.
+          </p>
+        </div>
+
+        <div class="row">
+          <label class="remember" for="trust" style="text-transform:none;letter-spacing:.01em;font-size:.875rem;font-weight:350;margin:0">
+            <input type="checkbox" id="trust"> Trust this workstation for 8 hours
+          </label>
+          <a class="link" href="#reset">Reset password</a>
+        </div>
+
+        <button class="submit" id="submit" type="submit" data-state="idle" disabled>
+          <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>
+          <svg class="tick" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <span id="submitLabel">Sign in</span>
+        </button>
+
+        <p class="after" id="after" data-on="false" role="status">Opening Cash Position for 20 Aug 2026.</p>
+      </form>
+
+      <div class="meta">
+        <span class="env">PROD · v1.4.2</span>
+        <span>Authorized users only. Access is logged.</span>
+        <a href="#vendor">
+          Vendor portal
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ artwork ============ -->
+  <aside class="art" id="art">
+    <div class="art-skel" aria-hidden="true"></div>
+    <img id="artImg"
+         src="https://u107408310.p.clickup-attachments.com/u107408310/41387ca8-a0c4-4307-b4b6-25d672a69e73/generated-image-73e505a5-57f5-4f6d-bba9-24aec9dcede0.png?view=open"
+         alt="Technical line drawing of an ATM, an armored cash-in-transit van, sealed cash cassettes and banded banknotes, connected by a replenishment route.">
+    <div class="art-copy">
+      <p class="art-eyebrow">Replenishment cycle</p>
+      <h2>From vault to dispenser, one tracked chain of custody.</h2>
+      <p>Order, escort, load, count, reconcile. Every handover carries a signature and a timestamp.</p>
+      <div class="legend">
+        <span><span class="n">6</span> vendors</span>
+        <span><span class="n">4.212</span> terminals</span>
+        <span><span class="n">09:00</span> WIB DSR cutoff</span>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+(function(){
+  /* artwork load + skeleton */
+  var art=document.getElementById('art'), img=document.getElementById('artImg');
+  function shown(){ art.classList.add('loaded'); img.classList.add('ready'); }
+  if(img.complete && img.naturalWidth) shown(); else {
+    img.addEventListener('load',shown);
+    img.addEventListener('error',function(){ art.classList.add('loaded'); });
+  }
+
+  var form=document.getElementById('loginForm');
+  var cid=document.getElementById('cid'), pwd=document.getElementById('pwd');
+  var fCid=document.getElementById('f-cid'), fPwd=document.getElementById('f-pwd');
+  var btn=document.getElementById('submit'), label=document.getElementById('submitLabel');
+  var after=document.getElementById('after'), caps=document.getElementById('caps');
+  var reveal=document.getElementById('reveal'), eye=document.getElementById('eye');
+
+  var EYE='<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.87 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.87 0"/><circle cx="12" cy="12" r="3"/>';
+  var EYE_OFF='<path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.06 6.06A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.94-1.94"/><path d="M14.08 14.08a3 3 0 1 1-4.16-4.16"/><path d="m2 2 20 20"/>';
+
+  function sync(){
+    var ok=cid.value.trim()!=='' && pwd.value!=='';
+    if(btn.dataset.state==='idle') btn.disabled=!ok;
+  }
+  cid.addEventListener('input',function(){fCid.dataset.invalid='false';sync();});
+  pwd.addEventListener('input',function(){fPwd.dataset.invalid='false';sync();});
+
+  function capsCheck(e){
+    if(typeof e.getModifierState!=='function') return;
+    caps.dataset.on=e.getModifierState('CapsLock')?'true':'false';
+  }
+  pwd.addEventListener('keyup',capsCheck);
+  pwd.addEventListener('keydown',capsCheck);
+  pwd.addEventListener('blur',function(){caps.dataset.on='false';});
+
+  reveal.addEventListener('click',function(){
+    var shownPwd=pwd.type==='text';
+    pwd.type=shownPwd?'password':'text';
+    reveal.setAttribute('aria-pressed',String(!shownPwd));
+    reveal.setAttribute('aria-label',shownPwd?'Show password':'Hide password');
+    eye.innerHTML=shownPwd?EYE:EYE_OFF;
+    pwd.focus();
+  });
+
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(btn.dataset.state==='loading'||btn.dataset.state==='success') return;
+
+    var bad=false;
+    if(!/^\d{7}$/.test(cid.value.trim())){ fCid.dataset.invalid='true'; bad=true; }
+    if(pwd.value.length<1){ fPwd.dataset.invalid='true'; bad=true; }
+    if(bad){ (fCid.dataset.invalid==='true'?cid:pwd).focus(); return; }
+
+    btn.dataset.state='loading'; btn.disabled=true; label.textContent='Verifying';
+    setTimeout(function(){
+      btn.dataset.state='success'; label.textContent='Signed in';
+      after.dataset.on='true';
+      cid.disabled=true; pwd.disabled=true; reveal.disabled=true;
+    },1400);
+  });
+
+  sync();
+})();
+</script>
+</body>
+</html>

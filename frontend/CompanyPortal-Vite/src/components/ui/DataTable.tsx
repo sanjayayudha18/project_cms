@@ -45,6 +45,8 @@ export function DataTable<T>({
                   ?.align;
                 const canSort = header.column.getCanSort();
 
+                const sortHandler = header.column.getToggleSortingHandler();
+
                 return (
                   <th
                     key={header.id}
@@ -55,7 +57,19 @@ export function DataTable<T>({
                       canSort ? "cursor-pointer select-none" : "",
                       align === "right" ? "text-right" : "text-left",
                     ].join(" ")}
-                    onClick={header.column.getToggleSortingHandler()}
+                    onClick={sortHandler}
+                    onKeyDown={
+                      canSort
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              sortHandler?.(e);
+                            }
+                          }
+                        : undefined
+                    }
+                    tabIndex={canSort ? 0 : undefined}
+                    role={canSort ? "button" : undefined}
                   >
                     <span className="inline-flex items-center gap-1">
                       {header.isPlaceholder

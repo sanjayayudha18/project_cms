@@ -77,15 +77,19 @@ describe("DsrSummary", () => {
     expect(totals300).toHaveLength(2);
 
     // Verify the labels are rendered alongside the values
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves in DsrSummary's known markup.
     const beginningCard = screen.getByText("Total Saldo Awal").closest("div")!;
     expect(beginningCard).toHaveTextContent("750.000.000");
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves here — same card markup as above.
     const cashInCard = screen.getByText("Total Kas Masuk").closest("div")!;
     expect(cashInCard).toHaveTextContent("300.000.000");
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves here — same card markup as above.
     const cashOutCard = screen.getByText("Total Kas Keluar").closest("div")!;
     expect(cashOutCard).toHaveTextContent("750.000.000");
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves here — same card markup as above.
     const endingCard = screen.getByText("Total Saldo Akhir").closest("div")!;
     expect(endingCard).toHaveTextContent("300.000.000");
   });

@@ -32,6 +32,7 @@ export function AppShell({ children }: AppShellProps) {
   const location = useRouterState({ select: (s) => s.location });
   const isFirstRender = useRef(true);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: location.pathname is the intentional trigger to shift focus to <main> on route change, even though it isn't read in the body.
   useEffect(() => {
     // Skip focus shift on initial mount
     if (isFirstRender.current) {

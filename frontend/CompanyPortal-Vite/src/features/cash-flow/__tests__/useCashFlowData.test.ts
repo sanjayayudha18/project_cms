@@ -42,18 +42,19 @@ describe("useCashFlowData", () => {
 
     const data = result.current.data;
     expect(data).toBeDefined();
+    if (!data) throw new Error("Expected result.current.data to be defined");
 
     // stats has length 4
-    expect(data!.stats).toHaveLength(4);
+    expect(data.stats).toHaveLength(4);
 
     // vendorChart.data has length 7 (7 days)
-    expect(data!.vendorChart.data).toHaveLength(7);
+    expect(data.vendorChart.data).toHaveLength(7);
 
     // vendorChart.vendors has length 4
-    expect(data!.vendorChart.vendors).toHaveLength(4);
+    expect(data.vendorChart.vendors).toHaveLength(4);
 
     // atmLevels has length 6
-    expect(data!.atmLevels).toHaveLength(6);
+    expect(data.atmLevels).toHaveLength(6);
   });
 
   it('data values match prototype (first stat: "Rp 48,2 M")', async () => {
@@ -65,9 +66,13 @@ describe("useCashFlowData", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    const data = result.current.data!;
-    expect(data.stats[0]!.value).toBe("Rp 48,2 M");
-    expect(data.stats[0]!.label).toBe("Total Kas Beredar");
+    const data = result.current.data;
+    if (!data) throw new Error("Expected result.current.data to be defined");
+
+    const [firstStat] = data.stats;
+    if (!firstStat) throw new Error("Expected data.stats to have at least one entry");
+    expect(firstStat.value).toBe("Rp 48,2 M");
+    expect(firstStat.label).toBe("Total Kas Beredar");
   });
 
   it("exposes error state fields for error handling", async () => {

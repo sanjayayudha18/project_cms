@@ -104,14 +104,17 @@ function groupSchedule(entries: ScheduleEntry[]): GroupedSchedule[] {
   const vendorMap = new Map<string, Map<string, ScheduleEntry[]>>();
 
   for (const entry of entries) {
-    if (!vendorMap.has(entry.vendorName)) {
-      vendorMap.set(entry.vendorName, new Map());
+    let dateMap = vendorMap.get(entry.vendorName);
+    if (!dateMap) {
+      dateMap = new Map();
+      vendorMap.set(entry.vendorName, dateMap);
     }
-    const dateMap = vendorMap.get(entry.vendorName)!;
-    if (!dateMap.has(entry.scheduledDate)) {
-      dateMap.set(entry.scheduledDate, []);
+    let dateEntries = dateMap.get(entry.scheduledDate);
+    if (!dateEntries) {
+      dateEntries = [];
+      dateMap.set(entry.scheduledDate, dateEntries);
     }
-    dateMap.get(entry.scheduledDate)!.push(entry);
+    dateEntries.push(entry);
   }
 
   const result: GroupedSchedule[] = [];
@@ -126,7 +129,7 @@ function groupSchedule(entries: ScheduleEntry[]): GroupedSchedule[] {
 }
 
 function formatDate(iso: string): string {
-  const date = new Date(iso + "T00:00:00");
+  const date = new Date(`${iso}T00:00:00`);
   return date.toLocaleDateString("id-ID", {
     weekday: "short",
     day: "numeric",

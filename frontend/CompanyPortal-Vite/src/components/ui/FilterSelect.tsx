@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 interface FilterSelectProps {
   label: string;
   options: { value: string; label: string }[];
@@ -17,12 +19,18 @@ export function FilterSelect({
   onChange,
   placeholder = "Semua",
 }: FilterSelectProps) {
+  const selectId = useId();
+
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-[var(--n-600)] uppercase tracking-wider">
+      <label
+        htmlFor={selectId}
+        className="text-xs font-medium text-[var(--n-600)] uppercase tracking-wider"
+      >
         {label}
       </label>
       <select
+        id={selectId}
         value={value ?? ""}
         onChange={(e) => {
           const val = e.target.value;

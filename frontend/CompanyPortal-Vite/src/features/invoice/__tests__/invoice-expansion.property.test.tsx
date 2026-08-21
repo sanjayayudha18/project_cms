@@ -64,6 +64,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           const invoicedText = cells[1].textContent;
           expect(invoicedText).toBeTruthy();
           // Verify the cell contains a number-like formatted string (dots as separators)
+          // biome-ignore lint/style/noNonNullAssertion: truthy-checked via the assertion above.
           expect(invoicedText!.length).toBeGreaterThan(0);
 
           // 3. Matched order reference (or em dash if null)
@@ -77,6 +78,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           // 4. Expected amount (formatted as IDR)
           const expectedText = cells[3].textContent;
           expect(expectedText).toBeTruthy();
+          // biome-ignore lint/style/noNonNullAssertion: truthy-checked via the assertion above.
           expect(expectedText!.length).toBeGreaterThan(0);
 
           // 5. Variance (formatted as IDR)
@@ -86,6 +88,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           // 6. Match status — rendered as a Badge with the correct label
           const badgeEl = cells[5].querySelector("span");
           expect(badgeEl).not.toBeNull();
+          // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
           expect(badgeEl!.textContent).toContain(matchStatusLabels[item.matchStatus]);
         }
 

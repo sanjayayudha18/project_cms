@@ -136,6 +136,7 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/^(\d+) menit/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const minutes = Number.parseInt(match![1], 10);
         expect(minutes).toBe(Math.floor(seconds / 60));
       }),
@@ -150,6 +151,7 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/(\d+) detik$/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const secs = Number.parseInt(match![1], 10);
         expect(secs).toBe(seconds % 60);
       }),
@@ -186,7 +188,9 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/^(\d+) menit (\d+) detik$/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const minutes = Number.parseInt(match![1], 10);
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const secs = Number.parseInt(match![2], 10);
         expect(minutes * 60 + secs).toBe(seconds);
       }),

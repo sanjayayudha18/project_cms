@@ -144,7 +144,7 @@ describe("Toast System", () => {
   it("dismiss removes only the targeted toast", () => {
     render(<ToastContainer />);
 
-    let targetId: string;
+    let targetId = "";
     act(() => {
       const store = useToastStore.getState();
       store.toast({ type: "error", message: "Keep me" });
@@ -155,7 +155,7 @@ describe("Toast System", () => {
     expect(screen.getByText("Remove me")).toBeInTheDocument();
 
     act(() => {
-      useToastStore.getState().dismiss(targetId!);
+      useToastStore.getState().dismiss(targetId);
     });
 
     expect(screen.getByText("Keep me")).toBeInTheDocument();

@@ -145,6 +145,7 @@ describe("InvoiceFlow", () => {
     const user = userEvent.setup();
     render(<InvoiceFlow />);
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("tr") always resolves in InvoiceFlow's known markup.
     const firstRow = screen.getByText("INV-2024-001").closest("tr")!;
     await user.click(firstRow);
 
@@ -158,6 +159,7 @@ describe("InvoiceFlow", () => {
     const user = userEvent.setup();
     render(<InvoiceFlow />);
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("tr") always resolves in InvoiceFlow's known markup.
     const firstRow = screen.getByText("INV-2024-001").closest("tr")!;
     await user.click(firstRow);
 
@@ -173,6 +175,7 @@ describe("InvoiceFlow", () => {
     const user = userEvent.setup();
     render(<InvoiceFlow />);
 
+    // biome-ignore lint/style/noNonNullAssertion: closest("tr") always resolves in InvoiceFlow's known markup.
     const firstRow = screen.getByText("INV-2024-001").closest("tr")!;
     await user.click(firstRow);
     expect(screen.getByText("CIT Service ATM-JKT-001 (16 Jan)")).toBeInTheDocument();
@@ -269,6 +272,7 @@ describe("InvoiceDetail", () => {
   it("renders exactly as many rows as line items", () => {
     const { container } = render(<InvoiceDetail lineItems={sampleLineItems} />);
 
+    // biome-ignore lint/style/noNonNullAssertion: container always renders a <tbody> for InvoiceDetail.
     const tbody = container.querySelector("tbody")!;
     const rows = tbody.querySelectorAll("tr");
     expect(rows).toHaveLength(3);

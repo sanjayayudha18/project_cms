@@ -8,6 +8,8 @@ const mockLevels: AtmLevel[] = [
   { id: "ATM-00189", label: "ATM-00189", percentage: 43 },
   { id: "ATM-00302", label: "ATM-00302", percentage: 15 },
 ];
+const [atmHigh, , atmLow] = mockLevels;
+if (!atmHigh || !atmLow) throw new Error("Expected mockLevels to have fixed fixture entries");
 
 describe("getCashLevelTier", () => {
   it('returns "success" for percentage >= 50 (e.g. 82)', () => {
@@ -57,34 +59,34 @@ describe("AtmLevelRow", () => {
   }
 
   it("renders ATM identifier with monospace font (font-mono class)", () => {
-    renderRow(mockLevels[0]!);
+    renderRow(atmHigh);
 
     const label = screen.getByText("ATM-00417");
     expect(label).toHaveClass("font-mono");
   });
 
   it("renders percentage value with tabular-nums class", () => {
-    renderRow(mockLevels[0]!);
+    renderRow(atmHigh);
 
     const pctCell = screen.getByText("82%");
     expect(pctCell).toHaveClass("tabular-nums");
   });
 
   it('renders progress bar with role="progressbar"', () => {
-    renderRow(mockLevels[0]!);
+    renderRow(atmHigh);
 
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
   });
 
   it("sets aria-valuenow matching the percentage", () => {
-    renderRow(mockLevels[0]!);
+    renderRow(atmHigh);
 
     const progressbar = screen.getByRole("progressbar");
     expect(progressbar).toHaveAttribute("aria-valuenow", "82");
   });
 
   it("sets aria-valuemin=0 and aria-valuemax=100", () => {
-    renderRow(mockLevels[0]!);
+    renderRow(atmHigh);
 
     const progressbar = screen.getByRole("progressbar");
     expect(progressbar).toHaveAttribute("aria-valuemin", "0");
@@ -92,7 +94,7 @@ describe("AtmLevelRow", () => {
   });
 
   it("applies success tier bg class for high percentage", () => {
-    renderRow(mockLevels[0]!); // 82% -> success
+    renderRow(atmHigh); // 82% -> success
 
     const progressbar = screen.getByRole("progressbar");
     const fill = progressbar.firstElementChild as HTMLElement;
@@ -100,7 +102,7 @@ describe("AtmLevelRow", () => {
   });
 
   it("applies danger tier bg class for low percentage", () => {
-    renderRow(mockLevels[2]!); // 15% -> danger
+    renderRow(atmLow); // 15% -> danger
 
     const progressbar = screen.getByRole("progressbar");
     const fill = progressbar.firstElementChild as HTMLElement;

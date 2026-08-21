@@ -135,6 +135,7 @@ describe("Route Protection — Property 4: Unauthorized Route Blocking", () => {
           if (unauthorizedRoles.length === 0) return;
 
           // Pick the baseRole only if it's unauthorized, otherwise use first unauthorized
+          // biome-ignore lint/style/noNonNullAssertion: unauthorizedRoles.length === 0 already returned above.
           const userRole = unauthorizedRoles.includes(baseRole) ? baseRole : unauthorizedRoles[0]!;
 
           useAuthStore.setState({

@@ -88,12 +88,14 @@ const columns: ColumnDef<DSRUploadRecord>[] = [
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
 
+const SKELETON_ROW_IDS = ["skeleton-1", "skeleton-2", "skeleton-3", "skeleton-4", "skeleton-5"];
+
 function TableSkeleton() {
   return (
     <div className="flex flex-col gap-[var(--space-2)]">
-      {Array.from({ length: 5 }).map((_, i) => (
+      {SKELETON_ROW_IDS.map((id) => (
         <div
-          key={`skeleton-${i}`}
+          key={id}
           className="h-10 w-full animate-pulse rounded-[var(--radius-sm)]"
           style={{ backgroundColor: "var(--n-100)" }}
         />
@@ -174,15 +176,29 @@ export function UploadHistory() {
                       "right"
                         ? "text-right"
                         : "text-left";
+                    const canSort = header.column.getCanSort();
+                    const sortHandler = header.column.getToggleSortingHandler();
                     return (
                       <th
                         key={header.id}
                         className={`px-[var(--space-3)] py-[var(--space-2)] text-xs font-medium uppercase tracking-wider select-none ${align}`}
                         style={{
                           color: "var(--n-500)",
-                          cursor: header.column.getCanSort() ? "pointer" : "default",
+                          cursor: canSort ? "pointer" : "default",
                         }}
-                        onClick={header.column.getToggleSortingHandler()}
+                        onClick={sortHandler}
+                        onKeyDown={
+                          canSort
+                            ? (e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  sortHandler?.(e);
+                                }
+                              }
+                            : undefined
+                        }
+                        tabIndex={canSort ? 0 : undefined}
+                        role={canSort ? "button" : undefined}
                         aria-sort={
                           header.column.getIsSorted() === "asc"
                             ? "ascending"

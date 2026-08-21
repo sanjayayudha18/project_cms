@@ -105,15 +105,19 @@ describe("CitSummary", () => {
     expect(screen.getByText("Failed")).toBeInTheDocument();
 
     // Check specific counts - find count values near their labels
+    // biome-ignore lint/style/noNonNullAssertion: closest("div")/parentElement always resolve in CitSummary's known markup.
     const scheduledCard = screen.getByText("Scheduled").closest("div")!.parentElement!;
     expect(scheduledCard).toHaveTextContent("1");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const inTransitCard = screen.getByText("In Transit").closest("div")!.parentElement!;
     expect(inTransitCard).toHaveTextContent("1");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const completedCard = screen.getByText("Completed").closest("div")!.parentElement!;
     expect(completedCard).toHaveTextContent("2");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const failedCard = screen.getByText("Failed").closest("div")!.parentElement!;
     expect(failedCard).toHaveTextContent("1");
   });
@@ -232,6 +236,7 @@ describe("CitTracker", () => {
     expect(screen.getByText("CIT Tracker")).toBeInTheDocument();
 
     // Summary grid present (4 status cards)
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves in CitTracker's known markup.
     const summaryGrid = screen.getByText("CIT Tracker").closest("div")!.querySelector(".grid");
     expect(summaryGrid?.children.length).toBe(4);
 

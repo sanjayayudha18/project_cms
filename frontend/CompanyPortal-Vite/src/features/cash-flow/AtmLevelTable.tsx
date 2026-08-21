@@ -45,6 +45,7 @@ export function AtmLevelRow({ atm }: { readonly atm: AtmLevel }) {
         <div
           className="h-2 rounded-full bg-[var(--n-100)] overflow-hidden"
           role="progressbar"
+          tabIndex={0}
           aria-valuenow={atm.percentage}
           aria-valuemin={0}
           aria-valuemax={100}

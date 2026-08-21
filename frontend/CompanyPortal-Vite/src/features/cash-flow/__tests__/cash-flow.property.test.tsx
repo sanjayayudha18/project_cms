@@ -50,6 +50,7 @@ describe("Property 1: Trend indicator accessibility and correctness", () => {
         const expectedLabel = direction === "up" ? "Naik" : "Turun";
 
         expect(srOnlyEl).not.toBeNull();
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         expect(srOnlyEl!.textContent).toBe(expectedLabel);
       }),
     );
@@ -82,10 +83,12 @@ describe("Property 2: Vendor chart color contrast", () => {
   function parseOklch(color: string): { l: number; c: number; h: number } {
     const match = color.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
     if (!match) throw new Error(`Invalid OKLCH color: ${color}`);
+    const [, lStr, cStr, hStr] = match;
+    if (!lStr || !cStr || !hStr) throw new Error(`Invalid OKLCH color: ${color}`);
     return {
-      l: Number.parseFloat(match[1]!),
-      c: Number.parseFloat(match[2]!),
-      h: Number.parseFloat(match[3]!),
+      l: Number.parseFloat(lStr),
+      c: Number.parseFloat(cStr),
+      h: Number.parseFloat(hStr),
     };
   }
 
@@ -213,8 +216,11 @@ describe("Property 4: ARIA progressbar attribute completeness", () => {
 
         const progressbar = container.querySelector('[role="progressbar"]');
         expect(progressbar).not.toBeNull();
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         expect(progressbar!.getAttribute("aria-valuenow")).toBe(String(percentage));
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         expect(progressbar!.getAttribute("aria-valuemin")).toBe("0");
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         expect(progressbar!.getAttribute("aria-valuemax")).toBe("100");
       }),
     );

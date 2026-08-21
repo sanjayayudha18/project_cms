@@ -12,6 +12,7 @@ export function CashFlowScreen() {
 
   if (isLoading) return <CashFlowSkeleton />;
   if (isError) return <ErrorState onRetry={refetch} />;
+  if (!data) return null;
 
   return (
     <div className="py-6 max-[759px]:py-4">
@@ -23,7 +24,7 @@ export function CashFlowScreen() {
       <Badge variant="info" icon={Database} label="Sumber: EOD H-1" />
 
       <div className="mt-4">
-        <StatsCardGrid stats={data!.stats} />
+        <StatsCardGrid stats={data.stats} />
       </div>
 
       {/* Layout terpisah: chart + tabel */}
@@ -36,26 +37,28 @@ export function CashFlowScreen() {
             </h2>
             <Badge variant="neutral" icon={Calendar} label="7 hari" />
           </div>
-          <VendorBarChart data={data!.vendorChart.data} vendors={data!.vendorChart.vendors} />
+          <VendorBarChart data={data.vendorChart.data} vendors={data.vendorChart.vendors} />
         </div>
 
         {/* Panel AtmLevelTable */}
         <div className="rounded-lg bg-[var(--n-0)] p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-[var(--n-900)] mb-4">Level Kas per ATM</h2>
-          <AtmLevelTable levels={data!.atmLevels} />
+          <AtmLevelTable levels={data.atmLevels} />
         </div>
       </div>
     </div>
   );
 }
 
+const CASH_FLOW_SKELETON_CARD_IDS = ["stat-1", "stat-2", "stat-3", "stat-4"];
+
 function CashFlowSkeleton() {
   return (
     <div className="py-6 animate-pulse space-y-6">
       <div className="h-8 w-64 bg-[var(--n-200)] rounded" />
       <div className="grid grid-cols-1 min-[768px]:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-24 bg-[var(--n-100)] rounded-lg" />
+        {CASH_FLOW_SKELETON_CARD_IDS.map((id) => (
+          <div key={id} className="h-24 bg-[var(--n-100)] rounded-lg" />
         ))}
       </div>
       <div className="grid grid-cols-1 min-[1024px]:grid-cols-[1.5fr_1fr] gap-6">

@@ -177,27 +177,34 @@ function extractJsxStringLiterals(content: string): string[] {
   // Match single-line text content between JSX tags: >some text<
   // Only match text on a single line (no newlines) to avoid grabbing code blocks
   const jsxTextRegex = />([^<>{}\n]+)</g;
-  let match: RegExpExecArray | null;
+  let match: RegExpExecArray | null = jsxTextRegex.exec(withoutComments);
 
-  while ((match = jsxTextRegex.exec(withoutComments)) !== null) {
+  while (match !== null) {
     const text = match[1]?.trim();
-    if (!text || text.length <= 1 || /^\s*$/.test(text)) continue;
-    // Skip if it looks like code: contains =, ;, (), [], or template literals
-    if (/[=;()\[\]`$]/.test(text)) continue;
-    // Skip if it starts with a dot (method chain) or is camelCase/PascalCase identifier
-    if (/^\.[a-z]/.test(text)) continue;
-    if (/^[a-z][a-zA-Z0-9]+$/.test(text)) continue;
-    strings.push(text);
+    if (text && text.length > 1 && !/^\s*$/.test(text)) {
+      // Skip if it looks like code: contains =, ;, (), [], or template literals
+      // Skip if it starts with a dot (method chain) or is camelCase/PascalCase identifier
+      if (
+        !/[=;()\[\]`$]/.test(text) &&
+        !/^\.[a-z]/.test(text) &&
+        !/^[a-z][a-zA-Z0-9]+$/.test(text)
+      ) {
+        strings.push(text);
+      }
+    }
+    match = jsxTextRegex.exec(withoutComments);
   }
 
   // Match string literals in JSX attributes that are user-facing:
   // label="...", title="...", description="...", message="...", placeholder="...", eyebrow="..."
   const attrRegex = /(?:label|title|description|message|placeholder|eyebrow)\s*=\s*"([^"]+)"/g;
-  while ((match = attrRegex.exec(withoutComments)) !== null) {
-    const text = match[1]?.trim();
+  let attrMatch: RegExpExecArray | null = attrRegex.exec(withoutComments);
+  while (attrMatch !== null) {
+    const text = attrMatch[1]?.trim();
     if (text && text.length > 1) {
       strings.push(text);
     }
+    attrMatch = attrRegex.exec(withoutComments);
   }
 
   return strings;
@@ -391,9 +398,7 @@ describe("Property 11: UI Strings Language Compliance", () => {
           for (const pattern of englishSentencePatterns) {
             if (pattern.test(text)) {
               expect.fail(
-                `English sentence found in ${relPath}: "${text}" ` +
-                  `(matched pattern: ${pattern}). ` +
-                  `Full English sentences must be translated to Bahasa Indonesia.`,
+                `English sentence found in ${relPath}: "${text}" (matched pattern: ${pattern}). Full English sentences must be translated to Bahasa Indonesia.`,
               );
             }
           }

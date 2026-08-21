@@ -156,6 +156,16 @@ export function InvoiceFlow() {
                 <tr
                   className="border-b border-[var(--n-100)] transition-colors duration-100 hover:bg-[var(--red-50)] cursor-pointer"
                   onClick={row.getToggleExpandedHandler()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      row.getToggleExpandedHandler()();
+                    }
+                  }}
+                  tabIndex={0}
+                  // biome-ignore lint/a11y/useSemanticElements: must stay a <tr> for valid table semantics — a <button> here would break the table structure for assistive tech.
+                  role="button"
+                  aria-expanded={row.getIsExpanded()}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td

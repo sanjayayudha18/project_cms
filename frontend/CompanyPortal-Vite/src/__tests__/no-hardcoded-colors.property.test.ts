@@ -89,9 +89,7 @@ function findColorViolations(
   const strippedContent = stripComments(content);
   const lines = strippedContent.split("\n");
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-
+  for (const [i, line] of lines.entries()) {
     // Check hex colors
     const hexMatches = line.matchAll(HEX_COLOR_PATTERN);
     for (const match of hexMatches) {

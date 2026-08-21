@@ -86,7 +86,7 @@ type DmaaFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
-type ItmCashpo struct {
+type ItmReplenish struct {
 	ID     int64 `json:"id"`
 	FileID int64 `json:"file_id"`
 	// Parsed from TGLREPLENISH raw format (1YYMMDD)
@@ -113,7 +113,7 @@ type ItmCashpo struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 }
 
-type ItmCashposFile struct {
+type ItmReplenishFile struct {
 	ID       int64  `json:"id"`
 	Filename string `json:"filename"`
 	// Business date the file represents (from filename)

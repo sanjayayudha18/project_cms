@@ -2,7 +2,7 @@
 ITM ATM Cash Position ETL Scheduler
 ====================================
 Reads CSV files from FTP_DATA/ITM/, parses them, and pushes rows
-into the `itm_cashpos` table in the CMS PostgreSQL database.
+into the `itm_replenish` table in the CMS PostgreSQL database.
 
 Idempotent: uses SHA-256 file checksum to skip already-processed files.
 """
@@ -61,7 +61,7 @@ _MONTH_MAP: dict[str, int] = {
 # =============================================================================
 def setup_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_file = LOG_DIR / f"itm_cashpos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_file = LOG_DIR / f"itm_replenish_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(message)s",
@@ -291,7 +291,7 @@ def read_csv_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
 # DATABASE OPERATIONS
 # =============================================================================
 INSERT_ROW_SQL = """
-INSERT INTO itm_cashpos (
+INSERT INTO itm_replenish (
     file_id, replenish_date, replenish_time, terminal_id, machine_type,
     teller_id, branch_code, escrow,
     refund_denom_10k, refund_denom_20k, refund_denom_50k, refund_denom_100k, refund_total,
@@ -309,7 +309,7 @@ def file_already_processed(conn, checksum: str) -> bool:
     """Check if file with this checksum was already processed successfully."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT id, status FROM itm_cashpos_files WHERE checksum = %s",
+            "SELECT id, status FROM itm_replenish_files WHERE checksum = %s",
             (checksum,),
         )
         row = cur.fetchone()
@@ -326,7 +326,7 @@ def create_file_record(
     with conn.cursor() as cur:
         # Try to find existing record (for retries of failed files)
         cur.execute(
-            "SELECT id FROM itm_cashpos_files WHERE checksum = %s",
+            "SELECT id FROM itm_replenish_files WHERE checksum = %s",
             (checksum,),
         )
         existing = cur.fetchone()
@@ -335,7 +335,7 @@ def create_file_record(
             # Reset for re-processing
             cur.execute(
                 """
-                UPDATE itm_cashpos_files
+                UPDATE itm_replenish_files
                 SET status = 'processing', error_message = NULL,
                     row_count = NULL, success_count = NULL, error_count = NULL,
                     processed_at = NULL, updated_at = now()
@@ -344,13 +344,13 @@ def create_file_record(
                 (file_id,),
             )
             # Delete old rows from failed attempt
-            cur.execute("DELETE FROM itm_cashpos WHERE file_id = %s", (file_id,))
+            cur.execute("DELETE FROM itm_replenish WHERE file_id = %s", (file_id,))
             conn.commit()
             return file_id
 
         cur.execute(
             """
-            INSERT INTO itm_cashpos_files (filename, file_date, checksum, status)
+            INSERT INTO itm_replenish_files (filename, file_date, checksum, status)
             VALUES (%s, %s, %s, 'processing')
             RETURNING id
             """,
@@ -374,7 +374,7 @@ def update_file_status(
     with conn.cursor() as cur:
         cur.execute(
             """
-            UPDATE itm_cashpos_files
+            UPDATE itm_replenish_files
             SET status = %s, row_count = %s, success_count = %s,
                 error_count = %s, error_message = %s,
                 processed_at = now(), updated_at = now()

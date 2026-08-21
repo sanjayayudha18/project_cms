@@ -59,4 +59,22 @@
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  /* ─── Login shell only (scoped dark exception; global app stays light) ───── */
+  --login-chrome-deep: oklch(0.3 0.11 29);
+  --login-chrome: oklch(0.4 0.155 29);
+  --login-chrome-fg: oklch(0.94 0.012 29);
+  --login-well: oklch(0.245 0.088 29);
+  --login-well-hover: oklch(0.275 0.098 29);
+  --login-line: oklch(0.38 0.105 29);
+  --login-line-strong: oklch(0.47 0.12 29);
+  --login-fg-dim: oklch(0.82 0.045 29);
+  --login-fg-muted: oklch(0.68 0.05 29);
+  --login-primary: oklch(0.552 0.205 29);
+  --login-primary-hover: oklch(0.485 0.193 29);
+  --login-primary-fg: oklch(0.99 0.004 29);
+  --login-danger-fg: oklch(0.82 0.12 12);
+  --login-danger-bg: oklch(0.28 0.06 12);
+  --login-focus-ring: oklch(0.82 0.045 29 / 0.55);
+  --login-artwork-well: oklch(0.22 0.08 29);
 }

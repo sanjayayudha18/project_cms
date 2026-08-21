@@ -114,13 +114,13 @@ func validateStatus(status string) error {
 	return nil
 }
 
-// AtmWithCashPos is a single ATM row joined with its latest itm_cashpos
+// AtmWithCashPos is a single ATM row joined with its latest itm_replenish
 // record. TerminalID/LocationName/Address/MachineType/Brand/DeploymentType
 // and Status are plain strings (not pointers) because the underlying
 // atms/locations columns they come from are NOT NULL — verified live
 // against the cms database (see tasks.md Task 1.1). The cashpos-derived
 // fields are pointers because a LEFT JOIN LATERAL leaves them NULL when a
-// terminal has no itm_cashpos record yet (status "no_data").
+// terminal has no itm_replenish record yet (status "no_data").
 type AtmWithCashPos struct {
 	TerminalID              string
 	LocationName            string
@@ -232,9 +232,9 @@ func (s *AtmPortalService) ListATMs(ctx context.Context, params ListATMsParams) 
 	}
 
 	// GetLastUpdated is a `:one` query with no matching row when
-	// itm_cashpos is empty — that's pgx.ErrNoRows, not a NULL value inside
+	// itm_replenish is empty — that's pgx.ErrNoRows, not a NULL value inside
 	// a row, so it needs its own not-found branch rather than a Valid
-	// check (see design.md's Error Handling table: "No itm_cashpos
+	// check (see design.md's Error Handling table: "No itm_replenish
 	// records globally" -> "last_updated: null", not a 500).
 	var lastUpdated *time.Time
 	lastUpdatedRow, err := s.repo.GetLastUpdated(ctx)

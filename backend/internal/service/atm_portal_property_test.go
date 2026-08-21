@@ -77,21 +77,21 @@ func insertTestATM(ctx context.Context, tx pgx.Tx, terminalID string, locationID
 	return err
 }
 
-// insertTestCashposFile inserts a fresh itm_cashpos_files row and returns its id.
+// insertTestCashposFile inserts a fresh itm_replenish_files row and returns its id.
 func insertTestCashposFile(ctx context.Context, tx pgx.Tx) (int64, error) {
 	var id int64
 	err := tx.QueryRow(ctx, `
-		INSERT INTO itm_cashpos_files (filename, file_date, status)
+		INSERT INTO itm_replenish_files (filename, file_date, status)
 		VALUES ($1, CURRENT_DATE, 'completed')
 		RETURNING id
 	`, "proptest-"+uuid.NewString()+".txt").Scan(&id)
 	return id, err
 }
 
-// insertTestCashpos inserts a fresh itm_cashpos row.
+// insertTestCashpos inserts a fresh itm_replenish row.
 func insertTestCashpos(ctx context.Context, tx pgx.Tx, fileID int64, terminalID string, replenishDate time.Time, replenishTime string, refundTotal float64) error {
 	_, err := tx.Exec(ctx, `
-		INSERT INTO itm_cashpos (file_id, replenish_date, replenish_time, terminal_id, machine_type, teller_id, branch_code, refund_total, replenish_total)
+		INSERT INTO itm_replenish (file_id, replenish_date, replenish_time, terminal_id, machine_type, teller_id, branch_code, refund_total, replenish_total)
 		VALUES ($1, $2::date, $3::time, $4, 'ATM', 'T001', 'BR001', $5, $5)
 	`, fileID, replenishDate, replenishTime, terminalID, refundTotal)
 	return err
@@ -211,7 +211,7 @@ func TestProperty1_ReplenishmentStatusClassification(t *testing.T) {
 }
 
 // TestProperty2_LatestRecordSelection validates Property 2: for any
-// terminal with multiple itm_cashpos records, the system uses exclusively
+// terminal with multiple itm_replenish records, the system uses exclusively
 // the record with the maximum (replenish_date, replenish_time) tuple —
 // refund_total, last_replenish_date, and last_replenish_time must all come
 // from that single most recent record, not a mix of rows.

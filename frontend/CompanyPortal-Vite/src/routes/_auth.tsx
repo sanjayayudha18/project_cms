@@ -1,4 +1,5 @@
 import { Outlet, createRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { rootRoute } from "./__root";
 
 export const authRoute = createRoute({
@@ -7,95 +8,84 @@ export const authRoute = createRoute({
   component: AuthLayout,
 });
 
-function AuthLayout() {
-  return (
-    <div className="grid min-h-screen lg:grid-cols-2" style={{ backgroundColor: "var(--n-50)" }}>
-      {/* Left panel — brand / decorative (hidden on mobile) */}
-      <div
-        className="hidden flex-col justify-between p-[var(--space-12)] lg:flex"
-        style={{ backgroundColor: "var(--red-500)" }}
-      >
-        <div className="flex items-center gap-[var(--space-3)]">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)]"
-            style={{ backgroundColor: "oklch(1 0 0 / 0.15)" }}
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </div>
-          <span className="text-base font-semibold text-white">CMS</span>
-        </div>
+const ARTWORK_SRC = "/assets/crown-login-artwork.png";
+const ARTWORK_ALT =
+  "Ilustrasi operasional kas: mesin ATM, kendaraan cash-in-transit, kontainer uang, lembaran uang, dan diagram rute pengiriman";
 
-        <div className="flex flex-col gap-[var(--space-4)]">
-          <blockquote
-            className="text-2xl font-semibold leading-snug text-white"
-            style={{ textWrap: "balance" }}
-          >
+function AuthLayout() {
+  const [artworkState, setArtworkState] = useState<"loading" | "ready" | "error">("loading");
+
+  return (
+    <div className="login-shell" data-testid="login-shell">
+      <section className="login-shell__identity" aria-label="Formulir masuk Company Portal">
+        <div className="login-shell__identity-inner">
+          <header className="login-shell__brand">
+            <div className="login-shell__mark" aria-hidden="true">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                role="img"
+                aria-label="CMS"
+              >
+                <title>CMS</title>
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </div>
+            <div className="login-shell__brand-text">
+              <span className="login-shell__brand-name">CMS</span>
+              <span className="login-shell__brand-divider" aria-hidden="true" />
+              <span className="login-shell__brand-sub">Company Portal</span>
+            </div>
+          </header>
+
+          <p className="login-shell__lead">
             Kelola operasional kas ATM secara terintegrasi, dari peramalan hingga rekonsiliasi.
-          </blockquote>
-          <p className="text-sm" style={{ color: "oklch(1 0 0 / 0.7)" }}>
-            End-to-End Cash Management System
+          </p>
+          <p className="login-shell__product">Cash Management System</p>
+
+          <div className="login-shell__outlet">
+            <Outlet />
+          </div>
+
+          <footer className="login-shell__footer">
+            <p className="login-shell__footer-note">Akses diotorisasi dan dicatat.</p>
+            <p className="login-shell__footer-copy">© 2026 CIMB Niaga STCC</p>
+          </footer>
+        </div>
+      </section>
+
+      <aside
+        className={`login-shell__artwork login-shell__artwork--${artworkState}`}
+        aria-label="Panel visual operasional kas"
+      >
+        {artworkState !== "error" && (
+          <img
+            className="login-shell__artwork-img"
+            src={ARTWORK_SRC}
+            alt={ARTWORK_ALT}
+            data-testid="login-artwork"
+            onLoad={() => setArtworkState("ready")}
+            onError={() => setArtworkState("error")}
+          />
+        )}
+        {artworkState === "loading" && (
+          <div className="login-shell__artwork-skeleton" aria-hidden="true" />
+        )}
+        <div className="login-shell__artwork-scrim">
+          <p className="login-shell__artwork-caption">
+            Operasional ATM dan cash-in-transit dalam satu sistem manajemen kas.
           </p>
         </div>
-
-        <p className="text-xs" style={{ color: "oklch(1 0 0 / 0.5)" }}>
-          © 2026 CIMB Niaga STCC
-        </p>
-      </div>
-
-      {/* Right panel — login form */}
-      <div className="flex flex-col items-center justify-center px-[var(--space-6)] py-[var(--space-12)]">
-        {/* Mobile brand (visible only < lg) */}
-        <div className="mb-[var(--space-8)] flex items-center gap-[var(--space-3)] lg:hidden">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)]"
-            style={{ backgroundColor: "var(--red-500)" }}
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </div>
-          <span className="text-base font-semibold" style={{ color: "var(--n-900)" }}>
-            Cash Management System
-          </span>
-        </div>
-
-        <div className="w-full max-w-[380px]">
-          <Outlet />
-        </div>
-
-        {/* Mobile footer */}
-        <p className="mt-[var(--space-8)] text-xs lg:hidden" style={{ color: "var(--n-400)" }}>
-          © 2026 CIMB Niaga STCC
-        </p>
-      </div>
+      </aside>
     </div>
   );
 }

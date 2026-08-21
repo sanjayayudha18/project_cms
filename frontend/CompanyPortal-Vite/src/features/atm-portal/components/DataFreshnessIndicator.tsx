@@ -1,6 +1,6 @@
 /**
  * "Data terakhir: dd MMM yyyy, HH:mm" (Req 112.2), or "Data terakhir: belum
- * tersedia" when no itm_cashpos records exist yet (Req 112.4).
+ * tersedia" when no itm_replenish records exist yet (Req 112.4).
  */
 
 import { formatAtmDateTime } from "../lib/formatters";

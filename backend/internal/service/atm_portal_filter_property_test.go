@@ -25,7 +25,7 @@ import (
 // Property 7: Sort order correctness
 //
 // Properties 3, 6, 7 run read-only against the live `cms` dataset (1904
-// active ATMs, ~710 with itm_cashpos data) — no writes needed. Properties 4
+// active ATMs, ~710 with itm_replenish data) — no writes needed. Properties 4
 // and 5 need custom-seeded rows: the real dataset is 100% status
 // "unconfigured" (no thresholds configured yet) and 100% is_active=true /
 // deleted_at IS NULL, so neither would exercise anything without seeded

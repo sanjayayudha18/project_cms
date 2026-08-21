@@ -34,7 +34,7 @@ WITH sub AS (
     JOIN regions r ON r.id = l.region_id
     LEFT JOIN LATERAL (
         SELECT cp.replenish_date, cp.replenish_time, cp.refund_total
-        FROM itm_cashpos cp
+        FROM itm_replenish cp
         WHERE cp.terminal_id = a.terminal_id
         ORDER BY cp.replenish_date DESC, cp.replenish_time DESC
         LIMIT 1
@@ -111,7 +111,7 @@ FROM (
     FROM atms a
     LEFT JOIN LATERAL (
         SELECT cp.refund_total
-        FROM itm_cashpos cp
+        FROM itm_replenish cp
         WHERE cp.terminal_id = a.terminal_id
         ORDER BY cp.replenish_date DESC, cp.replenish_time DESC
         LIMIT 1
@@ -150,12 +150,12 @@ func (q *Queries) GetATMSummary(ctx context.Context) (GetATMSummaryRow, error) {
 const getLastUpdated = `-- name: GetLastUpdated :one
 SELECT
     (replenish_date + replenish_time)::timestamp AS last_updated
-FROM itm_cashpos
+FROM itm_replenish
 ORDER BY replenish_date DESC, replenish_time DESC
 LIMIT 1
 `
 
-// Most recent replenish_date + replenish_time across all itm_cashpos
+// Most recent replenish_date + replenish_time across all itm_replenish
 // records, used for the data-freshness indicator. Returns NULL when no
 // cashpos records exist yet.
 func (q *Queries) GetLastUpdated(ctx context.Context) (pgtype.Timestamp, error) {
@@ -200,7 +200,7 @@ WITH sub AS (
             cp.refund_total,
             cp.replenish_total,
             cp.escrow
-        FROM itm_cashpos cp
+        FROM itm_replenish cp
         WHERE cp.terminal_id = a.terminal_id
         ORDER BY cp.replenish_date DESC, cp.replenish_time DESC
         LIMIT 1
@@ -287,7 +287,7 @@ type ListATMsWithCashPosRow struct {
 	Status                  string         `json:"status"`
 }
 
-// Paginated, filtered, sorted ATM list joined with the latest itm_cashpos
+// Paginated, filtered, sorted ATM list joined with the latest itm_replenish
 // record per terminal. location_name/address/region are NOT columns on
 // atms — they require joining locations (via atms.location_id) and
 // regions (via locations.region_id). Status is computed here via a CASE

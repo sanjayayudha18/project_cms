@@ -105,7 +105,7 @@ func insertATM(t *testing.T, tx pgx.Tx, locationID int64, spec testATMSpec) {
 	}
 	var fileID int64
 	err = tx.QueryRow(ctx, `
-		INSERT INTO itm_cashpos_files (filename, file_date, status)
+		INSERT INTO itm_replenish_files (filename, file_date, status)
 		VALUES ($1, CURRENT_DATE, 'completed')
 		RETURNING id
 	`, "itest-"+uuid.NewString()+".txt").Scan(&fileID)
@@ -113,7 +113,7 @@ func insertATM(t *testing.T, tx pgx.Tx, locationID int64, spec testATMSpec) {
 		t.Fatalf("insert cashpos file: %v", err)
 	}
 	_, err = tx.Exec(ctx, `
-		INSERT INTO itm_cashpos (file_id, replenish_date, replenish_time, terminal_id, machine_type, teller_id, branch_code, refund_total, replenish_total)
+		INSERT INTO itm_replenish (file_id, replenish_date, replenish_time, terminal_id, machine_type, teller_id, branch_code, refund_total, replenish_total)
 		VALUES ($1, CURRENT_DATE, '10:00:00'::time, $2, $3, 'T001', 'BR001', $4, $5)
 	`, fileID, spec.terminalID, spec.machineType, spec.refundTotal, spec.replenishTotal)
 	if err != nil {
@@ -271,7 +271,7 @@ func TestIntegration_AtmPortal_BrandDeploymentTypeFiltering(t *testing.T) {
 // TestIntegration_AtmPortal_NullEdgeCases validates that NULL DB values
 // serialize as JSON `null` (not zero values) for both an ATM with no
 // thresholds configured at all (status "unconfigured") and an ATM with
-// thresholds configured but no itm_cashpos record yet (status "no_data").
+// thresholds configured but no itm_replenish record yet (status "no_data").
 func TestIntegration_AtmPortal_NullEdgeCases(t *testing.T) {
 	router, tx := setupAtmPortalHarness(t)
 	regionID := seedRegionID(t, tx)

@@ -165,6 +165,7 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 		"../../migrations/007_seed_vendor_vaults_hardened.sql",
 		"../../migrations/008_seed_atms.sql",
 		"../../migrations/009_itm_cashpos.sql",
+		"../../migrations/010_rename_itm_cashpos_to_itm_replenish.sql",
 	}
 
 	for _, path := range migrations {

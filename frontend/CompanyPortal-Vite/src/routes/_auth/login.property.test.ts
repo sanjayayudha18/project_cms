@@ -1,29 +1,9 @@
 // Feature: user-login, Property 18: Whitespace-Only Input Rejection
 // Feature: user-login, Property 19: Retry-After Countdown Formatting
+// Feature: revamp-login, max-length and countdown clamp boundaries
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
-
-// ─── Extracted Logic Under Test ───────────────────────────────────────────────
-
-/**
- * Login form validation schema — extracted from login.tsx.
- * Validates that username and password are non-empty after trimming.
- */
-const loginSchema = z.object({
-  username: z.string().min(1, "Wajib diisi"),
-  password: z.string().min(1, "Wajib diisi"),
-});
-
-/**
- * Formats a Retry-After value (in seconds) as "M menit S detik".
- * Used in the login page lockout UI.
- */
-function formatRetryAfter(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes} menit ${secs} detik`;
-}
+import { formatRetryAfter, loginSchema, remainingRateLimitSeconds } from "./login";
 
 // ─── Arbitraries ──────────────────────────────────────────────────────────────
 
@@ -41,49 +21,47 @@ const arbRetryAfterSeconds: fc.Arbitrary<number> = fc.integer({
   max: 900,
 });
 
+const arbNonEmptyCredential: fc.Arbitrary<string> = fc
+  .string({ minLength: 1, maxLength: 64 })
+  .filter((s) => s.trim().length > 0);
+
 // ─── Property 18: Whitespace-Only Input Rejection ─────────────────────────────
 
 /**
- * **Validates: Requirements 9.6, 3.7**
- *
- * For any string composed entirely of whitespace characters (spaces, tabs,
- * newlines), the frontend form validation SHALL treat it as empty and reject
- * submission.
+ * For any string composed entirely of whitespace characters, the exported
+ * loginSchema SHALL reject submission with a field error (no pre-trim in the test).
  */
 describe("Property 18: Whitespace-Only Input Rejection", () => {
-  it("whitespace-only username is rejected by Zod schema (min(1) rejects empty after trimming)", () => {
+  it("whitespace-only username is rejected by exported loginSchema", () => {
     fc.assert(
       fc.property(arbWhitespaceOnly, (whitespace) => {
-        // The Zod schema uses min(1), but Zod's min doesn't auto-trim.
-        // However, the form trims input before submission via .trim(),
-        // so a whitespace-only string effectively becomes "".
-        const trimmed = whitespace.trim();
         const result = loginSchema.safeParse({
-          username: trimmed,
+          username: whitespace,
           password: "validpass",
         });
         expect(result.success).toBe(false);
         if (!result.success) {
           const usernameError = result.error.issues.find((i) => i.path[0] === "username");
           expect(usernameError).toBeDefined();
+          expect(usernameError?.message).toBe("Wajib diisi");
         }
       }),
       { numRuns: 100 },
     );
   });
 
-  it("whitespace-only password is rejected by Zod schema", () => {
+  it("whitespace-only password is rejected by exported loginSchema", () => {
     fc.assert(
       fc.property(arbWhitespaceOnly, (whitespace) => {
-        const trimmed = whitespace.trim();
         const result = loginSchema.safeParse({
           username: "validuser",
-          password: trimmed,
+          password: whitespace,
         });
         expect(result.success).toBe(false);
         if (!result.success) {
           const passwordError = result.error.issues.find((i) => i.path[0] === "password");
           expect(passwordError).toBeDefined();
+          expect(passwordError?.message).toBe("Wajib diisi");
         }
       }),
       { numRuns: 100 },
@@ -94,10 +72,63 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
     fc.assert(
       fc.property(arbWhitespaceOnly, arbWhitespaceOnly, (wsUser, wsPass) => {
         const result = loginSchema.safeParse({
-          username: wsUser.trim(),
-          password: wsPass.trim(),
+          username: wsUser,
+          password: wsPass,
         });
         expect(result.success).toBe(false);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("does not trim a valid password that only has surrounding spaces when core is non-empty", () => {
+    // Password with leading/trailing space but non-empty core must still be accepted
+    // (schema rejects only pure whitespace; it must not strip password content).
+    const result = loginSchema.safeParse({
+      username: "validuser",
+      password: " pass ",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+// ─── Max length boundaries ────────────────────────────────────────────────────
+
+describe("Login schema max-length boundaries", () => {
+  it("accepts username at 128 and rejects 129", () => {
+    const ok = loginSchema.safeParse({
+      username: "a".repeat(128),
+      password: "validpass",
+    });
+    expect(ok.success).toBe(true);
+
+    const over = loginSchema.safeParse({
+      username: "a".repeat(129),
+      password: "validpass",
+    });
+    expect(over.success).toBe(false);
+  });
+
+  it("accepts password at 72 and rejects 73", () => {
+    const ok = loginSchema.safeParse({
+      username: "validuser",
+      password: "p".repeat(72),
+    });
+    expect(ok.success).toBe(true);
+
+    const over = loginSchema.safeParse({
+      username: "validuser",
+      password: "p".repeat(73),
+    });
+    expect(over.success).toBe(false);
+  });
+
+  it("accepts arbitrary valid credential pairs within limits", () => {
+    fc.assert(
+      fc.property(arbNonEmptyCredential, arbNonEmptyCredential, (username, password) => {
+        fc.pre(username.length <= 128 && password.length <= 72);
+        const result = loginSchema.safeParse({ username, password });
+        expect(result.success).toBe(true);
       }),
       { numRuns: 100 },
     );
@@ -106,13 +137,6 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
 
 // ─── Property 19: Retry-After Countdown Formatting ────────────────────────────
 
-/**
- * **Validates: Requirements 9.8**
- *
- * For any integer value N (representing seconds from the Retry-After header),
- * the frontend lockout display SHALL format it as "M menit S detik" where
- * M = floor(N/60) and S = N mod 60, with correct values for all N in [1, 900].
- */
 describe("Property 19: Retry-After Countdown Formatting", () => {
   it("formats as 'M menit S detik' with correct M and S", () => {
     fc.assert(
@@ -126,58 +150,6 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         expect(formatted).toBe(expected);
       }),
       { numRuns: 500 },
-    );
-  });
-
-  it("M = floor(N/60) is always correct", () => {
-    fc.assert(
-      fc.property(arbRetryAfterSeconds, (seconds) => {
-        const formatted = formatRetryAfter(seconds);
-        const match = formatted.match(/^(\d+) menit/);
-        expect(match).not.toBeNull();
-
-        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
-        const minutes = Number.parseInt(match![1], 10);
-        expect(minutes).toBe(Math.floor(seconds / 60));
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("S = N mod 60 is always correct", () => {
-    fc.assert(
-      fc.property(arbRetryAfterSeconds, (seconds) => {
-        const formatted = formatRetryAfter(seconds);
-        const match = formatted.match(/(\d+) detik$/);
-        expect(match).not.toBeNull();
-
-        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
-        const secs = Number.parseInt(match![1], 10);
-        expect(secs).toBe(seconds % 60);
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("minutes is in range [0, 15] for N in [1, 900]", () => {
-    fc.assert(
-      fc.property(arbRetryAfterSeconds, (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        expect(minutes).toBeGreaterThanOrEqual(0);
-        expect(minutes).toBeLessThanOrEqual(15);
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("seconds remainder is in range [0, 59]", () => {
-    fc.assert(
-      fc.property(arbRetryAfterSeconds, (seconds) => {
-        const secs = seconds % 60;
-        expect(secs).toBeGreaterThanOrEqual(0);
-        expect(secs).toBeLessThanOrEqual(59);
-      }),
-      { numRuns: 200 },
     );
   });
 
@@ -196,5 +168,37 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
       }),
       { numRuns: 200 },
     );
+  });
+
+  it("formats zero as 0 menit 0 detik", () => {
+    expect(formatRetryAfter(0)).toBe("0 menit 0 detik");
+  });
+});
+
+// ─── Countdown clamp ──────────────────────────────────────────────────────────
+
+describe("remainingRateLimitSeconds clamp", () => {
+  it("never returns negative values", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 1_000_000 }),
+        fc.integer({ min: 0, max: 2_000_000 }),
+        (deadlineOffset, nowOffset) => {
+          const base = 1_700_000_000_000;
+          const deadline = base + deadlineOffset;
+          const now = base + nowOffset;
+          const remaining = remainingRateLimitSeconds(deadline, now);
+          expect(remaining).toBeGreaterThanOrEqual(0);
+        },
+      ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("returns ceil remaining seconds until deadline", () => {
+    const deadline = 1_000_000;
+    expect(remainingRateLimitSeconds(deadline, 999_000)).toBe(1);
+    expect(remainingRateLimitSeconds(deadline, 1_000_000)).toBe(0);
+    expect(remainingRateLimitSeconds(deadline, 1_001_000)).toBe(0);
   });
 });

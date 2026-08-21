@@ -150,6 +150,16 @@ const TOKENS: Record<string, string> = {
   "--danger-fg": "oklch(0.500 0.195 12)",
   "--info-bg": "oklch(0.955 0.03 245)",
   "--info-fg": "oklch(0.480 0.110 245)",
+  /* Scoped login shell tokens */
+  "--login-chrome-deep": "oklch(0.300 0.110 29)",
+  "--login-chrome-fg": "oklch(0.940 0.012 29)",
+  "--login-well": "oklch(0.245 0.088 29)",
+  "--login-fg-dim": "oklch(0.820 0.045 29)",
+  "--login-fg-muted": "oklch(0.680 0.050 29)",
+  "--login-primary": "oklch(0.552 0.205 29)",
+  "--login-primary-fg": "oklch(0.990 0.004 29)",
+  "--login-danger-fg": "oklch(0.820 0.120 12)",
+  "--login-danger-bg": "oklch(0.280 0.060 12)",
 };
 
 // ============================================================
@@ -249,6 +259,34 @@ const NORMAL_TEXT_PAIRS: ColorPair[] = [
     minRatio: 4.5,
     sizeCategory: "normal",
   },
+  {
+    name: "--login-chrome-fg on --login-chrome-deep (login body)",
+    fg: TOKENS["--login-chrome-fg"],
+    bg: TOKENS["--login-chrome-deep"],
+    minRatio: 4.5,
+    sizeCategory: "normal",
+  },
+  {
+    name: "--login-chrome-fg on --login-well (login input text)",
+    fg: TOKENS["--login-chrome-fg"],
+    bg: TOKENS["--login-well"],
+    minRatio: 4.5,
+    sizeCategory: "normal",
+  },
+  {
+    name: "--login-fg-dim on --login-chrome-deep (login secondary)",
+    fg: TOKENS["--login-fg-dim"],
+    bg: TOKENS["--login-chrome-deep"],
+    minRatio: 4.5,
+    sizeCategory: "normal",
+  },
+  {
+    name: "--login-danger-fg on --login-danger-bg (login alert)",
+    fg: TOKENS["--login-danger-fg"],
+    bg: TOKENS["--login-danger-bg"],
+    minRatio: 4.5,
+    sizeCategory: "normal",
+  },
 ];
 
 const LARGE_TEXT_PAIRS: ColorPair[] = [
@@ -263,6 +301,13 @@ const LARGE_TEXT_PAIRS: ColorPair[] = [
     name: "--n-0 on --red-500 (primary button white text)",
     fg: TOKENS["--n-0"],
     bg: TOKENS["--red-500"],
+    minRatio: 3.0,
+    sizeCategory: "large",
+  },
+  {
+    name: "--login-primary-fg on --login-primary (login CTA)",
+    fg: TOKENS["--login-primary-fg"],
+    bg: TOKENS["--login-primary"],
     minRatio: 3.0,
     sizeCategory: "large",
   },

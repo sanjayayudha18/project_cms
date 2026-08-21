@@ -1,6 +1,6 @@
-import { LayoutDashboard } from "lucide-react";
-import { describe, expect, it } from "vitest";
 import type { DbRole } from "@/lib/auth/store";
+import { LayoutDashboard, Monitor } from "lucide-react";
+import { describe, expect, it } from "vitest";
 import { GROUP_LABELS, NAV_CONFIG, type NavItem, filterNavByRoles } from "./navigation";
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -134,6 +134,17 @@ describe("NAV_CONFIG", () => {
     expect(settings?.roles).toEqual(["ADMIN"]);
   });
 
+  it("atm-portal item has the Monitor icon, correct href, roles, and group", () => {
+    const atmPortal = NAV_CONFIG.find((i) => i.id === "atm-portal");
+    expect(atmPortal).toBeDefined();
+    expect(atmPortal?.label).toBe("ATM Portal");
+    expect(atmPortal?.icon).toBe(Monitor);
+    expect(atmPortal?.href).toBe("/atm-portal");
+    expect(atmPortal?.roles).toEqual(["ATM-USER", "ATM-SPV"]);
+    expect(atmPortal?.group).toBe("monitoring");
+    expect(atmPortal?.disabled).toBeUndefined();
+  });
+
   it("all roles in NAV_CONFIG are valid DbRole or wildcard", () => {
     const validRoles: (DbRole | "*")[] = [
       "*",
@@ -160,6 +171,7 @@ describe("NAV_CONFIG", () => {
 describe("GROUP_LABELS", () => {
   it("has labels in Bahasa Indonesia", () => {
     expect(GROUP_LABELS.general).toBe("Umum");
+    expect(GROUP_LABELS.monitoring).toBe("Monitoring");
     expect(GROUP_LABELS.forecasting).toBe("Peramalan");
     expect(GROUP_LABELS.invoice).toBe("Tagihan");
     expect(GROUP_LABELS["cash-count"]).toBe("Perhitungan Kas");

@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "@/lib/auth/store";
 import {
+  GROUP_LABELS,
+  NAV_CONFIG,
   type NavGroup,
   type NavItem,
-  NAV_CONFIG,
-  GROUP_LABELS,
   filterNavByRoles,
 } from "@/lib/config/navigation";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,12 +19,7 @@ interface SidebarProps {
 
 // ─── Group ordering ───────────────────────────────────────────────────────────
 
-const GROUP_ORDER: NavGroup[] = [
-  "general",
-  "forecasting",
-  "invoice",
-  "cash-count",
-];
+const GROUP_ORDER: NavGroup[] = ["general", "monitoring", "forecasting", "invoice", "cash-count"];
 
 // ─── Sidebar Component ────────────────────────────────────────────────────────
 
@@ -133,6 +128,7 @@ export function Sidebar({
         return (
           <div
             key={group}
+            // biome-ignore lint/a11y/useSemanticElements: <fieldset> groups form controls, not read-only nav links — role="group" is the correct WAI-ARIA pattern here
             role="group"
             aria-label={GROUP_LABELS[group]}
             className={groupIdx > 0 ? "mt-[var(--space-2)]" : ""}
@@ -212,7 +208,19 @@ function NavItemButton({
         data-nav-item
         tabIndex={tabIndex}
         onClick={onClick}
-        onFocus={onFocus}
+        onFocus={(e) => {
+          onFocus();
+          if (!isActive && !item.disabled) {
+            e.currentTarget.style.backgroundColor = "var(--n-100)";
+            e.currentTarget.style.color = "var(--n-800)";
+          }
+        }}
+        onBlur={(e) => {
+          if (!isActive && !item.disabled) {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "var(--n-600)";
+          }
+        }}
         onMouseEnter={() => collapsed && setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         disabled={item.disabled}
@@ -220,14 +228,12 @@ function NavItemButton({
         aria-disabled={item.disabled}
         className={[
           "flex w-full items-center gap-[var(--space-3)] rounded-[var(--radius-md)] text-[13px] font-medium",
-          collapsed ? "justify-center h-10 w-10 mx-auto" : "px-[var(--space-3)] py-[var(--space-2)]",
+          collapsed
+            ? "justify-center h-10 w-10 mx-auto"
+            : "px-[var(--space-3)] py-[var(--space-2)]",
         ].join(" ")}
         style={{
-          color: isActive
-            ? "var(--red-600)"
-            : item.disabled
-              ? "var(--n-400)"
-              : "var(--n-600)",
+          color: isActive ? "var(--red-600)" : item.disabled ? "var(--n-400)" : "var(--n-600)",
           backgroundColor: isActive ? "var(--red-50)" : "transparent",
           cursor: item.disabled ? "not-allowed" : "pointer",
           borderLeft: isActive && !collapsed ? "3px solid var(--red-500)" : "3px solid transparent",
@@ -250,11 +256,7 @@ function NavItemButton({
           aria-hidden="true"
           style={{
             flexShrink: 0,
-            color: isActive
-              ? "var(--red-500)"
-              : item.disabled
-                ? "var(--n-300)"
-                : "currentColor",
+            color: isActive ? "var(--red-500)" : item.disabled ? "var(--n-300)" : "currentColor",
           }}
         />
         {!collapsed && (

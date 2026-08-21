@@ -1,10 +1,10 @@
-import { render } from '@testing-library/react';
-import fc from 'fast-check';
-import { describe, it, expect } from 'vitest';
-import { AtmLevelRow, getCashLevelTier } from '../AtmLevelTable';
-import { TrendIndicator } from '../StatsCard';
-import { VENDOR_COLORS } from '../constants';
-import type { TrendDirection } from '../types';
+import { render } from "@testing-library/react";
+import fc from "fast-check";
+import { describe, expect, it } from "vitest";
+import { AtmLevelRow, getCashLevelTier } from "../AtmLevelTable";
+import { TrendIndicator } from "../StatsCard";
+import { VENDOR_COLORS } from "../constants";
+import type { TrendDirection } from "../types";
 
 /**
  * **Validates: Requirements 3.6, 9.3**
@@ -16,14 +16,14 @@ import type { TrendDirection } from '../types';
  * 2. When direction is 'down': rendered element contains danger color class AND has sr-only "Turun" text
  * 3. The percentage value is always displayed as text content
  */
-describe('Property 1: Trend indicator accessibility and correctness', () => {
+describe("Property 1: Trend indicator accessibility and correctness", () => {
   const directionArb = fc.oneof(
-    fc.constant('up' as TrendDirection),
-    fc.constant('down' as TrendDirection),
+    fc.constant("up" as TrendDirection),
+    fc.constant("down" as TrendDirection),
   );
   const percentageArb = fc.float({ min: Math.fround(0.1), max: Math.fround(99.9) });
 
-  it('applies correct semantic color class for direction', () => {
+  it("applies correct semantic color class for direction", () => {
     fc.assert(
       fc.property(directionArb, percentageArb, (direction, percentage) => {
         const { container } = render(
@@ -32,24 +32,22 @@ describe('Property 1: Trend indicator accessibility and correctness', () => {
 
         const wrapper = container.firstElementChild as HTMLElement;
         const expectedClass =
-          direction === 'up'
-            ? 'text-[var(--success-fg)]'
-            : 'text-[var(--danger-fg)]';
+          direction === "up" ? "text-[var(--success-fg)]" : "text-[var(--danger-fg)]";
 
         expect(wrapper.className).toContain(expectedClass);
       }),
     );
   });
 
-  it('includes sr-only label matching direction', () => {
+  it("includes sr-only label matching direction", () => {
     fc.assert(
       fc.property(directionArb, percentageArb, (direction, percentage) => {
         const { container } = render(
           <TrendIndicator direction={direction} percentage={percentage} />,
         );
 
-        const srOnlyEl = container.querySelector('.sr-only');
-        const expectedLabel = direction === 'up' ? 'Naik' : 'Turun';
+        const srOnlyEl = container.querySelector(".sr-only");
+        const expectedLabel = direction === "up" ? "Naik" : "Turun";
 
         expect(srOnlyEl).not.toBeNull();
         expect(srOnlyEl!.textContent).toBe(expectedLabel);
@@ -57,7 +55,7 @@ describe('Property 1: Trend indicator accessibility and correctness', () => {
     );
   });
 
-  it('always displays percentage value as text content', () => {
+  it("always displays percentage value as text content", () => {
     fc.assert(
       fc.property(directionArb, percentageArb, (direction, percentage) => {
         const { container } = render(
@@ -79,17 +77,15 @@ describe('Property 1: Trend indicator accessibility and correctness', () => {
  * against the chart background (--n-0: oklch(0.992 0.003 29)) is at least 3:1
  * for graphical objects.
  */
-describe('Property 2: Vendor chart color contrast', () => {
+describe("Property 2: Vendor chart color contrast", () => {
   /** Parse "oklch(L C H)" string into { l, c, h } */
   function parseOklch(color: string): { l: number; c: number; h: number } {
-    const match = color.match(
-      /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/,
-    );
+    const match = color.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
     if (!match) throw new Error(`Invalid OKLCH color: ${color}`);
     return {
-      l: parseFloat(match[1]!),
-      c: parseFloat(match[2]!),
-      h: parseFloat(match[3]!),
+      l: Number.parseFloat(match[1]!),
+      c: Number.parseFloat(match[2]!),
+      h: Number.parseFloat(match[3]!),
     };
   }
 
@@ -139,26 +135,23 @@ describe('Property 2: Vendor chart color contrast', () => {
   }
 
   /** Chart background color: --n-0 */
-  const CHART_BACKGROUND = 'oklch(0.992 0.003 29)';
+  const CHART_BACKGROUND = "oklch(0.992 0.003 29)";
 
   const bgLinear = oklchToLinearRgb(CHART_BACKGROUND);
   const bgLuminance = relativeLuminance(bgLinear.r, bgLinear.g, bgLinear.b);
 
-  it('each vendor color has ≥2:1 contrast ratio against chart background (graphical objects with legend)', () => {
+  it("each vendor color has ≥2:1 contrast ratio against chart background (graphical objects with legend)", () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom(...VENDOR_COLORS),
-        (vendor) => {
-          const fgLinear = oklchToLinearRgb(vendor.color);
-          const fgLuminance = relativeLuminance(fgLinear.r, fgLinear.g, fgLinear.b);
-          const ratio = contrastRatio(fgLuminance, bgLuminance);
+      fc.property(fc.constantFrom(...VENDOR_COLORS), (vendor) => {
+        const fgLinear = oklchToLinearRgb(vendor.color);
+        const fgLuminance = relativeLuminance(fgLinear.r, fgLinear.g, fgLinear.b);
+        const ratio = contrastRatio(fgLuminance, bgLuminance);
 
-          // WCAG 2.1 requires ≥3:1 for graphical objects, but chart bars are paired
-          // with a text legend and axis labels providing redundant identification.
-          // We enforce ≥2:1 minimum to prevent colors that are too close to background.
-          expect(ratio).toBeGreaterThanOrEqual(2.0);
-        },
-      ),
+        // WCAG 2.1 requires ≥3:1 for graphical objects, but chart bars are paired
+        // with a text legend and axis labels providing redundant identification.
+        // We enforce ≥2:1 minimum to prevent colors that are too close to background.
+        expect(ratio).toBeGreaterThanOrEqual(2.0);
+      }),
     );
   });
 });
@@ -173,18 +166,18 @@ describe('Property 2: Vendor chart color contrast', () => {
  * 2. When percentage >= 20 and < 50: getCashLevelTier returns 'warning'
  * 3. When percentage < 20: getCashLevelTier returns 'danger'
  */
-describe('Property 3: ATM level semantic color mapping', () => {
-  it('maps any percentage in [0, 100] to the correct tier', () => {
+describe("Property 3: ATM level semantic color mapping", () => {
+  it("maps any percentage in [0, 100] to the correct tier", () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 100 }), (percentage) => {
         const tier = getCashLevelTier(percentage);
 
         if (percentage >= 50) {
-          expect(tier).toBe('success');
+          expect(tier).toBe("success");
         } else if (percentage >= 20) {
-          expect(tier).toBe('warning');
+          expect(tier).toBe("warning");
         } else {
-          expect(tier).toBe('danger');
+          expect(tier).toBe("danger");
         }
       }),
     );
@@ -202,7 +195,7 @@ describe('Property 3: ATM level semantic color mapping', () => {
  * 3. `aria-valuemin` equals 0
  * 4. `aria-valuemax` equals 100
  */
-describe('Property 4: ARIA progressbar attribute completeness', () => {
+describe("Property 4: ARIA progressbar attribute completeness", () => {
   const percentageArb = fc.integer({ min: 0, max: 100 });
   const idArb = fc.string({ minLength: 3, maxLength: 10 });
   const labelArb = fc.string({ minLength: 3, maxLength: 10 });
@@ -220,11 +213,9 @@ describe('Property 4: ARIA progressbar attribute completeness', () => {
 
         const progressbar = container.querySelector('[role="progressbar"]');
         expect(progressbar).not.toBeNull();
-        expect(progressbar!.getAttribute('aria-valuenow')).toBe(
-          String(percentage),
-        );
-        expect(progressbar!.getAttribute('aria-valuemin')).toBe('0');
-        expect(progressbar!.getAttribute('aria-valuemax')).toBe('100');
+        expect(progressbar!.getAttribute("aria-valuenow")).toBe(String(percentage));
+        expect(progressbar!.getAttribute("aria-valuemin")).toBe("0");
+        expect(progressbar!.getAttribute("aria-valuemax")).toBe("100");
       }),
     );
   });

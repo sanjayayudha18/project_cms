@@ -1,4 +1,4 @@
-export type BalanceStatus = 'Critical' | 'Low' | 'Normal';
+export type BalanceStatus = "Critical" | "Low" | "Normal";
 
 const CRITICAL_THRESHOLD = 50_000_000;
 const LOW_THRESHOLD = 150_000_000;
@@ -12,10 +12,10 @@ const LOW_THRESHOLD = 150_000_000;
  */
 export function deriveStatus(endingBalance: number): BalanceStatus {
   if (endingBalance < CRITICAL_THRESHOLD) {
-    return 'Critical';
+    return "Critical";
   }
   if (endingBalance <= LOW_THRESHOLD) {
-    return 'Low';
+    return "Low";
   }
-  return 'Normal';
+  return "Normal";
 }

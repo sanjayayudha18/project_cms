@@ -172,9 +172,7 @@ function extractJsxStringLiterals(content: string): string[] {
 
   // Remove block comments (/* ... */) and line comments (// ...)
   // so we don't accidentally capture comment text
-  const withoutComments = content
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+  const withoutComments = content.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
   // Match single-line text content between JSX tags: >some text<
   // Only match text on a single line (no newlines) to avoid grabbing code blocks
@@ -194,8 +192,7 @@ function extractJsxStringLiterals(content: string): string[] {
 
   // Match string literals in JSX attributes that are user-facing:
   // label="...", title="...", description="...", message="...", placeholder="...", eyebrow="..."
-  const attrRegex =
-    /(?:label|title|description|message|placeholder|eyebrow)\s*=\s*"([^"]+)"/g;
+  const attrRegex = /(?:label|title|description|message|placeholder|eyebrow)\s*=\s*"([^"]+)"/g;
   while ((match = attrRegex.exec(withoutComments)) !== null) {
     const text = match[1]?.trim();
     if (text && text.length > 1) {
@@ -284,12 +281,8 @@ describe("Property 11: UI Strings Language Compliance", () => {
           const relPath = path.relative(FEATURES_DIR, file);
           const lowerText = text.toLowerCase().trim();
           const matchedPhrase =
-            FORBIDDEN_ENGLISH_PHRASES.find((p) =>
-              lowerText.includes(p.toLowerCase()),
-            ) ??
-            FORBIDDEN_STANDALONE_LABELS.find(
-              (l) => lowerText === l.toLowerCase(),
-            ) ??
+            FORBIDDEN_ENGLISH_PHRASES.find((p) => lowerText.includes(p.toLowerCase())) ??
+            FORBIDDEN_STANDALONE_LABELS.find((l) => lowerText === l.toLowerCase()) ??
             text;
           violations.push({ file: relPath, text, matchedPhrase });
         }
@@ -333,12 +326,8 @@ describe("Property 11: UI Strings Language Compliance", () => {
           if (isForbidden) {
             const lowerText = text.toLowerCase().trim();
             const matchedPhrase =
-              FORBIDDEN_ENGLISH_PHRASES.find((p) =>
-                lowerText.includes(p.toLowerCase()),
-              ) ??
-              FORBIDDEN_STANDALONE_LABELS.find(
-                (l) => lowerText === l.toLowerCase(),
-              );
+              FORBIDDEN_ENGLISH_PHRASES.find((p) => lowerText.includes(p.toLowerCase())) ??
+              FORBIDDEN_STANDALONE_LABELS.find((l) => lowerText === l.toLowerCase());
             expect.fail(
               `Forbidden English phrase in ${relPath}: "${text}" ` +
                 `(matched: "${matchedPhrase}"). Should be translated to Bahasa Indonesia.`,

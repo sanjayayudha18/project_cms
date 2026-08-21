@@ -1,9 +1,9 @@
 import { ErrorBoundary } from "@/components/feedback";
 import { useAuthStore } from "@/lib/auth/store";
 import { AlertTriangle } from "lucide-react";
+import { AttentionPanel } from "./AttentionPanel";
 import { MetricStrip } from "./MetricStrip";
 import { ReplenishmentSummary } from "./ReplenishmentSummary";
-import { AttentionPanel } from "./AttentionPanel";
 
 /**
  * DashboardScreen — halaman landing operasional.
@@ -65,12 +65,11 @@ function DashboardContent() {
  *
  * @validates Requirements 2.6
  */
-function DashboardErrorFallback({ resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) {
+function DashboardErrorFallback({
+  resetErrorBoundary,
+}: { error: Error; resetErrorBoundary: () => void }) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center justify-center gap-4 py-16 text-center"
-    >
+    <div role="alert" className="flex flex-col items-center justify-center gap-4 py-16 text-center">
       <div
         className="flex items-center justify-center w-14 h-14 rounded-full"
         style={{ backgroundColor: "var(--danger-bg)" }}
@@ -88,8 +87,12 @@ function DashboardErrorFallback({ resetErrorBoundary }: { error: Error; resetErr
         onClick={resetErrorBoundary}
         className="mt-2 inline-flex items-center gap-2 rounded-[var(--radius-md)] px-4 py-2 text-sm font-medium text-white transition-colors duration-150"
         style={{ backgroundColor: "var(--red-500)" }}
-        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--red-600)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--red-500)"; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--red-600)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--red-500)";
+        }}
       >
         Coba Lagi
       </button>

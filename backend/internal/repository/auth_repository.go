@@ -2,12 +2,27 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
+
+// timestamptzToPtr converts a pgx pgtype.Timestamptz into a *time.Time,
+// returning nil when the column was SQL NULL. sqlc >= 1.29 generates
+// pgtype.Timestamptz for nullable timestamptz columns instead of
+// *time.Time, so callers that need the pointer form (e.g. auth.UserRecord)
+// convert at the repository boundary.
+func timestamptzToPtr(ts pgtype.Timestamptz) *time.Time {
+	if !ts.Valid {
+		return nil
+	}
+	t := ts.Time
+	return &t
+}
 
 // AuthRepository implements auth.UserRepository using sqlc-generated queries.
 type AuthRepository struct {
@@ -41,7 +56,7 @@ func (r *AuthRepository) FindByUsername(ctx context.Context, username string) (*
 		IsKaryawan:   row.IsKaryawan,
 		VendorID:     row.VendorID,
 		IsActive:     row.IsActive,
-		DeletedAt:    row.DeletedAt,
+		DeletedAt:    timestamptzToPtr(row.DeletedAt),
 	}, nil
 }
 

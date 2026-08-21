@@ -1,6 +1,6 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
 
-type NoticeBannerVariant = 'warning' | 'danger' | 'info';
+type NoticeBannerVariant = "warning" | "danger" | "info";
 
 interface NoticeBannerProps {
   icon: LucideIcon;
@@ -11,16 +11,16 @@ interface NoticeBannerProps {
 
 const variantStyles: Record<NoticeBannerVariant, { container: string; icon: string }> = {
   warning: {
-    container: 'bg-[var(--warning-bg)] text-[var(--warning-fg)]',
-    icon: 'text-[var(--warning-fg)]',
+    container: "bg-[var(--warning-bg)] text-[var(--warning-fg)]",
+    icon: "text-[var(--warning-fg)]",
   },
   danger: {
-    container: 'bg-[var(--danger-bg)] text-[var(--danger-fg)]',
-    icon: 'text-[var(--danger-fg)]',
+    container: "bg-[var(--danger-bg)] text-[var(--danger-fg)]",
+    icon: "text-[var(--danger-fg)]",
   },
   info: {
-    container: 'bg-[var(--info-bg)] text-[var(--info-fg)]',
-    icon: 'text-[var(--info-fg)]',
+    container: "bg-[var(--info-bg)] text-[var(--info-fg)]",
+    icon: "text-[var(--info-fg)]",
   },
 };
 
@@ -28,7 +28,12 @@ const variantStyles: Record<NoticeBannerVariant, { container: string; icon: stri
  * A semantic notice banner for displaying warnings, errors, or informational messages.
  * Renders an icon, bold title, and description with variant-based coloring.
  */
-export function NoticeBanner({ icon: Icon, title, description, variant = 'warning' }: NoticeBannerProps) {
+export function NoticeBanner({
+  icon: Icon,
+  title,
+  description,
+  variant = "warning",
+}: NoticeBannerProps) {
   const styles = variantStyles[variant];
 
   return (

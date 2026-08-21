@@ -27,9 +27,17 @@ import (
 
 const (
 	testJWTSecret   = "integration-test-secret-key-min-32-bytes!"
-	testDevPassword = "Password123!"
+	testDevPassword = "password123"
 	companyPortal   = "company"
 	vendorPortal    = "vendor"
+
+	// testCompanyUser and testVendorUser are seeded by 003_seed_roles_users.sql:
+	// testCompanyUser has role ADMIN, is_karyawan=true (company portal).
+	// testVendorUser has role VENDOR-USER, is_karyawan=false, vendor_id set (vendor portal).
+	// Both authenticate with testDevPassword — 003_seed_roles_users.sql's
+	// password_hash values are a verified bcrypt hash of "password123".
+	testCompanyUser = "Yudha"
+	testVendorUser  = "vendor.ssi"
 )
 
 // ─── Test Harness ─────────────────────────────────────────────────────────────
@@ -122,15 +130,41 @@ func setupHarness(t *testing.T) *testHarness {
 	}
 }
 
-// runMigrations executes the SQL migration files against the test database.
+// runMigrations executes the SQL migration files against the test database,
+// skipping entirely if the schema is already present. DATABASE_URL is
+// expected to point at the shared `cms` database (see docker-compose.yml),
+// which already carries the full migrated schema and seed data. Re-running
+// the migrations against it is not safe: ALTER TABLE ... ADD CONSTRAINT has
+// no IF NOT EXISTS form in Postgres, so a second run fails on duplicate
+// constraint errors even though the CREATE TABLE / INSERT statements
+// themselves are idempotent.
 func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()
 
+	var schemaExists bool
+	err := pool.QueryRow(ctx, `SELECT to_regclass('public.roles') IS NOT NULL`).Scan(&schemaExists)
+	if err != nil {
+		t.Fatalf("checking existing schema: %v", err)
+	}
+	if schemaExists {
+		return
+	}
+
+	// Order matters: 001.1_vendor_vaults.sql adds an FK to vendor_branches,
+	// which is created in 002_cms_tables.sql, so it must run after it.
+	// 001_create_db_cms.sql is excluded — it issues CREATE DATABASE, which
+	// cannot run from a pool already connected to that database.
 	migrations := []string{
-		"../../migrations/001_create_roles_vendors_users.sql",
-		"../../migrations/002_seed_sample_data.sql",
-		"../../migrations/003_add_local_dev_auth.up.sql",
+		"../../migrations/002_cms_tables.sql",
+		"../../migrations/001.1_vendor_vaults.sql",
+		"../../migrations/003_seed_roles_users.sql",
+		"../../migrations/004_seed_regions_locations.sql",
+		"../../migrations/005_seed_vendors.sql",
+		"../../migrations/006_seed_vendor_branches_fixed.sql",
+		"../../migrations/007_seed_vendor_vaults_hardened.sql",
+		"../../migrations/008_seed_atms.sql",
+		"../../migrations/009_itm_cashpos.sql",
 	}
 
 	for _, path := range migrations {
@@ -205,8 +239,8 @@ type errorResponseBody struct {
 func TestIntegration_CompanyLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
-	// john.admin is an internal user with auth_source='local_dev'
-	w := doLogin(h.router, "john.admin", testDevPassword, companyPortal)
+	// testCompanyUser is an internal user (is_karyawan=true), role ADMIN
+	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -220,8 +254,8 @@ func TestIntegration_CompanyLogin_Success(t *testing.T) {
 	if resp.AccessToken == "" {
 		t.Error("access_token should not be empty")
 	}
-	if resp.User.Username != "john.admin" {
-		t.Errorf("username = %q, want john.admin", resp.User.Username)
+	if resp.User.Username != testCompanyUser {
+		t.Errorf("username = %q, want %q", resp.User.Username, testCompanyUser)
 	}
 	if resp.User.Role != "ADMIN" {
 		t.Errorf("role = %q, want ADMIN", resp.User.Role)
@@ -240,11 +274,8 @@ func TestIntegration_CompanyLogin_Success(t *testing.T) {
 func TestIntegration_VendorLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
-	// andi.vendor is a vendor user with auth_source='local'
-	// The seed uses a placeholder hash; we need to set a real bcrypt hash first
-	setVendorPassword(t, h.pool)
-
-	w := doLogin(h.router, "andi.vendor", testDevPassword, vendorPortal)
+	// testVendorUser is a vendor user (is_karyawan=false, vendor_id set), role VENDOR-USER
+	w := doLogin(h.router, testVendorUser, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -255,8 +286,8 @@ func TestIntegration_VendorLogin_Success(t *testing.T) {
 		t.Fatalf("decoding response: %v", err)
 	}
 
-	if resp.User.Username != "andi.vendor" {
-		t.Errorf("username = %q, want andi.vendor", resp.User.Username)
+	if resp.User.Username != testVendorUser {
+		t.Errorf("username = %q, want %q", resp.User.Username, testVendorUser)
 	}
 	if resp.User.Role != "VENDOR-USER" {
 		t.Errorf("role = %q, want VENDOR-USER", resp.User.Role)
@@ -273,7 +304,7 @@ func TestIntegration_PortalMismatch_InternalOnVendor(t *testing.T) {
 	h := setupHarness(t)
 
 	// Internal user trying to login via vendor portal
-	w := doLogin(h.router, "john.admin", testDevPassword, vendorPortal)
+	w := doLogin(h.router, testCompanyUser, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -288,10 +319,9 @@ func TestIntegration_PortalMismatch_InternalOnVendor(t *testing.T) {
 
 func TestIntegration_PortalMismatch_VendorOnCompany(t *testing.T) {
 	h := setupHarness(t)
-	setVendorPassword(t, h.pool)
 
 	// Vendor user trying to login via company portal
-	w := doLogin(h.router, "andi.vendor", testDevPassword, companyPortal)
+	w := doLogin(h.router, testVendorUser, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -309,14 +339,14 @@ func TestIntegration_RateLimitEnforcement(t *testing.T) {
 
 	// Exhaust 5 failed attempts for a username
 	for i := 0; i < 5; i++ {
-		w := doLogin(h.router, "john.admin", "wrong-password", companyPortal)
+		w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: expected 401, got %d", i+1, w.Code)
 		}
 	}
 
 	// 6th attempt should be rate limited
-	w := doLogin(h.router, "john.admin", "wrong-password", companyPortal)
+	w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d: %s", w.Code, w.Body.String())
 	}
@@ -328,7 +358,7 @@ func TestIntegration_RateLimitEnforcement(t *testing.T) {
 	}
 
 	// Even correct password should be blocked
-	w = doLogin(h.router, "john.admin", testDevPassword, companyPortal)
+	w = doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429 even with correct pw, got %d", w.Code)
 	}
@@ -338,7 +368,7 @@ func TestIntegration_TokenRefresh(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login first to get a refresh token
-	w := doLogin(h.router, "john.admin", testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d %s", w.Code, w.Body.String())
 	}
@@ -359,8 +389,8 @@ func TestIntegration_TokenRefresh(t *testing.T) {
 	if resp.AccessToken == "" {
 		t.Error("refreshed access_token should not be empty")
 	}
-	if resp.User.Username != "john.admin" {
-		t.Errorf("username = %q, want john.admin", resp.User.Username)
+	if resp.User.Username != testCompanyUser {
+		t.Errorf("username = %q, want %q", resp.User.Username, testCompanyUser)
 	}
 
 	// New refresh cookie should be issued (rotation)
@@ -377,7 +407,7 @@ func TestIntegration_Logout_BlacklistsJTI(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, "john.admin", testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -401,7 +431,7 @@ func TestIntegration_RefreshAfterLogout_Fails(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, "john.admin", testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -480,7 +510,7 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
 	// Attempt login — should get 503 because Redis is unreachable (fail-closed)
-	w := doLogin(r, "john.admin", testDevPassword, companyPortal)
+	w := doLogin(r, testCompanyUser, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when Redis down, got %d: %s",
@@ -494,20 +524,3 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	}
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// setVendorPassword sets a proper bcrypt hash for the vendor test user.
-// The seed migration uses a placeholder hash that won't validate.
-func setVendorPassword(t *testing.T, pool *pgxpool.Pool) {
-	t.Helper()
-
-	// Use the same bcrypt hash as the internal dev users
-	// (hash of "Password123!" with cost 12)
-	hash := "$2a$12$LJ3m4sMKfRzL7P8bN5Q2kuXjVnZ8Y1p6w3dK9RtHmQvWuC0xOyGNi"
-	_, err := pool.Exec(context.Background(),
-		"UPDATE users SET password_hash = $1 WHERE username = 'andi.vendor'",
-		hash)
-	if err != nil {
-		t.Fatalf("setting vendor password: %v", err)
-	}
-}

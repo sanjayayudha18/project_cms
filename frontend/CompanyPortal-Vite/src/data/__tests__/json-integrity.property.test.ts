@@ -1,10 +1,10 @@
 // Feature: frontend-consolidation, Property 1: Static JSON Data Integrity
 // **Validates: Requirements 1.6, 12.2**
 
-import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
-import { describe, it, expect } from "vitest";
+import { resolve } from "node:path";
 import * as fc from "fast-check";
+import { describe, expect, it } from "vitest";
 
 const REQUIRED_JSON_FILES = [
   "atms.json",

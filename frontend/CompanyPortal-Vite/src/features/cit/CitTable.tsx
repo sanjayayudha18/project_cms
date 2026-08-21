@@ -1,58 +1,52 @@
-import { type ColumnDef } from '@tanstack/react-table';
-import {
-  Calendar,
-  Truck,
-  CheckCircle,
-  XCircle,
-  ExternalLink,
-} from 'lucide-react';
+import type { ColumnDef } from "@tanstack/react-table";
+import { Calendar, CheckCircle, ExternalLink, Truck, XCircle } from "lucide-react";
 
-import { DataTable } from '@/components/ui/DataTable';
-import { Badge, type BadgeVariant } from '@/components/ui/Badge';
-import { formatIDR } from '@/lib/utils/formatCurrency';
+import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { DataTable } from "@/components/ui/DataTable";
+import { formatIDR } from "@/lib/utils/formatCurrency";
 
-import type { EnrichedCitOrder, CitStatus } from './types';
+import type { CitStatus, EnrichedCitOrder } from "./types";
 
 const statusConfig: Record<
   CitStatus,
   { variant: BadgeVariant; icon: typeof Calendar; label: string }
 > = {
-  Scheduled: { variant: 'info', icon: Calendar, label: 'Scheduled' },
-  'In Transit': { variant: 'warning', icon: Truck, label: 'In Transit' },
-  Completed: { variant: 'success', icon: CheckCircle, label: 'Completed' },
-  Failed: { variant: 'danger', icon: XCircle, label: 'Failed' },
+  Scheduled: { variant: "info", icon: Calendar, label: "Scheduled" },
+  "In Transit": { variant: "warning", icon: Truck, label: "In Transit" },
+  Completed: { variant: "success", icon: CheckCircle, label: "Completed" },
+  Failed: { variant: "danger", icon: XCircle, label: "Failed" },
 };
 
 const columns: ColumnDef<EnrichedCitOrder, unknown>[] = [
   {
-    accessorKey: 'id',
-    header: 'Order ID',
+    accessorKey: "id",
+    header: "Order ID",
   },
   {
-    accessorKey: 'atmId',
-    header: 'ATM ID',
+    accessorKey: "atmId",
+    header: "ATM ID",
   },
   {
-    accessorKey: 'vendorName',
-    header: 'Vendor',
+    accessorKey: "vendorName",
+    header: "Vendor",
   },
   {
-    accessorKey: 'orderDate',
-    header: 'Tanggal Order',
+    accessorKey: "orderDate",
+    header: "Tanggal Order",
   },
   {
-    accessorKey: 'scheduledDate',
-    header: 'Tanggal Jadwal',
+    accessorKey: "scheduledDate",
+    header: "Tanggal Jadwal",
   },
   {
-    accessorKey: 'amount',
-    header: 'Jumlah (IDR)',
-    meta: { align: 'right' },
+    accessorKey: "amount",
+    header: "Jumlah (IDR)",
+    meta: { align: "right" },
     cell: ({ getValue }) => formatIDR(getValue() as number),
   },
   {
-    accessorKey: 'status',
-    header: 'Status',
+    accessorKey: "status",
+    header: "Status",
     cell: ({ getValue }) => {
       const status = getValue() as CitStatus;
       const config = statusConfig[status];
@@ -60,8 +54,8 @@ const columns: ColumnDef<EnrichedCitOrder, unknown>[] = [
     },
   },
   {
-    accessorKey: 'evidenceUrl',
-    header: 'Bukti',
+    accessorKey: "evidenceUrl",
+    header: "Bukti",
     enableSorting: false,
     cell: ({ getValue }) => {
       const url = getValue() as string | null;
@@ -93,7 +87,7 @@ export function CitTable({ data }: CitTableProps) {
     <DataTable
       data={data}
       columns={columns}
-      defaultSorting={[{ id: 'scheduledDate', desc: true }]}
+      defaultSorting={[{ id: "scheduledDate", desc: true }]}
       emptyMessage="Tidak ada order CIT yang sesuai filter"
     />
   );

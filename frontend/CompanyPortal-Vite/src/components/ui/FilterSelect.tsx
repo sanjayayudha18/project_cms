@@ -15,7 +15,7 @@ export function FilterSelect({
   options,
   value,
   onChange,
-  placeholder = 'Semua',
+  placeholder = "Semua",
 }: FilterSelectProps) {
   return (
     <div className="flex flex-col gap-1">
@@ -23,10 +23,10 @@ export function FilterSelect({
         {label}
       </label>
       <select
-        value={value ?? ''}
+        value={value ?? ""}
         onChange={(e) => {
           const val = e.target.value;
-          onChange(val === '' ? null : val);
+          onChange(val === "" ? null : val);
         }}
         className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] font-sans focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)] outline-none"
       >

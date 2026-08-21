@@ -11,8 +11,9 @@ The feature is a classic read-heavy, server-driven table pattern — no state ma
 1. **Server-side pagination, sorting, and filtering** — the ATM fleet can grow to thousands of records; client-side processing is not viable.
 2. **Status computed in SQL** — the replenishment flag logic uses a `CASE` expression in the query rather than post-processing in Go, keeping the response pipeline lean.
 3. **Lateral join for latest cashpos** — `LATERAL (SELECT ... ORDER BY replenish_date DESC, replenish_time DESC LIMIT 1)` avoids window-function overhead and is index-friendly on `(terminal_id, replenish_date)`.
-4. **Schema gap: `brand` and `deployment_type`** — the `atms` table currently lacks these columns. The design adds them via a new migration. Until migration runs, the Brand and Deployment Type filters will be hidden in the UI.
-5. **Column name mapping** — the `atms` table uses `low_threshold` and `critical_threshold` (not `low_threshold_amount` / `critical_threshold_amount` as requirements reference). The service layer maps these correctly.
+4. ~~Schema gap: `brand` and `deployment_type`~~ — **superseded.** Verified live against `backend/migrations/008_seed_atms.sql` and the running `cms` database: `atms.brand` and `atms.deployment_type` already exist and are seeded. No migration is needed; Brand and Deployment Type filters ship in the same wave as the others.
+5. ~~Column name mapping~~ — **superseded.** The threshold columns are already named `low_threshold_amount` / `critical_threshold_amount`, matching `requirements.md` exactly. No mapping needed in the service layer.
+6. **Location and region require a join, not flat columns on `atms`** — `atms` only carries `location_id` (FK). `location_name`, `address`, and `region` (as referenced by the Response example and the `region` filter param) live on `locations` (`name`, `address_line1`, `address_line2`, `region_id`) and `regions` (`region`), reached via `atms.location_id → locations.id → locations.region_id → regions.id`. The query design below joins both tables. `address` uses `locations.address_line1` only — `address_line2` is not included in the response (decision confirmed; revisit if the UI later needs it).
 
 ---
 
@@ -107,8 +108,8 @@ AtmPortalScreen
 │   ├── SearchInput (debounced, 300ms)
 │   ├── StatusMultiSelect
 │   ├── MachineTypeMultiSelect
-│   ├── BrandMultiSelect (deferred — schema gap)
-│   ├── DeploymentTypeSelect (deferred — schema gap)
+│   ├── BrandMultiSelect
+│   ├── DeploymentTypeSelect
 │   └── ClearAllButton + ActiveFilterCount
 ├── AtmTable (TanStack Table)
 │   ├── TableHeader (sortable columns with aria-sort)
@@ -154,7 +155,6 @@ frontend/CompanyPortal-Vite/src/features/atm-portal/
 backend/internal/handler/atm_portal_handler.go
 backend/internal/service/atm_portal.go
 backend/queries/atm_portal.sql
-backend/migrations/0XX_add_brand_deployment_type.sql
 ```
 
 ---
@@ -343,33 +343,38 @@ type ListATMsResult struct {
 
 The main query uses `LEFT JOIN LATERAL` to fetch the latest cashpos per terminal efficiently. The `(terminal_id, replenish_date)` index on `itm_cashpos` supports this pattern well.
 
+**Correction:** `location_name`, `address`, and `region` are NOT columns on `atms` — verified live against the `cms` database. They require joining `locations` (via `atms.location_id`) and `regions` (via `locations.region_id`). Both joins are `INNER JOIN`, not `LEFT`, since `atms.location_id` and `locations.region_id` are both `NOT NULL` under current constraints. Threshold column names are `low_threshold_amount` / `critical_threshold_amount`, matching `atms` as-is. `address` maps to `locations.address_line1` only (confirmed — `address_line2` is not surfaced).
+
 ```sql
 -- backend/queries/atm_portal.sql
 
 -- name: ListATMsWithCashPos :many
 SELECT
     a.terminal_id,
-    a.location_name,
-    a.address,
+    l.name AS location_name,
+    l.address_line1 AS address,
     a.machine_type,
     a.brand,
     a.deployment_type,
-    a.low_threshold,
-    a.critical_threshold,
+    r.region,
+    a.low_threshold_amount,
+    a.critical_threshold_amount,
     lcp.replenish_date  AS last_replenish_date,
     lcp.replenish_time  AS last_replenish_time,
     lcp.refund_total,
     lcp.replenish_total,
     lcp.escrow,
     CASE
-        WHEN a.low_threshold IS NULL THEN 'unconfigured'
+        WHEN a.low_threshold_amount IS NULL THEN 'unconfigured'
         WHEN lcp.refund_total IS NULL THEN 'no_data'
-        WHEN a.critical_threshold IS NOT NULL
-             AND lcp.refund_total <= a.critical_threshold THEN 'critical'
-        WHEN lcp.refund_total <= a.low_threshold THEN 'low'
+        WHEN a.critical_threshold_amount IS NOT NULL
+             AND lcp.refund_total <= a.critical_threshold_amount THEN 'critical'
+        WHEN lcp.refund_total <= a.low_threshold_amount THEN 'low'
         ELSE 'normal'
     END AS status
 FROM atms a
+JOIN locations l ON l.id = a.location_id
+JOIN regions r ON r.id = l.region_id
 LEFT JOIN LATERAL (
     SELECT
         cp.replenish_date,
@@ -386,9 +391,29 @@ WHERE a.is_active = true
   AND a.deleted_at IS NULL
 ORDER BY a.terminal_id ASC
 LIMIT @page_size OFFSET (@page - 1) * @page_size;
+
+-- name: CountATMsWithCashPos :one
+SELECT COUNT(*)
+FROM atms a
+JOIN locations l ON l.id = a.location_id
+JOIN regions r ON r.id = l.region_id
+LEFT JOIN LATERAL (
+    SELECT
+        cp.replenish_date,
+        cp.replenish_time,
+        cp.refund_total
+    FROM itm_cashpos cp
+    WHERE cp.terminal_id = a.terminal_id
+    ORDER BY cp.replenish_date DESC, cp.replenish_time DESC
+    LIMIT 1
+) lcp ON true
+WHERE a.is_active = true
+  AND a.deleted_at IS NULL;
 ```
 
-**Note:** The actual implementation will use dynamic query building in Go for filters and sorting (sqlc supports dynamic queries via `sqlc.arg` and conditional clauses, or the service layer builds the query string). The CASE expression is duplicated in the summary query to compute global counts.
+**`CountATMsWithCashPos` note:** mirrors `ListATMsWithCashPos`'s `FROM`/`JOIN`/`WHERE` clauses exactly (plus whatever dynamic filter predicates apply — search, status, machine_type, brand, deployment_type, region) so the count matches the filtered result set for pagination math (Property 6). It keeps the `locations`/`regions` joins (unlike `GetATMSummary` below) because the `region` filter predicate needs `r.region` to bind against, and because the lateral join is required if any filter or status computation depends on `lcp.refund_total`. No `ORDER BY`/`LIMIT`/`OFFSET`.
+
+**Note:** The actual implementation will use dynamic query building in Go for filters and sorting (sqlc supports dynamic queries via `sqlc.arg` and conditional clauses, or the service layer builds the query string). The CASE expression is duplicated in the summary query to compute global counts. The summary query does not need the `locations`/`regions` joins since it only aggregates status counts.
 
 ```sql
 -- name: GetATMSummary :one
@@ -402,11 +427,11 @@ SELECT
 FROM (
     SELECT
         CASE
-            WHEN a.low_threshold IS NULL THEN 'unconfigured'
+            WHEN a.low_threshold_amount IS NULL THEN 'unconfigured'
             WHEN lcp.refund_total IS NULL THEN 'no_data'
-            WHEN a.critical_threshold IS NOT NULL
-                 AND lcp.refund_total <= a.critical_threshold THEN 'critical'
-            WHEN lcp.refund_total <= a.low_threshold THEN 'low'
+            WHEN a.critical_threshold_amount IS NOT NULL
+                 AND lcp.refund_total <= a.critical_threshold_amount THEN 'critical'
+            WHEN lcp.refund_total <= a.low_threshold_amount THEN 'low'
             ELSE 'normal'
         END AS status
     FROM atms a
@@ -429,31 +454,9 @@ ORDER BY replenish_date DESC, replenish_time DESC
 LIMIT 1;
 ```
 
-### Schema Gap: New Migration Required
+### Schema Gap: Superseded — No Migration Required
 
-The `atms` table currently lacks `brand` and `deployment_type` columns referenced in Requirement 5.3. A new migration adds them:
-
-```sql
--- backend/migrations/0XX_add_brand_deployment_type.sql
-BEGIN;
-
-ALTER TABLE atms ADD COLUMN brand text;
-ALTER TABLE atms ADD COLUMN deployment_type text
-    CHECK (deployment_type IN ('ONSITE', 'OFFSITE'));
-
-CREATE INDEX idx_atms_brand ON atms(brand) WHERE brand IS NOT NULL;
-CREATE INDEX idx_atms_deployment_type ON atms(deployment_type)
-    WHERE deployment_type IS NOT NULL;
-
-COMMENT ON COLUMN atms.brand
-    IS 'ATM hardware manufacturer (Hyosung, Wincor, Diebold)';
-COMMENT ON COLUMN atms.deployment_type
-    IS 'ONSITE (bank premises) or OFFSITE (external location)';
-
-END;
-```
-
-**Implementation note:** The frontend Brand and Deployment Type filter controls should be conditionally rendered — hidden if the API indicates these columns are not yet populated (or always shown with empty options until data exists).
+**This section is stale and no longer applies.** Verified live against the running `cms` database and `backend/migrations/008_seed_atms.sql`: `atms.brand` and `atms.deployment_type` already exist and are seeded. No migration is needed, and no columns are conditionally hidden — Brand and Deployment Type filters ship in the same wave as Status and Machine Type. See Task 1 in `tasks.md` for the verification step that replaces this migration task.
 
 ### Navigation Integration
 

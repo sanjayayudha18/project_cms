@@ -1,92 +1,90 @@
-import { useMemo, useState } from 'react';
-import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
-import { TriangleAlert, AlertCircle, Search } from 'lucide-react';
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+import { AlertCircle, Search, TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { PageHeader } from '@/components/ui/PageHeader';
-import { NoticeBanner } from '@/components/ui/NoticeBanner';
-import { DataTable } from '@/components/ui/DataTable';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { FilterSelect } from '@/components/ui/FilterSelect';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { formatIDRFull, formatDifference } from '@/lib/utils/formatters';
-import { useToast } from '@/lib/hooks/useToast';
-import { filterExceptions } from './reconciliation.utils';
-import type { ReconciliationException } from './types';
-import exceptions from '@/data/reconciliation-exceptions.json';
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { DataTable } from "@/components/ui/DataTable";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import { NoticeBanner } from "@/components/ui/NoticeBanner";
+import { PageHeader } from "@/components/ui/PageHeader";
+import exceptions from "@/data/reconciliation-exceptions.json";
+import { useToast } from "@/lib/hooks/useToast";
+import { formatDifference, formatIDRFull } from "@/lib/utils/formatters";
+import { filterExceptions } from "./reconciliation.utils";
+import type { ReconciliationException } from "./types";
 
 const data = exceptions as ReconciliationException[];
 
 const exceptionTypeOptions = [
-  { value: 'Open exceptions', label: 'Exception terbuka' },
-  { value: 'All records', label: 'Semua catatan' },
-  { value: 'Resolved', label: 'Terselesaikan' },
+  { value: "Open exceptions", label: "Exception terbuka" },
+  { value: "All records", label: "Semua catatan" },
+  { value: "Resolved", label: "Terselesaikan" },
 ];
 
 const severityOptions = [
-  { value: 'All severity', label: 'Semua tingkat' },
-  { value: 'High', label: 'Tinggi' },
-  { value: 'Medium', label: 'Sedang' },
+  { value: "All severity", label: "Semua tingkat" },
+  { value: "High", label: "Tinggi" },
+  { value: "Medium", label: "Sedang" },
 ];
 
 const columnHelper = createColumnHelper<ReconciliationException>();
 
 function formatTime(isoString: string): string {
   const date = new Date(isoString);
-  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 const columns = [
-  columnHelper.accessor('atmId', {
-    header: 'Mesin',
+  columnHelper.accessor("atmId", {
+    header: "Mesin",
     cell: (info) => (
       <div>
         <span className="font-semibold text-[var(--n-900)]">{info.getValue()}</span>
-        <span className="block text-xs text-[var(--n-500)]">{formatTime(info.row.original.lastCountTime)}</span>
+        <span className="block text-xs text-[var(--n-500)]">
+          {formatTime(info.row.original.lastCountTime)}
+        </span>
       </div>
     ),
   }),
-  columnHelper.accessor('location', {
-    header: 'Lokasi',
+  columnHelper.accessor("location", {
+    header: "Lokasi",
     cell: (info) => <span className="text-[var(--n-800)]">{info.getValue()}</span>,
   }),
-  columnHelper.accessor('countedAmount', {
-    header: 'Terhitung',
-    meta: { align: 'right' },
-    cell: (info) => (
-      <span className="tabular-nums">{formatIDRFull(info.getValue())}</span>
-    ),
+  columnHelper.accessor("countedAmount", {
+    header: "Terhitung",
+    meta: { align: "right" },
+    cell: (info) => <span className="tabular-nums">{formatIDRFull(info.getValue())}</span>,
   }),
-  columnHelper.accessor('escrowAmount', {
-    header: 'Escrow',
-    meta: { align: 'right' },
-    cell: (info) => (
-      <span className="tabular-nums">{formatIDRFull(info.getValue())}</span>
-    ),
+  columnHelper.accessor("escrowAmount", {
+    header: "Escrow",
+    meta: { align: "right" },
+    cell: (info) => <span className="tabular-nums">{formatIDRFull(info.getValue())}</span>,
   }),
-  columnHelper.accessor('difference', {
-    header: 'Selisih',
-    meta: { align: 'right' },
+  columnHelper.accessor("difference", {
+    header: "Selisih",
+    meta: { align: "right" },
     cell: (info) => {
       const { text, colorClass } = formatDifference(info.getValue());
       return <span className={`tabular-nums font-medium ${colorClass}`}>{text}</span>;
     },
   }),
-  columnHelper.accessor('severity', {
-    header: 'Tingkat',
+  columnHelper.accessor("severity", {
+    header: "Tingkat",
     cell: (info) => {
       const severity = info.getValue();
       return (
         <Badge
-          variant={severity === 'high' ? 'danger' : 'warning'}
-          icon={severity === 'high' ? AlertCircle : TriangleAlert}
-          label={severity === 'high' ? 'Tinggi' : 'Sedang'}
+          variant={severity === "high" ? "danger" : "warning"}
+          icon={severity === "high" ? AlertCircle : TriangleAlert}
+          label={severity === "high" ? "Tinggi" : "Sedang"}
         />
       );
     },
   }),
-  columnHelper.accessor('owner', {
-    header: 'Penanggung Jawab',
+  columnHelper.accessor("owner", {
+    header: "Penanggung Jawab",
     cell: (info) => {
       const owner = info.getValue();
       return owner ? (
@@ -105,16 +103,16 @@ const columns = [
  */
 export function ReconciliationScreen() {
   const { toast } = useToast();
-  const [exceptionType, setExceptionType] = useState<string | null>('Open exceptions');
-  const [severity, setSeverity] = useState<string | null>('All severity');
+  const [exceptionType, setExceptionType] = useState<string | null>("Open exceptions");
+  const [severity, setSeverity] = useState<string | null>("All severity");
 
   const filtered = useMemo(
-    () => filterExceptions(data, severity ?? 'All severity', exceptionType ?? 'All records'),
+    () => filterExceptions(data, severity ?? "All severity", exceptionType ?? "All records"),
     [severity, exceptionType],
   );
 
   const unresolvedHighCount = useMemo(
-    () => data.filter((r) => r.severity === 'high' && r.owner === null).length,
+    () => data.filter((r) => r.severity === "high" && r.owner === null).length,
     [],
   );
 
@@ -140,7 +138,10 @@ export function ReconciliationScreen() {
         actions={
           <>
             <Button variant="secondary">Jejak audit</Button>
-            <Button variant="primary" onClick={() => toast({ type: 'success', message: 'Rekonsiliasi dimulai' })}>
+            <Button
+              variant="primary"
+              onClick={() => toast({ type: "success", message: "Rekonsiliasi dimulai" })}
+            >
               Jalankan rekonsiliasi
             </Button>
           </>
@@ -171,7 +172,9 @@ export function ReconciliationScreen() {
         />
         <div className="flex items-center gap-2 min-h-[44px] text-sm text-[var(--n-500)]">
           <Search className="h-4 w-4" aria-hidden="true" />
-          <span>{filtered.length} exception{filtered.length !== 1 ? '' : ''}</span>
+          <span>
+            {filtered.length} exception{filtered.length !== 1 ? "" : ""}
+          </span>
         </div>
       </div>
 

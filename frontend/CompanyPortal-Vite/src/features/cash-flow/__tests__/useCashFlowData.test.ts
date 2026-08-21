@@ -1,10 +1,10 @@
-import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect } from 'vitest';
-import { createElement } from 'react';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import { createElement } from "react";
+import { describe, expect, it } from "vitest";
 
-import { useCashFlowData } from '../useCashFlowData';
-import { CASH_FLOW_QUERY_KEY } from '../constants';
+import { CASH_FLOW_QUERY_KEY } from "../constants";
+import { useCashFlowData } from "../useCashFlowData";
 
 function createWrapper(queryClient?: QueryClient) {
   const client =
@@ -17,12 +17,12 @@ function createWrapper(queryClient?: QueryClient) {
   };
 }
 
-describe('useCashFlowData', () => {
+describe("useCashFlowData", () => {
   it('uses the correct query key ["cash-flow", "summary"]', () => {
-    expect(CASH_FLOW_QUERY_KEY).toEqual(['cash-flow', 'summary']);
+    expect(CASH_FLOW_QUERY_KEY).toEqual(["cash-flow", "summary"]);
   });
 
-  it('returns isLoading: true initially', () => {
+  it("returns isLoading: true initially", () => {
     const { result } = renderHook(() => useCashFlowData(), {
       wrapper: createWrapper(),
     });
@@ -31,7 +31,7 @@ describe('useCashFlowData', () => {
     expect(result.current.data).toBeUndefined();
   });
 
-  it('returns data conforming to CashFlowSummary shape after loading', async () => {
+  it("returns data conforming to CashFlowSummary shape after loading", async () => {
     const { result } = renderHook(() => useCashFlowData(), {
       wrapper: createWrapper(),
     });
@@ -66,11 +66,11 @@ describe('useCashFlowData', () => {
     });
 
     const data = result.current.data!;
-    expect(data.stats[0]!.value).toBe('Rp 48,2 M');
-    expect(data.stats[0]!.label).toBe('Total Kas Beredar');
+    expect(data.stats[0]!.value).toBe("Rp 48,2 M");
+    expect(data.stats[0]!.label).toBe("Total Kas Beredar");
   });
 
-  it('exposes error state fields for error handling', async () => {
+  it("exposes error state fields for error handling", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -80,10 +80,10 @@ describe('useCashFlowData', () => {
     });
 
     // Hook returns the error-related interface fields
-    expect(result.current).toHaveProperty('isError');
-    expect(result.current).toHaveProperty('error');
-    expect(result.current).toHaveProperty('refetch');
-    expect(typeof result.current.refetch).toBe('function');
+    expect(result.current).toHaveProperty("isError");
+    expect(result.current).toHaveProperty("error");
+    expect(result.current).toHaveProperty("refetch");
+    expect(typeof result.current.refetch).toBe("function");
 
     // Initially no error while loading/fetching
     expect(result.current.isError).toBe(false);

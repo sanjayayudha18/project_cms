@@ -9,10 +9,7 @@ export const authRoute = createRoute({
 
 function AuthLayout() {
   return (
-    <div
-      className="grid min-h-screen lg:grid-cols-2"
-      style={{ backgroundColor: "var(--n-50)" }}
-    >
+    <div className="grid min-h-screen lg:grid-cols-2" style={{ backgroundColor: "var(--n-50)" }}>
       {/* Left panel — brand / decorative (hidden on mobile) */}
       <div
         className="hidden flex-col justify-between p-[var(--space-12)] lg:flex"
@@ -44,7 +41,10 @@ function AuthLayout() {
         </div>
 
         <div className="flex flex-col gap-[var(--space-4)]">
-          <blockquote className="text-2xl font-semibold leading-snug text-white" style={{ textWrap: "balance" }}>
+          <blockquote
+            className="text-2xl font-semibold leading-snug text-white"
+            style={{ textWrap: "balance" }}
+          >
             Kelola operasional kas ATM secara terintegrasi, dari peramalan hingga rekonsiliasi.
           </blockquote>
           <p className="text-sm" style={{ color: "oklch(1 0 0 / 0.7)" }}>
@@ -92,10 +92,7 @@ function AuthLayout() {
         </div>
 
         {/* Mobile footer */}
-        <p
-          className="mt-[var(--space-8)] text-xs lg:hidden"
-          style={{ color: "var(--n-400)" }}
-        >
+        <p className="mt-[var(--space-8)] text-xs lg:hidden" style={{ color: "var(--n-400)" }}>
           © 2026 CIMB Niaga STCC
         </p>
       </div>

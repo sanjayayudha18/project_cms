@@ -65,10 +65,7 @@ export function LoginPage() {
     <div className="flex flex-col gap-[var(--space-8)]">
       {/* Header */}
       <div className="flex flex-col gap-[var(--space-2)]">
-        <h1
-          className="text-2xl font-semibold tracking-tight"
-          style={{ color: "var(--n-900)" }}
-        >
+        <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--n-900)" }}>
           Selamat datang
         </h1>
         <p className="text-sm leading-relaxed" style={{ color: "var(--n-500)" }}>
@@ -84,8 +81,15 @@ export function LoginPage() {
           role="alert"
           data-testid="login-error"
         >
-          <AlertCircle size={16} className="shrink-0" style={{ color: "var(--danger-fg)" }} aria-hidden="true" />
-          <p className="text-sm" style={{ color: "var(--danger-fg)" }}>{loginError}</p>
+          <AlertCircle
+            size={16}
+            className="shrink-0"
+            style={{ color: "var(--danger-fg)" }}
+            aria-hidden="true"
+          />
+          <p className="text-sm" style={{ color: "var(--danger-fg)" }}>
+            {loginError}
+          </p>
         </div>
       )}
 

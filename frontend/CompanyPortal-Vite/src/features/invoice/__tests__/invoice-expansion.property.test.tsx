@@ -2,8 +2,8 @@
 import { render } from "@testing-library/react";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import type { InvoiceLineItem, MatchStatus } from "../types";
 import { InvoiceDetail } from "../InvoiceDetail";
+import type { InvoiceLineItem, MatchStatus } from "../types";
 
 /**
  * Property 6: Invoice Expansion Shows Complete Line Items
@@ -43,9 +43,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
   it("renders exactly N line item rows with all required fields for N ≥ 1 line items", () => {
     fc.assert(
       fc.property(arbLineItems, (lineItems) => {
-        const { container, unmount } = render(
-          <InvoiceDetail lineItems={lineItems} />,
-        );
+        const { container, unmount } = render(<InvoiceDetail lineItems={lineItems} />);
 
         // Should render exactly N rows in tbody
         const rows = container.querySelectorAll("tbody tr");

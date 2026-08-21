@@ -16,9 +16,11 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/config"
+	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/handler"
 	custommw "github.com/cimb-niaga/cms/backend/internal/middleware"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
+	"github.com/cimb-niaga/cms/backend/internal/service"
 )
 
 func main() {
@@ -106,6 +108,11 @@ func main() {
 	// Create and mount auth handler
 	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter)
 	r.Mount("/api/v1/auth", authHandler.Routes())
+
+	// Create and mount ATM Portal handler, protected by RequireAuth
+	atmPortalService := service.NewAtmPortalService(db.New(dbPool))
+	atmPortalHandler := handler.NewAtmPortalHandler(atmPortalService)
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-portal", atmPortalHandler.Routes())
 
 	// Start HTTP server
 	addr := ":" + cfg.Port

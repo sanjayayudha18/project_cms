@@ -8,17 +8,13 @@
 import { Link } from "@tanstack/react-router";
 import { createColumnHelper } from "@tanstack/react-table";
 
+import { Badge } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Badge } from "@/components/ui/Badge";
+import schedules from "@/data/replenishment-schedules.json";
 import { sortByStatusPriority } from "@/features/dashboard/replenishment.utils";
 import { formatIDRFull } from "@/lib/utils/formatters";
-import schedules from "@/data/replenishment-schedules.json";
-import type {
-  ReplenishmentSchedule,
-  BadgeVariant,
-  ProgressBarStatus,
-} from "./types";
+import type { BadgeVariant, ProgressBarStatus, ReplenishmentSchedule } from "./types";
 
 /** Map schedule status to Badge variant. */
 const statusBadgeVariant: Record<ReplenishmentSchedule["status"], BadgeVariant> = {
@@ -39,9 +35,7 @@ const statusLabel: Record<ReplenishmentSchedule["status"], string> = {
 };
 
 /** Map schedule status to ProgressBar-compatible status. */
-function toProgressBarStatus(
-  status: ReplenishmentSchedule["status"],
-): ProgressBarStatus {
+function toProgressBarStatus(status: ReplenishmentSchedule["status"]): ProgressBarStatus {
   if (status === "completed") return "completed";
   if (status === "delayed") return "delayed";
   return "in-transit";
@@ -55,23 +49,17 @@ const columns = [
     cell: (info) => (
       <div>
         <span className="font-bold text-[var(--n-900)]">{info.getValue()}</span>
-        <span className="block text-xs text-[var(--n-500)]">
-          {info.row.original.region}
-        </span>
+        <span className="block text-xs text-[var(--n-500)]">{info.row.original.region}</span>
       </div>
     ),
   }),
   columnHelper.accessor("vendor", {
     header: "Vendor",
-    cell: (info) => (
-      <span className="text-[var(--n-700)]">{info.getValue()}</span>
-    ),
+    cell: (info) => <span className="text-[var(--n-700)]">{info.getValue()}</span>,
   }),
   columnHelper.accessor("machineCount", {
     header: "Mesin",
-    cell: (info) => (
-      <span className="tabular-nums text-[var(--n-800)]">{info.getValue()}</span>
-    ),
+    cell: (info) => <span className="tabular-nums text-[var(--n-800)]">{info.getValue()}</span>,
   }),
   columnHelper.display({
     id: "progress",
@@ -103,9 +91,7 @@ const columns = [
 ];
 
 /** Sorted schedule data for the dashboard table. */
-const sortedSchedules = sortByStatusPriority(
-  schedules as ReplenishmentSchedule[],
-);
+const sortedSchedules = sortByStatusPriority(schedules as ReplenishmentSchedule[]);
 
 export function ReplenishmentSummary() {
   return (

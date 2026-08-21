@@ -124,25 +124,22 @@ describe("Property 12: Test Import Path Alias Compliance", () => {
 
   it("no test file uses relative imports that exit the feature directory", () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom(...testFiles),
-        (testFilePath) => {
-          const content = fs.readFileSync(testFilePath, "utf-8");
-          const importPaths = extractImportPaths(content);
+      fc.property(fc.constantFrom(...testFiles), (testFilePath) => {
+        const content = fs.readFileSync(testFilePath, "utf-8");
+        const importPaths = extractImportPaths(content);
 
-          const violatingImports = importPaths.filter(
-            (p) => isProjectSourceImport(p) && isRelativeImportExitingFeature(p),
+        const violatingImports = importPaths.filter(
+          (p) => isProjectSourceImport(p) && isRelativeImportExitingFeature(p),
+        );
+
+        if (violatingImports.length > 0) {
+          const relativePath = path.relative(FEATURES_DIR, testFilePath);
+          expect.fail(
+            `File "${relativePath}" has cross-feature relative imports that should use @/ prefix:\n` +
+              violatingImports.map((p) => `  - ${p}`).join("\n"),
           );
-
-          if (violatingImports.length > 0) {
-            const relativePath = path.relative(FEATURES_DIR, testFilePath);
-            expect.fail(
-              `File "${relativePath}" has cross-feature relative imports that should use @/ prefix:\n` +
-                violatingImports.map((p) => `  - ${p}`).join("\n"),
-            );
-          }
-        },
-      ),
+        }
+      }),
       { numRuns: Math.max(100, testFiles.length * 10) },
     );
   });

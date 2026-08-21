@@ -1,15 +1,15 @@
-import { Calendar, Truck, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, CheckCircle, Truck, XCircle } from "lucide-react";
 
-import type { EnrichedCitOrder, CitStatus } from './types';
+import type { CitStatus, EnrichedCitOrder } from "./types";
 
 const statusMeta: Record<CitStatus, { icon: typeof Calendar; colorClass: string }> = {
-  Scheduled: { icon: Calendar, colorClass: 'text-[var(--info-fg)]' },
-  'In Transit': { icon: Truck, colorClass: 'text-[var(--warning-fg)]' },
-  Completed: { icon: CheckCircle, colorClass: 'text-[var(--success-fg)]' },
-  Failed: { icon: XCircle, colorClass: 'text-[var(--danger-fg)]' },
+  Scheduled: { icon: Calendar, colorClass: "text-[var(--info-fg)]" },
+  "In Transit": { icon: Truck, colorClass: "text-[var(--warning-fg)]" },
+  Completed: { icon: CheckCircle, colorClass: "text-[var(--success-fg)]" },
+  Failed: { icon: XCircle, colorClass: "text-[var(--danger-fg)]" },
 };
 
-const statuses: CitStatus[] = ['Scheduled', 'In Transit', 'Completed', 'Failed'];
+const statuses: CitStatus[] = ["Scheduled", "In Transit", "Completed", "Failed"];
 
 interface CitSummaryProps {
   data: EnrichedCitOrder[];

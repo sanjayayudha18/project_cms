@@ -6,6 +6,6 @@ export interface ReconciliationException {
   countedAmount: number;
   escrowAmount: number;
   difference: number;
-  severity: 'high' | 'medium';
+  severity: "high" | "medium";
   owner: string | null;
 }

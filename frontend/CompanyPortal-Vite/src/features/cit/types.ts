@@ -1,4 +1,4 @@
-export type CitStatus = 'Scheduled' | 'In Transit' | 'Completed' | 'Failed';
+export type CitStatus = "Scheduled" | "In Transit" | "Completed" | "Failed";
 
 export interface CitOrder {
   id: string;

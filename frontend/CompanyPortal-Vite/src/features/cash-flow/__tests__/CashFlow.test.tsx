@@ -1,8 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Banknote, Cpu, Landmark, Truck } from "lucide-react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { StatsCardData, VendorDayFlow, VendorConfig } from "../types";
+import type { StatsCardData, VendorConfig, VendorDayFlow } from "../types";
 
 // ─── Mock recharts (jsdom cannot render SVG) ─────────────────────────────────
 
@@ -43,9 +43,9 @@ vi.mock("@/components/ui/Badge", () => ({
 
 // ─── Import components after mocks ───────────────────────────────────────────
 
+import { CashFlowScreen } from "../CashFlowScreen";
 import { StatsCardGrid } from "../StatsCardGrid";
 import { VendorBarChart } from "../VendorBarChart";
-import { CashFlowScreen } from "../CashFlowScreen";
 
 // ─── Test Data ───────────────────────────────────────────────────────────────
 
@@ -219,9 +219,7 @@ describe("CashFlowScreen", () => {
     render(<CashFlowScreen />);
 
     // Error message in Bahasa Indonesia
-    expect(
-      screen.getByText("Gagal memuat data cash flow. Silakan coba lagi."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Gagal memuat data cash flow. Silakan coba lagi.")).toBeInTheDocument();
 
     // Retry button
     const retryButton = screen.getByText("Coba Lagi");

@@ -19,9 +19,7 @@ const ALL_DB_ROLES: DbRole[] = [
 ];
 
 const ADMIN_ROLES: DbRole[] = ["ADMIN", "ADMIN_PARAM"];
-const NON_ADMIN_ROLES: DbRole[] = ALL_DB_ROLES.filter(
-  (r) => !ADMIN_ROLES.includes(r),
-);
+const NON_ADMIN_ROLES: DbRole[] = ALL_DB_ROLES.filter((r) => !ADMIN_ROLES.includes(r));
 
 // ─── Arbitraries ──────────────────────────────────────────────────────────────
 
@@ -48,6 +46,7 @@ const arbNavItem: fc.Arbitrary<NavItem> = fc
     ),
     group: fc.constantFrom(
       "general" as const,
+      "monitoring" as const,
       "forecasting" as const,
       "invoice" as const,
       "cash-count" as const,
@@ -109,9 +108,7 @@ describe("Property 13: Navigation Filtering by Role", () => {
 
         for (const item of items) {
           const shouldBeIncluded =
-            isAdmin ||
-            item.roles.includes("*") ||
-            item.roles.includes(userRole);
+            isAdmin || item.roles.includes("*") || item.roles.includes(userRole);
 
           if (shouldBeIncluded) {
             expect(result).toContain(item);
@@ -128,8 +125,7 @@ describe("Property 13: Navigation Filtering by Role", () => {
         const result = filterNavByRoles(items, userRole);
 
         for (const item of items) {
-          const shouldBeExcluded =
-            !item.roles.includes("*") && !item.roles.includes(userRole);
+          const shouldBeExcluded = !item.roles.includes("*") && !item.roles.includes(userRole);
 
           if (shouldBeExcluded) {
             expect(result).not.toContain(item);
@@ -171,15 +167,13 @@ describe("Property 13: Navigation Filtering by Role", () => {
 
         // Every returned item is justified
         for (const item of result) {
-          const justified =
-            item.roles.includes("*") || item.roles.includes(userRole);
+          const justified = item.roles.includes("*") || item.roles.includes(userRole);
           expect(justified).toBe(true);
         }
 
         // No missing items
         for (const item of NAV_CONFIG) {
-          const shouldBeIn =
-            item.roles.includes("*") || item.roles.includes(userRole);
+          const shouldBeIn = item.roles.includes("*") || item.roles.includes(userRole);
           if (shouldBeIn) {
             expect(result).toContain(item);
           }

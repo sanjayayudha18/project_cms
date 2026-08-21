@@ -1,65 +1,65 @@
-import { type ColumnDef } from '@tanstack/react-table';
-import { AlertCircle, AlertTriangle, Minus } from 'lucide-react';
+import type { ColumnDef } from "@tanstack/react-table";
+import { AlertCircle, AlertTriangle, Minus } from "lucide-react";
 
-import { Badge } from '@/components/ui/Badge';
-import { DataTable } from '@/components/ui/DataTable';
-import { formatIDR } from '@/lib/utils/formatCurrency';
+import { Badge } from "@/components/ui/Badge";
+import { DataTable } from "@/components/ui/DataTable";
+import { formatIDR } from "@/lib/utils/formatCurrency";
 
-import type { EnrichedForecastRecord } from './types';
+import type { EnrichedForecastRecord } from "./types";
 
 const priorityOrder: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 
 const columns: ColumnDef<EnrichedForecastRecord, unknown>[] = [
   {
-    accessorKey: 'atmId',
-    header: 'ATM ID',
+    accessorKey: "atmId",
+    header: "ATM ID",
   },
   {
-    accessorKey: 'location',
-    header: 'Lokasi',
+    accessorKey: "location",
+    header: "Lokasi",
   },
   {
-    accessorKey: 'vendorName',
-    header: 'Vendor',
+    accessorKey: "vendorName",
+    header: "Vendor",
   },
   {
-    accessorKey: 'currentBalance',
-    header: 'Saldo Saat Ini',
-    meta: { align: 'right' },
+    accessorKey: "currentBalance",
+    header: "Saldo Saat Ini",
+    meta: { align: "right" },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
-    accessorKey: 'predictedUsageH1',
-    header: 'Prediksi H+1',
-    meta: { align: 'right' },
+    accessorKey: "predictedUsageH1",
+    header: "Prediksi H+1",
+    meta: { align: "right" },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
-    accessorKey: 'predictedUsageH2',
-    header: 'Prediksi H+2',
-    meta: { align: 'right' },
+    accessorKey: "predictedUsageH2",
+    header: "Prediksi H+2",
+    meta: { align: "right" },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
-    accessorKey: 'recommendedReplenishment',
-    header: 'Rekomendasi Pengisian',
-    meta: { align: 'right' },
+    accessorKey: "recommendedReplenishment",
+    header: "Rekomendasi Pengisian",
+    meta: { align: "right" },
     cell: ({ getValue }) => formatIDR(getValue<number>()),
   },
   {
-    accessorKey: 'priority',
-    header: 'Prioritas',
+    accessorKey: "priority",
+    header: "Prioritas",
     sortingFn: (rowA, rowB) => {
-      const a = priorityOrder[rowA.getValue<string>('priority')] ?? 2;
-      const b = priorityOrder[rowB.getValue<string>('priority')] ?? 2;
+      const a = priorityOrder[rowA.getValue<string>("priority")] ?? 2;
+      const b = priorityOrder[rowB.getValue<string>("priority")] ?? 2;
       return a - b;
     },
     cell: ({ getValue }) => {
       const priority = getValue<string>();
-      if (priority === 'High') {
+      if (priority === "High") {
         return <Badge variant="danger" icon={AlertCircle} label="High" />;
       }
-      if (priority === 'Medium') {
+      if (priority === "Medium") {
         return <Badge variant="warning" icon={AlertTriangle} label="Medium" />;
       }
       return <Badge variant="neutral" icon={Minus} label="Low" />;
@@ -76,7 +76,7 @@ export function ForecastTable({ data }: ForecastTableProps) {
     <DataTable
       data={data}
       columns={columns}
-      defaultSorting={[{ id: 'priority', desc: false }]}
+      defaultSorting={[{ id: "priority", desc: false }]}
       emptyMessage="Tidak ada ATM yang sesuai dengan prioritas yang dipilih"
     />
   );

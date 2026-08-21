@@ -1,13 +1,6 @@
-import {
-  TriangleAlert,
-  AlertCircle,
-  Clock,
-  Truck,
-  FileCheck,
-  type LucideIcon,
-} from "lucide-react";
 import attentionData from "@/data/attention-items.json";
-import type { AttentionItem, AttentionCategory } from "./types";
+import { AlertCircle, Clock, FileCheck, type LucideIcon, TriangleAlert, Truck } from "lucide-react";
+import type { AttentionCategory, AttentionItem } from "./types";
 
 /**
  * AttentionPanel — daftar item yang memerlukan perhatian operator.
@@ -56,9 +49,7 @@ export function AttentionPanel() {
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-lg font-semibold text-[var(--n-900)] leading-tight">
-          Perlu Perhatian
-        </h2>
+        <h2 className="text-lg font-semibold text-[var(--n-900)] leading-tight">Perlu Perhatian</h2>
         <span
           className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--n-100)] text-[var(--n-700)] text-xs font-medium"
           aria-label={`${items.length} item`}
@@ -103,9 +94,7 @@ function AttentionListItem({ item }: { item: AttentionItem }) {
       </div>
 
       {/* Relative timestamp */}
-      <span className="flex-shrink-0 text-xs text-[var(--n-400)] mt-0.5">
-        {item.time}
-      </span>
+      <span className="flex-shrink-0 text-xs text-[var(--n-400)] mt-0.5">{item.time}</span>
     </li>
   );
 }

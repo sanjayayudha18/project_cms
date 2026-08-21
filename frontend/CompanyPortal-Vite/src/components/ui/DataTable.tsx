@@ -1,13 +1,13 @@
-import { useState } from "react";
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  flexRender,
   type ColumnDef,
   type SortingState,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { useState } from "react";
 
 interface DataTableProps<T> {
   data: T[];
@@ -41,8 +41,8 @@ export function DataTable<T>({
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => {
-                const align =
-                  (header.column.columnDef.meta as { align?: string } | undefined)?.align;
+                const align = (header.column.columnDef.meta as { align?: string } | undefined)
+                  ?.align;
                 const canSort = header.column.getCanSort();
 
                 return (
@@ -60,10 +60,7 @@ export function DataTable<T>({
                     <span className="inline-flex items-center gap-1">
                       {header.isPlaceholder
                         ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.getIsSorted() === "asc" && (
                         <ArrowUp className="h-3.5 w-3.5" aria-label="Urutan naik" />
                       )}
@@ -80,10 +77,7 @@ export function DataTable<T>({
         <tbody>
           {table.getRowModel().rows.length === 0 ? (
             <tr>
-              <td
-                colSpan={columns.length}
-                className="px-4 py-12 text-center text-[var(--n-500)]"
-              >
+              <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--n-500)]">
                 {emptyMessage}
               </td>
             </tr>
@@ -94,8 +88,8 @@ export function DataTable<T>({
                 className="border-b border-[var(--n-100)] transition-colors duration-100 hover:bg-[var(--red-50)]"
               >
                 {row.getVisibleCells().map((cell) => {
-                  const align =
-                    (cell.column.columnDef.meta as { align?: string } | undefined)?.align;
+                  const align = (cell.column.columnDef.meta as { align?: string } | undefined)
+                    ?.align;
 
                   return (
                     <td

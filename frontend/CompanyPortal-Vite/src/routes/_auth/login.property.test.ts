@@ -64,9 +64,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          const usernameError = result.error.issues.find(
-            (i) => i.path[0] === "username",
-          );
+          const usernameError = result.error.issues.find((i) => i.path[0] === "username");
           expect(usernameError).toBeDefined();
         }
       }),
@@ -84,9 +82,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          const passwordError = result.error.issues.find(
-            (i) => i.path[0] === "password",
-          );
+          const passwordError = result.error.issues.find((i) => i.path[0] === "password");
           expect(passwordError).toBeDefined();
         }
       }),

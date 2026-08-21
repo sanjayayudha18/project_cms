@@ -1,20 +1,20 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from "react";
 
-import { FilterSelect } from '@/components/ui/FilterSelect';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { compoundFilter } from '@/lib/utils/filters';
-import vendorsData from '@/data/vendors.json';
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import vendorsData from "@/data/vendors.json";
+import { compoundFilter } from "@/lib/utils/filters";
 
-import { useCitData } from './useCitData';
-import { CitTable } from './CitTable';
-import { CitSummary } from './CitSummary';
-import type { CitStatus } from './types';
+import { CitSummary } from "./CitSummary";
+import { CitTable } from "./CitTable";
+import type { CitStatus } from "./types";
+import { useCitData } from "./useCitData";
 
 const statusOptions: { value: string; label: string }[] = [
-  { value: 'Scheduled', label: 'Scheduled' },
-  { value: 'In Transit', label: 'In Transit' },
-  { value: 'Completed', label: 'Completed' },
-  { value: 'Failed', label: 'Failed' },
+  { value: "Scheduled", label: "Scheduled" },
+  { value: "In Transit", label: "In Transit" },
+  { value: "Completed", label: "Completed" },
+  { value: "Failed", label: "Failed" },
 ];
 
 const vendorOptions = vendorsData.map((v) => ({

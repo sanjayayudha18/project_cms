@@ -1,8 +1,8 @@
 // Feature: frontend-consolidation, Property 4: CIT Filter Consistency
 
+import { compoundFilter } from "@/lib/utils/filters";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { compoundFilter } from "@/lib/utils/filters";
 import type { CitOrder, CitStatus } from "../types";
 
 /**
@@ -32,8 +32,12 @@ const arbCitOrder: fc.Arbitrary<CitOrder> = fc.record({
   id: fc.uuid(),
   atmId: fc.stringMatching(/^ATM-\d{3,5}$/),
   vendorId: arbVendorId,
-  orderDate: fc.date({ min: new Date("2024-01-01"), max: new Date("2025-12-31") }).map((d) => d.toISOString().slice(0, 10)),
-  scheduledDate: fc.date({ min: new Date("2024-01-01"), max: new Date("2025-12-31") }).map((d) => d.toISOString().slice(0, 10)),
+  orderDate: fc
+    .date({ min: new Date("2024-01-01"), max: new Date("2025-12-31") })
+    .map((d) => d.toISOString().slice(0, 10)),
+  scheduledDate: fc
+    .date({ min: new Date("2024-01-01"), max: new Date("2025-12-31") })
+    .map((d) => d.toISOString().slice(0, 10)),
   amount: fc.nat({ max: 500_000_000 }),
   status: arbStatus,
   evidenceUrl: fc.oneof(fc.constant(null), fc.webUrl()),
@@ -44,15 +48,9 @@ const arbCitOrderArray: fc.Arbitrary<CitOrder[]> = fc.array(arbCitOrder, {
   maxLength: 50,
 });
 
-const arbStatusFilter: fc.Arbitrary<CitStatus | null> = fc.oneof(
-  fc.constant(null),
-  arbStatus,
-);
+const arbStatusFilter: fc.Arbitrary<CitStatus | null> = fc.oneof(fc.constant(null), arbStatus);
 
-const arbVendorFilter: fc.Arbitrary<string | null> = fc.oneof(
-  fc.constant(null),
-  arbVendorId,
-);
+const arbVendorFilter: fc.Arbitrary<string | null> = fc.oneof(fc.constant(null), arbVendorId);
 
 /**
  * Computes CitSummary counts per status from a filtered array,

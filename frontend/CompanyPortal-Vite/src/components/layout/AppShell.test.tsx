@@ -7,9 +7,7 @@ import { AppShell } from "./AppShell";
 // AppShell calls useRouterState({ select }) with a selector and useRouter().navigate.
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: (opts?: { select?: (s: { location: { pathname: string } }) => unknown }) =>
-    opts?.select
-      ? opts.select({ location: { pathname: "/" } })
-      : { location: { pathname: "/" } },
+    opts?.select ? opts.select({ location: { pathname: "/" } }) : { location: { pathname: "/" } },
   useRouter: () => ({ navigate: vi.fn() }),
 }));
 

@@ -30,7 +30,7 @@ ON CONFLICT (code) DO NOTHING;
 -- ============================================================
 -- 3. Seed Users (one per role for development/testing)
 -- ============================================================
--- bcrypt hash for 'password123': $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+-- bcrypt hash for 'password123': $2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi
 INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_karyawan, auth_source, password_hash, vendor_id, is_active) VALUES
     (
         (SELECT id FROM public.roles WHERE role = 'ADMIN'),
@@ -40,7 +40,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'admin@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -52,7 +52,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'admin.param@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -64,7 +64,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'budi.santoso@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -76,7 +76,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'dewi.lestari@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -88,7 +88,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'andi.prasetyo@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -100,7 +100,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'siti.rahayu@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -112,7 +112,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'rizky.firmansyah@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -124,7 +124,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'maya.putri@cimbniaga.co.id',
         true,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         NULL,
         true
     ),
@@ -136,7 +136,7 @@ INSERT INTO public.users (role_id, employee_id, username, full_name, email, is_k
         'ahmad.hidayat@ssi.co.id',
         false,
         'local',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+        '$2a$10$tFDuAumLIoM.bD25Zrt0vuq/rbnslTSeYNvmSD4KS62wobuRmpwsi',
         (SELECT id FROM public.vendors WHERE code = 'SSI'),
         true
     )

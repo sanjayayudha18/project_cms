@@ -32,8 +32,9 @@ export interface SkeletonTextProps {
 export function SkeletonText({ lines = 3, className }: SkeletonTextProps) {
   return (
     <div className={cn("flex flex-col gap-2", className)} aria-hidden="true">
-      {Array.from({ length: lines }, (_, i) => (
+      {Array.from({ length: lines }).map((_, i) => (
         <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: generic loading placeholder lines have no stable identity to key by
           key={i}
           className="animate-pulse rounded"
           style={{
@@ -109,8 +110,9 @@ export function SkeletonTable({ rows = 5, columns = 4, className }: SkeletonTabl
     <div className={cn("flex flex-col gap-2", className)} aria-hidden="true">
       {/* Header row */}
       <div className="flex gap-3 py-2">
-        {Array.from({ length: columns }, (_, i) => (
+        {Array.from({ length: columns }).map((_, i) => (
           <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: generic loading placeholder header cells have no stable identity to key by
             key={i}
             className="animate-pulse flex-1 rounded"
             style={{
@@ -122,14 +124,16 @@ export function SkeletonTable({ rows = 5, columns = 4, className }: SkeletonTabl
         ))}
       </div>
       {/* Data rows */}
-      {Array.from({ length: rows }, (_, rowIdx) => (
+      {Array.from({ length: rows }).map((_, rowIdx) => (
         <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: generic loading placeholder rows have no stable identity to key by
           key={rowIdx}
           className="flex gap-3 py-2"
           style={{ borderTop: "1px solid var(--n-100)" }}
         >
-          {Array.from({ length: columns }, (_, colIdx) => (
+          {Array.from({ length: columns }).map((_, colIdx) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: generic loading placeholder cells have no stable identity to key by
               key={colIdx}
               className="animate-pulse flex-1 rounded"
               style={{

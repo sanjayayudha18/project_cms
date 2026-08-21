@@ -150,7 +150,10 @@ describe("useAuthStore", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 403,
-        json: async () => ({ error: "portal_mismatch", message: "Akun tidak memiliki akses ke portal ini" }),
+        json: async () => ({
+          error: "portal_mismatch",
+          message: "Akun tidak memiliki akses ke portal ini",
+        }),
       });
 
       await useAuthStore.getState().login("vendor", "pass");
@@ -213,7 +216,10 @@ describe("useAuthStore", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 503,
-        json: async () => ({ error: "service_unavailable", message: "Layanan sedang tidak tersedia" }),
+        json: async () => ({
+          error: "service_unavailable",
+          message: "Layanan sedang tidak tersedia",
+        }),
       });
 
       await useAuthStore.getState().login("user", "pass");

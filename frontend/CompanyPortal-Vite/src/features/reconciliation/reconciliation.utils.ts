@@ -1,4 +1,4 @@
-import type { ReconciliationException } from './types';
+import type { ReconciliationException } from "./types";
 
 /**
  * Combined AND filter for reconciliation exceptions.
@@ -25,24 +25,18 @@ export function filterExceptions(
   });
 }
 
-function matchesSeverity(
-  record: ReconciliationException,
-  severity: string,
-): boolean {
+function matchesSeverity(record: ReconciliationException, severity: string): boolean {
   const normalized = severity.toLowerCase();
-  if (normalized === 'all severity' || normalized === 'all') return true;
-  if (normalized === 'high') return record.severity === 'high';
-  if (normalized === 'medium') return record.severity === 'medium';
+  if (normalized === "all severity" || normalized === "all") return true;
+  if (normalized === "high") return record.severity === "high";
+  if (normalized === "medium") return record.severity === "medium";
   return true;
 }
 
-function matchesExceptionType(
-  record: ReconciliationException,
-  exceptionType: string,
-): boolean {
+function matchesExceptionType(record: ReconciliationException, exceptionType: string): boolean {
   const normalized = exceptionType.toLowerCase();
-  if (normalized === 'open exceptions') return record.owner === null;
-  if (normalized === 'all records' || normalized === 'all') return true;
-  if (normalized === 'resolved') return record.owner !== null;
+  if (normalized === "open exceptions") return record.owner === null;
+  if (normalized === "all records" || normalized === "all") return true;
+  if (normalized === "resolved") return record.owner !== null;
   return true;
 }

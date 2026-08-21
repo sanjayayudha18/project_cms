@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, ...props }: { children: React.ReactNode; to?: string }) => (
-    <a href={props.to ?? "#"} data-testid="mock-link">{children}</a>
+    <a href={props.to ?? "#"} data-testid="mock-link">
+      {children}
+    </a>
   ),
 }));
 

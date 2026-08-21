@@ -28,8 +28,12 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
           style={{ color: "var(--n-600)" }}
           aria-label={sidebarCollapsed ? "Buka menu navigasi" : "Tutup menu navigasi"}
           aria-expanded={!sidebarCollapsed}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--n-100)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--n-100)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
         >
           <Menu size={20} aria-hidden="true" />
         </button>
@@ -62,8 +66,12 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
           className="relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)]"
           style={{ color: "var(--n-600)" }}
           aria-label="Notifikasi"
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--n-100)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--n-100)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
         >
           <Bell size={18} aria-hidden="true" />
           {/* Notification dot */}
@@ -89,8 +97,12 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
             onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
             className="flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] px-[var(--space-2)] py-[var(--space-1)]"
             style={{ color: "var(--n-700)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--n-100)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--n-100)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
             data-testid="header-user-name"
@@ -157,7 +169,9 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                 >
                   {user.role}
                 </span>
-                <span className="text-xs" style={{ color: "var(--n-500)" }}>{user.email}</span>
+                <span className="text-xs" style={{ color: "var(--n-500)" }}>
+                  {user.email}
+                </span>
               </div>
 
               {/* Logout */}
@@ -166,8 +180,12 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                 onClick={onLogout}
                 className="flex w-full items-center gap-[var(--space-2)] px-[var(--space-3)] py-[var(--space-2)] text-sm"
                 style={{ color: "var(--danger-fg)" }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--danger-bg)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--danger-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
                 role="menuitem"
                 data-testid="header-logout-button"
                 aria-label="Keluar dari sistem"

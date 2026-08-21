@@ -11,7 +11,7 @@ import type { AuthUser } from "../../auth/store";
 // Cash_Count_PIC	Beranda, all Cash Count items
 // Cash_Count_Lead	Beranda, all Cash Count items
 // Branch	Beranda, Proyeksi H+2 only
-// Approver	Beranda, all Forecasting + Invoice + Cash Count 
+// Approver	Beranda, all Forecasting + Invoice + Cash Count
 
 const MOCK_USER: AuthUser = {
   id: 1,

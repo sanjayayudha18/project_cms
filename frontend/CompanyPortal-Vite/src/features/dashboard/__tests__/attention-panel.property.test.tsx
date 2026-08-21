@@ -96,9 +96,7 @@ describe("Property 2: AttentionPanel Renders All Required Fields", () => {
           expect(timeEl?.textContent).toBe(item.time);
 
           // Category-appropriate icon indicator — check the icon container has correct bg class
-          const iconContainer = li.querySelector(
-            "div.flex-shrink-0",
-          );
+          const iconContainer = li.querySelector("div.flex-shrink-0");
           expect(iconContainer?.className).toContain(categoryBgClasses[item.category]);
         }
 

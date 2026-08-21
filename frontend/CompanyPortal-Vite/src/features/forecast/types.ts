@@ -5,7 +5,7 @@ export interface ForecastRecord {
   predictedUsageH1: number;
   predictedUsageH2: number;
   recommendedReplenishment: number;
-  priority: 'High' | 'Medium' | 'Low';
+  priority: "High" | "Medium" | "Low";
 }
 
 export interface EnrichedForecastRecord extends ForecastRecord {

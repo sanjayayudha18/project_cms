@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 
-import { EmptyState } from '@/components/ui/EmptyState';
-import { FilterSelect } from '@/components/ui/FilterSelect';
-import { SummaryCard } from '@/components/ui/SummaryCard';
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import { SummaryCard } from "@/components/ui/SummaryCard";
 
-import { ForecastTable } from './ForecastTable';
-import { ScheduleList } from './ScheduleList';
-import { useForecastData } from './useForecastData';
+import { ForecastTable } from "./ForecastTable";
+import { ScheduleList } from "./ScheduleList";
+import { useForecastData } from "./useForecastData";
 
 const priorityOptions = [
-  { value: 'High', label: 'High' },
-  { value: 'Medium', label: 'Medium' },
-  { value: 'Low', label: 'Low' },
+  { value: "High", label: "High" },
+  { value: "Medium", label: "Medium" },
+  { value: "Low", label: "Low" },
 ];
 
 export function ForecastView() {

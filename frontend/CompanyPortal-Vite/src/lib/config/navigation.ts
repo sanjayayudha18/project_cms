@@ -12,6 +12,7 @@ import {
   GitCompare,
   LayoutDashboard,
   ListChecks,
+  Monitor,
   Receipt,
   Scale,
   Settings,
@@ -25,7 +26,7 @@ import type { DbRole } from "@/lib/auth/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type NavGroup = "general" | "forecasting" | "invoice" | "cash-count";
+export type NavGroup = "general" | "monitoring" | "forecasting" | "invoice" | "cash-count";
 
 export interface NavItem {
   id: string;
@@ -41,6 +42,7 @@ export interface NavItem {
 
 export const GROUP_LABELS: Record<NavGroup, string> = {
   general: "Umum",
+  monitoring: "Monitoring",
   forecasting: "Peramalan",
   invoice: "Tagihan",
   "cash-count": "Perhitungan Kas",
@@ -89,6 +91,16 @@ export const NAV_CONFIG: NavItem[] = [
     href: "/settings",
     roles: ["ADMIN"],
     group: "general",
+  },
+
+  // Monitoring
+  {
+    id: "atm-portal",
+    label: "ATM Portal",
+    icon: Monitor,
+    href: "/atm-portal",
+    roles: ["ATM-USER", "ATM-SPV"],
+    group: "monitoring",
   },
 
   // Forecasting
@@ -148,7 +160,14 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Proyeksi H+2",
     icon: TrendingUp,
     href: "/forecasting/h2-projection",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-USER", "BRANCH-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    roles: [
+      "ATM-USER",
+      "ATM-SPV",
+      "BRANCH-USER",
+      "BRANCH-SPV",
+      "BRANCH-ATM-USER",
+      "BRANCH-ATM-SPV",
+    ],
     group: "forecasting",
     disabled: true,
   },

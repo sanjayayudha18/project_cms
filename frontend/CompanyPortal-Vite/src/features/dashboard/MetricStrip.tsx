@@ -1,6 +1,6 @@
-import { AlertTriangle, Banknote, Route, Wifi } from "lucide-react";
-import { formatIDRAbbreviated } from "@/lib/utils/formatters";
 import kpiData from "@/data/dashboard-kpi.json";
+import { formatIDRAbbreviated } from "@/lib/utils/formatters";
+import { AlertTriangle, Banknote, Route, Wifi } from "lucide-react";
 import type { DashboardKpi } from "./types";
 
 /**
@@ -57,10 +57,7 @@ export function MetricStrip() {
         grid grid-cols-1 min-[760px]:grid-cols-2 min-[1080px]:grid-cols-4"
     >
       {metrics.map((metric, index) => (
-        <div
-          key={metric.label}
-          className={`p-5 ${getCardBorderClasses(index)}`}
-        >
+        <div key={metric.label} className={`p-5 ${getCardBorderClasses(index)}`}>
           <div className="flex items-center gap-1.5 text-xs text-[var(--n-500)]">
             {metric.icon}
             <span>{metric.label}</span>
@@ -68,9 +65,7 @@ export function MetricStrip() {
           <div className="mt-1 text-2xl font-bold tabular-nums text-[var(--n-900)]">
             {metric.value}
           </div>
-          <div className="mt-1 text-xs text-[var(--n-500)]">
-            {metric.meta}
-          </div>
+          <div className="mt-1 text-xs text-[var(--n-500)]">{metric.meta}</div>
         </div>
       ))}
     </div>

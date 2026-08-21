@@ -5,8 +5,8 @@
  * @module formatCurrency
  */
 
-const idrFormatter = new Intl.NumberFormat('id-ID', {
-  style: 'decimal',
+const idrFormatter = new Intl.NumberFormat("id-ID", {
+  style: "decimal",
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
 });
@@ -31,5 +31,5 @@ export function formatIDR(amount: number): string {
  * @example parseIDR("0") // 0
  */
 export function parseIDR(formatted: string): number {
-  return Number(formatted.replace(/\./g, ''));
+  return Number(formatted.replace(/\./g, ""));
 }

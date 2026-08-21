@@ -1,5 +1,8 @@
+name: CMS-frontEnd
+
 services:
-  userportal-vite:
+  # ─── CompanyPortal Frontend ────────────────────────────────────────────────
+  userportal:
     build:
       context: ./CompanyPortal-Vite
       dockerfile: Dockerfile
@@ -8,8 +11,17 @@ services:
     ports:
       - "3001:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cms-net
 
-  vendorportal-vite:
+  # ─── VendorPortal Frontend ─────────────────────────────────────────────────
+  vendorportal:
     build:
       context: ./VendorPortal-Vite
       dockerfile: Dockerfile
@@ -18,3 +30,16 @@ services:
     ports:
       - "3002:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cms-net
+
+networks:
+  cms-net:
+    external: true
+    name: cms-backend_cms-net

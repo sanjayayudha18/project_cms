@@ -1,4 +1,4 @@
-export type DsrStatus = 'Critical' | 'Low' | 'Normal';
+export type DsrStatus = "Critical" | "Low" | "Normal";
 
 export interface DsrRecord {
   id: string;

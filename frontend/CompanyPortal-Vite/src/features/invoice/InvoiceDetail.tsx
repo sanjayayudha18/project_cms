@@ -1,9 +1,9 @@
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, XCircle } from "lucide-react";
 
-import { Badge } from '@/components/ui/Badge';
-import type { BadgeVariant } from '@/components/ui/Badge';
-import { formatIDR } from '@/lib/utils/formatCurrency';
-import type { InvoiceLineItem, MatchStatus } from './types';
+import { Badge } from "@/components/ui/Badge";
+import type { BadgeVariant } from "@/components/ui/Badge";
+import { formatIDR } from "@/lib/utils/formatCurrency";
+import type { InvoiceLineItem, MatchStatus } from "./types";
 
 interface InvoiceDetailProps {
   lineItems: InvoiceLineItem[];
@@ -13,9 +13,9 @@ const matchStatusConfig: Record<
   MatchStatus,
   { variant: BadgeVariant; icon: typeof CheckCircle; label: string }
 > = {
-  Matched: { variant: 'success', icon: CheckCircle, label: 'Cocok' },
-  Mismatch: { variant: 'danger', icon: XCircle, label: 'Tidak Cocok' },
-  'Pending Review': { variant: 'warning', icon: Clock, label: 'Menunggu Review' },
+  Matched: { variant: "success", icon: CheckCircle, label: "Cocok" },
+  Mismatch: { variant: "danger", icon: XCircle, label: "Tidak Cocok" },
+  "Pending Review": { variant: "warning", icon: Clock, label: "Menunggu Review" },
 };
 
 /**
@@ -53,18 +53,13 @@ export function InvoiceDetail({ lineItems }: InvoiceDetailProps) {
           {lineItems.map((item) => {
             const config = matchStatusConfig[item.matchStatus];
             return (
-              <tr
-                key={item.id}
-                className="border-b border-[var(--n-100)]"
-              >
-                <td className="px-3 py-2 text-[var(--n-800)]">
-                  {item.description}
-                </td>
+              <tr key={item.id} className="border-b border-[var(--n-100)]">
+                <td className="px-3 py-2 text-[var(--n-800)]">{item.description}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--n-800)]">
                   {formatIDR(item.invoicedAmount)}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-[var(--n-700)]">
-                  {item.matchedOrderRef ?? '—'}
+                  {item.matchedOrderRef ?? "—"}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--n-800)]">
                   {formatIDR(item.expectedAmount)}
@@ -73,11 +68,7 @@ export function InvoiceDetail({ lineItems }: InvoiceDetailProps) {
                   {formatIDR(item.variance)}
                 </td>
                 <td className="px-3 py-2">
-                  <Badge
-                    variant={config.variant}
-                    icon={config.icon}
-                    label={config.label}
-                  />
+                  <Badge variant={config.variant} icon={config.icon} label={config.label} />
                 </td>
               </tr>
             );

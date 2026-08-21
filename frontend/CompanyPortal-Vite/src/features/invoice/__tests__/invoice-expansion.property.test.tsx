@@ -2,8 +2,8 @@
 import { render } from "@testing-library/react";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import type { InvoiceLineItem, MatchStatus } from "../types";
 import { InvoiceDetail } from "../InvoiceDetail";
+import type { InvoiceLineItem, MatchStatus } from "../types";
 
 /**
  * Property 6: Invoice Expansion Shows Complete Line Items
@@ -43,9 +43,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
   it("renders exactly N line item rows with all required fields for N ≥ 1 line items", () => {
     fc.assert(
       fc.property(arbLineItems, (lineItems) => {
-        const { container, unmount } = render(
-          <InvoiceDetail lineItems={lineItems} />,
-        );
+        const { container, unmount } = render(<InvoiceDetail lineItems={lineItems} />);
 
         // Should render exactly N rows in tbody
         const rows = container.querySelectorAll("tbody tr");
@@ -66,6 +64,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           const invoicedText = cells[1].textContent;
           expect(invoicedText).toBeTruthy();
           // Verify the cell contains a number-like formatted string (dots as separators)
+          // biome-ignore lint/style/noNonNullAssertion: truthy-checked via the assertion above.
           expect(invoicedText!.length).toBeGreaterThan(0);
 
           // 3. Matched order reference (or em dash if null)
@@ -79,6 +78,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           // 4. Expected amount (formatted as IDR)
           const expectedText = cells[3].textContent;
           expect(expectedText).toBeTruthy();
+          // biome-ignore lint/style/noNonNullAssertion: truthy-checked via the assertion above.
           expect(expectedText!.length).toBeGreaterThan(0);
 
           // 5. Variance (formatted as IDR)
@@ -88,6 +88,7 @@ describe("Property 6: Invoice Expansion Shows Complete Line Items", () => {
           // 6. Match status — rendered as a Badge with the correct label
           const badgeEl = cells[5].querySelector("span");
           expect(badgeEl).not.toBeNull();
+          // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
           expect(badgeEl!.textContent).toContain(matchStatusLabels[item.matchStatus]);
         }
 

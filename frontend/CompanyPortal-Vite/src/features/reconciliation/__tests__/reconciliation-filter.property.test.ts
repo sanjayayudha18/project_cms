@@ -1,8 +1,8 @@
+import * as fc from "fast-check";
 // Feature: frontend-consolidation, Property 7: Reconciliation Filter Behavioral Equivalence
-import { describe, expect, it } from 'vitest';
-import * as fc from 'fast-check';
-import { filterExceptions } from '../reconciliation.utils';
-import type { ReconciliationException } from '../types';
+import { describe, expect, it } from "vitest";
+import { filterExceptions } from "../reconciliation.utils";
+import type { ReconciliationException } from "../types";
 
 /**
  * Property 7: Reconciliation Filter Behavioral Equivalence
@@ -20,12 +20,9 @@ import type { ReconciliationException } from '../types';
  * **Validates: Requirements 8.4**
  */
 
-const severityArb = fc.constantFrom<'high' | 'medium'>('high', 'medium');
+const severityArb = fc.constantFrom<"high" | "medium">("high", "medium");
 
-const ownerArb = fc.oneof(
-  fc.constant(null),
-  fc.string({ minLength: 1, maxLength: 20 }),
-);
+const ownerArb = fc.oneof(fc.constant(null), fc.string({ minLength: 1, maxLength: 20 }));
 
 const reconciliationExceptionArb: fc.Arbitrary<ReconciliationException> = fc.record({
   id: fc.uuid(),
@@ -41,16 +38,16 @@ const reconciliationExceptionArb: fc.Arbitrary<ReconciliationException> = fc.rec
 
 const exceptionsArb = fc.array(reconciliationExceptionArb, { minLength: 0, maxLength: 50 });
 
-const severityFilterArb = fc.constantFrom('All severity', 'High', 'Medium');
-const exceptionTypeFilterArb = fc.constantFrom('Open exceptions', 'All records', 'Resolved');
+const severityFilterArb = fc.constantFrom("All severity", "High", "Medium");
+const exceptionTypeFilterArb = fc.constantFrom("Open exceptions", "All records", "Resolved");
 
-describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Behavioral Equivalence', () => {
+describe("Feature: frontend-consolidation, Property 7: Reconciliation Filter Behavioral Equivalence", () => {
   it('severity "High" returns only records with severity === "high"', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'High', 'All records');
-        expect(result.every((r) => r.severity === 'high')).toBe(true);
-        const expected = records.filter((r) => r.severity === 'high');
+        const result = filterExceptions(records, "High", "All records");
+        expect(result.every((r) => r.severity === "high")).toBe(true);
+        const expected = records.filter((r) => r.severity === "high");
         expect(result).toEqual(expected);
       }),
       { numRuns: 100 },
@@ -60,9 +57,9 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
   it('severity "Medium" returns only records with severity === "medium"', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'Medium', 'All records');
-        expect(result.every((r) => r.severity === 'medium')).toBe(true);
-        const expected = records.filter((r) => r.severity === 'medium');
+        const result = filterExceptions(records, "Medium", "All records");
+        expect(result.every((r) => r.severity === "medium")).toBe(true);
+        const expected = records.filter((r) => r.severity === "medium");
         expect(result).toEqual(expected);
       }),
       { numRuns: 100 },
@@ -72,7 +69,7 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
   it('"All severity" returns all records regardless of severity', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'All severity', 'All records');
+        const result = filterExceptions(records, "All severity", "All records");
         expect(result).toEqual(records);
       }),
       { numRuns: 100 },
@@ -82,7 +79,7 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
   it('"Open exceptions" returns only records where owner is null', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'All severity', 'Open exceptions');
+        const result = filterExceptions(records, "All severity", "Open exceptions");
         expect(result.every((r) => r.owner === null)).toBe(true);
         const expected = records.filter((r) => r.owner === null);
         expect(result).toEqual(expected);
@@ -94,7 +91,7 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
   it('"Resolved" returns only records where owner is not null', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'All severity', 'Resolved');
+        const result = filterExceptions(records, "All severity", "Resolved");
         expect(result.every((r) => r.owner !== null)).toBe(true);
         const expected = records.filter((r) => r.owner !== null);
         expect(result).toEqual(expected);
@@ -106,14 +103,14 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
   it('"All records" returns all records regardless of owner', () => {
     fc.assert(
       fc.property(exceptionsArb, (records) => {
-        const result = filterExceptions(records, 'All severity', 'All records');
+        const result = filterExceptions(records, "All severity", "All records");
         expect(result).toEqual(records);
       }),
       { numRuns: 100 },
     );
   });
 
-  it('combined filters apply as AND — severity and exceptionType both constrain', () => {
+  it("combined filters apply as AND — severity and exceptionType both constrain", () => {
     fc.assert(
       fc.property(
         exceptionsArb,
@@ -125,24 +122,24 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
           // Verify every result matches both criteria
           for (const record of result) {
             // Check severity
-            if (severity === 'High') expect(record.severity).toBe('high');
-            if (severity === 'Medium') expect(record.severity).toBe('medium');
+            if (severity === "High") expect(record.severity).toBe("high");
+            if (severity === "Medium") expect(record.severity).toBe("medium");
 
             // Check exception type
-            if (exceptionType === 'Open exceptions') expect(record.owner).toBeNull();
-            if (exceptionType === 'Resolved') expect(record.owner).not.toBeNull();
+            if (exceptionType === "Open exceptions") expect(record.owner).toBeNull();
+            if (exceptionType === "Resolved") expect(record.owner).not.toBeNull();
           }
 
           // Verify no matching record is excluded (no false negatives)
           const expected = records.filter((r) => {
             const passesSeverity =
-              severity === 'All severity' ||
-              (severity === 'High' && r.severity === 'high') ||
-              (severity === 'Medium' && r.severity === 'medium');
+              severity === "All severity" ||
+              (severity === "High" && r.severity === "high") ||
+              (severity === "Medium" && r.severity === "medium");
             const passesType =
-              exceptionType === 'All records' ||
-              (exceptionType === 'Open exceptions' && r.owner === null) ||
-              (exceptionType === 'Resolved' && r.owner !== null);
+              exceptionType === "All records" ||
+              (exceptionType === "Open exceptions" && r.owner === null) ||
+              (exceptionType === "Resolved" && r.owner !== null);
             return passesSeverity && passesType;
           });
           expect(result).toEqual(expected);
@@ -152,7 +149,7 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
     );
   });
 
-  it('filter result is always a subset of the input — no records are invented', () => {
+  it("filter result is always a subset of the input — no records are invented", () => {
     fc.assert(
       fc.property(
         exceptionsArb,
@@ -170,7 +167,7 @@ describe('Feature: frontend-consolidation, Property 7: Reconciliation Filter Beh
     );
   });
 
-  it('filter preserves original order of matching records', () => {
+  it("filter preserves original order of matching records", () => {
     fc.assert(
       fc.property(
         exceptionsArb,

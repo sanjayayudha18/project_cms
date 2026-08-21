@@ -10,9 +10,33 @@
     "approverName": "Dewi Putri",
     "approvedAt": "2024-01-22T10:30:00Z",
     "lineItems": [
-      { "id": "LI-001-01", "description": "CIT Service ATM-JKT-001 (16 Jan)", "invoicedAmount": 250000000, "matchedOrderRef": "CIT-20240115-001", "expectedAmount": 250000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-001-02", "description": "CIT Service ATM-JKT-007 (17 Jan)", "invoicedAmount": 400000000, "matchedOrderRef": "CIT-20240116-003", "expectedAmount": 400000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-001-03", "description": "CIT Service ATM-SBY-004 (19 Jan)", "invoicedAmount": 280000000, "matchedOrderRef": "CIT-20240118-001", "expectedAmount": 280000000, "variance": 0, "matchStatus": "Matched" }
+      {
+        "id": "LI-001-01",
+        "description": "CIT Service ATM-JKT-001 (16 Jan)",
+        "invoicedAmount": 250000000,
+        "matchedOrderRef": "CIT-20240115-001",
+        "expectedAmount": 250000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-001-02",
+        "description": "CIT Service ATM-JKT-007 (17 Jan)",
+        "invoicedAmount": 400000000,
+        "matchedOrderRef": "CIT-20240116-003",
+        "expectedAmount": 400000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-001-03",
+        "description": "CIT Service ATM-SBY-004 (19 Jan)",
+        "invoicedAmount": 280000000,
+        "matchedOrderRef": "CIT-20240118-001",
+        "expectedAmount": 280000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      }
     ]
   },
   {
@@ -26,13 +50,44 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-002-01", "description": "CIT Service ATM-JKT-003 (16 Jan)", "invoicedAmount": 350000000, "matchedOrderRef": "CIT-20240115-002", "expectedAmount": 350000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-002-02", "description": "CIT Service ATM-BDG-005 (18 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240117-001", "expectedAmount": 300000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-002-03", "description": "CIT Service ATM-JKT-004 (18 Jan)", "invoicedAmount": 320000000, "matchedOrderRef": "CIT-20240117-002", "expectedAmount": 300000000, "variance": 20000000, "matchStatus": "Mismatch" },
-      { "id": "LI-002-04", "description": "CIT Service ATM-JKT-008 (19 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240118-002", "expectedAmount": 300000000, "variance": 0, "matchStatus": "Matched" }
+      {
+        "id": "LI-002-01",
+        "description": "CIT Service ATM-JKT-003 (16 Jan)",
+        "invoicedAmount": 350000000,
+        "matchedOrderRef": "CIT-20240115-002",
+        "expectedAmount": 350000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-002-02",
+        "description": "CIT Service ATM-BDG-005 (18 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240117-001",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-002-03",
+        "description": "CIT Service ATM-JKT-004 (18 Jan)",
+        "invoicedAmount": 320000000,
+        "matchedOrderRef": "CIT-20240117-002",
+        "expectedAmount": 300000000,
+        "variance": 20000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "id": "LI-002-04",
+        "description": "CIT Service ATM-JKT-008 (19 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240118-002",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      }
     ]
-  }
-,
+  },
   {
     "id": "INV-2024-003",
     "vendorId": "V-003",
@@ -44,9 +99,33 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-003-01", "description": "CIT Service ATM-BDG-003 (16 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240115-003", "expectedAmount": 280000000, "variance": 20000000, "matchStatus": "Mismatch" },
-      { "id": "LI-003-02", "description": "CIT Service ATM-JKT-005 (17 Jan)", "invoicedAmount": 350000000, "matchedOrderRef": "CIT-20240116-001", "expectedAmount": 350000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-003-03", "description": "CIT Service ATM-SBY-003 (17 Jan)", "invoicedAmount": 320000000, "matchedOrderRef": "CIT-20240116-002", "expectedAmount": 320000000, "variance": 0, "matchStatus": "Matched" }
+      {
+        "id": "LI-003-01",
+        "description": "CIT Service ATM-BDG-003 (16 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240115-003",
+        "expectedAmount": 280000000,
+        "variance": 20000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "id": "LI-003-02",
+        "description": "CIT Service ATM-JKT-005 (17 Jan)",
+        "invoicedAmount": 350000000,
+        "matchedOrderRef": "CIT-20240116-001",
+        "expectedAmount": 350000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-003-03",
+        "description": "CIT Service ATM-SBY-003 (17 Jan)",
+        "invoicedAmount": 320000000,
+        "matchedOrderRef": "CIT-20240116-002",
+        "expectedAmount": 320000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      }
     ]
   },
   {
@@ -60,8 +139,24 @@
     "approverName": "Ahmad Fauzi",
     "approvedAt": "2024-01-16T14:00:00Z",
     "lineItems": [
-      { "id": "LI-004-01", "description": "CIT Service ATM-JKT-006 (20 Jan)", "invoicedAmount": 350000000, "matchedOrderRef": "CIT-20240119-002", "expectedAmount": 350000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-004-02", "description": "CIT Service ATM-JKT-002 (21 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240120-001", "expectedAmount": 300000000, "variance": 0, "matchStatus": "Matched" }
+      {
+        "id": "LI-004-01",
+        "description": "CIT Service ATM-JKT-006 (20 Jan)",
+        "invoicedAmount": 350000000,
+        "matchedOrderRef": "CIT-20240119-002",
+        "expectedAmount": 350000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-004-02",
+        "description": "CIT Service ATM-JKT-002 (21 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240120-001",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      }
     ]
   },
   {
@@ -75,8 +170,24 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-005-01", "description": "CIT Service ATM-SBY-005 (20 Jan)", "invoicedAmount": 250000000, "matchedOrderRef": "CIT-20240119-003", "expectedAmount": 250000000, "variance": 0, "matchStatus": "Pending Review" },
-      { "id": "LI-005-02", "description": "CIT Service ATM-BDG-003 (20 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240119-001", "expectedAmount": 300000000, "variance": 0, "matchStatus": "Pending Review" }
+      {
+        "id": "LI-005-01",
+        "description": "CIT Service ATM-SBY-005 (20 Jan)",
+        "invoicedAmount": 250000000,
+        "matchedOrderRef": "CIT-20240119-003",
+        "expectedAmount": 250000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      },
+      {
+        "id": "LI-005-02",
+        "description": "CIT Service ATM-BDG-003 (20 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240119-001",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      }
     ]
   },
   {
@@ -90,8 +201,24 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-006-01", "description": "CIT Service ATM-BDG-006 (21 Jan)", "invoicedAmount": 300000000, "matchedOrderRef": "CIT-20240120-002", "expectedAmount": 300000000, "variance": 0, "matchStatus": "Pending Review" },
-      { "id": "LI-006-02", "description": "CIT Service ATM-SBY-003 (22 Jan)", "invoicedAmount": 350000000, "matchedOrderRef": "CIT-20240120-004", "expectedAmount": 350000000, "variance": 0, "matchStatus": "Pending Review" }
+      {
+        "id": "LI-006-01",
+        "description": "CIT Service ATM-BDG-006 (21 Jan)",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": "CIT-20240120-002",
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      },
+      {
+        "id": "LI-006-02",
+        "description": "CIT Service ATM-SBY-003 (22 Jan)",
+        "invoicedAmount": 350000000,
+        "matchedOrderRef": "CIT-20240120-004",
+        "expectedAmount": 350000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      }
     ]
   },
   {
@@ -105,8 +232,24 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-007-01", "description": "CIT Service ATM-SBY-001 (21 Jan)", "invoicedAmount": 220000000, "matchedOrderRef": "CIT-20240120-003", "expectedAmount": 220000000, "variance": 0, "matchStatus": "Matched" },
-      { "id": "LI-007-02", "description": "CIT Service scheduled reserve", "invoicedAmount": 300000000, "matchedOrderRef": null, "expectedAmount": 300000000, "variance": 0, "matchStatus": "Pending Review" }
+      {
+        "id": "LI-007-01",
+        "description": "CIT Service ATM-SBY-001 (21 Jan)",
+        "invoicedAmount": 220000000,
+        "matchedOrderRef": "CIT-20240120-003",
+        "expectedAmount": 220000000,
+        "variance": 0,
+        "matchStatus": "Matched"
+      },
+      {
+        "id": "LI-007-02",
+        "description": "CIT Service scheduled reserve",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": null,
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      }
     ]
   },
   {
@@ -120,8 +263,24 @@
     "approverName": null,
     "approvedAt": null,
     "lineItems": [
-      { "id": "LI-008-01", "description": "CIT Service general pickup", "invoicedAmount": 380000000, "matchedOrderRef": null, "expectedAmount": 350000000, "variance": 30000000, "matchStatus": "Mismatch" },
-      { "id": "LI-008-02", "description": "CIT Service emergency delivery", "invoicedAmount": 300000000, "matchedOrderRef": null, "expectedAmount": 300000000, "variance": 0, "matchStatus": "Pending Review" }
+      {
+        "id": "LI-008-01",
+        "description": "CIT Service general pickup",
+        "invoicedAmount": 380000000,
+        "matchedOrderRef": null,
+        "expectedAmount": 350000000,
+        "variance": 30000000,
+        "matchStatus": "Mismatch"
+      },
+      {
+        "id": "LI-008-02",
+        "description": "CIT Service emergency delivery",
+        "invoicedAmount": 300000000,
+        "matchedOrderRef": null,
+        "expectedAmount": 300000000,
+        "variance": 0,
+        "matchStatus": "Pending Review"
+      }
     ]
   }
 ]

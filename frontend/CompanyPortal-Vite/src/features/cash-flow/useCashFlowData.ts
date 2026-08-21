@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Banknote, Cpu, Landmark, Truck } from "lucide-react";
 
-import type { CashFlowSummary, UseCashFlowDataReturn } from "./types";
 import { CASH_FLOW_QUERY_KEY, CASH_FLOW_STALE_TIME, VENDOR_COLORS } from "./constants";
+import type { CashFlowSummary, UseCashFlowDataReturn } from "./types";
 
 /**
  * Data mock sesuai prototipe ClickUp.

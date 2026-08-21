@@ -1,7 +1,7 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { EnrichedCitOrder, CitStatus } from "../types";
+import type { EnrichedCitOrder } from "../types";
 
 // ─── Mock useCitData hook ────────────────────────────────────────────────────
 
@@ -105,15 +105,19 @@ describe("CitSummary", () => {
     expect(screen.getByText("Failed")).toBeInTheDocument();
 
     // Check specific counts - find count values near their labels
+    // biome-ignore lint/style/noNonNullAssertion: closest("div")/parentElement always resolve in CitSummary's known markup.
     const scheduledCard = screen.getByText("Scheduled").closest("div")!.parentElement!;
     expect(scheduledCard).toHaveTextContent("1");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const inTransitCard = screen.getByText("In Transit").closest("div")!.parentElement!;
     expect(inTransitCard).toHaveTextContent("1");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const completedCard = screen.getByText("Completed").closest("div")!.parentElement!;
     expect(completedCard).toHaveTextContent("2");
 
+    // biome-ignore lint/style/noNonNullAssertion: same guaranteed card markup as above.
     const failedCard = screen.getByText("Failed").closest("div")!.parentElement!;
     expect(failedCard).toHaveTextContent("1");
   });
@@ -212,9 +216,7 @@ describe("CitTable", () => {
   it("renders empty message when data is empty", () => {
     render(<CitTable data={[]} />);
 
-    expect(
-      screen.getByText("Tidak ada order CIT yang sesuai filter"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Tidak ada order CIT yang sesuai filter")).toBeInTheDocument();
   });
 });
 
@@ -234,9 +236,8 @@ describe("CitTracker", () => {
     expect(screen.getByText("CIT Tracker")).toBeInTheDocument();
 
     // Summary grid present (4 status cards)
-    const summaryGrid = screen.getByText("CIT Tracker")
-      .closest("div")!
-      .querySelector(".grid");
+    // biome-ignore lint/style/noNonNullAssertion: closest("div") always resolves in CitTracker's known markup.
+    const summaryGrid = screen.getByText("CIT Tracker").closest("div")!.querySelector(".grid");
     expect(summaryGrid?.children.length).toBe(4);
 
     // Table columns present
@@ -327,9 +328,7 @@ describe("CitTracker", () => {
     fireEvent.change(selects[0], { target: { value: "Failed" } });
 
     // Empty state message should be displayed
-    expect(
-      screen.getByText("Tidak ada order CIT yang sesuai filter"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Tidak ada order CIT yang sesuai filter")).toBeInTheDocument();
   });
 
   it("displays empty state when no data is returned", () => {
@@ -338,9 +337,7 @@ describe("CitTracker", () => {
     render(<CitTracker />);
 
     // Empty state message
-    expect(
-      screen.getByText("Tidak ada order CIT yang sesuai filter"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Tidak ada order CIT yang sesuai filter")).toBeInTheDocument();
   });
 
   it("resets filter back to show all when selecting empty value", () => {

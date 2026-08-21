@@ -35,10 +35,10 @@ const arbEnrichedDsrRecord: fc.Arbitrary<EnrichedDsrRecord> = fc.record({
   vendorName: fc.string({ minLength: 1, maxLength: 30 }),
 });
 
-const arbDsrRecordArray: fc.Arbitrary<EnrichedDsrRecord[]> = fc.array(
-  arbEnrichedDsrRecord,
-  { minLength: 1, maxLength: 50 },
-);
+const arbDsrRecordArray: fc.Arbitrary<EnrichedDsrRecord[]> = fc.array(arbEnrichedDsrRecord, {
+  minLength: 1,
+  maxLength: 50,
+});
 
 describe("Property 5: DSR Summary Aggregation Invariant", () => {
   it("totalBeginningBalance equals sum of all records' beginningBalance", () => {

@@ -7,11 +7,7 @@
  * Filters an array of records by a single field value.
  * Returns all records unchanged when value is null (no filter applied).
  */
-export function filterByField<T>(
-  records: T[],
-  field: keyof T,
-  value: T[keyof T] | null,
-): T[] {
+export function filterByField<T>(records: T[], field: keyof T, value: T[keyof T] | null): T[] {
   if (value === null) {
     return records;
   }
@@ -26,10 +22,7 @@ export function filterByField<T>(
  *   compoundFilter(orders, { status: 'Completed', vendorId: null })
  *   -> filters by status only (vendorId is null so ignored)
  */
-export function compoundFilter<T>(
-  records: T[],
-  filters: Partial<Record<keyof T, unknown>>,
-): T[] {
+export function compoundFilter<T>(records: T[], filters: Partial<Record<keyof T, unknown>>): T[] {
   const activeFilters = Object.entries(filters).filter(
     ([, value]) => value !== null && value !== undefined,
   ) as [string, unknown][];
@@ -39,8 +32,6 @@ export function compoundFilter<T>(
   }
 
   return records.filter((record) =>
-    activeFilters.every(
-      ([key, value]) => record[key as keyof T] === value,
-    ),
+    activeFilters.every(([key, value]) => record[key as keyof T] === value),
   );
 }

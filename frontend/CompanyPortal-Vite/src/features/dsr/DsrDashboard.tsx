@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState } from "react";
 
-import { EmptyState } from '@/components/ui/EmptyState';
+import { EmptyState } from "@/components/ui/EmptyState";
 
-import { DsrSummary } from './DsrSummary';
-import { DsrTable } from './DsrTable';
-import { useDsrData } from './useDsrData';
+import { DsrSummary } from "./DsrSummary";
+import { DsrTable } from "./DsrTable";
+import { useDsrData } from "./useDsrData";
 
-const DEFAULT_DATE = '2024-01-15';
+const DEFAULT_DATE = "2024-01-15";
 
 export function DsrDashboard() {
   const [date, setDate] = useState(DEFAULT_DATE);

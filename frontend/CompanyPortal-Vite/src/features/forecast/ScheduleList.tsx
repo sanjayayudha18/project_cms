@@ -1,25 +1,95 @@
-import { Calendar, Truck } from 'lucide-react';
+import { Calendar, Truck } from "lucide-react";
 
-import { Card } from '@/components/ui/Card';
-import { formatIDR } from '@/lib/utils/formatCurrency';
+import { Card } from "@/components/ui/Card";
+import { formatIDR } from "@/lib/utils/formatCurrency";
 
-import type { ScheduleEntry } from './types';
+import type { ScheduleEntry } from "./types";
 
 /**
  * Data jadwal pengisian ulang untuk 3 hari ke depan (H+1, H+2, H+3).
  * Diambil dari data forecast — ATM dengan rekomendasi pengisian > 0.
  */
 const scheduleData: ScheduleEntry[] = [
-  { id: 'SCH-001', atmId: 'ATM-JKT-001', location: 'Sudirman Plaza', vendorName: 'PT Gardanet', scheduledDate: '2024-01-21', amount: 250000000 },
-  { id: 'SCH-002', atmId: 'ATM-JKT-002', location: 'Thamrin City', vendorName: 'PT Gardanet', scheduledDate: '2024-01-21', amount: 350000000 },
-  { id: 'SCH-003', atmId: 'ATM-BDG-001', location: 'Dago Plaza', vendorName: 'PT Gardanet', scheduledDate: '2024-01-22', amount: 250000000 },
-  { id: 'SCH-004', atmId: 'ATM-JKT-005', location: 'Menteng Square', vendorName: 'PT G4S', scheduledDate: '2024-01-21', amount: 300000000 },
-  { id: 'SCH-005', atmId: 'ATM-BDG-003', location: 'Cihampelas Walk', vendorName: 'PT G4S', scheduledDate: '2024-01-22', amount: 300000000 },
-  { id: 'SCH-006', atmId: 'ATM-SBY-001', location: 'Tunjungan Plaza', vendorName: 'PT Gardanet', scheduledDate: '2024-01-23', amount: 250000000 },
-  { id: 'SCH-007', atmId: 'ATM-SBY-003', location: 'Pakuwon Mall', vendorName: 'PT G4S', scheduledDate: '2024-01-23', amount: 350000000 },
-  { id: 'SCH-008', atmId: 'ATM-JKT-004', location: 'Senayan Park', vendorName: 'PT SSI', scheduledDate: '2024-01-21', amount: 200000000 },
-  { id: 'SCH-009', atmId: 'ATM-BDG-005', location: 'Buah Batu Square', vendorName: 'PT SSI', scheduledDate: '2024-01-22', amount: 200000000 },
-  { id: 'SCH-010', atmId: 'ATM-SBY-002', location: 'Galaxy Mall', vendorName: 'PT SSI', scheduledDate: '2024-01-23', amount: 200000000 },
+  {
+    id: "SCH-001",
+    atmId: "ATM-JKT-001",
+    location: "Sudirman Plaza",
+    vendorName: "PT Gardanet",
+    scheduledDate: "2024-01-21",
+    amount: 250000000,
+  },
+  {
+    id: "SCH-002",
+    atmId: "ATM-JKT-002",
+    location: "Thamrin City",
+    vendorName: "PT Gardanet",
+    scheduledDate: "2024-01-21",
+    amount: 350000000,
+  },
+  {
+    id: "SCH-003",
+    atmId: "ATM-BDG-001",
+    location: "Dago Plaza",
+    vendorName: "PT Gardanet",
+    scheduledDate: "2024-01-22",
+    amount: 250000000,
+  },
+  {
+    id: "SCH-004",
+    atmId: "ATM-JKT-005",
+    location: "Menteng Square",
+    vendorName: "PT G4S",
+    scheduledDate: "2024-01-21",
+    amount: 300000000,
+  },
+  {
+    id: "SCH-005",
+    atmId: "ATM-BDG-003",
+    location: "Cihampelas Walk",
+    vendorName: "PT G4S",
+    scheduledDate: "2024-01-22",
+    amount: 300000000,
+  },
+  {
+    id: "SCH-006",
+    atmId: "ATM-SBY-001",
+    location: "Tunjungan Plaza",
+    vendorName: "PT Gardanet",
+    scheduledDate: "2024-01-23",
+    amount: 250000000,
+  },
+  {
+    id: "SCH-007",
+    atmId: "ATM-SBY-003",
+    location: "Pakuwon Mall",
+    vendorName: "PT G4S",
+    scheduledDate: "2024-01-23",
+    amount: 350000000,
+  },
+  {
+    id: "SCH-008",
+    atmId: "ATM-JKT-004",
+    location: "Senayan Park",
+    vendorName: "PT SSI",
+    scheduledDate: "2024-01-21",
+    amount: 200000000,
+  },
+  {
+    id: "SCH-009",
+    atmId: "ATM-BDG-005",
+    location: "Buah Batu Square",
+    vendorName: "PT SSI",
+    scheduledDate: "2024-01-22",
+    amount: 200000000,
+  },
+  {
+    id: "SCH-010",
+    atmId: "ATM-SBY-002",
+    location: "Galaxy Mall",
+    vendorName: "PT SSI",
+    scheduledDate: "2024-01-23",
+    amount: 200000000,
+  },
 ];
 
 interface GroupedSchedule {
@@ -34,14 +104,17 @@ function groupSchedule(entries: ScheduleEntry[]): GroupedSchedule[] {
   const vendorMap = new Map<string, Map<string, ScheduleEntry[]>>();
 
   for (const entry of entries) {
-    if (!vendorMap.has(entry.vendorName)) {
-      vendorMap.set(entry.vendorName, new Map());
+    let dateMap = vendorMap.get(entry.vendorName);
+    if (!dateMap) {
+      dateMap = new Map();
+      vendorMap.set(entry.vendorName, dateMap);
     }
-    const dateMap = vendorMap.get(entry.vendorName)!;
-    if (!dateMap.has(entry.scheduledDate)) {
-      dateMap.set(entry.scheduledDate, []);
+    let dateEntries = dateMap.get(entry.scheduledDate);
+    if (!dateEntries) {
+      dateEntries = [];
+      dateMap.set(entry.scheduledDate, dateEntries);
     }
-    dateMap.get(entry.scheduledDate)!.push(entry);
+    dateEntries.push(entry);
   }
 
   const result: GroupedSchedule[] = [];
@@ -56,12 +129,12 @@ function groupSchedule(entries: ScheduleEntry[]): GroupedSchedule[] {
 }
 
 function formatDate(iso: string): string {
-  const date = new Date(iso + 'T00:00:00');
-  return date.toLocaleDateString('id-ID', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+  const date = new Date(`${iso}T00:00:00`);
+  return date.toLocaleDateString("id-ID", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -111,9 +184,7 @@ export function ScheduleList() {
                         <span>
                           {entry.atmId} — {entry.location}
                         </span>
-                        <span className="tabular-nums font-medium">
-                          {formatIDR(entry.amount)}
-                        </span>
+                        <span className="tabular-nums font-medium">{formatIDR(entry.amount)}</span>
                       </li>
                     ))}
                   </ul>

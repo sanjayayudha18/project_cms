@@ -1,16 +1,16 @@
-import { formatIDR } from '@/lib/utils/formatCurrency';
+import { formatIDR } from "@/lib/utils/formatCurrency";
 
 interface SummaryCardProps {
   label: string;
   value: string | number;
-  format?: 'currency' | 'number' | 'text';
+  format?: "currency" | "number" | "text";
 }
 
 /**
  * Metric card displaying a label and formatted value.
  * Supports currency (IDR), plain number, or text formatting.
  */
-export function SummaryCard({ label, value, format = 'text' }: SummaryCardProps) {
+export function SummaryCard({ label, value, format = "text" }: SummaryCardProps) {
   const formattedValue = formatValue(value, format);
 
   return (
@@ -23,15 +23,12 @@ export function SummaryCard({ label, value, format = 'text' }: SummaryCardProps)
   );
 }
 
-function formatValue(
-  value: string | number,
-  format: 'currency' | 'number' | 'text',
-): string {
-  if (format === 'currency' && typeof value === 'number') {
+function formatValue(value: string | number, format: "currency" | "number" | "text"): string {
+  if (format === "currency" && typeof value === "number") {
     return formatIDR(value);
   }
-  if (format === 'number' && typeof value === 'number') {
-    return value.toLocaleString('id-ID');
+  if (format === "number" && typeof value === "number") {
+    return value.toLocaleString("id-ID");
   }
   return String(value);
 }

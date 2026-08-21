@@ -1,15 +1,15 @@
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
   Legend,
   ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
-import type { VendorDayFlow, VendorConfig } from "./types";
-import { CHART_HEIGHT, CHART_MAX_BAR_SIZE, CHART_BAR_RADIUS } from "./constants";
+import { CHART_BAR_RADIUS, CHART_HEIGHT, CHART_MAX_BAR_SIZE } from "./constants";
+import type { VendorConfig, VendorDayFlow } from "./types";
 
 interface VendorBarChartProps {
   readonly data: readonly VendorDayFlow[];
@@ -45,11 +45,7 @@ export function VendorBarChart({ data, vendors }: VendorBarChartProps) {
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <BarChart data={[...data]} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="oklch(0.908 0.006 29)"
-            vertical={false}
-          />
+          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.908 0.006 29)" vertical={false} />
           <XAxis
             dataKey="date"
             tick={{ fontSize: 12, fill: "oklch(0.56 0.009 29)" }}

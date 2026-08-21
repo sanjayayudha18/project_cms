@@ -19,26 +19,16 @@ export function Forbidden() {
         className="flex h-16 w-16 items-center justify-center rounded-full"
         style={{ backgroundColor: "var(--danger-bg)" }}
       >
-        <ShieldX
-          size={32}
-          style={{ color: "var(--danger-fg)" }}
-          aria-hidden="true"
-        />
+        <ShieldX size={32} style={{ color: "var(--danger-fg)" }} aria-hidden="true" />
       </div>
 
       {/* Heading */}
-      <h1
-        className="text-xl font-semibold"
-        style={{ color: "var(--n-900)" }}
-      >
+      <h1 className="text-xl font-semibold" style={{ color: "var(--n-900)" }}>
         403 — Akses Ditolak
       </h1>
 
       {/* Description */}
-      <p
-        className="max-w-[400px] text-sm"
-        style={{ color: "var(--n-600)" }}
-      >
+      <p className="max-w-[400px] text-sm" style={{ color: "var(--n-600)" }}>
         Anda tidak memiliki akses ke halaman ini.
       </p>
 

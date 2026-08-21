@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo } from "react";
 
-import { formatIDR } from '@/lib/utils/formatCurrency';
+import { formatIDR } from "@/lib/utils/formatCurrency";
 
-import type { DsrRecord, DsrSummaryTotals } from './types';
+import type { DsrRecord, DsrSummaryTotals } from "./types";
 
 interface DsrSummaryProps {
   readonly data: readonly DsrRecord[];
@@ -25,10 +25,10 @@ export function DsrSummary({ data }: DsrSummaryProps) {
   const totals: DsrSummaryTotals = useMemo(() => computeDsrTotals(data), [data]);
 
   const cards: { label: string; value: number }[] = [
-    { label: 'Total Saldo Awal', value: totals.beginningBalance },
-    { label: 'Total Kas Masuk', value: totals.cashIn },
-    { label: 'Total Kas Keluar', value: totals.cashOut },
-    { label: 'Total Saldo Akhir', value: totals.endingBalance },
+    { label: "Total Saldo Awal", value: totals.beginningBalance },
+    { label: "Total Kas Masuk", value: totals.cashIn },
+    { label: "Total Kas Keluar", value: totals.cashOut },
+    { label: "Total Saldo Akhir", value: totals.endingBalance },
   ];
 
   return (

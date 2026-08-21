@@ -34,8 +34,8 @@ export function formatIDRAbbreviated(value: number): string {
  * @example formatIDRFull(0) // "IDR 0"
  */
 export function formatIDRFull(value: number): string {
-  const formatted = new Intl.NumberFormat('id-ID', {
-    style: 'decimal',
+  const formatted = new Intl.NumberFormat("id-ID", {
+    style: "decimal",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
@@ -51,9 +51,9 @@ export function formatIDRFull(value: number): string {
  * @example getGreeting(20) // "Good evening"
  */
 export function getGreeting(hour: number): string {
-  if (hour >= 0 && hour <= 11) return 'Good morning';
-  if (hour >= 12 && hour <= 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour >= 0 && hour <= 11) return "Good morning";
+  if (hour >= 12 && hour <= 17) return "Good afternoon";
+  return "Good evening";
 }
 
 /**
@@ -61,11 +61,11 @@ export function getGreeting(hour: number): string {
  * Format: "Tuesday, 21 July 2026"
  */
 export function formatFullDate(date: Date): string {
-  return date.toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+  return date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
@@ -86,7 +86,7 @@ export function progressPercent(completed: number, total: number): number {
  */
 export function formatBadgeCount(count: number): string | null {
   if (count <= 0) return null;
-  if (count > 99) return '99+';
+  if (count > 99) return "99+";
   return String(count);
 }
 
@@ -99,13 +99,15 @@ export function formatBadgeCount(count: number): string | null {
  */
 export function getInitials(name: string): string {
   const trimmed = name.trim();
-  if (trimmed === '') return '';
+  if (trimmed === "") return "";
 
   const parts = trimmed.split(/\s+/);
+  const first = parts[0] ?? "";
   if (parts.length === 1) {
-    return parts[0]![0]!.toUpperCase();
+    return first.charAt(0).toUpperCase();
   }
-  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+  const last = parts[parts.length - 1] ?? "";
+  return (first.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 /**
@@ -114,18 +116,18 @@ export function getInitials(name: string): string {
  */
 export function formatDifference(value: number): { text: string; colorClass: string } {
   if (value === 0) {
-    return { text: 'IDR 0', colorClass: '' };
+    return { text: "IDR 0", colorClass: "" };
   }
 
-  const absFormatted = new Intl.NumberFormat('id-ID', {
-    style: 'decimal',
+  const absFormatted = new Intl.NumberFormat("id-ID", {
+    style: "decimal",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.abs(value));
 
   if (value < 0) {
-    return { text: `- IDR ${absFormatted}`, colorClass: 'text-danger' };
+    return { text: `- IDR ${absFormatted}`, colorClass: "text-danger" };
   }
 
-  return { text: `+ IDR ${absFormatted}`, colorClass: 'text-success' };
+  return { text: `+ IDR ${absFormatted}`, colorClass: "text-success" };
 }

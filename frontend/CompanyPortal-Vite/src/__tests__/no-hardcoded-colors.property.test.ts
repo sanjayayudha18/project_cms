@@ -1,5 +1,5 @@
 // Feature: frontend-consolidation, Property 10: No Hardcoded Color Values in Ported Files
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -89,9 +89,7 @@ function findColorViolations(
   const strippedContent = stripComments(content);
   const lines = strippedContent.split("\n");
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-
+  for (const [i, line] of lines.entries()) {
     // Check hex colors
     const hexMatches = line.matchAll(HEX_COLOR_PATTERN);
     for (const match of hexMatches) {
@@ -151,7 +149,10 @@ describe("Property 10: No Hardcoded Color Values in Ported Files", () => {
 
   it("exhaustive check: every source file in src/features/ is free of hardcoded colors", () => {
     // Deterministic scan of ALL files (complements the property-based random sampling)
-    const allViolations: { file: string; violations: { pattern: string; match: string; line: number }[] }[] = [];
+    const allViolations: {
+      file: string;
+      violations: { pattern: string; match: string; line: number }[];
+    }[] = [];
 
     for (const filePath of sourceFiles) {
       const content = readFileSync(filePath, "utf-8");
@@ -173,9 +174,7 @@ describe("Property 10: No Hardcoded Color Values in Ported Files", () => {
         )
         .join("\n\n");
 
-      expect.fail(
-        `Found hardcoded color values in ${allViolations.length} file(s):\n\n${report}`,
-      );
+      expect.fail(`Found hardcoded color values in ${allViolations.length} file(s):\n\n${report}`);
     }
   });
 });

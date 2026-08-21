@@ -11,18 +11,6 @@ import { NotificationsPage } from '@/features/notifications/NotificationsPage';
 import { NotFound } from '@/components/NotFound';
 
 export const router = createBrowserRouter([
-  // Root redirect to /dashboard
-  {
-    path: '/',
-    element: <Navigate to="/dashboard" replace />,
-  },
-
-  // Dashboard redirect to /orders (vendor default view)
-  {
-    path: '/dashboard',
-    element: <Navigate to="/orders" replace />,
-  },
-
   // Guest-only route (login)
   {
     element: <GuestRoute />,
@@ -38,6 +26,15 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      // Root redirect to /orders (vendor default view)
+      {
+        path: '/',
+        element: <Navigate to="/orders" replace />,
+      },
+      {
+        path: '/dashboard',
+        element: <Navigate to="/orders" replace />,
+      },
       {
         element: <AppShell />,
         children: [

@@ -4,11 +4,11 @@
  */
 
 export type ReplenishmentStatus =
-  | 'completed'
-  | 'in-transit'
-  | 'scheduled'
-  | 'delayed'
-  | 'pending-vendor';
+  | "completed"
+  | "in-transit"
+  | "scheduled"
+  | "delayed"
+  | "pending-vendor";
 
 export interface ReplenishmentSchedule {
   id: string;

@@ -1,8 +1,8 @@
+import * as fc from "fast-check";
 // Feature: frontend-consolidation, Property 8: Replenishment filterSchedules Behavioral Equivalence
-import { describe, expect, it } from 'vitest';
-import * as fc from 'fast-check';
-import { filterSchedules } from '../replenishment.utils';
-import type { ReplenishmentSchedule } from '../types';
+import { describe, expect, it } from "vitest";
+import { filterSchedules } from "../replenishment.utils";
+import type { ReplenishmentSchedule } from "../types";
 
 /**
  * Property 8: Replenishment filterSchedules Behavioral Equivalence
@@ -19,16 +19,16 @@ import type { ReplenishmentSchedule } from '../types';
  * **Validates: Requirements 9.4**
  */
 
-const statusArb = fc.constantFrom<ReplenishmentSchedule['status']>(
-  'completed',
-  'in-transit',
-  'scheduled',
-  'delayed',
-  'pending-vendor',
+const statusArb = fc.constantFrom<ReplenishmentSchedule["status"]>(
+  "completed",
+  "in-transit",
+  "scheduled",
+  "delayed",
+  "pending-vendor",
 );
 
-const regionPool = ['Jakarta', 'Bandung', 'Surabaya', 'Medan', 'Bali'];
-const vendorPool = ['CIT-A', 'CIT-B', 'CIT-C', 'Vendor-X', 'Vendor-Y'];
+const regionPool = ["Jakarta", "Bandung", "Surabaya", "Medan", "Bali"];
+const vendorPool = ["CIT-A", "CIT-B", "CIT-C", "Vendor-X", "Vendor-Y"];
 
 const regionArb = fc.constantFrom(...regionPool);
 const vendorArb = fc.constantFrom(...vendorPool);
@@ -50,22 +50,22 @@ const schedulesArb = fc.array(replenishmentScheduleArb, { minLength: 0, maxLengt
 
 // Filter criteria arbitraries — include the "All" variants and specific values
 const regionFilterArb = fc.oneof(
-  fc.constant('All'),
-  fc.constant('All regions'),
+  fc.constant("All"),
+  fc.constant("All regions"),
   fc.constantFrom(...regionPool),
 );
 
 const vendorFilterArb = fc.oneof(
-  fc.constant('All'),
-  fc.constant('All vendors'),
+  fc.constant("All"),
+  fc.constant("All vendors"),
   fc.constantFrom(...vendorPool),
 );
 
-describe('Feature: frontend-consolidation, Property 8: Replenishment filterSchedules Behavioral Equivalence', () => {
+describe("Feature: frontend-consolidation, Property 8: Replenishment filterSchedules Behavioral Equivalence", () => {
   it('region "All" returns all records regardless of region', () => {
     fc.assert(
       fc.property(schedulesArb, (records) => {
-        const result = filterSchedules(records, 'All', 'All');
+        const result = filterSchedules(records, "All", "All");
         expect(result).toEqual(records);
       }),
       { numRuns: 100 },
@@ -75,7 +75,7 @@ describe('Feature: frontend-consolidation, Property 8: Replenishment filterSched
   it('region "All regions" returns all records regardless of region', () => {
     fc.assert(
       fc.property(schedulesArb, (records) => {
-        const result = filterSchedules(records, 'All regions', 'All');
+        const result = filterSchedules(records, "All regions", "All");
         expect(result).toEqual(records);
       }),
       { numRuns: 100 },
@@ -85,17 +85,17 @@ describe('Feature: frontend-consolidation, Property 8: Replenishment filterSched
   it('vendor "All vendors" returns all records regardless of vendor', () => {
     fc.assert(
       fc.property(schedulesArb, (records) => {
-        const result = filterSchedules(records, 'All', 'All vendors');
+        const result = filterSchedules(records, "All", "All vendors");
         expect(result).toEqual(records);
       }),
       { numRuns: 100 },
     );
   });
 
-  it('specific region returns only records matching that region', () => {
+  it("specific region returns only records matching that region", () => {
     fc.assert(
       fc.property(schedulesArb, regionArb, (records, region) => {
-        const result = filterSchedules(records, region, 'All');
+        const result = filterSchedules(records, region, "All");
         const expected = records.filter((r) => r.region === region);
         expect(result).toEqual(expected);
       }),
@@ -103,10 +103,10 @@ describe('Feature: frontend-consolidation, Property 8: Replenishment filterSched
     );
   });
 
-  it('specific vendor returns only records matching that vendor', () => {
+  it("specific vendor returns only records matching that vendor", () => {
     fc.assert(
       fc.property(schedulesArb, vendorArb, (records, vendor) => {
-        const result = filterSchedules(records, 'All', vendor);
+        const result = filterSchedules(records, "All", vendor);
         const expected = records.filter((r) => r.vendor === vendor);
         expect(result).toEqual(expected);
       }),
@@ -114,64 +114,49 @@ describe('Feature: frontend-consolidation, Property 8: Replenishment filterSched
     );
   });
 
-  it('combined region + vendor filters apply as AND — both must match', () => {
+  it("combined region + vendor filters apply as AND — both must match", () => {
     fc.assert(
-      fc.property(
-        schedulesArb,
-        regionFilterArb,
-        vendorFilterArb,
-        (records, region, vendor) => {
-          const result = filterSchedules(records, region, vendor);
+      fc.property(schedulesArb, regionFilterArb, vendorFilterArb, (records, region, vendor) => {
+        const result = filterSchedules(records, region, vendor);
 
-          const regionActive = region !== 'All' && region !== 'All regions';
-          const vendorActive = vendor !== 'All' && vendor !== 'All vendors';
+        const regionActive = region !== "All" && region !== "All regions";
+        const vendorActive = vendor !== "All" && vendor !== "All vendors";
 
-          // Reference implementation — identical logic to Source_App
-          const expected = records.filter((record) => {
-            if (regionActive && record.region !== region) return false;
-            if (vendorActive && record.vendor !== vendor) return false;
-            return true;
-          });
+        // Reference implementation — identical logic to Source_App
+        const expected = records.filter((record) => {
+          if (regionActive && record.region !== region) return false;
+          if (vendorActive && record.vendor !== vendor) return false;
+          return true;
+        });
 
-          expect(result).toEqual(expected);
-        },
-      ),
+        expect(result).toEqual(expected);
+      }),
       { numRuns: 100 },
     );
   });
 
-  it('filter result is always a subset of input — no records are invented', () => {
+  it("filter result is always a subset of input — no records are invented", () => {
     fc.assert(
-      fc.property(
-        schedulesArb,
-        regionFilterArb,
-        vendorFilterArb,
-        (records, region, vendor) => {
-          const result = filterSchedules(records, region, vendor);
-          expect(result.length).toBeLessThanOrEqual(records.length);
-          for (const r of result) {
-            expect(records).toContainEqual(r);
-          }
-        },
-      ),
+      fc.property(schedulesArb, regionFilterArb, vendorFilterArb, (records, region, vendor) => {
+        const result = filterSchedules(records, region, vendor);
+        expect(result.length).toBeLessThanOrEqual(records.length);
+        for (const r of result) {
+          expect(records).toContainEqual(r);
+        }
+      }),
       { numRuns: 100 },
     );
   });
 
-  it('filter preserves original order of matching records', () => {
+  it("filter preserves original order of matching records", () => {
     fc.assert(
-      fc.property(
-        schedulesArb,
-        regionFilterArb,
-        vendorFilterArb,
-        (records, region, vendor) => {
-          const result = filterSchedules(records, region, vendor);
-          const indices = result.map((r) => records.indexOf(r));
-          for (let i = 1; i < indices.length; i++) {
-            expect(indices[i]).toBeGreaterThan(indices[i - 1]);
-          }
-        },
-      ),
+      fc.property(schedulesArb, regionFilterArb, vendorFilterArb, (records, region, vendor) => {
+        const result = filterSchedules(records, region, vendor);
+        const indices = result.map((r) => records.indexOf(r));
+        for (let i = 1; i < indices.length; i++) {
+          expect(indices[i]).toBeGreaterThan(indices[i - 1]);
+        }
+      }),
       { numRuns: 100 },
     );
   });

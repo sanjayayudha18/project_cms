@@ -224,3 +224,81 @@ Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure
 
 ### RateLimiter interface in auth package for testability
 Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.
+
+### Cross-portal cookie leakage: guard role in both `initialize` and `refreshToken`
+Both frontend portals (CompanyPortal on :3001, VendorPortal on :3002) share the same `localhost` domain, so HTTP-only refresh token cookies set by one portal are sent by the browser to the other. The backend `/api/v1/auth/refresh` endpoint doesn't enforce portal-type scoping.
+
+**Fix pattern (defense-in-depth at frontend):** After every successful refresh response, check `data.user.role` against the portal's allowed role(s) before setting `isAuthenticated = true`:
+- VendorPortal: reject if `role !== 'VENDOR-USER'`
+- CompanyPortal: reject if `role === 'VENDOR-USER'`
+
+Apply this guard in **both** the `initialize()` path (first page load) and the `refreshToken()` path (token renewal mid-session). Without both, one path will still leak.
+
+**Long-term fix:** Backend should validate `X-Portal-Type` header on the refresh endpoint, or use separate cookie names/paths per portal.
+
+### Literal types in API response interfaces cause dead-code elimination of runtime guards
+When a response interface types a field as a literal (e.g., `role: 'VENDOR-USER'`), esbuild/Vite's production bundler can determine that a runtime check like `if (data.user.role !== 'VENDOR-USER')` is always `false` and eliminate the entire `if` block as dead code. The guard compiles away and never runs in production.
+
+**Fix:** Type API response fields that need runtime validation as `string` (or a union of all possible backend values), not as a single literal. The narrowing/validation happens explicitly in code, not implicitly via types:
+```typescript
+// BAD — bundler may eliminate the guard
+interface Response { role: 'VENDOR-USER' }
+if (data.user.role !== 'VENDOR-USER') { return; } // dead code in prod
+
+// GOOD — bundler preserves the guard
+interface Response { role: string }
+if (data.user.role !== 'VENDOR-USER') { return; } // always runs
+```
+After validation passes, use `as AuthUser['role']` to narrow back to the domain type. This pattern applies to any API response field where you need a runtime guard that the bundler must not optimize away.
+
+### Separate docker-compose projects: nginx upstream must use `host.docker.internal`
+Frontend and backend run in **separate** docker-compose projects (`frontend/docker-compose.yml` vs `backend/docker-compose.yml`). They have isolated networks even if both define `cms-net` — Docker prefixes the network name with the project name. Nginx `proxy_pass http://backend:8080` will fail with `host not found in upstream` because the `backend` hostname only exists in the backend's network.
+
+Fix: use variable-based proxy_pass with Docker's internal DNS resolver to avoid crash-on-startup:
+```nginx
+location /api/ {
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $backend_upstream http://host.docker.internal:8080;
+    proxy_pass $backend_upstream;
+    # ... headers
+}
+```
+Key points:
+- `resolver 127.0.0.11` = Docker's embedded DNS
+- `set $variable` makes nginx resolve the upstream at request-time, not startup (prevents crash if backend is down)
+- `host.docker.internal` routes to the host machine where backend exposes its port
+- This applies to ALL frontend nginx.conf files in this project (CompanyPortal + VendorPortal)
+
+### Python PostgreSQL driver on Windows: use `psycopg` v3, keyword params, and override libpq config paths
+
+**Root cause:** On this Windows dev machine, `psycopg2` (and `psycopg[binary]` which also uses `libpq` internally) throws `'utf-8' codec can't decode byte 0xab in position 113` during `connect()`. The error happens because `libpq` (the C library that both drivers use) automatically reads configuration files from `%APPDATA%\postgresql\` on Windows. If the `%APPDATA%` path contains characters valid in Windows-1252 but invalid in UTF-8 (common with non-ASCII Windows usernames or OneDrive paths), `libpq` crashes during its config file lookup — before it even attempts the TCP connection.
+
+**Three fixes applied together (all required):**
+
+1. **Use `psycopg[binary]>=3.2.10` instead of `psycopg2-binary`** — psycopg2-binary has no pre-built wheels for Python 3.13+/3.14 on Windows. The build fails because it needs `pg_config` and C compiler. `psycopg[binary]` v3 ships wheels reliably.
+
+2. **Use keyword params, not a DSN string** — avoids any chance of encoding corruption in the connection string itself:
+```python
+conn = psycopg.connect(
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", "5432")),
+    dbname=os.getenv("DB_NAME", "cms"),
+    user=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASS", "postgres"),
+    autocommit=False,
+)
+```
+
+3. **Override libpq config file paths before connecting** — stops libpq from scanning `%APPDATA%` paths that contain non-UTF-8 bytes:
+```python
+os.environ.setdefault("PGSERVICEFILE", "NUL")
+os.environ.setdefault("PGPASSFILE", "NUL")
+os.environ.setdefault("PGSYSCONFDIR", ".")
+```
+
+**Also:** use `python-dotenv` + a `.env` file for DB credentials instead of `set` commands, so devs don't need to set env vars manually each session.
+
+This applies to ALL Python scheduler scripts in this project (`scheduler/dmaa/`, `scheduler/itm/`, and any future ETL scripts).
+
+### `machine_type` means different things in `itm_cashpos` vs `atms`
+The `itm_cashpos` table uses denomination-based classification: `ATM100K` (dispenses 100K only), `ATM50K` (50K only), `CRM` (recycler). The `atms` master table uses functional classification: `ATM`, `CRM`, `CDM`. These are NOT interchangeable — a single physical terminal in `atms` with `machine_type='ATM'` may appear as `ATM100K` or `ATM50K` in `itm_cashpos` depending on its cassette configuration. When joining across these tables, match on `terminal_id`, never on `machine_type`. When building UI that surfaces both (e.g., ATM Profile showing replenishment history), display the `itm_cashpos.machine_type` as "denomination config" and `atms.machine_type` as "device type."

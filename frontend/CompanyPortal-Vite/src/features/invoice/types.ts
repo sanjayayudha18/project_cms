@@ -1,6 +1,6 @@
-export type MatchStatus = 'Matched' | 'Mismatch' | 'Pending Review';
+export type MatchStatus = "Matched" | "Mismatch" | "Pending Review";
 
-export type ValidationStatus = 'Uploaded' | 'Validated' | 'Approved' | 'Mismatch Detected';
+export type ValidationStatus = "Uploaded" | "Validated" | "Approved" | "Mismatch Detected";
 
 export interface InvoiceLineItem {
   id: string;

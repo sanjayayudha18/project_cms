@@ -81,7 +81,7 @@ function relativeLuminance(r: number, g: number, b: number): number {
  * Compute WCAG contrast ratio between two relative luminance values.
  * Formula: (L1 + 0.05) / (L2 + 0.05) where L1 >= L2
  */
-export function contrastRatio(lum1: number, lum2: number): number {
+function contrastRatio(lum1: number, lum2: number): number {
   const lighter = Math.max(lum1, lum2);
   const darker = Math.min(lum1, lum2);
   return (lighter + 0.05) / (darker + 0.05);
@@ -90,7 +90,7 @@ export function contrastRatio(lum1: number, lum2: number): number {
 /**
  * Full pipeline: OKLCH values → relative luminance
  */
-export function oklchToLuminance(L: number, C: number, H: number): number {
+function oklchToLuminance(L: number, C: number, H: number): number {
   const [labL, labA, labB] = oklchToOklab(L, C, H);
   const [linR, linG, linB] = oklabToLinearSrgb(labL, labA, labB);
 
@@ -110,7 +110,7 @@ export function oklchToLuminance(L: number, C: number, H: number): number {
 /**
  * Parse an OKLCH CSS string like "oklch(0.552 0.205 29)" into [L, C, H]
  */
-export function parseOklch(value: string): [number, number, number] {
+function parseOklch(value: string): [number, number, number] {
   const match = value.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/);
   if (!match) {
     throw new Error(`Invalid OKLCH value: ${value}`);
@@ -121,7 +121,7 @@ export function parseOklch(value: string): [number, number, number] {
 /**
  * Compute WCAG contrast ratio between two OKLCH color strings
  */
-export function computeContrastFromOklch(fg: string, bg: string): number {
+function computeContrastFromOklch(fg: string, bg: string): number {
   const [fgL, fgC, fgH] = parseOklch(fg);
   const [bgL, bgC, bgH] = parseOklch(bg);
   const fgLum = oklchToLuminance(fgL, fgC, fgH);

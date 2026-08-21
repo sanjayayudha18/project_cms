@@ -1,0 +1,34 @@
+[
+  {
+    "file": "Order_All_20260716.xlsx",
+    "rows": 895,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260716.csv",
+    "backup_file": "C:\\Users\\RB Yudha Rangga\\OneDrive\\Documents\\Development\\CMS2\\FTP_DATA\\DMAA\\backup\\Order_All_20260716.xlsx"
+  },
+  {
+    "file": "Order_All_20260717.xlsx",
+    "rows": 1370,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260717.csv",
+    "backup_file": "C:\\Users\\RB Yudha Rangga\\OneDrive\\Documents\\Development\\CMS2\\FTP_DATA\\DMAA\\backup\\Order_All_20260717.xlsx"
+  },
+  {
+    "file": "Order_All_20260720.xlsx",
+    "rows": 963,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260720.csv",
+    "backup_file": "C:\\Users\\RB Yudha Rangga\\OneDrive\\Documents\\Development\\CMS2\\FTP_DATA\\DMAA\\backup\\Order_All_20260720.xlsx"
+  },
+  {
+    "file": "Order_All_20260721.xlsx",
+    "rows": 969,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260721.csv",
+    "backup_file": "C:\\Users\\RB Yudha Rangga\\OneDrive\\Documents\\Development\\CMS2\\FTP_DATA\\DMAA\\backup\\Order_All_20260721.xlsx"
+  }
+]

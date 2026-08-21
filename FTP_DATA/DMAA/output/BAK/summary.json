@@ -1,0 +1,30 @@
+[
+  {
+    "file": "Order_All_20260716.xlsx",
+    "rows": 895,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260716.csv"
+  },
+  {
+    "file": "Order_All_20260717.xlsx",
+    "rows": 1370,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260717.csv"
+  },
+  {
+    "file": "Order_All_20260720.xlsx",
+    "rows": 963,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260720.csv"
+  },
+  {
+    "file": "Order_All_20260721.xlsx",
+    "rows": 969,
+    "status": "success",
+    "error_count": 0,
+    "output_file": "cleaned_Order_All_20260721.csv"
+  }
+]

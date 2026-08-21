@@ -60,13 +60,14 @@ function findTestFiles(): string[] {
 function extractImportPaths(content: string): string[] {
   const importRegex = /(?:^|\n)\s*import\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]/g;
   const paths: string[] = [];
-  let match: RegExpExecArray | null;
+  let match: RegExpExecArray | null = importRegex.exec(content);
 
-  while ((match = importRegex.exec(content)) !== null) {
+  while (match !== null) {
     const importPath = match[1];
     if (importPath) {
       paths.push(importPath);
     }
+    match = importRegex.exec(content);
   }
 
   return paths;
@@ -124,25 +125,21 @@ describe("Property 12: Test Import Path Alias Compliance", () => {
 
   it("no test file uses relative imports that exit the feature directory", () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom(...testFiles),
-        (testFilePath) => {
-          const content = fs.readFileSync(testFilePath, "utf-8");
-          const importPaths = extractImportPaths(content);
+      fc.property(fc.constantFrom(...testFiles), (testFilePath) => {
+        const content = fs.readFileSync(testFilePath, "utf-8");
+        const importPaths = extractImportPaths(content);
 
-          const violatingImports = importPaths.filter(
-            (p) => isProjectSourceImport(p) && isRelativeImportExitingFeature(p),
+        const violatingImports = importPaths.filter(
+          (p) => isProjectSourceImport(p) && isRelativeImportExitingFeature(p),
+        );
+
+        if (violatingImports.length > 0) {
+          const relativePath = path.relative(FEATURES_DIR, testFilePath);
+          expect.fail(
+            `File "${relativePath}" has cross-feature relative imports that should use @/ prefix:\n${violatingImports.map((p) => `  - ${p}`).join("\n")}`,
           );
-
-          if (violatingImports.length > 0) {
-            const relativePath = path.relative(FEATURES_DIR, testFilePath);
-            expect.fail(
-              `File "${relativePath}" has cross-feature relative imports that should use @/ prefix:\n` +
-                violatingImports.map((p) => `  - ${p}`).join("\n"),
-            );
-          }
-        },
-      ),
+        }
+      }),
       { numRuns: Math.max(100, testFiles.length * 10) },
     );
   });
@@ -159,8 +156,7 @@ describe("Property 12: Test Import Path Alias Compliance", () => {
         if (isRelativeImportExitingFeature(importPath)) {
           const relativePath = path.relative(FEATURES_DIR, testFilePath);
           expect.fail(
-            `File "${relativePath}" imports "${importPath}" using a relative path ` +
-              `that exits the feature directory. It should use the @/ prefix instead.`,
+            `File "${relativePath}" imports "${importPath}" using a relative path that exits the feature directory. It should use the @/ prefix instead.`,
           );
         }
       }

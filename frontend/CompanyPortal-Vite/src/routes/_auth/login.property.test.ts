@@ -64,9 +64,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          const usernameError = result.error.issues.find(
-            (i) => i.path[0] === "username",
-          );
+          const usernameError = result.error.issues.find((i) => i.path[0] === "username");
           expect(usernameError).toBeDefined();
         }
       }),
@@ -84,9 +82,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          const passwordError = result.error.issues.find(
-            (i) => i.path[0] === "password",
-          );
+          const passwordError = result.error.issues.find((i) => i.path[0] === "password");
           expect(passwordError).toBeDefined();
         }
       }),
@@ -140,6 +136,7 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/^(\d+) menit/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const minutes = Number.parseInt(match![1], 10);
         expect(minutes).toBe(Math.floor(seconds / 60));
       }),
@@ -154,6 +151,7 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/(\d+) detik$/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const secs = Number.parseInt(match![1], 10);
         expect(secs).toBe(seconds % 60);
       }),
@@ -190,7 +188,9 @@ describe("Property 19: Retry-After Countdown Formatting", () => {
         const match = formatted.match(/^(\d+) menit (\d+) detik$/);
         expect(match).not.toBeNull();
 
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const minutes = Number.parseInt(match![1], 10);
+        // biome-ignore lint/style/noNonNullAssertion: null-checked via the assertion above.
         const secs = Number.parseInt(match![2], 10);
         expect(minutes * 60 + secs).toBe(seconds);
       }),

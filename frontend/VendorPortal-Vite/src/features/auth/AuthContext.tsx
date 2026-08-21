@@ -22,7 +22,7 @@ interface LoginSuccessResponse {
     username: string;
     full_name: string;
     email: string;
-    role: 'VENDOR-USER';
+    role: string; // Intentionally broad — backend may return any role during refresh
     is_karyawan: boolean;
     vendor_id: number | null;
   };
@@ -53,7 +53,7 @@ function mapUserResponse(raw: LoginSuccessResponse['user']): AuthUser {
     username: raw.username,
     fullName: raw.full_name,
     email: raw.email,
-    role: raw.role,
+    role: raw.role as AuthUser['role'],
     isKaryawan: raw.is_karyawan,
     vendorId: raw.vendor_id,
   };
@@ -92,6 +92,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (response.ok) {
           const data = (await response.json()) as LoginSuccessResponse;
+
+          // Guard: only accept VENDOR-USER role on the vendor portal.
+          // If a company/internal user's refresh token is present (shared
+          // cookie on localhost), reject it so they can't access vendor portal.
+          if (data.user.role !== 'VENDOR-USER') {
+            return;
+          }
+
           setAccessToken(data.access_token);
           setUser(mapUserResponse(data.user));
         }
@@ -234,6 +242,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         const data = (await response.json()) as LoginSuccessResponse;
+
+        // Guard: reject non-vendor users on token refresh
+        if (data.user.role !== 'VENDOR-USER') {
+          setAccessToken(null);
+          setUser(null);
+          return false;
+        }
+
         setAccessToken(data.access_token);
         setUser(mapUserResponse(data.user));
         return true;

@@ -15,6 +15,7 @@
 7. Two frontends: internal (LDAP) + vendor portal (local auth). Keep separate (Sec 5).
 8. Two backend entrypoints, one codebase: `cmd/api` (transactional, office hours) + `cmd/batch` (EOD, midnight). Shared `internal/*` (Sec 14).
 9. EOD batch output is the source of truth for the transactional module. Write to DB, signal readiness before transactional reads (Sec 14).
+10. OpenCode must not run any Git command. The user handles all Git operations.
 
 * * *
 

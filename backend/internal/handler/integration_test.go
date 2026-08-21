@@ -166,6 +166,7 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 		"../../migrations/008_seed_atms.sql",
 		"../../migrations/009_itm_cashpos.sql",
 		"../../migrations/010_rename_itm_cashpos_to_itm_replenish.sql",
+		"../../migrations/011_itm_cashpos.sql",
 	}
 
 	for _, path := range migrations {
@@ -524,4 +525,3 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 		t.Errorf("error = %q, want service_unavailable", resp.Error)
 	}
 }
-

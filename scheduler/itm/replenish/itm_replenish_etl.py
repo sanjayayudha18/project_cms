@@ -23,8 +23,8 @@ import psycopg
 
 from dotenv import load_dotenv
 
-# Load .env file from the same directory as this script
-load_dotenv(Path(__file__).parent / ".env")
+# Load the shared scheduler .env file.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # =============================================================================
 # CONFIG

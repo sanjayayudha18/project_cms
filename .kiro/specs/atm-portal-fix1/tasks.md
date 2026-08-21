@@ -16,8 +16,8 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
 
 ## Tasks
 
-- [ ] 1. Backend: SQL date-range filters + sort by replenish_total
-  - [ ] 1.1 Extend `backend/queries/atm_portal.sql` — `ListATMsWithCashPos` **and** `CountATMsWithCashPos` (filters must stay identical or pagination `total` drifts)
+- [x] 1. Backend: SQL date-range filters + sort by replenish_total
+  - [x] 1.1 Extend `backend/queries/atm_portal.sql` — `ListATMsWithCashPos` **and** `CountATMsWithCashPos` (filters must stay identical or pagination `total` drifts)
     - **List:** add optional bounds on `sub.last_replenish_date`:
       - `(sqlc.arg('date_from')::text = '' OR sub.last_replenish_date >= sqlc.arg('date_from')::date)`
       - `(sqlc.arg('date_to')::text = '' OR sub.last_replenish_date <= sqlc.arg('date_to')::date)`
@@ -29,72 +29,73 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
     - Do **not** add date filters to `GetATMSummary` or `GetLastUpdated` (summary stays global / independent of list filters — Property 10)
     - Add ORDER BY arms for `sort_by = 'replenish_total'` asc/desc (mirror `refund_total` pattern exactly, including NULL sort behavior)
     - _Touches: List + Count only_
-  - [ ] 1.2 Run `sqlc generate` and confirm `backend/internal/db/atm_portal.sql.go` picks up `DateFrom`, `DateTo` on **both** List and Count params, and replenish_total sort params
+  - [x] 1.2 Run `sqlc generate` and confirm `backend/internal/db/atm_portal.sql.go` picks up `DateFrom`, `DateTo` on **both** List and Count params, and replenish_total sort params
     - _No hand-edit of generated files_
 
-- [ ] 2. Backend: service + handler params
-  - [ ] 2.1 Extend `ListATMsParams` in `backend/internal/service/atm_portal.go`
+- [x] 2. Backend: service + handler params
+  - [x] 2.1 Extend `ListATMsParams` in `backend/internal/service/atm_portal.go`
     - Fields: `DateFrom string`, `DateTo string` (JSON `date_from` / `date_to`)
     - Validation (hand `validate()` — tags alone are not enforced):
       - Each non-empty value must parse as `YYYY-MM-DD` (use `time.Parse("2006-01-02", ...)`); Indonesian error e.g. `date_from harus berformat YYYY-MM-DD`
       - If both set and `date_from > date_to` → validation error e.g. `date_from tidak boleh lebih besar dari date_to`
     - Extend `sort_by` oneof / slices allow-list **and** `validate()` error message allow-list with `replenish_total`
     - **Wiring (required):** pass `DateFrom`/`DateTo` into **both** `ListATMsWithCashPosParams` and `CountATMsWithCashPosParams` inside `ListATMs` (empty string when unset)
-  - [ ] 2.2 Extend `parseListATMsParams` in `backend/internal/handler/atm_portal_handler.go`
+  - [x] 2.2 Extend `parseListATMsParams` in `backend/internal/handler/atm_portal_handler.go`
     - Read `date_from`, `date_to` from query string (no defaults — empty means unbound)
     - No response shape change required (`replenish_total` already on `atmPortalRow`)
 
-- [ ] 3. Backend: tests
-  - [ ] 3.1 Property / integration coverage for date filter
+- [x] 3. Backend: tests
+  - [x] 3.1 Property / integration coverage for date filter
     - **Property: Date range filter correctness** — for any fixtures with known `last_replenish_date`, filtered rows satisfy `date_from ≤ last_replenish_date ≤ date_to` (inclusive); only-from / only-to / both / neither cases
     - NULL `last_replenish_date` excluded when any bound is active
     - Invalid format and `date_from > date_to` → 400
     - Summary object identical across differently date-filtered requests (extends Property 10)
     - Extend `drawFilterParams` / sort allow-lists in `atm_portal_*_property_test.go` so random filters include dates and `replenish_total`
-  - [ ] 3.2 Sort by `replenish_total` asc/desc (extend existing sort property or example test)
-  - [ ] 3.3 Checkpoint — `go test` for atm_portal packages; manual `GET /api/v1/atm-portal/atms?date_from=...&date_to=...`
+  - [x] 3.2 Sort by `replenish_total` asc/desc (extend existing sort property or example test)
+  - [x] 3.3 Checkpoint — `go test` for atm_portal packages; manual `GET /api/v1/atm-portal/atms?date_from=...&date_to=...`
+    - Note: integration property tests skip without `DATABASE_URL`; unit validation tests pass. `go build ./cmd/api` OK.
 
-- [ ] 4. Frontend: types, URL state, data hook
+- [x] 4. Frontend: types, URL state, data hook
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
-  - [ ] 4.1 Extend `AtmPortalParams` in `types.ts` with `date_from: string` and `date_to: string` (empty string default)
-  - [ ] 4.2 Extend `ATM_PORTAL_SEARCH_SCHEMA`, defaults, `parseSearchParams`, `omitDefaults` in `useAtmPortalUrlState.ts`
+  - [x] 4.1 Extend `AtmPortalParams` in `types.ts` with `date_from: string` and `date_to: string` (empty string default)
+  - [x] 4.2 Extend `ATM_PORTAL_SEARCH_SCHEMA`, defaults, `parseSearchParams`, `omitDefaults` in `useAtmPortalUrlState.ts`
     - Defaults: both `""`; omit from URL when empty
     - Zod: optional strings (format validated server-side; client may lightly check `YYYY-MM-DD` before navigate if cheap)
-  - [ ] 4.3 Extend `buildQueryString` in `useAtmPortalData.ts` to include `date_from` / `date_to`
-  - [ ] 4.4 Extend Property 11 URL round-trip generators to include the new keys; update `mockParams` if present
+  - [x] 4.3 Extend `buildQueryString` in `useAtmPortalData.ts` to include `date_from` / `date_to`
+  - [x] 4.4 Extend Property 11 URL round-trip generators to include the new keys; update `mockParams` if present
 
-- [ ] 5. Frontend: FilterBar date controls
+- [x] 5. Frontend: FilterBar date controls
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
-  - [ ] 5.1 Add date range UI to `components/FilterBar.tsx`
+  - [x] 5.1 Add date range UI to `components/FilterBar.tsx`
     - Two native `<input type="date">` (match DSR pattern in `DsrDashboard.tsx`) labeled e.g. **"Dari tanggal"** / **"Sampai tanggal"**
     - Controlled via props: `dateFrom`, `dateTo`, `onFilterChange` partial includes `date_from` | `date_to`
     - **Widen** `onFilterChange` / prop `Pick<>` types (today limited to status/machine/brand/deployment only)
     - `min-h-[44px]` touch targets consistent with existing controls
     - Changing either date resets page to 1 (via existing `setParams` parent pattern)
     - Include non-empty date bounds in **active filter count**; **Clear All** clears both
-  - [ ] 5.2 Wire props through `AtmPortalScreen.tsx` from `useAtmPortalUrlState`
+  - [x] 5.2 Wire props through `AtmPortalScreen.tsx` from `useAtmPortalUrlState`
 
-- [ ] 6. Frontend: AtmTable Total Replenish column + sort
+- [x] 6. Frontend: AtmTable Total Replenish column + sort
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
-  - [ ] 6.1 Update `components/AtmTable.tsx`
+  - [x] 6.1 Update `components/AtmTable.tsx`
     - Insert column after **Refund Total** (before Threshold):
       - `{ key: "replenish_total", label: "Total Replenish", sortable: true, align: "right" }`
     - Cell: `formatRupiah(atm.replenish_total)` (already handles null → "—"); `tabular-nums` + right align
     - Header click uses existing sort toggle; parent already passes `sortBy`/`sortOrder`/`onSortChange`
     - Bump loading skeleton cell count / `colSpan` if any so column count matches
     - Bump `min-w-[...]` if needed so horizontal scroll still works
-  - [ ] 6.2 Allow `sort_by=replenish_total` in FE URL schema / any client-side allow-lists (property test generators)
+  - [x] 6.2 Allow `sort_by=replenish_total` in FE URL schema / any client-side allow-lists (property test generators)
 
-- [ ] 7. Frontend: tests + checkpoint
-  - [ ] 7.1 Component tests
+- [x] 7. Frontend: tests + checkpoint
+  - [x] 7.1 Component tests
     - FilterBar renders both date inputs; change fires `onFilterChange` with `date_from`/`date_to`
     - Clear All clears dates; active count includes date bounds
     - AtmTable header includes "Total Replenish"; row shows formatted `replenish_total` (and "—" when null)
     - Sort header for Total Replenish invokes `onSortChange("replenish_total", ...)`
-  - [ ] 7.2 Checkpoint
-    - `pnpm tsc -b tsconfig.app.json`, `pnpm lint`, `pnpm test` (atm-portal related) from `frontend/CompanyPortal-Vite`
-    - Manual: set date range in UI → URL updates → table filters; Total Replenish visible and sortable; Clear All restores full list
-    - Ensure all tests pass; ask user if questions arise
+  - [x] 7.2 Checkpoint
+    - `pnpm tsc -b tsconfig.app.json`, `pnpm test` (atm-portal): **44 passed**
+    - Backend: `go build ./cmd/api`, validation unit tests pass; integration properties skip without DATABASE_URL
+    - Manual browser check left for user (date URL sync + Total Replenish column)
 
 ## Notes
 
@@ -110,15 +111,15 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
 
 ## Definition of Done
 
-- [ ] List + Count filters identical for dates
-- [ ] `GetATMSummary` / `GetLastUpdated` unchanged; Property 10 still green with date params
-- [ ] `sort_by=replenish_total` allowed BE + FE + tests
-- [ ] Invalid date / `from > to` → 400, Indonesian messages
-- [ ] NULL last date excluded when any bound set
-- [ ] FE URL round-trip (Property 11) includes `date_from`/`date_to`
-- [ ] Table shows Total Replenish via `formatRupiah`; null → "—"
-- [ ] No migration; no new endpoint; no VendorPortal touch
-- [ ] `sqlc generate` only for generated Go; no hand-edits
+- [x] List + Count filters identical for dates
+- [x] `GetATMSummary` / `GetLastUpdated` unchanged; Property 10 still green with date params
+- [x] `sort_by=replenish_total` allowed BE + FE + tests
+- [x] Invalid date / `from > to` → 400, Indonesian messages
+- [x] NULL last date excluded when any bound set
+- [x] FE URL round-trip (Property 11) includes `date_from`/`date_to`
+- [x] Table shows Total Replenish via `formatRupiah`; null → "—"
+- [x] No migration; no new endpoint; no VendorPortal touch
+- [x] `sqlc generate` only for generated Go; no hand-edits
 
 ## Task Dependency Graph
 

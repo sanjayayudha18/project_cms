@@ -1,6 +1,6 @@
 ---
-description: Create implementation plan with risk assessment
-agent: plan
+description: Create CMS implementation plan with risk assessment
+agent: planner
 subtask: true
 ---
 
@@ -8,42 +8,26 @@ subtask: true
 
 Create a detailed implementation plan for: $ARGUMENTS
 
+Follow the CMS planner agent rules (`.opencode/agent/planner.md` / `.opencode/prompts/agents/planner.txt`).
+
 ## Your Task
 
-1. **Restate Requirements** - Clarify what needs to be built
-2. **Identify Risks** - Surface potential issues, blockers, and dependencies
-3. **Create Step Plan** - Break down implementation into phases
-4. **Wait for Confirmation** - MUST receive user approval before proceeding
+1. **Read project context** — `.opencode/opencode.md` is source of truth
+2. **Restate requirements** — clarify what will be built and out of scope
+3. **Inspect the codebase** — use real paths, modules, and existing patterns
+4. **Identify risks** — auth, money, maker-checker, migrations, replica routing, contracts
+5. **Create step plan** — phased, file-specific, independently verifiable
+6. **Wait for confirmation** — MUST receive user approval before any implementation
 
-## Output Format
+## Hard Rules
 
-### Requirements Restatement
-[Clear, concise restatement of what will be built]
+- Do not invent endpoints, tables, columns, env vars, modules, or dependencies
+- Flag new table/column/module/dependency for approval before planning them in
+- Planning is read-only: no file edits until the user says yes / proceed
+- Preserve unrelated worktree changes
 
-### Implementation Phases
-[Phase 1: Description]
-- Step 1.1
-- Step 1.2
-...
+## Output
 
-[Phase 2: Description]
-- Step 2.1
-- Step 2.2
-...
+Use the CMS planner plan format (Outcome, Scope, Evidence, Steps, Testing, Risks, Definition of Done).
 
-### Dependencies
-[List external dependencies, APIs, services needed]
-
-### Risks
-- HIGH: [Critical risks that could block implementation]
-- MEDIUM: [Moderate risks to address]
-- LOW: [Minor concerns]
-
-### Estimated Complexity
-[HIGH/MEDIUM/LOW with time estimates]
-
-**WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
-
----
-
-**CRITICAL**: Do NOT write any code until the user explicitly confirms with "yes", "proceed", or similar affirmative response.
+**WAITING FOR CONFIRMATION**: Proceed with this plan? (yes / no / modify)

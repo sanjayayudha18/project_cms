@@ -36,7 +36,15 @@ export function AtmPortalScreen() {
   }
 
   function handleClearAll(): void {
-    setParams({ status: "all", machine_type: "", brand: "", deployment_type: "" });
+    setParams({
+      status: "all",
+      machine_type: "",
+      brand: "",
+      deployment_type: "",
+      date_from: "",
+      date_to: "",
+      page: 1,
+    });
   }
 
   return (
@@ -64,6 +72,8 @@ export function AtmPortalScreen() {
         machineType={params.machine_type}
         brand={params.brand}
         deploymentType={params.deployment_type}
+        dateFrom={params.date_from}
+        dateTo={params.date_to}
         onFilterChange={setParams}
         onClearAll={handleClearAll}
       />

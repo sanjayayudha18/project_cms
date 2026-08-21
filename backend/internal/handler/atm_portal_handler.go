@@ -80,6 +80,8 @@ func parseListATMsParams(q url.Values) (service.ListATMsParams, error) {
 		Brand:          q.Get("brand"),
 		DeploymentType: q.Get("deployment_type"),
 		Region:         q.Get("region"),
+		DateFrom:       q.Get("date_from"),
+		DateTo:         q.Get("date_to"),
 		SortBy:         queryOrDefault(q, "sort_by", defaultSortBy),
 		SortOrder:      queryOrDefault(q, "sort_order", defaultSortOrder),
 	}, nil

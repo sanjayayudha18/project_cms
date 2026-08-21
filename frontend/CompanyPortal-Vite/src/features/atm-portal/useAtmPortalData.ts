@@ -22,6 +22,8 @@ function buildQueryString(params: AtmPortalParams): string {
     brand: params.brand,
     deployment_type: params.deployment_type,
     region: params.region,
+    date_from: params.date_from,
+    date_to: params.date_to,
     sort_by: params.sort_by,
     sort_order: params.sort_order,
   }).toString();

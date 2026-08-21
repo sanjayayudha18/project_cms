@@ -243,7 +243,7 @@ func TestProperty5_ActiveOnlyInvariant(t *testing.T) {
 		queries := db.New(tx)
 		svc := NewAtmPortalService(queries)
 
-		sortBy := rapid.SampledFrom([]string{"terminal_id", "location", "last_replenish_date", "refund_total", "status"}).Draw(rt, "sortBy")
+		sortBy := rapid.SampledFrom([]string{"terminal_id", "location", "last_replenish_date", "refund_total", "replenish_total", "status"}).Draw(rt, "sortBy")
 		sortOrder := rapid.SampledFrom([]string{"asc", "desc"}).Draw(rt, "sortOrder")
 
 		result, err := svc.ListATMs(ctx, ListATMsParams{
@@ -327,7 +327,7 @@ func TestProperty7_SortOrderCorrectness(t *testing.T) {
 	ctx := context.Background()
 	svc := NewAtmPortalService(db.New(pool))
 
-	sortBys := []string{"terminal_id", "location", "last_replenish_date", "refund_total", "status"}
+	sortBys := []string{"terminal_id", "location", "last_replenish_date", "refund_total", "replenish_total", "status"}
 
 	rapid.Check(t, func(rt *rapid.T) {
 		sortBy := rapid.SampledFrom(sortBys).Draw(rt, "sortBy")
@@ -358,11 +358,11 @@ func TestProperty7_SortOrderCorrectness(t *testing.T) {
 // sortedPairOK checks that a's sort key is correctly ordered relative to
 // b's, per sortBy/sortOrder — including Postgres's default NULL placement
 // (NULLS LAST for ASC, NULLS FIRST for DESC) for the nullable columns
-// (last_replenish_date, refund_total). String comparisons are delegated to
-// Postgres itself (SELECT $1 <= $2) rather than reimplemented in Go: the
-// database's default collation is not byte-order — e.g. it places
-// "Circle" before "CIRCLE" — so a hand-rolled Go string comparison would
-// disagree with what the query's ORDER BY actually did.
+// (last_replenish_date, refund_total, replenish_total). String comparisons
+// are delegated to Postgres itself (SELECT $1 <= $2) rather than
+// reimplemented in Go: the database's default collation is not byte-order
+// — e.g. it places "Circle" before "CIRCLE" — so a hand-rolled Go string
+// comparison would disagree with what the query's ORDER BY actually did.
 func sortedPairOK(ctx context.Context, pool *pgxpool.Pool, sortBy, sortOrder string, a, b AtmWithCashPos) (bool, string, error) {
 	asc := sortOrder == "asc"
 	switch sortBy {
@@ -377,6 +377,8 @@ func sortedPairOK(ctx context.Context, pool *pgxpool.Pool, sortBy, sortOrder str
 		return ok, fmt.Sprintf("%q vs %q", a.Status, b.Status), err
 	case "refund_total":
 		return nullableFloatOrderOK(a.RefundTotal, b.RefundTotal, asc), fmt.Sprintf("%v vs %v", ptrOrNil(a.RefundTotal), ptrOrNil(b.RefundTotal)), nil
+	case "replenish_total":
+		return nullableFloatOrderOK(a.ReplenishTotal, b.ReplenishTotal, asc), fmt.Sprintf("%v vs %v", ptrOrNil(a.ReplenishTotal), ptrOrNil(b.ReplenishTotal)), nil
 	case "last_replenish_date":
 		return nullableTimeOrderOK(a.LastReplenishDate, b.LastReplenishDate, asc), fmt.Sprintf("%v vs %v", a.LastReplenishDate, b.LastReplenishDate), nil
 	}

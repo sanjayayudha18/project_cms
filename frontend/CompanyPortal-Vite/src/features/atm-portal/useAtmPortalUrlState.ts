@@ -28,6 +28,8 @@ export const ATM_PORTAL_SEARCH_SCHEMA = z.object({
   brand: z.string().optional(),
   deployment_type: z.string().optional(),
   region: z.string().optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
   sort_by: z.string().optional(),
   sort_order: z.enum(["asc", "desc"]).optional(),
 });
@@ -43,6 +45,8 @@ const ATM_PORTAL_SEARCH_DEFAULTS: AtmPortalParams = {
   brand: "",
   deployment_type: "",
   region: "",
+  date_from: "",
+  date_to: "",
   sort_by: "terminal_id",
   sort_order: "asc",
 };
@@ -77,6 +81,8 @@ export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams
       ATM_PORTAL_SEARCH_DEFAULTS.deployment_type,
     ),
     region: toStringOrDefault(raw.region, ATM_PORTAL_SEARCH_DEFAULTS.region),
+    date_from: toStringOrDefault(raw.date_from, ATM_PORTAL_SEARCH_DEFAULTS.date_from),
+    date_to: toStringOrDefault(raw.date_to, ATM_PORTAL_SEARCH_DEFAULTS.date_to),
     sort_by: toStringOrDefault(raw.sort_by, ATM_PORTAL_SEARCH_DEFAULTS.sort_by),
     sort_order: raw.sort_order === "desc" ? "desc" : ATM_PORTAL_SEARCH_DEFAULTS.sort_order,
   };

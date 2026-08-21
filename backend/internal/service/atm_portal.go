@@ -42,8 +42,14 @@ type ListATMsParams struct {
 	Brand          string `json:"brand"`
 	DeploymentType string `json:"deployment_type"`
 	Region         string `json:"region"`
-	SortBy         string `json:"sort_by" validate:"omitempty,oneof=terminal_id location last_replenish_date refund_total status"`
+	DateFrom       string `json:"date_from"`
+	DateTo         string `json:"date_to"`
+	SortBy         string `json:"sort_by" validate:"omitempty,oneof=terminal_id location last_replenish_date refund_total replenish_total status"`
 	SortOrder      string `json:"sort_order" validate:"omitempty,oneof=asc desc"`
+}
+
+var allowedSortBy = []string{
+	"terminal_id", "location", "last_replenish_date", "refund_total", "replenish_total", "status",
 }
 
 // validate checks ListATMsParams against the rules documented in its
@@ -61,11 +67,31 @@ func (p ListATMsParams) validate() error {
 	if err := validateStatus(p.Status); err != nil {
 		return err
 	}
-	if p.SortBy != "" && !slices.Contains([]string{"terminal_id", "location", "last_replenish_date", "refund_total", "status"}, p.SortBy) {
-		return &ValidationError{Field: "sort_by", Message: "harus salah satu dari: terminal_id, location, last_replenish_date, refund_total, status"}
+	if err := validateDateBound("date_from", p.DateFrom); err != nil {
+		return err
+	}
+	if err := validateDateBound("date_to", p.DateTo); err != nil {
+		return err
+	}
+	if p.DateFrom != "" && p.DateTo != "" && p.DateFrom > p.DateTo {
+		return &ValidationError{Field: "date_from", Message: "tidak boleh lebih besar dari date_to"}
+	}
+	if p.SortBy != "" && !slices.Contains(allowedSortBy, p.SortBy) {
+		return &ValidationError{Field: "sort_by", Message: "harus salah satu dari: terminal_id, location, last_replenish_date, refund_total, replenish_total, status"}
 	}
 	if p.SortOrder != "" && !slices.Contains([]string{"asc", "desc"}, p.SortOrder) {
 		return &ValidationError{Field: "sort_order", Message: "harus salah satu dari: asc, desc"}
+	}
+	return nil
+}
+
+// validateDateBound checks an optional YYYY-MM-DD date query param.
+func validateDateBound(field, value string) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", value); err != nil {
+		return &ValidationError{Field: field, Message: "harus berformat YYYY-MM-DD"}
 	}
 	return nil
 }
@@ -173,6 +199,8 @@ func (s *AtmPortalService) ListATMs(ctx context.Context, params ListATMsParams) 
 		Brand:          params.Brand,
 		DeploymentType: params.DeploymentType,
 		Region:         params.Region,
+		DateFrom:       params.DateFrom,
+		DateTo:         params.DateTo,
 		SortBy:         params.SortBy,
 		SortOrder:      params.SortOrder,
 		Page:           int32(params.Page),
@@ -190,6 +218,8 @@ func (s *AtmPortalService) ListATMs(ctx context.Context, params ListATMsParams) 
 		Brand:          params.Brand,
 		DeploymentType: params.DeploymentType,
 		Region:         params.Region,
+		DateFrom:       params.DateFrom,
+		DateTo:         params.DateTo,
 	}
 	total, err := s.repo.CountATMsWithCashPos(ctx, countArg)
 	if err != nil {

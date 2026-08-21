@@ -208,6 +208,57 @@ describe("AtmTable — Req 8.1, 8.2, 8.4, 11.1, 11.7", () => {
       "descending",
     );
   });
+
+  it("renders Total Replenish column with formatted replenish_total (fix1)", () => {
+    render(
+      <AtmTable
+        data={[atmFixture]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="terminal_id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: /Total Replenish/ })).toBeInTheDocument();
+    // formatRupiah(5000000) → "Rp 5.000.000"
+    expect(screen.getByText("Rp 5.000.000")).toBeInTheDocument();
+  });
+
+  it("shows em dash when replenish_total is null (fix1)", () => {
+    render(
+      <AtmTable
+        data={[{ ...atmFixture, replenish_total: null, refund_total: null, low_threshold: null }]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="terminal_id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    const dashes = screen.getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Total Replenish header sort invokes onSortChange with replenish_total (fix1)", async () => {
+    const onSortChange = vi.fn();
+    render(
+      <AtmTable
+        data={[atmFixture]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="terminal_id"
+        sortOrder="asc"
+        onSortChange={onSortChange}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Total Replenish/ }));
+    expect(onSortChange).toHaveBeenCalledWith("replenish_total", "asc");
+  });
 });
 
 // ─── Req 4.8: Pagination page size options ────────────────────────────────────
@@ -231,21 +282,60 @@ describe("PaginationControls — Req 4.8", () => {
 
 // ─── Req 11.5: Search input aria-label ─────────────────────────────────────────
 
-describe("FilterBar — Req 11.5", () => {
+describe("FilterBar — Req 11.5 + date range (fix1)", () => {
+  const defaultFilterBarProps = {
+    searchInput: "",
+    onSearchInputChange: () => {},
+    status: "all",
+    machineType: "",
+    brand: "",
+    deploymentType: "",
+    dateFrom: "",
+    dateTo: "",
+    onFilterChange: () => {},
+    onClearAll: () => {},
+  };
+
   it("search input has a correct aria-label", () => {
+    render(<FilterBar {...defaultFilterBarProps} />);
+    expect(screen.getByLabelText("Cari berdasarkan Terminal ID atau lokasi")).toBeInTheDocument();
+  });
+
+  it("renders Dari tanggal and Sampai tanggal inputs", () => {
+    render(<FilterBar {...defaultFilterBarProps} />);
+    expect(screen.getByLabelText("Dari tanggal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sampai tanggal")).toBeInTheDocument();
+  });
+
+  it("date change fires onFilterChange with date_from/date_to and page 1", async () => {
+    const onFilterChange = vi.fn();
+    render(<FilterBar {...defaultFilterBarProps} onFilterChange={onFilterChange} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Dari tanggal"), "2026-08-01");
+    expect(onFilterChange).toHaveBeenCalled();
+    const lastFrom = onFilterChange.mock.calls.at(-1)?.[0];
+    expect(lastFrom).toMatchObject({ page: 1 });
+    expect(lastFrom).toHaveProperty("date_from");
+
+    onFilterChange.mockClear();
+    await user.type(screen.getByLabelText("Sampai tanggal"), "2026-08-21");
+    const lastTo = onFilterChange.mock.calls.at(-1)?.[0];
+    expect(lastTo).toMatchObject({ page: 1 });
+    expect(lastTo).toHaveProperty("date_to");
+  });
+
+  it("active filter count includes date bounds; Clear All is shown", () => {
+    const onClearAll = vi.fn();
     render(
       <FilterBar
-        searchInput=""
-        onSearchInputChange={() => {}}
-        status="all"
-        machineType=""
-        brand=""
-        deploymentType=""
-        onFilterChange={() => {}}
-        onClearAll={() => {}}
+        {...defaultFilterBarProps}
+        dateFrom="2026-08-01"
+        dateTo="2026-08-21"
+        onClearAll={onClearAll}
       />,
     );
-    expect(screen.getByLabelText("Cari berdasarkan Terminal ID atau lokasi")).toBeInTheDocument();
+    expect(screen.getByText("2 filter aktif")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear All" })).toBeInTheDocument();
   });
 });
 
@@ -280,6 +370,8 @@ const mockParams: AtmPortalParams = {
   brand: "",
   deployment_type: "",
   region: "",
+  date_from: "",
+  date_to: "",
   sort_by: "terminal_id",
   sort_order: "asc",
 };

@@ -84,6 +84,8 @@ WHERE
         OR sub.brand = ANY(string_to_array(sqlc.arg('brand')::text, ',')))
     AND (sqlc.arg('deployment_type')::text = '' OR sub.deployment_type = sqlc.arg('deployment_type')::text)
     AND (sqlc.arg('region')::text = '' OR sub.region ILIKE '%' || sqlc.arg('region')::text || '%')
+    AND (sqlc.arg('date_from')::text = '' OR sub.last_replenish_date >= sqlc.arg('date_from')::date)
+    AND (sqlc.arg('date_to')::text = '' OR sub.last_replenish_date <= sqlc.arg('date_to')::date)
 ORDER BY
     CASE WHEN sqlc.arg('sort_by')::text = 'terminal_id' AND sqlc.arg('sort_order')::text = 'asc' THEN sub.terminal_id END ASC,
     CASE WHEN sqlc.arg('sort_by')::text = 'terminal_id' AND sqlc.arg('sort_order')::text = 'desc' THEN sub.terminal_id END DESC,
@@ -93,6 +95,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_by')::text = 'last_replenish_date' AND sqlc.arg('sort_order')::text = 'desc' THEN sub.last_replenish_date END DESC,
     CASE WHEN sqlc.arg('sort_by')::text = 'refund_total' AND sqlc.arg('sort_order')::text = 'asc' THEN sub.refund_total END ASC,
     CASE WHEN sqlc.arg('sort_by')::text = 'refund_total' AND sqlc.arg('sort_order')::text = 'desc' THEN sub.refund_total END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'replenish_total' AND sqlc.arg('sort_order')::text = 'asc' THEN sub.replenish_total END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'replenish_total' AND sqlc.arg('sort_order')::text = 'desc' THEN sub.replenish_total END DESC,
     CASE WHEN sqlc.arg('sort_by')::text = 'status' AND sqlc.arg('sort_order')::text = 'asc' THEN sub.status END ASC,
     CASE WHEN sqlc.arg('sort_by')::text = 'status' AND sqlc.arg('sort_order')::text = 'desc' THEN sub.status END DESC,
     sub.terminal_id ASC
@@ -110,6 +114,7 @@ WITH sub AS (
         a.brand,
         a.deployment_type,
         r.region,
+        lcp.replenish_date AS last_replenish_date,
         CASE
             WHEN a.low_threshold_amount IS NULL THEN 'unconfigured'
             WHEN lcp.refund_total IS NULL THEN 'no_data'
@@ -144,7 +149,9 @@ WHERE
     AND (sqlc.arg('brand')::text = ''
         OR sub.brand = ANY(string_to_array(sqlc.arg('brand')::text, ',')))
     AND (sqlc.arg('deployment_type')::text = '' OR sub.deployment_type = sqlc.arg('deployment_type')::text)
-    AND (sqlc.arg('region')::text = '' OR sub.region ILIKE '%' || sqlc.arg('region')::text || '%');
+    AND (sqlc.arg('region')::text = '' OR sub.region ILIKE '%' || sqlc.arg('region')::text || '%')
+    AND (sqlc.arg('date_from')::text = '' OR sub.last_replenish_date >= sqlc.arg('date_from')::date)
+    AND (sqlc.arg('date_to')::text = '' OR sub.last_replenish_date <= sqlc.arg('date_to')::date);
 
 -- name: GetATMSummary :one
 -- Global status counts across all active ATMs, independent of any list

@@ -98,9 +98,14 @@ interface FilterBarProps {
   machineType: string;
   brand: string;
   deploymentType: string;
+  dateFrom: string;
+  dateTo: string;
   onFilterChange: (
     partial: Partial<
-      Pick<AtmPortalParams, "status" | "machine_type" | "brand" | "deployment_type">
+      Pick<
+        AtmPortalParams,
+        "status" | "machine_type" | "brand" | "deployment_type" | "date_from" | "date_to" | "page"
+      >
     >,
   ) => void;
   onClearAll: () => void;
@@ -113,6 +118,8 @@ export function FilterBar({
   machineType,
   brand,
   deploymentType,
+  dateFrom,
+  dateTo,
   onFilterChange,
   onClearAll,
 }: FilterBarProps) {
@@ -121,6 +128,8 @@ export function FilterBar({
     machineType !== "",
     brand !== "",
     deploymentType !== "",
+    dateFrom !== "",
+    dateTo !== "",
   ].filter(Boolean).length;
 
   return (
@@ -173,6 +182,39 @@ export function FilterBar({
         value={deploymentType === "" ? null : deploymentType}
         onChange={(value) => onFilterChange({ deployment_type: value ?? "" })}
       />
+
+      <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="atm-portal-date-from"
+            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
+          >
+            Dari tanggal
+          </label>
+          <input
+            id="atm-portal-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => onFilterChange({ date_from: e.target.value, page: 1 })}
+            className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor="atm-portal-date-to"
+            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
+          >
+            Sampai tanggal
+          </label>
+          <input
+            id="atm-portal-date-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => onFilterChange({ date_to: e.target.value, page: 1 })}
+            className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+          />
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-[var(--n-600)]">

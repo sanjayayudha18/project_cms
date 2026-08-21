@@ -35,6 +35,7 @@ const COLUMNS: readonly Column[] = [
   { key: "deployment_type", label: "Deployment Type", sortable: false },
   { key: "last_replenish_date", label: "Last Replenish Date", sortable: true },
   { key: "refund_total", label: "Refund Total", sortable: true, align: "right" },
+  { key: "replenish_total", label: "Total Replenish", sortable: true, align: "right" },
   { key: "threshold", label: "Threshold", sortable: false, align: "right" },
   { key: "status", label: "Status", sortable: true },
 ];
@@ -71,7 +72,7 @@ export function AtmTable({
 
   return (
     <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
-      <table aria-label="Daftar ATM" className="w-full min-w-[900px] border-collapse text-sm">
+      <table aria-label="Daftar ATM" className="w-full min-w-[1040px] border-collapse text-sm">
         <thead>
           <tr className="border-[var(--n-200)] border-b bg-[var(--n-50)]">
             {COLUMNS.map((column) => {
@@ -138,6 +139,7 @@ function AtmRow({ atm }: { atm: AtmRecord }) {
         {atm.last_replenish_date ? formatAtmDate(new Date(atm.last_replenish_date)) : "—"}
       </td>
       <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.refund_total)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.replenish_total)}</td>
       <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.low_threshold)}</td>
       <td className="px-3 py-2">
         <StatusBadge status={atm.status} />

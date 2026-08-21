@@ -24,6 +24,16 @@ import (
 // about summary independence from *filters*) and every filter field
 // randomized across a mix of real, partially-matching, and no-match values.
 func drawFilterParams(rt *rapid.T, label string) ListATMsParams {
+	dateFrom := rapid.SampledFrom([]string{"", "2020-01-01", "2024-06-01", "2026-01-01"}).Draw(rt, label+".dateFrom")
+	dateToChoices := []string{"", "2024-12-31", "2026-08-21", "2030-12-31"}
+	if dateFrom != "" {
+		// Keep date_from <= date_to when both set so validate() does not reject.
+		dateToChoices = append(dateToChoices, dateFrom)
+	}
+	dateTo := rapid.SampledFrom(dateToChoices).Draw(rt, label+".dateTo")
+	if dateFrom != "" && dateTo != "" && dateFrom > dateTo {
+		dateFrom, dateTo = dateTo, dateFrom
+	}
 	return ListATMsParams{
 		Page:           1,
 		PageSize:       25,
@@ -33,7 +43,9 @@ func drawFilterParams(rt *rapid.T, label string) ListATMsParams {
 		Brand:          rapid.SampledFrom([]string{"", "Hyosung", "Wincor", "Diebold"}).Draw(rt, label+".brand"),
 		DeploymentType: rapid.SampledFrom([]string{"", "ONSITE", "OFFSITE"}).Draw(rt, label+".deploymentType"),
 		Region:         rapid.SampledFrom([]string{"", "Jakarta", "Bali", "zzz-no-match"}).Draw(rt, label+".region"),
-		SortBy:         rapid.SampledFrom([]string{"terminal_id", "location", "last_replenish_date", "refund_total", "status"}).Draw(rt, label+".sortBy"),
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		SortBy:         rapid.SampledFrom([]string{"terminal_id", "location", "last_replenish_date", "refund_total", "replenish_total", "status"}).Draw(rt, label+".sortBy"),
 		SortOrder:      rapid.SampledFrom([]string{"asc", "desc"}).Draw(rt, label+".sortOrder"),
 	}
 }

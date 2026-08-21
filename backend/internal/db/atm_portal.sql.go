@@ -20,6 +20,7 @@ WITH sub AS (
         a.brand,
         a.deployment_type,
         r.region,
+        lcp.replenish_date AS last_replenish_date,
         CASE
             WHEN a.low_threshold_amount IS NULL THEN 'unconfigured'
             WHEN lcp.refund_total IS NULL THEN 'no_data'
@@ -55,6 +56,8 @@ WHERE
         OR sub.brand = ANY(string_to_array($4::text, ',')))
     AND ($5::text = '' OR sub.deployment_type = $5::text)
     AND ($6::text = '' OR sub.region ILIKE '%' || $6::text || '%')
+    AND ($7::text = '' OR sub.last_replenish_date >= $7::date)
+    AND ($8::text = '' OR sub.last_replenish_date <= $8::date)
 `
 
 type CountATMsWithCashPosParams struct {
@@ -64,6 +67,8 @@ type CountATMsWithCashPosParams struct {
 	Brand          string `json:"brand"`
 	DeploymentType string `json:"deployment_type"`
 	Region         string `json:"region"`
+	DateFrom       string `json:"date_from"`
+	DateTo         string `json:"date_to"`
 }
 
 // Mirrors ListATMsWithCashPos's FROM/JOIN/WHERE (including all dynamic
@@ -77,6 +82,8 @@ func (q *Queries) CountATMsWithCashPos(ctx context.Context, arg CountATMsWithCas
 		arg.Brand,
 		arg.DeploymentType,
 		arg.Region,
+		arg.DateFrom,
+		arg.DateTo,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -229,19 +236,23 @@ WHERE
         OR sub.brand = ANY(string_to_array($4::text, ',')))
     AND ($5::text = '' OR sub.deployment_type = $5::text)
     AND ($6::text = '' OR sub.region ILIKE '%' || $6::text || '%')
+    AND ($7::text = '' OR sub.last_replenish_date >= $7::date)
+    AND ($8::text = '' OR sub.last_replenish_date <= $8::date)
 ORDER BY
-    CASE WHEN $7::text = 'terminal_id' AND $8::text = 'asc' THEN sub.terminal_id END ASC,
-    CASE WHEN $7::text = 'terminal_id' AND $8::text = 'desc' THEN sub.terminal_id END DESC,
-    CASE WHEN $7::text = 'location' AND $8::text = 'asc' THEN sub.location_name END ASC,
-    CASE WHEN $7::text = 'location' AND $8::text = 'desc' THEN sub.location_name END DESC,
-    CASE WHEN $7::text = 'last_replenish_date' AND $8::text = 'asc' THEN sub.last_replenish_date END ASC,
-    CASE WHEN $7::text = 'last_replenish_date' AND $8::text = 'desc' THEN sub.last_replenish_date END DESC,
-    CASE WHEN $7::text = 'refund_total' AND $8::text = 'asc' THEN sub.refund_total END ASC,
-    CASE WHEN $7::text = 'refund_total' AND $8::text = 'desc' THEN sub.refund_total END DESC,
-    CASE WHEN $7::text = 'status' AND $8::text = 'asc' THEN sub.status END ASC,
-    CASE WHEN $7::text = 'status' AND $8::text = 'desc' THEN sub.status END DESC,
+    CASE WHEN $9::text = 'terminal_id' AND $10::text = 'asc' THEN sub.terminal_id END ASC,
+    CASE WHEN $9::text = 'terminal_id' AND $10::text = 'desc' THEN sub.terminal_id END DESC,
+    CASE WHEN $9::text = 'location' AND $10::text = 'asc' THEN sub.location_name END ASC,
+    CASE WHEN $9::text = 'location' AND $10::text = 'desc' THEN sub.location_name END DESC,
+    CASE WHEN $9::text = 'last_replenish_date' AND $10::text = 'asc' THEN sub.last_replenish_date END ASC,
+    CASE WHEN $9::text = 'last_replenish_date' AND $10::text = 'desc' THEN sub.last_replenish_date END DESC,
+    CASE WHEN $9::text = 'refund_total' AND $10::text = 'asc' THEN sub.refund_total END ASC,
+    CASE WHEN $9::text = 'refund_total' AND $10::text = 'desc' THEN sub.refund_total END DESC,
+    CASE WHEN $9::text = 'replenish_total' AND $10::text = 'asc' THEN sub.replenish_total END ASC,
+    CASE WHEN $9::text = 'replenish_total' AND $10::text = 'desc' THEN sub.replenish_total END DESC,
+    CASE WHEN $9::text = 'status' AND $10::text = 'asc' THEN sub.status END ASC,
+    CASE WHEN $9::text = 'status' AND $10::text = 'desc' THEN sub.status END DESC,
     sub.terminal_id ASC
-LIMIT $10::int OFFSET ($9::int - 1) * $10::int
+LIMIT $12::int OFFSET ($11::int - 1) * $12::int
 `
 
 type ListATMsWithCashPosParams struct {
@@ -251,6 +262,8 @@ type ListATMsWithCashPosParams struct {
 	Brand          string `json:"brand"`
 	DeploymentType string `json:"deployment_type"`
 	Region         string `json:"region"`
+	DateFrom       string `json:"date_from"`
+	DateTo         string `json:"date_to"`
 	SortBy         string `json:"sort_by"`
 	SortOrder      string `json:"sort_order"`
 	Page           int32  `json:"page"`
@@ -297,6 +310,8 @@ func (q *Queries) ListATMsWithCashPos(ctx context.Context, arg ListATMsWithCashP
 		arg.Brand,
 		arg.DeploymentType,
 		arg.Region,
+		arg.DateFrom,
+		arg.DateTo,
 		arg.SortBy,
 		arg.SortOrder,
 		arg.Page,

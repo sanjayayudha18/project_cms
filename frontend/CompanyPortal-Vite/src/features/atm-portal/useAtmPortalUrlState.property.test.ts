@@ -34,11 +34,14 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
     brand: fc.string({ maxLength: 30 }),
     deployment_type: fc.string({ maxLength: 30 }),
     region: fc.string({ maxLength: 30 }),
+    date_from: fc.constantFrom("", "2024-01-01", "2026-08-01"),
+    date_to: fc.constantFrom("", "2024-12-31", "2026-08-21"),
     sort_by: fc.constantFrom(
       "terminal_id",
       "location",
       "last_replenish_date",
       "refund_total",
+      "replenish_total",
       "status",
     ),
     sort_order: fc.constantFrom("asc", "desc"),
@@ -77,6 +80,8 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
       brand: "",
       deployment_type: "",
       region: "",
+      date_from: "",
+      date_to: "",
       sort_by: "terminal_id",
       sort_order: "asc",
     };
@@ -93,6 +98,8 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
       brand: "",
       deployment_type: "",
       region: "",
+      date_from: "",
+      date_to: "",
       sort_by: "terminal_id",
       sort_order: "asc",
     });

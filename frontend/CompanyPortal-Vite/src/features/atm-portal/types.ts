@@ -58,6 +58,8 @@ export interface AtmPortalParams {
   readonly brand: string;
   readonly deployment_type: string;
   readonly region: string;
+  readonly date_from: string;
+  readonly date_to: string;
   readonly sort_by: string;
   readonly sort_order: "asc" | "desc";
 }

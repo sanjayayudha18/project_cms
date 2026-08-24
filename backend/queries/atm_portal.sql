@@ -195,3 +195,70 @@ SELECT
 FROM itm_replenish
 ORDER BY replenish_date DESC, replenish_time DESC
 LIMIT 1;
+
+-- name: ListItmCashpos :many
+-- Paginated raw itm_cashpos rows for ATM Portal Cashpos view. Explicit
+-- column list (never SELECT *) so schema drift is visible. Empty-string
+-- filters mean "no filter". Sort keys are allowlisted in the service.
+SELECT
+    c.id,
+    c.file_id,
+    c.cashpos_date,
+    c.terminal_id,
+    c.machine_type,
+    c.teller_id,
+    c.branch_code,
+    c.starting_cash_10k,
+    c.cash_in_10k,
+    c.cash_out_10k,
+    c.cash_position_10k,
+    c.starting_cash_20k,
+    c.cash_in_20k,
+    c.cash_out_20k,
+    c.cash_position_20k,
+    c.starting_cash_50k,
+    c.cash_in_50k,
+    c.cash_out_50k,
+    c.cash_position_50k,
+    c.starting_cash_100k,
+    c.cash_in_100k,
+    c.cash_out_100k,
+    c.cash_position_100k,
+    c.position_source,
+    c.created_at
+FROM itm_cashpos c
+WHERE
+    (sqlc.arg('search')::text = ''
+        OR c.terminal_id ILIKE '%' || sqlc.arg('search')::text || '%'
+        OR c.branch_code ILIKE '%' || sqlc.arg('search')::text || '%'
+        OR c.teller_id ILIKE '%' || sqlc.arg('search')::text || '%')
+    AND (sqlc.arg('date_from')::text = '' OR c.cashpos_date >= sqlc.arg('date_from')::date)
+    AND (sqlc.arg('date_to')::text = '' OR c.cashpos_date <= sqlc.arg('date_to')::date)
+ORDER BY
+    CASE WHEN sqlc.arg('sort_by')::text = 'cashpos_date' AND sqlc.arg('sort_order')::text = 'asc' THEN c.cashpos_date END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'cashpos_date' AND sqlc.arg('sort_order')::text = 'desc' THEN c.cashpos_date END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'terminal_id' AND sqlc.arg('sort_order')::text = 'asc' THEN c.terminal_id END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'terminal_id' AND sqlc.arg('sort_order')::text = 'desc' THEN c.terminal_id END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'machine_type' AND sqlc.arg('sort_order')::text = 'asc' THEN c.machine_type END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'machine_type' AND sqlc.arg('sort_order')::text = 'desc' THEN c.machine_type END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'branch_code' AND sqlc.arg('sort_order')::text = 'asc' THEN c.branch_code END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'branch_code' AND sqlc.arg('sort_order')::text = 'desc' THEN c.branch_code END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'asc' THEN c.created_at END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'created_at' AND sqlc.arg('sort_order')::text = 'desc' THEN c.created_at END DESC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'id' AND sqlc.arg('sort_order')::text = 'asc' THEN c.id END ASC,
+    CASE WHEN sqlc.arg('sort_by')::text = 'id' AND sqlc.arg('sort_order')::text = 'desc' THEN c.id END DESC,
+    c.cashpos_date DESC,
+    c.id DESC
+LIMIT sqlc.arg('page_size')::int OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
+
+-- name: CountItmCashpos :one
+-- Mirrors ListItmCashpos filters for pagination total.
+SELECT COUNT(*)
+FROM itm_cashpos c
+WHERE
+    (sqlc.arg('search')::text = ''
+        OR c.terminal_id ILIKE '%' || sqlc.arg('search')::text || '%'
+        OR c.branch_code ILIKE '%' || sqlc.arg('search')::text || '%'
+        OR c.teller_id ILIKE '%' || sqlc.arg('search')::text || '%')
+    AND (sqlc.arg('date_from')::text = '' OR c.cashpos_date >= sqlc.arg('date_from')::date)
+    AND (sqlc.arg('date_to')::text = '' OR c.cashpos_date <= sqlc.arg('date_to')::date);

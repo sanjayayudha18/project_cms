@@ -23,8 +23,17 @@ import {
 import type { ReplenishmentStatus } from "./types";
 
 export const ATM_PORTAL_QUERY_KEY = ["atm-portal", "list"] as const;
+export const ATM_CASHPOS_QUERY_KEY = ["atm-portal", "cashpos"] as const;
 
 export const ATM_PORTAL_STALE_TIME = 2 * 60 * 1000; // 2 minutes
+
+export const ATM_PORTAL_MODE_REPLENISH = "replenish" as const;
+export const ATM_PORTAL_MODE_CASHPOS = "cashpos" as const;
+
+export const CASHPOS_DEFAULT_SORT_BY = "cashpos_date" as const;
+export const CASHPOS_DEFAULT_SORT_ORDER = "desc" as const;
+export const REPLENISH_DEFAULT_SORT_BY = "terminal_id" as const;
+export const REPLENISH_DEFAULT_SORT_ORDER = "asc" as const;
 
 interface StatusBadgeConfig {
   readonly label: string;

@@ -1,38 +1,75 @@
 /**
- * ATM Portal page: composes the presentational Task-9 pieces around
- * useAtmPortalUrlState (URL-owned filter/sort/page) and useAtmPortalData
- * (TanStack Query fetch). Rendered inside the existing `AppShell` via the
- * `_protected` route layout (design.md), so this component does not wrap
- * itself in AppShell — matching ReplenishmentScreen.tsx's convention.
+ * ATM Portal page: mode selector (Replenish | Cashpos), URL-owned state,
+ * and mode-specific table/query composition.
  *
- * Retry re-fetches through `queryClient.refetchQueries` against the exact
- * current query key (Req 5.6/5.7/8.3) rather than resetting any filter
- * state, so an error retry preserves the user's current filter selections.
+ * Layout order matches replenish chrome: header → freshness/summary →
+ * filters (incl. dates) → table mode dropdown → table → pagination.
  */
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useQueryClient } from "@tanstack/react-query";
 import { AriaLiveRegion } from "./components/AriaLiveRegion";
+import { AtmCashposTable } from "./components/AtmCashposTable";
 import { AtmTable } from "./components/AtmTable";
 import { DataFreshnessIndicator } from "./components/DataFreshnessIndicator";
 import { FilterBar } from "./components/FilterBar";
 import { PaginationControls } from "./components/PaginationControls";
 import { SummaryCardsGrid } from "./components/SummaryCardsGrid";
-import { ATM_PORTAL_QUERY_KEY } from "./constants";
-import { useAtmPortalData } from "./useAtmPortalData";
+import { TableModeSelect } from "./components/TableModeSelect";
+import {
+  ATM_CASHPOS_QUERY_KEY,
+  ATM_PORTAL_MODE_CASHPOS,
+  ATM_PORTAL_QUERY_KEY,
+} from "./constants";
+import { useAtmCashposData, useAtmPortalData } from "./useAtmPortalData";
 import { useAtmPortalUrlState } from "./useAtmPortalUrlState";
 
 export function AtmPortalScreen() {
   const queryClient = useQueryClient();
-  const { params, searchInput, setSearchInput, setParams } = useAtmPortalUrlState();
-  const { data, isLoading, isError } = useAtmPortalData(params);
+  const { params, searchInput, setSearchInput, setParams, setMode } = useAtmPortalUrlState();
+  const isCashpos = params.mode === ATM_PORTAL_MODE_CASHPOS;
+
+  // Replenish query stays enabled for shared chrome (freshness + summary)
+  // even in cashpos mode so the page chrome matches ATM Replenish.
+  const replenishQuery = useAtmPortalData({ ...params, mode: "replenish" });
+  const cashposQuery = useAtmCashposData(params);
+
+  const isLoading = isCashpos ? cashposQuery.isLoading : replenishQuery.isLoading;
+  const isError = isCashpos ? cashposQuery.isError : replenishQuery.isError;
+  const resultCount = isCashpos
+    ? (cashposQuery.data?.data.length ?? 0)
+    : (replenishQuery.data?.data.length ?? 0);
+  const page = isCashpos
+    ? (cashposQuery.data?.page ?? params.page)
+    : (replenishQuery.data?.page ?? params.page);
+  const pageSize = isCashpos
+    ? (cashposQuery.data?.page_size ?? params.page_size)
+    : (replenishQuery.data?.page_size ?? params.page_size);
+  const total = isCashpos ? (cashposQuery.data?.total ?? 0) : (replenishQuery.data?.total ?? 0);
 
   function handleRetry(): void {
+    if (isCashpos) {
+      queryClient.refetchQueries({
+        queryKey: [
+          ...ATM_CASHPOS_QUERY_KEY,
+          {
+            page: params.page,
+            page_size: params.page_size,
+            search: params.search,
+            date_from: params.date_from,
+            date_to: params.date_to,
+            sort_by: params.sort_by,
+            sort_order: params.sort_order,
+          },
+        ],
+      });
+      return;
+    }
     queryClient.refetchQueries({ queryKey: [...ATM_PORTAL_QUERY_KEY, params] });
   }
 
   function handleSortChange(sortBy: string, sortOrder: "asc" | "desc"): void {
-    setParams({ sort_by: sortBy, sort_order: sortOrder });
+    setParams({ sort_by: sortBy, sort_order: sortOrder, page: 1 });
   }
 
   function handleClearAll(): void {
@@ -58,12 +95,16 @@ export function AtmPortalScreen() {
       <AriaLiveRegion
         isLoading={isLoading}
         isError={isError}
-        resultCount={data?.data.length ?? 0}
+        resultCount={resultCount}
+        mode={params.mode}
       />
 
-      <DataFreshnessIndicator lastUpdated={data?.last_updated ?? null} />
+      <DataFreshnessIndicator lastUpdated={replenishQuery.data?.last_updated ?? null} />
 
-      <SummaryCardsGrid summary={data?.summary} isLoading={isLoading} />
+      <SummaryCardsGrid
+        summary={replenishQuery.data?.summary}
+        isLoading={replenishQuery.isLoading && !replenishQuery.data}
+      />
 
       <FilterBar
         searchInput={searchInput}
@@ -78,22 +119,36 @@ export function AtmPortalScreen() {
         onClearAll={handleClearAll}
       />
 
-      <AtmTable
-        data={data?.data ?? []}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={handleRetry}
-        sortBy={params.sort_by}
-        sortOrder={params.sort_order}
-        onSortChange={handleSortChange}
-      />
+      <TableModeSelect mode={params.mode} onModeChange={setMode} />
+
+      {isCashpos ? (
+        <AtmCashposTable
+          data={cashposQuery.data?.data ?? []}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={handleRetry}
+          sortBy={params.sort_by}
+          sortOrder={params.sort_order}
+          onSortChange={handleSortChange}
+        />
+      ) : (
+        <AtmTable
+          data={replenishQuery.data?.data ?? []}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={handleRetry}
+          sortBy={params.sort_by}
+          sortOrder={params.sort_order}
+          onSortChange={handleSortChange}
+        />
+      )}
 
       <PaginationControls
-        page={data?.page ?? params.page}
-        pageSize={data?.page_size ?? params.page_size}
-        total={data?.total ?? 0}
-        onPageChange={(page) => setParams({ page })}
-        onPageSizeChange={(pageSize) => setParams({ page_size: pageSize, page: 1 })}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={(nextPage) => setParams({ page: nextPage })}
+        onPageSizeChange={(nextSize) => setParams({ page_size: nextSize, page: 1 })}
       />
     </div>
   );

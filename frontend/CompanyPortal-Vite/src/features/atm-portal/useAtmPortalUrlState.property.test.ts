@@ -25,27 +25,42 @@ import { omitDefaults, parseSearchParams } from "./useAtmPortalUrlState";
  * generated including the empty string.
  */
 describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-trip", () => {
-  const validParams: fc.Arbitrary<AtmPortalParams> = fc.record({
-    page: fc.integer({ min: 1, max: 9999 }),
-    page_size: fc.integer({ min: 1, max: 100 }),
-    search: fc.string({ maxLength: 100 }),
-    status: fc.constantFrom("all", "low", "critical", "normal", "unconfigured", "no_data"),
-    machine_type: fc.string({ maxLength: 30 }),
-    brand: fc.string({ maxLength: 30 }),
-    deployment_type: fc.string({ maxLength: 30 }),
-    region: fc.string({ maxLength: 30 }),
-    date_from: fc.constantFrom("", "2024-01-01", "2026-08-01"),
-    date_to: fc.constantFrom("", "2024-12-31", "2026-08-21"),
-    sort_by: fc.constantFrom(
-      "terminal_id",
-      "location",
-      "last_replenish_date",
-      "refund_total",
-      "replenish_total",
-      "status",
-    ),
-    sort_order: fc.constantFrom("asc", "desc"),
-  });
+  const validParams: fc.Arbitrary<AtmPortalParams> = fc
+    .constantFrom("replenish" as const, "cashpos" as const)
+    .chain((mode) =>
+      fc.record({
+        mode: fc.constant(mode),
+        page: fc.integer({ min: 1, max: 9999 }),
+        page_size: fc.integer({ min: 1, max: 100 }),
+        search: fc.string({ maxLength: 100 }),
+        status: fc.constantFrom("all", "low", "critical", "normal", "unconfigured", "no_data"),
+        machine_type: fc.string({ maxLength: 30 }),
+        brand: fc.string({ maxLength: 30 }),
+        deployment_type: fc.string({ maxLength: 30 }),
+        region: fc.string({ maxLength: 30 }),
+        date_from: fc.constantFrom("", "2024-01-01", "2026-08-01"),
+        date_to: fc.constantFrom("", "2024-12-31", "2026-08-21"),
+        sort_by:
+          mode === "cashpos"
+            ? fc.constantFrom(
+                "cashpos_date",
+                "terminal_id",
+                "machine_type",
+                "branch_code",
+                "created_at",
+                "id",
+              )
+            : fc.constantFrom(
+                "terminal_id",
+                "location",
+                "last_replenish_date",
+                "refund_total",
+                "replenish_total",
+                "status",
+              ),
+        sort_order: fc.constantFrom("asc" as const, "desc" as const),
+      }),
+    );
 
   it("round-trips: parseSearchParams(omitDefaults(params)) === params", () => {
     fc.assert(
@@ -60,18 +75,23 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
     fc.assert(
       fc.property(validParams, (params) => {
         const serialized = omitDefaults(params);
+        if (params.mode === "replenish") expect(serialized).not.toHaveProperty("mode");
         if (params.page === 1) expect(serialized).not.toHaveProperty("page");
         if (params.page_size === 25) expect(serialized).not.toHaveProperty("page_size");
         if (params.search === "") expect(serialized).not.toHaveProperty("search");
         if (params.status === "all") expect(serialized).not.toHaveProperty("status");
-        if (params.sort_by === "terminal_id") expect(serialized).not.toHaveProperty("sort_by");
-        if (params.sort_order === "asc") expect(serialized).not.toHaveProperty("sort_order");
+        const defaultSortBy = params.mode === "cashpos" ? "cashpos_date" : "terminal_id";
+        const defaultSortOrder = params.mode === "cashpos" ? "desc" : "asc";
+        if (params.sort_by === defaultSortBy) expect(serialized).not.toHaveProperty("sort_by");
+        if (params.sort_order === defaultSortOrder)
+          expect(serialized).not.toHaveProperty("sort_order");
       }),
     );
   });
 
   it("the all-defaults params object serializes to an empty object", () => {
     const defaults: AtmPortalParams = {
+      mode: "replenish",
       page: 1,
       page_size: 25,
       search: "",
@@ -90,6 +110,7 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
 
   it("parseSearchParams({}) reconstructs the all-defaults params object", () => {
     expect(parseSearchParams({})).toEqual({
+      mode: "replenish",
       page: 1,
       page_size: 25,
       search: "",
@@ -102,6 +123,18 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
       date_to: "",
       sort_by: "terminal_id",
       sort_order: "asc",
+    });
+  });
+
+  it("invalid mode falls back to replenish", () => {
+    expect(parseSearchParams({ mode: "nope" }).mode).toBe("replenish");
+  });
+
+  it("cashpos mode defaults sort to cashpos_date desc", () => {
+    expect(parseSearchParams({ mode: "cashpos" })).toMatchObject({
+      mode: "cashpos",
+      sort_by: "cashpos_date",
+      sort_order: "desc",
     });
   });
 });

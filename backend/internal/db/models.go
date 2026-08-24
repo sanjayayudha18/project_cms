@@ -86,6 +86,54 @@ type DmaaFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ItmCashpo struct {
+	ID     int64 `json:"id"`
+	FileID int64 `json:"file_id"`
+	// Business date parsed from the source filename
+	CashposDate pgtype.Date `json:"cashpos_date"`
+	TerminalID  string      `json:"terminal_id"`
+	// ATM50K | ATM100K | CRM
+	MachineType      string         `json:"machine_type"`
+	TellerID         string         `json:"teller_id"`
+	BranchCode       string         `json:"branch_code"`
+	StartingCash10k  pgtype.Numeric `json:"starting_cash_10k"`
+	CashIn10k        pgtype.Numeric `json:"cash_in_10k"`
+	CashOut10k       pgtype.Numeric `json:"cash_out_10k"`
+	CashPosition10k  pgtype.Numeric `json:"cash_position_10k"`
+	StartingCash20k  pgtype.Numeric `json:"starting_cash_20k"`
+	CashIn20k        pgtype.Numeric `json:"cash_in_20k"`
+	CashOut20k       pgtype.Numeric `json:"cash_out_20k"`
+	CashPosition20k  pgtype.Numeric `json:"cash_position_20k"`
+	StartingCash50k  pgtype.Numeric `json:"starting_cash_50k"`
+	CashIn50k        pgtype.Numeric `json:"cash_in_50k"`
+	CashOut50k       pgtype.Numeric `json:"cash_out_50k"`
+	CashPosition50k  pgtype.Numeric `json:"cash_position_50k"`
+	StartingCash100k pgtype.Numeric `json:"starting_cash_100k"`
+	CashIn100k       pgtype.Numeric `json:"cash_in_100k"`
+	CashOut100k      pgtype.Numeric `json:"cash_out_100k"`
+	CashPosition100k pgtype.Numeric `json:"cash_position_100k"`
+	// Source indicator from POSITION_SOURCE, for example CURRENT or REPLENISH
+	PositionSource string             `json:"position_source"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type ItmCashposFile struct {
+	ID       int64  `json:"id"`
+	Filename string `json:"filename"`
+	// Business date parsed from the source filename
+	FileDate pgtype.Date `json:"file_date"`
+	Checksum *string     `json:"checksum"`
+	// pending | processing | completed | failed
+	Status       string             `json:"status"`
+	RowCount     *int32             `json:"row_count"`
+	SuccessCount *int32             `json:"success_count"`
+	ErrorCount   *int32             `json:"error_count"`
+	ErrorMessage *string            `json:"error_message"`
+	ProcessedAt  pgtype.Timestamptz `json:"processed_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ItmReplenish struct {
 	ID     int64 `json:"id"`
 	FileID int64 `json:"file_id"`

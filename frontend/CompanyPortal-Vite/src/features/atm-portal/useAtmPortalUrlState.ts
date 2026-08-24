@@ -1,25 +1,25 @@
 /**
- * URL search-param sync for ATM Portal filters/sort/page (design.md's
- * "URL State Sync" section):
- * - Filter/sort/page state lives in URL search params, via useSearch()
+ * URL search-param sync for ATM Portal filters/sort/page/mode.
+ * - Filter/sort/page/mode state lives in URL search params
  * - Default values are omitted from the URL for clean, shareable links
- * - Browser back/forward navigates filter history — so param changes push a
- *   new history entry, not replace (the one exception: `search` writes are
- *   debounced 300ms, so a burst of keystrokes collapses into one entry)
- *
- * Written to be self-sufficient ahead of Task 10.3's route registration:
- * reads/parses search params defensively with useSearch({ strict: false })
- * rather than depending on a route's `validateSearch` already existing.
- * ATM_PORTAL_SEARCH_SCHEMA is exported so Task 10.3 can wire it into the
- * route's `validateSearch` for compile-time-typed search params too.
+ * - Mode default is replenish; switching mode resets page to 1 and mode-specific sort
  */
 
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import type { AtmPortalParams } from "./types";
+import {
+  ATM_PORTAL_MODE_CASHPOS,
+  ATM_PORTAL_MODE_REPLENISH,
+  CASHPOS_DEFAULT_SORT_BY,
+  CASHPOS_DEFAULT_SORT_ORDER,
+  REPLENISH_DEFAULT_SORT_BY,
+  REPLENISH_DEFAULT_SORT_ORDER,
+} from "./constants";
+import type { AtmPortalMode, AtmPortalParams } from "./types";
 
 export const ATM_PORTAL_SEARCH_SCHEMA = z.object({
+  mode: z.enum(["replenish", "cashpos"]).optional(),
   page: z.number().int().min(1).optional(),
   page_size: z.number().int().min(1).max(100).optional(),
   search: z.string().max(100).optional(),
@@ -37,6 +37,7 @@ export const ATM_PORTAL_SEARCH_SCHEMA = z.object({
 export type AtmPortalSearchParams = z.infer<typeof ATM_PORTAL_SEARCH_SCHEMA>;
 
 const ATM_PORTAL_SEARCH_DEFAULTS: AtmPortalParams = {
+  mode: ATM_PORTAL_MODE_REPLENISH,
   page: 1,
   page_size: 25,
   search: "",
@@ -47,8 +48,8 @@ const ATM_PORTAL_SEARCH_DEFAULTS: AtmPortalParams = {
   region: "",
   date_from: "",
   date_to: "",
-  sort_by: "terminal_id",
-  sort_order: "asc",
+  sort_by: REPLENISH_DEFAULT_SORT_BY,
+  sort_order: REPLENISH_DEFAULT_SORT_ORDER,
 };
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -62,14 +63,23 @@ function toStringOrDefault(value: unknown, fallback: string): string {
   return typeof value === "string" && value !== "" ? value : fallback;
 }
 
+function parseMode(value: unknown): AtmPortalMode {
+  return value === ATM_PORTAL_MODE_CASHPOS ? ATM_PORTAL_MODE_CASHPOS : ATM_PORTAL_MODE_REPLENISH;
+}
+
 /**
- * Merges raw (possibly-string, possibly-absent) URL search values with
- * defaults. Exported (paired with omitDefaults) for Property 11's
- * round-trip test — serializing a params object with omitDefaults and then
- * deserializing it with this function must reconstruct the original.
+ * Merges raw URL search values with defaults. Mode-aware sort defaults:
+ * cashpos defaults to cashpos_date/desc when sort is absent.
  */
 export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams {
+  const mode = parseMode(raw.mode);
+  const defaultSortBy =
+    mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_BY : REPLENISH_DEFAULT_SORT_BY;
+  const defaultSortOrder =
+    mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_ORDER : REPLENISH_DEFAULT_SORT_ORDER;
+
   return {
+    mode,
     page: toNumber(raw.page, ATM_PORTAL_SEARCH_DEFAULTS.page),
     page_size: toNumber(raw.page_size, ATM_PORTAL_SEARCH_DEFAULTS.page_size),
     search: toStringOrDefault(raw.search, ATM_PORTAL_SEARCH_DEFAULTS.search),
@@ -83,16 +93,30 @@ export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams
     region: toStringOrDefault(raw.region, ATM_PORTAL_SEARCH_DEFAULTS.region),
     date_from: toStringOrDefault(raw.date_from, ATM_PORTAL_SEARCH_DEFAULTS.date_from),
     date_to: toStringOrDefault(raw.date_to, ATM_PORTAL_SEARCH_DEFAULTS.date_to),
-    sort_by: toStringOrDefault(raw.sort_by, ATM_PORTAL_SEARCH_DEFAULTS.sort_by),
-    sort_order: raw.sort_order === "desc" ? "desc" : ATM_PORTAL_SEARCH_DEFAULTS.sort_order,
+    sort_by: toStringOrDefault(raw.sort_by, defaultSortBy),
+    sort_order:
+      raw.sort_order === "asc" || raw.sort_order === "desc" ? raw.sort_order : defaultSortOrder,
   };
 }
 
-/** Drops keys whose value equals the default, so the URL stays clean. */
+/** Mode-aware default comparison for omitDefaults. */
+function defaultForKey(key: keyof AtmPortalParams, mode: AtmPortalMode): AtmPortalParams[keyof AtmPortalParams] {
+  if (key === "sort_by") {
+    return mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_BY : REPLENISH_DEFAULT_SORT_BY;
+  }
+  if (key === "sort_order") {
+    return mode === ATM_PORTAL_MODE_CASHPOS
+      ? CASHPOS_DEFAULT_SORT_ORDER
+      : REPLENISH_DEFAULT_SORT_ORDER;
+  }
+  return ATM_PORTAL_SEARCH_DEFAULTS[key];
+}
+
+/** Drops keys whose value equals the mode-aware default. */
 export function omitDefaults(params: AtmPortalParams): AtmPortalSearchParams {
   const out: AtmPortalSearchParams = {};
   for (const key of Object.keys(ATM_PORTAL_SEARCH_DEFAULTS) as (keyof AtmPortalParams)[]) {
-    if (params[key] !== ATM_PORTAL_SEARCH_DEFAULTS[key]) {
+    if (params[key] !== defaultForKey(key, params.mode)) {
       (out as Record<string, unknown>)[key] = params[key];
     }
   }
@@ -109,14 +133,11 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 }
 
 export interface UseAtmPortalUrlStateReturn {
-  /** Current filter/sort/page state, defaults already applied. */
   readonly params: AtmPortalParams;
-  /** The search input's live (non-debounced) value, for the controlled input. */
   readonly searchInput: string;
-  /** Updates the search input immediately; the URL write is debounced 300ms. */
   readonly setSearchInput: (value: string) => void;
-  /** Updates any non-search param(s) immediately (page, sort, filters, ...). */
   readonly setParams: (partial: Partial<Omit<AtmPortalParams, "search">>) => void;
+  readonly setMode: (mode: AtmPortalMode) => void;
 }
 
 export function useAtmPortalUrlState(): UseAtmPortalUrlStateReturn {
@@ -127,12 +148,11 @@ export function useAtmPortalUrlState(): UseAtmPortalUrlStateReturn {
   const [searchInput, setSearchInput] = useState(params.search);
   const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
 
-  // Reflect external URL changes (back/forward, shared link) into the input.
   useEffect(() => {
     setSearchInput(params.search);
   }, [params.search]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: params is re-derived every render; including it (or navigate/omitDefaults) here would re-fire this effect every render and fight the debounce
+  // biome-ignore lint/correctness/useExhaustiveDependencies: params is re-derived every render; including it would re-fire this effect every render
   useEffect(() => {
     if (debouncedSearch === params.search) {
       return;
@@ -146,5 +166,21 @@ export function useAtmPortalUrlState(): UseAtmPortalUrlStateReturn {
     navigate({ to: ".", search: next });
   }
 
-  return { params, searchInput, setSearchInput, setParams };
+  function setMode(mode: AtmPortalMode): void {
+    if (mode === params.mode) {
+      return;
+    }
+    const sortBy =
+      mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_BY : REPLENISH_DEFAULT_SORT_BY;
+    const sortOrder =
+      mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_ORDER : REPLENISH_DEFAULT_SORT_ORDER;
+    setParams({
+      mode,
+      page: 1,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    });
+  }
+
+  return { params, searchInput, setSearchInput, setParams, setMode };
 }

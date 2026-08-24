@@ -1,29 +1,42 @@
 /**
- * Visually hidden `aria-live="polite"` region announcing ATM table state
- * transitions (loading/loaded/error/empty) to screen readers (Req 11.8).
- *
- * The announcement text must actually change between states — a static
- * region that never re-renders its text announces nothing after the first
- * mount, so each state maps to distinct wording (not just visibility).
+ * Visually hidden `aria-live="polite"` region announcing table state
+ * transitions for the active ATM Portal dataset.
  */
+
+import type { AtmPortalMode } from "../types";
 
 interface AriaLiveRegionProps {
   isLoading: boolean;
   isError: boolean;
   resultCount: number;
+  mode?: AtmPortalMode;
 }
 
-function announcementFor({ isLoading, isError, resultCount }: AriaLiveRegionProps): string {
+function datasetLabel(mode: AtmPortalMode): string {
+  return mode === "cashpos" ? "ATM Cashpos" : "ATM";
+}
+
+function announcementFor({
+  isLoading,
+  isError,
+  resultCount,
+  mode = "replenish",
+}: AriaLiveRegionProps): string {
+  const label = datasetLabel(mode);
   if (isLoading) {
-    return "Memuat data ATM…";
+    return `Memuat data ${label}…`;
   }
   if (isError) {
-    return "Gagal memuat data ATM";
+    return `Gagal memuat data ${label}`;
   }
   if (resultCount === 0) {
-    return "Tidak ada ATM yang sesuai filter";
+    return mode === "cashpos"
+      ? "Tidak ada data cashpos yang sesuai filter"
+      : "Tidak ada ATM yang sesuai filter";
   }
-  return `Menampilkan ${resultCount} ATM`;
+  return mode === "cashpos"
+    ? `Menampilkan ${resultCount} baris ATM Cashpos`
+    : `Menampilkan ${resultCount} ATM`;
 }
 
 export function AriaLiveRegion(props: AriaLiveRegionProps) {

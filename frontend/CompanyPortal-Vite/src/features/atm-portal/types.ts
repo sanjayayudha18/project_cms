@@ -49,7 +49,10 @@ export interface AtmPortalResponse {
   readonly last_updated: string | null;
 }
 
+export type AtmPortalMode = "replenish" | "cashpos";
+
 export interface AtmPortalParams {
+  readonly mode: AtmPortalMode;
   readonly page: number;
   readonly page_size: number;
   readonly search: string;
@@ -58,6 +61,53 @@ export interface AtmPortalParams {
   readonly brand: string;
   readonly deployment_type: string;
   readonly region: string;
+  readonly date_from: string;
+  readonly date_to: string;
+  readonly sort_by: string;
+  readonly sort_order: "asc" | "desc";
+}
+
+/** One itm_cashpos row; all denomination amounts are decimal strings. */
+export interface AtmCashposRecord {
+  readonly id: number;
+  readonly file_id: number;
+  readonly cashpos_date: string;
+  readonly terminal_id: string;
+  readonly machine_type: string;
+  readonly teller_id: string;
+  readonly branch_code: string;
+  readonly starting_cash_10k: string;
+  readonly cash_in_10k: string;
+  readonly cash_out_10k: string;
+  readonly cash_position_10k: string;
+  readonly starting_cash_20k: string;
+  readonly cash_in_20k: string;
+  readonly cash_out_20k: string;
+  readonly cash_position_20k: string;
+  readonly starting_cash_50k: string;
+  readonly cash_in_50k: string;
+  readonly cash_out_50k: string;
+  readonly cash_position_50k: string;
+  readonly starting_cash_100k: string;
+  readonly cash_in_100k: string;
+  readonly cash_out_100k: string;
+  readonly cash_position_100k: string;
+  readonly position_source: string;
+  readonly created_at: string;
+}
+
+export interface AtmCashposResponse {
+  readonly data: readonly AtmCashposRecord[];
+  readonly total: number;
+  readonly page: number;
+  readonly page_size: number;
+}
+
+/** Cashpos-only request params (no replenish-only filters). */
+export interface AtmCashposParams {
+  readonly page: number;
+  readonly page_size: number;
+  readonly search: string;
   readonly date_from: string;
   readonly date_to: string;
   readonly sort_by: string;

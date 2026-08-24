@@ -10,13 +10,21 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AriaLiveRegion } from "../components/AriaLiveRegion";
+import { AtmCashposTable } from "../components/AtmCashposTable";
 import { AtmTable } from "../components/AtmTable";
 import { FilterBar } from "../components/FilterBar";
 import { PaginationControls } from "../components/PaginationControls";
 import { StatusBadge } from "../components/StatusBadge";
 import { SummaryCardsGrid } from "../components/SummaryCardsGrid";
+import { TableModeSelect } from "../components/TableModeSelect";
 import { STATUS_BADGE_CONFIG } from "../constants";
-import type { AtmPortalParams, AtmPortalResponse, AtmRecord, AtmSummary } from "../types";
+import type {
+  AtmCashposRecord,
+  AtmPortalParams,
+  AtmPortalResponse,
+  AtmRecord,
+  AtmSummary,
+} from "../types";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -362,6 +370,7 @@ describe("AriaLiveRegion — Req 11.8", () => {
 // ─── Req 3.2, 8.3: PageHeader content + retry triggers refetch (composed) ─────
 
 const mockParams: AtmPortalParams = {
+  mode: "replenish",
   page: 1,
   page_size: 25,
   search: "",
@@ -376,19 +385,53 @@ const mockParams: AtmPortalParams = {
   sort_order: "asc",
 };
 
+const mockSetMode = vi.fn();
+const mockUrlState = {
+  params: mockParams as AtmPortalParams,
+  searchInput: "",
+  setSearchInput: vi.fn(),
+  setParams: vi.fn(),
+  setMode: mockSetMode,
+};
+
 vi.mock("../useAtmPortalUrlState", () => ({
-  useAtmPortalUrlState: () => ({
-    params: mockParams,
-    searchInput: "",
-    setSearchInput: vi.fn(),
-    setParams: vi.fn(),
-  }),
+  useAtmPortalUrlState: () => mockUrlState,
 }));
 
 const mockUseAtmPortalData = vi.fn();
+const mockUseAtmCashposData = vi.fn();
 vi.mock("../useAtmPortalData", () => ({
   useAtmPortalData: () => mockUseAtmPortalData(),
+  useAtmCashposData: () => mockUseAtmCashposData(),
 }));
+
+const cashposFixture: AtmCashposRecord = {
+  id: 1,
+  file_id: 2,
+  cashpos_date: "2026-08-20",
+  terminal_id: "ATM001",
+  machine_type: "ATM100K",
+  teller_id: "T001",
+  branch_code: "BR01",
+  starting_cash_10k: "1000000.00",
+  cash_in_10k: "50.50",
+  cash_out_10k: "25.25",
+  cash_position_10k: "1025.25",
+  starting_cash_20k: "0.00",
+  cash_in_20k: "0.00",
+  cash_out_20k: "0.00",
+  cash_position_20k: "0.00",
+  starting_cash_50k: "0.00",
+  cash_in_50k: "0.00",
+  cash_out_50k: "0.00",
+  cash_position_50k: "0.00",
+  starting_cash_100k: "9999999999999999.99",
+  cash_in_100k: "1.01",
+  cash_out_100k: "2.02",
+  cash_position_100k: "3.03",
+  position_source: "CURRENT",
+  created_at: "2026-08-20T10:30:00Z",
+};
 
 const mockResponse: AtmPortalResponse = {
   data: [atmFixture],
@@ -413,6 +456,10 @@ function renderScreenWithClient() {
 describe("AtmPortalScreen composition — Req 3.2, 8.3", () => {
   beforeEach(() => {
     mockUseAtmPortalData.mockReset();
+    mockUseAtmCashposData.mockReset();
+    mockSetMode.mockReset();
+    mockUrlState.params = { ...mockParams };
+    mockUseAtmCashposData.mockReturnValue({ data: undefined, isLoading: false, isError: false });
   });
 
   it("renders PageHeader with the correct title and description (Req 3.2)", async () => {
@@ -430,6 +477,8 @@ describe("AtmPortalScreen composition — Req 3.2, 8.3", () => {
     expect(
       screen.getByText("Monitor posisi kas dan status replenishment seluruh ATM"),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Tampilan tabel")).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Daftar ATM" })).toBeInTheDocument();
   });
 
   it("retry click triggers a refetch (Req 8.3)", async () => {
@@ -447,7 +496,170 @@ describe("AtmPortalScreen composition — Req 3.2, 8.3", () => {
     await user.click(screen.getByRole("button", { name: "Coba Lagi" }));
 
     expect(refetchSpy).toHaveBeenCalledWith({
-      queryKey: ["atm-portal", "list", mockParams],
+      queryKey: ["atm-portal", "list", mockUrlState.params],
     });
+  });
+
+  it("cashpos mode renders cashpos table with same filter chrome as replenish", async () => {
+    mockUrlState.params = {
+      ...mockParams,
+      mode: "cashpos",
+      sort_by: "cashpos_date",
+      sort_order: "desc",
+    };
+    mockUseAtmPortalData.mockReturnValue({ data: mockResponse, isLoading: false, isError: false });
+    mockUseAtmCashposData.mockReturnValue({
+      data: { data: [cashposFixture], total: 1, page: 1, page_size: 25 },
+      isLoading: false,
+      isError: false,
+    });
+    const AtmPortalScreen = await importAtmPortalScreen();
+    const { queryClient } = renderScreenWithClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AtmPortalScreen />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("table", { name: "Daftar ATM Cashpos" })).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Daftar ATM" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Total ATM/)).toBeInTheDocument();
+    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByText("Brand")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dari tanggal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tampilan tabel")).toBeInTheDocument();
+    expect(screen.getByText("ATM001")).toBeInTheDocument();
+    expect(screen.getByText("Rp 9.999.999.999.999.999,99")).toBeInTheDocument();
+  });
+});
+
+describe("TableModeSelect", () => {
+  it("exposes exactly ATM Replenish and ATM Cashpos options", () => {
+    render(<TableModeSelect mode="replenish" onModeChange={() => {}} />);
+    const select = screen.getByLabelText("Tampilan tabel");
+    const options = within(select as HTMLSelectElement).getAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["ATM Replenish", "ATM Cashpos"]);
+  });
+
+  it("calls onModeChange when selection changes", async () => {
+    const onModeChange = vi.fn();
+    render(<TableModeSelect mode="replenish" onModeChange={onModeChange} />);
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Tampilan tabel"), "cashpos");
+    expect(onModeChange).toHaveBeenCalledWith("cashpos");
+  });
+});
+
+describe("AtmCashposTable", () => {
+  const noop = () => {};
+
+  it("renders all schema field headers", () => {
+    render(
+      <AtmCashposTable
+        data={[cashposFixture]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="cashpos_date"
+        sortOrder="desc"
+        onSortChange={noop}
+      />,
+    );
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent?.trim());
+    expect(headers).toEqual([
+      "ID",
+      "File ID",
+      "Created At",
+      "Cashpos Date",
+      "Terminal ID",
+      "Machine Type",
+      "Teller ID",
+      "Branch Code",
+      "Position Source",
+      "Starting 10K",
+      "In 10K",
+      "Out 10K",
+      "Pos 10K",
+      "Starting 20K",
+      "In 20K",
+      "Out 20K",
+      "Pos 20K",
+      "Starting 50K",
+      "In 50K",
+      "Out 50K",
+      "Pos 50K",
+      "Starting 100K",
+      "In 100K",
+      "Out 100K",
+      "Pos 100K",
+    ]);
+  });
+
+  it("loading/error/empty/retry states", async () => {
+    const { rerender } = render(
+      <AtmCashposTable
+        data={[]}
+        isLoading={true}
+        isError={false}
+        onRetry={noop}
+        sortBy="id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(5);
+
+    const onRetry = vi.fn();
+    rerender(
+      <AtmCashposTable
+        data={[]}
+        isLoading={false}
+        isError={true}
+        onRetry={onRetry}
+        sortBy="id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    expect(screen.getByText("Gagal memuat data ATM Cashpos")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Coba Lagi" }));
+    expect(onRetry).toHaveBeenCalled();
+
+    rerender(
+      <AtmCashposTable
+        data={[]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    expect(screen.getByText("Tidak ada data cashpos yang sesuai filter")).toBeInTheDocument();
+  });
+});
+
+describe("FilterBar shared chrome", () => {
+  it("always shows status, brand, machine type, deployment, and date filters", () => {
+    render(
+      <FilterBar
+        searchInput=""
+        onSearchInputChange={() => {}}
+        status="all"
+        machineType=""
+        brand=""
+        deploymentType=""
+        dateFrom=""
+        dateTo=""
+        onFilterChange={() => {}}
+        onClearAll={() => {}}
+      />,
+    );
+    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByText("Brand")).toBeInTheDocument();
+    expect(screen.getByText("Machine Type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dari tanggal")).toBeInTheDocument();
   });
 });

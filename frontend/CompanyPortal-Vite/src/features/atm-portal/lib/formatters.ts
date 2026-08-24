@@ -59,6 +59,37 @@ export function formatRupiah(value: number | null): string {
 }
 
 /**
+ * Format an exact decimal string amount (from cashpos API) as Rupiah without
+ * float conversion. Integer part gets thousand separators; fractional part
+ * is shown only when non-zero (or always when present and not ".00").
+ *
+ * @example formatRupiahDecimal("1250000.00") // "Rp 1.250.000"
+ * @example formatRupiahDecimal("1250000.50") // "Rp 1.250.000,50"
+ * @example formatRupiahDecimal("9999999999999999.99") // "Rp 9.999.999.999.999.999,99"
+ */
+export function formatRupiahDecimal(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+  const neg = value.startsWith("-");
+  const raw = neg ? value.slice(1) : value;
+  const [intRaw, fracRaw = ""] = raw.split(".");
+  const intDigits = (intRaw || "0").replace(/\D/g, "") || "0";
+  // Thousand-separate integer digits from the right without Number().
+  let grouped = "";
+  for (let i = 0; i < intDigits.length; i++) {
+    if (i > 0 && (intDigits.length - i) % 3 === 0) {
+      grouped += ".";
+    }
+    grouped += intDigits[i];
+  }
+  const fracSignificant = fracRaw.replace(/0+$/, "");
+  const body =
+    fracSignificant.length > 0 ? `${grouped},${fracSignificant}` : grouped;
+  return `Rp ${neg ? `-${body}` : body}`;
+}
+
+/**
  * Format a Date as "dd MMM yyyy" using Indonesian month abbreviations and
  * UTC date components (see module doc for why). Returns "—" for null.
  *

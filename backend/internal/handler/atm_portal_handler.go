@@ -17,11 +17,13 @@ import (
 // in the service layer, since they're an HTTP-parsing concern — the
 // service just validates whatever concrete params it's given.
 const (
-	defaultPage      = 1
-	defaultPageSize  = 25
-	defaultStatus    = "all"
-	defaultSortBy    = "terminal_id"
-	defaultSortOrder = "asc"
+	defaultPage             = 1
+	defaultPageSize         = 25
+	defaultStatus           = "all"
+	defaultSortBy           = "terminal_id"
+	defaultSortOrder        = "asc"
+	defaultCashposSortBy    = "cashpos_date"
+	defaultCashposSortOrder = "desc"
 )
 
 // AtmPortalHandler handles ATM Portal HTTP endpoints.
@@ -38,6 +40,7 @@ func NewAtmPortalHandler(svc service.AtmPortalServicer) *AtmPortalHandler {
 func (h *AtmPortalHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/atms", h.ListATMs)
+	r.Get("/cashpos", h.ListCashpos)
 	return r
 }
 
@@ -57,6 +60,46 @@ func (h *AtmPortalHandler) ListATMs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, toListATMsResponse(result))
+}
+
+// ListCashpos handles GET /cashpos — paginated raw itm_cashpos rows.
+// Monetary fields are decimal strings (no float).
+func (h *AtmPortalHandler) ListCashpos(w http.ResponseWriter, r *http.Request) {
+	params, err := parseListCashposParams(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+
+	result, err := h.service.ListCashpos(r.Context(), params)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toListCashposResponse(result))
+}
+
+// parseListCashposParams parses cashpos query params with API defaults.
+func parseListCashposParams(q url.Values) (service.ListCashposParams, error) {
+	page, err := parseIntParam(q, "page", defaultPage)
+	if err != nil {
+		return service.ListCashposParams{}, fmt.Errorf("page harus berupa angka")
+	}
+	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
+	if err != nil {
+		return service.ListCashposParams{}, fmt.Errorf("page_size harus berupa angka")
+	}
+
+	return service.ListCashposParams{
+		Page:      page,
+		PageSize:  pageSize,
+		Search:    q.Get("search"),
+		DateFrom:  q.Get("date_from"),
+		DateTo:    q.Get("date_to"),
+		SortBy:    queryOrDefault(q, "sort_by", defaultCashposSortBy),
+		SortOrder: queryOrDefault(q, "sort_order", defaultCashposSortOrder),
+	}, nil
 }
 
 // parseListATMsParams parses query params into service.ListATMsParams,
@@ -217,4 +260,81 @@ func formatTimePtr(t *time.Time) *string {
 	}
 	s := t.Format(time.RFC3339)
 	return &s
+}
+
+// cashposRow is a single itm_cashpos row in the API response. All 16
+// denomination amounts are decimal strings to avoid float precision loss.
+type cashposRow struct {
+	ID               int64  `json:"id"`
+	FileID           int64  `json:"file_id"`
+	CashposDate      string `json:"cashpos_date"`
+	TerminalID       string `json:"terminal_id"`
+	MachineType      string `json:"machine_type"`
+	TellerID         string `json:"teller_id"`
+	BranchCode       string `json:"branch_code"`
+	StartingCash10k  string `json:"starting_cash_10k"`
+	CashIn10k        string `json:"cash_in_10k"`
+	CashOut10k       string `json:"cash_out_10k"`
+	CashPosition10k  string `json:"cash_position_10k"`
+	StartingCash20k  string `json:"starting_cash_20k"`
+	CashIn20k        string `json:"cash_in_20k"`
+	CashOut20k       string `json:"cash_out_20k"`
+	CashPosition20k  string `json:"cash_position_20k"`
+	StartingCash50k  string `json:"starting_cash_50k"`
+	CashIn50k        string `json:"cash_in_50k"`
+	CashOut50k       string `json:"cash_out_50k"`
+	CashPosition50k  string `json:"cash_position_50k"`
+	StartingCash100k string `json:"starting_cash_100k"`
+	CashIn100k       string `json:"cash_in_100k"`
+	CashOut100k      string `json:"cash_out_100k"`
+	CashPosition100k string `json:"cash_position_100k"`
+	PositionSource   string `json:"position_source"`
+	CreatedAt        string `json:"created_at"`
+}
+
+// listCashposResponse is the JSON body for GET /cashpos.
+type listCashposResponse struct {
+	Data     []cashposRow `json:"data"`
+	Total    int64        `json:"total"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+}
+
+func toListCashposResponse(result *service.ListCashposResult) listCashposResponse {
+	data := make([]cashposRow, len(result.Data))
+	for i, row := range result.Data {
+		data[i] = cashposRow{
+			ID:               row.ID,
+			FileID:           row.FileID,
+			CashposDate:      row.CashposDate.Format("2006-01-02"),
+			TerminalID:       row.TerminalID,
+			MachineType:      row.MachineType,
+			TellerID:         row.TellerID,
+			BranchCode:       row.BranchCode,
+			StartingCash10k:  row.StartingCash10k,
+			CashIn10k:        row.CashIn10k,
+			CashOut10k:       row.CashOut10k,
+			CashPosition10k:  row.CashPosition10k,
+			StartingCash20k:  row.StartingCash20k,
+			CashIn20k:        row.CashIn20k,
+			CashOut20k:       row.CashOut20k,
+			CashPosition20k:  row.CashPosition20k,
+			StartingCash50k:  row.StartingCash50k,
+			CashIn50k:        row.CashIn50k,
+			CashOut50k:       row.CashOut50k,
+			CashPosition50k:  row.CashPosition50k,
+			StartingCash100k: row.StartingCash100k,
+			CashIn100k:       row.CashIn100k,
+			CashOut100k:      row.CashOut100k,
+			CashPosition100k: row.CashPosition100k,
+			PositionSource:   row.PositionSource,
+			CreatedAt:        row.CreatedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return listCashposResponse{
+		Data:     data,
+		Total:    result.Total,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+	}
 }

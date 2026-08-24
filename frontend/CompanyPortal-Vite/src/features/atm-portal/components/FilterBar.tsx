@@ -1,29 +1,7 @@
 /**
  * Search input + status/machine_type/brand multi-selects + deployment_type
- * select + active filter count / "Clear All" (Req 5.1-5.3, 5.5, 10.4, 11.5).
- *
- * Purely presentational/controlled — receives current values and change
- * callbacks as props rather than calling useAtmPortalUrlState() itself, so
- * the parent screen (Task 10.1) is the single owner of URL state and this
- * component stays easy to test in isolation.
- *
- * `search`'s 300ms debounce already lives in useAtmPortalUrlState (Task
- * 8.2) — this component just binds to onSearchInputChange, it doesn't
- * debounce anything itself.
- *
- * Multi-select is implemented as a row of toggleable chip buttons (native
- * <button aria-pressed>), not a dropdown-with-checkboxes widget — there's
- * no existing multi-select component in this codebase to reuse, and chips
- * avoid needing to build focus-trap/outside-click handling for a custom
- * popover just for this task. deployment_type reuses the existing
- * FilterSelect (single-select, already has the 44x44 touch target baked
- * in).
- *
- * Brand options are exactly the three requirements.md Req 89.3 lists
- * (Hyosung, Wincor, Diebold) verbatim, even though the real atms table has
- * six distinct brand values (also Hitachi, OKI, NCR) — matching the quoted
- * requirement, not the live data, per this project's convention of
- * following requirements.md acceptance criteria verbatim where quoted.
+ * select + date range + active filter count / "Clear All".
+ * Same filter surface for both ATM Replenish and ATM Cashpos modes.
  */
 
 import { FilterSelect } from "@/components/ui/FilterSelect";
@@ -132,6 +110,8 @@ export function FilterBar({
     dateTo !== "",
   ].filter(Boolean).length;
 
+  const searchLabel = "Cari berdasarkan Terminal ID atau lokasi";
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
@@ -139,7 +119,7 @@ export function FilterBar({
           htmlFor="atm-portal-search"
           className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
         >
-          Cari berdasarkan Terminal ID atau lokasi
+          {searchLabel}
         </label>
         <input
           id="atm-portal-search"
@@ -147,7 +127,7 @@ export function FilterBar({
           value={searchInput}
           onChange={(e) => onSearchInputChange(e.target.value.slice(0, SEARCH_MAX_LENGTH))}
           maxLength={SEARCH_MAX_LENGTH}
-          placeholder="Cari berdasarkan Terminal ID atau lokasi"
+          placeholder={searchLabel}
           className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
         />
       </div>

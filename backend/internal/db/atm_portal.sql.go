@@ -90,6 +90,32 @@ func (q *Queries) CountATMsWithCashPos(ctx context.Context, arg CountATMsWithCas
 	return count, err
 }
 
+const countItmCashpos = `-- name: CountItmCashpos :one
+SELECT COUNT(*)
+FROM itm_cashpos c
+WHERE
+    ($1::text = ''
+        OR c.terminal_id ILIKE '%' || $1::text || '%'
+        OR c.branch_code ILIKE '%' || $1::text || '%'
+        OR c.teller_id ILIKE '%' || $1::text || '%')
+    AND ($2::text = '' OR c.cashpos_date >= $2::date)
+    AND ($3::text = '' OR c.cashpos_date <= $3::date)
+`
+
+type CountItmCashposParams struct {
+	Search   string `json:"search"`
+	DateFrom string `json:"date_from"`
+	DateTo   string `json:"date_to"`
+}
+
+// Mirrors ListItmCashpos filters for pagination total.
+func (q *Queries) CountItmCashpos(ctx context.Context, arg CountItmCashposParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countItmCashpos, arg.Search, arg.DateFrom, arg.DateTo)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getATMSummary = `-- name: GetATMSummary :one
 SELECT
     COUNT(*) AS total,
@@ -339,6 +365,126 @@ func (q *Queries) ListATMsWithCashPos(ctx context.Context, arg ListATMsWithCashP
 			&i.ReplenishTotal,
 			&i.Escrow,
 			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItmCashpos = `-- name: ListItmCashpos :many
+SELECT
+    c.id,
+    c.file_id,
+    c.cashpos_date,
+    c.terminal_id,
+    c.machine_type,
+    c.teller_id,
+    c.branch_code,
+    c.starting_cash_10k,
+    c.cash_in_10k,
+    c.cash_out_10k,
+    c.cash_position_10k,
+    c.starting_cash_20k,
+    c.cash_in_20k,
+    c.cash_out_20k,
+    c.cash_position_20k,
+    c.starting_cash_50k,
+    c.cash_in_50k,
+    c.cash_out_50k,
+    c.cash_position_50k,
+    c.starting_cash_100k,
+    c.cash_in_100k,
+    c.cash_out_100k,
+    c.cash_position_100k,
+    c.position_source,
+    c.created_at
+FROM itm_cashpos c
+WHERE
+    ($1::text = ''
+        OR c.terminal_id ILIKE '%' || $1::text || '%'
+        OR c.branch_code ILIKE '%' || $1::text || '%'
+        OR c.teller_id ILIKE '%' || $1::text || '%')
+    AND ($2::text = '' OR c.cashpos_date >= $2::date)
+    AND ($3::text = '' OR c.cashpos_date <= $3::date)
+ORDER BY
+    CASE WHEN $4::text = 'cashpos_date' AND $5::text = 'asc' THEN c.cashpos_date END ASC,
+    CASE WHEN $4::text = 'cashpos_date' AND $5::text = 'desc' THEN c.cashpos_date END DESC,
+    CASE WHEN $4::text = 'terminal_id' AND $5::text = 'asc' THEN c.terminal_id END ASC,
+    CASE WHEN $4::text = 'terminal_id' AND $5::text = 'desc' THEN c.terminal_id END DESC,
+    CASE WHEN $4::text = 'machine_type' AND $5::text = 'asc' THEN c.machine_type END ASC,
+    CASE WHEN $4::text = 'machine_type' AND $5::text = 'desc' THEN c.machine_type END DESC,
+    CASE WHEN $4::text = 'branch_code' AND $5::text = 'asc' THEN c.branch_code END ASC,
+    CASE WHEN $4::text = 'branch_code' AND $5::text = 'desc' THEN c.branch_code END DESC,
+    CASE WHEN $4::text = 'created_at' AND $5::text = 'asc' THEN c.created_at END ASC,
+    CASE WHEN $4::text = 'created_at' AND $5::text = 'desc' THEN c.created_at END DESC,
+    CASE WHEN $4::text = 'id' AND $5::text = 'asc' THEN c.id END ASC,
+    CASE WHEN $4::text = 'id' AND $5::text = 'desc' THEN c.id END DESC,
+    c.cashpos_date DESC,
+    c.id DESC
+LIMIT $7::int OFFSET ($6::int - 1) * $7::int
+`
+
+type ListItmCashposParams struct {
+	Search    string `json:"search"`
+	DateFrom  string `json:"date_from"`
+	DateTo    string `json:"date_to"`
+	SortBy    string `json:"sort_by"`
+	SortOrder string `json:"sort_order"`
+	Page      int32  `json:"page"`
+	PageSize  int32  `json:"page_size"`
+}
+
+// Paginated raw itm_cashpos rows for ATM Portal Cashpos view. Explicit
+// column list (never SELECT *) so schema drift is visible. Empty-string
+// filters mean "no filter". Sort keys are allowlisted in the service.
+func (q *Queries) ListItmCashpos(ctx context.Context, arg ListItmCashposParams) ([]ItmCashpo, error) {
+	rows, err := q.db.Query(ctx, listItmCashpos,
+		arg.Search,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.SortBy,
+		arg.SortOrder,
+		arg.Page,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ItmCashpo{}
+	for rows.Next() {
+		var i ItmCashpo
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileID,
+			&i.CashposDate,
+			&i.TerminalID,
+			&i.MachineType,
+			&i.TellerID,
+			&i.BranchCode,
+			&i.StartingCash10k,
+			&i.CashIn10k,
+			&i.CashOut10k,
+			&i.CashPosition10k,
+			&i.StartingCash20k,
+			&i.CashIn20k,
+			&i.CashOut20k,
+			&i.CashPosition20k,
+			&i.StartingCash50k,
+			&i.CashIn50k,
+			&i.CashOut50k,
+			&i.CashPosition50k,
+			&i.StartingCash100k,
+			&i.CashIn100k,
+			&i.CashOut100k,
+			&i.CashPosition100k,
+			&i.PositionSource,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

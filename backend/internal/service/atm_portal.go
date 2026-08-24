@@ -162,6 +162,9 @@ type ListATMsResult struct {
 // AtmPortalRepository is the small, service-defined interface the
 // sqlc-generated *db.Queries satisfies. Defined here (where it's used),
 // per Go convention, so the service can be tested against a fake.
+// Cashpos methods live on AtmPortalCashposRepository; *db.Queries
+// implements both and is stored here as AtmPortalRepository (ListATMs
+// path). ListCashpos type-asserts to AtmPortalCashposRepository.
 type AtmPortalRepository interface {
 	ListATMsWithCashPos(ctx context.Context, arg db.ListATMsWithCashPosParams) ([]db.ListATMsWithCashPosRow, error)
 	CountATMsWithCashPos(ctx context.Context, arg db.CountATMsWithCashPosParams) (int64, error)
@@ -172,6 +175,7 @@ type AtmPortalRepository interface {
 // AtmPortalServicer is the interface AtmPortalHandler depends on.
 type AtmPortalServicer interface {
 	ListATMs(ctx context.Context, params ListATMsParams) (*ListATMsResult, error)
+	ListCashpos(ctx context.Context, params ListCashposParams) (*ListCashposResult, error)
 }
 
 // AtmPortalService implements AtmPortalServicer.

@@ -5,6 +5,7 @@ import { rootRoute } from "./routes/__root";
 import { authRoute } from "./routes/_auth";
 import { protectedRoute } from "./routes/_protected";
 import { atmPortalRoute } from "./routes/atm-portal";
+import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { citRoute } from "./routes/cit";
@@ -27,6 +28,7 @@ const routeTree = rootRoute.addChildren([
   protectedRoute.addChildren([
     indexRoute,
     atmPortalRoute,
+    atmProfileRoute,
     cashFlowRoute,
     citRoute,
     replenishmentRoute,

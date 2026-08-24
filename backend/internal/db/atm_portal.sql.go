@@ -90,6 +90,28 @@ func (q *Queries) CountATMsWithCashPos(ctx context.Context, arg CountATMsWithCas
 	return count, err
 }
 
+const countCashposByTerminal = `-- name: CountCashposByTerminal :one
+SELECT COUNT(*)
+FROM itm_cashpos
+WHERE terminal_id = $1::text
+  AND ($2::text = '' OR cashpos_date >= $2::date)
+  AND ($3::text = '' OR cashpos_date <= $3::date)
+`
+
+type CountCashposByTerminalParams struct {
+	TerminalID string `json:"terminal_id"`
+	DateFrom   string `json:"date_from"`
+	DateTo     string `json:"date_to"`
+}
+
+// Mirrors ListCashposByTerminal filters for pagination total.
+func (q *Queries) CountCashposByTerminal(ctx context.Context, arg CountCashposByTerminalParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCashposByTerminal, arg.TerminalID, arg.DateFrom, arg.DateTo)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countItmCashpos = `-- name: CountItmCashpos :one
 SELECT COUNT(*)
 FROM itm_cashpos c
@@ -114,6 +136,87 @@ func (q *Queries) CountItmCashpos(ctx context.Context, arg CountItmCashposParams
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const countReplenishByTerminal = `-- name: CountReplenishByTerminal :one
+SELECT COUNT(*)
+FROM itm_replenish
+WHERE terminal_id = $1::text
+  AND ($2::text = '' OR replenish_date >= $2::date)
+  AND ($3::text = '' OR replenish_date <= $3::date)
+`
+
+type CountReplenishByTerminalParams struct {
+	TerminalID string `json:"terminal_id"`
+	DateFrom   string `json:"date_from"`
+	DateTo     string `json:"date_to"`
+}
+
+// Mirrors ListReplenishByTerminal filters for pagination total.
+func (q *Queries) CountReplenishByTerminal(ctx context.Context, arg CountReplenishByTerminalParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countReplenishByTerminal, arg.TerminalID, arg.DateFrom, arg.DateTo)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getATMByTerminalID = `-- name: GetATMByTerminalID :one
+SELECT
+    a.terminal_id,
+    l.name AS location_name,
+    l.address_line1 AS address,
+    a.machine_type,
+    a.brand,
+    a.model,
+    a.deployment_type,
+    a.operation_hours,
+    a.capacity_amount,
+    a.low_threshold_amount,
+    a.critical_threshold_amount,
+    a.is_active
+FROM atms a
+JOIN locations l ON l.id = a.location_id
+WHERE a.terminal_id = $1::text
+  AND a.is_active = true
+  AND a.deleted_at IS NULL
+`
+
+type GetATMByTerminalIDRow struct {
+	TerminalID              string         `json:"terminal_id"`
+	LocationName            string         `json:"location_name"`
+	Address                 string         `json:"address"`
+	MachineType             string         `json:"machine_type"`
+	Brand                   string         `json:"brand"`
+	Model                   string         `json:"model"`
+	DeploymentType          string         `json:"deployment_type"`
+	OperationHours          string         `json:"operation_hours"`
+	CapacityAmount          pgtype.Numeric `json:"capacity_amount"`
+	LowThresholdAmount      pgtype.Numeric `json:"low_threshold_amount"`
+	CriticalThresholdAmount pgtype.Numeric `json:"critical_threshold_amount"`
+	IsActive                bool           `json:"is_active"`
+}
+
+// ATM Profile master data (atm-profile spec). Only active, non-deleted ATMs
+// are visible — matches ListATMsWithCashPos's WHERE clause so a terminal
+// absent from the list is also absent here (consistent 404).
+func (q *Queries) GetATMByTerminalID(ctx context.Context, terminalID string) (GetATMByTerminalIDRow, error) {
+	row := q.db.QueryRow(ctx, getATMByTerminalID, terminalID)
+	var i GetATMByTerminalIDRow
+	err := row.Scan(
+		&i.TerminalID,
+		&i.LocationName,
+		&i.Address,
+		&i.MachineType,
+		&i.Brand,
+		&i.Model,
+		&i.DeploymentType,
+		&i.OperationHours,
+		&i.CapacityAmount,
+		&i.LowThresholdAmount,
+		&i.CriticalThresholdAmount,
+		&i.IsActive,
+	)
+	return i, err
 }
 
 const getATMSummary = `-- name: GetATMSummary :one
@@ -189,6 +292,25 @@ func (q *Queries) GetLastUpdated(ctx context.Context) (pgtype.Timestamp, error) 
 	var last_updated pgtype.Timestamp
 	err := row.Scan(&last_updated)
 	return last_updated, err
+}
+
+const getLatestReplenishForTerminal = `-- name: GetLatestReplenishForTerminal :one
+SELECT refund_total
+FROM itm_replenish
+WHERE terminal_id = $1::text
+ORDER BY replenish_date DESC, replenish_time DESC
+LIMIT 1
+`
+
+// Latest itm_replenish record's refund_total for the profile header's
+// status computation (same precedence CASE as ListATMsWithCashPos, applied
+// in the service layer). Returns pgx.ErrNoRows when the terminal has no
+// replenish history yet (status = "no_data").
+func (q *Queries) GetLatestReplenishForTerminal(ctx context.Context, terminalID string) (pgtype.Numeric, error) {
+	row := q.db.QueryRow(ctx, getLatestReplenishForTerminal, terminalID)
+	var refund_total pgtype.Numeric
+	err := row.Scan(&refund_total)
+	return refund_total, err
 }
 
 const listATMsWithCashPos = `-- name: ListATMsWithCashPos :many
@@ -376,6 +498,85 @@ func (q *Queries) ListATMsWithCashPos(ctx context.Context, arg ListATMsWithCashP
 	return items, nil
 }
 
+const listCashposByTerminal = `-- name: ListCashposByTerminal :many
+SELECT
+    id, file_id, cashpos_date, terminal_id, machine_type, teller_id, branch_code,
+    starting_cash_10k, cash_in_10k, cash_out_10k, cash_position_10k,
+    starting_cash_20k, cash_in_20k, cash_out_20k, cash_position_20k,
+    starting_cash_50k, cash_in_50k, cash_out_50k, cash_position_50k,
+    starting_cash_100k, cash_in_100k, cash_out_100k, cash_position_100k,
+    position_source, created_at
+FROM itm_cashpos
+WHERE terminal_id = $1::text
+  AND ($2::text = '' OR cashpos_date >= $2::date)
+  AND ($3::text = '' OR cashpos_date <= $3::date)
+ORDER BY cashpos_date DESC, id DESC
+LIMIT $5::int
+OFFSET ($4::int - 1) * $5::int
+`
+
+type ListCashposByTerminalParams struct {
+	TerminalID string `json:"terminal_id"`
+	DateFrom   string `json:"date_from"`
+	DateTo     string `json:"date_to"`
+	Page       int32  `json:"page"`
+	PageSize   int32  `json:"page_size"`
+}
+
+// Paginated cash position history for a single ATM (atm-profile spec),
+// optional inclusive date_from/date_to filtering, newest first.
+func (q *Queries) ListCashposByTerminal(ctx context.Context, arg ListCashposByTerminalParams) ([]ItmCashpo, error) {
+	rows, err := q.db.Query(ctx, listCashposByTerminal,
+		arg.TerminalID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.Page,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ItmCashpo{}
+	for rows.Next() {
+		var i ItmCashpo
+		if err := rows.Scan(
+			&i.ID,
+			&i.FileID,
+			&i.CashposDate,
+			&i.TerminalID,
+			&i.MachineType,
+			&i.TellerID,
+			&i.BranchCode,
+			&i.StartingCash10k,
+			&i.CashIn10k,
+			&i.CashOut10k,
+			&i.CashPosition10k,
+			&i.StartingCash20k,
+			&i.CashIn20k,
+			&i.CashOut20k,
+			&i.CashPosition20k,
+			&i.StartingCash50k,
+			&i.CashIn50k,
+			&i.CashOut50k,
+			&i.CashPosition50k,
+			&i.StartingCash100k,
+			&i.CashIn100k,
+			&i.CashOut100k,
+			&i.CashPosition100k,
+			&i.PositionSource,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItmCashpos = `-- name: ListItmCashpos :many
 SELECT
     c.id,
@@ -485,6 +686,95 @@ func (q *Queries) ListItmCashpos(ctx context.Context, arg ListItmCashposParams) 
 			&i.CashPosition100k,
 			&i.PositionSource,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReplenishByTerminal = `-- name: ListReplenishByTerminal :many
+SELECT
+    replenish_date, replenish_time, terminal_id, machine_type,
+    teller_id, branch_code, escrow,
+    refund_denom_10k, refund_denom_20k, refund_denom_50k, refund_denom_100k, refund_total,
+    replenish_denom_10k, replenish_denom_20k, replenish_denom_50k, replenish_denom_100k, replenish_total
+FROM itm_replenish
+WHERE terminal_id = $1::text
+  AND ($2::text = '' OR replenish_date >= $2::date)
+  AND ($3::text = '' OR replenish_date <= $3::date)
+ORDER BY replenish_date DESC, replenish_time DESC
+LIMIT $5::int
+OFFSET ($4::int - 1) * $5::int
+`
+
+type ListReplenishByTerminalParams struct {
+	TerminalID string `json:"terminal_id"`
+	DateFrom   string `json:"date_from"`
+	DateTo     string `json:"date_to"`
+	Page       int32  `json:"page"`
+	PageSize   int32  `json:"page_size"`
+}
+
+type ListReplenishByTerminalRow struct {
+	ReplenishDate      pgtype.Date    `json:"replenish_date"`
+	ReplenishTime      pgtype.Time    `json:"replenish_time"`
+	TerminalID         string         `json:"terminal_id"`
+	MachineType        string         `json:"machine_type"`
+	TellerID           string         `json:"teller_id"`
+	BranchCode         string         `json:"branch_code"`
+	Escrow             pgtype.Numeric `json:"escrow"`
+	RefundDenom10k     pgtype.Numeric `json:"refund_denom_10k"`
+	RefundDenom20k     pgtype.Numeric `json:"refund_denom_20k"`
+	RefundDenom50k     pgtype.Numeric `json:"refund_denom_50k"`
+	RefundDenom100k    pgtype.Numeric `json:"refund_denom_100k"`
+	RefundTotal        pgtype.Numeric `json:"refund_total"`
+	ReplenishDenom10k  pgtype.Numeric `json:"replenish_denom_10k"`
+	ReplenishDenom20k  pgtype.Numeric `json:"replenish_denom_20k"`
+	ReplenishDenom50k  pgtype.Numeric `json:"replenish_denom_50k"`
+	ReplenishDenom100k pgtype.Numeric `json:"replenish_denom_100k"`
+	ReplenishTotal     pgtype.Numeric `json:"replenish_total"`
+}
+
+// Paginated replenishment history for a single ATM (atm-profile spec),
+// optional inclusive date_from/date_to filtering, newest first.
+func (q *Queries) ListReplenishByTerminal(ctx context.Context, arg ListReplenishByTerminalParams) ([]ListReplenishByTerminalRow, error) {
+	rows, err := q.db.Query(ctx, listReplenishByTerminal,
+		arg.TerminalID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.Page,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReplenishByTerminalRow{}
+	for rows.Next() {
+		var i ListReplenishByTerminalRow
+		if err := rows.Scan(
+			&i.ReplenishDate,
+			&i.ReplenishTime,
+			&i.TerminalID,
+			&i.MachineType,
+			&i.TellerID,
+			&i.BranchCode,
+			&i.Escrow,
+			&i.RefundDenom10k,
+			&i.RefundDenom20k,
+			&i.RefundDenom50k,
+			&i.RefundDenom100k,
+			&i.RefundTotal,
+			&i.ReplenishDenom10k,
+			&i.ReplenishDenom20k,
+			&i.ReplenishDenom50k,
+			&i.ReplenishDenom100k,
+			&i.ReplenishTotal,
 		); err != nil {
 			return nil, err
 		}

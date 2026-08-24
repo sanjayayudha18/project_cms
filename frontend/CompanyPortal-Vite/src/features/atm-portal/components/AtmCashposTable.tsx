@@ -98,7 +98,10 @@ export function AtmCashposTable({
 
   return (
     <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
-      <table aria-label="Daftar ATM Cashpos" className="w-full min-w-[2200px] border-collapse text-sm">
+      <table
+        aria-label="Daftar ATM Cashpos"
+        className="w-full min-w-[2200px] border-collapse text-sm"
+      >
         <thead>
           <tr className="border-[var(--n-200)] border-b bg-[var(--n-50)]">
             {COLUMNS.map((column) => {
@@ -146,9 +149,7 @@ export function AtmCashposTable({
           {isLoading && <SkeletonRows columnCount={COLUMNS.length} />}
           {!isLoading && isError && <ErrorRow columnCount={COLUMNS.length} onRetry={onRetry} />}
           {!isLoading && !isError && data.length === 0 && <EmptyRow columnCount={COLUMNS.length} />}
-          {!isLoading &&
-            !isError &&
-            data.map((row) => <CashposRow key={row.id} row={row} />)}
+          {!isLoading && !isError && data.map((row) => <CashposRow key={row.id} row={row} />)}
         </tbody>
       </table>
     </div>

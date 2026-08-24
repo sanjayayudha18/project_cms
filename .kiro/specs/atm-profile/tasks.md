@@ -221,6 +221,31 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
 - Monetary fields serialized as decimal strings to avoid float precision loss
 - All endpoints wrapped in existing `RequireAuth` middleware (no new auth logic needed)
 
+## Claude Model Recommendations
+
+| Task Group | Recommended Model | Rationale |
+|------------|------------------|-----------|
+| 1.1 (sqlc queries) | Sonnet | Straightforward SQL, pattern-matching from existing queries. No deep reasoning needed. |
+| 2.1 (Service layer) | Sonnet | Business logic is well-defined in the design doc. Status computation is a simple conditional chain. |
+| 2.2–2.6 (Property tests) | Opus | Property-based test design requires reasoning about invariants and edge cases. Worth the extra intelligence. |
+| 3.1 (HTTP handlers) | Sonnet | Boilerplate-heavy handler code following existing patterns in the codebase. |
+| 3.2 (Handler unit tests) | Sonnet | Table-driven tests following existing test patterns. |
+| 5.1 (TypeScript types) | Haiku | Pure type definitions copied from the design doc. Minimal reasoning. |
+| 5.2 (Data hooks) | Sonnet | TanStack Query hooks following established patterns. Moderate complexity. |
+| 6.1 (Formatters) | Sonnet | Small utility functions with clear specs. |
+| 6.2–6.4 (Formatter property tests) | Opus | Designing good property generators and shrink strategies benefits from deeper reasoning. |
+| 7.1 (AtmHeader) | Sonnet | UI component with clear requirements. Responsive grid + conditional rendering. |
+| 7.2 (TabNavigation) | Opus | Accessible tab pattern (WAI-ARIA) + keyboard navigation + URL sync. Multiple interacting concerns. |
+| 7.3 (Tab property test) | Sonnet | Simple round-trip property, well-scoped. |
+| 7.4–7.5 (Tables) | Sonnet | TanStack Table setup following existing CashposTable pattern. Column config heavy but mechanical. |
+| 8.1 (Route file) | Haiku | Single-line route definition. Trivial. |
+| 8.2 (AtmProfileScreen) | Opus | Page orchestration: error boundaries, loading states, tab routing, ARIA live regions, breadcrumbs. Most complex frontend task. |
+| 8.3 (ARIA property test) | Sonnet | Focused property with clear state machine. |
+| 9.1 (Navigation link) | Haiku | Add a `<Link>` component to an existing table column. Minimal change. |
+| 11.1–11.4 (Unit tests) | Sonnet | Component tests with React Testing Library. Standard patterns. |
+
+**Summary:** Use **Opus** for tasks requiring architectural reasoning (property test design, complex UI orchestration with accessibility). Use **Sonnet** for the majority of implementation tasks. Use **Haiku** for trivial boilerplate (type defs, route files, single-line changes).
+
 ## Task Dependency Graph
 
 ```json

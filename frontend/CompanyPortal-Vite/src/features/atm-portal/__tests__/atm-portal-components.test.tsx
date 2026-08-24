@@ -8,6 +8,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AriaLiveRegion } from "../components/AriaLiveRegion";
 import { AtmCashposTable } from "../components/AtmCashposTable";
@@ -25,6 +26,22 @@ import type {
   AtmRecord,
   AtmSummary,
 } from "../types";
+
+// AtmTable's terminal_id cell renders a router <Link>, which throws outside a
+// RouterProvider. Tests here render AtmTable/AtmPortalScreen standalone (no
+// router context), so Link is stubbed as a plain anchor — same approach
+// AppShell.test.tsx uses for router hooks.
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  return {
+    ...actual,
+    Link: ({ children, className }: { children?: ReactNode; className?: string }) => (
+      <a href="/atm-portal/stub" className={className}>
+        {children}
+      </a>
+    ),
+  };
+});
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

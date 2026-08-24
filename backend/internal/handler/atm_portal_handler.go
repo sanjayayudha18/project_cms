@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -41,7 +42,118 @@ func (h *AtmPortalHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/atms", h.ListATMs)
 	r.Get("/cashpos", h.ListCashpos)
+	r.Get("/atms/{terminalId}", h.GetATMProfile)
+	r.Get("/atms/{terminalId}/replenish", h.ListATMReplenish)
+	r.Get("/atms/{terminalId}/cashpos", h.ListATMCashpos)
 	return r
+}
+
+// GetATMProfile handles GET /atms/{terminalId} — ATM master data + computed
+// replenishment status for the ATM Profile header.
+func (h *AtmPortalHandler) GetATMProfile(w http.ResponseWriter, r *http.Request) {
+	terminalID := strings.TrimSpace(chi.URLParam(r, "terminalId"))
+	if terminalID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "Terminal ID wajib diisi")
+		return
+	}
+
+	result, err := h.service.GetATMProfile(r.Context(), terminalID)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toATMProfileResponse(result))
+}
+
+// ListATMReplenish handles GET /atms/{terminalId}/replenish — paginated
+// replenishment history for a single ATM.
+func (h *AtmPortalHandler) ListATMReplenish(w http.ResponseWriter, r *http.Request) {
+	terminalID := strings.TrimSpace(chi.URLParam(r, "terminalId"))
+	if terminalID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "Terminal ID wajib diisi")
+		return
+	}
+
+	params, err := parseListATMReplenishParams(terminalID, r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+
+	result, err := h.service.ListATMReplenish(r.Context(), params)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toListATMReplenishResponse(result))
+}
+
+// ListATMCashpos handles GET /atms/{terminalId}/cashpos — paginated cash
+// position history for a single ATM.
+func (h *AtmPortalHandler) ListATMCashpos(w http.ResponseWriter, r *http.Request) {
+	terminalID := strings.TrimSpace(chi.URLParam(r, "terminalId"))
+	if terminalID == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "Terminal ID wajib diisi")
+		return
+	}
+
+	params, err := parseListATMCashposParams(terminalID, r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+
+	result, err := h.service.ListATMCashpos(r.Context(), params)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, toListATMCashposResponse(result))
+}
+
+// parseListATMReplenishParams parses path + query params for the replenish
+// history endpoint, applying API-contract defaults.
+func parseListATMReplenishParams(terminalID string, q url.Values) (service.ListATMReplenishParams, error) {
+	page, err := parseIntParam(q, "page", defaultPage)
+	if err != nil {
+		return service.ListATMReplenishParams{}, fmt.Errorf("page harus berupa angka")
+	}
+	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
+	if err != nil {
+		return service.ListATMReplenishParams{}, fmt.Errorf("page_size harus berupa angka")
+	}
+
+	return service.ListATMReplenishParams{
+		TerminalID: terminalID,
+		Page:       page,
+		PageSize:   pageSize,
+		DateFrom:   q.Get("date_from"),
+		DateTo:     q.Get("date_to"),
+	}, nil
+}
+
+// parseListATMCashposParams parses path + query params for the cash
+// position history endpoint, applying API-contract defaults.
+func parseListATMCashposParams(terminalID string, q url.Values) (service.ListATMCashposParams, error) {
+	page, err := parseIntParam(q, "page", defaultPage)
+	if err != nil {
+		return service.ListATMCashposParams{}, fmt.Errorf("page harus berupa angka")
+	}
+	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
+	if err != nil {
+		return service.ListATMCashposParams{}, fmt.Errorf("page_size harus berupa angka")
+	}
+
+	return service.ListATMCashposParams{
+		TerminalID: terminalID,
+		Page:       page,
+		PageSize:   pageSize,
+		DateFrom:   q.Get("date_from"),
+		DateTo:     q.Get("date_to"),
+	}, nil
 }
 
 // ListATMs handles GET /atms — paginated, filtered, sorted ATM list with
@@ -150,6 +262,11 @@ func queryOrDefault(q url.Values, key, def string) string {
 
 // handleServiceError maps service package errors to HTTP responses.
 func (h *AtmPortalHandler) handleServiceError(w http.ResponseWriter, err error) {
+	if errors.Is(err, service.ErrATMNotFound) {
+		writeError(w, http.StatusNotFound, "not_found", "ATM tidak ditemukan")
+		return
+	}
+
 	var validationErr *service.ValidationError
 	if errors.As(err, &validationErr) {
 		// design.md's 400 Bad Request contract uses a single combined
@@ -332,6 +449,153 @@ func toListCashposResponse(result *service.ListCashposResult) listCashposRespons
 		}
 	}
 	return listCashposResponse{
+		Data:     data,
+		Total:    result.Total,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+	}
+}
+
+// atmProfileResponse is the JSON body for GET /atms/{terminalId}, matching
+// design.md's API contract field names.
+type atmProfileResponse struct {
+	TerminalID              string  `json:"terminal_id"`
+	LocationName            string  `json:"location_name"`
+	Address                 string  `json:"address"`
+	MachineType             string  `json:"machine_type"`
+	Brand                   string  `json:"brand"`
+	Model                   string  `json:"model"`
+	DeploymentType          string  `json:"deployment_type"`
+	OperationHours          string  `json:"operation_hours"`
+	CapacityAmount          *string `json:"capacity_amount"`
+	LowThresholdAmount      *string `json:"low_threshold_amount"`
+	CriticalThresholdAmount *string `json:"critical_threshold_amount"`
+	IsActive                bool    `json:"is_active"`
+	ReplenishmentStatus     string  `json:"replenishment_status"`
+}
+
+func toATMProfileResponse(result *service.ATMProfileResult) atmProfileResponse {
+	return atmProfileResponse{
+		TerminalID:              result.TerminalID,
+		LocationName:            result.LocationName,
+		Address:                 result.Address,
+		MachineType:             result.MachineType,
+		Brand:                   result.Brand,
+		Model:                   result.Model,
+		DeploymentType:          result.DeploymentType,
+		OperationHours:          result.OperationHours,
+		CapacityAmount:          result.CapacityAmount,
+		LowThresholdAmount:      result.LowThresholdAmount,
+		CriticalThresholdAmount: result.CriticalThresholdAmount,
+		IsActive:                result.IsActive,
+		ReplenishmentStatus:     result.ReplenishmentStatus,
+	}
+}
+
+// replenishRow is a single itm_replenish row scoped to one terminal, in the
+// API response. All 11 monetary fields are decimal strings.
+type replenishRow struct {
+	ReplenishDate      string `json:"replenish_date"`
+	ReplenishTime      string `json:"replenish_time"`
+	TerminalID         string `json:"terminal_id"`
+	MachineType        string `json:"machine_type"`
+	TellerID           string `json:"teller_id"`
+	BranchCode         string `json:"branch_code"`
+	Escrow             string `json:"escrow"`
+	RefundDenom10k     string `json:"refund_denom_10k"`
+	RefundDenom20k     string `json:"refund_denom_20k"`
+	RefundDenom50k     string `json:"refund_denom_50k"`
+	RefundDenom100k    string `json:"refund_denom_100k"`
+	RefundTotal        string `json:"refund_total"`
+	ReplenishDenom10k  string `json:"replenish_denom_10k"`
+	ReplenishDenom20k  string `json:"replenish_denom_20k"`
+	ReplenishDenom50k  string `json:"replenish_denom_50k"`
+	ReplenishDenom100k string `json:"replenish_denom_100k"`
+	ReplenishTotal     string `json:"replenish_total"`
+}
+
+// listATMReplenishResponse is the JSON body for GET /atms/{terminalId}/replenish.
+type listATMReplenishResponse struct {
+	Data     []replenishRow `json:"data"`
+	Total    int64          `json:"total"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+}
+
+func toListATMReplenishResponse(result *service.ListATMReplenishResult) listATMReplenishResponse {
+	data := make([]replenishRow, len(result.Data))
+	for i, rec := range result.Data {
+		data[i] = replenishRow{
+			ReplenishDate:      rec.ReplenishDate,
+			ReplenishTime:      rec.ReplenishTime,
+			TerminalID:         rec.TerminalID,
+			MachineType:        rec.MachineType,
+			TellerID:           rec.TellerID,
+			BranchCode:         rec.BranchCode,
+			Escrow:             rec.Escrow,
+			RefundDenom10k:     rec.RefundDenom10k,
+			RefundDenom20k:     rec.RefundDenom20k,
+			RefundDenom50k:     rec.RefundDenom50k,
+			RefundDenom100k:    rec.RefundDenom100k,
+			RefundTotal:        rec.RefundTotal,
+			ReplenishDenom10k:  rec.ReplenishDenom10k,
+			ReplenishDenom20k:  rec.ReplenishDenom20k,
+			ReplenishDenom50k:  rec.ReplenishDenom50k,
+			ReplenishDenom100k: rec.ReplenishDenom100k,
+			ReplenishTotal:     rec.ReplenishTotal,
+		}
+	}
+	return listATMReplenishResponse{
+		Data:     data,
+		Total:    result.Total,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+	}
+}
+
+// listATMCashposResponse is the JSON body for GET /atms/{terminalId}/cashpos.
+// Reuses cashposRow (the existing GET /cashpos row DTO) since
+// service.ListATMCashposResult.Data is already []service.CashposRow — same
+// shape as the global cashpos list.
+type listATMCashposResponse struct {
+	Data     []cashposRow `json:"data"`
+	Total    int64        `json:"total"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+}
+
+func toListATMCashposResponse(result *service.ListATMCashposResult) listATMCashposResponse {
+	data := make([]cashposRow, len(result.Data))
+	for i, row := range result.Data {
+		data[i] = cashposRow{
+			ID:               row.ID,
+			FileID:           row.FileID,
+			CashposDate:      row.CashposDate.Format("2006-01-02"),
+			TerminalID:       row.TerminalID,
+			MachineType:      row.MachineType,
+			TellerID:         row.TellerID,
+			BranchCode:       row.BranchCode,
+			StartingCash10k:  row.StartingCash10k,
+			CashIn10k:        row.CashIn10k,
+			CashOut10k:       row.CashOut10k,
+			CashPosition10k:  row.CashPosition10k,
+			StartingCash20k:  row.StartingCash20k,
+			CashIn20k:        row.CashIn20k,
+			CashOut20k:       row.CashOut20k,
+			CashPosition20k:  row.CashPosition20k,
+			StartingCash50k:  row.StartingCash50k,
+			CashIn50k:        row.CashIn50k,
+			CashOut50k:       row.CashOut50k,
+			CashPosition50k:  row.CashPosition50k,
+			StartingCash100k: row.StartingCash100k,
+			CashIn100k:       row.CashIn100k,
+			CashOut100k:      row.CashOut100k,
+			CashPosition100k: row.CashPosition100k,
+			PositionSource:   row.PositionSource,
+			CreatedAt:        row.CreatedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return listATMCashposResponse{
 		Data:     data,
 		Total:    result.Total,
 		Page:     result.Page,

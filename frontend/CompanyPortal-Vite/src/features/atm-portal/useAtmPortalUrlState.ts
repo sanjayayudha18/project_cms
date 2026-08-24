@@ -100,7 +100,10 @@ export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams
 }
 
 /** Mode-aware default comparison for omitDefaults. */
-function defaultForKey(key: keyof AtmPortalParams, mode: AtmPortalMode): AtmPortalParams[keyof AtmPortalParams] {
+function defaultForKey(
+  key: keyof AtmPortalParams,
+  mode: AtmPortalMode,
+): AtmPortalParams[keyof AtmPortalParams] {
   if (key === "sort_by") {
     return mode === ATM_PORTAL_MODE_CASHPOS ? CASHPOS_DEFAULT_SORT_BY : REPLENISH_DEFAULT_SORT_BY;
   }

@@ -176,6 +176,9 @@ type AtmPortalRepository interface {
 type AtmPortalServicer interface {
 	ListATMs(ctx context.Context, params ListATMsParams) (*ListATMsResult, error)
 	ListCashpos(ctx context.Context, params ListCashposParams) (*ListCashposResult, error)
+	GetATMProfile(ctx context.Context, terminalID string) (*ATMProfileResult, error)
+	ListATMReplenish(ctx context.Context, params ListATMReplenishParams) (*ListATMReplenishResult, error)
+	ListATMCashpos(ctx context.Context, params ListATMCashposParams) (*ListATMCashposResult, error)
 }
 
 // AtmPortalService implements AtmPortalServicer.

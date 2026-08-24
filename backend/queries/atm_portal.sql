@@ -262,3 +262,87 @@ WHERE
         OR c.teller_id ILIKE '%' || sqlc.arg('search')::text || '%')
     AND (sqlc.arg('date_from')::text = '' OR c.cashpos_date >= sqlc.arg('date_from')::date)
     AND (sqlc.arg('date_to')::text = '' OR c.cashpos_date <= sqlc.arg('date_to')::date);
+
+-- name: GetATMByTerminalID :one
+-- ATM Profile master data (atm-profile spec). Only active, non-deleted ATMs
+-- are visible — matches ListATMsWithCashPos's WHERE clause so a terminal
+-- absent from the list is also absent here (consistent 404).
+SELECT
+    a.terminal_id,
+    l.name AS location_name,
+    l.address_line1 AS address,
+    a.machine_type,
+    a.brand,
+    a.model,
+    a.deployment_type,
+    a.operation_hours,
+    a.capacity_amount,
+    a.low_threshold_amount,
+    a.critical_threshold_amount,
+    a.is_active
+FROM atms a
+JOIN locations l ON l.id = a.location_id
+WHERE a.terminal_id = sqlc.arg('terminal_id')::text
+  AND a.is_active = true
+  AND a.deleted_at IS NULL;
+
+-- name: GetLatestReplenishForTerminal :one
+-- Latest itm_replenish record's refund_total for the profile header's
+-- status computation (same precedence CASE as ListATMsWithCashPos, applied
+-- in the service layer). Returns pgx.ErrNoRows when the terminal has no
+-- replenish history yet (status = "no_data").
+SELECT refund_total
+FROM itm_replenish
+WHERE terminal_id = sqlc.arg('terminal_id')::text
+ORDER BY replenish_date DESC, replenish_time DESC
+LIMIT 1;
+
+-- name: ListReplenishByTerminal :many
+-- Paginated replenishment history for a single ATM (atm-profile spec),
+-- optional inclusive date_from/date_to filtering, newest first.
+SELECT
+    replenish_date, replenish_time, terminal_id, machine_type,
+    teller_id, branch_code, escrow,
+    refund_denom_10k, refund_denom_20k, refund_denom_50k, refund_denom_100k, refund_total,
+    replenish_denom_10k, replenish_denom_20k, replenish_denom_50k, replenish_denom_100k, replenish_total
+FROM itm_replenish
+WHERE terminal_id = sqlc.arg('terminal_id')::text
+  AND (sqlc.arg('date_from')::text = '' OR replenish_date >= sqlc.arg('date_from')::date)
+  AND (sqlc.arg('date_to')::text = '' OR replenish_date <= sqlc.arg('date_to')::date)
+ORDER BY replenish_date DESC, replenish_time DESC
+LIMIT sqlc.arg('page_size')::int
+OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
+
+-- name: CountReplenishByTerminal :one
+-- Mirrors ListReplenishByTerminal filters for pagination total.
+SELECT COUNT(*)
+FROM itm_replenish
+WHERE terminal_id = sqlc.arg('terminal_id')::text
+  AND (sqlc.arg('date_from')::text = '' OR replenish_date >= sqlc.arg('date_from')::date)
+  AND (sqlc.arg('date_to')::text = '' OR replenish_date <= sqlc.arg('date_to')::date);
+
+-- name: ListCashposByTerminal :many
+-- Paginated cash position history for a single ATM (atm-profile spec),
+-- optional inclusive date_from/date_to filtering, newest first.
+SELECT
+    id, file_id, cashpos_date, terminal_id, machine_type, teller_id, branch_code,
+    starting_cash_10k, cash_in_10k, cash_out_10k, cash_position_10k,
+    starting_cash_20k, cash_in_20k, cash_out_20k, cash_position_20k,
+    starting_cash_50k, cash_in_50k, cash_out_50k, cash_position_50k,
+    starting_cash_100k, cash_in_100k, cash_out_100k, cash_position_100k,
+    position_source, created_at
+FROM itm_cashpos
+WHERE terminal_id = sqlc.arg('terminal_id')::text
+  AND (sqlc.arg('date_from')::text = '' OR cashpos_date >= sqlc.arg('date_from')::date)
+  AND (sqlc.arg('date_to')::text = '' OR cashpos_date <= sqlc.arg('date_to')::date)
+ORDER BY cashpos_date DESC, id DESC
+LIMIT sqlc.arg('page_size')::int
+OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
+
+-- name: CountCashposByTerminal :one
+-- Mirrors ListCashposByTerminal filters for pagination total.
+SELECT COUNT(*)
+FROM itm_cashpos
+WHERE terminal_id = sqlc.arg('terminal_id')::text
+  AND (sqlc.arg('date_from')::text = '' OR cashpos_date >= sqlc.arg('date_from')::date)
+  AND (sqlc.arg('date_to')::text = '' OR cashpos_date <= sqlc.arg('date_to')::date);

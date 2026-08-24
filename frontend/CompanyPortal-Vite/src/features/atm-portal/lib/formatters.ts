@@ -67,6 +67,22 @@ export function formatRupiah(value: number | null): string {
  * @example formatRupiahDecimal("1250000.50") // "Rp 1.250.000,50"
  * @example formatRupiahDecimal("9999999999999999.99") // "Rp 9.999.999.999.999.999,99"
  */
+/**
+ * Thousand-separates a run of digits from the right without Number()
+ * (arbitrary precision, no float rounding). Shared by formatRupiahDecimal
+ * and formatWholeNumber so the grouping logic lives in one place.
+ */
+function groupThousands(digits: string): string {
+  let grouped = "";
+  for (let i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 === 0) {
+      grouped += ".";
+    }
+    grouped += digits[i];
+  }
+  return grouped;
+}
+
 export function formatRupiahDecimal(value: string | null | undefined): string {
   if (value === null || value === undefined || value === "") {
     return "—";
@@ -75,18 +91,44 @@ export function formatRupiahDecimal(value: string | null | undefined): string {
   const raw = neg ? value.slice(1) : value;
   const [intRaw, fracRaw = ""] = raw.split(".");
   const intDigits = (intRaw || "0").replace(/\D/g, "") || "0";
-  // Thousand-separate integer digits from the right without Number().
-  let grouped = "";
-  for (let i = 0; i < intDigits.length; i++) {
-    if (i > 0 && (intDigits.length - i) % 3 === 0) {
-      grouped += ".";
-    }
-    grouped += intDigits[i];
-  }
+  const grouped = groupThousands(intDigits);
   const fracSignificant = fracRaw.replace(/0+$/, "");
-  const body =
-    fracSignificant.length > 0 ? `${grouped},${fracSignificant}` : grouped;
+  const body = fracSignificant.length > 0 ? `${grouped},${fracSignificant}` : grouped;
   return `Rp ${neg ? `-${body}` : body}`;
+}
+
+/**
+ * Formats an exact decimal string amount as a dot-separated whole number —
+ * no "Rp " prefix, no decimal fraction (cashpos denomination columns,
+ * design.md Req 8.3). The fractional part is dropped (not rounded), matching
+ * how these numeric(20,2) denomination amounts are always whole rupiah in
+ * practice.
+ *
+ * @example formatWholeNumber("1250000.00") // "1.250.000"
+ * @example formatWholeNumber(null) // "—"
+ */
+export function formatWholeNumber(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+  const neg = value.startsWith("-");
+  const raw = neg ? value.slice(1) : value;
+  const [intRaw] = raw.split(".");
+  const intDigits = (intRaw || "0").replace(/\D/g, "") || "0";
+  const grouped = groupThousands(intDigits);
+  return neg && grouped !== "0" ? `-${grouped}` : grouped;
+}
+
+/**
+ * Formats an ISO "YYYY-MM-DD" date string as "dd MMM yyyy" using Indonesian
+ * month abbreviations. Thin wrapper over formatAtmDate — reuses its UTC-based
+ * parsing (day-only values must not shift a day under local-timezone
+ * getters) instead of reimplementing the month lookup.
+ *
+ * @example formatDateIndonesian("2026-07-15") // "15 Jul 2026"
+ */
+export function formatDateIndonesian(isoDate: string): string {
+  return formatAtmDate(new Date(isoDate));
 }
 
 /**

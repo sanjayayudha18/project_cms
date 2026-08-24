@@ -12,7 +12,10 @@ interface TableModeSelectProps {
 export function TableModeSelect({ mode, onModeChange }: TableModeSelectProps) {
   return (
     <div className="flex flex-col gap-1 sm:max-w-xs">
-      <label htmlFor="atm-portal-table-mode" className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
+      <label
+        htmlFor="atm-portal-table-mode"
+        className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
+      >
         Tampilan tabel
       </label>
       <select

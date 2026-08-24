@@ -22,6 +22,18 @@ type stubAtmPortalService struct {
 	listCashposResult *service.ListCashposResult
 	listCashposErr    error
 	lastCashposParams service.ListCashposParams
+
+	profileResult         *service.ATMProfileResult
+	profileErr            error
+	lastProfileTerminalID string
+
+	listReplenishResult *service.ListATMReplenishResult
+	listReplenishErr    error
+	lastReplenishParams service.ListATMReplenishParams
+
+	listATMCashposResult *service.ListATMCashposResult
+	listATMCashposErr    error
+	lastATMCashposParams service.ListATMCashposParams
 }
 
 func (s *stubAtmPortalService) ListATMs(context.Context, service.ListATMsParams) (*service.ListATMsResult, error) {
@@ -31,6 +43,21 @@ func (s *stubAtmPortalService) ListATMs(context.Context, service.ListATMsParams)
 func (s *stubAtmPortalService) ListCashpos(_ context.Context, params service.ListCashposParams) (*service.ListCashposResult, error) {
 	s.lastCashposParams = params
 	return s.listCashposResult, s.listCashposErr
+}
+
+func (s *stubAtmPortalService) GetATMProfile(_ context.Context, terminalID string) (*service.ATMProfileResult, error) {
+	s.lastProfileTerminalID = terminalID
+	return s.profileResult, s.profileErr
+}
+
+func (s *stubAtmPortalService) ListATMReplenish(_ context.Context, params service.ListATMReplenishParams) (*service.ListATMReplenishResult, error) {
+	s.lastReplenishParams = params
+	return s.listReplenishResult, s.listReplenishErr
+}
+
+func (s *stubAtmPortalService) ListATMCashpos(_ context.Context, params service.ListATMCashposParams) (*service.ListATMCashposResult, error) {
+	s.lastATMCashposParams = params
+	return s.listATMCashposResult, s.listATMCashposErr
 }
 
 func mountCashposHandler(svc service.AtmPortalServicer) http.Handler {

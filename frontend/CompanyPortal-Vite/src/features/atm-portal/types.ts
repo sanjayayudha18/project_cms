@@ -113,3 +113,60 @@ export interface AtmCashposParams {
   readonly sort_by: string;
   readonly sort_order: "asc" | "desc";
 }
+
+// ─── ATM Profile (single-ATM detail page) ──────────────────────────────────
+
+/** ATM master data from GET /api/v1/atm-portal/atms/:terminalId. */
+export interface AtmProfileMasterData {
+  readonly terminal_id: string;
+  readonly location_name: string;
+  readonly address: string;
+  readonly machine_type: string;
+  readonly brand: string;
+  readonly model: string;
+  readonly deployment_type: string;
+  readonly operation_hours: string;
+  readonly capacity_amount: string | null;
+  readonly low_threshold_amount: string | null;
+  readonly critical_threshold_amount: string | null;
+  readonly is_active: boolean;
+  readonly replenishment_status: ReplenishmentStatus;
+}
+
+/** One itm_replenish row scoped to a single terminal. */
+export interface AtmReplenishRecord {
+  readonly replenish_date: string;
+  readonly replenish_time: string;
+  readonly terminal_id: string;
+  readonly machine_type: string;
+  readonly teller_id: string;
+  readonly branch_code: string;
+  readonly escrow: string;
+  readonly refund_denom_10k: string;
+  readonly refund_denom_20k: string;
+  readonly refund_denom_50k: string;
+  readonly refund_denom_100k: string;
+  readonly refund_total: string;
+  readonly replenish_denom_10k: string;
+  readonly replenish_denom_20k: string;
+  readonly replenish_denom_50k: string;
+  readonly replenish_denom_100k: string;
+  readonly replenish_total: string;
+}
+
+export interface AtmReplenishResponse {
+  readonly data: readonly AtmReplenishRecord[];
+  readonly total: number;
+  readonly page: number;
+  readonly page_size: number;
+}
+
+/** Date-range + pagination params shared by both ATM Profile history tabs. */
+export interface AtmProfileHistoryParams {
+  readonly page: number;
+  readonly page_size: number;
+  readonly date_from: string;
+  readonly date_to: string;
+}
+
+export type AtmProfileTab = "replenish" | "cashpos";

@@ -16,11 +16,7 @@ import { FilterBar } from "./components/FilterBar";
 import { PaginationControls } from "./components/PaginationControls";
 import { SummaryCardsGrid } from "./components/SummaryCardsGrid";
 import { TableModeSelect } from "./components/TableModeSelect";
-import {
-  ATM_CASHPOS_QUERY_KEY,
-  ATM_PORTAL_MODE_CASHPOS,
-  ATM_PORTAL_QUERY_KEY,
-} from "./constants";
+import { ATM_CASHPOS_QUERY_KEY, ATM_PORTAL_MODE_CASHPOS, ATM_PORTAL_QUERY_KEY } from "./constants";
 import { useAtmCashposData, useAtmPortalData } from "./useAtmPortalData";
 import { useAtmPortalUrlState } from "./useAtmPortalUrlState";
 

@@ -13,6 +13,7 @@
 
 import { Skeleton } from "@/components/feedback/Skeleton";
 import { Button } from "@/components/ui/Button";
+import { Link } from "@tanstack/react-router";
 import { AlertCircle, ArrowDown, ArrowUp } from "lucide-react";
 import { formatAtmDate, formatRupiah } from "../lib/formatters";
 import type { AtmRecord } from "../types";
@@ -130,7 +131,15 @@ export function AtmTable({
 function AtmRow({ atm }: { atm: AtmRecord }) {
   return (
     <tr className="border-[var(--n-100)] border-b last:border-0">
-      <td className="px-3 py-2 font-mono">{atm.terminal_id}</td>
+      <td className="px-3 py-2 font-mono">
+        <Link
+          to="/atm-portal/$terminalId"
+          params={{ terminalId: atm.terminal_id }}
+          className="text-[var(--red-600)] underline-offset-2 hover:underline"
+        >
+          {atm.terminal_id}
+        </Link>
+      </td>
       <td className="px-3 py-2">{atm.location_name}</td>
       <td className="px-3 py-2">{atm.machine_type}</td>
       <td className="px-3 py-2">{atm.brand}</td>

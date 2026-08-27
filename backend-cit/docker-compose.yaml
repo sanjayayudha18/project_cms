@@ -1,8 +1,8 @@
 name: CMS-Backend-CIT
 
-# Run the shared infra compose first (from repo root) so the `cms-net`
-# external network and Redis exist:
-#   docker compose up -d
+# Depends on backend/docker-compose.yaml having created the `cms-net`
+# network + Redis first:
+#   cd ../backend && docker compose up -d
 # Then, from this directory:
 #   docker compose up --build
 

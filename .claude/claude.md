@@ -2,6 +2,7 @@
 
 # PROJECT\_CONTEXT.md — Cash Management System (CMS) for ATM & CIT
 > **AI: READ THIS FIRST, EVERY SESSION.** Single source of truth. If your work conflicts with this, STOP and ask. Never invent endpoints, tables, columns, env vars, or modules.
+> **For simple explanations of CMS concepts**, see [eli5.md](./.claude/eli5.md) — use when explaining to teammates or stakeholders.
 * * *
 ## 0\. Golden Rules
 1. Stack is FIXED (Sec 2). No new libs/frameworks without approval.
@@ -22,6 +23,17 @@
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
 
 * * *
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+
 ## 2\. Tech Stack (SOURCE OF TRUTH)
 
 | Layer | Choice |

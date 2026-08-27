@@ -42,4 +42,4 @@ services:
 networks:
   cms-net:
     external: true
-    name: cms-backend_cms-net
+    name: cms-net

@@ -40,6 +40,11 @@ cd backend
 docker compose down
 docker compose up -d --build
 
+`````````
+cd backend-cit 
+docker compose down
+docker compose up -d --build
+
 Frontend:
 
 cd frontend

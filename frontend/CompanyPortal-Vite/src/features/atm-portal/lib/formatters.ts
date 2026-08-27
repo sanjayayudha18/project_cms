@@ -186,3 +186,18 @@ export function formatAtmDateTime(date: Date | null): string {
   const year = date.getFullYear();
   return `${day} ${month} ${year}, ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
+
+/**
+ * Today's date as a local "YYYY-MM-DD" string — the default value for the
+ * ATM Portal and DMAA Forecast date filters. Local (not UTC) so it matches
+ * the viewer's calendar day; a UTC-based ISO string would report yesterday
+ * before 07:00 WIB.
+ *
+ * @example todayISO() // "2026-08-26" on 26 Aug 2026
+ */
+export function todayISO(): string {
+  const now = new Date();
+  const month = pad2(now.getMonth() + 1);
+  const day = pad2(now.getDate());
+  return `${now.getFullYear()}-${month}-${day}`;
+}

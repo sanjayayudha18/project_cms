@@ -9,6 +9,7 @@ import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { citRoute } from "./routes/cit";
+import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { dsrDashboardRoute } from "./routes/forecasting/dsr-dashboard";
 import { dsrUploadRoute } from "./routes/forecasting/dsr-upload";
 import { forecastRoute } from "./routes/forecasting/forecast";
@@ -34,6 +35,7 @@ const routeTree = rootRoute.addChildren([
     replenishmentRoute,
     forecastingRoute,
     forecastRoute,
+    dmaaForecastRoute,
     dsrUploadRoute,
     dsrDashboardRoute,
     invoiceRoute,

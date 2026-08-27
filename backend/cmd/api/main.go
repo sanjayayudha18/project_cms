@@ -114,6 +114,16 @@ func main() {
 	atmPortalHandler := handler.NewAtmPortalHandler(atmPortalService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-portal", atmPortalHandler.Routes())
 
+	// Create and mount DMAA Forecast handler (read-only viewer, read-replica
+	// bound; currently the shared pool until the replica pool is wired).
+	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL wiring lands
+	dmaaForecastService := service.NewDmaaForecastService(db.New(dbPool))
+	dmaaForecastHandler := handler.NewDmaaForecastHandler(dmaaForecastService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV", "ADMIN", "ADMIN_PARAM"),
+	).Mount("/api/v1/dmaa-forecast", dmaaForecastHandler.Routes())
+
 	// Start HTTP server
 	addr := ":" + cfg.Port
 	srv := &http.Server{

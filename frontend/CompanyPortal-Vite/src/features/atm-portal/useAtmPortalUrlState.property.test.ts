@@ -1,5 +1,6 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { todayISO } from "./lib/formatters";
 import type { AtmPortalParams } from "./types";
 import { omitDefaults, parseSearchParams } from "./useAtmPortalUrlState";
 
@@ -100,8 +101,8 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
       brand: "",
       deployment_type: "",
       region: "",
-      date_from: "",
-      date_to: "",
+      date_from: todayISO(),
+      date_to: todayISO(),
       sort_by: "terminal_id",
       sort_order: "asc",
     };
@@ -119,11 +120,22 @@ describe("parseSearchParams / omitDefaults — Property 11: URL-filter round-tri
       brand: "",
       deployment_type: "",
       region: "",
-      date_from: "",
-      date_to: "",
+      date_from: todayISO(),
+      date_to: todayISO(),
       sort_by: "terminal_id",
       sort_order: "asc",
     });
+  });
+
+  it("date filters default to today; cleared dates round-trip as empty strings", () => {
+    // Absent from URL → today's date (the "now" default)
+    expect(parseSearchParams({}).date_from).toBe(todayISO());
+    expect(parseSearchParams({}).date_to).toBe(todayISO());
+    // Explicitly cleared ("?date_from=") → "" (no filter), preserved in URL
+    const cleared = parseSearchParams({ date_from: "", date_to: "" });
+    expect(cleared.date_from).toBe("");
+    expect(cleared.date_to).toBe("");
+    expect(omitDefaults(cleared)).toEqual({ date_from: "", date_to: "" });
   });
 
   it("invalid mode falls back to replenish", () => {

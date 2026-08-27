@@ -129,6 +129,14 @@ export const NAV_CONFIG: NavItem[] = [
     group: "forecasting",
   },
   {
+    id: "dmaa-forecast",
+    label: "DMAA Forecast",
+    icon: BarChart3,
+    href: "/forecasting/dmaa-forecast",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    group: "forecasting",
+  },
+  {
     id: "fill-instruction",
     label: "Instruksi Pengisian",
     icon: FileText,

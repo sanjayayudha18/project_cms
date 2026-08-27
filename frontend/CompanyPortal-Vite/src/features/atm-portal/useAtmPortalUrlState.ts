@@ -1,7 +1,10 @@
 /**
  * URL search-param sync for ATM Portal filters/sort/page/mode.
  * - Filter/sort/page/mode state lives in URL search params
- * - Default values are omitted from the URL for clean, shareable links
+ * - Date filters default to TODAY (computed per call, local timezone);
+ *   default values are omitted from the URL for clean, shareable links
+ * - An explicit empty string ("?date_from=") means the user cleared the
+ *   filter: no date bound sent to the API (backend "" = no filter)
  * - Mode default is replenish; switching mode resets page to 1 and mode-specific sort
  */
 
@@ -16,6 +19,7 @@ import {
   REPLENISH_DEFAULT_SORT_BY,
   REPLENISH_DEFAULT_SORT_ORDER,
 } from "./constants";
+import { todayISO } from "./lib/formatters";
 import type { AtmPortalMode, AtmPortalParams } from "./types";
 
 export const ATM_PORTAL_SEARCH_SCHEMA = z.object({
@@ -46,6 +50,8 @@ const ATM_PORTAL_SEARCH_DEFAULTS: AtmPortalParams = {
   brand: "",
   deployment_type: "",
   region: "",
+  // Date defaults are dynamic (today) — applied in parseSearchParams and
+  // defaultForKey, not here. The "" placeholders below are never read.
   date_from: "",
   date_to: "",
   sort_by: REPLENISH_DEFAULT_SORT_BY,
@@ -69,7 +75,9 @@ function parseMode(value: unknown): AtmPortalMode {
 
 /**
  * Merges raw URL search values with defaults. Mode-aware sort defaults:
- * cashpos defaults to cashpos_date/desc when sort is absent.
+ * cashpos defaults to cashpos_date/desc when sort is absent. Dates: absent
+ * → today (default), "" → explicitly cleared (no filter), any string →
+ * itself.
  */
 export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams {
   const mode = parseMode(raw.mode);
@@ -91,8 +99,8 @@ export function parseSearchParams(raw: Record<string, unknown>): AtmPortalParams
       ATM_PORTAL_SEARCH_DEFAULTS.deployment_type,
     ),
     region: toStringOrDefault(raw.region, ATM_PORTAL_SEARCH_DEFAULTS.region),
-    date_from: toStringOrDefault(raw.date_from, ATM_PORTAL_SEARCH_DEFAULTS.date_from),
-    date_to: toStringOrDefault(raw.date_to, ATM_PORTAL_SEARCH_DEFAULTS.date_to),
+    date_from: typeof raw.date_from === "string" ? raw.date_from : todayISO(),
+    date_to: typeof raw.date_to === "string" ? raw.date_to : todayISO(),
     sort_by: toStringOrDefault(raw.sort_by, defaultSortBy),
     sort_order:
       raw.sort_order === "asc" || raw.sort_order === "desc" ? raw.sort_order : defaultSortOrder,
@@ -111,6 +119,9 @@ function defaultForKey(
     return mode === ATM_PORTAL_MODE_CASHPOS
       ? CASHPOS_DEFAULT_SORT_ORDER
       : REPLENISH_DEFAULT_SORT_ORDER;
+  }
+  if (key === "date_from" || key === "date_to") {
+    return todayISO();
   }
   return ATM_PORTAL_SEARCH_DEFAULTS[key];
 }

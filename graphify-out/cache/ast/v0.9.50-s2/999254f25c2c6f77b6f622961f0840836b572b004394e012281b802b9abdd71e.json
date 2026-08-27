@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_cit_internal_integration_integration_go", "label": "integration.go", "file_type": "code", "source_file": "backend-cit/internal/integration/integration.go", "source_location": "L1"}], "edges": [], "raw_calls": [], "go_imports": {}}

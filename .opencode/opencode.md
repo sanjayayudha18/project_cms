@@ -129,17 +129,29 @@ task check
 * * *
 
 ## 3\. Architecture, Modules & Data Map
-### Backend layout
+### Backend layout — Go workspace, three modules
+
+Repo root is a Go workspace (`go.work`) linking three sibling modules. `pkg/` is shared infra with **no** dependency on either backend; `backend/` and `backend-cit/` each depend on `pkg/` only — never on each other (acyclic, compiler-enforced).
+
 ```
-backend/
-  cmd/api/main.go        # transactional server entrypoint
-  cmd/batch/main.go      # EOD runner entrypoint
-  configs/               # env config loader
-  pkg/middleware/        # auth + role middleware
-  pkg/response/          # consistent JSON envelope
-  pkg/database/          # pgxpool: primary (write) + replica (read)
-  internal/<module>/     # one folder per domain module
+CMS2/
+  go.work                    # links backend/, backend-cit/, pkg/
+  pkg/                       # shared: auth, middleware, config, response
+    auth/                    # JWT TokenService, blacklist, Provider/UserRepository interfaces
+    middleware/              # RequireAuth, RequireRoles, rate limiter
+    config/                  # env config loader, Load(defaultPort)
+    response/                # {success,data} envelope (adopted by backend-cit; NOT by backend — see below)
+  backend/                   # ATM backend — own go.mod, port 8080
+    cmd/api/main.go          # transactional server entrypoint
+    cmd/batch/main.go        # EOD runner entrypoint
+    internal/<module>/       # ATM-specific: auth (login service), handler, service, repository
+    migrations/              # sole owner of ALL DB migrations (CIT tables included)
+  backend-cit/               # CIT backend — own go.mod, port 8081
+    cmd/api/main.go          # health check + RequireAuth-protected route group; validates tokens, issues none
+    internal/<module>/       # CIT-specific: cit, journal, dsr, reconciliation, integration, handler, service, repository
 ```
+
+**ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with the existing frontends (`CodexCash-Vite`/`VendorPortal-Vite`) — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` use `pkg/response`.
 ### Frontends (two separate SPAs)
 ```
 frontend/CodexCash-Vite/     # internal app, LDAP login
@@ -186,7 +198,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 *   **Audit**: every state change writes `audit_logs` (who, what, before/after, when, ip).
 *   **RBAC**: enforce at middleware AND service layer.
 *   **Idempotency**: all file ingests (DSR/invoice/escrow) idempotent per file hash -> `import_jobs`.
-*   **Consistent response**: all endpoints return `pkg/response` envelope.
+*   **Consistent response**: CIT endpoints (`backend-cit`) return the `pkg/response` envelope. ATM's `internal/handler` keeps its existing flat JSON shape (e.g. `{"access_token":...}`) for frontend wire compatibility — see Sec 3.
 
 * * *
 
@@ -248,8 +260,8 @@ GCS_BUCKET=
 LOG_LEVEL=info
 ```
 *   Never commit `.env`. Never log secrets/JWTs/LDAP/SMTP creds.
-*   docker-compose (local): backend + frontend-internal + frontend-vendor + redis. Postgres external.
-*   Backend Dockerfile: multi-stage, distroless/alpine, non-root, HEALTHCHECK on /health.
+*   docker-compose (local, root `docker-compose.yml`): backend + backend-cit + redis. Postgres external. Frontends have their own Dockerfiles/compose, not yet wired into this file.
+*   Backend Dockerfile: multi-stage, distroless/alpine, non-root, HEALTHCHECK on /health. `backend/Dockerfile` and `backend-cit/Dockerfile` both build from repo root (context `.`) to resolve `pkg/` via `go.work`.
 *   Frontend Dockerfiles: Vite build -> Nginx serve dist (one image per frontend).
 *   .dockerignore: node\_modules, dist, .env, .git.
 
@@ -259,7 +271,7 @@ LOG_LEVEL=info
 | # | Product | Role |
 | ---| ---| --- |
 | 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend (Go+Chi) |
+| 2 | Compute Engine | Backend, currently ONE VM running both `backend/` (ATM, port 8080) and `backend-cit/` (CIT, port 8081) as separate containers — see split-VM plan below |
 | 3 | CloudSQL Postgres | Primary (write) |
 | 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
@@ -272,8 +284,15 @@ LOG_LEVEL=info
 | 12 | Cloud Logging | Structured logs |
 | 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
 
-**Pipeline**: Cloud Build -> lint + go test + vite build (x2) -> build images -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine.
-**Rollback**: keep previous image SHA deployable.
+**Current state (now): ONE Compute Engine VM runs both backends** as separate Docker containers (`backend` on 8080, `backend-cit` on 8081) — see root `docker-compose.yml` (Sec 9). Fine for now: CIT is still a skeleton with no real endpoints, low load.
+
+**Planned (2028): split into two separate Compute Engine VMs**, one per backend. This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so moving CIT to its own VM later requires **no code change** — just deploy the existing `backend-cit` image to a new VM and repoint its `.env`. When that split happens:
+*   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
+*   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
+*   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
+
+**Pipeline**: Cloud Build -> lint + go test + vite build (x2) -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
+**Rollback**: keep previous image SHA deployable, per service.
 
 * * *
 
@@ -285,7 +304,7 @@ LOG_LEVEL=info
 - [ ] Money as numeric, timestamps timestamptz
 - [ ] Tests passing incl. auth/RBAC/money cases
 - [ ] No secrets/config hardcoded; .env.example updated
-- [ ] Uses pkg/response envelope
+- [ ] Uses pkg/response envelope (backend-cit); ATM keeps flat JSON for frontend wire compat (Sec 3)
 - [ ] Builds cleanly in Docker
 
 * * *
@@ -296,12 +315,13 @@ LOG_LEVEL=info
 *   Frontends: two separate SPAs. Internal = LDAP; Vendor = local creds in CMS.
 *   Email: company SMTP relay.
 *   DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
+*   Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 3). Deployed together on ONE Compute Engine VM today (two containers); planned to split into two separate VMs in 2028 (Sec 10) — the module split already makes that a zero-code-change deployment change when it happens.
 
 * * *
 
 ## 13\. UI/UX & Brand (from `claude.md` Sec 13 + steering `ui_design.md`)
 
-**Brand anchor**: CIMB Niaga Red. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue. **Light mode only** (no dark mode, no toggle).
+**Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue. **Light mode only** (no dark mode, no toggle).
 
 **Two themes, one per frontend:**
 *   **Internal app** (`frontend/CodexCash-Vite`) -> "Merah Sirih". Warm off-white neutrals, red as a ≤10% accent. Optimized for data-dense screens.
@@ -339,32 +359,37 @@ Both run on the **same VM**; active windows don't overlap (no contention).
 
 ## 15\. Project Structure (from steering `structure.md`)
 ```
-CMS/
-├── frontend/                 # React + TypeScript + Vite
-│   ├── src/
-│   │   ├── components/       # Shared UI components
-│   │   ├── features/         # Feature modules (forecasting, invoice, cash-count)
-│   │   ├── lib/              # Utilities, API client, auth
-│   │   ├── routes/           # TanStack Router file-based routes
-│   │   └── styles/           # Design tokens, Tailwind config
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                  # Go API + Worker
+CMS2/
+├── frontend/                 # React + TypeScript + Vite (monorepo root)
+│   ├── CodexCash-Vite/       # internal app, LDAP login
+│   └── VendorPortal-Vite/    # vendor portal, local login
+├── go.work                   # links backend/, backend-cit/, pkg/
+├── pkg/                      # shared Go infra (auth, middleware, config, response)
+│   ├── auth/
+│   ├── middleware/
+│   ├── config/
+│   └── response/
+├── backend/                  # ATM backend — own go.mod, port 8080
 │   ├── cmd/
-│   │   ├── api/              # HTTP server entrypoint
-│   │   └── worker/           # asynq worker entrypoint
+│   │   ├── api/              # HTTP server entrypoint (transactional)
+│   │   ├── batch/           # EOD runner entrypoint
+│   │   └── worker/          # asynq worker entrypoint
 │   ├── internal/
 │   │   ├── domain/           # Business entities, value objects
 │   │   ├── service/          # Business logic
-│   │   ├── handler/          # HTTP handlers (Chi routes)
+│   │   ├── handler/          # HTTP handlers (Chi routes) — flat JSON for frontend wire compat
 │   │   ├── repository/       # DB access (sqlc + interfaces)
 │   │   ├── middleware/       # Auth, logging, RBAC, rate-limit
 │   │   ├── queue/            # asynq task definitions + handlers
 │   │   └── pdf/              # Typst template rendering
-│   ├── migrations/           # SQL migration files
+│   ├── migrations/           # SQL migration files (sole owner of ALL DB migrations)
 │   ├── queries/              # sqlc SQL query files
 │   ├── templates/            # Typst PDF templates
-│   ├── go.mod / go.sum
+│   └── go.mod / go.sum
+├── backend-cit/              # CIT backend — own go.mod, port 8081
+│   ├── cmd/api/              # health check + RequireAuth-protected routes (validates tokens)
+│   ├── internal/             # cit, journal, dsr, reconciliation, integration, handler, service, repository
+│   └── go.mod / go.sum
 ├── docker/                   # Dockerfiles (api, frontend, worker)
 ├── docker-compose.yml / docker-compose.prod.yml
 ├── Taskfile.yml

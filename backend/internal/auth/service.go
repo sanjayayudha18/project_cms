@@ -3,22 +3,16 @@ package auth
 import (
 	"context"
 	"strings"
-)
 
-// RateLimiter abstracts rate limiting for testability.
-// The concrete implementation lives in internal/middleware.
-type RateLimiter interface {
-	Check(ctx context.Context, username, ip string) error
-	IncrementFailed(ctx context.Context, username, ip string) error
-	ResetUsername(ctx context.Context, username string) error
-}
+	"github.com/cimb-niaga/cms/pkg/auth"
+)
 
 // Service orchestrates the login flow.
 type Service struct {
-	providers    []Provider
-	tokenService *TokenService
-	userRepo     UserRepository
-	rateLimiter  RateLimiter
+	providers    []auth.Provider
+	tokenService *auth.TokenService
+	userRepo     auth.UserRepository
+	rateLimiter  auth.RateLimiter
 }
 
 // LoginRequest holds the data required for a login attempt.
@@ -47,7 +41,7 @@ type UserProfile struct {
 }
 
 // NewService creates a new auth Service with the given dependencies.
-func NewService(providers []Provider, tokenService *TokenService, userRepo UserRepository, rateLimiter RateLimiter) *Service {
+func NewService(providers []auth.Provider, tokenService *auth.TokenService, userRepo auth.UserRepository, rateLimiter auth.RateLimiter) *Service {
 	return &Service{
 		providers:    providers,
 		tokenService: tokenService,
@@ -81,20 +75,20 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	// Step 3: User lookup
 	user, err := s.userRepo.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, "", ErrServiceUnavailable
+		return nil, "", auth.ErrServiceUnavailable
 	}
 	if user == nil {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", auth.ErrInvalidCredentials
 	}
 	// deleted_at is already filtered by FindByUsername (WHERE deleted_at IS NULL),
 	// but if returned user has deleted_at set, treat as not found
 	if user.DeletedAt != nil {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", auth.ErrInvalidCredentials
 	}
 
 	// Step 4: is_active check
 	if !user.IsActive {
-		return nil, "", ErrAccountInactive
+		return nil, "", auth.ErrAccountInactive
 	}
 
 	// Step 5: Credential verification via selected Provider
@@ -107,7 +101,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if authErr != nil {
 		// Increment rate limit on credential failure
 		_ = s.rateLimiter.IncrementFailed(ctx, req.Username, req.IP)
-		return nil, "", ErrInvalidCredentials
+		return nil, "", auth.ErrInvalidCredentials
 	}
 
 	// Step 6: Portal type restriction
@@ -116,7 +110,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	}
 
 	// Step 7: Generate token pair
-	identity := &AuthIdentity{
+	identity := &auth.AuthIdentity{
 		UserID:     user.ID,
 		Username:   user.Username,
 		Role:       user.Role,
@@ -126,7 +120,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	accessToken, refreshToken, err := s.tokenService.GenerateTokenPair(identity)
 	if err != nil {
-		return nil, "", ErrServiceUnavailable
+		return nil, "", auth.ErrServiceUnavailable
 	}
 
 	// Step 8: Update last_login_at + reset rate limit
@@ -154,23 +148,23 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 func (s *Service) validateInput(req LoginRequest) error {
 	// Username validation
 	if strings.TrimSpace(req.Username) == "" {
-		return &ValidationError{Field: "username", Message: "wajib diisi"}
+		return &auth.ValidationError{Field: "username", Message: "wajib diisi"}
 	}
 	if len(req.Username) > 255 {
-		return &ValidationError{Field: "username", Message: "maksimal 255 karakter"}
+		return &auth.ValidationError{Field: "username", Message: "maksimal 255 karakter"}
 	}
 
 	// Password validation
 	if strings.TrimSpace(req.Password) == "" {
-		return &ValidationError{Field: "password", Message: "wajib diisi"}
+		return &auth.ValidationError{Field: "password", Message: "wajib diisi"}
 	}
 	if len(req.Password) > 255 {
-		return &ValidationError{Field: "password", Message: "maksimal 255 karakter"}
+		return &auth.ValidationError{Field: "password", Message: "maksimal 255 karakter"}
 	}
 
 	// Portal type validation
 	if req.PortalType != "company" && req.PortalType != "vendor" {
-		return &ValidationError{Field: "X-Portal-Type", Message: "harus bernilai 'company' atau 'vendor'"}
+		return &auth.ValidationError{Field: "X-Portal-Type", Message: "harus bernilai 'company' atau 'vendor'"}
 	}
 
 	return nil
@@ -179,7 +173,7 @@ func (s *Service) validateInput(req LoginRequest) error {
 // selectProvider finds the appropriate auth provider for the given auth_source.
 // Returns ErrLDAPNotConfigured if auth_source is 'ldap' and no provider supports it.
 // Returns ErrUnsupportedAuthSource for unknown auth_source values.
-func (s *Service) selectProvider(authSource string) (Provider, error) {
+func (s *Service) selectProvider(authSource string) (auth.Provider, error) {
 	for _, p := range s.providers {
 		if p.Supports(authSource) {
 			return p, nil
@@ -187,21 +181,21 @@ func (s *Service) selectProvider(authSource string) (Provider, error) {
 	}
 
 	if authSource == "ldap" {
-		return nil, ErrLDAPNotConfigured
+		return nil, auth.ErrLDAPNotConfigured
 	}
 
-	return nil, ErrUnsupportedAuthSource
+	return nil, auth.ErrUnsupportedAuthSource
 }
 
 // validatePortalAccess checks that the user type matches the requested portal.
 // is_karyawan=true + portal='vendor' → ErrPortalMismatch
 // is_karyawan=false + portal='company' → ErrPortalMismatch
-func (s *Service) validatePortalAccess(user *UserRecord, portalType string) error {
+func (s *Service) validatePortalAccess(user *auth.UserRecord, portalType string) error {
 	if user.IsKaryawan && portalType == "vendor" {
-		return ErrPortalMismatch
+		return auth.ErrPortalMismatch
 	}
 	if !user.IsKaryawan && portalType == "company" {
-		return ErrPortalMismatch
+		return auth.ErrPortalMismatch
 	}
 	return nil
 }

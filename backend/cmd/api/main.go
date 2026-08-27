@@ -15,12 +15,14 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
-	"github.com/cimb-niaga/cms/backend/internal/config"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/handler"
-	custommw "github.com/cimb-niaga/cms/backend/internal/middleware"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
 	"github.com/cimb-niaga/cms/backend/internal/service"
+	"github.com/cimb-niaga/cms/pkg/config"
+	custommw "github.com/cimb-niaga/cms/pkg/middleware"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 func main() {
@@ -30,7 +32,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Load configuration from environment
-	cfg, err := config.Load()
+	cfg, err := config.Load("8080")
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
@@ -81,8 +83,8 @@ func main() {
 	})
 
 	// Initialize auth dependencies
-	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
-	tokenService := auth.NewTokenService(auth.TokenConfig{
+	tokenBlacklist := pkgauth.NewRedisTokenBlacklist(redisClient)
+	tokenService := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          cfg.JWTSecret,
 		AccessTokenExpiry:  cfg.AccessTokenExpiry,
 		RefreshTokenExpiry: cfg.RefreshTokenExpiry,
@@ -99,7 +101,7 @@ func main() {
 	// Create auth service with local provider
 	localProvider := auth.NewLocalProvider(userRepo)
 	authService := auth.NewService(
-		[]auth.Provider{localProvider},
+		[]pkgauth.Provider{localProvider},
 		tokenService,
 		userRepo,
 		rateLimiter,

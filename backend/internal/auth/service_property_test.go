@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	"pgregory.net/rapid"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 // Feature: user-login
 // Property 2: Auth Error Uniformity
 // Property 14: Portal Type Isolation
-// Property 15: Auth Provider Selection
+// Property 15: Auth pkgauth.Provider Selection
 // Property 16: Input Validation Priority
 // Property 17: Password Length Boundaries
 
@@ -69,8 +71,8 @@ func genWhitespaceString() *rapid.Generator[string] {
 // **Validates: Requirements 3.3, 3.4, 3.6**
 //
 // For any authentication failure — whether caused by a non-existent username
-// (nil repo result) or an incorrect password (provider returning ErrInvalidCredentials)
-// — the Auth_Service SHALL return ErrInvalidCredentials.
+// (nil repo result) or an incorrect password (provider returning pkgauth.ErrInvalidCredentials)
+// — the Auth_Service SHALL return pkgauth.ErrInvalidCredentials.
 func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		username := genNonWhitespaceString(1, 50).Draw(t, "username")
@@ -90,9 +92,9 @@ func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 			repo = &stubUserRepo{findResult: nil, findErr: nil}
 			provider = &stubProvider{}
 		case 1:
-			// Wrong password: user exists, active, provider returns ErrInvalidCredentials
+			// Wrong password: user exists, active, provider returns pkgauth.ErrInvalidCredentials
 			isKaryawan := rapid.Bool().Draw(t, "isKaryawan")
-			user := &UserRecord{
+			user := &pkgauth.UserRecord{
 				ID:           rapid.Int64Range(1, 100000).Draw(t, "userID"),
 				Username:     username,
 				FullName:     "Test User",
@@ -113,7 +115,7 @@ func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 				portalType = "vendor"
 			}
 			repo = &stubUserRepo{findResult: user}
-			provider = &stubProvider{authenticateErr: ErrInvalidCredentials}
+			provider = &stubProvider{authenticateErr: pkgauth.ErrInvalidCredentials}
 		}
 
 		svc := newServiceUnderTest(provider, repo, rl)
@@ -125,9 +127,9 @@ func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 			IP:         "10.0.0.1",
 		})
 
-		// Both failure modes must produce ErrInvalidCredentials
-		if !errors.Is(err, ErrInvalidCredentials) {
-			t.Fatalf("failureMode=%d: expected ErrInvalidCredentials, got: %v", failureMode, err)
+		// Both failure modes must produce pkgauth.ErrInvalidCredentials
+		if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+			t.Fatalf("failureMode=%d: expected pkgauth.ErrInvalidCredentials, got: %v", failureMode, err)
 		}
 	})
 }
@@ -136,7 +138,7 @@ func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 // **Validates: Requirements 12.4, 12.5, 12.10**
 //
 // For any user where is_karyawan=true + portal_type='vendor', or
-// is_karyawan=false + portal_type='company', returns ErrPortalMismatch
+// is_karyawan=false + portal_type='company', returns pkgauth.ErrPortalMismatch
 // (but only after credential verification succeeds).
 func TestProperty_Service_PortalTypeIsolation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -152,7 +154,7 @@ func TestProperty_Service_PortalTypeIsolation(t *testing.T) {
 		username := genNonWhitespaceString(1, 50).Draw(t, "username")
 		password := genNonWhitespaceString(1, 50).Draw(t, "password")
 
-		user := &UserRecord{
+		user := &pkgauth.UserRecord{
 			ID:           rapid.Int64Range(1, 100000).Draw(t, "userID"),
 			Username:     username,
 			FullName:     "Test User",
@@ -169,9 +171,9 @@ func TestProperty_Service_PortalTypeIsolation(t *testing.T) {
 			user.VendorID = int64Ptr(rapid.Int64Range(1, 1000).Draw(t, "vendorID"))
 		}
 
-		// Provider succeeds (credentials are valid)
+		// pkgauth.Provider succeeds (credentials are valid)
 		provider := &stubProvider{
-			authenticateID: &AuthIdentity{
+			authenticateID: &pkgauth.AuthIdentity{
 				UserID:     user.ID,
 				Username:   user.Username,
 				Role:       user.Role,
@@ -191,19 +193,19 @@ func TestProperty_Service_PortalTypeIsolation(t *testing.T) {
 			IP:         "10.0.0.1",
 		})
 
-		if !errors.Is(err, ErrPortalMismatch) {
-			t.Fatalf("isKaryawan=%v, portalType=%s: expected ErrPortalMismatch, got: %v",
+		if !errors.Is(err, pkgauth.ErrPortalMismatch) {
+			t.Fatalf("isKaryawan=%v, portalType=%s: expected pkgauth.ErrPortalMismatch, got: %v",
 				isKaryawan, portalType, err)
 		}
 	})
 }
 
-// --- Property 15: Auth Provider Selection ---
+// --- Property 15: Auth pkgauth.Provider Selection ---
 // **Validates: Requirements 2.3, 2.4, 2.6**
 //
 // auth_source 'local'/'local_dev' → LocalProvider selected.
-// 'ldap' without LDAP provider → ErrLDAPNotConfigured.
-// Unknown → ErrUnsupportedAuthSource.
+// 'ldap' without LDAP provider → pkgauth.ErrLDAPNotConfigured.
+// Unknown → pkgauth.ErrUnsupportedAuthSource.
 func TestProperty_Service_AuthProviderSelection(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		// Choose auth_source scenario: 0=local, 1=local_dev, 2=ldap, 3=unknown
@@ -229,7 +231,7 @@ func TestProperty_Service_AuthProviderSelection(t *testing.T) {
 		username := genNonWhitespaceString(1, 50).Draw(t, "username")
 		password := genNonWhitespaceString(1, 50).Draw(t, "password")
 
-		user := &UserRecord{
+		user := &pkgauth.UserRecord{
 			ID:           rapid.Int64Range(1, 100000).Draw(t, "userID"),
 			Username:     username,
 			FullName:     "Test User",
@@ -248,7 +250,7 @@ func TestProperty_Service_AuthProviderSelection(t *testing.T) {
 			supportsFunc: func(source string) bool {
 				return source == "local" || source == "local_dev"
 			},
-			authenticateID: &AuthIdentity{
+			authenticateID: &pkgauth.AuthIdentity{
 				UserID:     user.ID,
 				Username:   user.Username,
 				Role:       user.Role,
@@ -271,21 +273,21 @@ func TestProperty_Service_AuthProviderSelection(t *testing.T) {
 		switch scenario {
 		case 0, 1:
 			// local/local_dev: provider selected successfully, no provider-selection error
-			if errors.Is(err, ErrLDAPNotConfigured) {
-				t.Fatalf("auth_source=%q: should not get ErrLDAPNotConfigured", authSource)
+			if errors.Is(err, pkgauth.ErrLDAPNotConfigured) {
+				t.Fatalf("auth_source=%q: should not get pkgauth.ErrLDAPNotConfigured", authSource)
 			}
-			if errors.Is(err, ErrUnsupportedAuthSource) {
-				t.Fatalf("auth_source=%q: should not get ErrUnsupportedAuthSource", authSource)
+			if errors.Is(err, pkgauth.ErrUnsupportedAuthSource) {
+				t.Fatalf("auth_source=%q: should not get pkgauth.ErrUnsupportedAuthSource", authSource)
 			}
 		case 2:
-			// ldap without LDAP provider → ErrLDAPNotConfigured
-			if !errors.Is(err, ErrLDAPNotConfigured) {
-				t.Fatalf("auth_source=ldap: expected ErrLDAPNotConfigured, got: %v", err)
+			// ldap without LDAP provider → pkgauth.ErrLDAPNotConfigured
+			if !errors.Is(err, pkgauth.ErrLDAPNotConfigured) {
+				t.Fatalf("auth_source=ldap: expected pkgauth.ErrLDAPNotConfigured, got: %v", err)
 			}
 		case 3:
-			// unknown → ErrUnsupportedAuthSource
-			if !errors.Is(err, ErrUnsupportedAuthSource) {
-				t.Fatalf("auth_source=%q: expected ErrUnsupportedAuthSource, got: %v", authSource, err)
+			// unknown → pkgauth.ErrUnsupportedAuthSource
+			if !errors.Is(err, pkgauth.ErrUnsupportedAuthSource) {
+				t.Fatalf("auth_source=%q: expected pkgauth.ErrUnsupportedAuthSource, got: %v", authSource, err)
 			}
 		}
 	})
@@ -315,7 +317,7 @@ func TestProperty_Service_InputValidationPriority(t *testing.T) {
 
 		// Set up stubs that would fail auth if reached (proves validation runs first)
 		provider := &stubProvider{
-			authenticateErr: ErrInvalidCredentials,
+			authenticateErr: pkgauth.ErrInvalidCredentials,
 		}
 		repo := &stubUserRepo{findResult: nil, findErr: nil}
 		rl := &stubRateLimiter{}
@@ -329,10 +331,10 @@ func TestProperty_Service_InputValidationPriority(t *testing.T) {
 			IP:         "10.0.0.1",
 		})
 
-		// Must get a ValidationError, not ErrInvalidCredentials
-		var validationErr *ValidationError
+		// Must get a pkgauth.ValidationError, not pkgauth.ErrInvalidCredentials
+		var validationErr *pkgauth.ValidationError
 		if !errors.As(err, &validationErr) {
-			t.Fatalf("invalidField=%d: expected *ValidationError, got: %T (%v)", invalidField, err, err)
+			t.Fatalf("invalidField=%d: expected *pkgauth.ValidationError, got: %T (%v)", invalidField, err, err)
 		}
 
 		switch invalidField {
@@ -363,7 +365,7 @@ func TestProperty_Service_PasswordLengthBoundaries(t *testing.T) {
 		portalType := genValidPortalType().Draw(t, "portalType")
 
 		// Stubs that would fail auth if reached
-		provider := &stubProvider{authenticateErr: ErrInvalidCredentials}
+		provider := &stubProvider{authenticateErr: pkgauth.ErrInvalidCredentials}
 		repo := &stubUserRepo{findResult: nil}
 		rl := &stubRateLimiter{}
 
@@ -376,10 +378,10 @@ func TestProperty_Service_PasswordLengthBoundaries(t *testing.T) {
 			IP:         "10.0.0.1",
 		})
 
-		// Must get a ValidationError for password length
-		var validationErr *ValidationError
+		// Must get a pkgauth.ValidationError for password length
+		var validationErr *pkgauth.ValidationError
 		if !errors.As(err, &validationErr) {
-			t.Fatalf("password len=%d: expected *ValidationError, got: %T (%v)", len(password), err, err)
+			t.Fatalf("password len=%d: expected *pkgauth.ValidationError, got: %T (%v)", len(password), err, err)
 		}
 		if validationErr.Field != "password" {
 			t.Fatalf("expected Field=password, got %s", validationErr.Field)

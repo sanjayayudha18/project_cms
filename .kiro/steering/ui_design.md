@@ -134,7 +134,45 @@ Rules:
 *   No signalling error/status by color alone, always icon + text.
 
 * * *
+## 11\. Two Themes — One Per Frontend
+
+**Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue.
+
+### Internal App — "Merah Sirih" (`frontend/CodexCash-Vite`)
+
+Warm off-white neutrals, red as a ≤10% accent (primary buttons, active states, key figures). Optimized for data-dense screens operators stare at all day. This is the theme described in Sections 1-10 above.
+
+| Token | OKLCH | Role |
+| ---| ---| --- |
+| Primary | `oklch(56% 0.223 27)` | CTAs, active states |
+| Primary Deep | `oklch(47% 0.185 27)` | Hover, pressed |
+| Red Tint | `oklch(94% 0.03 25)` | Row hover, tinted backgrounds |
+| Surface | `oklch(98.6% 0.006 40)` | Page background |
+| Text | `oklch(26% 0.02 30)` | Body text, headings |
+
+### Vendor Portal — "Merah Menyala" (`frontend/VendorPortal-Vite`)
+
+Bold, brand-forward: maroon-red top bar, full-red active sidebar. Strong CIMB identity from first load, especially on login. External-facing presence.
+
+| Token | OKLCH | Role |
+| ---| ---| --- |
+| Primary | `oklch(54% 0.233 27)` | CTAs, active states |
+| Maroon Bar | `oklch(40% 0.155 26)` | Top navigation bar |
+| Maroon Deep | `oklch(30% 0.11 25)` | Sidebar active, pressed states |
+| Surface | `oklch(99.5% 0.003 40)` | Page background |
+| Text | `oklch(25% 0.02 28)` | Body text, headings |
+
+### Theme Rules
+
+*   **Accessibility**: never encode status with color alone — always pair red/green with a label or icon (color-blind users). Deep red on white is safe for bold text/buttons only; do NOT use it for small thin text (insufficient contrast).
+*   Red is an accent, not wallpaper (internal). Don't scatter it everywhere — it works because it's rare.
+*   Money as `tabular-nums`, currency shown explicitly (IDR), amounts right-aligned in tables.
+*   Font: one family in multiple weights (hierarchy via scale + weight, not two competing fonts).
+*   Both themes share the same semantic color tokens (success/warning/danger/info from Section 4) and the same component patterns (Section 8). Only brand intensity and navigation chrome differ.
+
+* * *
 ## Conventions
 *   Update this file when a token, component pattern, or rule changes.
 *   Tokens live as CSS custom properties; the HTML style guide is the visual source of truth. Keep them in sync.
 *   When generating a new screen, reuse existing tokens and component patterns; do not invent new colors or one-off spacing.
+*   When building for the vendor portal, apply "Merah Menyala" palette. For internal app, apply "Merah Sirih" (default, described in Sections 1-10).

@@ -19,8 +19,10 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
-	"github.com/cimb-niaga/cms/backend/internal/middleware"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
+	"github.com/cimb-niaga/cms/pkg/middleware"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -48,7 +50,7 @@ type testHarness struct {
 	pool        *pgxpool.Pool
 	miniRedis   *miniredis.Miniredis
 	redisClient *redis.Client
-	tokenSvc    *auth.TokenService
+	tokenSvc    *pkgauth.TokenService
 }
 
 // setupHarness creates a full integration test stack:
@@ -90,14 +92,14 @@ func setupHarness(t *testing.T) *testHarness {
 
 	// Build the full dependency graph
 	repo := repository.NewAuthRepository(pool)
-	blacklist := auth.NewRedisTokenBlacklist(redisClient)
+	blacklist := pkgauth.NewRedisTokenBlacklist(redisClient)
 
-	tokenCfg := auth.TokenConfig{
+	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
 		RefreshTokenExpiry: 7 * 24 * time.Hour,
 	}
-	tokenSvc := auth.NewTokenService(tokenCfg, blacklist)
+	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 
 	localProvider := auth.NewLocalProvider(repo)
 
@@ -109,7 +111,7 @@ func setupHarness(t *testing.T) *testHarness {
 	rateLimiter := middleware.NewRateLimiter(redisClient, rateLimiterCfg)
 
 	authSvc := auth.NewService(
-		[]auth.Provider{localProvider},
+		[]pkgauth.Provider{localProvider},
 		tokenSvc,
 		repo,
 		rateLimiter,
@@ -484,14 +486,14 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 
 	// Build dependencies with dead Redis
 	repo := repository.NewAuthRepository(pool)
-	blacklist := auth.NewRedisTokenBlacklist(redisClient)
+	blacklist := pkgauth.NewRedisTokenBlacklist(redisClient)
 
-	tokenCfg := auth.TokenConfig{
+	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
 		RefreshTokenExpiry: 7 * 24 * time.Hour,
 	}
-	tokenSvc := auth.NewTokenService(tokenCfg, blacklist)
+	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 	localProvider := auth.NewLocalProvider(repo)
 
 	rateLimiterCfg := middleware.RateLimitConfig{
@@ -502,7 +504,7 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	rateLimiter := middleware.NewRateLimiter(redisClient, rateLimiterCfg)
 
 	authSvc := auth.NewService(
-		[]auth.Provider{localProvider},
+		[]pkgauth.Provider{localProvider},
 		tokenSvc, repo, rateLimiter,
 	)
 

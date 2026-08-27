@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_cit_internal_repository_repository_go", "label": "repository.go", "file_type": "code", "source_file": "backend-cit/internal/repository/repository.go", "source_location": "L1"}], "edges": [], "raw_calls": [], "go_imports": {}}

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_migrations_002_cms_tables_sql", "label": "002_cms_tables.sql", "file_type": "code", "source_file": "backend/migrations/002_cms_tables.sql", "source_location": null}], "edges": []}

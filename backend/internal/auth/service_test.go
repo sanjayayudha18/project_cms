@@ -5,15 +5,17 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 // --- Stub implementations for service tests ---
 
-// stubProvider implements Provider for service tests.
+// stubProvider implements pkgauth.Provider for service tests.
 type stubProvider struct {
 	supportsFunc    func(authSource string) bool
 	authenticateErr error
-	authenticateID  *AuthIdentity
+	authenticateID  *pkgauth.AuthIdentity
 }
 
 func (m *stubProvider) Supports(authSource string) bool {
@@ -23,23 +25,23 @@ func (m *stubProvider) Supports(authSource string) bool {
 	return authSource == "local" || authSource == "local_dev"
 }
 
-func (m *stubProvider) Authenticate(_ context.Context, _, _ string) (*AuthIdentity, error) {
+func (m *stubProvider) Authenticate(_ context.Context, _, _ string) (*pkgauth.AuthIdentity, error) {
 	if m.authenticateErr != nil {
 		return nil, m.authenticateErr
 	}
 	return m.authenticateID, nil
 }
 
-// stubUserRepo implements UserRepository for service tests.
+// stubUserRepo implements pkgauth.UserRepository for service tests.
 type stubUserRepo struct {
-	findResult       *UserRecord
+	findResult       *pkgauth.UserRecord
 	findErr          error
 	updateLoginErr   error
-	getProfileResult *UserRecord
+	getProfileResult *pkgauth.UserRecord
 	getProfileErr    error
 }
 
-func (m *stubUserRepo) FindByUsername(_ context.Context, _ string) (*UserRecord, error) {
+func (m *stubUserRepo) FindByUsername(_ context.Context, _ string) (*pkgauth.UserRecord, error) {
 	return m.findResult, m.findErr
 }
 
@@ -47,11 +49,11 @@ func (m *stubUserRepo) UpdateLastLogin(_ context.Context, _ int64) error {
 	return m.updateLoginErr
 }
 
-func (m *stubUserRepo) GetUserProfile(_ context.Context, _ int64) (*UserRecord, error) {
+func (m *stubUserRepo) GetUserProfile(_ context.Context, _ int64) (*pkgauth.UserRecord, error) {
 	return m.getProfileResult, m.getProfileErr
 }
 
-// stubRateLimiter implements RateLimiter for service tests.
+// stubRateLimiter implements pkgauth.RateLimiter for service tests.
 type stubRateLimiter struct {
 	checkErr          error
 	incrementFailedFn func(ctx context.Context, username, ip string) error
@@ -78,16 +80,32 @@ func (m *stubRateLimiter) ResetUsername(ctx context.Context, username string) er
 
 // --- Test helpers ---
 
+// testTokenConfig returns a TokenConfig suitable for unit tests.
+func testTokenConfig() pkgauth.TokenConfig {
+	return pkgauth.TokenConfig{
+		SecretKey:          []byte("test-secret-key-minimum-32-bytes!"),
+		AccessTokenExpiry:  15 * time.Minute,
+		RefreshTokenExpiry: 7 * 24 * time.Hour,
+	}
+}
+
+// noopBlacklist is a TokenBlacklist stub that never blacklists anything.
+type noopBlacklist struct{}
+
+func (noopBlacklist) Add(_ context.Context, _ string, _ time.Duration) error { return nil }
+func (noopBlacklist) IsBlacklisted(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
 // newServiceUnderTest creates a Service wired with stubs for unit testing.
 func newServiceUnderTest(provider *stubProvider, repo *stubUserRepo, rl *stubRateLimiter) *Service {
-	bl := newMockBlacklist()
-	tokenSvc := NewTokenService(testTokenConfig(), bl)
-	return NewService([]Provider{provider}, tokenSvc, repo, rl)
+	tokenSvc := pkgauth.NewTokenService(testTokenConfig(), noopBlacklist{})
+	return NewService([]pkgauth.Provider{provider}, tokenSvc, repo, rl)
 }
 
 // activeKaryawanUser returns a typical active karyawan user record for testing.
-func activeKaryawanUser() *UserRecord {
-	return &UserRecord{
+func activeKaryawanUser() *pkgauth.UserRecord {
+	return &pkgauth.UserRecord{
 		ID:           1,
 		Username:     "john.admin",
 		FullName:     "John Admin",
@@ -111,7 +129,7 @@ func TestService_Login_Success(t *testing.T) {
 	user := activeKaryawanUser()
 
 	provider := &stubProvider{
-		authenticateID: &AuthIdentity{
+		authenticateID: &pkgauth.AuthIdentity{
 			UserID:     user.ID,
 			Username:   user.Username,
 			Role:       user.Role,
@@ -172,7 +190,7 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 	user := activeKaryawanUser()
 
 	provider := &stubProvider{
-		authenticateErr: ErrInvalidCredentials,
+		authenticateErr: pkgauth.ErrInvalidCredentials,
 	}
 	repo := &stubUserRepo{findResult: user}
 	rl := &stubRateLimiter{}
@@ -192,8 +210,8 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 	if refreshToken != "" {
 		t.Error("expected empty refresh token for invalid credentials")
 	}
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials, got: %v", err)
 	}
 }
 
@@ -221,8 +239,8 @@ func TestService_Login_UserNotFound_GenericError(t *testing.T) {
 	if refreshToken != "" {
 		t.Error("expected empty refresh token for user not found")
 	}
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials (generic error), got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials (generic error), got: %v", err)
 	}
 }
 
@@ -251,8 +269,8 @@ func TestService_Login_DeletedUser_GenericError(t *testing.T) {
 	if refreshToken != "" {
 		t.Error("expected empty refresh token for deleted user")
 	}
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials (generic error), got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials (generic error), got: %v", err)
 	}
 }
 
@@ -279,8 +297,8 @@ func TestService_Login_InactiveUser(t *testing.T) {
 	if refreshToken != "" {
 		t.Error("expected empty refresh token for inactive user")
 	}
-	if !errors.Is(err, ErrAccountInactive) {
-		t.Errorf("expected ErrAccountInactive, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrAccountInactive) {
+		t.Errorf("expected pkgauth.ErrAccountInactive, got: %v", err)
 	}
 }
 
@@ -289,7 +307,7 @@ func TestService_Login_PortalMismatch(t *testing.T) {
 	user := activeKaryawanUser()
 
 	provider := &stubProvider{
-		authenticateID: &AuthIdentity{
+		authenticateID: &pkgauth.AuthIdentity{
 			UserID:     user.ID,
 			Username:   user.Username,
 			Role:       user.Role,
@@ -315,13 +333,13 @@ func TestService_Login_PortalMismatch(t *testing.T) {
 	if refreshToken != "" {
 		t.Error("expected empty refresh token for portal mismatch")
 	}
-	if !errors.Is(err, ErrPortalMismatch) {
-		t.Errorf("expected ErrPortalMismatch, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrPortalMismatch) {
+		t.Errorf("expected pkgauth.ErrPortalMismatch, got: %v", err)
 	}
 }
 
 func TestService_Login_ValidationBeforeAuth(t *testing.T) {
-	// Empty username should return ValidationError before any auth logic runs.
+	// Empty username should return pkgauth.ValidationError before any auth logic runs.
 	provider := &stubProvider{
 		authenticateErr: errors.New("should not be called"),
 	}
@@ -351,9 +369,9 @@ func TestService_Login_ValidationBeforeAuth(t *testing.T) {
 		t.Fatal("expected an error for empty username")
 	}
 
-	var validationErr *ValidationError
+	var validationErr *pkgauth.ValidationError
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("expected *ValidationError, got: %T (%v)", err, err)
+		t.Fatalf("expected *pkgauth.ValidationError, got: %T (%v)", err, err)
 	}
 	if validationErr.Field != "username" {
 		t.Errorf("expected Field=username, got %s", validationErr.Field)
@@ -362,7 +380,7 @@ func TestService_Login_ValidationBeforeAuth(t *testing.T) {
 
 func TestService_Login_RateLimitBlocks(t *testing.T) {
 	// Rate limiter returns error - propagated to caller
-	rateLimitErr := &RateLimitError{RetryAfter: 540}
+	rateLimitErr := &pkgauth.RateLimitError{RetryAfter: 540}
 
 	provider := &stubProvider{}
 	repo := &stubUserRepo{}
@@ -387,9 +405,9 @@ func TestService_Login_RateLimitBlocks(t *testing.T) {
 		t.Fatal("expected an error for rate limited request")
 	}
 
-	var rlErr *RateLimitError
+	var rlErr *pkgauth.RateLimitError
 	if !errors.As(err, &rlErr) {
-		t.Fatalf("expected *RateLimitError, got: %T (%v)", err, err)
+		t.Fatalf("expected *pkgauth.RateLimitError, got: %T (%v)", err, err)
 	}
 	if rlErr.RetryAfter != 540 {
 		t.Errorf("expected RetryAfter=540, got %d", rlErr.RetryAfter)

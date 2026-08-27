@@ -9,22 +9,24 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
-	"github.com/cimb-niaga/cms/backend/internal/middleware"
+	"github.com/cimb-niaga/cms/pkg/middleware"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
 	authService  *auth.Service
-	tokenService *auth.TokenService
-	userRepo     auth.UserRepository
+	tokenService *pkgauth.TokenService
+	userRepo     pkgauth.UserRepository
 	rateLimiter  *middleware.RateLimiter
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
 func NewAuthHandler(
 	authService *auth.Service,
-	tokenService *auth.TokenService,
-	userRepo auth.UserRepository,
+	tokenService *pkgauth.TokenService,
+	userRepo pkgauth.UserRepository,
 	rateLimiter *middleware.RateLimiter,
 ) *AuthHandler {
 	return &AuthHandler{
@@ -115,7 +117,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate new token pair
-	identity := &auth.AuthIdentity{
+	identity := &pkgauth.AuthIdentity{
 		UserID:     user.ID,
 		Username:   user.Username,
 		Role:       user.Role,
@@ -191,28 +193,28 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 // handleAuthError maps auth package errors to appropriate HTTP responses.
 func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
-	var validationErr *auth.ValidationError
+	var validationErr *pkgauth.ValidationError
 	if errors.As(err, &validationErr) {
 		writeValidationError(w, validationErr.Field, validationErr.Message)
 		return
 	}
 
-	var rateLimitErr *auth.RateLimitError
+	var rateLimitErr *pkgauth.RateLimitError
 	if errors.As(err, &rateLimitErr) {
 		writeTooManyRequests(w, "Terlalu banyak percobaan login", rateLimitErr.RetryAfter)
 		return
 	}
 
 	switch {
-	case errors.Is(err, auth.ErrInvalidCredentials):
+	case errors.Is(err, pkgauth.ErrInvalidCredentials):
 		writeUnauthorized(w, "Username atau password salah")
-	case errors.Is(err, auth.ErrAccountInactive):
+	case errors.Is(err, pkgauth.ErrAccountInactive):
 		writeError(w, http.StatusForbidden, "account_inactive", "Akun tidak aktif")
-	case errors.Is(err, auth.ErrPortalMismatch):
+	case errors.Is(err, pkgauth.ErrPortalMismatch):
 		writeError(w, http.StatusForbidden, "portal_mismatch", "Akun tidak memiliki akses ke portal ini")
-	case errors.Is(err, auth.ErrLDAPNotConfigured):
+	case errors.Is(err, pkgauth.ErrLDAPNotConfigured):
 		writeServiceUnavailable(w, "LDAP authentication tidak tersedia")
-	case errors.Is(err, auth.ErrServiceUnavailable):
+	case errors.Is(err, pkgauth.ErrServiceUnavailable):
 		writeServiceUnavailable(w, "Layanan sedang tidak tersedia")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")

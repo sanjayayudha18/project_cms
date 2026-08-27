@@ -6,15 +6,17 @@ import (
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
+
+	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
 // mockUserRepository is a test double for UserRepository.
 type mockUserRepository struct {
-	user *UserRecord
+	user *pkgauth.UserRecord
 	err  error
 }
 
-func (m *mockUserRepository) FindByUsername(_ context.Context, _ string) (*UserRecord, error) {
+func (m *mockUserRepository) FindByUsername(_ context.Context, _ string) (*pkgauth.UserRecord, error) {
 	return m.user, m.err
 }
 
@@ -22,7 +24,7 @@ func (m *mockUserRepository) UpdateLastLogin(_ context.Context, _ int64) error {
 	return nil
 }
 
-func (m *mockUserRepository) GetUserProfile(_ context.Context, _ int64) (*UserRecord, error) {
+func (m *mockUserRepository) GetUserProfile(_ context.Context, _ int64) (*pkgauth.UserRecord, error) {
 	return m.user, m.err
 }
 
@@ -42,7 +44,7 @@ func TestLocalProvider_Authenticate_ValidPassword(t *testing.T) {
 	vendorID := int64(42)
 
 	repo := &mockUserRepository{
-		user: &UserRecord{
+		user: &pkgauth.UserRecord{
 			ID:           1,
 			Username:     "john.admin",
 			FullName:     "John Admin",
@@ -87,7 +89,7 @@ func TestLocalProvider_Authenticate_WrongPassword(t *testing.T) {
 	hash := hashPassword(t, "CorrectPassword!")
 
 	repo := &mockUserRepository{
-		user: &UserRecord{
+		user: &pkgauth.UserRecord{
 			ID:           1,
 			Username:     "john.admin",
 			PasswordHash: &hash,
@@ -101,8 +103,8 @@ func TestLocalProvider_Authenticate_WrongPassword(t *testing.T) {
 	provider := NewLocalProvider(repo)
 	identity, err := provider.Authenticate(context.Background(), "john.admin", "WrongPassword!")
 
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials, got: %v", err)
 	}
 	if identity != nil {
 		t.Error("expected nil identity on wrong password")
@@ -119,8 +121,8 @@ func TestLocalProvider_Authenticate_UserNotFound(t *testing.T) {
 	provider := NewLocalProvider(repo)
 	identity, err := provider.Authenticate(context.Background(), "nonexistent", "AnyPassword1")
 
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials, got: %v", err)
 	}
 	if identity != nil {
 		t.Error("expected nil identity when user not found")
@@ -148,7 +150,7 @@ func TestLocalProvider_Authenticate_RepoError(t *testing.T) {
 func TestLocalProvider_Authenticate_NilPasswordHash(t *testing.T) {
 	// LDAP user with nil password_hash
 	repo := &mockUserRepository{
-		user: &UserRecord{
+		user: &pkgauth.UserRecord{
 			ID:           2,
 			Username:     "ldap.user",
 			PasswordHash: nil,
@@ -162,8 +164,8 @@ func TestLocalProvider_Authenticate_NilPasswordHash(t *testing.T) {
 	provider := NewLocalProvider(repo)
 	identity, err := provider.Authenticate(context.Background(), "ldap.user", "AnyPassword1")
 
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("expected ErrInvalidCredentials, got: %v", err)
+	if !errors.Is(err, pkgauth.ErrInvalidCredentials) {
+		t.Errorf("expected pkgauth.ErrInvalidCredentials, got: %v", err)
 	}
 	if identity != nil {
 		t.Error("expected nil identity when password_hash is nil")

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_migrations_001_1_vendor_vaults_sql", "label": "001.1_vendor_vaults.sql", "file_type": "code", "source_file": "backend/migrations/001.1_vendor_vaults.sql", "source_location": null}], "edges": []}

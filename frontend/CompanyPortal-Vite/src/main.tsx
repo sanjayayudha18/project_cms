@@ -9,6 +9,7 @@ import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { citRoute } from "./routes/cit";
+import { eodMonitoringRoute } from "./routes/eod-monitoring";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { dsrDashboardRoute } from "./routes/forecasting/dsr-dashboard";
 import { dsrUploadRoute } from "./routes/forecasting/dsr-upload";
@@ -42,6 +43,7 @@ const routeTree = rootRoute.addChildren([
     invoiceListRoute,
     reconciliationRoute,
     cashCountRoute,
+    eodMonitoringRoute,
   ]),
 ]);
 

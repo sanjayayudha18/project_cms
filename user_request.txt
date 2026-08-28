@@ -1,4 +1,0 @@
-hi, in ".kiro\specs\atm-portal-fase2" add requirements.md file.
-
-i want to create requirements for:
-1. 

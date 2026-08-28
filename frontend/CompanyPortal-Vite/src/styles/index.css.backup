@@ -76,22 +76,12 @@ p {
 }
 
 .login-shell__identity {
-  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: var(--space-12) clamp(24px, 5.5vw, 96px);
-  background: radial-gradient(120% 100% at 0% 0%, var(--login-chrome) 0%, var(--login-chrome-deep) 55%),
-    linear-gradient(155deg, var(--login-chrome-deep) 0%, var(--login-chrome-deep) 100%);
+  background-color: var(--login-chrome-deep);
   overflow-y: auto;
-}
-
-.login-shell__identity::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--login-primary) 0%, var(--login-line-strong) 100%);
 }
 
 .login-shell__identity-inner {
@@ -115,10 +105,9 @@ p {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  background-color: var(--login-primary);
-  color: var(--login-primary-fg);
-  border: 1px solid var(--login-line-strong);
-  box-shadow: 0 4px 16px var(--login-mark-glow);
+  background-color: var(--login-well);
+  color: var(--login-chrome-fg);
+  border: 1px solid var(--login-line);
 }
 
 .login-shell__brand-text {
@@ -418,14 +407,11 @@ p {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  box-shadow: 0 6px 20px var(--login-mark-glow);
-  transition: background-color 150ms ease-out, box-shadow 150ms ease-out, transform 150ms ease-out;
+  transition: background-color 150ms ease-out;
 }
 
 .login-form__submit:hover:not(:disabled) {
   background-color: var(--login-primary-hover);
-  box-shadow: 0 8px 24px var(--login-mark-glow);
-  transform: translateY(-1px);
 }
 
 .login-form__submit:focus-visible {

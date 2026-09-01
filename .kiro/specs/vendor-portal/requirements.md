@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Vendor Portal for the CIMB Niaga Cash Management System (CMS). This is a completely separate frontend SPA from the internal CodexCash app, running in its own Docker container with separate Dockerfile, Nginx configuration, and port. The portal allows CIT vendor personnel (PT Gardanet, PT SSI, PT G4S) to log in with local credentials, view their assigned CIT orders, upload handover evidence, view invoices, check replenishment schedules, and monitor DSR data for their assigned ATMs. Vendors are scoped to their own assignments only and cannot access other vendors' data or internal-only features. The portal uses the "Merah Menyala" brand theme (bold, brand-forward with maroon-red top bar and full-red active sidebar). Initial implementation is a prototype with static JSON mock data that can be swapped for real API calls later.
+Vendor Portal for the CIMB Niaga Cash Management System (CMS). This is a completely separate frontend SPA from the internal CROWN app, running in its own Docker container with separate Dockerfile, Nginx configuration, and port. The portal allows CIT vendor personnel (PT Gardanet, PT SSI, PT G4S) to log in with local credentials, view their assigned CIT orders, upload handover evidence, view invoices, check replenishment schedules, and monitor DSR data for their assigned ATMs. Vendors are scoped to their own assignments only and cannot access other vendors' data or internal-only features. The portal uses the "Merah Menyala" brand theme (bold, brand-forward with maroon-red top bar and full-red active sidebar). Initial implementation is a prototype with static JSON mock data that can be swapped for real API calls later.
 
 ## Glossary
 

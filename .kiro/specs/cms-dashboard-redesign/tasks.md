@@ -130,7 +130,7 @@ Transform the existing four-screen CMS prototype into a dashboard-centric operat
 
   - [x] 6.2 Redesign `src/components/layout/Sidebar.tsx`
     - Add `mobileOpen` and `onMobileClose` props
-    - Render Brand_Mark: "CN" in 38×38px rounded square (--red-500 bg), "CodexCash" text with "ATM & CIT" subtitle
+    - Render Brand_Mark: "CR" in 38×38px rounded square (--red-500 bg), "CROWN" text with "ATM & CIT" subtitle
     - Render two NavGroups with uppercase section eyebrow labels
     - Render Settings item below groups, separated by divider/16px whitespace
     - Render system status note at bottom: operational status text + "HH:mm WIB" timestamp

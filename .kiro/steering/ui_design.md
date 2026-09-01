@@ -138,7 +138,7 @@ Rules:
 
 **Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue.
 
-### Internal App — "Merah Sirih" (`frontend/CodexCash-Vite`)
+### Internal App — "Merah Sirih" (`frontend/CompanyPortal-Vite`)
 
 Warm off-white neutrals, red as a ≤10% accent (primary buttons, active states, key figures). Optimized for data-dense screens operators stare at all day. This is the theme described in Sections 1-10 above.
 

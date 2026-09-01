@@ -62,12 +62,12 @@ CMS2/
     internal/<module>/       # CIT-specific: cit, journal, dsr, reconciliation, integration, handler, service, repository
 ```
 
-**ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with `CodexCash-Vite`/`VendorPortal-Vite` — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` should use `pkg/response`.
+**ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with `CompanyPortal-Vite`/`VendorPortal-Vite` — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` should use `pkg/response`.
 
 ### Frontends (two separate SPAs)
 
 ```
-frontend/CodexCash-Vite/     # internal app, LDAP login
+frontend/CompanyPortal-Vite/ # internal app, LDAP login
 frontend/VendorPortal-Vite/  # vendor portal, local login
 ```
 

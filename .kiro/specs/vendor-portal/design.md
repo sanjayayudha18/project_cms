@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Vendor Portal is a standalone React SPA that provides CIT vendor personnel (PT Gardanet, PT SSI, PT G4S) with a scoped view into the CIMB Niaga Cash Management System. It runs independently from the internal CodexCash app in its own Docker container, with a separate codebase at `frontend/VendorPortal-Vite/`.
+The Vendor Portal is a standalone React SPA that provides CIT vendor personnel (PT Gardanet, PT SSI, PT G4S) with a scoped view into the CIMB Niaga Cash Management System. It runs independently from the internal CROWN app in its own Docker container, with a separate codebase at `frontend/VendorPortal-Vite/`.
 
 Key design goals:
 - **Complete isolation** from the internal frontend — no shared code, dependencies, or build artifacts

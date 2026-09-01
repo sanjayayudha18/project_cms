@@ -19,7 +19,7 @@ Redesign of the CMS frontend prototype to match the polished HTML reference (`cm
 - **Attention_Panel**: A sidebar panel listing urgent operational items requiring user action, categorized by severity
 - **Progress_Bar**: A visual bar within table rows showing completion percentage of a route
 - **Toast_Notification**: A temporary feedback message appearing at the bottom-right of the viewport
-- **Brand_Mark**: The "CN" identifier in a rounded red square representing CodexCash branding
+- **Brand_Mark**: The "CR" identifier in a rounded red square representing CROWN branding
 - **Navigation_Group**: A labeled section within the sidebar grouping related navigation items (Operations, Control)
 - **Count_Badge**: A pill-shaped counter next to a navigation item indicating pending items
 - **Scrim_Overlay**: A semi-transparent backdrop shown on mobile when the sidebar is open
@@ -42,7 +42,7 @@ Redesign of the CMS frontend prototype to match the polished HTML reference (`cm
 2. THE "Operations" Navigation_Group SHALL contain the following navigation items in order: Dashboard, Replenishment, Cash Count, and Reconciliation
 3. THE "Control" Navigation_Group SHALL contain the following navigation items in order: Vendor Invoices, DSR Reports, and Forecasting
 4. THE App_Shell SHALL display a Settings navigation item below the Navigation_Groups, visually separated from both groups by a horizontal divider or equivalent whitespace of at least 16px
-5. THE App_Shell SHALL display a Brand_Mark consisting of the letters "CN" in a 38×38px rounded square using the --red-500 background color, adjacent to the text "CodexCash" with subtitle "ATM & CIT", separated by 12px horizontal gap
+5. THE App_Shell SHALL display a Brand_Mark consisting of the letters "CR" in a 38×38px rounded square using the --red-500 background color, adjacent to the text "CROWN" with subtitle "ATM & CIT", separated by 12px horizontal gap
 6. WHEN a navigation item has pending items, THE App_Shell SHALL display a Count_Badge next to the item label showing the pending count as a number, displaying "99+" when the count exceeds 99
 7. THE App_Shell SHALL display a system status note at the bottom of the sidebar showing operational status text and last sync timestamp formatted as "HH:mm WIB" (e.g., "09:52 WIB")
 8. WHEN a navigation item is active, THE App_Shell SHALL highlight it with a --red-50 tinted background and --red-600 text color, distinguishing it from inactive items which use --n-600 text on transparent background

@@ -75,7 +75,7 @@ Two separate Go modules in a workspace (`go.work`), sharing `pkg/`:
 | ATM Backend API | Custom (multi-stage Go build, `backend/Dockerfile`) | ~15-25MB final image, port 8080 |
 | CIT Backend API | Custom (multi-stage Go build, `backend-cit/Dockerfile`) | ~15-25MB final image, port 8081 |
 | Worker | Same Go binary, different entrypoint | asynq worker for background jobs |
-| Frontend (internal) | nginx:alpine + static build | Serves CodexCash-Vite output |
+| Frontend (internal) | nginx:alpine + static build | Serves CompanyPortal-Vite output |
 | Frontend (vendor) | nginx:alpine + static build | Serves VendorPortal-Vite output |
 | Redis | redis:7-alpine | Queue backend (asynq) + JWT blacklist + rate-limit counters |
 
@@ -103,7 +103,7 @@ Two separate Go modules in a workspace (`go.work`), sharing `pkg/`:
 ## Build Commands
 
 ```bash
-# Frontend (run from frontend/CodexCash-Vite/ or frontend/VendorPortal-Vite/)
+# Frontend (run from frontend/CompanyPortal-Vite/ or frontend/VendorPortal-Vite/)
 pnpm install          # Install dependencies
 pnpm dev              # Vite dev server
 pnpm build            # Production build

@@ -52,7 +52,7 @@ CMS2/
 │   └── go.sum
 │
 ├── frontend/
-│   ├── CodexCash-Vite/           # Internal app (LDAP login)
+│   ├── CompanyPortal-Vite/       # Internal app (LDAP login)
 │   │   ├── src/
 │   │   │   ├── components/       # Shared UI components
 │   │   │   ├── features/         # Feature modules

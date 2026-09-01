@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Frontend prototype for the CIMB Niaga Cash Management System (CMS). This is a stakeholder demo application — a unified single-page app showing both internal (CodexCash) and vendor portal flows. The prototype uses hardcoded JSON mock data powering real React components in a near-production frontend shell. No backend, no database, no real authentication. The goal is to demonstrate key operational screens so stakeholders can validate the UX and approve full development.
+Frontend prototype for the CIMB Niaga Cash Management System (CMS). This is a stakeholder demo application — a unified single-page app showing both internal (CROWN) and vendor portal flows. The prototype uses hardcoded JSON mock data powering real React components in a near-production frontend shell. No backend, no database, no real authentication. The goal is to demonstrate key operational screens so stakeholders can validate the UX and approve full development.
 
 ## Glossary
 

@@ -1,7 +1,8 @@
 # PROJECT_CONTEXT.md — CMS ATM & CIT (OpenCode)
 
 > **AI: READ THIS FIRST, EVERY SESSION.** Single source of truth. If your work conflicts with this, STOP and ask. Never invent endpoints, tables, columns, env vars, or modules.
-> This file consolidates `.claude/claude.md` and all `.kiro/steering/*.md` into one reference for OpenCode.
+> **For simple explanations of CMS concepts**, see `.claude/eli5.md` — use when explaining to teammates or stakeholders.
+> This file consolidates `.claude/CLAUDE.md` and all `.kiro/steering/*.md` into one reference for OpenCode.
 
 * * *
 
@@ -24,6 +25,18 @@
 *   **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
 *   **Stage**: Greenfield, vibe-coded with AI.
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
+
+* * *
+
+## graphify
+
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when `graphify-out/graph.json` exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than `GRAPH_REPORT.md` or raw grep output.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
 
 * * *
 
@@ -151,16 +164,16 @@ CMS2/
     internal/<module>/       # CIT-specific: cit, journal, dsr, reconciliation, integration, handler, service, repository
 ```
 
-**ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with the existing frontends (`CodexCash-Vite`/`VendorPortal-Vite`) — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` use `pkg/response`.
+**ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with the existing frontends (`CompanyPortal-Vite`/`VendorPortal-Vite`) — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` use `pkg/response`.
 ### Frontends (two separate SPAs)
 ```
-frontend/CodexCash-Vite/     # internal app, LDAP login
+frontend/CompanyPortal-Vite/   # internal app, LDAP login
 frontend/VendorPortal-Vite/  # vendor portal, local login
 ```
 ### Modules (create ONLY these unless told)
 **Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
-**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/forecast` (H+2)
+**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/forecast` (H+2) · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3 DB map note)
 **Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
 **CIT**: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
 **Integration**: `internal/corebanking` (escrow batch file ingest + parse -> feeds reconciliation)
@@ -169,11 +182,28 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 *   **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local)
 *   **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`
 *   **Master**: `vendors`, `vendor_pics`, `vendor_vaults`, `locations`, `atms`, `vendor_assignments`
-*   **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results`
+*   **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
 *   **Finance**: `invoice_uploads`, `invoice_items`, `invoice_reconciliation_results`
 *   **CIT**: `cit_orders`, `cit_handover_evidences`, `cit_journals`, `cit_dsr_uploads`, `cit_reconciliation_results`
 *   **Integration**: `escrow_batch_files`, `escrow_batch_rows`, `escrow_reconciliation_results`
 > Need a new table/column? Propose here FIRST, get approval, then migrate.
+
+* * *
+
+## 3a. Business Rules & Requirements (from URS v0.3 Rev1, `archives/UR New Template v0.3...docx`)
+> Source-of-truth requirements doc. Anything below not yet reflected in code/schema is a **spec**, not an implemented behavior — check code before assuming it's live.
+
+*   **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
+    `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
+*   DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis.
+*   Duplicate-order prevention: an ATM with an active order is not reissued a new one for the same period.
+*   ATM in "problem" status (pending part, vandalism, etc.) is excluded from replenishment recommendations.
+*   Replenishment result is classified into 4 categories (holiday-adjusted): on-schedule · early (1–2 days) · late (1–2 days) · not done (>2 days off or skipped).
+*   **Cash count (vault, monthly)**: risk category from escrow (SIBS/MIS) balance analysis drives a random/non-patterned visit schedule. Assigned PIC gets email notification, can accept/reject (reject → reschedule or reassign). On accept, a surat tugas is issued. Berita Acara (BA) is filled digitally on-site, DSR column auto-fills from vendor's uploaded DSR, photo evidence attached, dual e-sign (vendor + bank PIC). Monthly recap = 3-way reconciliation: cash count vs. escrow (H-1, auto from MIS/SIBS) vs. proofing (manual input).
+*   **Cash count selektif (machine-level)**: same flow as vault cash count, scoped to specific ATMs per supervision instruction.
+*   **Invoice reconciliation**: vendor uploads invoice + supporting docs; CIMB Niaga internal team uploads ATM master data (active/terminated ATM, price, trip package, category VIP/Industri/Regular); system auto-reconciles; internal team can manually adjust against vendor disputes (sanggahan).
+*   **NFR targets**: 24×7 availability outside planned maintenance · dashboard load ≤3s (p95) · DSR upload ≤30s/doc · journal-post initial response ≤5s with async status confirm ≤2min · 300 concurrent active users · horizontal scalability for vendor portal · Data Centers: Bintaro & NTT.
+*   **DGCC / data privacy**: this system is internal + vendor-operational, not customer-facing, so UU PDP/POJK 22/2023 items on customer personal-data collection are likely N/A — but vendor (FLM) data exchange involves a third party, so a Third-Party Risk Assessment (TPRA) and Data Processing Agreement should be tracked as a compliance item, not assumed done.
 
 * * *
 
@@ -286,7 +316,7 @@ LOG_LEVEL=info
 
 **Current state (now): ONE Compute Engine VM runs both backends** as separate Docker containers (`backend` on 8080, `backend-cit` on 8081) — see root `docker-compose.yml` (Sec 9). Fine for now: CIT is still a skeleton with no real endpoints, low load.
 
-**Planned (2028): split into two separate Compute Engine VMs**, one per backend. This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so moving CIT to its own VM later requires **no code change** — just deploy the existing `backend-cit` image to a new VM and repoint its `.env`. When that split happens:
+**Planned (2028): split into two separate Compute Engine VMs**, one per backend. This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so moving CIT to its own VM later requires **no code change** — just deploy the existing `cms-backend-cit` image to a new VM and repoint its `.env`. When that split happens:
 *   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
 *   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
 *   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
@@ -316,6 +346,7 @@ LOG_LEVEL=info
 *   Email: company SMTP relay.
 *   DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
 *   Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 3). Deployed together on ONE Compute Engine VM today (two containers); planned to split into two separate VMs in 2028 (Sec 10) — the module split already makes that a zero-code-change deployment change when it happens.
+*   Cash count (vault + selective machine) is confirmed in-scope per URS v0.3 Rev1, but its module/tables are a **proposal pending approval** (Sec 3a) — not yet part of the approved module/table map in Sec 3 until confirmed.
 
 * * *
 
@@ -324,7 +355,7 @@ LOG_LEVEL=info
 **Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue. **Light mode only** (no dark mode, no toggle).
 
 **Two themes, one per frontend:**
-*   **Internal app** (`frontend/CodexCash-Vite`) -> "Merah Sirih". Warm off-white neutrals, red as a ≤10% accent. Optimized for data-dense screens.
+*   **Internal app** (`frontend/CompanyPortal-Vite`) -> "Merah Sirih". Warm off-white neutrals, red as a ≤10% accent. Optimized for data-dense screens.
 *   **Vendor portal** (`frontend/VendorPortal-Vite`) -> "Merah Menyala". Bold: maroon-red top bar, full-red active sidebar.
 
 **Design tokens (canonical, from `ui_design.md`):**
@@ -347,9 +378,11 @@ Both run on the **same VM**; active windows don't overlap (no contention).
 
 **What EOD does**: ingest from DSR (saldo akhir 00:00 per vault), Opti Cash forecast (Order H-1 & H), horizon H-2 (refund validation); compute Final Realisasi = rekomendasi DMAA − (saldo DSR + refund horizon H-2) per vendor; produce daily summaries read next working day.
 
+> This EOD `Final Realisasi` formula is separate from the daily `Order ATM` formula (Sec 3a) — don't conflate the two, they answer different questions (backdated realisasi summary vs. same-day/H-2 order calc).
+
 **Handoff rules (NON-NEGOTIABLE):**
 *   EOD output written to **DB = source of truth**. Redis only cache, never store of record.
-*   Every EOD run tracked: `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
+*   Every EOD run tracked in a run table (`forecast_runs` / an `eod_runs` table): `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
 *   Transactional reads a `processing_date` only after run marked **success**. Never partial/in-progress.
 *   On completion emit domain event (`EODCompleted` / `SummaryReady`).
 *   Batch ingests idempotent per file/`processing_date` (re-run safe).
@@ -361,7 +394,7 @@ Both run on the **same VM**; active windows don't overlap (no contention).
 ```
 CMS2/
 ├── frontend/                 # React + TypeScript + Vite (monorepo root)
-│   ├── CodexCash-Vite/       # internal app, LDAP login
+│   ├── CompanyPortal-Vite/  # internal app, LDAP login
 │   └── VendorPortal-Vite/    # vendor portal, local login
 ├── go.work                   # links backend/, backend-cit/, pkg/
 ├── pkg/                      # shared Go infra (auth, middleware, config, response)

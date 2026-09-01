@@ -14,3 +14,8 @@ The main objective of this system is to manage and control:
 - cash count for vault and selective machine
 - reconciliation against Corebanking escrow
 - vendor invoice validation and approval
+
+backend cit rename to backedn-branch
+acm pisah backend antara branch dngan atm frontend juga berbeda
+fase 2 plan pisah backend
+

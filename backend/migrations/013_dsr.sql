@@ -1,40 +1,74 @@
--- DSR (Laporan Saldo Harian) vendor daily report ingest.
--- Source: DSR_DATA/Laporan Saldo Harian DSR <BANK> <VENDOR> Tanggal <D Month YYYY>.xlsx
--- Two sheets, one file = one report:
---   'Rencana Isi'                   -> dsr_replenish_plan_rows  (next-day fill plan per ATM)
---   'penyelesaian klaim sel kurang' -> dsr_shortage_claims      (physical shortage claim settlement)
+-- DSR "SALDO HARIAN ATM" -- vendor daily ATM cash-balance statement.
+-- Source: DSR_DATA/Laporan Saldo Harian DSR <BANK> <VENDOR> Tanggal <D-Month-YYYY>.xlsx
+-- One workbook = one report = one sheet ('Daily').
+--
+-- WHAT THE SHEET IS (see the SALDO HARIAN ATM grid):
+--   A denomination-by-denomination cash-flow statement across 7 denom columns
+--   (100k, 50k, 20k, 10k, 5k, 2k, 1k) plus a total column. It is printed as two dated
+--   sections:
+--     Section 1 (report_date, "sampai pukul 00:00"): settled movements
+--        SALDO AWAL
+--        Penerimaan (receipts): reconciliation cartridge, bongkaran CDM, uang nyangkut CRM,
+--                               dari CIMB CIT, penyelesaian klaim nasabah,
+--                               penyelesaian klaim selisih kurang fisik (carries a memo no)
+--        Pengeluaran (disbursements): cartridge replenishment, setoran ke cash management
+--        SALDO AKHIR SAMPAI PUKUL 00:00
+--     Section 2 (report_date + 1, "status sementara"): provisional next-day movements
+--        Penerimaan (rekonsiliasi cartridge, batal replenishment, lain-lain)
+--        Pengeluaran (replenishment, kas cadangan, lain-lain)
+--        SALDO SEMENTARA SAMPAI PUKUL 09:00
+--        STATUS UANG CADANGAN ATM: Kondisi Layak Edar / Rusak & Tidak Layak Edar / TOTAL
 --
 -- UNITS (read before writing any ingest code):
---   The workbook prints most cash columns at x1.000 scale ("Denom (x 1.000)", "100 (x1000)").
---   Every *_amount_idr column here is FULL RUPIAH: multiply the sheet value by 1000 on ingest.
---   The one exception is the claim sheet NOMINAL column, which is already full rupiah -- see
---   the comment on dsr_shortage_claims.nominal_amount_idr. Mixing these up costs 3 zeroes.
+--   The workbook's total column is LABELLED "Total Rupiah x1.000", but the per-denom cells
+--   already hold FULL RUPIAH values: on the sample, SALDO AWAL 100k=18,574,100 and
+--   50k=21,913,800 sum to the printed total 40,487,900. So the "x1.000" is a display note on
+--   the total column, not a scale applied to the stored denom cells. Store every denom_* and
+--   the *_total columns as FULL IDR, no x1000 conversion. If a future file proves otherwise,
+--   fix it in the parser, not here.
 --
--- Helper columns (the unnamed '1000' columns H/I/J on 'Rencana Isi') are derived and not stored.
--- 'Sub Total' / 'TOTAL' footer rows are not stored as rows; the vendor-stated plan subtotals
--- land on dsr_files for ingest cross-check, claim totals are recomputable with SUM().
+-- SIGNS: Pengeluaran (disbursement) line items are stored NEGATIVE on the sheet
+--   (saldo_akhir = saldo_awal + subtotal_penerimaan + subtotal_pengeluaran works by addition).
+--   Keep the vendor's sign verbatim; do not flip it on ingest.
+--
+-- DERIVED ROWS ARE NOT STORED: every Subtotal / SALDO AWAL-carry / SALDO AKHIR / SALDO
+--   SEMENTARA / TOTAL row on the sheet is a spreadsheet formula (=SUM(...), =F12+F19+F22).
+--   We store only the leaf line-items that carry entered values, plus SALDO AWAL (the one
+--   balance that is an input, not a sum). Subtotals and closing balances are recomputed with
+--   SUM() on read; the vendor-stated closing balances land on atm_dsr_saldo_files for an
+--   ingest cross-check.
+--
+-- BROKEN CELLS: this real-world sample is riddled with '#REF!' (broken cross-sheet formulas
+--   in the vendor's own workbook). denom_* columns are therefore NULLABLE: a cell that reads
+--   as an Excel error ingests as NULL and increments atm_dsr_saldo_files.error_count, rather
+--   than aborting the whole EOD batch. Query unparseable reports with WHERE error_count > 0.
 
 BEGIN;
 
 -- ============================================================
 -- 1. One row per ingested report file (tracking + report header)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.dsr_files
+CREATE TABLE IF NOT EXISTS public.atm_dsr_saldo_files
 (
     id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
     filename text COLLATE pg_catalog."default" NOT NULL,
     checksum text COLLATE pg_catalog."default",
     status text COLLATE pg_catalog."default" NOT NULL DEFAULT 'pending',
     report_date date NOT NULL,
-    plan_date date,
-    vendor text COLLATE pg_catalog."default" NOT NULL,
+    status_date date,
     bank text COLLATE pg_catalog."default",
+    vendor text COLLATE pg_catalog."default" NOT NULL,
+    company text COLLATE pg_catalog."default",
+    recipient text COLLATE pg_catalog."default",
+    sender text COLLATE pg_catalog."default",
+    subject text COLLATE pg_catalog."default",
     prepared_by text COLLATE pg_catalog."default",
     checked_by text COLLATE pg_catalog."default",
     approved_by text COLLATE pg_catalog."default",
     currency text COLLATE pg_catalog."default" NOT NULL DEFAULT 'IDR',
-    plan_total_100k_amount_idr numeric(20, 2),
-    plan_total_50k_amount_idr numeric(20, 2),
+    saldo_akhir_0000_total_idr numeric(20, 2),
+    saldo_sementara_0900_total_idr numeric(20, 2),
+    status_cadangan_total_idr numeric(20, 2),
     row_count integer,
     success_count integer,
     error_count integer,
@@ -42,147 +76,95 @@ CREATE TABLE IF NOT EXISTS public.dsr_files
     processed_at timestamp with time zone,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dsr_files_pkey PRIMARY KEY (id),
-    CONSTRAINT dsr_files_checksum_uq UNIQUE (checksum),
-    CONSTRAINT dsr_files_date_vendor_uq UNIQUE (report_date, vendor)
+    CONSTRAINT atm_dsr_saldo_files_pkey PRIMARY KEY (id),
+    CONSTRAINT atm_dsr_saldo_files_checksum_uq UNIQUE (checksum),
+    CONSTRAINT atm_dsr_saldo_files_date_vendor_uq UNIQUE (report_date, vendor),
+    CONSTRAINT atm_dsr_saldo_files_status_chk
+        CHECK (status IN ('pending', 'processing', 'completed', 'failed'))
 );
 
-COMMENT ON COLUMN public.dsr_files.status
+COMMENT ON TABLE public.atm_dsr_saldo_files
+    IS 'One row per ingested SALDO HARIAN ATM workbook. Idempotent per checksum; re-ingest = delete this row, child rows cascade.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.status
     IS 'pending | processing | completed | failed';
-COMMENT ON COLUMN public.dsr_files.report_date
-    IS 'Report date from the filename (Tanggal 15 Juli 2026 -> 2026-07-15)';
-COMMENT ON COLUMN public.dsr_files.plan_date
-    IS 'Tanggal cell on the Rencana Isi sheet: the day being planned, normally report_date + 1';
-COMMENT ON COLUMN public.dsr_files.vendor
-    IS 'Vendor label as printed (e.g. BIJAK JAKARTA); not yet FK to vendors.code';
-COMMENT ON COLUMN public.dsr_files.plan_total_100k_amount_idr
-    IS 'Vendor-stated Sub Total row, full IDR. Ingest must verify it equals SUM(fill_100k_amount_idr).';
-COMMENT ON COLUMN public.dsr_files.plan_total_50k_amount_idr
-    IS 'Vendor-stated Sub Total row, full IDR. Ingest must verify it equals SUM(fill_50k_amount_idr).';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.report_date
+    IS 'Section-1 date (Tanggal cell, e.g. 2026-07-15). Also parsed from the filename as a cross-check.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.status_date
+    IS 'Section-2 provisional date (STATUS SALDO SEMENTARA), normally report_date + 1.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.vendor
+    IS 'Vendor label as printed (e.g. BIJAK JAKARTA). Not yet FK to vendors.code.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.company
+    IS 'Company header cell, e.g. PT. Bintang Jasa Artha Kelola - Jakarta.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.saldo_akhir_0000_total_idr
+    IS 'Vendor-stated SALDO AKHIR SAMPAI PUKUL 00:00 total, full IDR. Ingest cross-check: must equal SALDO AWAL + SUM(penerimaan section d0) + SUM(pengeluaran section d0).';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.saldo_sementara_0900_total_idr
+    IS 'Vendor-stated SALDO SEMENTARA SAMPAI PUKUL 09:00 total, full IDR. Recomputable cross-check.';
+COMMENT ON COLUMN public.atm_dsr_saldo_files.status_cadangan_total_idr
+    IS 'Vendor-stated TOTAL STATUS UANG CADANGAN ATM, full IDR (Layak Edar + Rusak).';
 
 -- ============================================================
--- 2. Next-day replenishment plan (sheet 'Rencana Isi')
+-- 2. Leaf line-items of the statement (sheet 'Daily'), wide denom layout
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.dsr_replenish_plan_rows
+-- Wide (one column per denom) deliberately: the denom set on this report is fixed at 7
+-- (100k..1k) and the whole point of the table is to reproduce and validate the printed
+-- statement row-for-row. A long/normalized layout (row x denom, FK to denoms) buys nothing
+-- here and makes the subtotal cross-check awkward.
+CREATE TABLE IF NOT EXISTS public.atm_dsr_saldo_rows
 (
     id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
     file_id bigint NOT NULL,
     row_no integer NOT NULL,
-    atm_terminal_id text COLLATE pg_catalog."default" NOT NULL,
-    atm_id bigint,
-    atm_location text COLLATE pg_catalog."default",
-    denom_config text COLLATE pg_catalog."default",
-    fill_100k_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    fill_50k_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    splank_balance_0800_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    remarks text COLLATE pg_catalog."default",
-    created_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dsr_replenish_plan_rows_pkey PRIMARY KEY (id),
-    CONSTRAINT dsr_replenish_plan_rows_file_row_uq UNIQUE (file_id, row_no)
-);
-
--- Keyed on row_no, not atm_terminal_id: the vendor legitimately sends the same ATM twice in
--- one plan (e.g. a zero-value row followed by the real one). Preserve both, dedupe downstream.
-COMMENT ON COLUMN public.dsr_replenish_plan_rows.row_no
-    IS 'Sheet line order (1..n), excluding header and Sub Total rows';
-COMMENT ON COLUMN public.dsr_replenish_plan_rows.atm_terminal_id
-    IS 'ATM ID column as sent by the vendor (e.g. 2440, A353, ZZVX). Kept verbatim, never overwritten -- this is the evidence of what the vendor claimed.';
-COMMENT ON COLUMN public.dsr_replenish_plan_rows.atm_id
-    IS 'Resolved at ingest from atm_terminal_id. NULL = ATM not in master data; the file still ingests (count them into dsr_files.error_count). Query unresolved rows with WHERE atm_id IS NULL.';
-COMMENT ON COLUMN public.dsr_replenish_plan_rows.denom_config
-    IS 'Denom (x 1.000) column as printed: 50 | 100 | TST. TST rows are recyclers and carry both 100k and 50k fills.';
-COMMENT ON COLUMN public.dsr_replenish_plan_rows.splank_balance_0800_amount_idr
-    IS 'Saldo Splank Pukul 08:00, full IDR (sheet value x 1000)';
-
-CREATE INDEX IF NOT EXISTS idx_dsr_replenish_plan_rows_file
-    ON public.dsr_replenish_plan_rows (file_id);
-CREATE INDEX IF NOT EXISTS idx_dsr_replenish_plan_rows_terminal
-    ON public.dsr_replenish_plan_rows (atm_terminal_id);
--- Serves both the atms join and the WHERE atm_id IS NULL unresolved-ATM check
--- (btree indexes NULLs), and backs the ON DELETE SET NULL cascade.
-CREATE INDEX IF NOT EXISTS idx_dsr_replenish_plan_rows_atm
-    ON public.dsr_replenish_plan_rows (atm_id);
-
--- ============================================================
--- 3. Physical shortage claims (sheet 'penyelesaian klaim sel kurang')
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.dsr_shortage_claims
-(
-    id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
-    file_id bigint NOT NULL,
-    row_no integer NOT NULL,
-    vendor text COLLATE pg_catalog."default" NOT NULL,
-    claim_date date,
-    nominal_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    atm_terminal_id text COLLATE pg_catalog."default",
-    atm_id bigint,
-    replenish_date date,
-    due_date date,
+    section text COLLATE pg_catalog."default" NOT NULL,
+    flow text COLLATE pg_catalog."default" NOT NULL,
+    line_label text COLLATE pg_catalog."default" NOT NULL,
     memo_no text COLLATE pg_catalog."default",
-    resolution text COLLATE pg_catalog."default",
+    denom_100k numeric(20, 2),
+    denom_50k numeric(20, 2),
+    denom_20k numeric(20, 2),
+    denom_10k numeric(20, 2),
+    denom_5k numeric(20, 2),
+    denom_2k numeric(20, 2),
+    denom_1k numeric(20, 2),
+    line_total_idr numeric(20, 2),
     remarks text COLLATE pg_catalog."default",
-    settle_100k_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    settle_50k_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    settle_20k_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
-    settle_total_amount_idr numeric(20, 2) NOT NULL DEFAULT 0,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dsr_shortage_claims_pkey PRIMARY KEY (id),
-    CONSTRAINT dsr_shortage_claims_file_row_uq UNIQUE (file_id, row_no),
-    CONSTRAINT dsr_shortage_claims_resolution_chk
-        CHECK (resolution IS NULL OR resolution IN ('DITERIMA', 'DITOLAK', 'INVESTIGASI'))
+    CONSTRAINT atm_dsr_saldo_rows_pkey PRIMARY KEY (id),
+    CONSTRAINT atm_dsr_saldo_rows_file_row_uq UNIQUE (file_id, row_no),
+    CONSTRAINT atm_dsr_saldo_rows_section_chk
+        CHECK (section IN ('d0', 'd1')),
+    CONSTRAINT atm_dsr_saldo_rows_flow_chk
+        CHECK (flow IN ('saldo_awal', 'penerimaan', 'pengeluaran', 'status_cadangan'))
 );
 
-COMMENT ON COLUMN public.dsr_shortage_claims.nominal_amount_idr
-    IS 'NOMINAL column, ALREADY full rupiah on the sheet (do NOT x1000). Negative = selisih kurang.';
-COMMENT ON COLUMN public.dsr_shortage_claims.resolution
-    IS 'PENYELESAIAN column; vendor dropdown: DITERIMA | DITOLAK | INVESTIGASI. NULL = not yet decided.';
-COMMENT ON COLUMN public.dsr_shortage_claims.settle_total_amount_idr
-    IS 'TOTAL column, full IDR. Ingest must verify it equals settle_100k + settle_50k + settle_20k, and that ABS(nominal_amount_idr) matches it when resolution = DITERIMA.';
-COMMENT ON COLUMN public.dsr_shortage_claims.memo_no
-    IS 'MEMO column, e.g. 313/ATM/BIJAK/VII/2026';
-COMMENT ON COLUMN public.dsr_shortage_claims.atm_terminal_id
-    IS 'ID column as sent by the vendor. Kept verbatim, never overwritten.';
-COMMENT ON COLUMN public.dsr_shortage_claims.atm_id
-    IS 'Resolved at ingest from atm_terminal_id. NULL = ATM not in master data; the claim still ingests. Query unresolved rows with WHERE atm_id IS NULL.';
+COMMENT ON TABLE public.atm_dsr_saldo_rows
+    IS 'Leaf line-items of the SALDO HARIAN ATM statement. Subtotal / SALDO AKHIR / SALDO SEMENTARA / TOTAL rows are NOT stored (they are spreadsheet SUMs, recomputed on read).';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.row_no
+    IS 'Sheet line order (1..n) across both sections, excluding header and derived subtotal/saldo rows. Stable ordering key for reproducing the statement.';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.section
+    IS 'd0 = section 1 (report_date, settled, sampai pukul 00:00). d1 = section 2 (report_date+1, status sementara).';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.flow
+    IS 'saldo_awal = opening balance (input, only in d0). penerimaan = receipt line. pengeluaran = disbursement line (values stored negative, verbatim). status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak & Tidak Layak Edar), d1 only.';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.line_label
+    IS 'Uraian text verbatim, e.g. "Dari CIMB Niaga CIT", "Untuk Cartridge Replenishment ATM & CRM", "Kondisi Rusak & Tidak Layak Edar".';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.memo_no
+    IS 'Memo/reference embedded in a line label, e.g. 313/ATM/BIJAK/VII/2026 on "Penyelesaian Klaim Selisih Kurang Fisik". NULL when the line carries no memo.';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.denom_100k
+    IS 'Value column for the 100,000 denomination, FULL IDR. NULL when the source cell was an Excel error (#REF!) -- counts into atm_dsr_saldo_files.error_count.';
+COMMENT ON COLUMN public.atm_dsr_saldo_rows.line_total_idr
+    IS 'Total Rupiah column for the line, FULL IDR. Ingest cross-check: must equal SUM(denom_100k..denom_1k) when no denom cell is NULL.';
 
-CREATE INDEX IF NOT EXISTS idx_dsr_shortage_claims_file
-    ON public.dsr_shortage_claims (file_id);
-CREATE INDEX IF NOT EXISTS idx_dsr_shortage_claims_terminal
-    ON public.dsr_shortage_claims (atm_terminal_id);
-CREATE INDEX IF NOT EXISTS idx_dsr_shortage_claims_memo
-    ON public.dsr_shortage_claims (memo_no);
-CREATE INDEX IF NOT EXISTS idx_dsr_shortage_claims_atm
-    ON public.dsr_shortage_claims (atm_id);
+CREATE INDEX IF NOT EXISTS idx_atm_dsr_saldo_rows_file
+    ON public.atm_dsr_saldo_rows (file_id);
+CREATE INDEX IF NOT EXISTS idx_atm_dsr_saldo_rows_section_flow
+    ON public.atm_dsr_saldo_rows (file_id, section, flow);
 
 -- ============================================================
--- 4. Foreign keys (re-ingest = delete the dsr_files row, children cascade)
+-- 3. Foreign key (re-ingest = delete the file row, children cascade)
 -- ============================================================
-ALTER TABLE IF EXISTS public.dsr_replenish_plan_rows
-    ADD CONSTRAINT fk_dsr_replenish_plan_rows_file FOREIGN KEY (file_id)
-    REFERENCES public.dsr_files (id) MATCH SIMPLE
+ALTER TABLE IF EXISTS public.atm_dsr_saldo_rows
+    ADD CONSTRAINT fk_atm_dsr_saldo_rows_file FOREIGN KEY (file_id)
+    REFERENCES public.atm_dsr_saldo_files (id) MATCH SIMPLE
     ON UPDATE NO ACTION
     ON DELETE CASCADE;
-
-ALTER TABLE IF EXISTS public.dsr_shortage_claims
-    ADD CONSTRAINT fk_dsr_shortage_claims_file FOREIGN KEY (file_id)
-    REFERENCES public.dsr_files (id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE CASCADE;
-
--- Soft link to master data. Nullable on purpose: a vendor file must ingest even when the
--- ATM is unknown, so an unresolvable row lands with atm_id = NULL instead of aborting the
--- EOD batch. SET NULL (not CASCADE) on delete: retiring an ATM must never delete the
--- vendor's report rows -- they are financial evidence.
-ALTER TABLE IF EXISTS public.dsr_replenish_plan_rows
-    ADD CONSTRAINT fk_dsr_replenish_plan_rows_atm FOREIGN KEY (atm_id)
-    REFERENCES public.atms (id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
-
-ALTER TABLE IF EXISTS public.dsr_shortage_claims
-    ADD CONSTRAINT fk_dsr_shortage_claims_atm FOREIGN KEY (atm_id)
-    REFERENCES public.atms (id) MATCH SIMPLE
-    ON UPDATE NO ACTION
-    ON DELETE SET NULL;
 
 COMMIT;

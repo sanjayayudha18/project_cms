@@ -24,7 +24,7 @@
 -- file in this directory would also be picked up by sqlc's schema glob):
 --   DO $$ DECLARE t text; BEGIN
 --     FOREACH t IN ARRAY ARRAY['atm_vendor_packages','atms','currencies','denoms',
---       'dmaa_files','dsr_files','itm_cashpos_files','itm_replenish_files','locations',
+--       'dmaa_files','atm_dsr_saldo_files','itm_cashpos_files','itm_replenish_files','locations',
 --       'regions','roles','users','vendor_branches','vendor_packages','vendor_vaults',
 --       'vendors']
 --     LOOP EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_set_updated_at ON public.%I', t, t);
@@ -69,7 +69,7 @@ BEGIN
         'currencies',
         'denoms',
         'dmaa_files',
-        'dsr_files',
+        'atm_dsr_saldo_files',
         'itm_cashpos_files',
         'itm_replenish_files',
         'locations',

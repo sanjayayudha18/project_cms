@@ -26,13 +26,13 @@
 
   /* Semantic colors */
   --color-success-bg: oklch(0.955 0.03 155);
-  --color-success-fg: oklch(0.480 0.115 155);
-  --color-warning-bg: oklch(0.960 0.055 78);
-  --color-warning-fg: oklch(0.520 0.115 78);
+  --color-success-fg: oklch(0.48 0.115 155);
+  --color-warning-bg: oklch(0.96 0.055 78);
+  --color-warning-fg: oklch(0.52 0.115 78);
   --color-danger-bg: oklch(0.955 0.035 12);
-  --color-danger-fg: oklch(0.500 0.195 12);
+  --color-danger-fg: oklch(0.5 0.195 12);
   --color-info-bg: oklch(0.955 0.03 245);
-  --color-info-fg: oklch(0.480 0.110 245);
+  --color-info-fg: oklch(0.48 0.11 245);
 }
 
 :root {
@@ -55,13 +55,105 @@
 
   /* Semantic colors (shared with CMS design system) */
   --vp-success-bg: oklch(0.955 0.03 155);
-  --vp-success-fg: oklch(0.480 0.115 155);
-  --vp-warning-bg: oklch(0.960 0.055 78);
-  --vp-warning-fg: oklch(0.520 0.115 78);
+  --vp-success-fg: oklch(0.48 0.115 155);
+  --vp-warning-bg: oklch(0.96 0.055 78);
+  --vp-warning-fg: oklch(0.52 0.115 78);
   --vp-danger-bg: oklch(0.955 0.035 12);
-  --vp-danger-fg: oklch(0.500 0.195 12);
+  --vp-danger-fg: oklch(0.5 0.195 12);
   --vp-info-bg: oklch(0.955 0.03 245);
-  --vp-info-fg: oklch(0.480 0.110 245);
+  --vp-info-fg: oklch(0.48 0.11 245);
+}
+
+/*
+ * CROWN login theme — hex fallback first, OKLCH override where supported.
+ * Reuses the vp-* semantic tokens above instead of redefining colors.
+ */
+:root {
+  --maroon-deep: #2b1315;
+  --primary: #b31d2e;
+  --primary-hover: #931827;
+  --primary-fg: #fffcfb;
+  --primary-text: #b31d2e;
+  --primary-tint: #f6e2e2;
+  --chrome-fg: #f3e6e5;
+  --bg: #fdfcfb;
+  --surface: #fdfcfb;
+  --surface-sunken: #f5f1ef;
+  --text: #3a2726;
+  --text-secondary: #6b5654;
+  --text-muted: #8c7a78;
+  --border-c: #e6dedc;
+  --border-strong: #cbbdb9;
+  --success: #2f7a4f;
+  --success-tint: #e5f3ea;
+  --danger: #a3243a;
+  --danger-tint: #f7e2e4;
+  --warning: #8a5a12;
+
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+
+@supports (color: oklch(0% 0 0)) {
+  :root {
+    --maroon-deep: var(--vp-sidebar);
+    --primary: oklch(54% 0.233 27);
+    --primary-hover: oklch(48% 0.22 27);
+    --primary-fg: oklch(99% 0.005 27);
+    --primary-text: oklch(54% 0.233 27);
+    --primary-tint: oklch(94% 0.035 27);
+    --chrome-fg: var(--vp-sidebar-text);
+    --bg: var(--vp-surface);
+    --surface: var(--vp-surface);
+    --surface-sunken: oklch(97% 0.006 40);
+    --text: var(--vp-text);
+    --text-secondary: oklch(45% 0.02 28);
+    --text-muted: oklch(58% 0.015 28);
+    --border-c: oklch(89% 0.006 40);
+    --border-strong: oklch(80% 0.01 40);
+    --success: var(--vp-success-fg);
+    --success-tint: var(--vp-success-bg);
+    --danger: var(--vp-danger-fg);
+    --danger-tint: var(--vp-danger-bg);
+    --warning: var(--vp-warning-fg);
+  }
+}
+
+@keyframes crown-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes crown-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-crown-rise {
+    animation: crown-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-crown-spin {
+    animation: crown-spin 0.7s linear infinite;
+  }
+}
+
+/* Keep autofill backgrounds in sync with the login surface instead of the
+   browser's default yellow tint. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  box-shadow: 0 0 0 1000px var(--surface) inset;
+  -webkit-text-fill-color: var(--text);
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 /*

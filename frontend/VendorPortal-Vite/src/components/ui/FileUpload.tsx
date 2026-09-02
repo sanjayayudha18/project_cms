@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { Upload, X, FileText } from 'lucide-react';
+import { FileText, Upload, X } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 
 interface FileUploadProps {
   readonly maxFiles: number;
@@ -50,9 +50,7 @@ export function FileUpload({
 
       for (const file of filesToProcess) {
         if (!acceptedTypes.includes(file.type)) {
-          newErrors.push(
-            `File ${file.name} tidak didukung. Gunakan JPEG, PNG, atau PDF.`,
-          );
+          newErrors.push(`File ${file.name} tidak didukung. Gunakan JPEG, PNG, atau PDF.`);
           continue;
         }
         if (file.size > maxSizeBytes) {
@@ -101,7 +99,7 @@ export function FileUpload({
       }
       // Reset input so the same file can be selected again
       if (inputRef.current) {
-        inputRef.current.value = '';
+        inputRef.current.value = "";
       }
     },
     [validateAndAddFiles],
@@ -122,7 +120,7 @@ export function FileUpload({
 
   const handleZoneKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+      if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         handleZoneClick();
       }
@@ -130,8 +128,7 @@ export function FileUpload({
     [handleZoneClick],
   );
 
-  const isImage = (file: File) =>
-    file.type === 'image/jpeg' || file.type === 'image/png';
+  const isImage = (file: File) => file.type === "image/jpeg" || file.type === "image/png";
 
   return (
     <div className="flex flex-col gap-3">
@@ -146,31 +143,28 @@ export function FileUpload({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={[
-          'flex flex-col items-center justify-center gap-2 min-h-[120px] p-6',
-          'border-2 border-dashed rounded-lg cursor-pointer',
-          'transition-colors duration-150',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active',
+          "flex flex-col items-center justify-center gap-2 min-h-[120px] p-6",
+          "border-2 border-dashed rounded-lg cursor-pointer",
+          "transition-colors duration-150",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active",
           isDragOver
-            ? 'border-sidebar-active bg-sidebar-active/5'
+            ? "border-sidebar-active bg-sidebar-active/5"
             : allErrors.length > 0
-              ? 'border-danger-fg/50 bg-danger-bg/30'
-              : 'border-neutral-300 hover:border-sidebar-active/50 hover:bg-neutral-50',
-        ].join(' ')}
+              ? "border-danger-fg/50 bg-danger-bg/30"
+              : "border-neutral-300 hover:border-sidebar-active/50 hover:bg-neutral-50",
+        ].join(" ")}
       >
         <Upload
-          className={[
-            'size-8',
-            isDragOver ? 'text-sidebar-active' : 'text-neutral-400',
-          ].join(' ')}
+          className={["size-8", isDragOver ? "text-sidebar-active" : "text-neutral-400"].join(" ")}
           aria-hidden="true"
         />
         <p className="text-sm text-neutral-500 text-center">
-          Seret file ke sini atau{' '}
+          Seret file ke sini atau{" "}
           <span className="font-medium text-sidebar-active">klik untuk memilih</span>
         </p>
         <p className="text-xs text-neutral-400">
-          JPEG, PNG, atau PDF. Maks {Math.round(maxSizeBytes / 1_048_576)}MB per file.
-          Maks {maxFiles} file.
+          JPEG, PNG, atau PDF. Maks {Math.round(maxSizeBytes / 1_048_576)}MB per file. Maks{" "}
+          {maxFiles} file.
         </p>
       </div>
 
@@ -179,7 +173,7 @@ export function FileUpload({
         ref={inputRef}
         type="file"
         multiple
-        accept={acceptedTypes.join(',')}
+        accept={acceptedTypes.join(",")}
         onChange={handleInputChange}
         className="hidden"
         aria-hidden="true"
@@ -234,8 +228,6 @@ export function FileUpload({
                   <X className="size-3" aria-hidden="true" />
                 </span>
               </button>
-
-
             </li>
           ))}
         </ul>

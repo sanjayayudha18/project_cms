@@ -1,4 +1,4 @@
-import * as fc from 'fast-check';
+import * as fc from "fast-check";
 
 /**
  * Property 8: Column Sorting Correctness
@@ -32,15 +32,13 @@ function sortDesc<T>(items: T[], accessor: (item: T) => string | number): T[] {
 }
 
 // Generate ISO date strings directly using integer-based approach (avoids Invalid Date issues)
-const scheduledDateArb = fc
-  .integer({ min: 1, max: 366 })
-  .map((dayOfYear) => {
-    const date = new Date(2024, 0, dayOfYear);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  });
+const scheduledDateArb = fc.integer({ min: 1, max: 366 }).map((dayOfYear) => {
+  const date = new Date(2024, 0, dayOfYear);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+});
 
 // Arbitrary for generating test records
 const recordArb = fc.record({
@@ -52,23 +50,21 @@ const recordArb = fc.record({
 
 const recordsArb = fc.array(recordArb, { minLength: 0, maxLength: 100 });
 
-describe('Property 8: Column Sorting Correctness', () => {
-  describe('Ascending sort produces non-decreasing order', () => {
-    it('by string column (scheduledDate)', () => {
+describe("Property 8: Column Sorting Correctness", () => {
+  describe("Ascending sort produces non-decreasing order", () => {
+    it("by string column (scheduledDate)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortAsc(records, (r) => r.scheduledDate);
           for (let i = 1; i < sorted.length; i++) {
-            expect(sorted[i - 1].scheduledDate <= sorted[i].scheduledDate).toBe(
-              true,
-            );
+            expect(sorted[i - 1].scheduledDate <= sorted[i].scheduledDate).toBe(true);
           }
         }),
         { numRuns: 100 },
       );
     });
 
-    it('by string column (name)', () => {
+    it("by string column (name)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortAsc(records, (r) => r.name);
@@ -80,7 +76,7 @@ describe('Property 8: Column Sorting Correctness', () => {
       );
     });
 
-    it('by numeric column (amount)', () => {
+    it("by numeric column (amount)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortAsc(records, (r) => r.amount);
@@ -93,22 +89,20 @@ describe('Property 8: Column Sorting Correctness', () => {
     });
   });
 
-  describe('Descending sort produces non-increasing order', () => {
-    it('by string column (scheduledDate)', () => {
+  describe("Descending sort produces non-increasing order", () => {
+    it("by string column (scheduledDate)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortDesc(records, (r) => r.scheduledDate);
           for (let i = 1; i < sorted.length; i++) {
-            expect(sorted[i - 1].scheduledDate >= sorted[i].scheduledDate).toBe(
-              true,
-            );
+            expect(sorted[i - 1].scheduledDate >= sorted[i].scheduledDate).toBe(true);
           }
         }),
         { numRuns: 100 },
       );
     });
 
-    it('by string column (name)', () => {
+    it("by string column (name)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortDesc(records, (r) => r.name);
@@ -120,7 +114,7 @@ describe('Property 8: Column Sorting Correctness', () => {
       );
     });
 
-    it('by numeric column (amount)', () => {
+    it("by numeric column (amount)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortDesc(records, (r) => r.amount);
@@ -133,8 +127,8 @@ describe('Property 8: Column Sorting Correctness', () => {
     });
   });
 
-  describe('Sort output is a permutation of input', () => {
-    it('ascending sort preserves same length', () => {
+  describe("Sort output is a permutation of input", () => {
+    it("ascending sort preserves same length", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortAsc(records, (r) => r.amount);
@@ -144,7 +138,7 @@ describe('Property 8: Column Sorting Correctness', () => {
       );
     });
 
-    it('descending sort preserves same length', () => {
+    it("descending sort preserves same length", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortDesc(records, (r) => r.amount);
@@ -154,7 +148,7 @@ describe('Property 8: Column Sorting Correctness', () => {
       );
     });
 
-    it('ascending sort contains same elements (no elements added or removed)', () => {
+    it("ascending sort contains same elements (no elements added or removed)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortAsc(records, (r) => r.amount);
@@ -174,7 +168,7 @@ describe('Property 8: Column Sorting Correctness', () => {
       );
     });
 
-    it('descending sort contains same elements (no elements added or removed)', () => {
+    it("descending sort contains same elements (no elements added or removed)", () => {
       fc.assert(
         fc.property(recordsArb, (records) => {
           const sorted = sortDesc(records, (r) => r.scheduledDate);

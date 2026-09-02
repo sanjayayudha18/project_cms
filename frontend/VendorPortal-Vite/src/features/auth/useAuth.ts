@@ -1,13 +1,13 @@
-import { useCallback, useContext } from 'react';
-import { AuthContext, type AuthContextValue } from './AuthContext';
+import { useCallback, useContext } from "react";
+import { AuthContext, type AuthContextValue } from "./AuthContext";
 
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 
   if (context === null) {
     throw new Error(
-      'useAuth must be used within an AuthProvider. ' +
-        'Wrap your component tree with <AuthProvider>.',
+      "useAuth must be used within an AuthProvider. " +
+        "Wrap your component tree with <AuthProvider>.",
     );
   }
 

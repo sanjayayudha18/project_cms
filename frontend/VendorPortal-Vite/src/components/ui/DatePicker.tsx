@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X } from "lucide-react";
 
 interface DatePickerProps {
   readonly startDate: string | null;
@@ -30,10 +30,8 @@ export function DatePicker({
           <input
             id="date-start"
             type="date"
-            value={startDate ?? ''}
-            onChange={(e) =>
-              onStartDateChange(e.target.value || null)
-            }
+            value={startDate ?? ""}
+            onChange={(e) => onStartDateChange(e.target.value || null)}
             className="min-h-[44px] min-w-[44px] rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm
                        text-surface-text
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active
@@ -65,10 +63,8 @@ export function DatePicker({
           <input
             id="date-end"
             type="date"
-            value={endDate ?? ''}
-            onChange={(e) =>
-              onEndDateChange(e.target.value || null)
-            }
+            value={endDate ?? ""}
+            onChange={(e) => onEndDateChange(e.target.value || null)}
             className="min-h-[44px] min-w-[44px] rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm
                        text-surface-text
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active

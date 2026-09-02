@@ -1,26 +1,26 @@
-import { useMemo, useState } from 'react';
-import { useSchedule } from '@/features/schedule/useSchedule';
-import { Badge } from '@/components/ui/Badge';
-import { DatePicker } from '@/components/ui/DatePicker';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { formatRp } from '@/lib/formatters';
-import type { ReplenishmentSchedule } from '@/lib/types';
-import { CalendarClock } from 'lucide-react';
+import { Badge } from "@/components/ui/Badge";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useSchedule } from "@/features/schedule/useSchedule";
+import { formatRp } from "@/lib/formatters";
+import type { ReplenishmentSchedule } from "@/lib/types";
+import { CalendarClock } from "lucide-react";
+import { useMemo, useState } from "react";
 
-type Priority = ReplenishmentSchedule['priority'];
-type ScheduleStatus = ReplenishmentSchedule['status'];
+type Priority = ReplenishmentSchedule["priority"];
+type ScheduleStatus = ReplenishmentSchedule["status"];
 
-const priorityBadgeMap: Record<Priority, 'danger' | 'warning' | 'neutral'> = {
-  High: 'danger',
-  Medium: 'warning',
-  Low: 'neutral',
+const priorityBadgeMap: Record<Priority, "danger" | "warning" | "neutral"> = {
+  High: "danger",
+  Medium: "warning",
+  Low: "neutral",
 };
 
-const statusBadgeMap: Record<ScheduleStatus, 'warning' | 'info' | 'success' | 'danger'> = {
-  Pending: 'warning',
-  Confirmed: 'info',
-  Executed: 'success',
-  Cancelled: 'danger',
+const statusBadgeMap: Record<ScheduleStatus, "warning" | "info" | "success" | "danger"> = {
+  Pending: "warning",
+  Confirmed: "info",
+  Executed: "success",
+  Cancelled: "danger",
 };
 
 const priorityOrder: Record<Priority, number> = {
@@ -38,11 +38,11 @@ interface DateGroup {
 }
 
 function formatDateHeader(isoDate: string): string {
-  const date = new Date(isoDate + 'T00:00:00');
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  const date = new Date(`${isoDate}T00:00:00`);
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -129,16 +129,10 @@ export function SchedulePage() {
           {groups.map((group) => (
             <section key={group.date} aria-label={`Jadwal ${group.formattedDate}`}>
               <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-2 mb-3">
-                <h2 className="text-sm font-semibold text-surface-text">
-                  {group.formattedDate}
-                </h2>
+                <h2 className="text-sm font-semibold text-surface-text">{group.formattedDate}</h2>
                 <div className="flex items-center gap-4 text-xs text-neutral-500">
-                  <span className="tabular-nums font-medium">
-                    {formatRp(group.totalAmount)}
-                  </span>
-                  <span>
-                    {group.count} jadwal
-                  </span>
+                  <span className="tabular-nums font-medium">{formatRp(group.totalAmount)}</span>
+                  <span>{group.count} jadwal</span>
                 </div>
               </div>
 
@@ -172,9 +166,7 @@ export function SchedulePage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant={statusBadgeMap[schedule.status]}>
-                            {schedule.status}
-                          </Badge>
+                          <Badge variant={statusBadgeMap[schedule.status]}>{schedule.status}</Badge>
                         </td>
                       </tr>
                     ))}

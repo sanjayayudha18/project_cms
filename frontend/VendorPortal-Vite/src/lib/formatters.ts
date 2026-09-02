@@ -1,11 +1,11 @@
-import type { BalanceStatus } from '@/lib/types';
+import type { BalanceStatus } from "@/lib/types";
 
 /**
  * Format an amount as IDR with dot-separated thousands (Indonesian locale).
  * Example: formatIDR(250000000) → "IDR 250.000.000"
  */
 export function formatIDR(amount: number): string {
-  return `IDR ${amount.toLocaleString('id-ID')}`;
+  return `IDR ${amount.toLocaleString("id-ID")}`;
 }
 
 /**
@@ -14,7 +14,7 @@ export function formatIDR(amount: number): string {
  * Example: formatRp(150000000) → "Rp 150.000.000"
  */
 export function formatRp(amount: number): string {
-  return `Rp ${amount.toLocaleString('id-ID')}`;
+  return `Rp ${amount.toLocaleString("id-ID")}`;
 }
 
 /**
@@ -24,7 +24,7 @@ export function formatRp(amount: number): string {
  */
 export function formatBadgeCount(count: number): string | null {
   if (count <= 0) return null;
-  if (count > 99) return '99+';
+  if (count > 99) return "99+";
   return String(count);
 }
 
@@ -34,7 +34,7 @@ export function formatBadgeCount(count: number): string | null {
  */
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + '...';
+  return `${text.slice(0, maxLength)}...`;
 }
 
 /**
@@ -44,7 +44,7 @@ export function truncate(text: string, maxLength: number): string {
  * - Normal: > 150,000,000
  */
 export function getBalanceStatus(endingBalance: number): BalanceStatus {
-  if (endingBalance < 50_000_000) return 'Critical';
-  if (endingBalance <= 150_000_000) return 'Low';
-  return 'Normal';
+  if (endingBalance < 50_000_000) return "Critical";
+  if (endingBalance <= 150_000_000) return "Low";
+  return "Normal";
 }

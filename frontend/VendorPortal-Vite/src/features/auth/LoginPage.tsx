@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useLocation, useNavigate } from 'react-router';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/features/auth/useAuth';
+import vendorHero from "@/assets/cit-vendor-illustration.png";
+import { useAuth } from "@/features/auth/useAuth";
+import { loginRoute } from "@/routes/login";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,10 +13,24 @@ interface LoginFormData {
   password: string;
 }
 
+type LoginStatus = "idle" | "loading" | "done" | "error" | "locked";
+
 // ─── Validation Helpers ───────────────────────────────────────────────────────
 
 function isNonWhitespace(value: string): boolean {
   return value.trim().length > 0;
+}
+
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m} menit ${s} detik` : `${s} detik`;
+}
+
+// ─── Small presentational bits ─────────────────────────────────────────────────
+
+function WarningIcon() {
+  return <AlertCircle size={15} className="shrink-0" aria-hidden="true" />;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -22,21 +38,26 @@ function isNonWhitespace(value: string): boolean {
 export function LoginPage() {
   const { state, login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Parse redirect URL from query params
-  const searchParams = new URLSearchParams(location.search);
-  const redirectTo = searchParams.get('redirect') ?? '/dashboard';
+  // Redirect target from the typed + sanitized `redirect` search param.
+  // Unsafe/missing values are transformed to undefined by the schema, so we
+  // fall back to the default destination /orders (Requirement 3.3, 3.4).
+  const { redirect } = useSearch({ from: loginRoute.id });
+  const redirectTo = redirect ?? "/orders";
 
-  // Already authenticated → redirect to dashboard
+  // Already authenticated (or just logged in) → go to the preserved redirect target
+  // (default /orders). Uses href so dynamic paths resolve. The guest guard performs
+  // the same navigation; both agree on the target, so there is no redirect conflict.
   useEffect(() => {
     if (state.isAuthenticated && !state.isAuthLoading) {
-      void navigate('/dashboard', { replace: true });
+      void navigate({ href: redirectTo, replace: true });
     }
-  }, [state.isAuthenticated, state.isAuthLoading, navigate]);
+  }, [state.isAuthenticated, state.isAuthLoading, navigate, redirectTo]);
 
   // Rate limit countdown timer
   useEffect(() => {
@@ -70,7 +91,7 @@ export function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: '', password: '' },
+    defaultValues: { username: "", password: "" },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -78,7 +99,9 @@ export function LoginPage() {
 
     try {
       await login(data.username, data.password);
-      void navigate(redirectTo, { replace: true });
+      // Use href so an arbitrary preserved path (possibly with dynamic segments,
+      // e.g. /orders/123/evidence) resolves correctly.
+      void navigate({ href: redirectTo, replace: true });
     } catch {
       // Error state is managed by AuthContext
     } finally {
@@ -89,15 +112,15 @@ export function LoginPage() {
   const isRateLimited = countdown !== null && countdown > 0;
   const isSubmitDisabled = isLoading || isRateLimited;
 
-  // Format countdown for display
-  function formatCountdown(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    if (m > 0) {
-      return `${m} menit ${s} detik`;
-    }
-    return `${s} detik`;
-  }
+  const status: LoginStatus = isRateLimited
+    ? "locked"
+    : isLoading
+      ? "loading"
+      : state.isAuthenticated
+        ? "done"
+        : state.error
+          ? "error"
+          : "idle";
 
   // Don't render login form if already authenticated
   if (state.isAuthenticated && !state.isAuthLoading) {
@@ -108,232 +131,370 @@ export function LoginPage() {
   if (state.isAuthLoading) {
     return (
       <div
-        className="flex min-h-svh items-center justify-center"
-        style={{ backgroundColor: 'var(--n-50, oklch(0.975 0.004 29))' }}
+        className="flex min-h-dvh items-center justify-center"
+        style={{ backgroundColor: "var(--bg)" }}
       >
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--red-500, oklch(0.552 0.205 29))' }} />
+        <span
+          className="animate-crown-spin size-8 rounded-full border-2 border-[var(--border-c)] border-t-[var(--primary)]"
+          role="status"
+          aria-label="Memuat"
+        />
       </div>
     );
   }
 
   return (
     <div
-      className="flex min-h-svh items-center justify-center p-4"
-      style={{ backgroundColor: 'var(--n-50, oklch(0.975 0.004 29))' }}
+      className="grid min-h-dvh grid-cols-1 lg:grid-cols-[44fr_56fr]"
+      style={{ backgroundColor: "var(--bg)", fontFamily: "var(--font-sans)" }}
     >
-      <div
-        className="w-full max-w-sm rounded-[10px] p-8"
-        style={{
-          backgroundColor: 'var(--n-0, oklch(0.992 0.003 29))',
-          boxShadow: '0 4px 12px oklch(0.25 0.02 29 / 0.08)',
-        }}
+      {/* ─── Left brand panel ──────────────────────────────────────────────── */}
+      <section
+        aria-label="CROWN — CIMB Niaga Portal Vendor"
+        className="relative hidden flex-col justify-between overflow-hidden px-12 py-14 lg:flex"
+        style={{ backgroundColor: "var(--maroon-deep)", color: "var(--chrome-fg)" }}
       >
-        {/* CIMB Niaga Branding */}
-        <div className="mb-8 text-center">
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: 'var(--red-500, oklch(0.552 0.205 29))' }}
-          >
-            CIMB Niaga
+        <div className="animate-crown-rise relative flex items-center gap-2.5">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M3 8l4 3 5-6 5 6 4-3-2 10H5L3 8z"
+              stroke="var(--primary-fg)"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div>
+            <p className="m-0 text-sm font-bold tracking-[0.02em]">CROWN</p>
+            <p className="m-0 text-xs" style={{ color: "var(--vp-sidebar-text-muted, inherit)" }}>
+              CIMB Niaga · Portal Vendor
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="animate-crown-rise relative flex max-w-[420px] flex-col gap-4"
+          style={{ animationDelay: "0.1s" }}
+        >
+          <h1 className="m-0 text-[32px] font-bold leading-[1.15] tracking-[-0.02em]">
+            Kelola replenishment ATM dari satu portal.
           </h1>
           <p
-            className="mt-1 text-sm"
-            style={{ color: 'var(--n-500, oklch(0.560 0.009 29))' }}
+            className="m-0 text-sm leading-relaxed"
+            style={{ color: "var(--vp-sidebar-text-muted, inherit)" }}
           >
-            Vendor Portal
+            Unggah DSR, pantau jadwal CIT, dan kelola invoice dalam satu alur kerja yang
+            terintegrasi dengan Cash Management System CIMB Niaga.
           </p>
         </div>
 
-        {/* Error Display — aria-live for screen readers */}
-        <div aria-live="polite" aria-atomic="true">
-          {state.error && (
-            <div
-              className="mb-4 flex items-center gap-3 rounded-[6px] px-4 py-3"
-              style={{ backgroundColor: 'var(--danger-bg, oklch(0.955 0.035 12))' }}
-              role="alert"
-            >
-              <AlertCircle
-                size={16}
-                className="shrink-0"
-                style={{ color: 'var(--danger-fg, oklch(0.500 0.195 12))' }}
-                aria-hidden="true"
-              />
-              <p
-                className="text-sm"
-                style={{ color: 'var(--danger-fg, oklch(0.500 0.195 12))' }}
-              >
-                {state.error}
-              </p>
-            </div>
-          )}
-
-          {isRateLimited && countdown !== null && (
-            <div
-              className="mb-4 rounded-[6px] px-4 py-3 text-sm"
-              style={{
-                backgroundColor: 'var(--warning-bg, oklch(0.960 0.055 78))',
-                color: 'var(--warning-fg, oklch(0.520 0.115 78))',
-              }}
-            >
-              Coba lagi dalam {formatCountdown(countdown)}
-            </div>
-          )}
+        <div
+          className="animate-crown-rise relative -my-2 h-[220px] w-full max-w-[420px] self-center overflow-hidden"
+          style={{ animationDelay: "0.15s" }}
+        >
+          <img
+            src={vendorHero}
+            alt=""
+            aria-hidden="true"
+            className="size-full object-cover object-[35%_62%] opacity-90"
+          />
         </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          {/* Username Field */}
-          <div className="mb-4">
-            <label
-              htmlFor="login-username"
-              className="mb-1.5 block text-[13px] font-medium"
-              style={{ color: 'var(--n-700, oklch(0.352 0.007 29))' }}
+        <dl
+          className="animate-crown-rise relative m-0 flex gap-10 border-t pt-6"
+          style={{ borderColor: "rgba(255,255,255,0.12)", animationDelay: "0.2s" }}
+        >
+          <div className="flex flex-col gap-1">
+            <dt
+              className="m-0 text-xs uppercase tracking-[0.08em]"
+              style={{ color: "var(--vp-sidebar-text-muted, inherit)" }}
             >
-              Username
-            </label>
-            <input
-              id="login-username"
-              type="text"
-              autoComplete="username"
-              placeholder="Username"
-              maxLength={128}
-              disabled={isSubmitDisabled}
-              aria-invalid={errors.username ? 'true' : undefined}
-              aria-describedby={errors.username ? 'username-error' : undefined}
-              className="h-10 w-full rounded-[6px] border px-3 text-sm outline-none transition-shadow"
-              style={{
-                borderColor: errors.username
-                  ? 'var(--danger-fg, oklch(0.500 0.195 12))'
-                  : 'var(--n-300, oklch(0.845 0.007 29))',
-                backgroundColor: 'var(--n-0, oklch(0.992 0.003 29))',
-                color: 'var(--n-800, oklch(0.258 0.006 29))',
-              }}
-              onFocus={(e) => {
-                if (!errors.username) {
-                  e.currentTarget.style.borderColor = 'var(--red-400, oklch(0.640 0.185 29))';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px var(--red-100, oklch(0.925 0.045 29))';
-                }
-              }}
-              {...register('username', {
-                required: 'Username wajib diisi',
-                validate: (v) => isNonWhitespace(v) || 'Username wajib diisi',
-                maxLength: { value: 128, message: 'Maksimal 128 karakter' },
-                onBlur: (e) => {
-                  if (!errors.username) {
-                    e.target.style.borderColor = 'var(--n-300, oklch(0.845 0.007 29))';
-                    e.target.style.boxShadow = 'none';
-                  }
-                },
-              })}
-            />
-            {errors.username && (
-              <p
-                id="username-error"
-                className="mt-1 text-xs"
-                style={{ color: 'var(--danger-fg, oklch(0.500 0.195 12))' }}
-              >
-                {errors.username.message}
-              </p>
-            )}
-          </div>
-
-          {/* Password Field */}
-          <div className="mb-6">
-            <label
-              htmlFor="login-password"
-              className="mb-1.5 block text-[13px] font-medium"
-              style={{ color: 'var(--n-700, oklch(0.352 0.007 29))' }}
+              Batas unggah DSR
+            </dt>
+            <dd
+              className="m-0 text-sm font-medium tabular-nums"
+              style={{ fontFamily: "var(--font-mono)" }}
             >
-              Password
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="Password"
-              maxLength={72}
-              disabled={isSubmitDisabled}
-              aria-invalid={errors.password ? 'true' : undefined}
-              aria-describedby={errors.password ? 'password-error' : undefined}
-              className="h-10 w-full rounded-[6px] border px-3 text-sm outline-none transition-shadow"
-              style={{
-                borderColor: errors.password
-                  ? 'var(--danger-fg, oklch(0.500 0.195 12))'
-                  : 'var(--n-300, oklch(0.845 0.007 29))',
-                backgroundColor: 'var(--n-0, oklch(0.992 0.003 29))',
-                color: 'var(--n-800, oklch(0.258 0.006 29))',
-              }}
-              onFocus={(e) => {
-                if (!errors.password) {
-                  e.currentTarget.style.borderColor = 'var(--red-400, oklch(0.640 0.185 29))';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px var(--red-100, oklch(0.925 0.045 29))';
-                }
-              }}
-              {...register('password', {
-                required: 'Password wajib diisi',
-                validate: (v) => isNonWhitespace(v) || 'Password wajib diisi',
-                maxLength: { value: 72, message: 'Maksimal 72 karakter' },
-                onBlur: (e) => {
-                  if (!errors.password) {
-                    e.target.style.borderColor = 'var(--n-300, oklch(0.845 0.007 29))';
-                    e.target.style.boxShadow = 'none';
-                  }
-                },
-              })}
-            />
-            {errors.password && (
-              <p
-                id="password-error"
-                className="mt-1 text-xs"
-                style={{ color: 'var(--danger-fg, oklch(0.500 0.195 12))' }}
-              >
-                {errors.password.message}
-              </p>
-            )}
+              09.00 WIB
+            </dd>
           </div>
+          <div className="flex flex-col gap-1">
+            <dt
+              className="m-0 text-xs uppercase tracking-[0.08em]"
+              style={{ color: "var(--vp-sidebar-text-muted, inherit)" }}
+            >
+              Bantuan operasional
+            </dt>
+            <dd
+              className="m-0 text-sm font-medium tabular-nums"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              021 1500 800
+            </dd>
+          </div>
+        </dl>
+      </section>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitDisabled}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-[6px] text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: isSubmitDisabled
-                ? 'var(--n-200, oklch(0.908 0.006 29))'
-                : 'var(--red-500, oklch(0.552 0.205 29))',
-              color: isSubmitDisabled
-                ? 'var(--n-400, oklch(0.700 0.008 29))'
-                : 'white',
-              cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (!isSubmitDisabled) {
-                e.currentTarget.style.backgroundColor = 'var(--red-600, oklch(0.485 0.193 29))';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isSubmitDisabled) {
-                e.currentTarget.style.backgroundColor = 'var(--red-500, oklch(0.552 0.205 29))';
-              }
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 0 3px var(--red-100, oklch(0.925 0.045 29))';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.boxShadow = 'none';
-            }}
+      {/* ─── Right form panel ──────────────────────────────────────────────── */}
+      <section
+        className="flex flex-col px-6 py-10 sm:px-12 lg:px-16"
+        style={{ backgroundColor: "var(--surface)" }}
+      >
+        <div className="flex justify-end">
+          <span
+            className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.11em]"
+            style={{ color: "var(--text-secondary)" }}
           >
-            {isLoading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                Memproses...
-              </>
-            ) : (
-              'Masuk'
-            )}
-          </button>
-        </form>
-      </div>
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: "var(--success)" }}
+            />
+            Layanan normal
+          </span>
+        </div>
+
+        <div className="mx-auto my-auto w-full max-w-[392px]">
+          <h2
+            className="m-0 text-[28px] font-bold leading-[1.15] tracking-[-0.028em]"
+            style={{ color: "var(--text)" }}
+          >
+            Masuk
+          </h2>
+          <p className="mt-2 text-[15px] leading-normal" style={{ color: "var(--text-secondary)" }}>
+            Gunakan kredensial vendor yang diterbitkan CIMB Niaga.
+          </p>
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="mt-8 flex flex-col gap-5 lg:mt-10"
+          >
+            {/* Username */}
+            <div className="flex flex-col gap-[7px]">
+              <label
+                htmlFor="user"
+                className="text-[13px] font-medium"
+                style={{ color: "var(--text)" }}
+              >
+                Nama pengguna
+              </label>
+              <input
+                id="user"
+                type="text"
+                autoComplete="username"
+                placeholder="gardanet.ops"
+                maxLength={128}
+                disabled={isSubmitDisabled}
+                aria-invalid={errors.username ? "true" : undefined}
+                aria-describedby={errors.username ? "user-err" : undefined}
+                className="h-11 w-full rounded-[4px] border px-3.5 text-sm outline-none transition-[border-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_3px_var(--primary-tint)]"
+                style={{
+                  borderColor: errors.username ? "var(--danger)" : "var(--border-strong)",
+                  backgroundColor: "var(--surface)",
+                  color: "var(--text)",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "var(--primary)";
+                }}
+                onBlurCapture={(e) => {
+                  if (!errors.username) {
+                    e.currentTarget.style.borderColor = "var(--border-strong)";
+                  }
+                }}
+                {...register("username", {
+                  required: "Username wajib diisi",
+                  validate: (v) => isNonWhitespace(v) || "Username wajib diisi",
+                  maxLength: { value: 128, message: "Maksimal 128 karakter" },
+                })}
+              />
+              {errors.username && (
+                <p
+                  id="user-err"
+                  className="m-0 flex items-start gap-1.5 text-xs font-medium"
+                  style={{ color: "var(--danger)" }}
+                >
+                  <WarningIcon />
+                  {errors.username.message}
+                </p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="flex flex-col gap-[7px]">
+              <label
+                htmlFor="pass"
+                className="text-[13px] font-medium"
+                style={{ color: "var(--text)" }}
+              >
+                Kata sandi
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  id="pass"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  maxLength={72}
+                  disabled={isSubmitDisabled}
+                  aria-invalid={errors.password ? "true" : undefined}
+                  aria-describedby={
+                    errors.password ? "pass-err" : isCapsLockOn ? "pass-capslock" : undefined
+                  }
+                  className="h-11 w-full rounded-[4px] border px-3.5 pr-10 text-sm outline-none transition-[border-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_3px_var(--primary-tint)]"
+                  style={{
+                    borderColor: errors.password ? "var(--danger)" : "var(--border-strong)",
+                    backgroundColor: "var(--surface)",
+                    color: "var(--text)",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--primary)";
+                  }}
+                  onBlurCapture={(e) => {
+                    if (!errors.password) {
+                      e.currentTarget.style.borderColor = "var(--border-strong)";
+                    }
+                  }}
+                  onKeyUp={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
+                  onKeyDown={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
+                  {...register("password", {
+                    required: "Password wajib diisi",
+                    validate: (v) => isNonWhitespace(v) || "Password wajib diisi",
+                    maxLength: { value: 72, message: "Maksimal 72 karakter" },
+                  })}
+                />
+                <button
+                  type="button"
+                  disabled={isSubmitDisabled}
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  className="absolute right-2.5 flex size-6 items-center justify-center rounded-sm disabled:opacity-50"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {showPassword ? (
+                    <EyeOff size={16} aria-hidden="true" />
+                  ) : (
+                    <Eye size={16} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              {errors.password && (
+                <p
+                  id="pass-err"
+                  className="m-0 flex items-start gap-1.5 text-xs font-medium"
+                  style={{ color: "var(--danger)" }}
+                >
+                  <WarningIcon />
+                  {errors.password.message}
+                </p>
+              )}
+              {isCapsLockOn && !errors.password && (
+                <p
+                  id="pass-capslock"
+                  className="m-0 flex items-start gap-1.5 text-xs font-medium"
+                  style={{ color: "var(--warning)" }}
+                >
+                  <WarningIcon />
+                  Caps Lock aktif.
+                </p>
+              )}
+            </div>
+
+            {/* Remember + forgot */}
+            <div className="-mt-1 flex items-center justify-between gap-4">
+              <label
+                className="flex cursor-pointer items-center gap-2.5 text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <input
+                  type="checkbox"
+                  disabled={isSubmitDisabled}
+                  className="m-0 size-4 cursor-pointer"
+                />
+                Ingat perangkat ini
+              </label>
+              <a
+                href="#reset"
+                className="rounded-sm text-sm font-medium no-underline hover:underline hover:underline-offset-[3px]"
+                style={{ color: "var(--primary-text)" }}
+              >
+                Lupa kata sandi?
+              </a>
+            </div>
+
+            {/* Status region: error / locked / done */}
+            <div aria-live="polite" aria-atomic="true">
+              {status === "error" && (
+                <p
+                  role="alert"
+                  className="m-0 flex gap-2.5 rounded-[4px] px-3.5 py-3 text-sm leading-[1.45]"
+                  style={{ backgroundColor: "var(--danger-tint)", color: "var(--danger)" }}
+                >
+                  <WarningIcon />
+                  <span>{state.error}</span>
+                </p>
+              )}
+
+              {status === "locked" && countdown !== null && (
+                <p
+                  role="alert"
+                  className="m-0 flex gap-2.5 rounded-[4px] px-3.5 py-3 text-sm leading-[1.45]"
+                  style={{ backgroundColor: "var(--danger-tint)", color: "var(--danger)" }}
+                >
+                  <WarningIcon />
+                  <span>
+                    Terlalu banyak percobaan. Coba lagi dalam {formatCountdown(countdown)}. Hubungi
+                    Bantuan Operasional di{" "}
+                    <span className="font-medium" style={{ fontFamily: "var(--font-mono)" }}>
+                      021 1500 800
+                    </span>{" "}
+                    untuk membuka lebih awal.
+                  </span>
+                </p>
+              )}
+
+              {status === "done" && (
+                <output
+                  className="m-0 flex gap-2.5 rounded-[4px] px-3.5 py-3 text-sm leading-[1.45]"
+                  style={{ backgroundColor: "var(--success-tint)", color: "var(--success)" }}
+                >
+                  <CheckCircle2 size={16} className="shrink-0" aria-hidden="true" />
+                  <span>Berhasil masuk. Mengalihkan ke dasbor vendor.</span>
+                </output>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitDisabled}
+              className="flex h-11 items-center justify-center gap-2.5 rounded-[4px] text-[15px] font-semibold outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--primary-tint)]"
+              style={{
+                backgroundColor: isSubmitDisabled ? "var(--border-c)" : "var(--primary)",
+                color: isSubmitDisabled ? "var(--text-muted)" : "var(--primary-fg)",
+                cursor: isSubmitDisabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {status === "loading" && (
+                <span
+                  className="animate-crown-spin size-4 rounded-full border-2 border-[rgba(255,252,251,0.35)] border-t-current"
+                  aria-hidden="true"
+                />
+              )}
+              {status === "done" && <CheckCircle2 size={16} aria-hidden="true" />}
+              {status === "loading"
+                ? "Memverifikasi"
+                : status === "done"
+                  ? "Berhasil masuk"
+                  : "Masuk"}
+            </button>
+          </form>
+
+          <p
+            className="mt-7 max-w-[52ch] border-t pt-5 text-xs leading-normal"
+            style={{ borderColor: "var(--border-c)", color: "var(--text-muted)" }}
+          >
+            Masukkan nama pengguna vendor, format nama.perusahaan.
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

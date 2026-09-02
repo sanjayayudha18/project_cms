@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { formatIDR, getBalanceStatus } from '@/lib/formatters';
-import type { DsrRecord } from '@/lib/types';
-import { Monitor } from 'lucide-react';
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { formatIDR, getBalanceStatus } from "@/lib/formatters";
+import type { DsrRecord } from "@/lib/types";
+import { Monitor } from "lucide-react";
+import { useMemo } from "react";
 
 interface DsrSummaryCardProps {
   readonly records: readonly DsrRecord[];
@@ -25,8 +25,8 @@ export function DsrSummaryCard({ records }: DsrSummaryCardProps) {
 
     for (const record of records) {
       const status = getBalanceStatus(record.endingBalance);
-      if (status === 'Critical') criticalCount++;
-      if (status === 'Low') lowCount++;
+      if (status === "Critical") criticalCount++;
+      if (status === "Low") lowCount++;
       totalEndingBalance += record.endingBalance;
     }
 
@@ -43,9 +43,7 @@ export function DsrSummaryCard({ records }: DsrSummaryCardProps) {
       <div className="flex items-center gap-2">
         <Monitor className="size-5 text-neutral-500" aria-hidden="true" />
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-            Total ATMs
-          </p>
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Total ATMs</p>
           <p className="text-lg font-semibold text-surface-text tabular-nums">
             {summary.totalAtms}
           </p>

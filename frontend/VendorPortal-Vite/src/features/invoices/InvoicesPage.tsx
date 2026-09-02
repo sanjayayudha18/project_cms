@@ -1,20 +1,20 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useInvoices } from '@/features/invoices/useInvoices';
-import { InvoiceDetail } from '@/features/invoices/InvoiceDetail';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { formatIDR } from '@/lib/formatters';
-import type { Invoice } from '@/lib/types';
-import { CheckCircle, FileText, ChevronDown, ChevronRight } from 'lucide-react';
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { InvoiceDetail } from "@/features/invoices/InvoiceDetail";
+import { useInvoices } from "@/features/invoices/useInvoices";
+import { formatIDR } from "@/lib/formatters";
+import type { Invoice } from "@/lib/types";
+import { CheckCircle, ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
-type ValidationStatus = Invoice['validationStatus'];
+type ValidationStatus = Invoice["validationStatus"];
 
-const statusBadgeMap: Record<ValidationStatus, 'info' | 'warning' | 'danger' | 'success'> = {
-  Uploaded: 'info',
-  Validated: 'warning',
-  'Mismatch Detected': 'danger',
-  Approved: 'success',
+const statusBadgeMap: Record<ValidationStatus, "info" | "warning" | "danger" | "success"> = {
+  Uploaded: "info",
+  Validated: "warning",
+  "Mismatch Detected": "danger",
+  Approved: "success",
 };
 
 export function InvoicesPage() {
@@ -35,7 +35,7 @@ export function InvoicesPage() {
 
   const handleRowKeyDown = useCallback(
     (e: React.KeyboardEvent, id: string) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+      if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         toggleExpanded(id);
       }
@@ -49,14 +49,14 @@ export function InvoicesPage() {
     const countByStatus: Record<ValidationStatus, number> = {
       Uploaded: 0,
       Validated: 0,
-      'Mismatch Detected': 0,
+      "Mismatch Detected": 0,
       Approved: 0,
     };
     let approvedSum = 0;
 
     for (const inv of invoices) {
       countByStatus[inv.validationStatus]++;
-      if (inv.validationStatus === 'Approved') {
+      if (inv.validationStatus === "Approved") {
         approvedSum += inv.totalAmount;
       }
     }
@@ -109,22 +109,16 @@ export function InvoicesPage() {
           </p>
         </Card>
         <Card>
-          <p className="text-xs uppercase tracking-wider text-neutral-500 font-medium">
-            By Status
-          </p>
+          <p className="text-xs uppercase tracking-wider text-neutral-500 font-medium">By Status</p>
           <div className="mt-1 flex flex-wrap gap-2">
             <Badge variant="info">{summary.countByStatus.Uploaded} Uploaded</Badge>
             <Badge variant="warning">{summary.countByStatus.Validated} Validated</Badge>
           </div>
         </Card>
         <Card>
-          <p className="text-xs uppercase tracking-wider text-neutral-500 font-medium">
-            By Status
-          </p>
+          <p className="text-xs uppercase tracking-wider text-neutral-500 font-medium">By Status</p>
           <div className="mt-1 flex flex-wrap gap-2">
-            <Badge variant="danger">
-              {summary.countByStatus['Mismatch Detected']} Mismatch
-            </Badge>
+            <Badge variant="danger">{summary.countByStatus["Mismatch Detected"]} Mismatch</Badge>
             <Badge variant="success" icon={CheckCircle}>
               {summary.countByStatus.Approved} Approved
             </Badge>
@@ -185,7 +179,7 @@ function InvoiceRow({ invoice, isExpanded, onToggle, onKeyDown }: InvoiceRowProp
         tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
-        aria-label={`Invoice ${invoice.invoiceNumber}, ${isExpanded ? 'collapse' : 'expand'} details`}
+        aria-label={`Invoice ${invoice.invoiceNumber}, ${isExpanded ? "collapse" : "expand"} details`}
       >
         <td className="px-4 py-3">
           {isExpanded ? (
@@ -196,16 +190,12 @@ function InvoiceRow({ invoice, isExpanded, onToggle, onKeyDown }: InvoiceRowProp
         </td>
         <td className="px-4 py-3 font-medium">{invoice.invoiceNumber}</td>
         <td className="px-4 py-3">{invoice.period}</td>
-        <td className="px-4 py-3 text-right tabular-nums">
-          {formatIDR(invoice.totalAmount)}
-        </td>
-        <td className="px-4 py-3 text-right tabular-nums">
-          {invoice.lineItemsCount}
-        </td>
+        <td className="px-4 py-3 text-right tabular-nums">{formatIDR(invoice.totalAmount)}</td>
+        <td className="px-4 py-3 text-right tabular-nums">{invoice.lineItemsCount}</td>
         <td className="px-4 py-3">
           <Badge
             variant={statusBadgeMap[status]}
-            icon={status === 'Approved' ? CheckCircle : undefined}
+            icon={status === "Approved" ? CheckCircle : undefined}
           >
             {status}
           </Badge>

@@ -1,11 +1,11 @@
-import { Component, type ErrorInfo, type ReactNode, useState, useEffect, useCallback } from 'react';
-import { NavLink, Outlet } from 'react-router';
-import { LogOut, AlertTriangle, Menu, X } from 'lucide-react';
-import { useAuth } from '@/features/auth/useAuth';
-import { useNotifications } from '@/features/notifications/useNotifications';
-import { NotificationBadge } from '@/components/layout/NotificationBadge';
-import { truncate } from '@/lib/formatters';
-import { NAV_ITEMS, ROUTES } from '@/lib/constants';
+import { NotificationBadge } from "@/components/layout/NotificationBadge";
+import { useAuth } from "@/features/auth/useAuth";
+import { useNotifications } from "@/features/notifications/useNotifications";
+import { NAV_ITEMS, ROUTES } from "@/lib/constants";
+import { truncate } from "@/lib/formatters";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, LogOut, Menu, X } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from "react";
 
 // --- Error Boundary ---
 
@@ -28,7 +28,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    console.error("ErrorBoundary caught:", error, errorInfo);
   }
 
   handleReset = () => {
@@ -40,9 +40,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       return (
         <div className="flex flex-col items-center justify-center gap-4 p-8 min-h-[300px]">
           <AlertTriangle className="size-12 text-danger-fg" aria-hidden="true" />
-          <p className="text-lg font-semibold text-surface-text">
-            Terjadi kesalahan
-          </p>
+          <p className="text-lg font-semibold text-surface-text">Terjadi kesalahan</p>
           <button
             type="button"
             onClick={this.handleReset}
@@ -63,7 +61,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 // --- AppShell Layout ---
 
-export function AppShell() {
+export function AppShell({ children }: { readonly children: ReactNode }) {
   const { state, logout } = useAuth();
   const user = state.user;
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -80,13 +78,13 @@ export function AppShell() {
     if (!mobileOpen) return;
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setMobileOpen(false);
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [mobileOpen]);
 
   return (
@@ -98,7 +96,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
-            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
             className="flex items-center justify-center rounded-md p-2 lg:hidden
                        hover:bg-white/10 transition-colors duration-150
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
@@ -111,14 +109,12 @@ export function AppShell() {
             )}
           </button>
 
-          <span className="font-semibold text-sm truncate max-w-[300px]">
-            Vendor Portal
-          </span>
+          <span className="font-semibold text-sm truncate max-w-[300px]">Vendor Portal</span>
         </div>
 
         <div className="flex items-center gap-3">
           <span className="text-sm hidden sm:inline">
-            {user ? truncate(user.fullName, 20) : ''}
+            {user ? truncate(user.fullName, 20) : ""}
           </span>
           <button
             type="button"
@@ -149,24 +145,23 @@ export function AppShell() {
           aria-label="Main navigation"
           className={`fixed top-14 left-0 bottom-0 bg-sidebar overflow-y-auto z-40
                       transition-[width] duration-200 ease-out
-                      ${mobileOpen ? 'w-64' : 'w-16 lg:w-64'}`}
+                      ${mobileOpen ? "w-64" : "w-16 lg:w-64"}`}
         >
           <ul className="flex flex-col gap-1 p-2">
             {visibleNavItems.map((item) => (
               <li key={item.path}>
-                <NavLink
+                <Link
                   to={item.path}
                   onClick={closeMobileSidebar}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
                      transition-colors duration-150 min-h-[44px]
-                     focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
-                     ${
-                       isActive
-                         ? 'bg-sidebar-active text-sidebar-active-text'
-                         : 'text-sidebar-text hover:bg-white/5 hover:text-sidebar-active-text'
-                     }`
-                  }
+                     focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+                  activeProps={{
+                    className: "bg-sidebar-active text-sidebar-active-text",
+                  }}
+                  inactiveProps={{
+                    className: "text-sidebar-text hover:bg-white/5 hover:text-sidebar-active-text",
+                  }}
                 >
                   <span className="relative shrink-0">
                     <item.icon className="size-5" aria-hidden="true" />
@@ -174,10 +169,8 @@ export function AppShell() {
                       <NotificationBadge count={unreadCount} />
                     )}
                   </span>
-                  <span className={mobileOpen ? 'inline' : 'hidden lg:inline'}>
-                    {item.label}
-                  </span>
-                </NavLink>
+                  <span className={mobileOpen ? "inline" : "hidden lg:inline"}>{item.label}</span>
+                </Link>
               </li>
             ))}
           </ul>
@@ -185,9 +178,7 @@ export function AppShell() {
 
         {/* Main Content */}
         <main className="flex-1 ml-16 lg:ml-64 bg-surface p-6 overflow-y-auto">
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
     </div>

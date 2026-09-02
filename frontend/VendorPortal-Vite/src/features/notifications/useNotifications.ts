@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/useAuth';
-import notificationsData from '@/data/notifications.json';
-import type { Notification } from '@/lib/types';
+import notificationsData from "@/data/notifications.json";
+import { useAuth } from "@/features/auth/useAuth";
+import type { Notification } from "@/lib/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function useNotifications() {
   const { state } = useAuth();
   const vendorId = state.user?.vendorId;
 
   const query = useQuery({
-    queryKey: ['notifications', vendorId],
+    queryKey: ["notifications", vendorId],
     queryFn: () => {
       const allNotifications = notificationsData as Notification[];
       return allNotifications.filter((n) => n.vendorId === String(vendorId));
@@ -16,8 +16,7 @@ export function useNotifications() {
     enabled: !!vendorId,
   });
 
-  const unreadCount =
-    query.data?.filter((n) => !n.isRead).length ?? 0;
+  const unreadCount = query.data?.filter((n) => !n.isRead).length ?? 0;
 
   return { ...query, unreadCount };
 }
@@ -34,12 +33,8 @@ export function useMarkAsRead() {
       return { notificationId, success: true };
     },
     onSuccess: ({ notificationId }) => {
-      queryClient.setQueryData<Notification[]>(
-        ['notifications', vendorId],
-        (old) =>
-          old?.map((n) =>
-            n.id === notificationId ? { ...n, isRead: true } : n,
-          ),
+      queryClient.setQueryData<Notification[]>(["notifications", vendorId], (old) =>
+        old?.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
       );
     },
   });
@@ -57,9 +52,8 @@ export function useMarkAllAsRead() {
       return { success: true };
     },
     onSuccess: () => {
-      queryClient.setQueryData<Notification[]>(
-        ['notifications', vendorId],
-        (old) => old?.map((n) => ({ ...n, isRead: true })),
+      queryClient.setQueryData<Notification[]>(["notifications", vendorId], (old) =>
+        old?.map((n) => ({ ...n, isRead: true })),
       );
     },
   });

@@ -1,23 +1,16 @@
-import type { LucideIcon } from 'lucide-react';
-import {
-  ClipboardList,
-  FileUp,
-  FileText,
-  Calendar,
-  Activity,
-  Bell,
-} from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
+import { Activity, Bell, Calendar, ClipboardList, FileText, FileUp } from "lucide-react";
 
 // --- Route Paths ---
 
 export const ROUTES = {
-  LOGIN: '/login',
-  ORDERS: '/orders',
-  EVIDENCE: '/orders/:id/evidence',
-  INVOICES: '/invoices',
-  SCHEDULE: '/schedule',
-  DSR: '/dsr',
-  NOTIFICATIONS: '/notifications',
+  LOGIN: "/login",
+  ORDERS: "/orders",
+  EVIDENCE: "/orders/:id/evidence",
+  INVOICES: "/invoices",
+  SCHEDULE: "/schedule",
+  DSR: "/dsr",
+  NOTIFICATIONS: "/notifications",
 } as const;
 
 // --- Navigation Items ---
@@ -30,12 +23,12 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'DSR Menu', path: ROUTES.DSR, icon: Activity },
-  { label: 'CIT Orders', path: ROUTES.ORDERS, icon: ClipboardList },
-  { label: 'Upload Evidence', path: ROUTES.EVIDENCE, icon: FileUp, hiddenFromNav: true },
-  { label: 'Invoices', path: ROUTES.INVOICES, icon: FileText },
-  { label: 'Replenishment Schedule', path: ROUTES.SCHEDULE, icon: Calendar },
-  { label: 'Notifications', path: ROUTES.NOTIFICATIONS, icon: Bell },
+  { label: "DSR Menu", path: ROUTES.DSR, icon: Activity },
+  { label: "CIT Orders", path: ROUTES.ORDERS, icon: ClipboardList },
+  { label: "Upload Evidence", path: ROUTES.EVIDENCE, icon: FileUp, hiddenFromNav: true },
+  { label: "Invoices", path: ROUTES.INVOICES, icon: FileText },
+  { label: "Replenishment Schedule", path: ROUTES.SCHEDULE, icon: Calendar },
+  { label: "Notifications", path: ROUTES.NOTIFICATIONS, icon: Bell },
 ] as const;
 
 // --- Balance Thresholds (IDR) ---

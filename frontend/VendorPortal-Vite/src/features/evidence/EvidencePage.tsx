@@ -1,23 +1,23 @@
-import { useParams, Link } from 'react-router';
-import { ArrowLeft, FileText, Image, Calendar, User, StickyNote } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { useEvidence } from '@/features/evidence/useEvidence';
-import { EvidenceForm } from '@/features/evidence/EvidenceForm';
-import type { EvidenceFile } from '@/lib/types';
+import { Card } from "@/components/ui/Card";
+import { EvidenceForm } from "@/features/evidence/EvidenceForm";
+import { useEvidence } from "@/features/evidence/useEvidence";
+import type { EvidenceFile } from "@/lib/types";
+import { Link, useParams } from "@tanstack/react-router";
+import { ArrowLeft, Calendar, FileText, Image, StickyNote, User } from "lucide-react";
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
 function isImageFile(file: EvidenceFile): boolean {
-  return file.type === 'image/jpeg' || file.type === 'image/png';
+  return file.type === "image/jpeg" || file.type === "image/png";
 }
 
 function ExistingEvidence({
@@ -45,17 +45,10 @@ function ExistingEvidence({
         <h3 className="text-sm font-medium text-surface-text">File Bukti</h3>
         <ul className="flex flex-wrap gap-3">
           {evidence.files.map((file) => (
-            <li
-              key={file.name}
-              className="flex flex-col items-center gap-1 w-20"
-            >
+            <li key={file.name} className="flex flex-col items-center gap-1 w-20">
               <div className="w-16 h-16 rounded-md border border-neutral-200 overflow-hidden flex items-center justify-center bg-neutral-50">
                 {isImageFile(file) ? (
-                  <img
-                    src={file.url}
-                    alt={file.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
                 ) : (
                   <FileText className="size-8 text-neutral-400" aria-hidden="true" />
                 )}
@@ -73,23 +66,21 @@ function ExistingEvidence({
         <div className="flex items-center gap-2">
           <Calendar className="size-4 text-neutral-400" aria-hidden="true" />
           <span className="text-sm text-neutral-600">
-            <span className="font-medium">Waktu serah terima:</span>{' '}
+            <span className="font-medium">Waktu serah terima:</span>{" "}
             {formatDateTime(evidence.handoverTimestamp)}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <User className="size-4 text-neutral-400" aria-hidden="true" />
           <span className="text-sm text-neutral-600">
-            <span className="font-medium">Penerima:</span>{' '}
-            {evidence.recipientName}
+            <span className="font-medium">Penerima:</span> {evidence.recipientName}
           </span>
         </div>
         {evidence.notes && (
           <div className="flex items-start gap-2">
             <StickyNote className="size-4 text-neutral-400 mt-0.5" aria-hidden="true" />
             <span className="text-sm text-neutral-600">
-              <span className="font-medium">Catatan:</span>{' '}
-              {evidence.notes}
+              <span className="font-medium">Catatan:</span> {evidence.notes}
             </span>
           </div>
         )}
@@ -99,8 +90,8 @@ function ExistingEvidence({
 }
 
 export function EvidencePage() {
-  const { id } = useParams<{ id: string }>();
-  const orderId = id ?? '';
+  const { id } = useParams({ strict: false }) as { id?: string };
+  const orderId = id ?? "";
   const { data: evidence, isLoading } = useEvidence(orderId);
 
   return (
@@ -114,12 +105,8 @@ export function EvidencePage() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           Kembali ke Daftar Order
         </Link>
-        <h1 className="text-xl font-semibold text-surface-text">
-          Upload Bukti Serah Terima
-        </h1>
-        {orderId && (
-          <p className="text-sm text-neutral-500">Order: {orderId}</p>
-        )}
+        <h1 className="text-xl font-semibold text-surface-text">Upload Bukti Serah Terima</h1>
+        {orderId && <p className="text-sm text-neutral-500">Order: {orderId}</p>}
       </div>
 
       {/* Content */}

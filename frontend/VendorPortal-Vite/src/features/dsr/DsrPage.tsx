@@ -1,59 +1,59 @@
-import { useState } from 'react';
-import { createColumnHelper, type ColumnDef, type SortingState } from '@tanstack/react-table';
-import { useDsr } from '@/features/dsr/useDsr';
-import { DsrSummaryCard } from '@/features/dsr/DsrSummaryCard';
-import { DataTable } from '@/components/ui/DataTable';
-import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { formatIDR, getBalanceStatus } from '@/lib/formatters';
-import type { DsrRecord, BalanceStatus } from '@/lib/types';
-import { DatabaseZap, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { DataTable } from "@/components/ui/DataTable";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { DsrSummaryCard } from "@/features/dsr/DsrSummaryCard";
+import { useDsr } from "@/features/dsr/useDsr";
+import { formatIDR, getBalanceStatus } from "@/lib/formatters";
+import type { BalanceStatus, DsrRecord } from "@/lib/types";
+import { type ColumnDef, type SortingState, createColumnHelper } from "@tanstack/react-table";
+import { DatabaseZap, Plus } from "lucide-react";
+import { useState } from "react";
 
-const balanceStatusBadgeMap: Record<BalanceStatus, 'danger' | 'warning' | 'success'> = {
-  Critical: 'danger',
-  Low: 'warning',
-  Normal: 'success',
+const balanceStatusBadgeMap: Record<BalanceStatus, "danger" | "warning" | "success"> = {
+  Critical: "danger",
+  Low: "warning",
+  Normal: "success",
 };
 
 const columnHelper = createColumnHelper<DsrRecord>();
 
 const columns: ColumnDef<DsrRecord, unknown>[] = [
-  columnHelper.accessor('atmId', {
-    header: 'ATM ID',
+  columnHelper.accessor("atmId", {
+    header: "ATM ID",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor('location', {
-    header: 'Location',
+  columnHelper.accessor("location", {
+    header: "Location",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor('date', {
-    header: 'Date',
+  columnHelper.accessor("date", {
+    header: "Date",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor('beginningBalance', {
-    header: 'Beginning Balance',
+  columnHelper.accessor("beginningBalance", {
+    header: "Beginning Balance",
     cell: (info) => formatIDR(info.getValue()),
     meta: { numeric: true },
   }),
-  columnHelper.accessor('cashIn', {
-    header: 'Cash In',
+  columnHelper.accessor("cashIn", {
+    header: "Cash In",
     cell: (info) => formatIDR(info.getValue()),
     meta: { numeric: true },
   }),
-  columnHelper.accessor('cashOut', {
-    header: 'Cash Out',
+  columnHelper.accessor("cashOut", {
+    header: "Cash Out",
     cell: (info) => formatIDR(info.getValue()),
     meta: { numeric: true },
   }),
-  columnHelper.accessor('endingBalance', {
-    header: 'Ending Balance',
+  columnHelper.accessor("endingBalance", {
+    header: "Ending Balance",
     cell: (info) => formatIDR(info.getValue()),
     meta: { numeric: true },
   }),
   columnHelper.display({
-    id: 'balanceStatus',
-    header: 'Balance Status',
+    id: "balanceStatus",
+    header: "Balance Status",
     cell: ({ row }) => {
       const status = getBalanceStatus(row.original.endingBalance);
       return <Badge variant={balanceStatusBadgeMap[status]}>{status}</Badge>;
@@ -63,10 +63,8 @@ const columns: ColumnDef<DsrRecord, unknown>[] = [
 ] as ColumnDef<DsrRecord, unknown>[];
 
 export function DsrPage() {
-  const [selectedDate, setSelectedDate] = useState('2024-01-15');
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'atmId', desc: false },
-  ]);
+  const [selectedDate, setSelectedDate] = useState("2024-01-15");
+  const [sorting, setSorting] = useState<SortingState>([{ id: "atmId", desc: false }]);
 
   const { data: records = [], isLoading } = useDsr(selectedDate);
 

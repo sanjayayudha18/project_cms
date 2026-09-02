@@ -1,10 +1,10 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import evidenceData from '@/data/evidence.json';
-import type { HandoverEvidence } from '@/lib/types';
+import evidenceData from "@/data/evidence.json";
+import type { HandoverEvidence } from "@/lib/types";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 export function useEvidence(orderId: string) {
   return useQuery({
-    queryKey: ['evidence', orderId],
+    queryKey: ["evidence", orderId],
     queryFn: () => {
       const allEvidence = evidenceData as HandoverEvidence[];
       return allEvidence.find((e) => e.orderId === orderId) ?? null;

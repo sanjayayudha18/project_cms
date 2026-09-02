@@ -1,22 +1,22 @@
-import { useNavigate } from 'react-router';
-import { Bell, CheckCheck } from 'lucide-react';
-import { useNotifications, useMarkAsRead, useMarkAllAsRead } from './useNotifications';
-import { truncate } from '@/lib/formatters';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import type { Notification } from '@/lib/types';
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { truncate } from "@/lib/formatters";
+import type { Notification } from "@/lib/types";
+import { useNavigate } from "@tanstack/react-router";
+import { Bell, CheckCheck } from "lucide-react";
+import { useMarkAllAsRead, useMarkAsRead, useNotifications } from "./useNotifications";
 
 /**
  * Format ISO timestamp to "DD MMM YYYY HH:mm" in Indonesian locale.
  */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -35,7 +35,8 @@ export function NotificationsPage() {
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
-    navigate(notification.relatedRoute);
+    // relatedRoute is an arbitrary internal path; href resolves dynamic segments.
+    void navigate({ href: notification.relatedRoute });
   }
 
   function handleMarkAllAsRead() {
@@ -78,7 +79,7 @@ export function NotificationsPage() {
       ) : (
         /* Notification list table */
         <div className="overflow-x-auto rounded-lg border border-neutral-200">
-          <table className="w-full text-left text-sm" role="table">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 bg-neutral-50">
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-neutral-500">
@@ -101,21 +102,18 @@ export function NotificationsPage() {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       handleNotificationClick(notification);
                     }
                   }}
                   tabIndex={0}
-                  role="row"
                   aria-label={`${notification.type}: ${notification.message}`}
                   className={[
-                    'cursor-pointer border-b border-neutral-100 transition-colors duration-150',
-                    'hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sidebar-active',
-                    notification.isRead
-                      ? 'bg-white'
-                      : 'bg-info-bg/30 font-bold',
-                  ].join(' ')}
+                    "cursor-pointer border-b border-neutral-100 transition-colors duration-150",
+                    "hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sidebar-active",
+                    notification.isRead ? "bg-white" : "bg-info-bg/30 font-bold",
+                  ].join(" ")}
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
                     {formatTimestamp(notification.timestamp)}

@@ -1,17 +1,14 @@
-import * as fc from 'fast-check';
-import ordersData from '@/data/orders.json';
-import invoicesData from '@/data/invoices.json';
-import schedulesData from '@/data/schedules.json';
-import dsrData from '@/data/dsr.json';
-import notificationsData from '@/data/notifications.json';
+import dsrData from "@/data/dsr.json";
+import invoicesData from "@/data/invoices.json";
+import notificationsData from "@/data/notifications.json";
+import ordersData from "@/data/orders.json";
+import schedulesData from "@/data/schedules.json";
+import * as fc from "fast-check";
 
 // --- Pure filter utility functions ---
 
 /** Filter any collection by vendorId */
-function filterByVendor<T extends { vendorId: string }>(
-  data: readonly T[],
-  vendorId: string,
-): T[] {
+function filterByVendor<T extends { vendorId: string }>(data: readonly T[], vendorId: string): T[] {
   return data.filter((record) => record.vendorId === vendorId);
 }
 
@@ -29,17 +26,17 @@ function filterByDateRange<T extends { scheduledDate: string }>(
 }
 
 /** Filter records by status */
-function filterByStatus<T extends { status: string }>(
-  data: readonly T[],
-  status: string,
-): T[] {
+function filterByStatus<T extends { status: string }>(data: readonly T[], status: string): T[] {
   return data.filter((record) => record.status === status);
 }
 
 /** Filter records by both status and date range (AND composition) */
-function filterByStatusAndDateRange<
-  T extends { status: string; scheduledDate: string },
->(data: readonly T[], status: string, startDate?: string, endDate?: string): T[] {
+function filterByStatusAndDateRange<T extends { status: string; scheduledDate: string }>(
+  data: readonly T[],
+  status: string,
+  startDate?: string,
+  endDate?: string,
+): T[] {
   return data.filter((record) => {
     if (record.status !== status) return false;
     if (startDate && record.scheduledDate < startDate) return false;
@@ -50,18 +47,9 @@ function filterByStatusAndDateRange<
 
 // --- Generators ---
 
-const vendorIdArb = fc.constantFrom(
-  'vendor-gardanet',
-  'vendor-ssi',
-  'vendor-g4s',
-);
+const vendorIdArb = fc.constantFrom("vendor-gardanet", "vendor-ssi", "vendor-g4s");
 
-const orderStatusArb = fc.constantFrom(
-  'Scheduled',
-  'In Transit',
-  'Completed',
-  'Failed',
-);
+const orderStatusArb = fc.constantFrom("Scheduled", "In Transit", "Completed", "Failed");
 
 // Extract the date range from actual orders data for realistic testing
 const allDates = ordersData.map((o) => o.scheduledDate).sort();
@@ -77,7 +65,7 @@ function dateInRange(): fc.Arbitrary<string> {
 
   return fc.integer({ min: 0, max: totalDays }).map((offset) => {
     const date = new Date(minDay + offset * dayMs);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   });
 }
 
@@ -105,8 +93,8 @@ function dateRangeArb(): fc.Arbitrary<{
 // Validates: Requirements 3.2, 5.2, 6.2, 7.2, 9.3, 9.9, 12.1, 12.2
 // =========================================================================
 
-describe('Property 1: Vendor Data Isolation', () => {
-  it('filtering orders by vendorId returns only matching records', () => {
+describe("Property 1: Vendor Data Isolation", () => {
+  it("filtering orders by vendorId returns only matching records", () => {
     fc.assert(
       fc.property(vendorIdArb, (vendorId) => {
         const result = filterByVendor(ordersData, vendorId);
@@ -117,7 +105,7 @@ describe('Property 1: Vendor Data Isolation', () => {
     );
   });
 
-  it('filtering invoices by vendorId returns only matching records', () => {
+  it("filtering invoices by vendorId returns only matching records", () => {
     fc.assert(
       fc.property(vendorIdArb, (vendorId) => {
         const result = filterByVendor(invoicesData, vendorId);
@@ -128,7 +116,7 @@ describe('Property 1: Vendor Data Isolation', () => {
     );
   });
 
-  it('filtering schedules by vendorId returns only matching records', () => {
+  it("filtering schedules by vendorId returns only matching records", () => {
     fc.assert(
       fc.property(vendorIdArb, (vendorId) => {
         const result = filterByVendor(schedulesData, vendorId);
@@ -139,7 +127,7 @@ describe('Property 1: Vendor Data Isolation', () => {
     );
   });
 
-  it('filtering DSR records by vendorId returns only matching records', () => {
+  it("filtering DSR records by vendorId returns only matching records", () => {
     fc.assert(
       fc.property(vendorIdArb, (vendorId) => {
         const result = filterByVendor(dsrData, vendorId);
@@ -150,7 +138,7 @@ describe('Property 1: Vendor Data Isolation', () => {
     );
   });
 
-  it('filtering notifications by vendorId returns only matching records', () => {
+  it("filtering notifications by vendorId returns only matching records", () => {
     fc.assert(
       fc.property(vendorIdArb, (vendorId) => {
         const result = filterByVendor(notificationsData, vendorId);
@@ -161,8 +149,8 @@ describe('Property 1: Vendor Data Isolation', () => {
     );
   });
 
-  it('filtering with non-existent vendorId returns empty array', () => {
-    const nonExistentIds = ['vendor-unknown', 'vendor-xyz', 'vendor-abc'];
+  it("filtering with non-existent vendorId returns empty array", () => {
+    const nonExistentIds = ["vendor-unknown", "vendor-xyz", "vendor-abc"];
     for (const vendorId of nonExistentIds) {
       expect(filterByVendor(ordersData, vendorId)).toHaveLength(0);
       expect(filterByVendor(invoicesData, vendorId)).toHaveLength(0);
@@ -172,27 +160,19 @@ describe('Property 1: Vendor Data Isolation', () => {
     }
   });
 
-  it('union of all vendor-filtered results equals the full dataset', () => {
-    const allVendors = ['vendor-gardanet', 'vendor-ssi', 'vendor-g4s'] as const;
+  it("union of all vendor-filtered results equals the full dataset", () => {
+    const allVendors = ["vendor-gardanet", "vendor-ssi", "vendor-g4s"] as const;
 
-    const allOrdersFiltered = allVendors.flatMap((v) =>
-      filterByVendor(ordersData, v),
-    );
+    const allOrdersFiltered = allVendors.flatMap((v) => filterByVendor(ordersData, v));
     expect(allOrdersFiltered.length).toBe(ordersData.length);
 
-    const allInvoicesFiltered = allVendors.flatMap((v) =>
-      filterByVendor(invoicesData, v),
-    );
+    const allInvoicesFiltered = allVendors.flatMap((v) => filterByVendor(invoicesData, v));
     expect(allInvoicesFiltered.length).toBe(invoicesData.length);
 
-    const allSchedulesFiltered = allVendors.flatMap((v) =>
-      filterByVendor(schedulesData, v),
-    );
+    const allSchedulesFiltered = allVendors.flatMap((v) => filterByVendor(schedulesData, v));
     expect(allSchedulesFiltered.length).toBe(schedulesData.length);
 
-    const allDsrFiltered = allVendors.flatMap((v) =>
-      filterByVendor(dsrData, v),
-    );
+    const allDsrFiltered = allVendors.flatMap((v) => filterByVendor(dsrData, v));
     expect(allDsrFiltered.length).toBe(dsrData.length);
 
     const allNotificationsFiltered = allVendors.flatMap((v) =>
@@ -207,8 +187,8 @@ describe('Property 1: Vendor Data Isolation', () => {
 // Validates: Requirements 3.5, 6.8, 6.9
 // =========================================================================
 
-describe('Property 6: Date Range Filtering', () => {
-  it('filtered results contain only records within the date range (inclusive)', () => {
+describe("Property 6: Date Range Filtering", () => {
+  it("filtered results contain only records within the date range (inclusive)", () => {
     fc.assert(
       fc.property(dateRangeArb(), ({ startDate, endDate }) => {
         const result = filterByDateRange(ordersData, startDate, endDate);
@@ -226,7 +206,7 @@ describe('Property 6: Date Range Filtering', () => {
     );
   });
 
-  it('result contains exactly the records within bounds (no missing records)', () => {
+  it("result contains exactly the records within bounds (no missing records)", () => {
     fc.assert(
       fc.property(dateRangeArb(), ({ startDate, endDate }) => {
         const result = filterByDateRange(ordersData, startDate, endDate);
@@ -248,7 +228,7 @@ describe('Property 6: Date Range Filtering', () => {
     );
   });
 
-  it('if only startDate provided, includes all records from that date onward', () => {
+  it("if only startDate provided, includes all records from that date onward", () => {
     fc.assert(
       fc.property(dateInRange(), (startDate) => {
         const result = filterByDateRange(ordersData, startDate, undefined);
@@ -261,7 +241,7 @@ describe('Property 6: Date Range Filtering', () => {
     );
   });
 
-  it('if only endDate provided, includes all records up to and including that date', () => {
+  it("if only endDate provided, includes all records up to and including that date", () => {
     fc.assert(
       fc.property(dateInRange(), (endDate) => {
         const result = filterByDateRange(ordersData, undefined, endDate);
@@ -274,7 +254,7 @@ describe('Property 6: Date Range Filtering', () => {
     );
   });
 
-  it('result is always a subset of the input', () => {
+  it("result is always a subset of the input", () => {
     fc.assert(
       fc.property(dateRangeArb(), ({ startDate, endDate }) => {
         const result = filterByDateRange(ordersData, startDate, endDate);
@@ -292,94 +272,67 @@ describe('Property 6: Date Range Filtering', () => {
 // Validates: Requirements 3.4
 // =========================================================================
 
-describe('Property 7: Status Filter with AND Composition', () => {
-  it('combined filter equals intersection of independent filters', () => {
+describe("Property 7: Status Filter with AND Composition", () => {
+  it("combined filter equals intersection of independent filters", () => {
     fc.assert(
-      fc.property(
-        orderStatusArb,
-        dateRangeArb(),
-        (status, { startDate, endDate }) => {
-          const combined = filterByStatusAndDateRange(
-            ordersData,
-            status,
-            startDate,
-            endDate,
-          );
+      fc.property(orderStatusArb, dateRangeArb(), (status, { startDate, endDate }) => {
+        const combined = filterByStatusAndDateRange(ordersData, status, startDate, endDate);
 
-          const byStatus = filterByStatus(ordersData, status);
-          const byDateRange = filterByDateRange(ordersData, startDate, endDate);
+        const byStatus = filterByStatus(ordersData, status);
+        const byDateRange = filterByDateRange(ordersData, startDate, endDate);
 
-          // Intersection: records in both sets
-          const byStatusIds = new Set(byStatus.map((r) => r.id));
-          const intersection = byDateRange.filter((r) => byStatusIds.has(r.id));
+        // Intersection: records in both sets
+        const byStatusIds = new Set(byStatus.map((r) => r.id));
+        const intersection = byDateRange.filter((r) => byStatusIds.has(r.id));
 
-          const combinedIds = new Set(combined.map((r) => r.id));
-          const intersectionIds = new Set(intersection.map((r) => r.id));
+        const combinedIds = new Set(combined.map((r) => r.id));
+        const intersectionIds = new Set(intersection.map((r) => r.id));
 
-          expect(combinedIds.size).toBe(intersectionIds.size);
-          for (const id of combinedIds) {
-            expect(intersectionIds.has(id)).toBe(true);
-          }
-        },
-      ),
+        expect(combinedIds.size).toBe(intersectionIds.size);
+        for (const id of combinedIds) {
+          expect(intersectionIds.has(id)).toBe(true);
+        }
+      }),
       { numRuns: 100 },
     );
   });
 
-  it('every record in combined result satisfies both status AND date range', () => {
+  it("every record in combined result satisfies both status AND date range", () => {
     fc.assert(
-      fc.property(
-        orderStatusArb,
-        dateRangeArb(),
-        (status, { startDate, endDate }) => {
-          const combined = filterByStatusAndDateRange(
-            ordersData,
-            status,
-            startDate,
-            endDate,
-          );
+      fc.property(orderStatusArb, dateRangeArb(), (status, { startDate, endDate }) => {
+        const combined = filterByStatusAndDateRange(ordersData, status, startDate, endDate);
 
-          for (const record of combined) {
-            expect(record.status).toBe(status);
-            if (startDate) {
-              expect(record.scheduledDate >= startDate).toBe(true);
-            }
-            if (endDate) {
-              expect(record.scheduledDate <= endDate).toBe(true);
-            }
+        for (const record of combined) {
+          expect(record.status).toBe(status);
+          if (startDate) {
+            expect(record.scheduledDate >= startDate).toBe(true);
           }
-        },
-      ),
+          if (endDate) {
+            expect(record.scheduledDate <= endDate).toBe(true);
+          }
+        }
+      }),
       { numRuns: 100 },
     );
   });
 
-  it('no record satisfying both conditions is missing from combined result', () => {
+  it("no record satisfying both conditions is missing from combined result", () => {
     fc.assert(
-      fc.property(
-        orderStatusArb,
-        dateRangeArb(),
-        (status, { startDate, endDate }) => {
-          const combined = filterByStatusAndDateRange(
-            ordersData,
-            status,
-            startDate,
-            endDate,
-          );
-          const combinedIds = new Set(combined.map((r) => r.id));
+      fc.property(orderStatusArb, dateRangeArb(), (status, { startDate, endDate }) => {
+        const combined = filterByStatusAndDateRange(ordersData, status, startDate, endDate);
+        const combinedIds = new Set(combined.map((r) => r.id));
 
-          for (const order of ordersData) {
-            const matchesStatus = order.status === status;
-            const matchesDateRange =
-              (!startDate || order.scheduledDate >= startDate) &&
-              (!endDate || order.scheduledDate <= endDate);
+        for (const order of ordersData) {
+          const matchesStatus = order.status === status;
+          const matchesDateRange =
+            (!startDate || order.scheduledDate >= startDate) &&
+            (!endDate || order.scheduledDate <= endDate);
 
-            if (matchesStatus && matchesDateRange) {
-              expect(combinedIds.has(order.id)).toBe(true);
-            }
+          if (matchesStatus && matchesDateRange) {
+            expect(combinedIds.has(order.id)).toBe(true);
           }
-        },
-      ),
+        }
+      }),
       { numRuns: 100 },
     );
   });

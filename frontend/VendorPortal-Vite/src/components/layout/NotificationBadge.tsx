@@ -1,4 +1,4 @@
-import { formatBadgeCount } from '@/lib/formatters';
+import { formatBadgeCount } from "@/lib/formatters";
 
 interface NotificationBadgeProps {
   readonly count: number;

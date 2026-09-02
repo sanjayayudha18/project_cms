@@ -30,13 +30,13 @@ export interface VendorUser {
   readonly displayName: string;
   readonly vendorId: string;
   readonly vendorName: string;
-  readonly role: 'Vendor';
+  readonly role: "Vendor";
 }
 
 export interface JwtPayload {
   readonly sub: string;
-  readonly auth_source: 'local';
-  readonly role: 'Vendor';
+  readonly auth_source: "local";
+  readonly role: "Vendor";
   readonly vendor_id: string;
   readonly vendor_name: string;
   readonly display_name: string;
@@ -50,10 +50,10 @@ export interface CITOrder {
   readonly id: string;
   readonly atmId: string;
   readonly location: string;
-  readonly orderType: 'Pickup' | 'Delivery';
+  readonly orderType: "Pickup" | "Delivery";
   readonly scheduledDate: string; // ISO date
   readonly amount: number; // IDR integer
-  readonly status: 'Scheduled' | 'In Transit' | 'Completed' | 'Failed';
+  readonly status: "Scheduled" | "In Transit" | "Completed" | "Failed";
   readonly vendorId: string;
   readonly hasEvidence: boolean;
 }
@@ -70,7 +70,7 @@ export interface HandoverEvidence {
 export interface EvidenceFile {
   readonly name: string;
   readonly url: string;
-  readonly type: 'image/jpeg' | 'image/png' | 'application/pdf';
+  readonly type: "image/jpeg" | "image/png" | "application/pdf";
   readonly size: number; // bytes
 }
 
@@ -80,7 +80,7 @@ export interface Invoice {
   readonly period: string;
   readonly totalAmount: number; // IDR integer
   readonly lineItemsCount: number;
-  readonly validationStatus: 'Uploaded' | 'Validated' | 'Mismatch Detected' | 'Approved';
+  readonly validationStatus: "Uploaded" | "Validated" | "Mismatch Detected" | "Approved";
   readonly vendorId: string;
   readonly lineItems: readonly InvoiceLineItem[];
 }
@@ -91,7 +91,7 @@ export interface InvoiceLineItem {
   readonly matchedOrderRef: string;
   readonly expectedAmount: number;
   readonly variance: number;
-  readonly matchStatus: 'Match' | 'Mismatch' | 'Pending';
+  readonly matchStatus: "Match" | "Mismatch" | "Pending";
 }
 
 export interface ReplenishmentSchedule {
@@ -100,8 +100,8 @@ export interface ReplenishmentSchedule {
   readonly location: string;
   readonly scheduledDate: string; // ISO date
   readonly recommendedAmount: number; // IDR integer
-  readonly priority: 'High' | 'Medium' | 'Low';
-  readonly status: 'Pending' | 'Confirmed' | 'Executed' | 'Cancelled';
+  readonly priority: "High" | "Medium" | "Low";
+  readonly status: "Pending" | "Confirmed" | "Executed" | "Cancelled";
   readonly vendorId: string;
 }
 
@@ -116,12 +116,16 @@ export interface DsrRecord {
   readonly vendorId: string;
 }
 
-export type BalanceStatus = 'Critical' | 'Low' | 'Normal';
+export type BalanceStatus = "Critical" | "Low" | "Normal";
 
 export interface Notification {
   readonly id: string;
   readonly timestamp: string; // ISO datetime
-  readonly type: 'New Assignment' | 'Order Status Changed' | 'Invoice Status Updated' | 'Schedule Updated';
+  readonly type:
+    | "New Assignment"
+    | "Order Status Changed"
+    | "Invoice Status Updated"
+    | "Schedule Updated";
   readonly message: string;
   readonly isRead: boolean;
   readonly vendorId: string;

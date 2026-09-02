@@ -1,6 +1,6 @@
-import * as fc from 'fast-check';
-import notificationsData from '@/data/notifications.json';
-import type { Notification } from '@/lib/types';
+import notificationsData from "@/data/notifications.json";
+import type { Notification } from "@/lib/types";
+import * as fc from "fast-check";
 
 /**
  * Property 13: Notification Type Routing
@@ -13,45 +13,45 @@ import type { Notification } from '@/lib/types';
  */
 
 type NotificationType =
-  | 'New Assignment'
-  | 'Order Status Changed'
-  | 'Invoice Status Updated'
-  | 'Schedule Updated';
+  | "New Assignment"
+  | "Order Status Changed"
+  | "Invoice Status Updated"
+  | "Schedule Updated";
 
 const typeToRoute: Record<NotificationType, string> = {
-  'New Assignment': '/orders',
-  'Order Status Changed': '/orders',
-  'Invoice Status Updated': '/invoices',
-  'Schedule Updated': '/schedule',
+  "New Assignment": "/orders",
+  "Order Status Changed": "/orders",
+  "Invoice Status Updated": "/invoices",
+  "Schedule Updated": "/schedule",
 };
 
-const VALID_ROUTES = ['/orders', '/invoices', '/schedule'];
+const VALID_ROUTES = ["/orders", "/invoices", "/schedule"];
 
 function getRouteForNotificationType(type: NotificationType): string {
   return typeToRoute[type];
 }
 
 const notificationTypeArb = fc.constantFrom<NotificationType>(
-  'New Assignment',
-  'Order Status Changed',
-  'Invoice Status Updated',
-  'Schedule Updated',
+  "New Assignment",
+  "Order Status Changed",
+  "Invoice Status Updated",
+  "Schedule Updated",
 );
 
-describe('Property 13: Notification Type Routing', () => {
-  it('each notification type maps to a defined route (never undefined)', () => {
+describe("Property 13: Notification Type Routing", () => {
+  it("each notification type maps to a defined route (never undefined)", () => {
     fc.assert(
       fc.property(notificationTypeArb, (type) => {
         const route = getRouteForNotificationType(type);
         expect(route).toBeDefined();
-        expect(typeof route).toBe('string');
+        expect(typeof route).toBe("string");
         expect(route.length).toBeGreaterThan(0);
       }),
       { numRuns: 100 },
     );
   });
 
-  it('the mapping is deterministic (same type always produces same route)', () => {
+  it("the mapping is deterministic (same type always produces same route)", () => {
     fc.assert(
       fc.property(notificationTypeArb, (type) => {
         const route1 = getRouteForNotificationType(type);
@@ -62,22 +62,22 @@ describe('Property 13: Notification Type Routing', () => {
     );
   });
 
-  it('verifies specific mappings: New Assignment → /orders, Order Status Changed → /orders, Invoice Status Updated → /invoices, Schedule Updated → /schedule', () => {
+  it("verifies specific mappings: New Assignment → /orders, Order Status Changed → /orders, Invoice Status Updated → /invoices, Schedule Updated → /schedule", () => {
     fc.assert(
       fc.property(notificationTypeArb, (type) => {
         const route = getRouteForNotificationType(type);
         switch (type) {
-          case 'New Assignment':
-            expect(route).toBe('/orders');
+          case "New Assignment":
+            expect(route).toBe("/orders");
             break;
-          case 'Order Status Changed':
-            expect(route).toBe('/orders');
+          case "Order Status Changed":
+            expect(route).toBe("/orders");
             break;
-          case 'Invoice Status Updated':
-            expect(route).toBe('/invoices');
+          case "Invoice Status Updated":
+            expect(route).toBe("/invoices");
             break;
-          case 'Schedule Updated':
-            expect(route).toBe('/schedule');
+          case "Schedule Updated":
+            expect(route).toBe("/schedule");
             break;
         }
       }),
@@ -85,7 +85,7 @@ describe('Property 13: Notification Type Routing', () => {
     );
   });
 
-  it('the mapped route is always one of the defined portal routes', () => {
+  it("the mapped route is always one of the defined portal routes", () => {
     fc.assert(
       fc.property(notificationTypeArb, (type) => {
         const route = getRouteForNotificationType(type);
@@ -95,19 +95,17 @@ describe('Property 13: Notification Type Routing', () => {
     );
   });
 
-  describe('mock data validation', () => {
-    it('every notification in mock data has a relatedRoute matching the expected mapping from its type', () => {
+  describe("mock data validation", () => {
+    it("every notification in mock data has a relatedRoute matching the expected mapping from its type", () => {
       const notifications = notificationsData as Notification[];
 
       for (const notification of notifications) {
-        const expectedRoute = getRouteForNotificationType(
-          notification.type as NotificationType,
-        );
+        const expectedRoute = getRouteForNotificationType(notification.type as NotificationType);
         expect(notification.relatedRoute).toBe(expectedRoute);
       }
     });
 
-    it('all notification types in mock data are valid types with defined routes', () => {
+    it("all notification types in mock data are valid types with defined routes", () => {
       const notifications = notificationsData as Notification[];
       const validTypes: readonly string[] = Object.keys(typeToRoute);
 

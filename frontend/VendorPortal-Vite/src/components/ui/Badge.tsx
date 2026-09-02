@@ -1,13 +1,13 @@
-import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, CheckCircle, Circle, Info, XCircle } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle, Circle, Info, XCircle } from "lucide-react";
 
 export interface BadgeProps {
-  readonly variant: 'info' | 'warning' | 'success' | 'danger' | 'neutral';
+  readonly variant: "info" | "warning" | "success" | "danger" | "neutral";
   readonly icon?: LucideIcon;
   readonly children: React.ReactNode;
 }
 
-const defaultIcons: Record<BadgeProps['variant'], LucideIcon> = {
+const defaultIcons: Record<BadgeProps["variant"], LucideIcon> = {
   info: Info,
   warning: AlertTriangle,
   success: CheckCircle,
@@ -15,12 +15,12 @@ const defaultIcons: Record<BadgeProps['variant'], LucideIcon> = {
   neutral: Circle,
 };
 
-const variantClasses: Record<BadgeProps['variant'], string> = {
-  info: 'bg-info-bg text-info-fg',
-  warning: 'bg-warning-bg text-warning-fg',
-  success: 'bg-success-bg text-success-fg',
-  danger: 'bg-danger-bg text-danger-fg',
-  neutral: 'bg-neutral-100 text-neutral-600',
+const variantClasses: Record<BadgeProps["variant"], string> = {
+  info: "bg-info-bg text-info-fg",
+  warning: "bg-warning-bg text-warning-fg",
+  success: "bg-success-bg text-success-fg",
+  danger: "bg-danger-bg text-danger-fg",
+  neutral: "bg-neutral-100 text-neutral-600",
 };
 
 export function Badge({ variant, icon, children }: BadgeProps) {

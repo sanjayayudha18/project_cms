@@ -1,4 +1,4 @@
-import * as fc from 'fast-check';
+import * as fc from "fast-check";
 
 /**
  * Property 10: Schedule Date Grouping Aggregation
@@ -19,8 +19,8 @@ import * as fc from 'fast-check';
  */
 
 // Types matching the production code
-type Priority = 'High' | 'Medium' | 'Low';
-type ScheduleStatus = 'Pending' | 'Confirmed' | 'Executed' | 'Cancelled';
+type Priority = "High" | "Medium" | "Low";
+type ScheduleStatus = "Pending" | "Confirmed" | "Executed" | "Cancelled";
 
 interface Schedule {
   id: string;
@@ -64,11 +64,9 @@ function groupAndSort(schedules: Schedule[]): DateGroup[] {
 
 // --- Generators ---
 
-const priorityArb = fc.constantFrom<Priority>('High', 'Medium', 'Low');
-const statusArb = fc.constantFrom<ScheduleStatus>('Pending', 'Confirmed', 'Executed', 'Cancelled');
-const dateArb = fc.integer({ min: 1, max: 30 }).map(
-  (d) => `2024-01-${String(d).padStart(2, '0')}`,
-);
+const priorityArb = fc.constantFrom<Priority>("High", "Medium", "Low");
+const statusArb = fc.constantFrom<ScheduleStatus>("Pending", "Confirmed", "Executed", "Cancelled");
+const dateArb = fc.integer({ min: 1, max: 30 }).map((d) => `2024-01-${String(d).padStart(2, "0")}`);
 
 const scheduleArb = fc.record({
   id: fc.string({ minLength: 1, maxLength: 10 }),
@@ -82,17 +80,14 @@ const schedulesArb = fc.array(scheduleArb, { minLength: 0, maxLength: 50 });
 
 // --- Property 10: Schedule Date Grouping Aggregation ---
 
-describe('Property 10: Schedule Date Grouping Aggregation', () => {
-  it('each group totalAmount equals the sum of recommendedAmount for schedules in that group', () => {
+describe("Property 10: Schedule Date Grouping Aggregation", () => {
+  it("each group totalAmount equals the sum of recommendedAmount for schedules in that group", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);
 
         for (const group of groups) {
-          const expectedTotal = group.schedules.reduce(
-            (sum, s) => sum + s.recommendedAmount,
-            0,
-          );
+          const expectedTotal = group.schedules.reduce((sum, s) => sum + s.recommendedAmount, 0);
           expect(group.totalAmount).toBe(expectedTotal);
         }
       }),
@@ -100,7 +95,7 @@ describe('Property 10: Schedule Date Grouping Aggregation', () => {
     );
   });
 
-  it('each group count equals the number of schedules for that date', () => {
+  it("each group count equals the number of schedules for that date", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);
@@ -113,7 +108,7 @@ describe('Property 10: Schedule Date Grouping Aggregation', () => {
     );
   });
 
-  it('union of all groups equals the original set (no records lost or duplicated)', () => {
+  it("union of all groups equals the original set (no records lost or duplicated)", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);
@@ -130,12 +125,8 @@ describe('Property 10: Schedule Date Grouping Aggregation', () => {
         expect(outputIds).toEqual(inputIds);
 
         // Also verify amounts match (stronger permutation check)
-        const inputAmounts = schedules
-          .map((s) => s.recommendedAmount)
-          .sort((a, b) => a - b);
-        const outputAmounts = allFromGroups
-          .map((s) => s.recommendedAmount)
-          .sort((a, b) => a - b);
+        const inputAmounts = schedules.map((s) => s.recommendedAmount).sort((a, b) => a - b);
+        const outputAmounts = allFromGroups.map((s) => s.recommendedAmount).sort((a, b) => a - b);
         expect(outputAmounts).toEqual(inputAmounts);
       }),
       { numRuns: 100 },
@@ -145,8 +136,8 @@ describe('Property 10: Schedule Date Grouping Aggregation', () => {
 
 // --- Property 11: Schedule Multi-Level Sort ---
 
-describe('Property 11: Schedule Multi-Level Sort', () => {
-  it('dates across groups are in strictly non-decreasing order (ascending)', () => {
+describe("Property 11: Schedule Multi-Level Sort", () => {
+  it("dates across groups are in strictly non-decreasing order (ascending)", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);
@@ -159,7 +150,7 @@ describe('Property 11: Schedule Multi-Level Sort', () => {
     );
   });
 
-  it('within each group, priorities are in non-increasing order (High >= Medium >= Low)', () => {
+  it("within each group, priorities are in non-increasing order (High >= Medium >= Low)", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);
@@ -176,7 +167,7 @@ describe('Property 11: Schedule Multi-Level Sort', () => {
     );
   });
 
-  it('sorted output is a permutation of the input', () => {
+  it("sorted output is a permutation of the input", () => {
     fc.assert(
       fc.property(schedulesArb, (schedules) => {
         const groups = groupAndSort(schedules);

@@ -5,7 +5,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface RequestConfig {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   body?: unknown;
   headers?: Record<string, string>;
@@ -92,12 +92,10 @@ async function handleUnauthorized(config: RequestConfig): Promise<Response | nul
 // ─── Core Fetch Execution ─────────────────────────────────────────────────────
 
 async function executeRequest(config: RequestConfig, isRetry = false): Promise<Response> {
-  const url = config.path.startsWith('http')
-    ? config.path
-    : config.path;
+  const url = config.path.startsWith("http") ? config.path : config.path;
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...config.headers,
   };
 
@@ -107,7 +105,7 @@ async function executeRequest(config: RequestConfig, isRetry = false): Promise<R
     method: config.method,
     headers: finalHeaders,
     body: config.body ? JSON.stringify(config.body) : undefined,
-    credentials: 'include',
+    credentials: "include",
   };
 
   const response = await fetch(url, fetchOptions);
@@ -128,7 +126,7 @@ async function executeRequest(config: RequestConfig, isRetry = false): Promise<R
 function createApiError(response: Response): ApiError {
   return {
     status: response.status,
-    message: response.statusText || 'Request failed',
+    message: response.statusText || "Request failed",
   };
 }
 
@@ -137,7 +135,7 @@ async function parseApiError(response: Response): Promise<ApiError> {
     const body = (await response.json()) as { message?: string; details?: unknown };
     return {
       status: response.status,
-      message: body.message ?? response.statusText ?? 'Request failed',
+      message: body.message ?? response.statusText ?? "Request failed",
       details: body.details,
     };
   } catch {
@@ -167,22 +165,22 @@ export async function apiClient<T = unknown>(config: RequestConfig): Promise<Api
 
 export const api = {
   get<T = unknown>(path: string, options?: Partial<RequestConfig>) {
-    return apiClient<T>({ method: 'GET', path, ...options });
+    return apiClient<T>({ method: "GET", path, ...options });
   },
 
   post<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
-    return apiClient<T>({ method: 'POST', path, body, ...options });
+    return apiClient<T>({ method: "POST", path, body, ...options });
   },
 
   put<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
-    return apiClient<T>({ method: 'PUT', path, body, ...options });
+    return apiClient<T>({ method: "PUT", path, body, ...options });
   },
 
   patch<T = unknown>(path: string, body?: unknown, options?: Partial<RequestConfig>) {
-    return apiClient<T>({ method: 'PATCH', path, body, ...options });
+    return apiClient<T>({ method: "PATCH", path, body, ...options });
   },
 
   delete<T = unknown>(path: string, options?: Partial<RequestConfig>) {
-    return apiClient<T>({ method: 'DELETE', path, ...options });
+    return apiClient<T>({ method: "DELETE", path, ...options });
   },
 } as const;

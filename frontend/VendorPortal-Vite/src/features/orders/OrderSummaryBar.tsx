@@ -1,16 +1,26 @@
-import { Card } from '@/components/ui/Card';
-import { Package, Truck, CheckCircle, XCircle } from 'lucide-react';
-import type { CITOrder } from '@/lib/types';
+import { Card } from "@/components/ui/Card";
+import type { CITOrder } from "@/lib/types";
+import { CheckCircle, Package, Truck, XCircle } from "lucide-react";
 
 interface OrderSummaryBarProps {
   readonly orders: readonly CITOrder[];
 }
 
 const statusConfig = [
-  { status: 'Scheduled' as const, label: 'Scheduled', icon: Package, colorClass: 'text-info-fg' },
-  { status: 'In Transit' as const, label: 'In Transit', icon: Truck, colorClass: 'text-warning-fg' },
-  { status: 'Completed' as const, label: 'Completed', icon: CheckCircle, colorClass: 'text-success-fg' },
-  { status: 'Failed' as const, label: 'Failed', icon: XCircle, colorClass: 'text-danger-fg' },
+  { status: "Scheduled" as const, label: "Scheduled", icon: Package, colorClass: "text-info-fg" },
+  {
+    status: "In Transit" as const,
+    label: "In Transit",
+    icon: Truck,
+    colorClass: "text-warning-fg",
+  },
+  {
+    status: "Completed" as const,
+    label: "Completed",
+    icon: CheckCircle,
+    colorClass: "text-success-fg",
+  },
+  { status: "Failed" as const, label: "Failed", icon: XCircle, colorClass: "text-danger-fg" },
 ] as const;
 
 /**
@@ -19,10 +29,10 @@ const statusConfig = [
  */
 export function OrderSummaryBar({ orders }: OrderSummaryBarProps) {
   const counts = {
-    Scheduled: orders.filter((o) => o.status === 'Scheduled').length,
-    'In Transit': orders.filter((o) => o.status === 'In Transit').length,
-    Completed: orders.filter((o) => o.status === 'Completed').length,
-    Failed: orders.filter((o) => o.status === 'Failed').length,
+    Scheduled: orders.filter((o) => o.status === "Scheduled").length,
+    "In Transit": orders.filter((o) => o.status === "In Transit").length,
+    Completed: orders.filter((o) => o.status === "Completed").length,
+    Failed: orders.filter((o) => o.status === "Failed").length,
   };
 
   return (

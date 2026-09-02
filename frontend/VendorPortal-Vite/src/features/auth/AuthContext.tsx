@@ -1,17 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import type { AuthState, AuthUser } from '@/lib/types';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient } from "@/lib/queryClient";
+import type { AuthState, AuthUser } from "@/lib/types";
+import { type ReactNode, createContext, useCallback, useEffect, useMemo, useState } from "react";
 
 // ─── API Config ───────────────────────────────────────────────────────────────
 
-const AUTH_API_BASE = '/api/v1/auth';
+const AUTH_API_BASE = "/api/v1/auth";
 
 // ─── Backend Response Types ───────────────────────────────────────────────────
 
@@ -47,13 +40,13 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapUserResponse(raw: LoginSuccessResponse['user']): AuthUser {
+function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {
   return {
     id: raw.id,
     username: raw.username,
     fullName: raw.full_name,
     email: raw.email,
-    role: raw.role as AuthUser['role'],
+    role: raw.role as AuthUser["role"],
     isKaryawan: raw.is_karyawan,
     vendorId: raw.vendor_id,
   };
@@ -84,8 +77,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async function initialize() {
       try {
         const response = await fetch(`${AUTH_API_BASE}/refresh`, {
-          method: 'POST',
-          credentials: 'include',
+          method: "POST",
+          credentials: "include",
         });
 
         if (cancelled) return;
@@ -96,7 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // Guard: only accept VENDOR-USER role on the vendor portal.
           // If a company/internal user's refresh token is present (shared
           // cookie on localhost), reject it so they can't access vendor portal.
-          if (data.user.role !== 'VENDOR-USER') {
+          if (data.user.role !== "VENDOR-USER") {
             return;
           }
 
@@ -127,13 +120,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       const response = await fetch(`${AUTH_API_BASE}/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'X-Portal-Type': 'vendor',
+          "Content-Type": "application/json",
+          "X-Portal-Type": "vendor",
         },
         body: JSON.stringify({ username, password }),
-        credentials: 'include',
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -148,54 +141,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Handle error responses
       switch (response.status) {
         case 401: {
-          setError('Username atau password salah');
-          throw new Error('Username atau password salah');
+          setError("Username atau password salah");
+          throw new Error("Username atau password salah");
         }
         case 403: {
           const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-          if (body?.error === 'account_inactive') {
-            setError('Akun tidak aktif');
-            throw new Error('Akun tidak aktif');
-          } else if (body?.error === 'portal_mismatch') {
-            setError('Akun tidak memiliki akses ke portal ini');
-            throw new Error('Akun tidak memiliki akses ke portal ini');
-          } else {
-            const msg = body?.message ?? 'Akses ditolak';
-            setError(msg);
-            throw new Error(msg);
+          if (body?.error === "account_inactive") {
+            setError("Akun tidak aktif");
+            throw new Error("Akun tidak aktif");
           }
+          if (body?.error === "portal_mismatch") {
+            setError("Akun tidak memiliki akses ke portal ini");
+            throw new Error("Akun tidak memiliki akses ke portal ini");
+          }
+          const msg = body?.message ?? "Akses ditolak";
+          setError(msg);
+          throw new Error(msg);
         }
         case 422: {
           const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-          const msg = body?.message ?? 'Validasi gagal';
+          const msg = body?.message ?? "Validasi gagal";
           setError(msg);
           throw new Error(msg);
         }
         case 429: {
-          const retryAfter = response.headers.get('Retry-After');
+          const retryAfter = response.headers.get("Retry-After");
           const seconds = retryAfter ? Number.parseInt(retryAfter, 10) : null;
           const retryValue = Number.isFinite(seconds) ? seconds : null;
-          setError('Terlalu banyak percobaan login');
+          setError("Terlalu banyak percobaan login");
           setRateLimitRetryAfter(retryValue);
-          throw new Error('Terlalu banyak percobaan login');
+          throw new Error("Terlalu banyak percobaan login");
         }
         case 503: {
-          setError('Layanan sedang tidak tersedia');
-          throw new Error('Layanan sedang tidak tersedia');
+          setError("Layanan sedang tidak tersedia");
+          throw new Error("Layanan sedang tidak tersedia");
         }
         default: {
           const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-          const msg = body?.message ?? 'Terjadi kesalahan. Silakan coba lagi.';
+          const msg = body?.message ?? "Terjadi kesalahan. Silakan coba lagi.";
           setError(msg);
           throw new Error(msg);
         }
       }
     } catch (err) {
-      if (err instanceof Error && err.message !== 'Failed to fetch') {
+      if (err instanceof Error && err.message !== "Failed to fetch") {
         throw err;
       }
       // Network error
-      const msg = 'Gagal terhubung ke server. Silakan coba lagi.';
+      const msg = "Gagal terhubung ke server. Silakan coba lagi.";
       setError(msg);
       throw new Error(msg);
     }
@@ -212,8 +205,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       await fetch(`${AUTH_API_BASE}/logout`, {
-        method: 'POST',
-        credentials: 'include',
+        method: "POST",
+        credentials: "include",
       });
     } catch {
       // Intentionally ignore — local state is already cleared
@@ -231,8 +224,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshPromise = (async () => {
       try {
         const response = await fetch(`${AUTH_API_BASE}/refresh`, {
-          method: 'POST',
-          credentials: 'include',
+          method: "POST",
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -244,7 +237,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = (await response.json()) as LoginSuccessResponse;
 
         // Guard: reject non-vendor users on token refresh
-        if (data.user.role !== 'VENDOR-USER') {
+        if (data.user.role !== "VENDOR-USER") {
           setAccessToken(null);
           setUser(null);
           return false;

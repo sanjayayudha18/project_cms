@@ -228,9 +228,11 @@ type User struct {
 	// Only for auth_source=local
 	PasswordHash *string `json:"password_hash"`
 	// Required for vendor/local users, null for internal LDAP users
-	VendorID    *int64             `json:"vendor_id"`
-	IsActive    bool               `json:"is_active"`
-	LastLoginAt pgtype.Timestamptz `json:"last_login_at"`
+	VendorID *int64 `json:"vendor_id"`
+	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
+	VendorBranchID *int64             `json:"vendor_branch_id"`
+	IsActive       bool               `json:"is_active"`
+	LastLoginAt    pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`

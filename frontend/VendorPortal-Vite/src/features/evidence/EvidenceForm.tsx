@@ -1,31 +1,27 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod/v4';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { FileUpload } from '@/components/ui/FileUpload';
-import { useUploadEvidence } from '@/features/evidence/useEvidence';
+import { Button } from "@/components/ui/Button";
+import { FileUpload } from "@/components/ui/FileUpload";
+import { useUploadEvidence } from "@/features/evidence/useEvidence";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const evidenceSchema = z.object({
   handoverTimestamp: z
     .string()
-    .min(1, 'Waktu serah terima wajib diisi')
+    .min(1, "Waktu serah terima wajib diisi")
     .refine((val) => new Date(val) <= new Date(), {
-      message: 'Waktu serah terima tidak boleh di masa depan',
+      message: "Waktu serah terima tidak boleh di masa depan",
     })
     .refine((val) => new Date(val) >= new Date(Date.now() - 72 * 60 * 60 * 1000), {
-      message: 'Waktu serah terima tidak boleh lebih dari 72 jam yang lalu',
+      message: "Waktu serah terima tidak boleh lebih dari 72 jam yang lalu",
     }),
   recipientName: z
     .string()
-    .min(1, 'Nama penerima wajib diisi')
-    .max(100, 'Nama penerima maksimal 100 karakter'),
-  notes: z
-    .string()
-    .max(500, 'Catatan maksimal 500 karakter')
-    .optional()
-    .or(z.literal('')),
+    .min(1, "Nama penerima wajib diisi")
+    .max(100, "Nama penerima maksimal 100 karakter"),
+  notes: z.string().max(500, "Catatan maksimal 500 karakter").optional().or(z.literal("")),
 });
 
 type EvidenceFormData = z.infer<typeof evidenceSchema>;
@@ -48,20 +44,20 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
   } = useForm<EvidenceFormData>({
     resolver: zodResolver(evidenceSchema),
     defaultValues: {
-      handoverTimestamp: '',
-      recipientName: '',
-      notes: '',
+      handoverTimestamp: "",
+      recipientName: "",
+      notes: "",
     },
   });
 
   const onSubmit = (data: EvidenceFormData) => {
     // Validate files separately
     if (files.length === 0) {
-      setFileError('Minimal 1 file wajib diunggah');
+      setFileError("Minimal 1 file wajib diunggah");
       return;
     }
     if (files.length > 5) {
-      setFileError('Maksimal 5 file per pengiriman');
+      setFileError("Maksimal 5 file per pengiriman");
       return;
     }
 
@@ -89,9 +85,7 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
         <div className="flex items-center justify-center w-16 h-16 rounded-full bg-success-bg">
           <CheckCircle className="size-8 text-success-fg" aria-hidden="true" />
         </div>
-        <h2 className="text-lg font-semibold text-surface-text">
-          Bukti berhasil diunggah
-        </h2>
+        <h2 className="text-lg font-semibold text-surface-text">Bukti berhasil diunggah</h2>
         <p className="text-sm text-neutral-500">
           Bukti serah terima untuk order {orderId} telah tersimpan.
         </p>
@@ -109,7 +103,7 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
         <FileUpload
           maxFiles={5}
           maxSizeBytes={10_485_760}
-          acceptedTypes={['image/jpeg', 'image/png', 'application/pdf']}
+          acceptedTypes={["image/jpeg", "image/png", "application/pdf"]}
           files={files}
           onFilesChange={(newFiles) => {
             setFiles(newFiles);
@@ -121,26 +115,21 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
 
       {/* Handover timestamp */}
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="handoverTimestamp"
-          className="text-sm font-medium text-surface-text"
-        >
+        <label htmlFor="handoverTimestamp" className="text-sm font-medium text-surface-text">
           Waktu Serah Terima <span className="text-danger-fg">*</span>
         </label>
         <input
           id="handoverTimestamp"
           type="datetime-local"
-          {...register('handoverTimestamp')}
+          {...register("handoverTimestamp")}
           aria-invalid={!!errors.handoverTimestamp}
-          aria-describedby={errors.handoverTimestamp ? 'handoverTimestamp-error' : undefined}
+          aria-describedby={errors.handoverTimestamp ? "handoverTimestamp-error" : undefined}
           className={[
-            'min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white',
-            'transition-colors duration-150',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active',
-            errors.handoverTimestamp
-              ? 'border-danger-fg'
-              : 'border-neutral-300',
-          ].join(' ')}
+            "min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white",
+            "transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active",
+            errors.handoverTimestamp ? "border-danger-fg" : "border-neutral-300",
+          ].join(" ")}
         />
         {errors.handoverTimestamp && (
           <p id="handoverTimestamp-error" className="text-sm text-danger-fg">
@@ -151,10 +140,7 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
 
       {/* Recipient name */}
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="recipientName"
-          className="text-sm font-medium text-surface-text"
-        >
+        <label htmlFor="recipientName" className="text-sm font-medium text-surface-text">
           Nama Penerima <span className="text-danger-fg">*</span>
         </label>
         <input
@@ -162,17 +148,15 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
           type="text"
           maxLength={100}
           placeholder="Masukkan nama penerima"
-          {...register('recipientName')}
+          {...register("recipientName")}
           aria-invalid={!!errors.recipientName}
-          aria-describedby={errors.recipientName ? 'recipientName-error' : undefined}
+          aria-describedby={errors.recipientName ? "recipientName-error" : undefined}
           className={[
-            'min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white',
-            'transition-colors duration-150',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active',
-            errors.recipientName
-              ? 'border-danger-fg'
-              : 'border-neutral-300',
-          ].join(' ')}
+            "min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white",
+            "transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active",
+            errors.recipientName ? "border-danger-fg" : "border-neutral-300",
+          ].join(" ")}
         />
         {errors.recipientName && (
           <p id="recipientName-error" className="text-sm text-danger-fg">
@@ -183,10 +167,7 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
 
       {/* Notes (optional) */}
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="notes"
-          className="text-sm font-medium text-surface-text"
-        >
+        <label htmlFor="notes" className="text-sm font-medium text-surface-text">
           Catatan <span className="text-xs text-neutral-400">(opsional)</span>
         </label>
         <textarea
@@ -194,17 +175,15 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
           maxLength={500}
           rows={3}
           placeholder="Tambahkan catatan jika diperlukan"
-          {...register('notes')}
+          {...register("notes")}
           aria-invalid={!!errors.notes}
-          aria-describedby={errors.notes ? 'notes-error' : undefined}
+          aria-describedby={errors.notes ? "notes-error" : undefined}
           className={[
-            'min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white resize-y',
-            'transition-colors duration-150',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active',
-            errors.notes
-              ? 'border-danger-fg'
-              : 'border-neutral-300',
-          ].join(' ')}
+            "min-h-[44px] px-3 py-2 rounded-md border text-sm text-surface-text bg-white resize-y",
+            "transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-active/30 focus-visible:border-sidebar-active",
+            errors.notes ? "border-danger-fg" : "border-neutral-300",
+          ].join(" ")}
         />
         {errors.notes && (
           <p id="notes-error" className="text-sm text-danger-fg">
@@ -228,13 +207,11 @@ export function EvidenceForm({ orderId }: EvidenceFormProps) {
           isLoading={uploadMutation.isPending}
           disabled={uploadMutation.isPending}
         >
-          {uploadMutation.isPending ? 'Mengunggah...' : 'Unggah Bukti'}
+          {uploadMutation.isPending ? "Mengunggah..." : "Unggah Bukti"}
         </Button>
 
         {uploadMutation.isPending && (
-          <span className="text-sm text-neutral-500">
-            Sedang mengunggah file...
-          </span>
+          <span className="text-sm text-neutral-500">Sedang mengunggah file...</span>
         )}
       </div>
     </form>

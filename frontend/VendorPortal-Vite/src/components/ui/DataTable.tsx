@@ -1,21 +1,21 @@
-import { useState } from 'react';
 import {
   type ColumnDef,
+  type RowData,
   type SortingState,
-  useReactTable,
+  flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  flexRender,
-} from '@tanstack/react-table';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+  useReactTable,
+} from "@tanstack/react-table";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 
 /**
  * Extend TanStack Table's column meta to support numeric column styling.
  * Columns with `meta: { numeric: true }` get right-aligned text and tabular-nums.
  */
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData, TValue> {
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData extends RowData, TValue> {
     numeric?: boolean;
   }
 }
@@ -50,7 +50,7 @@ export function DataTable<T>({
     columns,
     state: { sorting },
     onSortingChange: (updater) => {
-      const next = typeof updater === 'function' ? updater(sorting) : updater;
+      const next = typeof updater === "function" ? updater(sorting) : updater;
       if (isControlled) {
         onSortingChange(next);
       } else {
@@ -78,25 +78,25 @@ export function DataTable<T>({
                   <th
                     key={header.id}
                     className={`px-4 py-3 font-medium select-none ${
-                      isNumeric ? 'text-right' : 'text-left'
-                    } ${canSort ? 'cursor-pointer' : ''}`}
+                      isNumeric ? "text-right" : "text-left"
+                    } ${canSort ? "cursor-pointer" : ""}`}
                     onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                     aria-sort={
-                      header.column.getIsSorted() === 'asc'
-                        ? 'ascending'
-                        : header.column.getIsSorted() === 'desc'
-                          ? 'descending'
-                          : 'none'
+                      header.column.getIsSorted() === "asc"
+                        ? "ascending"
+                        : header.column.getIsSorted() === "desc"
+                          ? "descending"
+                          : "none"
                     }
                   >
                     <span className="inline-flex items-center gap-1">
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
-                      {canSort && header.column.getIsSorted() === 'asc' && (
+                      {canSort && header.column.getIsSorted() === "asc" && (
                         <ChevronUp className="size-3.5" aria-hidden="true" />
                       )}
-                      {canSort && header.column.getIsSorted() === 'desc' && (
+                      {canSort && header.column.getIsSorted() === "desc" && (
                         <ChevronDown className="size-3.5" aria-hidden="true" />
                       )}
                     </span>
@@ -109,28 +109,20 @@ export function DataTable<T>({
         <tbody>
           {table.getRowModel().rows.length === 0 && emptyMessage ? (
             <tr>
-              <td
-                colSpan={columns.length}
-                className="px-4 py-8 text-center text-neutral-400"
-              >
+              <td colSpan={columns.length} className="px-4 py-8 text-center text-neutral-400">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className="border-b border-neutral-100 hover:bg-red-50/30"
-              >
+              <tr key={row.id} className="border-b border-neutral-100 hover:bg-red-50/30">
                 {row.getVisibleCells().map((cell) => {
                   const isNumeric = cell.column.columnDef.meta?.numeric;
 
                   return (
                     <td
                       key={cell.id}
-                      className={`px-4 py-3 ${
-                        isNumeric ? 'text-right tabular-nums' : ''
-                      }`}
+                      className={`px-4 py-3 ${isNumeric ? "text-right tabular-nums" : ""}`}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>

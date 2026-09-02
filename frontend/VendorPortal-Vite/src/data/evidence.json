@@ -2,8 +2,18 @@
   {
     "orderId": "CIT-2024-001",
     "files": [
-      { "name": "handover_001.jpg", "url": "/evidence/handover_001.jpg", "type": "image/jpeg", "size": 2048000 },
-      { "name": "atm_condition_001.jpg", "url": "/evidence/atm_condition_001.jpg", "type": "image/jpeg", "size": 1536000 }
+      {
+        "name": "handover_001.jpg",
+        "url": "/evidence/handover_001.jpg",
+        "type": "image/jpeg",
+        "size": 2048000
+      },
+      {
+        "name": "atm_condition_001.jpg",
+        "url": "/evidence/atm_condition_001.jpg",
+        "type": "image/jpeg",
+        "size": 1536000
+      }
     ],
     "handoverTimestamp": "2024-01-15T10:30:00Z",
     "recipientName": "Pak Rudi Hartono",
@@ -13,8 +23,18 @@
   {
     "orderId": "CIT-2024-002",
     "files": [
-      { "name": "pickup_receipt_002.jpg", "url": "/evidence/pickup_receipt_002.jpg", "type": "image/jpeg", "size": 1820000 },
-      { "name": "cash_count_002.pdf", "url": "/evidence/cash_count_002.pdf", "type": "application/pdf", "size": 3450000 }
+      {
+        "name": "pickup_receipt_002.jpg",
+        "url": "/evidence/pickup_receipt_002.jpg",
+        "type": "image/jpeg",
+        "size": 1820000
+      },
+      {
+        "name": "cash_count_002.pdf",
+        "url": "/evidence/cash_count_002.pdf",
+        "type": "application/pdf",
+        "size": 3450000
+      }
     ],
     "handoverTimestamp": "2024-01-14T14:15:00Z",
     "recipientName": "Ibu Sari Dewi",
@@ -24,9 +44,24 @@
   {
     "orderId": "CIT-2024-006",
     "files": [
-      { "name": "handover_006.jpg", "url": "/evidence/handover_006.jpg", "type": "image/jpeg", "size": 2250000 },
-      { "name": "seal_verification_006.jpg", "url": "/evidence/seal_verification_006.jpg", "type": "image/jpeg", "size": 1980000 },
-      { "name": "berita_acara_006.pdf", "url": "/evidence/berita_acara_006.pdf", "type": "application/pdf", "size": 4100000 }
+      {
+        "name": "handover_006.jpg",
+        "url": "/evidence/handover_006.jpg",
+        "type": "image/jpeg",
+        "size": 2250000
+      },
+      {
+        "name": "seal_verification_006.jpg",
+        "url": "/evidence/seal_verification_006.jpg",
+        "type": "image/jpeg",
+        "size": 1980000
+      },
+      {
+        "name": "berita_acara_006.pdf",
+        "url": "/evidence/berita_acara_006.pdf",
+        "type": "application/pdf",
+        "size": 4100000
+      }
     ],
     "handoverTimestamp": "2024-01-08T09:45:00Z",
     "recipientName": "Pak Agus Setiawan",
@@ -36,7 +71,12 @@
   {
     "orderId": "CIT-2024-022",
     "files": [
-      { "name": "handover_022.jpg", "url": "/evidence/handover_022.jpg", "type": "image/jpeg", "size": 1750000 }
+      {
+        "name": "handover_022.jpg",
+        "url": "/evidence/handover_022.jpg",
+        "type": "image/jpeg",
+        "size": 1750000
+      }
     ],
     "handoverTimestamp": "2024-01-03T11:00:00Z",
     "recipientName": "Pak Hendra Kusuma",
@@ -46,8 +86,18 @@
   {
     "orderId": "CIT-2024-008",
     "files": [
-      { "name": "handover_008.jpg", "url": "/evidence/handover_008.jpg", "type": "image/jpeg", "size": 2100000 },
-      { "name": "atm_panel_008.jpg", "url": "/evidence/atm_panel_008.jpg", "type": "image/jpeg", "size": 1650000 }
+      {
+        "name": "handover_008.jpg",
+        "url": "/evidence/handover_008.jpg",
+        "type": "image/jpeg",
+        "size": 2100000
+      },
+      {
+        "name": "atm_panel_008.jpg",
+        "url": "/evidence/atm_panel_008.jpg",
+        "type": "image/jpeg",
+        "size": 1650000
+      }
     ],
     "handoverTimestamp": "2024-01-15T08:30:00Z",
     "recipientName": "Pak Bambang Sugiarto",
@@ -57,9 +107,24 @@
   {
     "orderId": "CIT-2024-011",
     "files": [
-      { "name": "handover_011.jpg", "url": "/evidence/handover_011.jpg", "type": "image/jpeg", "size": 2400000 },
-      { "name": "cash_bundle_011.jpg", "url": "/evidence/cash_bundle_011.jpg", "type": "image/jpeg", "size": 1920000 },
-      { "name": "berita_acara_011.pdf", "url": "/evidence/berita_acara_011.pdf", "type": "application/pdf", "size": 4850000 }
+      {
+        "name": "handover_011.jpg",
+        "url": "/evidence/handover_011.jpg",
+        "type": "image/jpeg",
+        "size": 2400000
+      },
+      {
+        "name": "cash_bundle_011.jpg",
+        "url": "/evidence/cash_bundle_011.jpg",
+        "type": "image/jpeg",
+        "size": 1920000
+      },
+      {
+        "name": "berita_acara_011.pdf",
+        "url": "/evidence/berita_acara_011.pdf",
+        "type": "application/pdf",
+        "size": 4850000
+      }
     ],
     "handoverTimestamp": "2024-01-11T13:20:00Z",
     "recipientName": "Ibu Nadia Putri",
@@ -69,8 +134,18 @@
   {
     "orderId": "CIT-2024-023",
     "files": [
-      { "name": "pickup_023.jpg", "url": "/evidence/pickup_023.jpg", "type": "image/jpeg", "size": 1580000 },
-      { "name": "receipt_023.png", "url": "/evidence/receipt_023.png", "type": "image/png", "size": 2750000 }
+      {
+        "name": "pickup_023.jpg",
+        "url": "/evidence/pickup_023.jpg",
+        "type": "image/jpeg",
+        "size": 1580000
+      },
+      {
+        "name": "receipt_023.png",
+        "url": "/evidence/receipt_023.png",
+        "type": "image/png",
+        "size": 2750000
+      }
     ],
     "handoverTimestamp": "2024-01-02T15:45:00Z",
     "recipientName": "Pak Doni Saputra",
@@ -80,8 +155,18 @@
   {
     "orderId": "CIT-2024-015",
     "files": [
-      { "name": "handover_015.jpg", "url": "/evidence/handover_015.jpg", "type": "image/jpeg", "size": 2180000 },
-      { "name": "atm_display_015.jpg", "url": "/evidence/atm_display_015.jpg", "type": "image/jpeg", "size": 1450000 }
+      {
+        "name": "handover_015.jpg",
+        "url": "/evidence/handover_015.jpg",
+        "type": "image/jpeg",
+        "size": 2180000
+      },
+      {
+        "name": "atm_display_015.jpg",
+        "url": "/evidence/atm_display_015.jpg",
+        "type": "image/jpeg",
+        "size": 1450000
+      }
     ],
     "handoverTimestamp": "2024-01-15T11:15:00Z",
     "recipientName": "Pak Wahyu Firmansyah",
@@ -91,9 +176,24 @@
   {
     "orderId": "CIT-2024-019",
     "files": [
-      { "name": "handover_019.jpg", "url": "/evidence/handover_019.jpg", "type": "image/jpeg", "size": 2350000 },
-      { "name": "seal_019.jpg", "url": "/evidence/seal_019.jpg", "type": "image/jpeg", "size": 1680000 },
-      { "name": "cash_count_019.pdf", "url": "/evidence/cash_count_019.pdf", "type": "application/pdf", "size": 3920000 }
+      {
+        "name": "handover_019.jpg",
+        "url": "/evidence/handover_019.jpg",
+        "type": "image/jpeg",
+        "size": 2350000
+      },
+      {
+        "name": "seal_019.jpg",
+        "url": "/evidence/seal_019.jpg",
+        "type": "image/jpeg",
+        "size": 1680000
+      },
+      {
+        "name": "cash_count_019.pdf",
+        "url": "/evidence/cash_count_019.pdf",
+        "type": "application/pdf",
+        "size": 3920000
+      }
     ],
     "handoverTimestamp": "2024-01-06T09:00:00Z",
     "recipientName": "Ibu Lina Marlina",
@@ -103,7 +203,12 @@
   {
     "orderId": "CIT-2024-020",
     "files": [
-      { "name": "pickup_020.jpg", "url": "/evidence/pickup_020.jpg", "type": "image/jpeg", "size": 1950000 }
+      {
+        "name": "pickup_020.jpg",
+        "url": "/evidence/pickup_020.jpg",
+        "type": "image/jpeg",
+        "size": 1950000
+      }
     ],
     "handoverTimestamp": "2024-01-03T16:30:00Z",
     "recipientName": "Pak Irfan Hakim",

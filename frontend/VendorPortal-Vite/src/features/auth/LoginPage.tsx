@@ -1,4 +1,3 @@
-import vendorHero from "@/assets/cit-vendor-illustration.png";
 import { useAuth } from "@/features/auth/useAuth";
 import { loginRoute } from "@/routes/login";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -187,18 +186,6 @@ export function LoginPage() {
           </p>
         </div>
 
-        <div
-          className="animate-crown-rise relative -my-2 h-[220px] w-full max-w-[420px] self-center overflow-hidden"
-          style={{ animationDelay: "0.15s" }}
-        >
-          <img
-            src={vendorHero}
-            alt=""
-            aria-hidden="true"
-            className="size-full object-cover object-[35%_62%] opacity-90"
-          />
-        </div>
-
         <dl
           className="animate-crown-rise relative m-0 flex gap-10 border-t pt-6"
           style={{ borderColor: "rgba(255,255,255,0.12)", animationDelay: "0.2s" }}
@@ -366,7 +353,7 @@ export function LoginPage() {
                   disabled={isSubmitDisabled}
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                  className="absolute right-2.5 flex size-6 items-center justify-center rounded-sm disabled:opacity-50"
+                  className="absolute right-1.5 flex size-8 cursor-pointer items-center justify-center rounded-sm outline-none transition-colors focus-visible:shadow-[0_0_0_3px_var(--primary-tint)] disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ color: "var(--text-muted)" }}
                 >
                   {showPassword ? (

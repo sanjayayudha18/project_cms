@@ -456,135 +456,159 @@ def read_rencana_isi_rows(path: Path) -> tuple[date | None, list[dict[str, Any]]
 # ============================================================
 # DB writes
 # ============================================================
-def _upsert_daily(conn, path: Path, vendor_name: str, uploaded_by: int | None) -> str:
+def _upsert_upload(conn, path: Path, vendor_name: str, uploaded_by: int | None) -> str:
+    """Writes one workbook into dsr_uploads + both row tables, in one transaction.
+
+    Both sheets share a single dsr_uploads row (020_dsr_daily_rencana_isi.sql), so
+    they are parsed first -- tolerantly, either may fail -- and then written
+    together. A sheet that failed to parse lands as status 'failed' with its
+    error in error_message; the other sheet still ingests.
+
+    Amounts are stored verbatim as printed on the sheet (no x1.000 rescaling).
+    """
     checksum = file_checksum(path)
-    file_fields, rows, error_count = read_daily_rows(path)
-    report_date = file_fields.get("report_date")
+
+    daily_fields: dict[str, Any] = {}
+    daily_rows: list[dict[str, Any]] = []
+    daily_error_count = 0
+    daily_status = "completed"
+    errors: list[str] = []
+    try:
+        daily_fields, daily_rows, daily_error_count = read_daily_rows(path)
+    except Exception as exc:
+        daily_status = "failed"
+        errors.append(f"Daily: {exc}")
+        logging.exception("Failed to parse 'Daily' sheet from %s", path.name)
+
+    plan_date = None
+    rencana_rows: list[dict[str, Any]] = []
+    rencana_status = "completed"
+    try:
+        plan_date, rencana_rows = read_rencana_isi_rows(path)
+    except Exception as exc:
+        rencana_status = "failed"
+        errors.append(f"Rencana Isi: {exc}")
+        logging.exception("Failed to parse 'Rencana Isi' sheet from %s", path.name)
+
+    # report_date comes from the Daily sheet; fall back to Rencana Isi's plan
+    # date minus a day when only that sheet parsed.
+    report_date = daily_fields.get("report_date")
+    if report_date is None and plan_date is not None:
+        fallback = plan_date - pd.Timedelta(days=1)
+        report_date = fallback.date() if hasattr(fallback, "date") else fallback
     if report_date is None:
         raise ValueError(f"Could not determine report_date from {path.name}")
 
     with conn.transaction(), conn.cursor() as cur:
         cur.execute(
-            "SELECT checksum FROM public.atm_dsr_saldo_files WHERE report_date = %s AND vendor = %s",
+            "SELECT checksum FROM public.dsr_uploads WHERE report_date = %s AND vendor = %s",
             (report_date, vendor_name),
         )
         existing = cur.fetchone()
         if existing and existing[0] == checksum:
             return "skipped"
         if existing:
+            # Re-upload for the same date: replace it wholesale, child rows cascade.
             cur.execute(
-                "DELETE FROM public.atm_dsr_saldo_files WHERE report_date = %s AND vendor = %s",
+                "DELETE FROM public.dsr_uploads WHERE report_date = %s AND vendor = %s",
                 (report_date, vendor_name),
             )
 
+        # Resolve vendor-sent terminal ids against master data. Unresolved ones
+        # now INGEST with atm_id NULL (no hard FK any more) and count as errors,
+        # instead of being silently dropped.
+        atm_ids: dict[str, int] = {}
+        if rencana_rows:
+            terminal_ids = list({row["atm_terminal_id"] for row in rencana_rows})
+            cur.execute(
+                "SELECT terminal_id, id FROM public.atms WHERE terminal_id = ANY(%s)",
+                (terminal_ids,),
+            )
+            atm_ids = {row[0]: row[1] for row in cur.fetchall()}
+            missing = set(terminal_ids) - set(atm_ids)
+            if missing:
+                logging.warning("%d unresolved ATM terminal id(s) in %s: %s",
+                                len(missing), path.name, sorted(missing))
+        rencana_error_count = sum(1 for row in rencana_rows if row["atm_terminal_id"] not in atm_ids)
+
         cur.execute(
             """
-            INSERT INTO public.atm_dsr_saldo_files
-                (filename, checksum, status, report_date, status_date, bank, vendor, company,
-                 recipient, sender, subject, currency,
-                 saldo_akhir_0000_total_idr, saldo_sementara_0900_total_idr,
-                 status_cadangan_total_idr, saldo_gabungan_total_idr,
-                 row_count, success_count, error_count, uploaded_by_user_id, processed_at)
-            VALUES (%s, %s, 'processing', %s, %s, %s, %s, %s, %s, %s, %s, 'IDR',
-                    %s, %s, %s, %s, %s, %s, %s, %s, now())
+            INSERT INTO public.dsr_uploads
+                (filename, checksum, vendor, report_date, uploaded_by_user_id,
+                 bank, company, recipient, sender, subject, currency,
+                 daily_status, daily_row_count, daily_error_count,
+                 rencana_isi_status, rencana_isi_row_count, rencana_isi_error_count,
+                 error_message, daily_status_date, rencana_isi_plan_date,
+                 saldo_akhir_0000_idr, saldo_sementara_0900_idr, status_cadangan_idr,
+                 saldo_gabungan_idr, rencana_isi_subtotal_idr, processed_at)
+            VALUES (%s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, 'IDR',
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s, %s, now())
             RETURNING id
             """,
-            (path.name, checksum, report_date, file_fields.get("status_date"),
-             file_fields.get("bank"), vendor_name, file_fields.get("company"),
-             file_fields.get("recipient"), file_fields.get("sender"), file_fields.get("subject"),
-             file_fields.get("saldo_akhir_0000_total_idr"),
-             file_fields.get("saldo_sementara_0900_total_idr"),
-             file_fields.get("status_cadangan_total_idr"),
-             file_fields.get("saldo_gabungan_total_idr"),
-             len(rows), len(rows), error_count, uploaded_by),
+            (path.name, checksum, vendor_name, report_date, uploaded_by,
+             daily_fields.get("bank"), daily_fields.get("company"),
+             daily_fields.get("recipient"), daily_fields.get("sender"),
+             daily_fields.get("subject"),
+             daily_status, len(daily_rows), daily_error_count,
+             rencana_status, len(rencana_rows), rencana_error_count,
+             "; ".join(errors) or None,
+             daily_fields.get("status_date"), plan_date,
+             daily_fields.get("saldo_akhir_0000_total_idr"),
+             daily_fields.get("saldo_sementara_0900_total_idr"),
+             daily_fields.get("status_cadangan_total_idr"),
+             daily_fields.get("saldo_gabungan_total_idr"),
+             _rencana_isi_subtotal(rencana_rows)),
         )
-        file_id = cur.fetchone()[0]
+        upload_id = cur.fetchone()[0]
 
-        cur.executemany(
-            """
-            INSERT INTO public.atm_dsr_saldo_rows
-                (file_id, row_no, section, flow, line_label, memo_no,
-                 denom_100k, denom_50k, denom_20k, denom_10k, denom_5k, denom_2k, denom_1k,
-                 line_total_idr, remarks)
-            VALUES (%(file_id)s, %(row_no)s, %(section)s, %(flow)s, %(line_label)s, %(memo_no)s,
-                    %(denom_100k)s, %(denom_50k)s, %(denom_20k)s, %(denom_10k)s, %(denom_5k)s,
-                    %(denom_2k)s, %(denom_1k)s, %(line_total_idr)s, %(remarks)s)
-            """,
-            [{**row, "file_id": file_id} for row in rows],
-        )
-        cur.execute(
-            "UPDATE public.atm_dsr_saldo_files SET status = 'completed', updated_at = now() WHERE id = %s",
-            (file_id,),
-        )
-    return "completed"
-
-
-def _upsert_rencana_isi(conn, path: Path, vendor_name: str, uploaded_by: int | None) -> str:
-    checksum = file_checksum(path)
-    plan_date, rows = read_rencana_isi_rows(path)
-    if plan_date is None:
-        raise ValueError(f"Could not determine plan_date from {path.name}")
-    report_date = plan_date - pd.Timedelta(days=1)
-    report_date = report_date.date() if hasattr(report_date, "date") else report_date
-
-    with conn.transaction(), conn.cursor() as cur:
-        cur.execute(
-            "SELECT checksum FROM public.atm_dsr_rencana_isi_files WHERE report_date = %s AND vendor = %s",
-            (report_date, vendor_name),
-        )
-        existing = cur.fetchone()
-        if existing and existing[0] == checksum:
-            return "skipped"
-        if existing:
-            cur.execute(
-                "DELETE FROM public.atm_dsr_rencana_isi_files WHERE report_date = %s AND vendor = %s",
-                (report_date, vendor_name),
+        if daily_rows:
+            cur.executemany(
+                """
+                INSERT INTO public.dsr_daily_rows
+                    (upload_id, row_no, location, section, flow, line_label, memo_no,
+                     denom_100k_idr, denom_50k_idr, denom_20k_idr, denom_10k_idr,
+                     denom_5k_idr, denom_2k_idr, denom_1k_idr, line_total_idr, remarks)
+                VALUES (%(upload_id)s, %(row_no)s, %(location)s, %(section)s, %(flow)s,
+                        %(line_label)s, %(memo_no)s,
+                        %(denom_100k)s, %(denom_50k)s, %(denom_20k)s, %(denom_10k)s,
+                        %(denom_5k)s, %(denom_2k)s, %(denom_1k)s, %(line_total_idr)s,
+                        %(remarks)s)
+                """,
+                [{"upload_id": upload_id, "location": row.get("location"), **row} for row in daily_rows],
             )
 
-        cur.execute(
-            """
-            INSERT INTO public.atm_dsr_rencana_isi_files
-                (filename, checksum, status, report_date, plan_date, vendor, currency,
-                 row_count, success_count, error_count, uploaded_by_user_id, processed_at)
-            VALUES (%s, %s, 'processing', %s, %s, %s, 'IDR', %s, %s, %s, %s, now())
-            RETURNING id
-            """,
-            (path.name, checksum, report_date, plan_date, vendor_name,
-             len(rows), 0, 0, uploaded_by),
-        )
-        file_id = cur.fetchone()[0]
+        if rencana_rows:
+            cur.executemany(
+                """
+                INSERT INTO public.dsr_rencana_isi_rows
+                    (upload_id, row_no, atm_terminal_id, atm_id, atm_location, denom_config,
+                     fill_100k_idr, fill_50k_idr, splank_balance_0800_idr, remarks)
+                VALUES (%(upload_id)s, %(row_no)s, %(atm_terminal_id)s, %(atm_id)s,
+                        %(atm_location)s, %(denom_config)s, %(fill_100k_idr)s,
+                        %(fill_50k_idr)s, %(splank_balance_0800_idr)s, %(remarks)s)
+                """,
+                [{"upload_id": upload_id, "atm_id": atm_ids.get(row["atm_terminal_id"]), **row}
+                 for row in rencana_rows],
+            )
 
-        terminal_ids = list({row["atm_terminal_id"] for row in rows})
-        cur.execute(
-            "SELECT terminal_id FROM public.atms WHERE terminal_id = ANY(%s)", (terminal_ids,)
-        )
-        valid_terminal_ids = {row[0] for row in cur.fetchall()}
-        missing = set(terminal_ids) - valid_terminal_ids
-        if missing:
-            logging.warning("Skipping %d unresolved ATM terminal id(s) in %s: %s",
-                             len(missing), path.name, sorted(missing))
-        valid_rows = [row for row in rows if row["atm_terminal_id"] in valid_terminal_ids]
+    return f"daily={daily_status} rencana_isi={rencana_status}"
 
-        cur.executemany(
-            """
-            INSERT INTO public.atm_dsr_rencana_isi_rows
-                (file_id, row_no, atm_terminal_id, atm_location, denom_config,
-                 fill_100k_idr, fill_50k_idr, splank_balance_0800_idr, remarks)
-            VALUES (%(file_id)s, %(row_no)s, %(atm_terminal_id)s, %(atm_location)s,
-                    %(denom_config)s, %(fill_100k_idr)s, %(fill_50k_idr)s,
-                    %(splank_balance_0800_idr)s, %(remarks)s)
-            """,
-            [{**row, "file_id": file_id} for row in valid_rows],
-        )
-        cur.execute(
-            """
-            UPDATE public.atm_dsr_rencana_isi_files
-            SET status = 'completed', success_count = %s, error_count = %s, updated_at = now()
-            WHERE id = %s
-            """,
-            (len(valid_rows), len(rows) - len(valid_rows), file_id),
-        )
-    return "completed"
+
+def _rencana_isi_subtotal(rows: list[dict[str, Any]]) -> Decimal | None:
+    """Sum of the fill columns -- the sheet's own Sub Total row is derived and
+    never stored, so this recomputes it for the cross-check against the Daily
+    d1 'Subtotal Pengeluaran' total."""
+    if not rows:
+        return None
+    total = Decimal(0)
+    for row in rows:
+        total += row.get("fill_100k_idr") or Decimal(0)
+        total += row.get("fill_50k_idr") or Decimal(0)
+    return total
 
 
 def _json_default(value: Any) -> Any:
@@ -648,22 +672,7 @@ def resolve_vendor_name(conn, vendor_code: str) -> str:
 def process_file(conn, path: Path) -> str:
     vendor_code, uploaded_by, _original_name = parse_upload_filename(path.name)
     vendor_name = resolve_vendor_name(conn, vendor_code)
-
-    daily_status = "skipped"
-    try:
-        daily_status = _upsert_daily(conn, path, vendor_name, uploaded_by)
-    except Exception:
-        conn.rollback()
-        logging.exception("Failed to ingest 'Daily' sheet from %s", path.name)
-
-    rencana_status = "skipped"
-    try:
-        rencana_status = _upsert_rencana_isi(conn, path, vendor_name, uploaded_by)
-    except Exception:
-        conn.rollback()
-        logging.exception("Failed to ingest 'Rencana Isi' sheet from %s", path.name)
-
-    return f"daily={daily_status} rencana_isi={rencana_status}"
+    return _upsert_upload(conn, path, vendor_name, uploaded_by)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

@@ -1,22 +1,22 @@
-# Graph Report - CMS2  (2026-09-01)
+# Graph Report - CMS2  (2026-09-04)
 
 ## Corpus Check
-- 484 files · ~418,677 words
+- 534 files · ~450,703 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3197 nodes · 5383 edges · 272 communities (226 shown, 46 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 219 edges (avg confidence: 0.85)
+- 3685 nodes · 6154 edges · 318 communities (261 shown, 57 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 256 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `317d04fe`
+- Built from commit: `d9b2466d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - eod-monitoring/types.ts
-- net/http.ResponseWriter
+- atm_portal_handler.go
 - main
 - dashboard/types.ts
 - stubs/index.ts
@@ -29,12 +29,12 @@
 - rules
 - CitTracker.tsx
 - compilerOptions
-- stubAtmPortalService
+- atm_portal_cashpos.go
 - atm-portal-components.test.tsx
-- itm_replenish_etl.py
+- dsr_etl.py
 - New
 - feedback/index.ts
-- react
+- VendorPortal-Vite/src/components/ui/DataTable.tsx
 - utils/index.ts
 - compilerOptions
 - compilerOptions
@@ -42,14 +42,14 @@
 - testing.T
 - DsrSummary.tsx
 - RequireAuth
-- routeGuard.property.test.tsx
-- itm_cashpos_etl.py
+- AuthContext.tsx
+- dsr_upload.go
 - datetime
 - ForecastView.tsx
 - CompanyPortal-Vite/src/main.tsx
 - changed-files-store.ts
 - ReplenishmentScreen.tsx
-- scheduler_service.py
+- database.py
 - dependencies
 - ReconciliationScreen.tsx
 - setupHarness
@@ -57,22 +57,22 @@
 - devDependencies
 - atm-portal/lib/formatters.ts
 - github.com/jackc/pgx/v5/pgtype.Timestamptz
-- SchedulerService
+- dependencies.py
 - InvoiceFlow.tsx
 - compilerOptions
 - compilerOptions
-- atm_portal.go
-- AtmProfileScreen.tsx
+- time.Time
 - atm-portal/types.ts
-- bak/dmaa_etl.py
+- rules
+- dsr.sql.go
 - dependencies
 - devDependencies
-- ReplenishTable.tsx
+- AtmHeader.tsx
 - navigation.property.test.ts
-- detector.py
-- retry.py
-- dmaa_to_db.py
-- LateDetector
+- VendorPortal-Vite/src/routes/_protected.tsx
+- itm_replenish_etl.py
+- RetryExecutor
+- itm_cashpos_etl.py
 - NewLocalProvider
 - UserRecord
 - schemas.py
@@ -82,27 +82,27 @@
 - contrast.property.test.ts
 - lib/types.ts
 - atm_portal_integration_test.go
-- AtmCashposTable.tsx
-- Settings
+- eod_retry_scheduler/main.py
+- service_dsr_etl/main.py
 - Header.tsx
 - newTestRateLimiter
-- dmaa/dmaa_etl.py
+- stubAtmPortalService
 - grouping.property.test.ts
 - VendorPortal-Vite/src/lib/api/client.ts
 - RateLimiter
-- AuditService
+- bak/dmaa_etl.py
 - ErrorBoundary
-- create_db_pool
+- dmaa_to_db.py
 - SchedulePage.tsx
 - dataFilters.property.test.ts
-- AriaLiveRegion.tsx
+- dmaa/dmaa_etl.py
 - useToast.ts
 - _auth.tsx
 - ui-strings-language.property.test.ts
-- plugins
+- SchedulerService
 - NotificationsPage
 - validation.property.test.ts
-- dmaa_forecast_handler_test.go
+- dmaa_forecast_handler.go
 - scripts
 - Sidebar.tsx
 - integration.test.tsx
@@ -112,7 +112,7 @@
 - scripts
 - VendorPortal-Vite/src/components/ui/Button.tsx
 - OrdersPage.tsx
-- RateLimitError
+- FilterBar.tsx
 - CompanyPortal-Vite/package.json
 - accessibility.property.test.tsx
 - Toast.tsx
@@ -122,7 +122,7 @@
 - sorting.property.test.ts
 - opencode.json
 - PROJECT_CONTEXT.md — CMS ATM & CIT (OpenCode)
-- connectForBugConditionTest
+- atm_portal_filter_property_test.go
 - 012_retry_scheduler.sql
 - CompanyPortal-Vite/src/components/ui/Badge.tsx
 - NoticeBanner.tsx
@@ -143,10 +143,10 @@
 - DataTable.test.tsx
 - invoices/InvoiceDetail.tsx
 - OrderSummaryBar.tsx
-- get_audit
-- get_late
-- get_summary
-- TestProperty10_SummaryIndependenceFromFilters
+- service_dsr_etl/routers/process.py
+- dsrUploadApi.ts
+- AtmTable.tsx
+- DBTX
 - 011_itm_cashpos.sql
 - CompanyPortal-Vite/src/components/ui/EmptyState.tsx
 - CompanyPortal-Vite/tsconfig.json
@@ -156,33 +156,40 @@
 - FileUpload.test.tsx
 - VendorPortal-Vite/tsconfig.json
 - github.com/cimb-niaga/cms/pkg
-- lucide-react
-- react-dom
-- fast-check
+- routeGuard.property.test.tsx
+- newPropertyTestRateLimiter
+- _FakeSettings
 - Model Reference - Backend vs Frontend Coding
-- @playwright/test
+- Testing flow: vendor upload DSR (local dev, Windows + Docker Desktop + Git Bash)
 - vite
-- @vitejs/plugin-react
-- jsdom
-- tailwindcss
-- @types/react
+- Architecture Decisions
+- net/http.ResponseWriter
+- eod_retry_scheduler/routers/status.py
+- AuditService
 - typescript
 - @vitejs/plugin-react
 - vitest
-- routes.tsx
+- service_dsr_etl/routers/status.py
+- DsrUploadDialog.tsx
+- dsr_upload_handler.go
 - queryClient.ts
+- eod_retry_scheduler/routers/audit.py
 - itm_cashpos
 - itm_cashpos_files
 - itm_replenish
 - itm_replenish_files
+- service_dsr_etl/routers/audit.py
+- get_late
+- VendorPortal-Vite/src/main.tsx
+- routerTestUtils.tsx
+- EvidenceForm.tsx
 - TokenService
-- NewTokenService
 - Eval Command
 - OpenCode ECC Plugin
 - Git 101 - Useful Commands Cheatsheet
 - Review Checklist
 - Refactor Clean Command
-- genAuthIdentity
+- NewRedisTokenBlacklist
 - Orchestrate Command
 - Review Checklist
 - Common Rust Errors
@@ -198,8 +205,8 @@
 - Setup Package Manager Command
 - Your Task
 - Test Coverage Command
-- NewRedisTokenBlacklist
-- Spec: vendor upload DSR (SALDO HARIAN ATM)
+- Load
+- Spec: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)
 - Check Categories
 - Report Format
 - Update Codemaps Command
@@ -211,11 +218,11 @@
 - AI-Native SDLC
 - Build Fix Command
 - Harness Audit Command
-- Intent: vendor upload DSR (SALDO HARIAN ATM)
-- Plan: vendor upload DSR (from intent.md + spec.md)
+- Intent: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)
+- Plan: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)
 - Review + deploy: vendor upload DSR
 - docker_101.md
-- rbac_property_test.go
+- routeMapping.property.test.tsx
 - Maintain / incidents: vendor upload DSR
 - Tests / feedback loop: vendor upload DSR
 - Checkpoint Command
@@ -223,7 +230,7 @@
 - Loop Status Command
 - Model Route Command
 - Quality Gate Command
-- ListATMsWithCashPosRow
+- public.atm_dsr_rencana_isi_rows
 - LoginPage.tsx
 - Evolve Command
 - Plan Command
@@ -236,19 +243,50 @@
 - Promote Command
 - CMS ATM & CIT
 - backend/CLAUDE.md
-- @testing-library/user-event
+- DsrUploadDialog.test.tsx
+- public.users
+- CompanyPortal-Vite/src/components/ui/Button.tsx
+- CompanyPortal-Vite/src/components/ui/Card.tsx
+- CompanyPortal-Vite/src/components/ui/DataTable.tsx
+- FilterSelect.tsx
+- PageHeader.tsx
+- VendorPortal-Vite/src/components/ui/Card.tsx
+- FileUpload.tsx
+- AuthHandler
+- public.users
+- react-hook-form
+- replan_db.md
+- jsdom
+- @tailwindcss/vite
+- response.go
+- vitest
+- tailwind-merge
+- @types/react-dom
+- public.atm_dsr_saldo_files
+- public.atm_dsr_saldo_rows
+- net/http.Request
+- RateLimitError
+- public.dsr_uploads
+- get_late
+- DsrDetailDialog.tsx
+- TestProperty10_SummaryIndependenceFromFilters
+- .Routes
+- ErrorResponse
+- lucide-react
+- fast-check
+- @tailwindcss/vite
 
 ## God Nodes (most connected - your core abstractions)
-1. `react` - 55 edges
-2. `PROJECT_CONTEXT.md — CMS ATM & CIT (OpenCode)` - 27 edges
+1. `PROJECT_CONTEXT.md — CMS ATM & CIT (OpenCode)` - 27 edges
+2. `writeError()` - 24 edges
 3. `NewAtmPortalService()` - 24 edges
-4. `compilerOptions` - 23 edges
-5. `Model Reference - Backend vs Frontend Coding` - 23 edges
-6. `Settings` - 22 edges
-7. `newServiceUnderTest()` - 21 edges
-8. `compilerOptions` - 20 edges
+4. `Model Reference - Backend vs Frontend Coding` - 23 edges
+5. `newServiceUnderTest()` - 21 edges
+6. `compilerOptions` - 21 edges
+7. `Architecture Decisions` - 21 edges
+8. `SchedulerService` - 20 edges
 9. `compilerOptions` - 20 edges
-10. `setupHarness()` - 19 edges
+10. `compilerOptions` - 20 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `main()` --calls--> `NewTokenService()`  [EXTRACTED]
@@ -265,19 +303,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (272 total, 46 thin omitted)
+## Communities (318 total, 57 thin omitted)
 
 ### Community 0 - "eod-monitoring/types.ts"
 Cohesion: 0.06
 Nodes (68): AuditLogSection(), AuditLogSectionProps, FILE_TYPE_OPTIONS, OUTCOME_LABELS, TRIGGER_OPTIONS, EodMonitoringPage(), FileStatusSection(), FileStatusSectionProps (+60 more)
 
-### Community 1 - "net/http.ResponseWriter"
-Cohesion: 0.07
-Nodes (59): formatDatePtr(), formatTimePtr(), chi.Router, NewAtmPortalHandler(), parseIntParam(), parseListATMCashposParams(), parseListATMReplenishParams(), parseListATMsParams() (+51 more)
+### Community 1 - "atm_portal_handler.go"
+Cohesion: 0.16
+Nodes (25): formatDatePtr(), formatTimePtr(), parseIntParam(), parseListATMCashposParams(), parseListATMReplenishParams(), parseListATMsParams(), parseListCashposParams(), queryOrDefault() (+17 more)
 
 ### Community 2 - "main"
-Cohesion: 0.21
-Nodes (11): LoginRequest, LoginResponse, main(), Service, UserProfile, NewService(), NewAuthHandler(), loginResponse (+3 more)
+Cohesion: 0.17
+Nodes (13): LoginRequest, LoginResponse, getenvDefault(), main(), Service, UserProfile, NewService(), NewAuthHandler() (+5 more)
 
 ### Community 3 - "dashboard/types.ts"
 Cohesion: 0.05
@@ -296,20 +334,20 @@ Cohesion: 0.08
 Nodes (36): DSRPreviewTable(), DSRPreviewTableProps, DSRUploadForm(), handleCancel(), handleConfirm(), handleFileSelect(), handleReset(), resetFileInput() (+28 more)
 
 ### Community 7 - "context.Context"
-Cohesion: 0.07
-Nodes (22): mockBlacklist, noopBlacklist, stubRateLimiter, CountATMsWithCashPosParams, CountCashposByTerminalParams, CountItmCashposParams, CountReplenishByTerminalParams, GetATMByTerminalIDRow (+14 more)
+Cohesion: 0.08
+Nodes (20): mockBlacklist, stubRateLimiter, CountATMsWithCashPosParams, CountCashposByTerminalParams, CountItmCashposParams, CountReplenishByTerminalParams, GetATMByTerminalIDRow, GetATMSummaryRow (+12 more)
 
 ### Community 8 - "useDmaaForecastUrlState.ts"
 Cohesion: 0.08
 Nodes (34): RFC-3339, DmaaForecastFilters(), DmaaForecastFiltersProps, cellValue(), Column, COLUMNS, DmaaForecastTable(), DmaaForecastTableProps (+26 more)
 
 ### Community 9 - "newServiceUnderTest"
-Cohesion: 0.11
-Nodes (36): stubProvider, printableASCIIRune(), TestProperty_BcryptRoundTrip(), genNonWhitespaceString(), genValidPortalType(), genWhitespaceString(), int64Ptr(), nonWSRune() (+28 more)
+Cohesion: 0.13
+Nodes (28): noopBlacklist, stubProvider, printableASCIIRune(), TestProperty_BcryptRoundTrip(), genNonWhitespaceString(), genValidPortalType(), genWhitespaceString(), int64Ptr() (+20 more)
 
 ### Community 10 - "AtmPortalScreen.tsx"
 Cohesion: 0.11
-Nodes (34): AtmPortalScreen(), handleClearAll(), handleSortChange(), ATM_CASHPOS_QUERY_KEY, ATM_PORTAL_MODE_CASHPOS, ATM_PORTAL_MODE_REPLENISH, ATM_PORTAL_QUERY_KEY, ATM_PORTAL_STALE_TIME (+26 more)
+Nodes (32): AtmPortalScreen(), handleClearAll(), handleSortChange(), ATM_CASHPOS_QUERY_KEY, ATM_PORTAL_MODE_CASHPOS, ATM_PORTAL_MODE_REPLENISH, ATM_PORTAL_QUERY_KEY, ATM_PORTAL_STALE_TIME (+24 more)
 
 ### Community 11 - "rules"
 Cohesion: 0.05
@@ -321,31 +359,31 @@ Nodes (27): CitSummary(), CitSummaryProps, statuses, statusMeta, CitTable(), Cit
 
 ### Community 13 - "compilerOptions"
 Cohesion: 0.06
-Nodes (35): compilerOptions, allowArbitraryExtensions, allowImportingTsExtensions, erasableSyntaxOnly, forceConsistentCasingInFileNames, jsx, lib, module (+27 more)
+Nodes (34): compilerOptions, allowImportingTsExtensions, baseUrl, forceConsistentCasingInFileNames, jsx, lib, module, moduleDetection (+26 more)
 
-### Community 14 - "stubAtmPortalService"
-Cohesion: 0.12
-Nodes (21): AtmPortalService, ListCashposParams, ListCashposResult, numericToDecimalString(), rowToCashposRow(), numericToFloat64Ptr(), AtmPortalService, ATMProfileResult (+13 more)
+### Community 14 - "atm_portal_cashpos.go"
+Cohesion: 0.31
+Nodes (7): AtmPortalService, ListCashposParams, ListCashposResult, numericToDecimalString(), rowToCashposRow(), AtmPortalCashposRepository, CashposRow
 
 ### Community 15 - "atm-portal-components.test.tsx"
-Cohesion: 0.07
-Nodes (29): AtmTable(), BRAND_OPTIONS, ChipGroup(), ChipGroupProps, DEPLOYMENT_TYPE_OPTIONS, FilterBar(), FilterBarProps, MACHINE_TYPE_OPTIONS (+21 more)
-
-### Community 16 - "itm_replenish_etl.py"
 Cohesion: 0.10
-Nodes (34): compute_checksum(), create_file_record(), extract_file_date(), file_already_processed(), insert_rows_batch(), main(), move_to_backup(), parse_csv_row() (+26 more)
+Nodes (22): announcementFor(), AriaLiveRegion(), AriaLiveRegionProps, datasetLabel(), SUMMARY_CARDS, SummaryCardsGrid(), SummaryCardsGridProps, VALUE_COLOR_CLASS (+14 more)
+
+### Community 16 - "dsr_etl.py"
+Cohesion: 0.09
+Nodes (39): archive(), _block_location(), cell_number(), _cell_text(), _column_maps(), connect(), dry_run_file(), _extract_header_fields() (+31 more)
 
 ### Community 17 - "New"
-Cohesion: 0.18
-Nodes (31): New(), TestProperty_DateRangeFilterCorrectness(), containsFold(), pgx.Tx, insertTestATMWithLifecycle(), nullableFloatOrderOK(), nullableTimeOrderOK(), sortedPairOK() (+23 more)
+Cohesion: 0.29
+Nodes (21): New(), TestProperty_DateRangeFilterCorrectness(), TestProperty4_StatusFilterCorrectness(), TestProperty5_ActiveOnlyInvariant(), TestProperty6_PaginationCorrectness(), TestPreservation_CascadeDeletesReplenishRowsWithFile(), TestPreservation_GetLastUpdated_NoRecordsReturnsNoRows(), TestPreservation_GetLastUpdated_ReturnsGlobalMostRecentRecord() (+13 more)
 
 ### Community 18 - "feedback/index.ts"
 Cohesion: 0.11
 Nodes (19): ErrorBoundary, ErrorBoundaryProps, ErrorBoundaryState, ErrorFallbackProps, NetworkError(), NetworkErrorProps, containsSensitiveDetails(), sanitizeServerError() (+11 more)
 
-### Community 19 - "react"
-Cohesion: 0.05
-Nodes (15): ButtonProps, CardProps, DataTableProps, FilterSelectProps, PageHeaderProps, CardProps, ColumnMeta, DataTableProps (+7 more)
+### Community 19 - "VendorPortal-Vite/src/components/ui/DataTable.tsx"
+Cohesion: 0.40
+Nodes (3): ColumnMeta, DataTableProps, @tanstack/react-table
 
 ### Community 20 - "utils/index.ts"
 Cohesion: 0.11
@@ -361,31 +399,31 @@ Nodes (31): compilerOptions, allowImportingTsExtensions, baseUrl, jsx, lib, modu
 
 ### Community 23 - "NewDmaaForecastService"
 Cohesion: 0.14
-Nodes (21): CountDmaaForecastParams, ListDmaaForecastParams, Queries, DmaaAtmForecast, ListDmaaForecastParams, ListDmaaForecastResult, NewDmaaForecastService(), sampleDmaaRow() (+13 more)
+Nodes (20): CountDmaaForecastParams, ListDmaaForecastParams, Queries, ListDmaaForecastParams, ListDmaaForecastResult, NewDmaaForecastService(), sampleDmaaRow(), TestListDmaaForecast_AllSortColumnsAndValidDatesPass() (+12 more)
 
 ### Community 24 - "testing.T"
-Cohesion: 0.17
-Nodes (28): mountCashposHandler(), TestListCashpos_BadPage(), TestListCashpos_Defaults(), TestListCashpos_Empty(), TestListCashpos_InternalError(), TestListCashpos_QueryForwarding(), TestListCashpos_SuccessAllFields(), TestListCashpos_ValidationError() (+20 more)
+Cohesion: 0.14
+Nodes (29): mountCashposHandler(), TestListCashpos_BadPage(), TestListCashpos_Defaults(), TestListCashpos_Empty(), TestListCashpos_InternalError(), TestListCashpos_QueryForwarding(), TestListCashpos_SuccessAllFields(), TestListCashpos_ValidationError() (+21 more)
 
 ### Community 25 - "DsrSummary.tsx"
 Cohesion: 0.14
 Nodes (23): DsrDashboard(), computeDsrTotals(), DsrSummary(), DsrSummaryProps, columnHelper, columns, DsrTable(), DsrTableProps (+15 more)
 
 ### Community 26 - "RequireAuth"
-Cohesion: 0.23
-Nodes (19): chi.Router, AuthContext, contextKey, GetAuthContext(), newTestTokenService(), RequireAuth(), RequireRoles(), dummyHandler() (+11 more)
+Cohesion: 0.20
+Nodes (24): AuthContext, contextKey, GetAuthContext(), containsRole(), identityGen(), newTestTokenService(), roleGen(), roleListGen() (+16 more)
 
-### Community 27 - "routeGuard.property.test.tsx"
-Cohesion: 0.11
-Nodes (18): ApiErrorResponse, AuthContext, AuthContextValue, AuthProvider(), initialize(), AuthProviderProps, LoginSuccessResponse, mapUserResponse() (+10 more)
+### Community 27 - "AuthContext.tsx"
+Cohesion: 0.16
+Nodes (13): ApiErrorResponse, AuthContext, AuthContextValue, AuthProvider(), initialize(), AuthProviderProps, LoginSuccessResponse, mapUserResponse() (+5 more)
 
-### Community 28 - "itm_cashpos_etl.py"
-Cohesion: 0.13
-Nodes (25): compute_checksum(), create_file_record(), extract_file_date(), file_already_processed(), insert_rows_batch(), main(), move_to_backup(), parse_csv_row() (+17 more)
+### Community 28 - "dsr_upload.go"
+Cohesion: 0.10
+Nodes (31): dailyRowErrorsToDto(), dailyRowsToDto(), dateOrNil(), redis.Client, DsrListUploadsParams, DsrService, DsrSheetDetail, DsrSheetResult (+23 more)
 
 ### Community 29 - "datetime"
-Cohesion: 0.13
-Nodes (20): datetime, FastAPI, Request, Auth dependency for protected endpoints (task 4.1)., Validate API key or JWT on protected endpoints. Returns the user identity., require_auth(), create_app(), lifespan() (+12 more)
+Cohesion: 0.07
+Nodes (29): Append-only audit log writer (task 10.1). No update/delete methods are exposed…, DetectedFile, FileDetector, LateDetector, Any, date, Pool, UUID (+21 more)
 
 ### Community 30 - "ForecastView.tsx"
 Cohesion: 0.17
@@ -403,21 +441,21 @@ Nodes (17): ECCHooksPlugin(), hasProjectFile(), resolvePath(), ECCHooksPluginFn,
 Cohesion: 0.15
 Nodes (20): filterSchedules(), sortByStatusPriority(), STATUS_PRIORITY, columnHelper, columns, ReplenishmentScreen(), schedules, STATUS_CONFIG (+12 more)
 
-### Community 34 - "scheduler_service.py"
+### Community 34 - "database.py"
 Cohesion: 0.10
-Nodes (16): Settings for the EOD Retry Scheduler service (env-driven, RETRY_ prefix)., _demo(), Async asyncpg connection pool + health check + DB retry helper. No ORM: the…, Execute a DB operation with exponential backoff retry (1s, 2s, 4s...)., with_db_retry(), _demo(), Path, ETL subprocess invocation for retry attempts (task 9.1). (+8 more)
+Nodes (23): health(), get, Request, Response, GET /health -- no auth required (task 14.1)., check_db_health(), create_db_pool(), _demo() (+15 more)
 
 ### Community 35 - "dependencies"
 Cohesion: 0.08
-Nodes (25): clsx, dependencies, clsx, @hookform/resolvers, react, react-hook-form, recharts, tailwind-merge (+17 more)
+Nodes (25): dependencies, clsx, @hookform/resolvers, react, react-dom, recharts, tailwind-merge, @tanstack/react-query (+17 more)
 
 ### Community 36 - "ReconciliationScreen.tsx"
 Cohesion: 0.15
 Nodes (17): filterExceptions(), matchesExceptionType(), matchesSeverity(), columnHelper, columns, data, exceptionTypeOptions, ReconciliationScreen() (+9 more)
 
 ### Community 37 - "setupHarness"
-Cohesion: 0.22
-Nodes (22): doLogin(), doLogout(), doRefresh(), extractRefreshCookie(), miniredis.Miniredis, redis.Client, runMigrations(), setupHarness() (+14 more)
+Cohesion: 0.21
+Nodes (23): doLogin(), doLogout(), doRefresh(), extractRefreshCookie(), miniredis.Miniredis, redis.Client, runMigrations(), setupHarness() (+15 more)
 
 ### Community 38 - "NewAtmPortalService"
 Cohesion: 0.14
@@ -425,19 +463,19 @@ Nodes (20): mustNumeric(), sampleCashposRow(), TestListCashpos_CountError(), Tes
 
 ### Community 39 - "devDependencies"
 Cohesion: 0.09
-Nodes (23): @biomejs/biome, devDependencies, @biomejs/biome, jsdom, tailwindcss, @tailwindcss/vite, @testing-library/jest-dom, @testing-library/react (+15 more)
+Nodes (23): devDependencies, @biomejs/biome, @playwright/test, tailwindcss, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event, @types/node (+15 more)
 
 ### Community 40 - "atm-portal/lib/formatters.ts"
-Cohesion: 0.14
-Nodes (16): AtmRow(), AtmTableProps, Column, COLUMNS, DataFreshnessIndicator(), DataFreshnessIndicatorProps, formatAtmDate(), formatAtmDateTime() (+8 more)
+Cohesion: 0.11
+Nodes (21): AtmCashposTable(), AtmCashposTableProps, CashposRow(), cellValue(), Column, COLUMNS, MONEY_KEYS, AtmRow() (+13 more)
 
 ### Community 41 - "github.com/jackc/pgx/v5/pgtype.Timestamptz"
-Cohesion: 0.20
-Nodes (21): ItmCashpo, Atm, AtmDenom, AtmVendorPackage, Currency, Denom, DmaaFile, ItmCashposFile (+13 more)
+Cohesion: 0.16
+Nodes (30): DmaaAtmForecast, ItmCashpo, Atm, AtmDenom, AtmVendorPackage, Currency, Denom, DmaaFile (+22 more)
 
-### Community 42 - "SchedulerService"
-Cohesion: 0.11
-Nodes (15): Process automatic retries for eligible failed files, isolating failures per…, Check if the SLA deadline passed without completion (Requirement 2)., Run one automatic retry attempt for a failed file (state machine transitions)., Manages periodic detection scans, retry cycles, and retry orchestration., Register jobs and start the APScheduler., Execute failure detection with mutual exclusion (Property 17)., SchedulerService, current_processing_date() (+7 more)
+### Community 42 - "dependencies.py"
+Cohesion: 0.08
+Nodes (31): GET /late (task 14.4)., post, Request, POST /process/{file_type} -- generic manual ETL trigger for dmaa, itm_cashpos,…, trigger_process(), manual_retry(), post, Request (+23 more)
 
 ### Community 43 - "InvoiceFlow.tsx"
 Cohesion: 0.23
@@ -449,71 +487,71 @@ Nodes (20): compilerOptions, allowImportingTsExtensions, lib, module, moduleDete
 
 ### Community 45 - "compilerOptions"
 Cohesion: 0.10
-Nodes (20): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, noEmit, noFallthroughCasesInSwitch (+12 more)
+Nodes (20): compilerOptions, allowImportingTsExtensions, lib, module, moduleDetection, moduleResolution, noEmit, noFallthroughCasesInSwitch (+12 more)
 
-### Community 46 - "atm_portal.go"
-Cohesion: 0.19
-Nodes (15): dateToTimePtr(), AtmPortalService, ListATMsParams, ListATMsResult, pgTimeToStringPtr(), pgTimeToHHMMSS(), rowToAtmWithCashPos(), timestampToTimePtr() (+7 more)
+### Community 46 - "time.Time"
+Cohesion: 0.18
+Nodes (16): dateToTimePtr(), AtmPortalService, ListATMsParams, ListATMsResult, pgTimeToStringPtr(), pgTimeToHHMMSS(), rowToAtmWithCashPos(), timestampToTimePtr() (+8 more)
 
-### Community 47 - "AtmProfileScreen.tsx"
-Cohesion: 0.19
-Nodes (14): announcementFor(), AtmProfileScreen(), TabNavigation(), focusAndActivate(), handleKeyDown(), buildHistoryQueryString(), fetchAtmCashposHistory(), fetchAtmMasterData() (+6 more)
+### Community 47 - "atm-portal/types.ts"
+Cohesion: 0.10
+Nodes (29): announcementFor(), AtmProfileScreen(), Tab, TabNavigation(), focusAndActivate(), handleKeyDown(), TabNavigationProps, TABS (+21 more)
 
-### Community 48 - "atm-portal/types.ts"
-Cohesion: 0.17
-Nodes (16): Tab, TabNavigationProps, TABS, AtmCashposParams, AtmCashposResponse, AtmPortalResponse, AtmProfileHistoryParams, AtmProfileTab (+8 more)
+### Community 48 - "rules"
+Cohesion: 0.05
+Nodes (37): useKeyWithClickEvents, useSemanticElements, noUselessFragments, noUnusedImports, noUnusedVariables, useExhaustiveDependencies, files, ignore (+29 more)
 
-### Community 49 - "bak/dmaa_etl.py"
-Cohesion: 0.21
-Nodes (19): enforce_column_set(), FieldRule, main(), move_to_backup(), normalize_empty_values(), normalize_headers(), parse_boolean(), parse_date() (+11 more)
+### Community 49 - "dsr.sql.go"
+Cohesion: 0.10
+Nodes (13): CountDsrUploadsByVendorParams, GetDsrUploadByChecksumRow, GetDsrUploadByIDForVendorParams, GetDsrUploadByIDForVendorRow, GetVendorByIDRow, ListDsrDailyRowErrorsRow, ListDsrDailyRowsRow, ListDsrRencanaIsiRowErrorsRow (+5 more)
 
 ### Community 50 - "dependencies"
-Cohesion: 0.11
-Nodes (19): dependencies, @hookform/resolvers, lucide-react, react, react-dom, react-hook-form, react-router, @tanstack/react-query (+11 more)
+Cohesion: 0.09
+Nodes (23): dependencies, clsx, @hookform/resolvers, lucide-react, react, react-dom, react-hook-form, @tanstack/react-query (+15 more)
 
 ### Community 51 - "devDependencies"
-Cohesion: 0.11
-Nodes (19): devDependencies, fast-check, oxlint, @tailwindcss/vite, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event, @types/node (+11 more)
+Cohesion: 0.10
+Nodes (21): devDependencies, @biomejs/biome, fast-check, jsdom, tailwindcss, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event (+13 more)
 
-### Community 52 - "ReplenishTable.tsx"
-Cohesion: 0.17
-Nodes (13): ariaLabelForAmount(), AtmHeader(), AtmHeaderProps, Field, fields(), cellValue(), Column, COLUMNS (+5 more)
+### Community 52 - "AtmHeader.tsx"
+Cohesion: 0.24
+Nodes (11): ariaLabelForAmount(), AtmHeader(), AtmHeaderProps, Field, fields(), StatusBadge(), StatusBadgeProps, STATUS_BADGE_CONFIG (+3 more)
 
 ### Community 53 - "navigation.property.test.ts"
 Cohesion: 0.17
 Nodes (13): filterNavByRoles(), GROUP_LABELS, NAV_CONFIG, NavGroup, NavItem, ADMIN_ROLES, ALL_DB_ROLES, arbAdminRole (+5 more)
 
-### Community 54 - "detector.py"
-Cohesion: 0.16
-Nodes (12): NamedTuple, DetectedFile, FileDetector, File failure detection + late (SLA) detection services (tasks 7.1, 7.2, 8.1)., Scans filesystem directories to find failed/unprocessed files., Find files in the not_processed directory for a given file type., Find files remaining in the input directory after the ETL window closed., compute_checksum() (+4 more)
+### Community 54 - "VendorPortal-Vite/src/routes/_protected.tsx"
+Cohesion: 0.08
+Nodes (19): adminRoute, authRoute, dashboardRoute, dsrRoute, forecastingRoute, indexRoute, invoicesRoute, isSafeInternalPath() (+11 more)
 
-### Community 55 - "retry.py"
-Cohesion: 0.15
-Nodes (15): post, extract_user_id(), Get user identity for audit log. Never logs the token itself., manual_retry(), Request, Response, UUID, POST /retry/{file_id} -- manual retry (task 14.3). (+7 more)
+### Community 55 - "itm_replenish_etl.py"
+Cohesion: 0.10
+Nodes (34): compute_checksum(), create_file_record(), extract_file_date(), file_already_processed(), insert_rows_batch(), main(), move_to_backup(), parse_csv_row() (+26 more)
 
-### Community 56 - "dmaa_to_db.py"
-Cohesion: 0.29
-Nodes (16): ensure_expected_schema(), get_connection(), get_file_date_from_modified_time(), get_source_system(), has_wildcard(), load_csv_to_postgres(), LoadResult, move_file_to_bak() (+8 more)
+### Community 56 - "RetryExecutor"
+Cohesion: 0.17
+Nodes (10): _demo(), _FakeSettings, Any, Path, ETL subprocess invocation for retry attempts (task 9.1). Generic over whichever…, Invokes ETL scripts via subprocess for retry attempts., Return the ETL script path for a given file type., Run the ETL script for the given file type and capture the result. extra_args… (+2 more)
 
-### Community 57 - "LateDetector"
-Cohesion: 0.15
-Nodes (11): LateDetector, date, Pool, time, UUID, Create a scan_runs entry recording this scan's outcome., Checks whether SLA deadlines have passed without completed processing., True if file_type is late for the given processing_date. (+3 more)
+### Community 57 - "itm_cashpos_etl.py"
+Cohesion: 0.13
+Nodes (25): compute_checksum(), create_file_record(), extract_file_date(), file_already_processed(), insert_rows_batch(), main(), move_to_backup(), parse_csv_row() (+17 more)
 
 ### Community 58 - "NewLocalProvider"
-Cohesion: 0.42
-Nodes (8): NewLocalProvider(), hashPassword(), TestLocalProvider_Authenticate_NilPasswordHash(), TestLocalProvider_Authenticate_RepoError(), TestLocalProvider_Authenticate_UserNotFound(), TestLocalProvider_Authenticate_ValidPassword(), TestLocalProvider_Authenticate_WrongPassword(), TestLocalProvider_Supports()
+Cohesion: 0.26
+Nodes (9): LocalProvider, NewLocalProvider(), hashPassword(), TestLocalProvider_Authenticate_NilPasswordHash(), TestLocalProvider_Authenticate_RepoError(), TestLocalProvider_Authenticate_UserNotFound(), TestLocalProvider_Authenticate_ValidPassword(), TestLocalProvider_Authenticate_WrongPassword() (+1 more)
 
 ### Community 59 - "UserRecord"
-Cohesion: 0.14
-Nodes (9): mockUserRepository, stubUserRepo, DBTX, Queries, pgx.Tx, NewAuthRepository(), timestamptzToPtr(), UserRecord (+1 more)
+Cohesion: 0.19
+Nodes (5): mockUserRepository, stubUserRepo, timestamptzToPtr(), UserRecord, AuthRepository
 
 ### Community 60 - "schemas.py"
 Cohesion: 0.24
-Nodes (14): BaseModel, Enum, APIResponse, AuditLogItem, FileStatusItem, FileType, LateDetectionItem, ManualRetryResponse (+6 more)
+Nodes (13): APIResponse, AuditLogItem, FileStatusItem, LateDetectionItem, ManualRetryResponse, ProcessingStatus, BaseModel, Pydantic response schemas shared by eod_retry_scheduler and service_dsr_etl.… (+5 more)
 
 ### Community 61 - "CashposProfileTable.tsx"
-Cohesion: 0.16
-Nodes (9): CashposProfileTable(), DENOM_FIELDS, DENOMINATIONS, denomKey(), PAGE_SIZE_OPTIONS, PaginationControls(), PaginationControlsProps, formatWholeNumber() (+1 more)
+Cohesion: 0.11
+Nodes (16): CashposProfileTable(), CashposProfileTableProps, DENOM_FIELDS, DENOMINATIONS, denomKey(), PAGE_SIZE_OPTIONS, PaginationControls(), PaginationControlsProps (+8 more)
 
 ### Community 62 - "_auth/login.tsx"
 Cohesion: 0.19
@@ -535,13 +573,13 @@ Nodes (14): AuthState, AuthUser, BalanceStatus, CITOrder, DbRole, DsrRecord, Evi
 Cohesion: 0.41
 Nodes (13): decodeListATMsResponse(), doGetATMs(), findRow(), chi.Router, pgx.Tx, insertATM(), insertLocation(), seedRegionID() (+5 more)
 
-### Community 67 - "AtmCashposTable.tsx"
-Cohesion: 0.16
-Nodes (9): AtmCashposTable(), AtmCashposTableProps, CashposRow(), cellValue(), Column, COLUMNS, MONEY_KEYS, CashposProfileTableProps (+1 more)
+### Community 67 - "eod_retry_scheduler/main.py"
+Cohesion: 0.10
+Nodes (18): BaseSettings, field_validator, Path, time, Settings for the EOD Retry Scheduler service (env-driven, RETRY_ prefix).…, Settings, create_app(), lifespan() (+10 more)
 
-### Community 68 - "Settings"
-Cohesion: 0.21
-Nodes (7): BaseSettings, field_validator, Path, time, Settings, main(), Uvicorn entrypoint (task 17.1). Run: python -m retry_scheduler.run
+### Community 68 - "service_dsr_etl/main.py"
+Cohesion: 0.10
+Nodes (18): BaseSettings, field_validator, Path, time, Settings for the DSR ETL service (env-driven, DSR_ETL_ prefix). Split out of…, Settings, create_app(), lifespan() (+10 more)
 
 ### Community 69 - "Header.tsx"
 Cohesion: 0.23
@@ -551,9 +589,9 @@ Nodes (5): AppShell(), AppShellProps, Header(), HeaderProps, mockUser
 Cohesion: 0.32
 Nodes (12): miniredis.Miniredis, RateLimiter, isRateLimitError(), newTestRateLimiter(), TestRateLimiter_AllowsBeforeUsernameLimit(), TestRateLimiter_AllowsUpToIPLimit(), TestRateLimiter_AllowsUpToUsernameLimit(), TestRateLimiter_BlocksAt21stIPAttempt() (+4 more)
 
-### Community 71 - "dmaa/dmaa_etl.py"
-Cohesion: 0.31
-Nodes (12): archive(), connect(), file_checksum(), integer_value(), log_missing_terminals(), main(), process_file(), Any (+4 more)
+### Community 71 - "stubAtmPortalService"
+Cohesion: 0.19
+Nodes (13): numericToFloat64Ptr(), AtmPortalService, ATMProfileResult, ListATMCashposParams, ListATMCashposResult, ListATMReplenishParams, ListATMReplenishResult, latestRefundTotal() (+5 more)
 
 ### Community 72 - "grouping.property.test.ts"
 Cohesion: 0.17
@@ -567,17 +605,17 @@ Nodes (10): api, apiClient(), ApiError, ApiResponse, createApiError(), executeRe
 Cohesion: 0.33
 Nodes (4): RateLimitConfig, RateLimiter, redis.Client, NewRateLimiter()
 
-### Community 75 - "AuditService"
+### Community 75 - "bak/dmaa_etl.py"
 Cohesion: 0.21
-Nodes (7): AuditService, date, Pool, UUID, Append-only audit log writer (task 10.1). No update/delete methods are exposed…, Writes retry_audit_logs entries. Append-only: no update/delete methods., Pool
+Nodes (19): enforce_column_set(), FieldRule, main(), move_to_backup(), normalize_empty_values(), normalize_headers(), parse_boolean(), parse_date() (+11 more)
 
 ### Community 76 - "ErrorBoundary"
 Cohesion: 0.18
 Nodes (4): AppShell(), ErrorBoundary, ErrorBoundaryProps, ErrorBoundaryState
 
-### Community 77 - "create_db_pool"
-Cohesion: 0.20
-Nodes (11): check_db_health(), create_db_pool(), get_db_pool(), Pool, Create the asyncpg connection pool., Lifespan helper: yields a pool, closes it on exit., True if a trivial query succeeds against the pool., health() (+3 more)
+### Community 77 - "dmaa_to_db.py"
+Cohesion: 0.29
+Nodes (16): ensure_expected_schema(), get_connection(), get_file_date_from_modified_time(), get_source_system(), has_wildcard(), load_csv_to_postgres(), LoadResult, move_file_to_bak() (+8 more)
 
 ### Community 78 - "SchedulePage.tsx"
 Cohesion: 0.24
@@ -587,9 +625,9 @@ Nodes (9): DateGroup, formatDateHeader(), groupAndSort(), Priority, priorityBadg
 Cohesion: 0.22
 Nodes (5): allDates, dateInRange(), dateRangeArb(), orderStatusArb, vendorIdArb
 
-### Community 80 - "AriaLiveRegion.tsx"
-Cohesion: 0.33
-Nodes (7): announcementFor(), AriaLiveRegion(), AriaLiveRegionProps, datasetLabel(), TableModeSelect(), TableModeSelectProps, AtmPortalMode
+### Community 80 - "dmaa/dmaa_etl.py"
+Cohesion: 0.31
+Nodes (12): archive(), connect(), file_checksum(), integer_value(), log_missing_terminals(), main(), process_file(), Any (+4 more)
 
 ### Community 81 - "useToast.ts"
 Cohesion: 0.25
@@ -603,9 +641,9 @@ Nodes (4): authRoute, loginRoute, queryClient, rootRoute
 Cohesion: 0.22
 Nodes (4): FEATURES_DIR, FORBIDDEN_ENGLISH_PHRASES, FORBIDDEN_STANDALONE_LABELS, PERMITTED_ENGLISH_TERMS
 
-### Community 84 - "plugins"
-Cohesion: 0.22
-Nodes (8): plugins, rules, react/only-export-components, react/rules-of-hooks, $schema, oxc, typescript, warn
+### Community 84 - "SchedulerService"
+Cohesion: 0.10
+Nodes (16): Process automatic retries for eligible failed files, isolating failures per…, Check if the SLA deadline passed without completion (Requirement 2)., Run one automatic retry attempt for a failed file (state machine transitions)., Runs the ETL for `file_type` once, serialized behind the same lock the cron…, Manages periodic detection scans, retry cycles, and retry orchestration., Register jobs and start the APScheduler., Execute failure detection with mutual exclusion (Property 17)., SchedulerService (+8 more)
 
 ### Community 85 - "NotificationsPage"
 Cohesion: 0.42
@@ -615,9 +653,9 @@ Nodes (5): formatTimestamp(), NotificationsPage(), useMarkAllAsRead(), useMarkAs
 Cohesion: 0.22
 Nodes (7): ACCEPTED_TYPES, fileNameArb, FileValidationResult, invalidSizeArb, invalidTypeArb, validSizeArb, validTypeArb
 
-### Community 87 - "dmaa_forecast_handler_test.go"
-Cohesion: 0.24
-Nodes (11): chi.Router, NewDmaaForecastHandler(), dmaaGet(), mountDmaaHandler(), TestListDmaaForecast_BadRequestCases(), TestListDmaaForecast_DefaultsApplied(), TestListDmaaForecast_ServiceErrors(), TestListDmaaForecast_SuccessEnvelope() (+3 more)
+### Community 87 - "dmaa_forecast_handler.go"
+Cohesion: 0.31
+Nodes (8): chi.Router, NewDmaaForecastHandler(), toDmaaForecastResponse(), DmaaForecastServicer, DmaaForecastHandler, dmaaForecastPagination, dmaaForecastResponse, dmaaForecastResponseRow
 
 ### Community 88 - "scripts"
 Cohesion: 0.25
@@ -636,8 +674,8 @@ Cohesion: 0.33
 Nodes (5): collectSourceFiles(), FEATURES_DIR, findColorViolations(), sourceFiles, stripComments()
 
 ### Community 94 - "scripts"
-Cohesion: 0.29
-Nodes (7): scripts, build, dev, lint, preview, test, test:watch
+Cohesion: 0.25
+Nodes (8): scripts, build, dev, format, lint, preview, test, test:watch
 
 ### Community 95 - "VendorPortal-Vite/src/components/ui/Button.tsx"
 Cohesion: 0.29
@@ -646,6 +684,10 @@ Nodes (5): ButtonProps, ButtonSize, ButtonVariant, sizeStyles, variantStyles
 ### Community 96 - "OrdersPage.tsx"
 Cohesion: 0.29
 Nodes (5): columnHelper, columns, OrderStatus, statusBadgeMap, StatusFilter
+
+### Community 97 - "FilterBar.tsx"
+Cohesion: 0.20
+Nodes (11): BRAND_OPTIONS, ChipGroup(), ChipGroupProps, DEPLOYMENT_TYPE_OPTIONS, FilterBar(), FilterBarProps, MACHINE_TYPE_OPTIONS, STATUS_OPTIONS (+3 more)
 
 ### Community 98 - "CompanyPortal-Vite/package.json"
 Cohesion: 0.33
@@ -683,9 +725,9 @@ Nodes (5): instructions, plugin, $schema, .opencode/opencode.md, .opencode/plugi
 Cohesion: 0.06
 Nodes (32): 0\. Golden Rules, 10\. GCP Deployment (0 -> Deployed), 11\. Definition of Done, 12\. Resolved Decisions, 13\. UI/UX & Brand (from `claude.md` Sec 13 + steering `ui_design.md`), 14\. Backend Split: Transactional vs Batch (EOD), 15\. Project Structure (from steering `structure.md`), 16\. Coding Style (from steering `coding-style.md`) (+24 more)
 
-### Community 108 - "connectForBugConditionTest"
-Cohesion: 0.60
-Nodes (4): connectForBugConditionTest(), TestBugCondition_IndexesUseItmReplenishNaming(), TestBugCondition_NoOldTableNameReferencesInCode(), TestBugCondition_TablesRenamedToItmReplenish()
+### Community 108 - "atm_portal_filter_property_test.go"
+Cohesion: 0.29
+Nodes (10): containsFold(), pgx.Tx, insertTestATMWithLifecycle(), nullableFloatOrderOK(), nullableTimeOrderOK(), sortedPairOK(), stringOrderOK(), TestProperty3_SearchFilterCorrectness() (+2 more)
 
 ### Community 109 - "012_retry_scheduler.sql"
 Cohesion: 0.40
@@ -700,8 +742,8 @@ Cohesion: 0.40
 Nodes (3): NoticeBannerProps, NoticeBannerVariant, variantStyles
 
 ### Community 112 - "VendorPortal-Vite/package.json"
-Cohesion: 0.40
-Nodes (4): name, private, type, version
+Cohesion: 0.33
+Nodes (5): name, packageManager, private, type, version
 
 ### Community 113 - "VendorPortal-Vite/src/components/ui/Badge.tsx"
 Cohesion: 0.40
@@ -712,8 +754,8 @@ Cohesion: 0.08
 Nodes (23): 0\. Golden Rules, 10\. GCP Deployment (0 -> Deployed), 11\. Definition of Done, 12\. Resolved Decisions, 13\. UI/UX & Brand, 14\. Backend Split: Transactional vs Batch (EOD), 1\. Overview, 2\. Tech Stack (SOURCE OF TRUTH) (+15 more)
 
 ### Community 115 - "DsrPage.tsx"
-Cohesion: 0.40
-Nodes (3): balanceStatusBadgeMap, columnHelper, columns
+Cohesion: 0.33
+Nodes (3): columnHelper, columns, statusBadgeMap
 
 ### Community 116 - "architect.md"
 Cohesion: 0.08
@@ -735,33 +777,101 @@ Nodes (3): REQUIRED_JSON_FILES, SOURCE_DATA_DIR, TARGET_DATA_DIR
 Cohesion: 0.50
 Nodes (3): testColumns, testData, TestRow
 
-### Community 129 - "get_audit"
-Cohesion: 0.50
-Nodes (4): get_audit(), date, get, Request
+### Community 129 - "service_dsr_etl/routers/process.py"
+Cohesion: 0.33
+Nodes (10): dsr_commit(), dsr_dry_run(), DsrFileRequest, _last_json_line(), BaseModel, post, Request, POST /process/{file_type} -- generic manual ETL trigger (drains the whole… (+2 more)
 
-### Community 130 - "get_late"
-Cohesion: 0.50
-Nodes (4): get_late(), date, get, Request
+### Community 130 - "dsrUploadApi.ts"
+Cohesion: 0.10
+Nodes (14): DsrConfirmResponse, DsrDailyPreview, DsrDailyRow, DsrDryRunResponse, DsrRencanaIsiPreview, DsrRencanaIsiRow, DsrRowErrorResponse, DsrSheetDetailDailyRow (+6 more)
 
-### Community 131 - "get_summary"
+### Community 131 - "AtmTable.tsx"
+Cohesion: 0.22
+Nodes (5): AtmTable(), AtmTableProps, Column, COLUMNS, AtmRecord
+
+### Community 132 - "DBTX"
 Cohesion: 0.50
-Nodes (4): get_summary(), date, get, Request
+Nodes (3): DBTX, Queries, pgx.Tx
 
 ### Community 142 - "github.com/cimb-niaga/cms/pkg"
 Cohesion: 0.67
 Nodes (3): github.com/cimb-niaga/cms/backend, github.com/cimb-niaga/cms/backend-cit, github.com/cimb-niaga/cms/pkg
 
+### Community 144 - "routeGuard.property.test.tsx"
+Cohesion: 0.24
+Nodes (7): buildRouter(), mockFetch, MockLoginPage(), protectedPathArb, ProtectedProbe(), queryStringArb, redirectSearchSchema
+
+### Community 145 - "newPropertyTestRateLimiter"
+Cohesion: 0.40
+Nodes (9): miniredis.Miniredis, RateLimiter, ipGen(), newPropertyTestRateLimiter(), TestProperty_IPRateLimitThreshold(), TestProperty_RateLimitResetOnSuccess(), TestProperty_UsernameRateLimitThreshold(), usernameGen() (+1 more)
+
+### Community 146 - "_FakeSettings"
+Cohesion: 0.28
+Nodes (4): _FakeSettings, _PastSlaSettings, Path, time
+
 ### Community 147 - "Model Reference - Backend vs Frontend Coding"
 Cohesion: 0.08
 Nodes (23): DeepSeek V4 Flash (`opencode/deepseek-v4-flash`), DeepSeek V4 Pro (`opencode/deepseek-v4-pro`), GLM-5.1 (`opencode/glm-5.1`), GLM-5.2 (`opencode/glm-5.2`), GLM-5.3 (`opencode/glm-5.3`), GPT 5.6 Luna (`opencode/gpt-5.6-luna`), Grok 4.5 (`opencode/grok-4.5`), Hy3 (`opencode/hy3-free`) (+15 more)
 
-### Community 208 - "TokenService"
-Cohesion: 0.16
-Nodes (7): AccessTokenClaims, LocalProvider, RefreshTokenClaims, TokenConfig, jwt.RegisteredClaims, AuthIdentity, TokenService
+### Community 148 - "Testing flow: vendor upload DSR (local dev, Windows + Docker Desktop + Git Bash)"
+Cohesion: 0.22
+Nodes (8): 0. Prasyarat sekali-jalan, 1. Start `service_dsr_etl` (host, port 8090), 2. Start backend (`cms-backend`, Docker, port 8080), 3. Start frontend (Vendor Portal, Docker, port 3002), 4. Login & upload — manual lewat browser, 5. Login & upload — scripted (tanpa buka browser, buat verifikasi cepat), Testing flow: vendor upload DSR (local dev, Windows + Docker Desktop + Git Bash), Troubleshooting cepat (masalah yang sudah pernah kejadian)
 
-### Community 209 - "NewTokenService"
+### Community 150 - "Architecture Decisions"
+Cohesion: 0.04
+Nodes (47): Architecture Decisions, Auth `initialize()` must not call `logout()` on failure, Code Style Preferences, Common Pitfalls, Cross-portal cookie leakage: guard role in both `initialize` and `refreshToken`, DB constraint evolution for dev/prod split: add a new enum value, don't relax existing ones, Docker build cache: always use `--no-cache` after frontend navigation/route changes, Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b` (+39 more)
+
+### Community 152 - "net/http.ResponseWriter"
+Cohesion: 0.34
+Nodes (10): writeError(), writeForbidden(), writeJSON(), writeServiceUnavailable(), writeTooManyRequests(), writeUnauthorized(), writeValidationError(), net/http.ResponseWriter (+2 more)
+
+### Community 153 - "eod_retry_scheduler/routers/status.py"
 Cohesion: 0.36
-Nodes (13): mockTokenBlacklist, NewTokenService(), jwt.Claims, newMockBlacklist(), signTokenWithKey(), testIdentity(), testTokenConfig(), TestTokenService_GenerateTokenPair_Valid() (+5 more)
+Nodes (7): get_status(), get_status_history(), date, get, Request, UUID, GET /status, GET /status/{file_id}/history (task 14.2).
+
+### Community 154 - "AuditService"
+Cohesion: 0.22
+Nodes (7): AuditService, date, Pool, UUID, Writes retry_audit_logs entries. Append-only: no update/delete methods., Any, Pool
+
+### Community 158 - "service_dsr_etl/routers/status.py"
+Cohesion: 0.36
+Nodes (7): get_status(), get_status_history(), date, get, Request, UUID, GET /status, GET /status/{file_id}/history (task 14.2).
+
+### Community 159 - "DsrUploadDialog.tsx"
+Cohesion: 0.38
+Nodes (6): DsrPreviewReview(), DsrUploadDialog(), DsrUploadDialogProps, errorMessage(), formatDecimalIDR(), Stage
+
+### Community 161 - "dsr_upload_handler.go"
+Cohesion: 0.23
+Nodes (15): parseFileID(), toDsrSheetDetailResponse(), toDsrSheetResponse(), toDsrUploadListResponse(), toDsrUploadResponse(), confirmRequest, dsrDailyRowResponse, dsrRencanaIsiRowResponse (+7 more)
+
+### Community 199 - "eod_retry_scheduler/routers/audit.py"
+Cohesion: 0.33
+Nodes (5): get_audit(), date, get, Request, GET /audit (task 14.6).
+
+### Community 204 - "service_dsr_etl/routers/audit.py"
+Cohesion: 0.33
+Nodes (5): get_audit(), date, get, Request, GET /audit (task 14.6).
+
+### Community 205 - "get_late"
+Cohesion: 0.50
+Nodes (4): get_late(), date, get, Request
+
+### Community 206 - "VendorPortal-Vite/src/main.tsx"
+Cohesion: 0.33
+Nodes (5): Register, rootElement, router, routeTree, @tanstack/react-router
+
+### Community 207 - "routerTestUtils.tsx"
+Cohesion: 0.40
+Nodes (5): buildTestRouter(), defaultPages, redirectSearchSchema, renderWithRouter(), TestPages
+
+### Community 208 - "EvidenceForm.tsx"
+Cohesion: 0.40
+Nodes (3): EvidenceFormData, EvidenceFormProps, evidenceSchema
+
+### Community 209 - "TokenService"
+Cohesion: 0.17
+Nodes (19): AccessTokenClaims, mockTokenBlacklist, RefreshTokenClaims, TokenConfig, jwt.RegisteredClaims, AuthIdentity, TokenService, NewTokenService() (+11 more)
 
 ### Community 210 - "Eval Command"
 Cohesion: 0.12
@@ -783,9 +893,9 @@ Nodes (13): Code Organization, Concurrency, Concurrency Issues, Error Handling, 
 Cohesion: 0.14
 Nodes (13): Before Removing, Consolidation Phase, Consolidation Strategies, Detection Phase, Identify Duplicates, Manual Checks, Refactor Clean Command, Removal Phase (+5 more)
 
-### Community 215 - "genAuthIdentity"
-Cohesion: 0.35
-Nodes (11): pgregory.net/rapid.T, redis.Client, newTestTokenServiceWithRedis(), TestProperty_Session_BlacklistPreventsTokenReuse(), TestProperty_Session_IdempotentLogout(), genAuthIdentity(), genSecretKey(), newTestTokenService() (+3 more)
+### Community 215 - "NewRedisTokenBlacklist"
+Cohesion: 0.17
+Nodes (17): RedisTokenBlacklist, TokenBlacklist, main(), pgregory.net/rapid.T, redis.Client, newTestTokenServiceWithRedis(), TestProperty_Session_BlacklistPreventsTokenReuse(), TestProperty_Session_IdempotentLogout() (+9 more)
 
 ### Community 216 - "Orchestrate Command"
 Cohesion: 0.15
@@ -847,13 +957,13 @@ Nodes (10): Coverage Requirements, Step 1: Define Interfaces (SCAFFOLD), Step 2:
 Cohesion: 0.18
 Nodes (10): Coverage Improvement Plan, Coverage Report Analysis, Coverage Targets, [Function/Component Name], Low Coverage Files, Summary, Test Coverage Command, Test Generation (+2 more)
 
-### Community 231 - "NewRedisTokenBlacklist"
-Cohesion: 0.29
-Nodes (6): RedisTokenBlacklist, TokenBlacklist, main(), blacklistKey(), redis.Client, NewRedisTokenBlacklist()
+### Community 231 - "Load"
+Cohesion: 0.23
+Nodes (15): Config, time.Duration, Load(), parseDuration(), setEnvForTest(), TestLoad_Error_JWTSecretTooShort(), TestLoad_Error_MissingDatabaseURL(), TestLoad_Error_MissingJWTSecret() (+7 more)
 
-### Community 232 - "Spec: vendor upload DSR (SALDO HARIAN ATM)"
+### Community 232 - "Spec: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)"
 Cohesion: 0.20
-Nodes (9): Acceptance, API surface (proposed - confirm before build), Data model, Flagged concerns (resolve with policy owner before build), Functional, Non-functional, Out of scope, Requirements (+1 more)
+Nodes (9): Acceptance, API surface (proposed — confirm before build), Data model, Flagged concerns (resolve with policy owner before build), Functional, Non-functional, Out of scope, Requirements (+1 more)
 
 ### Community 233 - "Check Categories"
 Cohesion: 0.20
@@ -899,13 +1009,13 @@ Nodes (7): Approach, Build Fix Command, Common Error Fixes, DO:, DON'T:, Verific
 Cohesion: 0.25
 Nodes (7): Arguments, Checklist, Deterministic Engine, Example Result, Harness Audit Command, Output Contract, Usage
 
-### Community 244 - "Intent: vendor upload DSR (SALDO HARIAN ATM)"
-Cohesion: 0.29
-Nodes (6): Affected users and systems, Constraints, Intent: vendor upload DSR (SALDO HARIAN ATM), Open questions, Problem, Proposed outcome
+### Community 244 - "Intent: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)"
+Cohesion: 0.22
+Nodes (8): Affected users and systems, Constraints, Deferred / explicitly out of scope, Intent: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi), Open questions, Problem, Proposed outcome, Resolved decisions (grilling session, 2026-09-03)
 
-### Community 245 - "Plan: vendor upload DSR (from intent.md + spec.md)"
-Cohesion: 0.29
-Nodes (6): Alternatives not taken, Files that change, Order of work, Plan: vendor upload DSR (from intent.md + spec.md), Proof (maps to tests.md), Risks
+### Community 245 - "Plan: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)"
+Cohesion: 0.15
+Nodes (12): 1. Migration — `backend/migrations/018_dsr_upload_accountability.sql` (new), 2. Python ETL — `scheduler/dsr/` (new directory), 3. `retry_scheduler` changes (existing service), 4. Go backend — new DSR upload slice, Alternatives not taken, Architecture, Corrections from spec.md, Files to change (+4 more)
 
 ### Community 246 - "Review + deploy: vendor upload DSR"
 Cohesion: 0.29
@@ -915,9 +1025,9 @@ Nodes (6): Approval gates (hooks / branch protection), Definition of Done gate (
 Cohesion: 0.29
 Nodes (6): 1st time create img, Clean Build, docker compose, docker compose up -d --build userportal-vite, docker compose up -d --build vendorportal-vite, update docker img
 
-### Community 248 - "rbac_property_test.go"
-Cohesion: 0.52
-Nodes (6): containsRole(), identityGen(), roleGen(), roleListGen(), TestProperty_AuthContextInjection(), TestProperty_RBACRoleAuthorization()
+### Community 248 - "routeMapping.property.test.tsx"
+Cohesion: 0.50
+Nodes (4): buildRouter(), mockFetch, pageProbe(), redirectSearchSchema
 
 ### Community 249 - "Maintain / incidents: vendor upload DSR"
 Cohesion: 0.33
@@ -947,9 +1057,13 @@ Nodes (5): Arguments, Model Route Command, Required Output, Routing Heuristic, U
 Cohesion: 0.33
 Nodes (5): Arguments, Notes, Pipeline, Quality Gate Command, Usage
 
+### Community 256 - "public.atm_dsr_rencana_isi_rows"
+Cohesion: 0.67
+Nodes (3): public.atm_dsr_rencana_isi_files, public.atm_dsr_rencana_isi_rows, public.atms
+
 ### Community 257 - "LoginPage.tsx"
-Cohesion: 0.50
-Nodes (3): isNonWhitespace(), LoginFormData, LoginPage()
+Cohesion: 0.38
+Nodes (5): formatCountdown(), isNonWhitespace(), LoginFormData, LoginPage(), LoginStatus
 
 ### Community 258 - "Evolve Command"
 Cohesion: 0.40
@@ -971,25 +1085,57 @@ Nodes (3): Expanding the Oxlint configuration, React Compiler, React + TypeScrip
 Cohesion: 0.50
 Nodes (3): Behavior Notes, Instinct Status Command, Your Task
 
+### Community 273 - "public.users"
+Cohesion: 0.67
+Nodes (3): public.atm_dsr_saldo_files, public.users, public.atm_dsr_rencana_isi_files
+
+### Community 281 - "AuthHandler"
+Cohesion: 0.25
+Nodes (6): clearRefreshCookie(), extractClientIP(), chi.Router, setRefreshCookie(), AuthHandler, loginRequest
+
+### Community 284 - "replan_db.md"
+Cohesion: 0.18
+Nodes (10): 1. DB migrations (source of the schema), 2. Go backend - the live feature (biggest blast radius), 2a. sqlc schema + queries (build breaks here first), 2b. sqlc-generated code (regenerated from 2a), 2c. Hand-written service + handler + wiring, 3. Python ETL (separate ingest path, writes the tables directly), 4. Frontend - vendor portal DSR feature, 5. Non-code / doc references (informational only, safe to ignore) (+2 more)
+
+### Community 287 - "response.go"
+Cohesion: 0.31
+Nodes (10): FieldError, WriteCreated(), WriteError(), writeJSON(), WriteSuccess(), WriteValidationError(), Envelope, ErrorBody (+2 more)
+
+### Community 305 - "net/http.Request"
+Cohesion: 0.40
+Nodes (3): chi.Router, net/http.Request, AtmPortalHandler
+
+### Community 307 - "public.dsr_uploads"
+Cohesion: 0.47
+Nodes (5): public.dsr_daily_rows, public.dsr_rencana_isi_rows, public.dsr_uploads, public.atms, public.users
+
+### Community 308 - "get_late"
+Cohesion: 0.50
+Nodes (4): get_late(), date, get, Request
+
+### Community 309 - "DsrDetailDialog.tsx"
+Cohesion: 0.67
+Nodes (3): DsrDetailDialog(), DsrDetailDialogProps, formatIDR()
+
 ## Knowledge Gaps
-- **1033 isolated node(s):** `$schema`, `.opencode/opencode.md`, `.opencode/plugins`, `ToolArgs`, `ToolInput` (+1028 more)
+- **1165 isolated node(s):** `$schema`, `.opencode/opencode.md`, `.opencode/plugins`, `ToolArgs`, `ToolInput` (+1160 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **46 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **57 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `react` to `eod-monitoring/types.ts`, `LoginPage.tsx`, `cash-flow/types.ts`, `forecasting/index.ts`, `useDmaaForecastUrlState.ts`, `AtmPortalScreen.tsx`, `CitTracker.tsx`, `atm-portal-components.test.tsx`, `feedback/index.ts`, `DsrSummary.tsx`, `routeGuard.property.test.tsx`, `ForecastView.tsx`, `CompanyPortal-Vite/src/main.tsx`, `ReplenishmentScreen.tsx`, `ReconciliationScreen.tsx`, `InvoiceFlow.tsx`, `AtmProfileScreen.tsx`, `atm-portal/types.ts`, `CashposProfileTable.tsx`, `_auth/login.tsx`, `Header.tsx`, `ErrorBoundary`, `SchedulePage.tsx`, `_auth.tsx`, `plugins`, `Sidebar.tsx`, `integration.test.tsx`, `VendorPortal-Vite/src/components/ui/Button.tsx`, `OrdersPage.tsx`, `Toast.tsx`, `InvoicesPage.tsx`, `DsrPage.tsx`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
-- **Why does `GetAuthContext()` connect `RequireAuth` to `rbac_property_test.go`, `net/http.ResponseWriter`, `context.Context`?**
+- **Why does `GetAuthContext()` connect `RequireAuth` to `net/http.ResponseWriter`, `context.Context`?**
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
+- **Why does `main()` connect `main` to `NewRedisTokenBlacklist`, `RequireAuth`, `setupHarness`, `NewAtmPortalService`, `Load`, `RateLimiter`, `New`, `TokenService`, `NewDmaaForecastService`, `dmaa_forecast_handler.go`, `testing.T`, `NewLocalProvider`, `dsr_upload.go`?**
   _High betweenness centrality (0.003) - this node is a cross-community bridge._
-- **Why does `ItmCashpo` connect `github.com/jackc/pgx/v5/pgtype.Timestamptz` to `NewAtmPortalService`, `stubAtmPortalService`, `context.Context`?**
+- **Why does `ItmCashpo` connect `github.com/jackc/pgx/v5/pgtype.Timestamptz` to `NewAtmPortalService`, `atm_portal_cashpos.go`, `context.Context`?**
   _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **What connects `$schema`, `.opencode/opencode.md`, `.opencode/plugins` to the rest of the system?**
-  _1033 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1165 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `eod-monitoring/types.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.060784313725490195 - nodes in this community are weakly interconnected._
-- **Should `net/http.ResponseWriter` be split into smaller, more focused modules?**
-  _Cohesion score 0.06726606726606726 - nodes in this community are weakly interconnected._
 - **Should `dashboard/types.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.05201266395296246 - nodes in this community are weakly interconnected._
+- **Should `stubs/index.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.05144230769230769 - nodes in this community are weakly interconnected._

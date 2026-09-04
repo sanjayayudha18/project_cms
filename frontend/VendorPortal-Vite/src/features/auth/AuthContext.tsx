@@ -1,6 +1,15 @@
+import { configureApiAuth } from "@/lib/api/client";
 import { queryClient } from "@/lib/queryClient";
 import type { AuthState, AuthUser } from "@/lib/types";
-import { type ReactNode, createContext, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 // ─── API Config ───────────────────────────────────────────────────────────────
 
@@ -68,6 +77,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+
+  // Kept in sync with accessToken below so the api client's getter (wired
+  // once, see the configureApiAuth effect) always reads the current token
+  // instead of closing over the value from whichever render wired it.
+  const accessTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // ─── Initialize: attempt token refresh on mount ─────────────────────────────
 
@@ -257,6 +274,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return refreshPromise;
   }, []);
+
+  // ─── Wire the api client's auth hooks ───────────────────────────────────────
+  // Without this, api.* calls (e.g. dsrUploadApi) never get an Authorization
+  // header and always 401, regardless of login state.
+
+  useEffect(() => {
+    configureApiAuth({
+      getToken: () => accessTokenRef.current,
+      refresh: refreshToken,
+      onFailure: () => {
+        setAccessToken(null);
+        setUser(null);
+      },
+    });
+  }, [refreshToken]);
 
   // ─── State ──────────────────────────────────────────────────────────────────
 

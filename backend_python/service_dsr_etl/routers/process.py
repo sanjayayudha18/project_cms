@@ -6,7 +6,7 @@ single-file endpoints for the vendor upload dry-run/confirm flow.
 target file. The two /process/dsr/* endpoints below instead target ONE named
 file, because the vendor upload flow is: upload -> dry-run parse (preview, no
 DB write) -> vendor confirms -> commit (re-parse the same file, write to DB).
-See scheduler/dsr/dsr_etl.py's --mode dry_run/--mode commit CLI surface and
+See backend_python/dsr/dsr_etl.py's --mode dry_run/--mode commit CLI surface and
 its module docstring for the full contract.
 """
 from __future__ import annotations

@@ -161,7 +161,7 @@ class SchedulerService:
         # ponytail: retry_file_tracking is the only schema this service owns.
         # A "completed" ETL run that never touched retry_file_tracking is invisible here;
         # true completion status lives in dmaa_files/itm_cashpos_files/itm_replenish_files/
-        # atm_dsr_*_files, which are out of scope for this migration.
+        # dsr_uploads, which is out of scope for this migration.
         async with self.pool.acquire() as conn:
             completed = await conn.fetchval(
                 """

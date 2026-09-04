@@ -3,6 +3,13 @@
 Status: draft. Stage: 4 Test. Reads: `plan.md`.
 The session runs these before reporting done. For bug fixes: write the failing test first.
 
+> **Post-plan update (2026-09-04):** see `plan.md`'s post-plan update and
+> `testing.md` — the upload flow is now two-phase (dry-run/confirm) and the
+> Python side is `backend_python/service_dsr_etl/` (not `retry_scheduler`). The
+> test cases below still trace to `spec.md`'s FR numbers as originally
+> written; re-verify against the current two-phase behavior before treating
+> any of them as passing.
+
 ## Commands (must exit non-zero on failure)
 - Build: `go build ./...`            (from backend/)
 - Test:  `go test ./...`             (from backend/)

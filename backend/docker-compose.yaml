@@ -17,6 +17,8 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    volumes:
+      - ../FTP_DATA:/app/FTP_DATA
     depends_on:
       redis:
         condition: service_healthy

@@ -26,6 +26,7 @@ interface DataTableProps<T> {
   readonly sorting?: SortingState;
   readonly onSortingChange?: (sorting: SortingState) => void;
   readonly emptyMessage?: string;
+  readonly onRowClick?: (row: T) => void;
 }
 
 /**
@@ -39,6 +40,7 @@ export function DataTable<T>({
   sorting: controlledSorting,
   onSortingChange,
   emptyMessage,
+  onRowClick,
 }: DataTableProps<T>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>([]);
 
@@ -115,7 +117,11 @@ export function DataTable<T>({
             </tr>
           ) : (
             table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-neutral-100 hover:bg-red-50/30">
+              <tr
+                key={row.id}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                className={`border-b border-neutral-100 hover:bg-red-50/30 ${onRowClick ? "cursor-pointer" : ""}`}
+              >
                 {row.getVisibleCells().map((cell) => {
                   const isNumeric = cell.column.columnDef.meta?.numeric;
 

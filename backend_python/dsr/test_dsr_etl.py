@@ -6,7 +6,13 @@ from pathlib import Path
 
 import openpyxl
 
-from dsr_etl import cell_number, parse_upload_filename, read_daily_rows, read_rencana_isi_rows
+from dsr_etl import (
+    _rencana_isi_subtotal,
+    cell_number,
+    parse_upload_filename,
+    read_daily_rows,
+    read_rencana_isi_rows,
+)
 
 
 def _build_synthetic_workbook(path: Path) -> None:
@@ -142,6 +148,17 @@ class DsrEtlParserTests(unittest.TestCase):
         self.assertEqual("1234", rows[0]["atm_terminal_id"])
         self.assertEqual(Decimal("400000"), rows[0]["fill_100k_idr"])
         self.assertEqual(Decimal("350000"), rows[0]["splank_balance_0800_idr"])
+
+    def test_rencana_isi_subtotal_sums_both_fill_columns(self) -> None:
+        # Recomputed, never read from the sheet's own derived Sub Total row --
+        # this is the value cross-checked against Daily d1 Subtotal Pengeluaran.
+        rows = [
+            {"fill_100k_idr": Decimal("150000"), "fill_50k_idr": Decimal("100000")},
+            {"fill_100k_idr": Decimal(0), "fill_50k_idr": Decimal("250000")},
+            {"fill_100k_idr": None, "fill_50k_idr": None},
+        ]
+        self.assertEqual(Decimal("500000"), _rencana_isi_subtotal(rows))
+        self.assertIsNone(_rencana_isi_subtotal([]))
 
 
 if __name__ == "__main__":

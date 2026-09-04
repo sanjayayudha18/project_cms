@@ -1,7 +1,7 @@
 """Settings for the DSR ETL service (env-driven, DSR_ETL_ prefix).
 
 Split out of retry_scheduler -- owns only the `dsr` file type (the vendor
-upload dry-run/confirm flow, see scheduler/dsr/dsr_etl.py), separate from the
+upload dry-run/confirm flow, see backend_python/dsr/dsr_etl.py), separate from the
 batch-shaped dmaa/itm_cashpos/itm_replenish ETLs now in eod_retry_scheduler.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     dsr_not_processed_dir: Path | None = None
 
     # ETL script path
-    etl_dsr_script: Path = Path("scheduler/dsr/dsr_etl.py")
+    etl_dsr_script: Path = Path("backend_python/dsr/dsr_etl.py")
 
     # Service
     service_version: str = "1.0.0"

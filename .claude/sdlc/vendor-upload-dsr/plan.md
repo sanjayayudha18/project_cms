@@ -3,6 +3,19 @@
 Status: draft — approved in Claude Code plan mode. Stage: 3 Build. Reads: `spec.md`.
 Trigger to next stage: engineer accepts this plan -> implementation -> `tests.md`.
 
+> **Post-plan update (2026-09-04):** the single-phase upload design below was
+> superseded during implementation by a two-phase dry-run/confirm flow (see
+> `testing.md` for the current operational flow), and the shared
+> `retry_scheduler` service referenced throughout this plan was later split
+> into two independent services: `backend_python/service_dsr_etl/` (owns `dsr`
+> only, port 8090 -- what this feature actually talks to) and
+> `backend_python/eod_retry_scheduler/` (owns `dmaa`/`itm_cashpos`/`itm_replenish`,
+> port 8091). Generic code shared by both now lives in `backend_python/lib/`.
+> The whole tree also moved from `scheduler/` to `backend_python/` at the repo
+> root (2026-09-04). Every `retry_scheduler`/`scheduler/` reference below is
+> historical -- read it as `service_dsr_etl`/`backend_python/` for anything
+> DSR-specific.
+
 > Produced in Claude Code plan mode on 2026-09-03. Confirmed against the real
 > codebase (not just `spec.md`'s assumptions) during planning; three
 > corrections surfaced and were resolved with the product owner before this
@@ -55,7 +68,8 @@ Vendor <---+
 ```
 Safety net: `retry_scheduler`'s existing cron-scan / late-check / auto-retry
 covers `dsr` once registered as a 4th `FILE_TYPES` entry — no new scheduling
-code needed there.
+code needed there. (Post-split: this safety net now runs inside
+`service_dsr_etl`, scoped to just `dsr` — see the update note above.)
 
 ## Files to change
 
@@ -151,8 +165,9 @@ Mirror existing migration style (`BEGIN;`/`COMMIT;`, `ALTER TABLE IF EXISTS
 - **`retry_scheduler` has no Docker packaging** (confirmed in
   `.kiro/specs/eod-retry-scheduler/tasks.md`) and no documented process
   supervision (systemd/manual) — this plan doesn't fix that gap, it just
-  doesn't make it worse. Local dev/testing will run it directly
-  (`uvicorn`/`python -m scheduler.retry_scheduler`).
+  doesn't make it worse. Local dev/testing runs it directly via `uvicorn`
+  (post-split: `service_dsr_etl.main:app` on port 8090) — still no Docker
+  packaging or process supervision for either split service.
 - **Shared lock contention**: reusing `SchedulerService`'s existing lock for
   the new manual-trigger path means a slow cron scan could make a vendor's
   upload wait close to the full 25s timeout before Go gives up and returns

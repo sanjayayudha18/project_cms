@@ -50,9 +50,9 @@ class Settings(BaseSettings):
     itm_replenish_not_processed_dir: Path | None = None
 
     # ETL script paths
-    etl_dmaa_script: Path = Path("scheduler/dmaa/dmaa_etl.py")
-    etl_itm_cashpos_script: Path = Path("scheduler/itm/cashpos/itm_cashpos_etl.py")
-    etl_itm_replenish_script: Path = Path("scheduler/itm/replenish/itm_replenish_etl.py")
+    etl_dmaa_script: Path = Path("backend_python/dmaa/dmaa_etl.py")
+    etl_itm_cashpos_script: Path = Path("backend_python/itm/cashpos/itm_cashpos_etl.py")
+    etl_itm_replenish_script: Path = Path("backend_python/itm/replenish/itm_replenish_etl.py")
 
     # Service
     service_version: str = "1.0.0"

@@ -126,6 +126,17 @@ func main() {
 		custommw.RequireRoles("ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV", "ADMIN", "ADMIN_PARAM"),
 	).Mount("/api/v1/dmaa-forecast", dmaaForecastHandler.Routes())
 
+	// Create and mount DSR upload handler. ATM-specific env vars are read
+	// directly here (not via pkg/config.Config) since that struct is shared
+	// with backend-cit and these settings are ATM-only.
+	dsrUploadDir := getenvDefault("DSR_UPLOAD_DIR", "FTP_DATA/DSR")
+	dsrRetryBaseURL := getenvDefault("DSR_RETRY_SCHEDULER_BASE_URL", "http://localhost:8090")
+	dsrProcessAuth := os.Getenv("DSR_RETRY_SCHEDULER_AUTH")
+	dsrHTTPClient := &http.Client{Timeout: 30 * time.Second}
+	dsrService := service.NewDsrService(db.New(dbPool), redisClient, dsrHTTPClient, dsrUploadDir, dsrRetryBaseURL, dsrProcessAuth)
+	dsrHandler := handler.NewDsrUploadHandler(dsrService)
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr", dsrHandler.Routes())
+
 	// Start HTTP server
 	addr := ":" + cfg.Port
 	srv := &http.Server{
@@ -160,4 +171,12 @@ func main() {
 	}
 
 	slog.Info("server stopped gracefully")
+}
+
+// getenvDefault reads an environment variable, returning def when unset/empty.
+func getenvDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }

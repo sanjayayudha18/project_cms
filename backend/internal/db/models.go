@@ -86,6 +86,98 @@ type DmaaFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type DsrDailyRow struct {
+	ID       int64 `json:"id"`
+	UploadID int64 `json:"upload_id"`
+	// Sheet line order (1..n) across both sections, excluding headers and derived subtotal/saldo rows. Stable ordering key for reproducing the statement.
+	RowNo int32 `json:"row_no"`
+	// Vault/site block header the row belongs to (e.g. LENTENG AGUNG, BINTARO). NULL for single-vault workbooks like BIJAK, which print one block.
+	Location *string `json:"location"`
+	// d0 = section 1 (report_date, settled, sampai pukul 00:00). d1 = section 2 (daily_status_date, status sementara).
+	Section string `json:"section"`
+	// saldo_awal = opening balance (d0 only). penerimaan / pengeluaran = receipt / disbursement line, sign stored verbatim as printed. status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak), d1 only.
+	Flow string `json:"flow"`
+	// Uraian text verbatim, e.g. Dari CIMB Niaga CIT, Untuk Cartridge Replenishment ATM & CRM.
+	LineLabel string `json:"line_label"`
+	// Memo/reference embedded in a line label, e.g. 313/ATM/BIJAK/VII/2026. NULL when the line carries none.
+	MemoNo *string `json:"memo_no"`
+	// Value attributable to the 100,000 denomination, verbatim as printed (the sheet labels this block "Denom (lembar)" but prints money). NULL when the source cell was an Excel error -- counts into daily_error_count.
+	Denom100kIdr pgtype.Numeric `json:"denom_100k_idr"`
+	Denom50kIdr  pgtype.Numeric `json:"denom_50k_idr"`
+	Denom20kIdr  pgtype.Numeric `json:"denom_20k_idr"`
+	Denom10kIdr  pgtype.Numeric `json:"denom_10k_idr"`
+	Denom5kIdr   pgtype.Numeric `json:"denom_5k_idr"`
+	Denom2kIdr   pgtype.Numeric `json:"denom_2k_idr"`
+	Denom1kIdr   pgtype.Numeric `json:"denom_1k_idr"`
+	// Total Rupiah x1.000 column, verbatim as printed. Cross-check: equals SUM(denom_*_idr) when no denom cell is NULL.
+	LineTotalIdr pgtype.Numeric     `json:"line_total_idr"`
+	Remarks      *string            `json:"remarks"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type DsrRencanaIsiRow struct {
+	ID       int64 `json:"id"`
+	UploadID int64 `json:"upload_id"`
+	RowNo    int32 `json:"row_no"`
+	// ATM ID column as sent by the vendor (e.g. 2440, A353, ZZVX). Verbatim, never overwritten -- this is the evidence of what the vendor claimed.
+	AtmTerminalID string `json:"atm_terminal_id"`
+	// Resolved at ingest from atm_terminal_id. NULL = ATM not in master data; the file still ingests (counts into rencana_isi_error_count). Find unresolved rows WHERE atm_id IS NULL.
+	AtmID *int64 `json:"atm_id"`
+	// Lokasi ATM column verbatim, e.g. JKT.AMBASADOR 1.
+	AtmLocation *string `json:"atm_location"`
+	// Denom (x 1.000) column as printed: 50 | 100 | TST. TST rows are recyclers and carry both fill_100k_idr and fill_50k_idr.
+	DenomConfig *string        `json:"denom_config"`
+	Fill100kIdr pgtype.Numeric `json:"fill_100k_idr"`
+	Fill50kIdr  pgtype.Numeric `json:"fill_50k_idr"`
+	// Saldo Splank Pukul 08:00 column, verbatim as printed. 0 on TST/recycler rows in the sample.
+	SplankBalance0800Idr pgtype.Numeric `json:"splank_balance_0800_idr"`
+	// Keterangan column verbatim, e.g. PENDING DSR TGL 16/07/2026.
+	Remarks   *string            `json:"remarks"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// One row per ingested DSR workbook. Idempotent per checksum; re-ingest = delete this row, both sheets child rows cascade.
+type DsrUpload struct {
+	ID       int64   `json:"id"`
+	Filename string  `json:"filename"`
+	Checksum *string `json:"checksum"`
+	// Vendor label as printed (e.g. BIJAK JAKARTA). Not yet FK to vendors.code.
+	Vendor string `json:"vendor"`
+	// Daily sheet Tanggal cell (e.g. 2026-07-15). Cross-checked against the filename.
+	ReportDate pgtype.Date `json:"report_date"`
+	// users.id of the vendor user who uploaded, resolved server-side from the JWT. NULL for manual backfill.
+	UploadedByUserID     *int64  `json:"uploaded_by_user_id"`
+	Bank                 *string `json:"bank"`
+	Company              *string `json:"company"`
+	Recipient            *string `json:"recipient"`
+	Sender               *string `json:"sender"`
+	Subject              *string `json:"subject"`
+	PreparedBy           *string `json:"prepared_by"`
+	CheckedBy            *string `json:"checked_by"`
+	ApprovedBy           *string `json:"approved_by"`
+	Currency             string  `json:"currency"`
+	DailyStatus          string  `json:"daily_status"`
+	DailyRowCount        *int32  `json:"daily_row_count"`
+	DailyErrorCount      *int32  `json:"daily_error_count"`
+	RencanaIsiStatus     string  `json:"rencana_isi_status"`
+	RencanaIsiRowCount   *int32  `json:"rencana_isi_row_count"`
+	RencanaIsiErrorCount *int32  `json:"rencana_isi_error_count"`
+	ErrorMessage         *string `json:"error_message"`
+	// Section-2 provisional date on Daily (STATUS SALDO SEMENTARA), normally report_date + 1.
+	DailyStatusDate pgtype.Date `json:"daily_status_date"`
+	// Tanggal cell on Rencana Isi: the day being planned, normally report_date + 1.
+	RencanaIsiPlanDate    pgtype.Date    `json:"rencana_isi_plan_date"`
+	SaldoAkhir0000Idr     pgtype.Numeric `json:"saldo_akhir_0000_idr"`
+	SaldoSementara0900Idr pgtype.Numeric `json:"saldo_sementara_0900_idr"`
+	StatusCadanganIdr     pgtype.Numeric `json:"status_cadangan_idr"`
+	SaldoGabunganIdr      pgtype.Numeric `json:"saldo_gabungan_idr"`
+	// Vendor-stated Sub Total of the fill plan. Must equal the Daily d1 Subtotal Pengeluaran total -- the one cross-sheet tie in the workbook.
+	RencanaIsiSubtotalIdr pgtype.Numeric     `json:"rencana_isi_subtotal_idr"`
+	ProcessedAt           pgtype.Timestamptz `json:"processed_at"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ItmCashpo struct {
 	ID     int64 `json:"id"`
 	FileID int64 `json:"file_id"`
@@ -178,6 +270,18 @@ type ItmReplenishFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LateDetection struct {
+	ID             pgtype.UUID        `json:"id"`
+	FileType       string             `json:"file_type"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	SlaDeadline    pgtype.Time        `json:"sla_deadline"`
+	DetectedAt     pgtype.Timestamptz `json:"detected_at"`
+	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
+	IsResolved     bool               `json:"is_resolved"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Location struct {
 	ID            int64              `json:"id"`
 	RegionID      int64              `json:"region_id"`
@@ -205,6 +309,45 @@ type Region struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type RetryAuditLog struct {
+	ID pgtype.UUID `json:"id"`
+	// retry_initiated | retry_completed
+	EventType string `json:"event_type"`
+	// auto | manual
+	TriggerType    string             `json:"trigger_type"`
+	FileID         pgtype.UUID        `json:"file_id"`
+	FileType       string             `json:"file_type"`
+	FileChecksum   *string            `json:"file_checksum"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	InitiatedBy    string             `json:"initiated_by"`
+	Outcome        *string            `json:"outcome"`
+	DurationMs     *int32             `json:"duration_ms"`
+	ErrorDetail    *string            `json:"error_detail"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type RetryFileTracking struct {
+	ID pgtype.UUID `json:"id"`
+	// dmaa | itm_cashpos | itm_replenish
+	FileType       string      `json:"file_type"`
+	Filename       string      `json:"filename"`
+	FilePath       string      `json:"file_path"`
+	FileChecksum   string      `json:"file_checksum"`
+	ProcessingDate pgtype.Date `json:"processing_date"`
+	// not_processed | input_remaining
+	DetectionSource string  `json:"detection_source"`
+	FailureReason   *string `json:"failure_reason"`
+	// pending | processing | completed | failed | max_retries_exhausted
+	ProcessingStatus string             `json:"processing_status"`
+	AutoRetryCount   int32              `json:"auto_retry_count"`
+	MaxRetries       int32              `json:"max_retries"`
+	DetectedAt       pgtype.Timestamptz `json:"detected_at"`
+	LastRetryAt      pgtype.Timestamptz `json:"last_retry_at"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Role struct {
 	ID int64 `json:"id"`
 	// ADMIN | ADMIN_PARAM | ATM-USER | ATM-SPV | BRANCH-USER | BRANCH-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | VENDOR-USER
@@ -212,6 +355,19 @@ type Role struct {
 	Description *string            `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ScanRun struct {
+	ID pgtype.UUID `json:"id"`
+	// failure_detection | late_detection
+	ScanType   string             `json:"scan_type"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	// running | success | failed
+	Status        string             `json:"status"`
+	FilesDetected *int32             `json:"files_detected"`
+	ErrorMessage  *string            `json:"error_message"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {
@@ -228,14 +384,14 @@ type User struct {
 	// Only for auth_source=local
 	PasswordHash *string `json:"password_hash"`
 	// Required for vendor/local users, null for internal LDAP users
-	VendorID *int64 `json:"vendor_id"`
-	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
-	VendorBranchID *int64             `json:"vendor_branch_id"`
-	IsActive       bool               `json:"is_active"`
-	LastLoginAt    pgtype.Timestamptz `json:"last_login_at"`
+	VendorID    *int64             `json:"vendor_id"`
+	IsActive    bool               `json:"is_active"`
+	LastLoginAt pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
+	VendorBranchID *int64 `json:"vendor_branch_id"`
 }
 
 type Vendor struct {

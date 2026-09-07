@@ -36,6 +36,7 @@ This project has a knowledge graph at `graphify-out/` with god nodes, community 
 - **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
 - **Stage**: Greenfield, vibe-coded with AI.
 - **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
+  - **Vendor sub-roles (CIT)**: `Vendor CIT` (uploads CIT DSR) and `Vendor CIT Supervisor` (supervises/approves CIT DSR uploads for the vendor). Both are vendor-portal (local auth) roles scoped to their own vendor's assignments only.
 
 ---
 
@@ -133,7 +134,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ## 4. Cross-Cutting Domain Rules (NON-NEGOTIABLE)
 
-- **Auth split**: Internal → LDAP bind (no local password). Vendor → local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth_source in claims. Vendors scoped to own assignments only.
+- **Auth split**: Internal → LDAP bind (no local password). Vendor → local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth_source in claims. Vendors scoped to own assignments only. Vendor roles include `Vendor CIT` (upload CIT DSR) and `Vendor CIT Supervisor` (supervise/approve CIT DSR uploads for the same vendor) — supervisor != uploader on the maker-checker gate.
 - **Maker-checker**: any create/update/delete on financial or master data → `approval_requests` (pending → approved/rejected). Effect applies only after approval. Maker != checker.
 - **Invoice**: CMS validates & approves only. Does NOT trigger/execute payment. Terminal = approved (handed off downstream).
 - **Escrow reconciliation**: source = batch file from Corebanking. Ingest → parse into `escrow_batch_rows` → reconcile vs CMS cash position → store deltas. Idempotent per file hash.

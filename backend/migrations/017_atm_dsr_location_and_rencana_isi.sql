@@ -73,7 +73,8 @@ COMMENT ON COLUMN public.atm_dsr_rencana_isi_files.plan_date
 -- ============================================================
 -- 3. Leaf rows: next-day per-ATM fill plan (sheet 'Rencana Isi')
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.atm_dsr_rencana_isi_rows
+CREATE TABLE IF NOT EXISTS 
+
 (
     id bigint NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 ),
     file_id bigint NOT NULL,

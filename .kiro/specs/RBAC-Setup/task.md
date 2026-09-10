@@ -54,18 +54,21 @@ CMS punya RBAC role-string yang berjalan (`RequireAuth`/`RequireRoles`, 9 role i
 - `backend/migrations/021_users_hierarchy.sql`: tambah `users.supervisor_id bigint` (self-FK, nullable) + `users.approval_level int` (nullable), gaya `016`. CHECK `supervisor_id <> id`. Index pada `supervisor_id`.
 - **Test:** migrasi up/down bersih; insert menolak `supervisor_id = id`; FK & index ada.
 - **Demo:** `\d users` menampilkan 2 kolom + FK; query `WITH RECURSIVE` menampilkan chain atasan.
+- **Model:** Opus — migrasi additive pada tabel `users` (auth) + self-FK hierarki; sentuhan auth = danger zone, salah constraint mahal di-rollback.
 
 ### [ ] Task 2 — Migrasi `approval_policies` + seed contoh
 - `022_approval_policies.sql`: `id, document_type, min_amount numeric(20,2), max_amount numeric(20,2), required_level int, is_active bool, timestamps`. Unik/anti-overlap per `(document_type, rentang)`; constraint `min_amount < max_amount`.
 - Seed contoh: invoice `< 100jt -> L2`, `>= 100jt -> L3`.
 - **Test:** up/down; lookup `(document_type, amount)` deterministik satu baris; overlap ditolak.
 - **Demo:** query dua nilai berbeda -> required_level berbeda.
+- **Model:** Opus — policy nilai uang -> required_level dengan anti-overlap; kesalahan di sini salah-rutekan approval maker-checker.
 
 ### [ ] Task 3 — Migrasi `audit_logs` + `internal/audit` writer
 - `023_audit_logs.sql` (append-only): `id, actor_id, action, entity_type, entity_id, before jsonb, after jsonb, ip text, created_at`.
 - `queries/audit.sql` + repository/service `internal/audit` `Write(ctx, entry)`; actor & ip dari `middleware.GetAuthContext` + RealIP.
 - **Test:** map field benar; before/after JSON tersimpan; tak ada path update/delete.
 - **Demo:** panggil writer dari harness, tampilkan baris audit lengkap.
+- **Model:** Sonnet — tabel append-only + writer service mengikuti pola sqlc/repository yang ada; terkontrol dan ter-test.
 
 ### [ ] Task 4 — Migrasi runtime approval
 - `024_approval_runtime.sql`:
@@ -75,33 +78,39 @@ CMS punya RBAC role-string yang berjalan (`RequireAuth`/`RequireRoles`, 9 role i
   - `user_leaves` (`user_id, start_at, end_at, reason`).
 - **Test:** up/down; FK & unik idempotency; enum status tervalidasi.
 - **Demo:** insert manual request + steps, tampilkan struktur runtime.
+- **Model:** Opus — skema inti runtime maker-checker (requests/steps/delegations/leaves) dengan uniqueness idempotency; fondasi money-approval, mahal bila salah.
 
 ### [ ] Task 5 — Chain resolver + effective-approver resolver (service, no HTTP)
 - `queries/approval.sql` + `internal/service`: (a) resolver chain atasan bertingkat dari `supervisor_id`/`approval_level` sampai `required_level`; (b) resolver "approver efektif" — approver cuti (`user_leaves` overlap now) -> delegate aktif (`approval_delegations` overlap now); guard maker != checker.
 - **Test (TDD table-driven):** chain berhenti di required_level; approver cuti -> delegate; tak ada delegate -> error jelas; delegate = maker -> ditolak.
 - **Demo:** unit test skenario normal, cuti+delegasi, tanpa delegasi.
+- **Model:** Opus — resolver hierarki bertingkat + effective-approver (cuti/delegasi) + guard maker != checker; logika inti yang salahnya melanggar four-eyes.
 
 ### [ ] Task 6 — Approval orchestrator (submit/approve/reject) + idempotency + audit
 - Service `SubmitForApproval`, `Approve`, `Reject`. Submit: lookup policy -> required_level -> request + steps via resolver -> idempotent per `(type, id)`. Approve: validasi approver step aktif = actor (atau delegate sah), maker != checker, majukan step / approved di step terakhir. Reject: stop. Tiap transisi tulis `audit_logs`. Write ke primary.
 - **Test (TDD):** submit ganda tak duplikat; approve berjenjang sampai approved; maker approve ditolak; reject stop; audit tiap transisi.
 - **Demo:** unit test end-to-end submit invoice 150jt -> 2 tingkat -> approved + trace audit.
+- **Model:** Opus — orchestrator submit/approve/reject + idempotency + audit tiap transisi; jantung maker-checker, correctness uang/approval kritikal.
 
 ### [ ] Task 7 — HTTP handler + wiring RBAC
 - `internal/handler/approval_handler.go` `Routes()`: `POST /submit`, `POST /{id}/approve`, `POST /{id}/reject`, `GET /{id}`, `GET /inbox`. Mount di `cmd/api/main.go` via `r.With(RequireAuth, RequireRoles(...supervisor roles...))`. Actor/ip dari `GetAuthContext` + RealIP.
 - **Test (httptest):** happy path submit/approve/reject/inbox; 401 tanpa token; 403 role tak berhak; 409 double-submit.
 - **Demo:** submit -> approver approve via inbox -> approved; non-approver 403.
+- **Model:** Sonnet — HTTP handler + RBAC wiring di atas orchestrator yang sudah ada; pola handler standar, ter-cover httptest.
 
 ### [ ] Task 8 — Admin endpoints (hierarki/delegasi/cuti) + threading level ke JWT/AuthContext
 - Endpoint admin set `supervisor_id`/`approval_level`, buat/cabut `approval_delegations`, catat `user_leaves` (tulis audit, `RequireRoles ADMIN/ADMIN_PARAM`).
 - Tambah `approval_level` (+ opsional `supervisor_id`) ke JWT claims & `AuthContext`; update token service + tests 9 role.
 - **Test:** admin-only enforced; delegasi rentang tumpang-tindih ditolak; klaim JWT bawa level; regression token existing hijau.
 - **Demo:** admin set hierarki 3 tingkat + delegasi, jalankan alur approval Task 6/7 yang mengikuti delegasi saat atasan cuti.
+- **Model:** Opus — mengubah JWT claims + AuthContext dan endpoint admin hierarki/delegasi; sentuhan auth, regresi token berisiko luas.
 
 ### [ ] Task 9 — Quality gate + dokumentasi
 - `sqlc generate`, `go test ./...`, `golangci-lint run`, `go build`.
 - Update project-context.md (tandai proposed -> ada), `.env.example` bila perlu, catatan pola approval untuk modul lain (invoice/dsr) memanggil orchestrator.
 - **Test:** seluruh suite hijau; coverage `internal/*` yang disentuh >= 80%.
 - **Demo:** ringkasan cara modul lain memakai `SubmitForApproval`.
+- **Model:** Sonnet — quality gate (sqlc/test/lint/build) + dokumentasi; butuh judgment triase, bukan reasoning tingkat Opus.
 
 ---
 

@@ -12,8 +12,10 @@ Merombak tampilan halaman login Vendor Portal agar sesuai mockup "CROWN" (`vendo
   - Muat font Plus Jakarta Sans + IBM Plex Mono (link `fonts.googleapis.com` di `index.html` atau `@import`), definisikan `--font-sans` dan `--font-mono`.
   - Tambahkan keyframes `crown-rise` + `crown-spin`, aturan `prefers-reduced-motion`, dan penanganan autofill `-webkit-autofill` seperti pada mockup.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/styles/index.css; frontend/VendorPortal-Vite/src/index.css_
+  - _Model: Sonnet — token OKLCH + fallback + font + keyframes; kerja CSS nyata dalam pola dikenal._
 
 - [ ] 2. Bangun kerangka layout split-screen sebagai struktur LoginPage baru
+  - _Model: Sonnet — kerangka layout responsif + pertahankan perilaku auth yang ada._
   - [ ] 2.1 Ganti markup `LoginPage.tsx` menjadi grid dua kolom `grid-cols-1 lg:grid-cols-[44fr_56fr]`, `min-h-dvh`
     - Panel kiri `<section>` brand (maroon-deep), panel kanan `<section>` form (surface terang).
     - Pertahankan landmark semantik dan tetap merender `null` saat sudah terautentikasi / spinner saat `state.isAuthLoading` (perilaku yang sudah ada).
@@ -29,14 +31,17 @@ Merombak tampilan halaman login Vendor Portal agar sesuai mockup "CROWN" (`vendo
   - Baris statistik bawah: "Batas unggah DSR" → "09.00 WIB" dan "Bantuan operasional" → "021 1500 800" (angka pakai `--font-mono` / `tabular-nums`).
   - Terapkan animasi masuk yang menghormati `prefers-reduced-motion`.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Haiku — markup brand + copy statis, minim penilaian._
 
 - [ ] 4. Panel kanan: pill status, heading, dan shell form
   - Status pill kanan-atas "Layanan normal" (titik hijau + label uppercase).
   - Heading "Masuk" + subheading "Gunakan kredensial vendor yang diterbitkan CIMB Niaga."
   - Siapkan elemen `<form onSubmit={handleSubmit(onSubmit)} noValidate>` sebagai wadah field (diisi di tugas berikutnya), pertahankan pemakaian `useForm` dari react-hook-form.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Sonnet — pill status + heading + shell form, pola dikenal._
 
 - [ ] 5. Field username dan password + validasi inline (wiring ke useAuth)
+  - _Model: Opus — field kredensial + wiring `login()`; menyentuh alur submit kredensial auth, salah berakibat mahal._
   - [ ] 5.1 Implementasi field "Nama pengguna" dan "Kata sandi" dengan `register` react-hook-form
     - Aturan validasi + pesan Bahasa Indonesia (wajib diisi, non-whitespace, batas panjang) seperti pada `LoginPage.tsx` saat ini.
     - Pesan error inline dengan ikon peringatan (Warn/AlertCircle), styling danger dari token tema.
@@ -50,18 +55,22 @@ Merombak tampilan halaman login Vendor Portal agar sesuai mockup "CROWN" (`vendo
   - Tombol ikon (Eye / eye-off) di dalam field password, `type="button"`.
   - `aria-label` dinamis: "Tampilkan kata sandi" / "Sembunyikan kata sandi"; nonaktif saat form terkunci/loading.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Haiku — tombol toggle ikon + aria-label, minim penilaian._
 
 - [ ] 7. Checkbox "Ingat perangkat ini" dan link "Lupa kata sandi?"
   - Checkbox remember-device (kontrol UI; belum ada perilaku persist backend — cukup state lokal).
   - Link "Lupa kata sandi?" dengan target stub (`#reset`). **Flag:** tidak ada alur reset password di kode saat ini — konfirmasi target ke user sebelum menghubungkan ke rute nyata.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Haiku — checkbox state lokal + link stub, minim penilaian._
 
 - [ ] 8. Deteksi Caps Lock + peringatan di bawah password
   - Pakai `getModifierState('CapsLock')` pada `onKeyUp`/`onKeyDown` field password.
   - Tampilkan peringatan "Caps Lock aktif." dengan ikon peringatan dan warna `--warning`.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Haiku — deteksi Caps Lock + peringatan, minim penilaian._
 
 - [ ] 9. Penanganan state UI (idle / loading / done / error / locked)
+  - _Model: Opus — pemetaan state auth termasuk lockout/rate-limit; salah tampil state kredensial berakibat mahal._
   - [ ] 9.1 Petakan state dari `useAuth` ke tampilan tombol dan alert
     - loading: spinner + label "Memverifikasi"; done: sukses hijau + "Berhasil masuk" dan pesan "Mengalihkan ke dasbor vendor" (`role="status"`).
     - error: alert danger-tint (`role="alert"`) dengan penghitung sisa percobaan; ambil pesan dari `state.error`.
@@ -76,14 +85,17 @@ Merombak tampilan halaman login Vendor Portal agar sesuai mockup "CROWN" (`vendo
   - Pertahankan `GuestRoute` yang mengalihkan user terautentikasi ke dashboard; jangan ubah `ProtectedRoute.tsx` maupun beralih ke TanStack Router.
   - **Flag:** target default `/dashboard` vs menu DSR `ROUTES.DSR = '/dsr'` — konfirmasi ke user, jangan diubah diam-diam.
   - _Referensi: frontend/VendorPortal-Vite/src/features/auth/ProtectedRoute.tsx; frontend/VendorPortal-Vite/src/lib/constants.ts; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Sonnet — pertahankan redirect + guard pasca-login, behavior-preserving._
 
 - [ ] 11. Pass aksesibilitas
   - `aria-invalid` + `aria-describedby` pada field; wilayah live `role="alert"` / `role="status"` dengan `aria-live`.
   - Focus ring `focus-visible` yang terlihat menggunakan `--primary`; urutan tab logis; label terkait `htmlFor`.
   - Hormati `prefers-reduced-motion` untuk semua animasi.
   - _Referensi: vendor-login-ui/crown-vendor-portal-login.html; frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx_
+  - _Model: Sonnet — atribut aria + fokus + tab order, pola dikenal._
 
 - [ ] 12. Sesuaikan dan lengkapi tes ter-kolokasi
+  - _Model: Sonnet — penyesuaian + penambahan tes komponen, pola dikenal._
   - [ ] 12.1 Sesuaikan tes yang ada bila selector berubah
     - Perbarui `AuthContext.test.tsx` bila query mengacu ke elemen login yang berubah; jaga `routeGuard.property.test.tsx` tetap lulus.
     - _Referensi: frontend/VendorPortal-Vite/src/features/auth/__tests__/AuthContext.test.tsx; routeGuard.property.test.tsx_
@@ -97,6 +109,7 @@ Merombak tampilan halaman login Vendor Portal agar sesuai mockup "CROWN" (`vendo
 - [ ] 13. Checkpoint akhir — pastikan gate kualitas hijau
   - Jalankan `pnpm lint`, `pnpm test --run`, dan `pnpm build` di `frontend/VendorPortal-Vite`. Pastikan semua lulus; perbaiki temuan sebelum selesai. Tanyakan ke user bila muncul pertanyaan.
   - _Referensi: frontend/VendorPortal-Vite_
+  - _Model: Sonnet — triase kegagalan lint/test/build butuh penilaian, jarang perlu Opus._
 
 ## Notes
 

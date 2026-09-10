@@ -171,6 +171,17 @@ func main() {
 		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
 	).Mount("/api/v1/admin/approval", adminApprovalHandler.Routes())
 
+	// Create and mount the Vendor Request handler (DMAA forecast -> CIT
+	// vendor replenishment order, self-contained maker-checker state
+	// machine — request-replenish-to-vendor spec). Mounted behind
+	// RequireAuth only, matching the approval handler above: the per-
+	// endpoint role subset (maker/checker/viewer) is applied inside
+	// Routes() itself since it differs per route, and actor-level
+	// authorization (creator/checker/four-eyes) is enforced in the service.
+	vendorRequestService := service.NewVendorRequestService(dbPool)
+	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService)
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
+
 	// Start HTTP server
 	addr := ":" + cfg.Port
 	srv := &http.Server{

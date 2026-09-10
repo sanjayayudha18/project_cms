@@ -12,6 +12,7 @@ Konvensi:
 ## Tasks
 
 - [ ] 1. Siapkan fondasi fitur dan tipe bersama (frontend)
+  - _Model: Haiku — scaffolding folder + definisi tipe, minim penilaian._
   - [ ] 1.1 Buat struktur folder dan tipe bersama
     - Buat struktur folder `src/features/dsr-home/` sesuai desain
     - Definisikan `types.ts`: `VendorIdentity`, `AssignedBranch`, `BalanceStatus`, `DsrRow`, `DsrSummary`, `DsrByDateResponse`, dan props komponen (`VendorIdentityPanelProps`, `DsrTableProps`, `DateSelectorProps`)
@@ -19,6 +20,7 @@ Konvensi:
     - _Requirements: 3.1, 6.4_
 
 - [ ] 2. Implementasi fungsi murni DSR (`dsr.logic.ts`)
+  - _Model: Sonnet — logika klasifikasi saldo + format IDR + agregasi, pola dikenal._
   - [ ] 2.1 Implementasi `getBalanceStatus`, `formatIDR`, `summarize`
     - `getBalanceStatus(endingBalance)`: Critical < 50.000.000; Low 50.000.000–150.000.000 inklusif; Normal > 150.000.000
     - `formatIDR(amount)`: `"IDR "` + angka locale id-ID (pemisah ribuan titik, tanpa desimal)
@@ -43,8 +45,10 @@ Konvensi:
 
 - [ ] 3. Checkpoint - fungsi murni frontend
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triase kegagalan test butuh penilaian, jarang perlu Opus._
 
 - [ ] 4. Backend: query read-only dan scoping vendor→ATM (sqlc)
+  - _Model: Sonnet — query sqlc read-only + wiring pool replica, pola dikenal._
   - [ ] 4.1 Definisikan query sqlc untuk identitas vendor + cabang assigned
     - Query `GetVendorByID` (dari `vendors` by id, hanya aktif/belum dihapus) untuk `vendor_name`
     - Query `ListVendorBranches` (dari `vendor_branches WHERE vendor_id = $1`, urut `branch_name` asc)
@@ -60,6 +64,7 @@ Konvensi:
     - _Requirements: 6.5_
 
 - [ ] 5. Backend: service layer DSR ter-scope vendor
+  - _Model: Opus — isolasi data ter-scope vendor + audit lintas-vendor + pemetaan uang; salah scope membocorkan data vendor lain._
   - [ ] 5.1 Implementasi `VendorIdentityService.GetIdentity(ctx, vendorID)`
     - Ambil nama vendor + daftar cabang; assert `vendorID != nil` dan vendor aktif
     - Susun `branch_count = len(branches)`, cabang terurut `branch_name` asc
@@ -83,6 +88,7 @@ Konvensi:
     - _Requirements: 3.9, 5.4, 5.5_
 
 - [ ] 6. Backend: handler + routing (JSON datar, terproteksi)
+  - _Model: Sonnet — handler + registrasi route + mapping error, pola dikenal._
   - [ ] 6.1 Implementasi handler `GET /api/v1/vendor/me/branches`
     - Ambil `vendor_id` dari `AuthContext`; kembalikan JSON datar `{vendor_id, vendor_name, branch_count, branches[]}`
     - _Requirements: 2.1, 2.2, 2.3, 6.4, 6.7_
@@ -99,8 +105,10 @@ Konvensi:
 
 - [ ] 7. Checkpoint - backend endpoint
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triase kegagalan test butuh penilaian, jarang perlu Opus._
 
 - [ ] 8. Frontend: API client + hooks TanStack Query
+  - _Model: Sonnet — fetcher + hooks TanStack Query, pola dikenal._
   - [ ] 8.1 Implementasi fetcher dengan Bearer JWT dan timeout 10s
     - Sisipkan Authorization Bearer pada setiap request ke ATM backend :8080; timeout 10s memicu error fetch
     - Interseptor 401 memicu pembersihan state auth + query cache
@@ -116,6 +124,7 @@ Konvensi:
     - **Validates: Requirements 5.1, 6.6, 6.7**
 
 - [ ] 9. Frontend: komponen DSR Home
+  - _Model: Sonnet — komponen React + tabel + kartu ringkasan, pola dikenal._
   - [ ] 9.1 Implementasi `VendorIdentityPanel.tsx`
     - Tampilkan nama vendor (+ elipsis via `truncate` dan atribut `title` bila > 40 char), daftar cabang terurut, `branch_count`
     - Empty state "belum ada cabang", error inline + tombol coba lagi; tema Merah Menyala
@@ -141,6 +150,7 @@ Konvensi:
     - _Requirements: 2.6, 2.7, 2.8, 3.1, 3.9, 3.10, 3.11, 5.3, 7.1_
 
 - [ ] 10. Frontend: routing, guard, dan redirect landing (TanStack Router)
+  - _Model: Sonnet — route terproteksi + guard + redirect, behavior-preserving._
   - [ ] 10.1 Susun route terproteksi dan default landing ke /dsr
     - `__root.tsx` (Query + Auth + Outlet), `_authed.tsx` (AppShell + guard), `_authed/index.tsx` (`/` → redirect `/dsr`), `_authed/dsr.tsx`
     - Sidebar menandai item DSR aktif (gaya Merah Menyala) saat pathname `/dsr`
@@ -156,6 +166,7 @@ Konvensi:
     - **Validates: Requirements 1.5, 1.6, 1.9**
 
 - [ ] 11. Frontend: aksesibilitas dan responsivitas
+  - _Model: Sonnet — landmark, kontras, fokus, dan responsivitas, pola dikenal._
   - [ ] 11.1 Landmark semantik, badge redundan, dan scroll responsif
     - `<main>` untuk konten utama, `<table>`/`<th>`/`<tr>` untuk data tabular
     - Status Saldo selalu warna + ikon unik + label teks (Req 7.1)
@@ -169,6 +180,7 @@ Konvensi:
     - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6_
 
 - [ ] 12. Integrasi akhir dan wiring end-to-end
+  - _Model: Sonnet — wiring komponen ke hooks/guard end-to-end, pola dikenal._
   - [ ] 12.1 Wire DsrHomePage ke hooks, DateSelector, dan guard route
     - Hubungkan `useVendorIdentity` + `useDsrByDate` ke panel/kartu/tabel; state tanggal terpilih dipertahankan saat error/retry
     - Pastikan alur login → redirect `/dsr` → render lengkap terhubung tanpa kode menggantung
@@ -179,6 +191,7 @@ Konvensi:
 
 - [ ] 13. Checkpoint akhir - seluruh test lulus
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triase kegagalan test butuh penilaian, jarang perlu Opus._
 
 ## Notes
 

@@ -21,6 +21,10 @@ import { invoiceListRoute } from "./routes/invoice/list";
 import { reconciliationRoute } from "./routes/invoice/reconciliation";
 import { loginRoute } from "./routes/login";
 import { replenishmentRoute } from "./routes/replenishment";
+import { forecastBrowserRoute } from "./routes/replenishment/forecast-browser";
+import { vendorRequestDetailRoute } from "./routes/replenishment/vendor-requests/$id";
+import { vendorRequestListRoute } from "./routes/replenishment/vendor-requests/index";
+import { vendorRequestNewRoute } from "./routes/replenishment/vendor-requests/new";
 import "./styles/index.css";
 
 // ─── Route Tree ───────────────────────────────────────────────────────────────
@@ -34,6 +38,10 @@ const routeTree = rootRoute.addChildren([
     cashFlowRoute,
     citRoute,
     replenishmentRoute,
+    forecastBrowserRoute,
+    vendorRequestNewRoute,
+    vendorRequestListRoute,
+    vendorRequestDetailRoute,
     forecastingRoute,
     forecastRoute,
     dmaaForecastRoute,

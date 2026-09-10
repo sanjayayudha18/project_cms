@@ -7,6 +7,7 @@ Restructure the CMS backend into a Go workspace (`go.work`) with three modules: 
 ## Tasks
 
 - [x] 1. Create shared `pkg/` module with extracted infrastructure code
+  - _Model: Opus — extracting auth/token/middleware into shared module; a mistake here silently weakens auth for both backends._
   - [x] 1.1 Create `pkg/go.mod` with module path `github.com/cimb-niaga/cms/pkg`, Go 1.25.0, and dependencies (chi/v5, jwt/v5, pgx/v5, go-redis/v9, x/crypto, google/uuid)
     - Initialize the module file with all required dependencies
     - _Requirements: 2.1, 2.7_
@@ -66,11 +67,14 @@ Restructure the CMS backend into a Go workspace (`go.work`) with three modules: 
   - [x] 2.1 Create `go.work` at repository root with Go 1.25.0 and `use` directives for `./backend`, `./backend-cit`, `./pkg`
     - Run `go work sync` to generate `go.work.sum`
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - _Model: Haiku — creating a `go.work` file with `use` directives is mechanical, well-specified config._
 
 - [x] 3. Checkpoint — Verify `pkg/` module compiles independently
   - Ensure `go build ./...` passes in `pkg/` directory, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; needs judgment to triage compile failures in the extracted module._
 
 - [x] 4. Update ATM backend to import from shared `pkg/`
+  - _Model: Opus — rewiring the live ATM backend's auth/middleware/config imports; a wrong swap breaks token validation on a running service._
   - [x] 4.1 Add `require github.com/cimb-niaga/cms/pkg` directive to `backend/go.mod`
     - _Requirements: 3.2_
 
@@ -115,8 +119,10 @@ Restructure the CMS backend into a Go workspace (`go.work`) with three modules: 
 
 - [x] 5. Checkpoint — Verify ATM backend compiles and tests pass
   - Ensure `go build ./...` and `go test ./...` pass in `backend/` directory, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging build/test failures after the import refactor needs judgment._
 
 - [x] 6. Create CIT backend skeleton
+  - _Model: Sonnet — scaffolding a new module with a Chi server, shared-auth wiring, and placeholder packages within known patterns._
   - [x] 6.1 Create `backend-cit/go.mod` with module path `github.com/cimb-niaga/cms/backend-cit`, Go 1.25.0, require `pkg`, and dependencies (chi/v5, pgx/v5, go-redis/v9, jwt/v5)
     - _Requirements: 4.1, 4.2, 4.6_
 
@@ -163,6 +169,7 @@ Restructure the CMS backend into a Go workspace (`go.work`) with three modules: 
     - depends_on redis (condition: service_healthy)
     - Health check: wget to `http://localhost:8081/health`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+  - _Model: Sonnet — adding a compose service with build context, ports, env, and health check within a known pattern._
 
 - [x] 8. Final checkpoint — Verify full workspace builds
   - Run `go build ./...` from repository root with workspace active
@@ -171,6 +178,7 @@ Restructure the CMS backend into a Go workspace (`go.work`) with three modules: 
   - Ensure no circular dependencies exist between modules
   - Ensure all tests pass, ask the user if questions arise.
   - _Requirements: 10.1, 10.2, 10.4, 10.5_
+  - _Model: Sonnet — final workspace-wide build/vet gate; needs judgment to triage cross-module or circular-dependency failures._
 
 ## Notes
 

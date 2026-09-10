@@ -15,6 +15,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
 ## Tasks
 
 - [ ] 1. Tambah dependensi TanStack Router dan siapkan skema search param
+  - _Model: Sonnet — tambah dependensi + skema sanitasi redirect Zod, pola dikenal._
   - [ ] 1.1 Tambah dependensi `@tanstack/react-router` (pertahankan `react-router` sementara agar test lama tetap hijau selama transisi)
     - Jalankan `pnpm add @tanstack/react-router` di `frontend/VendorPortal-Vite/`
     - Pastikan versi selaras dengan CompanyPortal (`^1.93.0` atau kompatibel)
@@ -33,6 +34,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Medium_
 
 - [ ] 2. Bangun akar route tree dan komponen provider
+  - _Model: Sonnet — root route + pemindahan provider, behavior-preserving._
   - [ ] 2.1 Buat `src/routes/__root.tsx` (`rootRoute`)
     - `createRootRoute` dengan `component: RootComponent` dan `notFoundComponent: NotFound`
     - `RootComponent` membungkus `<Outlet/>` dengan `QueryClientProvider` (pakai `queryClient` dari `@/lib/queryClient`) lalu `AuthProvider` (dari `@/features/auth/AuthContext`) tanpa modifikasi
@@ -44,6 +46,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Low_
 
 - [ ] 3. Bangun guard berbasis komponen (auth + guest) dan shell layout
+  - _Model: Sonnet — guard auth/guest + timeout + shell, behavior-preserving tanpa penanganan kredensial._
   - [ ] 3.1 Tulis ulang `src/features/auth/ProtectedRoute.tsx` menjadi komponen layout TanStack Router
     - Ekspor `ProtectedLayout` (auth guard) dan `AuthLayout` (guest guard) memakai `useAuth()`
     - `ProtectedLayout`: `isAuthLoading` → spinner `Loader2` (markup identik dengan saat ini); `!isAuthenticated` → `<Navigate to="/login" search={{ redirect: currentPath }} replace/>` dengan `currentPath = pathname + search` via `useRouterState`/`useLocation`; selain itu `<Outlet/>`
@@ -68,6 +71,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Medium_
 
 - [ ] 4. Definisikan route halaman, redirect, dan masking
+  - _Model: Haiku — definisi route + redirect + masking, sebagian besar wiring mekanis._
   - [ ] 4.1 Buat `src/routes/login.tsx` (`loginRoute`)
     - Child `_auth`, `path: "/login"`, `validateSearch: redirectSearchSchema`, `component: LoginPage`
     - _Requirements: 2.1, 3.8_
@@ -91,6 +95,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Haiku, Effort: Low_
 
 - [ ] 5. Adaptasi LoginPage ke search param TanStack Router
+  - _Model: Sonnet — adaptasi hook router pada LoginPage, behavior-preserving (bukan reimplementasi auth)._
   - [ ] 5.1 Ubah `src/features/auth/LoginPage.tsx`
     - Ganti `useLocation`/`URLSearchParams`/`useNavigate` (`react-router`) → `useSearch({ from: loginRoute.id })` dan `useNavigate` (`@tanstack/react-router`)
     - `redirectTo` dibaca dari search tervalidasi, default `/orders`; efek "sudah authenticated → redirect" mengarah ke `/orders`
@@ -103,6 +108,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Low_
 
 - [ ] 6. Wiring router di titik masuk aplikasi
+  - _Model: Sonnet — bangun route tree + createRouter + RouterProvider, pola dikenal._
   - [ ] 6.1 Ubah `src/main.tsx`
     - Bangun `routeTree` via `rootRoute.addChildren([...])` sesuai hierarki desain (`_auth`>login; `_protected`>shell>halaman; index; dashboard; admin/forecasting/reconciliation)
     - `createRouter({ routeTree })`; `declare module "@tanstack/react-router" { interface Register { router: typeof router } }`
@@ -119,6 +125,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
   - _Model: Claude Sonnet, Effort: Low_
 
 - [ ] 8. Adaptasi dan tambah test property-based (fast-check, min. 100 iterasi)
+  - _Model: Sonnet — property test guard/redirect/pemetaan route, pola dikenal._
   - [ ] 8.1 Siapkan util test TanStack Router memory-history
     - Helper membuat `createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [path] }) })` lalu render `<RouterProvider router={testRouter} />` dengan `fetch` di-mock; pastikan `AuthProvider` aktif via root
     - _Requirements: 7.1_
@@ -141,6 +148,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Medium_
 
 - [ ] 9. Test unit/integration dan parity a11y/visual
+  - _Model: Sonnet — test pemetaan route + parity a11y/visual, pola dikenal._
   - [ ]* 9.1 Pertahankan `src/features/auth/__tests__/AuthContext.test.tsx` tanpa perubahan logika
     - Sesuaikan hanya impor jika menyentuh router; logika auth tidak diubah
     - _Requirements: 4.1_
@@ -152,6 +160,7 @@ Semua perintah dijalankan dari `frontend/VendorPortal-Vite/`.
     - _Model: Claude Sonnet, Effort: Medium_
 
 - [ ] 10. Hapus React Router dan finalisasi
+  - _Model: Sonnet — hapus dependensi + bersihkan impor tersisa, pola dikenal._
   - [ ] 10.1 Hapus dependensi dan seluruh impor `react-router`
     - `pnpm remove react-router`; hapus setiap `import` `react-router`/`react-router-dom` yang tersisa di kode sumber
     - _Requirements: 7.4, 7.5_

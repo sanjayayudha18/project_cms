@@ -9,6 +9,7 @@ Implementation follows the project's feature-based module pattern (`src/features
 ## Tasks
 
 - [ ] 1. Set up feature module structure and types
+  - _Model: Sonnet — feature scaffolding, TypeScript types, and formatting utilities; standard frontend setup within known patterns._
   - [ ] 1.1 Create feature directory and barrel export
     - Create `src/features/eod-monitoring/` directory structure: `index.ts`, `types.ts`, `hooks/`, `components/`, `__tests__/`
     - Create `index.ts` barrel export (empty for now, will be populated as components are built)
@@ -27,6 +28,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - _Requirements: 4.5, 7.5, 8.7, 8.8_
 
 - [ ] 2. Implement TanStack Query hooks
+  - _Model: Sonnet — TanStack Query hooks, query keys, and mutations; routine data-fetching wiring._
   - [ ] 2.1 Create query hooks file
     - Create `src/features/eod-monitoring/hooks/useEodQueries.ts`
     - Define `eodKeys` query key factory: `all`, `summary(date)`, `status(date)`, `history(fileId)`, `late(date)`, `audit(date, fileType, trigger)`
@@ -48,6 +50,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - _Requirements: 12.3_
 
 - [ ] 3. Implement utility and header components
+  - _Model: Sonnet — small presentational React components (toggle, date picker, indicators); contained UI work._
   - [ ] 3.1 Create PollingToggle component
     - Create `src/features/eod-monitoring/components/PollingToggle.tsx`
     - Render a toggle switch showing polling state (active/inactive)
@@ -77,6 +80,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - _Requirements: 3.5, 10.2, 10.4_
 
 - [ ] 4. Implement Summary Section
+  - _Model: Sonnet — summary cards grid with loading/error states; standard component composition._
   - [ ] 4.1 Create SummarySection component
     - Create `src/features/eod-monitoring/components/SummarySection.tsx`
     - Fetch data using `useEodSummary(processingDate, refetchInterval)`
@@ -94,6 +98,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 3.2**
 
 - [ ] 5. Implement File Status Table
+  - _Model: Sonnet — DataTable with sorting, badge mapping, and keyboard nav; real UI work within known patterns._
   - [ ] 5.1 Create FileStatusSection component
     - Create `src/features/eod-monitoring/components/FileStatusSection.tsx`
     - Fetch data using `useEodStatus(processingDate, refetchInterval)`
@@ -118,9 +123,11 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 4.3, 8.5, 8.6**
 
 - [ ] 6. Checkpoint
+  - _Model: Sonnet — checkpoint gate; triaging test failures needs judgment but not Opus-level reasoning._
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 7. Implement Retry Drawer
+  - _Model: Sonnet — side drawer with animation, focus trap, and history list; contained frontend component._
   - [ ] 7.1 Create RetryDrawer component
     - Create `src/features/eod-monitoring/components/RetryDrawer.tsx`
     - Slide in from right: 300ms `cubic-bezier(0.22, 1, 0.36, 1)` on `transform` + `opacity`, exit at 225ms (75% of enter)
@@ -142,6 +149,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 5.5, 5.6, 5.7**
 
 - [ ] 8. Implement Retry Confirmation Dialog
+  - _Model: Sonnet — confirmation dialog with mutation wiring, toast, and 409 handling; the retry is executed backend-side, this is UI._
   - [ ] 8.1 Create RetryConfirmationDialog component
     - Create `src/features/eod-monitoring/components/RetryConfirmationDialog.tsx`
     - Accept `file: FileStatusItem | null` and `onClose: () => void` props
@@ -161,6 +169,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 6.2**
 
 - [ ] 9. Implement Late Alerts Section
+  - _Model: Sonnet — alert cards with badge mapping and empty/loading states; standard component work._
   - [ ] 9.1 Create LateAlertsSection component
     - Create `src/features/eod-monitoring/components/LateAlertsSection.tsx`
     - Fetch data using `useEodLate(processingDate, refetchInterval)`
@@ -179,6 +188,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 7.2, 7.3, 7.4, 7.5**
 
 - [ ] 10. Implement Audit Log Section
+  - _Model: Sonnet — filterable audit table with badge mapping and timestamp formatting; read-only display within known patterns._
   - [ ] 10.1 Create AuditLogSection component
     - Create `src/features/eod-monitoring/components/AuditLogSection.tsx`
     - Manage local filter state: `fileType` and `trigger` (default: null = "Semua")
@@ -200,9 +210,11 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 8.3**
 
 - [ ] 11. Checkpoint
+  - _Model: Sonnet — checkpoint gate; triaging test failures needs judgment but not Opus-level reasoning._
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 12. Implement Page Orchestrator and Route
+  - _Model: Sonnet — page state composition, route registration, and role-guard wiring; standard frontend orchestration._
   - [ ] 12.1 Create EodMonitoringPage orchestrator component
     - Create `src/features/eod-monitoring/components/EodMonitoringPage.tsx`
     - Manage page state: `processingDate` (default: today in WIB), `pollingEnabled` (default: true), `selectedFileId` (default: null), `retryDialogFile` (default: null)
@@ -231,6 +243,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - _Requirements: 12.1_
 
 - [ ] 13. Final integration and verification
+  - _Model: Sonnet — integration and property tests for the assembled page; test authoring within known patterns._
   - [ ]* 13.1 Write integration test for EodMonitoringPage
     - Test section isolation: mock one section API to fail, assert other sections render normally
     - Test date change triggers all section refetches
@@ -250,6 +263,7 @@ Implementation follows the project's feature-based module pattern (`src/features
     - **Validates: Requirements 4.5, 7.5, 8.7, 8.8**
 
 - [ ] 14. Final checkpoint
+  - _Model: Sonnet — final checkpoint gate; triaging failures needs judgment but not Opus-level reasoning._
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

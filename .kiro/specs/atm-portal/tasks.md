@@ -24,6 +24,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — low. Mostly confirming facts already verified live against the `cms` database in this session; no design judgment needed._
 
 - [ ] 2. Backend: sqlc queries
+  - _Model: Sonnet — read-only sqlc queries; the heavy dynamic join/lateral/precedence-CASE work in 2.1 is the correctness hotspot but still within Sonnet's reach per the per-task effort notes._
   - [x] 2.1 Write `backend/queries/atm_portal.sql` with `ListATMsWithCashPos`, `CountATMsWithCashPos`, `GetATMSummary`, `GetLastUpdated`
     - `JOIN locations l ON l.id = a.location_id` and `JOIN regions r ON r.id = l.region_id` for `location_name` (`l.name`), `address` (`l.address_line1` + nullable `l.address_line2`), and `region` (`r.region`) — these are NOT columns on `atms` directly (see Task 1.1 correction)
     - Use `LEFT JOIN LATERAL` on `itm_cashpos` ordered by `replenish_date DESC, replenish_time DESC LIMIT 1`
@@ -37,6 +38,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — low. Running a codegen tool and checking the output landed; no authorship._
 
 - [ ] 3. Backend: service layer
+  - _Model: Sonnet — read service with param validation and result assembly, shape fully specified by design.md._
   - [x] 3.1 Implement `backend/internal/service/atm_portal.go`
     - `ListATMsParams` struct with `validator` tags matching design.md exactly (page >=1, page_size 1-100, status oneof, sort_by oneof, sort_order oneof)
     - `AtmPortalService.ListATMs(ctx, params) (*ListATMsResult, error)` — validates params, delegates to repository, assembles `Data`, `Summary`, `Total`, `Page`, `PageSize`, `LastUpdated`
@@ -45,6 +47,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — medium. Validation-tag correctness matters but the shape is fully specified by design.md; low ambiguity._
 
 - [ ] 4. Backend: HTTP handler
+  - _Model: Sonnet — HTTP handler + route wiring mirroring existing `auth_handler.go` conventions._
   - [x] 4.1 Implement `backend/internal/handler/atm_portal_handler.go`
     - `AtmPortalHandler.Routes()` returning `chi.Router` with `GET /atms` → `ListATMs`
     - Parse query params, on validation failure return 400 with descriptive Indonesian message via existing `writeError`/`writeValidationError` helpers (match `auth_handler.go` conventions)
@@ -56,6 +59,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — low. One-line wiring, confirmed `RequireAuth` already exists at `internal/middleware/rbac.go:27`._
 
 - [ ] 5. Backend: property and integration tests (pgregory.net/rapid, requires test DB)
+  - _Model: Sonnet — property/integration tests verifying invariants against a real test Postgres; careful boundary reasoning but no money/approval logic._
   - [x] 5.1 Write property tests for status classification and latest-record selection (Properties 1, 2)
     - **Property 1: Replenishment status classification**
     - **Property 2: Latest record selection**
@@ -83,6 +87,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
   - _Model: Sonnet 5 — low. Running existing commands and comparing output against a spec; escalate only if a failure needs root-causing._
 
 - [ ] 7. Frontend: types, constants, formatters
+  - _Model: Sonnet — types/constants are transcription-level, but the locale formatters and their property tests carry the tier._
   - [x] 7.1 Create `src/features/atm-portal/types.ts` — `ReplenishmentStatus`, `AtmRecord`, `AtmSummary`, `AtmPortalResponse`, `AtmPortalParams` exactly per design.md
     - _Requirements: 9.4_
     - _Model: Sonnet 5 — low. Types are given verbatim in design.md; transcription work._
@@ -98,6 +103,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — medium. Pure-function property tests with `fast-check`; straightforward once formatters exist, but boundary values (0, null, 10^12) need deliberate generators._
 
 - [ ] 8. Frontend: data hook and URL state
+  - _Model: Sonnet — TanStack Query hook + debounced URL-search sync; established React pattern with known footguns._
   - [x] 8.1 Create `src/features/atm-portal/useAtmPortalData.ts` — TanStack Query hook, query key includes all params, `staleTime: 2min`, `placeholderData: keepPreviousData`, `refetchOnWindowFocus: true`
     - _Requirements: 1.1 through 1.10, 5.7, 8.3_
     - _Model: Sonnet 5 — medium. Query key composition and TanStack Query config are pattern-matchable against existing hooks in `src/features/*`._
@@ -110,6 +116,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — medium. Single round-trip invariant (serialize → parse → equal) with `fast-check`._
 
 - [ ] 9. Frontend: presentational components
+  - _Model: Sonnet — presentational components; most are small and fully specified, but `AtmTable` (9.5) with its five render states + `aria-sort` carries the group._
   - [x] 9.1 `components/StatusBadge.tsx` — icon + label per status (Critical/AlertTriangle/danger, Low/TrendingDown/warning, Normal/CheckCircle/success, Unconfigured/Settings/neutral, No Data/HelpCircle/neutral), text always visible (never color-only)
     - _Requirements: 4.5, 11.2_
     - _Model: Sonnet 5 — low. Small, fully enumerated icon/label/color mapping — no design decisions left open._
@@ -133,6 +140,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — low. Small, focused piece, but verify the announcement text actually changes on each state transition (a static `aria-live` region that never re-renders its text is a common a11y bug)._
 
 - [ ] 10. Frontend: page composition
+  - _Model: Sonnet — composition of already-built pieces; the error-retry-preserves-filters wiring needs deliberate state handling._
   - [x] 10.1 `AtmPortalScreen.tsx` — compose PageHeader ("ATM Portal" / "Monitor posisi kas dan status replenishment seluruh ATM"), DataFreshnessIndicator, SummaryCardsGrid, FilterBar, AtmTable, PaginationControls within existing `AppShell`
     - Loading state: skeleton cards + skeleton rows; Error state: retry preserves current filter selections; Retry button re-fetches via `queryClient.refetchQueries`
     - _Requirements: 3.1, 3.2, 3.5, 5.6, 5.7, 8.1, 8.2, 8.3, 8.5, 10.3_
@@ -145,6 +153,7 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
     - _Model: Sonnet 5 — low. Confirmed pattern already exists verbatim at `src/routes/replenishment.tsx`; copy the shape._
 
 - [ ] 11. Navigation integration
+  - _Model: Haiku — additive nav-config edits and matching test extensions; design.md gives the exact diff._
   - [x] 11.1 Extend `src/lib/config/navigation.ts` — add `"monitoring"` to `NavGroup` type (after `"general"`), add to `GROUP_LABELS`, add ATM Portal nav item (`Monitor` icon, `/atm-portal`, roles `["ATM-USER", "ATM-SPV"]`, group `"monitoring"`)
     - Verify `Sidebar.tsx` renders the new group in the correct position automatically (it derives order from type/GROUP_LABELS — no Sidebar.tsx changes expected, confirm during task)
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
@@ -160,11 +169,13 @@ Task 1 below replaces the design doc's proposed migration task with a verificati
   - _Model: Sonnet 5 — low. Running existing tooling and eyeballing the live page; escalate only if something fails and needs diagnosis._
 
 - [ ] 13. Unit tests (example-based, per design.md Testing Strategy table)
+  - _Model: Sonnet — wide but shallow example-based component tests against already-built components._
   - [x] 13.1 Frontend component tests: PageHeader content, summary card order, badge icon/label per status, loading skeleton counts, error state content, retry triggers refetch, empty state message, pagination options, Sidebar group ordering, nav link + icon + navigation, semantic table structure
     - _Requirements: 3.2, 3.3, 4.5, 4.8, 6.1, 6.2, 6.3, 8.1, 8.2, 8.3, 8.4, 11.1_
     - _Model: Sonnet 5 — medium. Wide surface (11 requirements) but each assertion is a simple example-based check against already-built components — breadth, not depth._
 
 - [ ] 14. Responsive and accessibility pass
+  - _Model: Sonnet — manual responsive/keyboard/a11y verification in a real browser; needs judgment, not deep reasoning._
   - [x] 14.1 Verify summary card grid breakpoints (4 col ≥1024px, 2 col 768–1023px, 1 col <768px), no horizontal page overflow from 320px up, table horizontal scroll container, 44×44px touch targets <768px
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
     - _Model: Sonnet 5 — medium. Manual/visual verification across breakpoints; needs a real browser check (resize_window / preview), not just code reading._

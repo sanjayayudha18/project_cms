@@ -7,6 +7,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
 ## Tasks
 
 - [x] 1. Set up feature module structure and types
+  - _Model: Haiku — TypeScript interfaces, color constants, and a dependency install are mechanical, low-judgment scaffolding._
   - [x] 1.1 Create TypeScript interfaces and type definitions
     - Create `src/features/cash-flow/types.ts` with all interfaces: `TrendDirection`, `CashLevelTier`, `StatsCardData`, `VendorDayFlow`, `VendorConfig`, `AtmLevel`, `CashFlowSummary`, `UseCashFlowDataReturn`
     - _Requirements: 8.3_
@@ -20,6 +21,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
     - _Requirements: 4.3_
 
 - [x] 2. Implement data fetching hook
+  - _Model: Sonnet — a TanStack Query hook with mock data plus its unit tests, standard implementation work._
   - [x] 2.1 Create useCashFlowData TanStack Query hook
     - Create `src/features/cash-flow/useCashFlowData.ts` with `useQuery` using key `['cash-flow', 'summary']`, mock fetch function with realistic prototype data (Rp 48,2 M, Rp 21,7 M, Rp 26,5 M, Rp 3,9 M / 6 orders), 5-min staleTime
     - _Requirements: 6.1, 6.2, 6.3_
@@ -29,6 +31,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
     - _Requirements: 6.1, 6.2, 6.3_
 
 - [x] 3. Implement StatsCard components
+  - _Model: Sonnet — React KPI card components with responsive grid and property/unit tests, normal component work._
   - [x] 3.1 Create StatsCard component
     - Create `src/features/cash-flow/StatsCard.tsx` with KPI display: icon, label, formatted value, optional subtitle, and TrendIndicator sub-component with sr-only text and semantic color classes
     - _Requirements: 3.2, 3.3, 3.4, 3.5, 3.6, 9.3_
@@ -47,6 +50,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
 - [x] 4. Implement VendorBarChart component
+  - _Model: Sonnet — a Recharts bar chart with accessibility and contrast tests, contained component work._
   - [x] 4.1 Create VendorBarChart with Recharts
     - Create `src/features/cash-flow/VendorBarChart.tsx` using `ResponsiveContainer`, `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `Legend` from recharts. Render grouped bars per vendor with OKLCH colors, min-height 240px, `aria-label` for accessibility
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 9.1_
@@ -62,8 +66,10 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
 
 - [x] 5. Checkpoint - Verify stats and chart components
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging component/test failures needs judgment._
 
 - [x] 6. Implement AtmLevelTable component
+  - _Model: Sonnet — a table with semantic-colored progress bars, ARIA attributes, and tests, standard component work._
   - [x] 6.1 Create AtmLevelTable with progress bars
     - Create `src/features/cash-flow/AtmLevelTable.tsx` with `getCashLevelTier` function, `AtmLevelRow` sub-component rendering monospace ATM ID, semantic-colored progress bar with ARIA attributes (`role="progressbar"`, `aria-valuenow`, `aria-valuemin=0`, `aria-valuemax=100`), and right-aligned tabular-nums percentage
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.2_
@@ -83,6 +89,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
     - _Requirements: 5.3, 5.4, 5.5, 5.6, 9.2_
 
 - [x] 7. Compose CashFlowScreen page
+  - _Model: Sonnet — composing the page from existing components with loading/error states and tests, standard wiring._
   - [x] 7.1 Create CashFlowScreen with loading/error states
     - Create `src/features/cash-flow/CashFlowScreen.tsx` composing PageHeader (title, description), DataSourceBadge (info variant, Database icon, "Sumber: EOD H-1"), StatsCardGrid, split layout grid (`grid-cols-[1.5fr_1fr]` at ≥1024px), VendorBarChartPanel, AtmLevelTablePanel, skeleton loading state, error state with retry
     - _Requirements: 2.1, 2.2, 2.3, 6.4, 6.5, 7.1, 7.2, 7.3, 9.4_
@@ -96,6 +103,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
     - _Requirements: 2.1, 6.4, 6.5, 9.4_
 
 - [x] 8. Integrate navigation and routing
+  - _Model: Haiku — nav registration and a single route entry are mechanical wiring; the integration test is the only judgment part._
   - [x] 8.1 Add Monitoring nav group to constants.ts
     - Update `src/lib/constants.ts`: import `Activity` icon, append a "Monitoring" `NavGroup` with a single item `{ path: '/cash-flow', label: 'Cash Flow Monitoring', icon: Activity }` after existing groups
     - _Requirements: 1.1, 1.3, 1.4_
@@ -110,6 +118,7 @@ Implement a read-only Cash Flow Monitoring dashboard page at `/cash-flow` follow
 
 - [x] 9. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — final test gate; triaging any failures needs judgment._
 
 ## Notes
 

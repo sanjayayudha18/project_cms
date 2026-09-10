@@ -93,6 +93,7 @@ Implementation plan for the user-login feature covering database migration, back
 - [ ] 10. CompanyPortal Auth Store Refactoring
   Refactor the existing Zustand auth store (`frontend/CompanyPortal-Vite/src/lib/auth/store.ts`) to use DB role strings, wire to real backend API, implement token refresh with single-flight pattern, and handle rate limit state.
   **Validates: Requirements 3, 9, 10, 11, 12**
+  - _Model: Opus — auth token handling + single-flight refresh + credential state; a mistake breaks auth for the whole portal._
   - [ ] 10.1 Refactor `src/lib/auth/store.ts` — replace the existing Role type with `DbRole` union type of 9 DB roles (`ADMIN | ADMIN_PARAM | ATM-USER | ATM-SPV | BRANCH-USER | BRANCH-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | VENDOR-USER`); update `AuthUser` interface to use single `role: DbRole` field; add `username`, `vendorId` fields; store access token in memory (not localStorage); add `rateLimitRetryAfter: number | null` state; add `isAuthLoading: boolean` state
     - _Requirements: 10.1, 10.5, 10.7_
   - [ ] 10.2 Implement `login` action in store — call `POST /api/v1/auth/login` with JSON body and `X-Portal-Type: company` header; on success extract `access_token` and `user` from response; on error parse error type (`auth_failed`, `account_inactive`, `portal_mismatch`, `rate_limited`, `validation_error`, `service_unavailable`) and set appropriate error state; for 429 parse `Retry-After` header and set `rateLimitRetryAfter`
@@ -109,6 +110,7 @@ Implementation plan for the user-login feature covering database migration, back
 - [ ] 11. CompanyPortal Navigation Refactoring
   Refactor navigation configuration (`frontend/CompanyPortal-Vite/src/lib/config/navigation.ts`) to use DB role strings and update `filterNavByRoles` logic for single-role filtering.
   **Validates: Requirement 11**
+  - _Model: Sonnet — role-based nav filtering, contained and test-covered._
   - [ ] 11.1 Refactor `src/lib/config/navigation.ts` — change `NavItem.roles` type to `(DbRole | "*")[]`; update all `NAV_CONFIG` entries to use DB role strings per the design role mapping table; remove any legacy role mapping constants (e.g., `ROLE_NAV_PERMISSIONS`)
     - _Requirements: 11.1, 11.5, 11.6_
   - [ ] 11.2 Refactor `filterNavByRoles` function — accept single `userRole: DbRole` parameter; if role is `ADMIN` or `ADMIN_PARAM` return all items; for `VENDOR-USER` return only items with vendor-specific routes or `"*"` wildcard; for other roles filter items where `item.roles.includes(userRole)` or `item.roles.includes("*")`; if role matches nothing, return only the default dashboard item
@@ -124,6 +126,7 @@ Implementation plan for the user-login feature covering database migration, back
 - [ ] 12. CompanyPortal Login Page Refactoring
   Refactor login page (`frontend/CompanyPortal-Vite/src/routes/login.tsx`) to connect to real backend with proper error handling, rate limit lockout display, form validation, and accessibility.
   **Validates: Requirements 9, 10, 12**
+  - _Model: Opus — credential submission flow + backend error handling + rate-limit lockout; auth correctness is critical._
   - [ ] 12.1 Refactor `src/routes/login.tsx` — use `username` field (not email); call store `login` action; handle all backend error types with Indonesian messages (`auth_failed` → "Username atau password salah", `account_inactive` → "Akun tidak aktif. Hubungi administrator.", `portal_mismatch` → "Akun tidak memiliki akses ke portal ini", `service_unavailable` → "Layanan sedang tidak tersedia. Coba lagi nanti."); on success redirect to stored path or `/dashboard`
     - _Requirements: 9.4, 9.5, 3.3, 3.4_
   - [ ] 12.2 Implement rate limit lockout UI — when `rateLimitRetryAfter` is set, display countdown formatted as "M menit S detik" (e.g., "9 menit 0 detik"); disable submit button during lockout; decrement countdown every second; clear lockout state when countdown reaches 0
@@ -142,6 +145,7 @@ Implementation plan for the user-login feature covering database migration, back
 - [ ] 13. CompanyPortal API Client Update
   Update the API client (`frontend/CompanyPortal-Vite/src/lib/api/client.ts`) to attach Bearer token and handle 401 with automatic single-flight refresh.
   **Validates: Requirement 10**
+  - _Model: Opus — Bearer attachment + 401 single-flight refresh orchestration; a mistake breaks every authenticated request._
   - [ ] 13.1 Refactor `src/lib/api/client.ts` — add request interceptor that reads access token from auth store and sets `Authorization: Bearer {token}` header on every request; add response interceptor that catches HTTP 401 responses
     - _Requirements: 10.2_
   - [ ] 13.2 Implement single-flight refresh in response interceptor — on 401, call `store.refreshToken()`; if refresh succeeds, retry original request with new token; if refresh fails, clear auth state and redirect to `/login?redirect={path}`; use module-level promise to ensure only one refresh call is in-flight (queue concurrent 401s behind the same promise)
@@ -151,10 +155,12 @@ Implementation plan for the user-login feature covering database migration, back
 
 - [ ] 14. Checkpoint — Verify CompanyPortal auth flow
   - Ensure all CompanyPortal auth-related tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triaging test failures needs judgment, rarely Opus-level reasoning._
 
 - [ ] 15. CompanyPortal Route Guards
   Implement protected route wrapper (`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`) with auth loading guard, role-based access control, and 403 page.
   **Validates: Requirements 10, 11**
+  - _Model: Opus — auth-loading guard + RBAC enforcement on protected routes; a gap exposes unauthorized access._
   - [ ] 15.1 Refactor `src/routes/_protected.tsx` — check `isAuthLoading` first (show nothing or spinner while resolving); if not authenticated after loading completes, redirect to `/login?redirect={currentPath}`; if authenticated but user role not in route's allowed roles list, render Forbidden component
     - _Requirements: 10.4, 10.7, 11.3_
   - [ ] 15.2 Create `src/components/Forbidden.tsx` — 403 page with message "Anda tidak memiliki akses ke halaman ini" and a link/button navigating back to `/dashboard`; follow CIMB design system (centered card, `--n-0` surface, `--n-50` background)
@@ -165,6 +171,7 @@ Implementation plan for the user-login feature covering database migration, back
 - [ ] 16. VendorPortal Auth Refactoring
   Refactor VendorPortal auth from simulated data to real backend API integration (`frontend/VendorPortal-Vite/src/features/auth/`).
   **Validates: Requirements 10, 12**
+  - _Model: Opus — real backend auth integration + credential submit + token refresh; auth correctness is critical._
   - [ ] 16.1 Refactor `src/features/auth/AuthContext.tsx` — remove simulated JWT/vendor data; implement real auth context with: `accessToken` in memory (not localStorage), `user: AuthUser | null`, `isAuthenticated`, `isAuthLoading` state; on mount attempt token refresh via `POST /api/v1/auth/refresh` (cookie-based) to restore session; expose `login`, `logout`, `refreshToken` methods via context
     - _Requirements: 10.1, 10.5, 10.7, 12.9_
   - [ ] 16.2 Refactor `src/features/auth/LoginPage.tsx` — call `POST /api/v1/auth/login` with `X-Portal-Type: vendor` header; display "Vendor Portal" subtitle on login card; apply CIMB branding (`--n-0` card on `--n-50` background, `--red-500` submit button); implement same form validation rules as CompanyPortal (non-empty, whitespace-only treated as empty, maxLength 128/72); implement accessibility (htmlFor/id label pairing, 3px `--red-100` focus halo, `aria-live="polite"` error region); handle all error types with Indonesian messages including portal mismatch ("Akun tidak memiliki akses ke portal ini"); implement rate limit lockout with "M menit S detik" countdown from Retry-After header; on success redirect to stored path or `/dashboard`
@@ -178,10 +185,12 @@ Implementation plan for the user-login feature covering database migration, back
 
 - [ ] 17. Checkpoint — Verify VendorPortal auth flow
   - Ensure all VendorPortal auth-related tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triaging test failures needs judgment, rarely Opus-level reasoning._
 
 - [ ] 18. Integration Testing
   Write integration tests verifying full login flow end-to-end against PostgreSQL and Redis.
   **Validates: Requirements 1–12 (integration coverage)**
+  - _Model: Sonnet — end-to-end auth tests against real DB/Redis; real work within known test patterns._
   - [ ] 18.1 Create `backend/internal/auth/integration_test.go` — setup test DB with migration applied, Redis test instance; test full login flow: HTTP POST → rate limit check → DB lookup → bcrypt verify → token generation → cookie set → response validation
     - _Requirements: 1, 2, 3, 4, 6_
   - [ ] 18.2 Write integration tests for portal isolation — company user login with X-Portal-Type: company succeeds; vendor user login with X-Portal-Type: vendor succeeds; company user with X-Portal-Type: vendor returns 403 portal_mismatch; vendor user with X-Portal-Type: company returns 403 portal_mismatch; invalid portal type returns 422
@@ -195,6 +204,7 @@ Implementation plan for the user-login feature covering database migration, back
 
 - [ ] 19. Final checkpoint — Ensure all tests pass
   - Run `go test ./...` for backend and `pnpm test` for both frontend portals. Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — triaging cross-portal test failures needs judgment, rarely Opus-level reasoning._
 
 ## Notes
 

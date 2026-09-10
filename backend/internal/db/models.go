@@ -594,6 +594,38 @@ type VendorPackage struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.
+type VendorRequest struct {
+	ID            int64       `json:"id"`
+	RequestNumber string      `json:"request_number"`
+	ForecastDate  pgtype.Date `json:"forecast_date"`
+	// draft | pending_approval | approved | rejected | processing | completed | failed | cancelled
+	Status          string             `json:"status"`
+	Notes           *string            `json:"notes"`
+	CreatedBy       int64              `json:"created_by"`
+	ApprovedBy      *int64             `json:"approved_by"`
+	RejectedBy      *int64             `json:"rejected_by"`
+	RejectionReason *string            `json:"rejection_reason"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
+	RejectedAt      pgtype.Timestamptz `json:"rejected_at"`
+}
+
+// Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
+type VendorRequestItem struct {
+	ID              int64 `json:"id"`
+	VendorRequestID int64 `json:"vendor_request_id"`
+	// ATM identifier; maps to requirements.md "atm_id" and dmaa_atm_forecast.terminal_id. Labeled "ATM ID" in the API/frontend.
+	TerminalID      string             `json:"terminal_id"`
+	PeriodePred     pgtype.Date        `json:"periode_pred"`
+	Denom           int32              `json:"denom"`
+	AmountReplenish int64              `json:"amount_replenish"`
+	AmountRefund    int64              `json:"amount_refund"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type VendorVault struct {
 	ID             int64  `json:"id"`
 	VendorBranchID int64  `json:"vendor_branch_id"`

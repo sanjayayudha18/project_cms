@@ -7,6 +7,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
 ## Tasks
 
 - [ ] 1. Backend: sqlc queries for ATM Profile
+  - _Model: Sonnet — read-only sqlc SELECT/count queries with pagination and date filters, pattern-matched from existing atm_portal queries._
   - [ ] 1.1 Add ATM Profile SQL queries to `backend/queries/atm_portal.sql`
     - Add `GetATMByTerminalID` query joining `atms` with `locations`, filtering `is_active = true` and `deleted_at IS NULL`
     - Add `GetLatestReplenishForTerminal` query returning `refund_total` for status computation
@@ -18,6 +19,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - _Requirements: 3.1, 4.1, 4.2, 4.3, 4.4, 4.7, 5.1, 5.2, 5.3_
 
 - [ ] 2. Backend: Service layer for ATM Profile
+  - _Model: Sonnet — read service with a well-defined status-precedence chain and param validation; sub-tasks 2.2–2.6 are property tests that inherit Sonnet (invariant checks, not money/approval logic)._
   - [ ] 2.1 Create `backend/internal/service/atm_portal_profile.go` with profile service methods
     - Implement `GetATMProfile(ctx, terminalID)` — validate terminal ID, fetch ATM master data from read replica, compute replenishment status using precedence logic (unconfigured → no_data → critical → low → normal), return `ATMProfileResult`
     - Implement `ListATMReplenish(ctx, params)` — validate pagination/date params, query read replica, return paginated result
@@ -52,6 +54,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - **Validates: Requirements 3.1**
 
 - [ ] 3. Backend: HTTP handlers for ATM Profile
+  - _Model: Sonnet — boilerplate-heavy handlers + param parsing following existing patterns; sub-task 3.2 unit tests inherit Sonnet._
   - [ ] 3.1 Add handler methods to `backend/internal/handler/atm_portal_handler.go`
     - Implement `GetATMProfile` handler: parse `terminalId` path param, validate non-empty, call service, serialize with `pkg/response` envelope, monetary fields as decimal strings or JSON null
     - Implement `ListATMReplenish` handler: parse path param + query params (page, page_size, date_from, date_to), validate formats, call service, serialize response
@@ -67,8 +70,10 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
 
 - [ ] 4. Checkpoint — Backend complete
   - Ensure all backend tests pass (`go test ./...`), sqlc generates cleanly, and `golangci-lint run` has no errors. Ask the user if questions arise.
+  - _Model: Sonnet — build/test/lint checkpoint; needs judgment to triage failures._
 
 - [ ] 5. Frontend: Types and data hooks
+  - _Model: Sonnet — TanStack Query hooks following established patterns; the 5.1 type defs alone are near-Haiku, but the hooks carry the tier._
   - [ ] 5.1 Add ATM Profile TypeScript types to `frontend/CompanyPortal-Vite/src/features/atm-portal/types.ts`
     - Add `AtmProfileMasterData` interface (all master data fields + replenishment_status)
     - Add `AtmReplenishRecord` interface
@@ -85,6 +90,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - _Requirements: 10.3, 9.6_
 
 - [ ] 6. Frontend: Utility formatters
+  - _Model: Sonnet — small pure formatters (Rupiah/date/whole-number display) with clear specs; sub-tasks 6.2–6.4 property tests inherit Sonnet._
   - [ ] 6.1 Create or extend currency/date formatting utilities
     - Implement `formatRupiah(value: string | null): string` — "Rp " prefix, dot-separated thousands, em dash for null
     - Implement `formatDateIndonesian(isoDate: string): string` — "dd MMM yyyy" with Indonesian month abbreviations
@@ -108,6 +114,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - **Validates: Requirements 8.3**
 
 - [ ] 7. Frontend: ATM Profile sub-components
+  - _Model: Sonnet — presentational components (header, tables) with clear specs, built on the existing CashposTable pattern._
   - [ ] 7.1 Create `AtmHeader` component in `src/features/atm-portal/components/AtmHeader.tsx`
     - Display all master data fields in responsive grid (3-col ≥1024px, 2-col 768–1023px, 1-col <768px)
     - Format monetary fields with `formatRupiah`, show em dash for null
@@ -156,6 +163,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - _Requirements: 8.1–8.10, 9.4, 9.5, 11.2, 12.3, 12.7_
 
 - [ ] 8. Frontend: ATM Profile page and routing
+  - _Model: Opus — page orchestration: breadcrumbs, tab routing, ARIA live regions, and full-page 404/5xx/timeout states; the most complex frontend task, and sub-task 8.1 (route file) is trivial but inherits._
   - [ ] 8.1 Create route file `frontend/CompanyPortal-Vite/src/routes/atm-portal.$terminalId.tsx`
     - Define TanStack Router route with `terminalId` dynamic segment
     - Export route component rendering `AtmProfileScreen`
@@ -181,6 +189,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - **Validates: Requirements 12.6**
 
 - [ ] 9. Frontend: Navigation integration
+  - _Model: Haiku — add a TanStack Router `<Link>` to an existing table column; minimal, low-judgment change._
   - [ ] 9.1 Update ATM Portal list to make terminal ID column a clickable link
     - Render terminal ID as a TanStack Router `<Link>` to `/atm-portal/$terminalId`
     - Apply standard link styling (visually distinguished from non-interactive text)
@@ -188,9 +197,11 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
     - _Requirements: 1.1, 1.2, 1.6_
 
 - [ ] 10. Checkpoint — All tests pass
+  - _Model: Sonnet — build/test/lint checkpoint; needs judgment to triage failures._
   - Ensure all frontend tests pass (`pnpm test --run`), backend tests pass (`go test ./...`), linting is clean. Ask the user if questions arise.
 
 - [ ] 11. Frontend: Component unit tests
+  - _Model: Sonnet — component tests with React Testing Library following standard patterns._
   - [ ]* 11.1 Write unit tests for AtmHeader component
     - Test renders all fields, handles null monetary (em dash), correct status badge variant, skeleton loading state
     - _Requirements: 2.1–2.7, 9.1_
@@ -209,6 +220,7 @@ The ATM Profile feature adds a single-ATM detail view to the existing ATM Portal
 
 - [ ] 12. Final checkpoint — Ensure all tests pass
   - Run full test suite: `go test ./...` and `pnpm test --run`. Ensure `golangci-lint run` and `pnpm lint` pass. Ask the user if questions arise.
+  - _Model: Sonnet — final build/test/lint gate; needs judgment to triage failures._
 
 ## Notes
 

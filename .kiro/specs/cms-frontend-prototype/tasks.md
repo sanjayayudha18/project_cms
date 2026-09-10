@@ -7,6 +7,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
 ## Tasks
 
 - [x] 1. Project scaffolding and configuration
+  - _Model: Haiku — Vite/TS/Tailwind scaffolding and OKLCH token config are mechanical, well-specified setup._
   - [x] 1.1 Initialize Vite + React + TypeScript project with core dependencies
     - Run `pnpm create vite frontend --template react-ts` and install: react@19, react-dom@19, react-router-dom, @tanstack/react-query@5, @tanstack/react-table@8, tailwindcss@4, lucide-react
     - Install dev dependencies: vitest, @testing-library/react, @testing-library/jest-dom, jsdom, fast-check, playwright, @vitejs/plugin-react
@@ -23,6 +24,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 10.3, 10.4_
 
 - [x] 2. Shared utilities and lib layer
+  - _Model: Sonnet — currency/status/filter utilities and nav config with property tests; small logic that must be exactly correct._
   - [x] 2.1 Implement currency formatting utility (`src/lib/formatCurrency.ts`)
     - Implement `formatIDR(amount: number): string` using `Intl.NumberFormat('id-ID')` for dot-separated thousands, no decimals
     - Implement `parseIDR(formatted: string): number` for round-trip parsing
@@ -86,6 +88,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 7.1_
 
 - [x] 3. Shared UI components
+  - _Model: Sonnet — reusable Badge/DataTable/Card/etc. components mapping to design tokens, standard UI work._
   - [x] 3.1 Implement Badge component (`src/components/ui/Badge.tsx`)
     - Accept `variant` (success, warning, danger, info, neutral), `icon` (Lucide icon), and `label` props
     - Render pill shape with icon + text label — never color alone
@@ -112,6 +115,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 3.6, 3.7, 4.8, 5.6, 6.1, 10.5_
 
 - [x] 4. Mock data layer
+  - _Model: Sonnet — hand-authored mock JSON must keep referential integrity across entities, verified by a property test._
   - [x] 4.1 Create mock data JSON files
     - `src/data/vendors.json`: 3+ vendors (PT Gardanet, PT SSI, PT G4S)
     - `src/data/atms.json`: 20+ ATMs across 3 region prefixes (JKT, BDG, SBY), pattern ATM-{REGION}-{NNN}
@@ -134,6 +138,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - **Validates: Requirements 7.5**
 
 - [x] 5. App shell, routing, and role context
+  - _Model: Sonnet — shell, routing, and role context with role-gated nav (demo-only, not real auth), standard React wiring._
   - [x] 5.1 Implement RoleContext (`src/context/RoleContext.tsx`)
     - Create context with `role`, `setRole`, `isInternal` computed property
     - Default to Admin role on initial load
@@ -158,8 +163,10 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
 
 - [x] 6. Checkpoint - Core infrastructure complete
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging infrastructure test failures needs judgment._
 
 - [x] 7. DSR Dashboard feature
+  - _Model: Sonnet — DSR screen with table, summary cards, date filtering, and unit tests, normal feature work._
   - [x] 7.1 Implement DSR Dashboard screen (`src/features/dsr/`)
     - Create `dsr.types.ts` with DsrRecord interface
     - Create `useDsrData.ts` TanStack Query hook filtering by selected date
@@ -180,6 +187,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 3.4, 3.6, 3.8_
 
 - [x] 8. Forecast View feature
+  - _Model: Sonnet — forecast screen with filtering, sorting, schedule list, and unit tests, standard feature work._
   - [x] 8.1 Implement Forecast View screen (`src/features/forecast/`)
     - Create `forecast.types.ts` with ForecastRecord interface
     - Create `useForecastData.ts` TanStack Query hook
@@ -201,6 +209,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 4.4, 4.6, 4.7, 4.9_
 
 - [x] 9. CIT Tracker feature
+  - _Model: Sonnet — CIT screen with compound filtering, status badges, and unit tests, standard feature work._
   - [x] 9.1 Implement CIT Tracker screen (`src/features/cit/`)
     - Create `cit.types.ts` with CitOrder interface
     - Create `useCitData.ts` TanStack Query hook
@@ -221,6 +230,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 5.4, 5.5, 5.6, 5.7_
 
 - [x] 10. Invoice Flow feature
+  - _Model: Sonnet — invoice screen with a mock maker-checker approval UI and role-gated button; demo-only (no real approval state), normal feature work._
   - [x] 10.1 Implement Invoice Flow screen (`src/features/invoice/`)
     - Create `invoice.types.ts` with Invoice and InvoiceLineItem interfaces
     - Create `useInvoiceData.ts` TanStack Query hook
@@ -245,8 +255,10 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
 
 - [x] 11. Checkpoint - All feature screens complete
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging feature-screen test failures needs judgment._
 
 - [x] 12. Docker containerization
+  - _Model: Sonnet — multi-stage Dockerfile, compose, and nginx SPA config with a build integration test, standard packaging work._
   - [x] 12.1 Create Docker configuration files
     - Create multi-stage `Dockerfile`: stage 1 runs `pnpm install && pnpm build`, stage 2 copies dist into `nginx:alpine`
     - Create `docker-compose.yml` with single frontend service mapping port 80 → host 3000 (configurable via env var)
@@ -261,6 +273,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 8.3, 8.5_
 
 - [x] 13. Responsive layout and accessibility polish
+  - _Model: Sonnet — responsive breakpoints, semantic HTML, touch targets, and a11y compliance, standard polish work._
   - [x] 13.1 Implement responsive breakpoints and accessibility compliance
     - Viewport < 1024px: sidebar renders as icon-only rail by default
     - Viewport 768px–1023px: no horizontal overflow, all elements reachable
@@ -271,6 +284,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
 
 - [x] 14. E2E tests with Playwright
+  - _Model: Sonnet — Playwright E2E specs across navigation, role switching, filtering, and approval flows, standard test authoring._
   - [x] 14.1 Write E2E tests for critical user flows
     - Navigation flow: sidebar links route correctly without full reload
     - Role switching: Vendor hides DSR/Forecast; internal roles restore all items
@@ -283,6 +297,7 @@ Build a frontend-only stakeholder demo SPA using Vite + React 19 + TypeScript. T
 
 - [x] 15. Final checkpoint - All tests pass and app is demo-ready
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — final demo-readiness gate; triaging any failures needs judgment._
 
 ## Notes
 

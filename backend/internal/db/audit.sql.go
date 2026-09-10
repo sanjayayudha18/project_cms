@@ -50,3 +50,43 @@ func (q *Queries) CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) 
 	)
 	return i, err
 }
+
+const listAuditLogsByEntity = `-- name: ListAuditLogsByEntity :many
+SELECT id, actor_id, action, entity_type, entity_id, before, after, ip, created_at FROM audit_logs
+WHERE entity_type = $1 AND entity_id = $2
+ORDER BY created_at ASC
+`
+
+// Generic append-only audit trail read for any (entity_type, entity_id) pair
+// -- backs GET /{id}/audit-log for vendor_request (Req 16.4) and is reusable
+// by any future entity without a new query. Ascending by created_at so the
+// trail reads chronologically (oldest first).
+func (q *Queries) ListAuditLogsByEntity(ctx context.Context, entityType string, entityID int64) ([]AuditLog, error) {
+	rows, err := q.db.Query(ctx, listAuditLogsByEntity, entityType, entityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuditLog{}
+	for rows.Next() {
+		var i AuditLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.ActorID,
+			&i.Action,
+			&i.EntityType,
+			&i.EntityID,
+			&i.Before,
+			&i.After,
+			&i.IP,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

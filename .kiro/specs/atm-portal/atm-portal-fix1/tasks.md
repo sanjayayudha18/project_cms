@@ -17,6 +17,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
 ## Tasks
 
 - [x] 1. Backend: SQL date-range filters + sort by replenish_total
+  - _Model: Sonnet — SQL filter/sort edits with a List/Count parity trap; read-only, no money math, but a missed Count predicate silently breaks pagination._
   - [x] 1.1 Extend `backend/queries/atm_portal.sql` — `ListATMsWithCashPos` **and** `CountATMsWithCashPos` (filters must stay identical or pagination `total` drifts)
     - **List:** add optional bounds on `sub.last_replenish_date`:
       - `(sqlc.arg('date_from')::text = '' OR sub.last_replenish_date >= sqlc.arg('date_from')::date)`
@@ -33,6 +34,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
     - _No hand-edit of generated files_
 
 - [x] 2. Backend: service + handler params
+  - _Model: Sonnet — param validation + wiring into both List and Count within a known service pattern; contained if wrong._
   - [x] 2.1 Extend `ListATMsParams` in `backend/internal/service/atm_portal.go`
     - Fields: `DateFrom string`, `DateTo string` (JSON `date_from` / `date_to`)
     - Validation (hand `validate()` — tags alone are not enforced):
@@ -45,6 +47,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
     - No response shape change required (`replenish_total` already on `atmPortalRow`)
 
 - [x] 3. Backend: tests
+  - _Model: Sonnet — property/integration tests over date-range and sort invariants; mechanical once generators exist._
   - [x] 3.1 Property / integration coverage for date filter
     - **Property: Date range filter correctness** — for any fixtures with known `last_replenish_date`, filtered rows satisfy `date_from ≤ last_replenish_date ≤ date_to` (inclusive); only-from / only-to / both / neither cases
     - NULL `last_replenish_date` excluded when any bound is active
@@ -56,6 +59,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
     - Note: integration property tests skip without `DATABASE_URL`; unit validation tests pass. `go build ./cmd/api` OK.
 
 - [x] 4. Frontend: types, URL state, data hook
+  - _Model: Sonnet — additive type/URL-state/hook changes following the existing atm-portal pattern._
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
   - [x] 4.1 Extend `AtmPortalParams` in `types.ts` with `date_from: string` and `date_to: string` (empty string default)
   - [x] 4.2 Extend `ATM_PORTAL_SEARCH_SCHEMA`, defaults, `parseSearchParams`, `omitDefaults` in `useAtmPortalUrlState.ts`
@@ -65,6 +69,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
   - [x] 4.4 Extend Property 11 URL round-trip generators to include the new keys; update `mockParams` if present
 
 - [x] 5. Frontend: FilterBar date controls
+  - _Model: Sonnet — controlled date inputs + prop-type widening + active-count/clear-all wiring in a React component._
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
   - [x] 5.1 Add date range UI to `components/FilterBar.tsx`
     - Two native `<input type="date">` (match DSR pattern in `DsrDashboard.tsx`) labeled e.g. **"Dari tanggal"** / **"Sampai tanggal"**
@@ -76,6 +81,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
   - [x] 5.2 Wire props through `AtmPortalScreen.tsx` from `useAtmPortalUrlState`
 
 - [x] 6. Frontend: AtmTable Total Replenish column + sort
+  - _Model: Sonnet — add one column + sort toggle to an existing table using an already-returned API field._
   - Paths under `frontend/CompanyPortal-Vite/src/features/atm-portal/`
   - [x] 6.1 Update `components/AtmTable.tsx`
     - Insert column after **Refund Total** (before Threshold):
@@ -87,6 +93,7 @@ Incremental enhancement on the shipped ATM Portal (`atm-portal` spec). Two addit
   - [x] 6.2 Allow `sort_by=replenish_total` in FE URL schema / any client-side allow-lists (property test generators)
 
 - [x] 7. Frontend: tests + checkpoint
+  - _Model: Sonnet — component tests plus a build/test checkpoint that needs judgment to triage failures._
   - [x] 7.1 Component tests
     - FilterBar renders both date inputs; change fires `onFilterChange` with `date_from`/`date_to`
     - Clear All clears dates; active count includes date bounds

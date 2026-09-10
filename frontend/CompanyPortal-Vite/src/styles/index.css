@@ -81,9 +81,18 @@ p {
   flex-direction: column;
   justify-content: center;
   padding: var(--space-12) clamp(24px, 5.5vw, 96px);
-  background: radial-gradient(120% 100% at 0% 0%, var(--login-chrome) 0%, var(--login-chrome-deep) 55%),
-    linear-gradient(155deg, var(--login-chrome-deep) 0%, var(--login-chrome-deep) 100%);
+  background: #ffffff;
   overflow-y: auto;
+
+  /* Override the left-panel color tokens: white background, dark text. */
+  --login-chrome-fg: oklch(0.2 0.02 27);
+  --login-well: oklch(0.97 0.005 27);
+  --login-well-hover: oklch(0.94 0.008 27);
+  --login-line: oklch(0.88 0.01 27);
+  --login-line-strong: oklch(0.7 0.02 27);
+  --login-fg-dim: oklch(0.4 0.02 27);
+  --login-fg-muted: oklch(0.55 0.02 27);
+  --login-focus-ring: oklch(0.56 0.223 27 / 0.25);
 }
 
 .login-shell__identity::before {

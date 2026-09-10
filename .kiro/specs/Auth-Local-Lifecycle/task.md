@@ -69,12 +69,14 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Update `.kiro/steering/project-context.md` Sec 2: tandai kolom baru `users.password_changed_at`, `users.must_change_password`, `users.failed_login_attempts`, `users.locked_until` + role `APPACCESS` + revive `auth_source='local_dev'` sebagai **usulan**.
 - **Test:** —（dokumentasi/keputusan; tanpa kode）
 - **Demo:** diff project-context menampilkan usulan kolom + role APPACCESS + auth_source local_dev.
+- **Model:** Haiku — hanya edit dokumentasi/keputusan skema di project-context, tanpa kode, penilaian minim.
 - **Selesai** (dicek 2026-09-09): sudah ada di `.kiro/steering/project-context.md` — baris ~39 (role APPACCESS, proposed) dan ~92 (auth_source local_dev + 4 kolom password policy, proposed), keduanya sudah merujuk balik ke spec ini.
 
 ### [x] Task 2 — Migrasi kolom kebijakan password lokal
 - `backend/migrations/026_users_password_policy.sql` (gaya `016`): `ADD COLUMN IF NOT EXISTS` untuk `password_changed_at timestamptz`, `must_change_password boolean NOT NULL DEFAULT false`, `failed_login_attempts int NOT NULL DEFAULT 0`, `locked_until timestamptz`. COMMENT tiap kolom (berlaku hanya untuk auth_source lokal). Tidak ada `users_auth_source_chk` di skema live untuk disesuaikan (lihat Background) — cukup 4 kolom di atas.
 - **Test:** migrasi up/down bersih; kolom + default benar; user LDAP existing tak terpengaruh (kolom nullable/default aman).
 - **Demo:** `\d users` menampilkan 4 kolom baru dengan default.
+- **Model:** Opus — migrasi skema tabel `users` (auth danger zone); kolom/default salah bisa merusak login existing.
 - **Selesai** (2026-09-09): file dibuat, idempotent (`ADD COLUMN IF NOT EXISTS`), tanpa constraint/index tambahan (lihat SAFETY note di file). **Belum diverifikasi jalan di DB nyata** — Postgres eksternal tidak dapat diakses dari sesi ini; jalankan manual lalu cek `\d users` sebelum lanjut ke Task 3.
 
 ### [x] Task 3 — Kebijakan password lokal di service (expiry 90d, warning 7d) — no HTTP
@@ -82,6 +84,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Login sukses password lokal: jika `expired` → tolak dengan error jelas + tandai wajib ganti; jika dalam window warning → sertakan `password_days_left` di response (tanpa mengubah bentuk flat JSON secara breaking — tambah field opsional).
 - **Test (table-driven):** tepat 90 hari, 91 hari (expired), 83 hari (warning 7), 82 hari (no warning), akun LDAP (kebijakan di-skip).
 - **Demo:** unit test matriks batas 90/7 hari.
+- **Model:** Opus — kebijakan expiry password di jalur login; logika salah bisa mengunci/meloloskan akun secara keliru.
 - **Selesai** (2026-09-09):
   - `pkg/auth/password_policy.go`: `PasswordExpiry` + `InPasswordWarningWindow`, konstanta `PasswordMaxAgeDays=90`/`PasswordWarnDays=7`. Table-driven test di `pkg/auth/password_policy_test.go` (90/91/83/82 hari + nil changedAt).
   - `pkg/auth/errors.go`: sentinel baru `ErrPasswordExpired`.
@@ -98,6 +101,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Query sqlc: increment `failed_login_attempts` saat gagal; saat mencapai 3 → set `locked_until=now()+30m`. Login saat `locked_until > now()` → `ErrAccountLocked` (error baru di `pkg/auth/errors.go`, pesan ID). Login sukses → reset `failed_login_attempts=0`, `locked_until=NULL`. Auto-unlock: `locked_until <= now()` dianggap tidak terkunci.
 - **Test (table-driven):** 2 gagal tak terkunci; 3 gagal terkunci; login saat terkunci ditolak walau password benar; setelah 30m boleh coba lagi; sukses mereset counter; akun LDAP tak kena lockout.
 - **Demo:** unit test urutan gagal×3 → locked → +31m → unlocked.
+- **Model:** Opus — lockout state per-akun di jalur auth; salah hitung bisa mengunci pengguna sah atau melewati proteksi brute-force.
 - **Selesai** (2026-09-09):
   - `pkg/auth/lockout.go`: `MaxFailedLogins=3`, `LockoutDuration=30m`, `IsLocked(lockedUntil, now)`. Test boundary di `pkg/auth/lockout_test.go` (nil, future, exact-now, 31m lewat).
   - `pkg/auth/errors.go`: sentinel baru `ErrAccountLocked`.
@@ -116,6 +120,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Tulis `audit_logs` (action `password_change`, actor=self, tanpa nilai password). Write → primary.
 - **Test (httptest + service):** happy path; old_password salah → 400/401; user LDAP → ditolak; new==old ditolak; audit tercatat tanpa secret; flag `must_change_password` jadi false.
 - **Demo:** login user `must_change_password=true` → change-password → login ulang tanpa paksaan.
+- **Model:** Opus — endpoint change-password + verifikasi bcrypt + audit; salah tangani = celah keamanan kredensial.
 - **Selesai** (2026-09-09):
   - `pkg/auth/password_strength.go`: `MinPasswordLength=8`, `MaxPasswordLength=255`, `ValidatePasswordStrength` (letter+digit, length bounds). Test di `pkg/auth/password_strength_test.go`.
   - `pkg/auth/errors.go`: sentinel baru `ErrChangeNotAllowed`, `ErrPasswordUnchanged`.
@@ -136,6 +141,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Tulis `audit_logs` (action `initial_password_set`, actor=APPACCESS, target user; tanpa nilai password).
 - **Test (httptest):** hanya APPACCESS boleh (role lain 403); target LDAP ditolak; `must_change_password` jadi true; audit tercatat; user lalu wajib change saat login pertama.
 - **Demo:** APPACCESS set password user baru → user login → dipaksa change.
+- **Model:** Opus — role gate APPACCESS + set password awal + migrasi seed role baru; auth + RBAC danger zone.
 - **Selesai** (2026-09-09):
   - `backend/migrations/027_seed_appaccess_role.sql` (**migrasi baru, sentuhan auth/role — lihat catatan di bawah**): `INSERT INTO roles ('APPACCESS', ...)` idempotent (`ON CONFLICT DO NOTHING`), gaya sama dengan `003_seed_roles_users.sql`; update COMMENT kolom `roles.role`. Role jadi 10, sesuai Resolved Decisions #1.
   - `backend/queries/auth.sql` + `auth.sql.go` (hand-edit, sqlc masih gagal karena migrasi `017`/`018`, tidak terkait): query baru `SetInitialPassword` — `UPDATE` atomik sama seperti `SetPassword` (Task 5) tapi `must_change_password = true` (bukan `false`) — mencerminkan arah kebalikannya.
@@ -154,6 +160,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Tulis `audit_logs` (action `user_deactivated`/`user_reactivated`).
 - **Test:** user ber-audit → deactivate = soft (baris tetap ada, `deleted_at` terisi); percobaan hard-delete ditolak/absen; user tanpa audit tetap soft-delete (konsisten, tak ada hard-delete di alur normal); user soft-deleted tak bisa login.
 - **Demo:** buat audit untuk user → deactivate → baris masih ada, login gagal, audit lama tetap tertaut.
+- **Model:** Opus — soft-delete akun + guard larang hard-delete demi integritas rantai audit; salah = putus audit atau akun ter-hapus permanen.
 - **Selesai** (2026-09-09):
   - **Penyederhanaan sengaja**: cek "punya audit atau tidak" TIDAK diimplementasikan sebagai percabangan runtime — kedua test case spec ("user ber-audit" vs "user tanpa audit") menghasilkan perilaku identik (soft-delete), jadi cukup satu code path tanpa query audit_logs tambahan yang tak pernah mengubah hasil. Konsisten dengan Tradeoffs section spec sendiri: "alur normal seluruhnya soft-delete demi konsistensi audit."
   - `backend/queries/auth.sql` + `auth.sql.go` (hand-edit, sqlc masih gagal di migrasi `017`/`018`, tidak terkait): query baru `DeactivateUser` (`is_active=false, deleted_at=now()`), `ReactivateUser` (kebalikannya). Tidak ada migrasi baru — kolom `is_active`/`deleted_at` sudah ada dari `002_cms_tables.sql`.
@@ -171,6 +178,7 @@ CMS harus tetap bisa dipakai **sebelum LDAP/Entra ID terhubung**: user internal 
 - Update project-context.md (tandai proposed → ada), `.env.example` bila ada konstanta yang perlu di-config (mis. override 90/7/3/30 — default hardcoded aman, config opsional). Catat pola: modul lain jangan hard-delete user.
 - **Test:** seluruh suite hijau; coverage `internal/*` & `pkg/auth` yang disentuh >= 80%.
 - **Demo:** ringkasan alur auth lokal end-to-end (login fallback → warning → expiry → lockout → change → soft-delete).
+- **Model:** Sonnet — quality gate (build/lint/test/coverage) + dokumentasi; butuh penilaian triase kegagalan, bukan reasoning Opus.
 - **Selesai** (2026-09-09):
   - **`sqlc generate`: masih GAGAL**, sama seperti setiap task sebelumnya — pre-existing, tidak terkait spec ini: `migrations/017_atm_dsr_location_and_rencana_isi.sql:79:5: syntax error` + `018...: relation "atm_dsr_rencana_isi_files" does not exist`. Semua perubahan sqlc di Task 2-7 (`auth.sql` → `auth.sql.go`) di-hand-edit, meniru persis gaya output sqlc yang sudah ada. **Ini bukan sesuatu yang saya perbaiki** — memperbaiki migrasi DSR lama di luar scope Auth-Local-Lifecycle dan berisiko; direkomendasikan jadi task terpisah kalau mau benar-benar menjalankan `sqlc generate` lagi.
   - `go build ./...`: bersih di modul `backend` & `pkg`.

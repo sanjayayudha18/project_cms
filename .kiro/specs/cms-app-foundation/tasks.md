@@ -7,6 +7,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
 ## Tasks
 
 - [x] 1. Project scaffolding and design token system
+  - _Model: Sonnet — project scaffolding plus OKLCH token setup and utilities; mostly config but the token math and formatters need care._
   - [x] 1.1 Initialize Vite project with React 19, TypeScript 5, Tailwind CSS 4, and install core dependencies
     - Initialize `frontend/` with Vite React-TS template
     - Install: `@tanstack/react-router`, `@tanstack/react-query`, `zustand`, `tailwindcss@4`, `lucide-react`, `zod`, `react-hook-form`, `xlsx` (SheetJS)
@@ -33,6 +34,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 4.3, 7.6**
 
 - [x] 2. Core layout components (App Shell)
+  - _Model: Sonnet — shell/sidebar/header components with RBAC nav filtering and property tests, standard React work._
   - [x] 2.1 Implement AppShell layout component with CSS Grid
     - Create `src/components/layout/AppShell.tsx` with fixed sidebar + header + scrollable main
     - Use CSS Grid: `grid-template-columns: auto 1fr`, `grid-template-rows: auto 1fr`
@@ -67,6 +69,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 1.7**
 
 - [x] 3. Authentication and session management
+  - _Model: Opus — client auth store, token storage, refresh, and login error safety; auth mistakes leak sessions or credentials._
   - [x] 3.1 Implement Zustand auth store with login, logout, refresh, and initialize actions
     - Create `src/lib/auth/store.ts` with `AuthState` + `AuthActions`
     - Store access token in memory (not localStorage) for XSS resistance
@@ -89,6 +92,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 2.4**
 
 - [x] 4. Routing and route protection
+  - _Model: Opus — route guards and RBAC enforcement at the router; a gap here exposes protected pages to unauthorized users._
   - [x] 4.1 Set up TanStack Router file-based route tree
     - Create `src/routes/__root.tsx` with QueryClientProvider, ToastProvider
     - Create `src/routes/_auth.tsx` as auth layout (centered card)
@@ -105,8 +109,10 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
 
 - [x] 5. Checkpoint - Ensure shell and auth work
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging shell/auth test failures needs judgment._
 
 - [x] 6. API client with stub layer
+  - _Model: Sonnet — fetch client with interceptors, 401 refresh-retry, and a stub layer; real work within a known pattern._
   - [x] 6.1 Implement API client with auth header injection and stub/real mode switching
     - Create `src/lib/api/config.ts` resolving `VITE_API_MODE` env var (`stub` | `real`)
     - Create `src/lib/api/client.ts` as fetch wrapper with request/response interceptors
@@ -126,6 +132,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 8.2, 8.4**
 
 - [x] 7. Error handling and loading states
+  - _Model: Sonnet — toast/error-boundary/skeleton components with error sanitization, standard UI work._
   - [x] 7.1 Implement Toast system with auto-dismiss and persistence rules
     - Create `src/components/ui/Toast.tsx` and `src/lib/hooks/useToast.ts`
     - Success toasts auto-dismiss after 5s; error toasts persist until dismissed
@@ -145,6 +152,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 9.3**
 
 - [x] 8. Dashboard landing page
+  - _Model: Sonnet — dashboard page with metric cards, activity feed, and query hooks, normal component work._
   - [x] 8.1 Implement Dashboard page with metric cards and activity feed
     - Create `src/routes/_protected/index.tsx` (Dashboard)
     - Create `src/features/dashboard/components/MetricCard.tsx` with tabular-nums, right-aligned IDR
@@ -158,6 +166,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 4.2**
 
 - [x] 9. Module landing pages
+  - _Model: Sonnet — landing pages built from a shared card component with disabled-state handling and tests._
   - [x] 9.1 Implement Forecasting, Invoice, and Cash Count module landing pages
     - Create `src/routes/_protected/forecasting/index.tsx` with 6 navigation cards (DSR Receipt, Fill Instruction, Fill Validation, Cash Supply, H+2 Projection, Holiday Calendar)
     - Create `src/routes/_protected/invoice/index.tsx` with 4 navigation cards (Invoice Upload, Reconciliation, Charge Calculation, Document Generation)
@@ -173,8 +182,10 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
 
 - [x] 10. Checkpoint - Ensure dashboard and module pages work
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — checkpoint gate; triaging page/test failures needs judgment._
 
 - [x] 11. DSR Upload flow (end-to-end)
+  - _Model: Sonnet — multi-step upload flow with Excel parsing, validation, preview, and a submit state machine; substantial but contained feature work._
   - [x] 11.1 Implement DSR file upload interface with validation
     - Create `src/routes/_protected/forecasting/dsr-upload.tsx` route page
     - Create `src/features/forecasting/components/DSRUploadForm.tsx` with file input accepting `.xlsx`, `.xls`
@@ -210,6 +221,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
     - **Validates: Requirements 6.2, 6.3, 6.6, 6.7, 6.8, 6.9**
 
 - [x] 12. Accessibility foundation
+  - _Model: Sonnet — keyboard nav, focus management, ARIA, and contrast checks with property tests, standard a11y work._
   - [x] 12.1 Implement keyboard navigation, focus management, and ARIA attributes
     - Add focus management on route change (move focus to main content)
     - Ensure all icon-only buttons have `aria-label` attributes
@@ -228,6 +240,7 @@ Build the foundational UI shell for the CMS application using React 19 + TypeScr
 
 - [x] 13. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - _Model: Sonnet — final test gate; triaging any failures needs judgment._
 
 ## Notes
 

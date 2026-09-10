@@ -33,6 +33,118 @@ type AtmDenom struct {
 	DenomID int64 `json:"denom_id"`
 }
 
+// One row per ingested RENCANA PENGISIAN (Rencana Isi sheet) dataset. Idempotent per checksum; re-ingest = delete this row, child rows cascade.
+type AtmDsrRencanaIsiFile struct {
+	ID       int64   `json:"id"`
+	Filename string  `json:"filename"`
+	Checksum *string `json:"checksum"`
+	Status   string  `json:"status"`
+	// Same workbook/report_date as the paired atm_dsr_saldo_files row (same file, different sheet). Not FK'd together: sheets are ingested independently and either may succeed alone.
+	ReportDate pgtype.Date `json:"report_date"`
+	// Tanggal cell on the Rencana Isi sheet: the day being planned, normally report_date + 1.
+	PlanDate     pgtype.Date        `json:"plan_date"`
+	Vendor       string             `json:"vendor"`
+	Currency     string             `json:"currency"`
+	RowCount     *int32             `json:"row_count"`
+	SuccessCount *int32             `json:"success_count"`
+	ErrorCount   *int32             `json:"error_count"`
+	ErrorMessage *string            `json:"error_message"`
+	ProcessedAt  pgtype.Timestamptz `json:"processed_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AtmDsrRencanaIsiRow struct {
+	ID     int64 `json:"id"`
+	FileID int64 `json:"file_id"`
+	// Sheet line order (1..n), excluding header and Sub Total/TOTAL rows.
+	RowNo int32 `json:"row_no"`
+	// ATM ID column as sent by the vendor (e.g. 5902, A353, ZZVX). Kept verbatim, never overwritten -- this is the evidence of what the vendor claimed.
+	AtmTerminalID string `json:"atm_terminal_id"`
+	// Resolved at ingest from atm_terminal_id. NULL = ATM not in master data; the file still ingests (count into atm_dsr_rencana_isi_files.error_count). Query unresolved rows with WHERE atm_id IS NULL.
+	AtmID       *int64  `json:"atm_id"`
+	AtmLocation *string `json:"atm_location"`
+	// Denom / "50/100" column as printed: 50 | 100 | TST. TST rows are recyclers and carry both fill_100k_idr and fill_50k_idr.
+	DenomConfig *string        `json:"denom_config"`
+	Fill100kIdr pgtype.Numeric `json:"fill_100k_idr"`
+	Fill50kIdr  pgtype.Numeric `json:"fill_50k_idr"`
+	// Saldo Splank Pukul 08:00 column, full IDR.
+	SplankBalance0800Idr pgtype.Numeric `json:"splank_balance_0800_idr"`
+	// Keterangan column verbatim, e.g. "PENDING DSR TGL 16/07/2026".
+	Remarks   *string            `json:"remarks"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+// One row per ingested SALDO HARIAN ATM workbook. Idempotent per checksum; re-ingest = delete this row, child rows cascade.
+type AtmDsrSaldoFile struct {
+	ID       int64   `json:"id"`
+	Filename string  `json:"filename"`
+	Checksum *string `json:"checksum"`
+	// pending | processing | completed | failed
+	Status string `json:"status"`
+	// Section-1 date (Tanggal cell, e.g. 2026-07-15). Also parsed from the filename as a cross-check.
+	ReportDate pgtype.Date `json:"report_date"`
+	// Section-2 provisional date (STATUS SALDO SEMENTARA), normally report_date + 1.
+	StatusDate pgtype.Date `json:"status_date"`
+	Bank       *string     `json:"bank"`
+	// Vendor label as printed (e.g. BIJAK JAKARTA). Not yet FK to vendors.code.
+	Vendor string `json:"vendor"`
+	// Company header cell, e.g. PT. Bintang Jasa Artha Kelola - Jakarta.
+	Company    *string `json:"company"`
+	Recipient  *string `json:"recipient"`
+	Sender     *string `json:"sender"`
+	Subject    *string `json:"subject"`
+	PreparedBy *string `json:"prepared_by"`
+	CheckedBy  *string `json:"checked_by"`
+	ApprovedBy *string `json:"approved_by"`
+	Currency   string  `json:"currency"`
+	// Vendor-stated SALDO AKHIR SAMPAI PUKUL 00:00 total, full IDR. Ingest cross-check: must equal SALDO AWAL + SUM(penerimaan section d0) + SUM(pengeluaran section d0).
+	SaldoAkhir0000TotalIdr pgtype.Numeric `json:"saldo_akhir_0000_total_idr"`
+	// Vendor-stated SALDO SEMENTARA SAMPAI PUKUL 09:00 total, full IDR. Recomputable cross-check.
+	SaldoSementara0900TotalIdr pgtype.Numeric `json:"saldo_sementara_0900_total_idr"`
+	// Vendor-stated TOTAL STATUS UANG CADANGAN ATM, full IDR (Layak Edar + Rusak).
+	StatusCadanganTotalIdr pgtype.Numeric     `json:"status_cadangan_total_idr"`
+	RowCount               *int32             `json:"row_count"`
+	SuccessCount           *int32             `json:"success_count"`
+	ErrorCount             *int32             `json:"error_count"`
+	ErrorMessage           *string            `json:"error_message"`
+	ProcessedAt            pgtype.Timestamptz `json:"processed_at"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	// Vendor-stated SALDO GABUNGAN (combined across all vault blocks) total, full IDR. Only present on multi-location workbooks; NULL on single-vault ones.
+	SaldoGabunganTotalIdr pgtype.Numeric `json:"saldo_gabungan_total_idr"`
+}
+
+// Leaf line-items of the SALDO HARIAN ATM statement. Subtotal / SALDO AKHIR / SALDO SEMENTARA / TOTAL rows are NOT stored (they are spreadsheet SUMs, recomputed on read).
+type AtmDsrSaldoRow struct {
+	ID     int64 `json:"id"`
+	FileID int64 `json:"file_id"`
+	// Sheet line order (1..n) across both sections, excluding header and derived subtotal/saldo rows. Stable ordering key for reproducing the statement.
+	RowNo int32 `json:"row_no"`
+	// d0 = section 1 (report_date, settled, sampai pukul 00:00). d1 = section 2 (report_date+1, status sementara).
+	Section string `json:"section"`
+	// saldo_awal = opening balance (input, only in d0). penerimaan = receipt line. pengeluaran = disbursement line (values stored negative, verbatim). status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak & Tidak Layak Edar), d1 only.
+	Flow string `json:"flow"`
+	// Uraian text verbatim, e.g. "Dari CIMB Niaga CIT", "Untuk Cartridge Replenishment ATM & CRM", "Kondisi Rusak & Tidak Layak Edar".
+	LineLabel string `json:"line_label"`
+	// Memo/reference embedded in a line label, e.g. 313/ATM/BIJAK/VII/2026 on "Penyelesaian Klaim Selisih Kurang Fisik". NULL when the line carries no memo.
+	MemoNo *string `json:"memo_no"`
+	// Value column for the 100,000 denomination, FULL IDR. NULL when the source cell was an Excel error (#REF!) -- counts into atm_dsr_saldo_files.error_count.
+	Denom100k pgtype.Numeric `json:"denom_100k"`
+	Denom50k  pgtype.Numeric `json:"denom_50k"`
+	Denom20k  pgtype.Numeric `json:"denom_20k"`
+	Denom10k  pgtype.Numeric `json:"denom_10k"`
+	Denom5k   pgtype.Numeric `json:"denom_5k"`
+	Denom2k   pgtype.Numeric `json:"denom_2k"`
+	Denom1k   pgtype.Numeric `json:"denom_1k"`
+	// Total Rupiah column for the line, FULL IDR. Ingest cross-check: must equal SUM(denom_100k..denom_1k) when no denom cell is NULL.
+	LineTotalIdr pgtype.Numeric     `json:"line_total_idr"`
+	Remarks      *string            `json:"remarks"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	// Vault/site block header the row belongs to, verbatim (e.g. LENTENG AGUNG, BINTARO, BEKASI, CIMONE). NULL for single-vault vendor workbooks (e.g. BIJAK) that print only one block.
+	Location *string `json:"location"`
+}
+
 type AtmVendorPackage struct {
 	ID                 int64              `json:"id"`
 	AtmID              int64              `json:"atm_id"`
@@ -178,6 +290,18 @@ type ItmReplenishFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LateDetection struct {
+	ID             pgtype.UUID        `json:"id"`
+	FileType       string             `json:"file_type"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	SlaDeadline    pgtype.Time        `json:"sla_deadline"`
+	DetectedAt     pgtype.Timestamptz `json:"detected_at"`
+	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
+	IsResolved     bool               `json:"is_resolved"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Location struct {
 	ID            int64              `json:"id"`
 	RegionID      int64              `json:"region_id"`
@@ -205,6 +329,45 @@ type Region struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type RetryAuditLog struct {
+	ID pgtype.UUID `json:"id"`
+	// retry_initiated | retry_completed
+	EventType string `json:"event_type"`
+	// auto | manual
+	TriggerType    string             `json:"trigger_type"`
+	FileID         pgtype.UUID        `json:"file_id"`
+	FileType       string             `json:"file_type"`
+	FileChecksum   *string            `json:"file_checksum"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	InitiatedBy    string             `json:"initiated_by"`
+	Outcome        *string            `json:"outcome"`
+	DurationMs     *int32             `json:"duration_ms"`
+	ErrorDetail    *string            `json:"error_detail"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type RetryFileTracking struct {
+	ID pgtype.UUID `json:"id"`
+	// dmaa | itm_cashpos | itm_replenish
+	FileType       string      `json:"file_type"`
+	Filename       string      `json:"filename"`
+	FilePath       string      `json:"file_path"`
+	FileChecksum   string      `json:"file_checksum"`
+	ProcessingDate pgtype.Date `json:"processing_date"`
+	// not_processed | input_remaining
+	DetectionSource string  `json:"detection_source"`
+	FailureReason   *string `json:"failure_reason"`
+	// pending | processing | completed | failed | max_retries_exhausted
+	ProcessingStatus string             `json:"processing_status"`
+	AutoRetryCount   int32              `json:"auto_retry_count"`
+	MaxRetries       int32              `json:"max_retries"`
+	DetectedAt       pgtype.Timestamptz `json:"detected_at"`
+	LastRetryAt      pgtype.Timestamptz `json:"last_retry_at"`
+	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Role struct {
 	ID int64 `json:"id"`
 	// ADMIN | ADMIN_PARAM | ATM-USER | ATM-SPV | BRANCH-USER | BRANCH-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | VENDOR-USER
@@ -212,6 +375,19 @@ type Role struct {
 	Description *string            `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ScanRun struct {
+	ID pgtype.UUID `json:"id"`
+	// failure_detection | late_detection
+	ScanType   string             `json:"scan_type"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	// running | success | failed
+	Status        string             `json:"status"`
+	FilesDetected *int32             `json:"files_detected"`
+	ErrorMessage  *string            `json:"error_message"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {
@@ -228,14 +404,14 @@ type User struct {
 	// Only for auth_source=local
 	PasswordHash *string `json:"password_hash"`
 	// Required for vendor/local users, null for internal LDAP users
-	VendorID *int64 `json:"vendor_id"`
-	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
-	VendorBranchID *int64             `json:"vendor_branch_id"`
-	IsActive       bool               `json:"is_active"`
-	LastLoginAt    pgtype.Timestamptz `json:"last_login_at"`
+	VendorID    *int64             `json:"vendor_id"`
+	IsActive    bool               `json:"is_active"`
+	LastLoginAt pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
+	VendorBranchID *int64 `json:"vendor_branch_id"`
 }
 
 type Vendor struct {

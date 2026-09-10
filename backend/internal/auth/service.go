@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/cimb-niaga/cms/pkg/auth"
 )
@@ -27,6 +28,15 @@ type LoginRequest struct {
 type LoginResponse struct {
 	AccessToken string      `json:"access_token"`
 	User        UserProfile `json:"user"`
+	// PasswordDaysLeft is set only when a local-password account (auth_source
+	// local|local_dev) is within the expiry warning window. Additive/optional
+	// — omitted entirely otherwise, so the flat JSON shape stays wire-compatible.
+	PasswordDaysLeft *int `json:"password_days_left,omitempty"`
+	// MustChangePassword mirrors users.must_change_password: true means the
+	// caller (FE) must force a password change before letting this user do
+	// anything else. Always present (default false) — additive field, does
+	// not break the existing flat JSON shape.
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 // UserProfile represents the user data returned in login and /me responses.
@@ -52,13 +62,16 @@ func NewService(providers []auth.Provider, tokenService *auth.TokenService, user
 
 // Login executes the authentication flow in strict order:
 // 1. Input validation
-// 2. Rate limit check
+// 2. Rate limit check (per-IP/username, pkg/middleware)
 // 3. User lookup (not found / deleted_at → generic error)
 // 4. is_active check
-// 5. Credential verification via Provider (based on auth_source)
+// 4b. Lockout check (per-account, local-password only)
+// 5. Credential verification via Provider (based on auth_source); on failure,
+//    increments the per-account lockout counter (local-password only)
+// 5c. Password expiry policy (local-password only)
 // 6. Portal type restriction
 // 7. Generate tokens
-// 8. Update last_login_at + reset rate limit
+// 8. Update last_login_at + reset rate limit + reset lockout counter
 //
 // Returns: LoginResponse, refreshToken (for httpOnly cookie), or error.
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, string, error) {
@@ -91,6 +104,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, "", auth.ErrAccountInactive
 	}
 
+	// Step 4b: Lockout check. Only auth_source=local|local_dev is evaluated —
+	// LDAP/Entra accounts are never locked by this policy. Checked before
+	// credential verification so a locked account is rejected even if the
+	// password is correct.
+	if isLocalAuthSource(user.AuthSource) && auth.IsLocked(user.LockedUntil, time.Now()) {
+		return nil, "", auth.ErrAccountLocked
+	}
+
 	// Step 5: Credential verification via selected Provider
 	provider, err := s.selectProvider(user.AuthSource)
 	if err != nil {
@@ -101,7 +122,30 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	if authErr != nil {
 		// Increment rate limit on credential failure
 		_ = s.rateLimiter.IncrementFailed(ctx, req.Username, req.IP)
+
+		// Per-account lockout counter (distinct from the per-IP/username rate
+		// limiter above). Only auth_source=local|local_dev is evaluated.
+		if isLocalAuthSource(user.AuthSource) {
+			newCount, incErr := s.userRepo.IncrementFailedLogin(ctx, user.ID)
+			if incErr == nil && newCount >= auth.MaxFailedLogins {
+				_ = s.userRepo.LockAccount(ctx, user.ID, time.Now().Add(auth.LockoutDuration))
+			}
+		}
 		return nil, "", auth.ErrInvalidCredentials
+	}
+
+	// Step 5c: Local-password expiry policy. Only auth_source=local|local_dev
+	// is evaluated — LDAP/Entra manage their own password policy.
+	var passwordDaysLeft *int
+	if isLocalAuthSource(user.AuthSource) {
+		expired, daysLeft := auth.PasswordExpiry(user.PasswordChangedAt, time.Now())
+		if expired {
+			_ = s.userRepo.MarkPasswordExpired(ctx, user.ID)
+			return nil, "", auth.ErrPasswordExpired
+		}
+		if auth.InPasswordWarningWindow(daysLeft) {
+			passwordDaysLeft = &daysLeft
+		}
 	}
 
 	// Step 6: Portal type restriction
@@ -111,11 +155,13 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	// Step 7: Generate token pair
 	identity := &auth.AuthIdentity{
-		UserID:     user.ID,
-		Username:   user.Username,
-		Role:       user.Role,
-		IsKaryawan: user.IsKaryawan,
-		VendorID:   user.VendorID,
+		UserID:        user.ID,
+		Username:      user.Username,
+		Role:          user.Role,
+		IsKaryawan:    user.IsKaryawan,
+		VendorID:      user.VendorID,
+		SupervisorID:  user.SupervisorID,
+		ApprovalLevel: user.ApprovalLevel,
 	}
 
 	accessToken, refreshToken, err := s.tokenService.GenerateTokenPair(identity)
@@ -123,9 +169,10 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, "", auth.ErrServiceUnavailable
 	}
 
-	// Step 8: Update last_login_at + reset rate limit
+	// Step 8: Update last_login_at + reset rate limit + reset lockout counter
 	_ = s.userRepo.UpdateLastLogin(ctx, user.ID)
 	_ = s.rateLimiter.ResetUsername(ctx, req.Username)
+	_ = s.userRepo.ResetLockout(ctx, user.ID)
 
 	response := &LoginResponse{
 		AccessToken: accessToken,
@@ -138,6 +185,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 			IsKaryawan: user.IsKaryawan,
 			VendorID:   user.VendorID,
 		},
+		PasswordDaysLeft:   passwordDaysLeft,
+		MustChangePassword: user.MustChangePassword,
 	}
 
 	return response, refreshToken, nil
@@ -198,4 +247,12 @@ func (s *Service) validatePortalAccess(user *auth.UserRecord, portalType string)
 		return auth.ErrPortalMismatch
 	}
 	return nil
+}
+
+// isLocalAuthSource reports whether the given auth_source is DB-authenticated
+// (local|local_dev), i.e. subject to the local-password expiry/lockout
+// policies. LDAP/Entra accounts manage their own password policy and are
+// always excluded.
+func isLocalAuthSource(authSource string) bool {
+	return authSource == "local" || authSource == "local_dev"
 }

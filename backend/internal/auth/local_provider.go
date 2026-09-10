@@ -48,10 +48,12 @@ func (p *LocalProvider) Authenticate(ctx context.Context, username, password str
 	}
 
 	return &auth.AuthIdentity{
-		UserID:     user.ID,
-		Username:   user.Username,
-		Role:       user.Role,
-		IsKaryawan: user.IsKaryawan,
-		VendorID:   user.VendorID,
+		UserID:        user.ID,
+		Username:      user.Username,
+		Role:          user.Role,
+		IsKaryawan:    user.IsKaryawan,
+		VendorID:      user.VendorID,
+		SupervisorID:  user.SupervisorID,
+		ApprovalLevel: user.ApprovalLevel,
 	}, nil
 }

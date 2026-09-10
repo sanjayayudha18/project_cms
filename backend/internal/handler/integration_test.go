@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
 	"github.com/cimb-niaga/cms/pkg/middleware"
@@ -117,7 +118,8 @@ func setupHarness(t *testing.T) *testHarness {
 		rateLimiter,
 	)
 
-	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter)
+	changePasswordSvc := auth.NewChangePasswordService(repo, audit.NewWriter(pool))
+	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter, changePasswordSvc)
 
 	// Build router
 	r := chi.NewRouter()
@@ -508,7 +510,8 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 		tokenSvc, repo, rateLimiter,
 	)
 
-	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter)
+	changePasswordSvc := auth.NewChangePasswordService(repo, audit.NewWriter(pool))
+	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter, changePasswordSvc)
 
 	r := chi.NewRouter()
 	r.Mount("/api/v1/auth", authHandler.Routes())

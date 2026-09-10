@@ -8,6 +8,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApprovalDelegation struct {
+	ID         int64              `json:"id"`
+	FromUserID int64              `json:"from_user_id"`
+	ToUserID   int64              `json:"to_user_id"`
+	StartAt    pgtype.Timestamptz `json:"start_at"`
+	EndAt      pgtype.Timestamptz `json:"end_at"`
+	Reason     *string            `json:"reason"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type ApprovalRequest struct {
+	ID            int64              `json:"id"`
+	MakerID       int64              `json:"maker_id"`
+	DocumentType  string             `json:"document_type"`
+	DocumentID    int64              `json:"document_id"`
+	Amount        pgtype.Numeric     `json:"amount"`
+	RequiredLevel int32              `json:"required_level"`
+	Status        string             `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ApprovalStep struct {
+	ID                 int64              `json:"id"`
+	RequestID          int64              `json:"request_id"`
+	StepLevel          int32              `json:"step_level"`
+	AssignedApproverID int64              `json:"assigned_approver_id"`
+	ActedByID          *int64             `json:"acted_by_id"`
+	Status             string             `json:"status"`
+	ActedAt            pgtype.Timestamptz `json:"acted_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+}
+
 type Atm struct {
 	ID                      int64              `json:"id"`
 	TerminalID              string             `json:"terminal_id"`
@@ -42,6 +75,18 @@ type AtmVendorPackage struct {
 	IsActive           bool               `json:"is_active"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AuditLog struct {
+	ID         int64              `json:"id"`
+	ActorID    int64              `json:"actor_id"`
+	Action     string             `json:"action"`
+	EntityType string             `json:"entity_type"`
+	EntityID   int64              `json:"entity_id"`
+	Before     []byte             `json:"before"`
+	After      []byte             `json:"after"`
+	IP         *string            `json:"ip"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type Currency struct {
@@ -392,6 +437,15 @@ type User struct {
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
 	VendorBranchID *int64 `json:"vendor_branch_id"`
+}
+
+type UserLeave struct {
+	ID        int64              `json:"id"`
+	UserID    int64              `json:"user_id"`
+	StartAt   pgtype.Timestamptz `json:"start_at"`
+	EndAt     pgtype.Timestamptz `json:"end_at"`
+	Reason    *string            `json:"reason"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Vendor struct {

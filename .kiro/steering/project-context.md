@@ -36,6 +36,7 @@ This project has a knowledge graph at `graphify-out/` with god nodes, community 
 - **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
 - **Stage**: Greenfield, vibe-coded with AI.
 - **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
+  - **Implemented** (migration `027_seed_appaccess_role.sql`, 2026-09-09): `APPACCESS` — sole authority for account provisioning (set initial passwords, force first-login change) + configuring CRUD mapping & RBAC delegation (maker-checker), distinct from `ADMIN`/`ADMIN_PARAM`. 10th role. See `.kiro/specs/Auth-Local-Lifecycle/task.md` Tasks 1 & 6. Not yet verified against a live DB (external Postgres unreachable this session) — run the migration and confirm `SELECT * FROM roles WHERE role='APPACCESS'` before relying on it in production.
   - **Vendor sub-roles (CIT)**: `Vendor CIT` (uploads CIT DSR) and `Vendor CIT Supervisor` (supervises/approves CIT DSR uploads for the vendor). Both are vendor-portal (local auth) roles scoped to their own vendor's assignments only.
 
 ---
@@ -74,7 +75,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ### Modules (create ONLY these unless told)
 
-**Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
+**Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` (**implemented**: append-only `audit.Writer`, RBAC-Setup Task 3) · `internal/approval` (**implemented**: maker-checker hierarchy + orchestrator, RBAC-Setup Tasks 1-9 — see "Approval integration pattern" below) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
 
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
 
@@ -88,8 +89,8 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ### DB logical groups (canonical table names)
 
-- **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local)
-- **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`
+- **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local), `users.supervisor_id` (self-FK, reporting line, migration 021) + `users.approval_level` (int, independent of role, migration 021) — **implemented**, RBAC-Setup Tasks 1-9 done, see `.kiro/specs/RBAC-Setup/task.md`; **implemented** (migration `026_users_password_policy.sql`, 2026-09-09): revived `auth_source='local_dev'` + `users.password_changed_at`, `users.must_change_password`, `users.failed_login_attempts`, `users.locked_until` (local-password policy: 90d expiry / 7d warning / 3x-fail lock / 30m auto-unlock, `pkg/auth.MaxFailedLogins`/`LockoutDuration`/`PasswordMaxAgeDays`/`PasswordWarnDays` — hardcoded constants, no env override) — see `.kiro/specs/Auth-Local-Lifecycle/task.md` Tasks 1-7. Not yet verified against a live DB this session (external Postgres unreachable) — run migrations `026`-`027` and confirm `\d users` before relying on it in production.
+- **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`, `approval_policies` (document_type + amount range → required_level, migration 022), `approval_steps` (per-level trail on an `approval_requests` row, migration 024), `approval_delegations` (leave fallback, migrations 024+025) + `user_leaves` (migration 024) — **implemented**, RBAC-Setup Tasks 1-9 done, see `.kiro/specs/RBAC-Setup/task.md`. `documents`/`notifications`/`import_jobs`/`export_jobs` remain unimplemented (not part of RBAC-Setup).
 - **Master**: `vendors`, `vendor_pics`, `vendor_vaults`, `locations`, `atms`, `vendor_assignments`
 - **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
 - **Finance**: `invoice_uploads`, `invoice_items`, `invoice_reconciliation_results`
@@ -97,6 +98,20 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 - **Integration**: `escrow_batch_files`, `escrow_batch_rows`, `escrow_reconciliation_results`
 
 > Need a new table/column? Propose here FIRST, get approval, then migrate.
+
+### Approval integration pattern (how other modules use `internal/approval`)
+
+Any module that needs maker-checker (invoice approval, DSR exception override, etc.) calls the existing `approval.Orchestrator` — do not build a second approval state machine.
+
+1. Construct once at startup, alongside your other `internal/<module>` wiring in `cmd/api/main.go`:
+   `repo := approval.NewRepository(dbPool)` (implements all three resolver/store interfaces), then
+   `orch := approval.NewOrchestrator(repo, repo, repo, audit.NewWriter(dbPool), nil)`.
+2. **Submit**: when your module's create/update flow needs sign-off, call
+   `orch.SubmitForApproval(ctx, makerID, "<your_document_type>", documentID, amount, ip)`. It returns `(request, created bool, err)` — `created=false` means a request for that `(document_type, document_id)` already exists (idempotent; map to `409` at your HTTP layer if you want to signal "already submitted", same as `internal/handler/approval_handler.go`'s `Submit`).
+3. **Add a threshold row** in `approval_policies` for your `document_type` (min/max amount → required_level) — see `022_approval_policies.sql`'s seed for the `invoice` example. Without a matching policy, `SubmitForApproval` returns `approval.ErrPolicyNotFound`.
+4. **Approve/Reject**: `orch.Approve(ctx, requestID, actorID, ip)` / `orch.Reject(...)`. Map `approval.ErrNotAuthorized` → `403`, `approval.ErrRequestNotPending` → `409` (see `approval_handler.go`'s `handleError` for the exact pattern).
+5. **Apply your module's effect only after `request.Status == "approved"`** — never apply it optimistically at submit time. Poll via `orch`'s underlying store or listen for the `final_approve` audit entry; there is no event bus yet (YAGNI until a second consumer needs one).
+6. You get the reporting-line hierarchy, leave/delegation fallback, and audit trail for free — do not duplicate `approval_delegations`/`user_leaves` lookups in your module.
 
 ---
 
@@ -295,3 +310,4 @@ Both run on the **same VM**. Because their active windows don't overlap, each ge
 - DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
 - Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 2). Deployed together on ONE Compute Engine VM today (two containers); planned to split into two separate VMs in 2028 (Sec 9) — the module split already makes that a zero-code-change deployment change when it happens.
 - Cash count (vault + selective machine) is confirmed in-scope per URS v0.3 Rev1, but its module/tables are a **proposal pending approval** (Sec 2a) — not yet part of the approved module/table map in Sec 2 until confirmed.
+- RBAC hierarchy + multi-layer maker-checker approval (`.kiro/specs/RBAC-Setup/task.md`, Tasks 1-9) is **implemented**: `internal/approval` (chain resolver, effective-approver/delegation resolver, orchestrator), `internal/audit` (append-only writer), migrations 021-025, admin endpoints (`/api/v1/admin/approval/*`, ADMIN/ADMIN_PARAM only) and `/api/v1/approvals/*` mounted behind `RequireAuth` only (submit must reach any maker; per-request authorization happens inside the orchestrator, not via `RequireRoles` — role and approval hierarchy are deliberately separate concepts). Other modules integrate via the pattern documented under Sec 2 "Approval integration pattern" — do not build a second approval state machine. Known gap: `sqlc generate` is currently blocked by an unrelated pre-existing bug in migration 017 (missing table name); `internal/db/{audit,approval}.sql.go` were hand-written to match sqlc's exact output convention and should be regenerated once 017 is fixed.

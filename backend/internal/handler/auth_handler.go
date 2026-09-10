@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,12 +15,21 @@ import (
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
+// ChangePasswordService is the subset of auth.ChangePasswordService the
+// handler needs (mirrors the ApprovalOrchestrator/ApprovalReader pattern in
+// approval_handler.go — a narrow interface so handler tests can fake it
+// without a real DB).
+type ChangePasswordService interface {
+	ChangePassword(ctx context.Context, userID int64, req auth.ChangePasswordRequest, actorIP string) error
+}
+
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
-	authService  *auth.Service
-	tokenService *pkgauth.TokenService
-	userRepo     pkgauth.UserRepository
-	rateLimiter  *middleware.RateLimiter
+	authService        *auth.Service
+	tokenService       *pkgauth.TokenService
+	userRepo           pkgauth.UserRepository
+	rateLimiter        *middleware.RateLimiter
+	changePasswordSvc  ChangePasswordService
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
@@ -28,12 +38,14 @@ func NewAuthHandler(
 	tokenService *pkgauth.TokenService,
 	userRepo pkgauth.UserRepository,
 	rateLimiter *middleware.RateLimiter,
+	changePasswordSvc ChangePasswordService,
 ) *AuthHandler {
 	return &AuthHandler{
-		authService:  authService,
-		tokenService: tokenService,
-		userRepo:     userRepo,
-		rateLimiter:  rateLimiter,
+		authService:       authService,
+		tokenService:      tokenService,
+		userRepo:          userRepo,
+		rateLimiter:       rateLimiter,
+		changePasswordSvc: changePasswordSvc,
 	}
 }
 
@@ -44,6 +56,7 @@ func (h *AuthHandler) Routes() chi.Router {
 	r.Post("/refresh", h.Refresh)
 	r.Post("/logout", h.Logout)
 	r.With(middleware.RequireAuth(h.tokenService)).Get("/me", h.Me)
+	r.With(middleware.RequireAuth(h.tokenService)).Post("/change-password", h.ChangePassword)
 	return r
 }
 
@@ -57,6 +70,10 @@ type loginRequest struct {
 type loginResponse struct {
 	AccessToken string           `json:"access_token"`
 	User        auth.UserProfile `json:"user"`
+	// PasswordDaysLeft/MustChangePassword mirror auth.LoginResponse — additive
+	// fields, existing FE clients that don't read them are unaffected.
+	PasswordDaysLeft   *int `json:"password_days_left,omitempty"`
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 // Login handles POST /login — authenticates user and returns tokens.
@@ -87,8 +104,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	setRefreshCookie(w, refreshToken)
 
 	writeJSON(w, http.StatusOK, loginResponse{
-		AccessToken: resp.AccessToken,
-		User:        resp.User,
+		AccessToken:        resp.AccessToken,
+		User:               resp.User,
+		PasswordDaysLeft:   resp.PasswordDaysLeft,
+		MustChangePassword: resp.MustChangePassword,
 	})
 }
 
@@ -191,6 +210,62 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// changePasswordRequest is the expected JSON body for POST /change-password.
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+// ChangePassword handles POST /change-password — self-service password
+// change for the caller's own account (RequireAuth). Requires the correct
+// old password; not an admin reset. LDAP/Entra accounts are rejected.
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "Request body tidak valid")
+		return
+	}
+
+	err := h.changePasswordSvc.ChangePassword(r.Context(), authCtx.UserID, auth.ChangePasswordRequest{
+		OldPassword: req.OldPassword,
+		NewPassword: req.NewPassword,
+	}, extractClientIP(r))
+	if err != nil {
+		h.handleChangePasswordError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Password berhasil diubah"})
+}
+
+// handleChangePasswordError maps ChangePassword errors to HTTP responses.
+func (h *AuthHandler) handleChangePasswordError(w http.ResponseWriter, err error) {
+	var validationErr *pkgauth.ValidationError
+	if errors.As(err, &validationErr) {
+		writeValidationError(w, validationErr.Field, validationErr.Message)
+		return
+	}
+
+	switch {
+	case errors.Is(err, pkgauth.ErrInvalidCredentials):
+		writeUnauthorized(w, "Password lama salah")
+	case errors.Is(err, pkgauth.ErrChangeNotAllowed):
+		writeError(w, http.StatusForbidden, "change_not_allowed", pkgauth.ErrChangeNotAllowed.Error())
+	case errors.Is(err, pkgauth.ErrPasswordUnchanged):
+		writeError(w, http.StatusBadRequest, "password_unchanged", pkgauth.ErrPasswordUnchanged.Error())
+	case errors.Is(err, pkgauth.ErrServiceUnavailable):
+		writeServiceUnavailable(w, "Layanan sedang tidak tersedia")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+	}
+}
+
 // handleAuthError maps auth package errors to appropriate HTTP responses.
 func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 	var validationErr *pkgauth.ValidationError
@@ -212,6 +287,10 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "account_inactive", "Akun tidak aktif")
 	case errors.Is(err, pkgauth.ErrPortalMismatch):
 		writeError(w, http.StatusForbidden, "portal_mismatch", "Akun tidak memiliki akses ke portal ini")
+	case errors.Is(err, pkgauth.ErrPasswordExpired):
+		writeError(w, http.StatusForbidden, "password_expired", pkgauth.ErrPasswordExpired.Error())
+	case errors.Is(err, pkgauth.ErrAccountLocked):
+		writeError(w, http.StatusForbidden, "account_locked", pkgauth.ErrAccountLocked.Error())
 	case errors.Is(err, pkgauth.ErrLDAPNotConfigured):
 		writeServiceUnavailable(w, "LDAP authentication tidak tersedia")
 	case errors.Is(err, pkgauth.ErrServiceUnavailable):

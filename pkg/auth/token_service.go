@@ -19,11 +19,13 @@ type TokenConfig struct {
 
 // AccessTokenClaims represents the claims embedded in an access token.
 type AccessTokenClaims struct {
-	UserID     int64  `json:"id"`
-	Username   string `json:"username"`
-	Role       string `json:"role"`
-	IsKaryawan bool   `json:"is_karyawan"`
-	VendorID   *int64 `json:"vendor_id,omitempty"`
+	UserID        int64  `json:"id"`
+	Username      string `json:"username"`
+	Role          string `json:"role"`
+	IsKaryawan    bool   `json:"is_karyawan"`
+	VendorID      *int64 `json:"vendor_id,omitempty"`
+	SupervisorID  *int64 `json:"supervisor_id,omitempty"`
+	ApprovalLevel *int32 `json:"approval_level,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -73,11 +75,13 @@ func (ts *TokenService) GenerateTokenPair(identity *AuthIdentity) (accessToken, 
 // generateAccessToken creates a signed access token with user identity claims.
 func (ts *TokenService) generateAccessToken(identity *AuthIdentity, now time.Time) (string, error) {
 	claims := AccessTokenClaims{
-		UserID:     identity.UserID,
-		Username:   identity.Username,
-		Role:       identity.Role,
-		IsKaryawan: identity.IsKaryawan,
-		VendorID:   identity.VendorID,
+		UserID:        identity.UserID,
+		Username:      identity.Username,
+		Role:          identity.Role,
+		IsKaryawan:    identity.IsKaryawan,
+		VendorID:      identity.VendorID,
+		SupervisorID:  identity.SupervisorID,
+		ApprovalLevel: identity.ApprovalLevel,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ts.config.AccessTokenExpiry)),

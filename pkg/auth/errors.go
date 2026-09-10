@@ -17,6 +17,11 @@ var (
 	ErrValidation            = errors.New("Validasi gagal")
 	ErrTokenExpired          = errors.New("Sesi telah berakhir")
 	ErrTokenInvalid          = errors.New("Token tidak valid")
+	ErrPasswordExpired       = errors.New("Password sudah kedaluwarsa (lebih dari 90 hari), hubungi admin untuk reset")
+	ErrAccountLocked         = errors.New("Akun terkunci karena terlalu banyak percobaan gagal. Coba lagi setelah 30 menit atau hubungi admin.")
+	ErrChangeNotAllowed      = errors.New("Password akun ini dikelola oleh LDAP/Entra, bukan lewat CMS")
+	ErrPasswordUnchanged     = errors.New("Password baru harus berbeda dari password lama")
+	ErrUserNotFound          = errors.New("Pengguna tidak ditemukan")
 )
 
 // ValidationError represents a structured field-level validation error.

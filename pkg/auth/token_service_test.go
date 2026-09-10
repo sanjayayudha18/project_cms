@@ -69,6 +69,62 @@ func signTokenWithKey(t *testing.T, claims jwt.Claims, key []byte) string {
 	return signed
 }
 
+// TestTokenService_AccessToken_CarriesApprovalLevelAndSupervisorID verifies
+// RBAC-Setup Task 8's requirement: approval_level (+ optional supervisor_id)
+// round-trips through the access token claims.
+func TestTokenService_AccessToken_CarriesApprovalLevelAndSupervisorID(t *testing.T) {
+	bl := newMockBlacklist()
+	svc := NewTokenService(testTokenConfig(), bl)
+
+	level := int32(3)
+	supervisorID := int64(42)
+	identity := testIdentity()
+	identity.ApprovalLevel = &level
+	identity.SupervisorID = &supervisorID
+
+	accessToken, _, err := svc.GenerateTokenPair(identity)
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	claims, err := svc.ValidateAccessToken(accessToken)
+	if err != nil {
+		t.Fatalf("ValidateAccessToken: %v", err)
+	}
+
+	if claims.ApprovalLevel == nil || *claims.ApprovalLevel != level {
+		t.Errorf("ApprovalLevel = %v, want %d", claims.ApprovalLevel, level)
+	}
+	if claims.SupervisorID == nil || *claims.SupervisorID != supervisorID {
+		t.Errorf("SupervisorID = %v, want %d", claims.SupervisorID, supervisorID)
+	}
+}
+
+// TestTokenService_AccessToken_ApprovalLevelOmittedWhenNil verifies a user
+// with no approval_level (not an approver) yields nil claims, not a zero value
+// that could be mistaken for level 0.
+func TestTokenService_AccessToken_ApprovalLevelOmittedWhenNil(t *testing.T) {
+	bl := newMockBlacklist()
+	svc := NewTokenService(testTokenConfig(), bl)
+
+	accessToken, _, err := svc.GenerateTokenPair(testIdentity())
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	claims, err := svc.ValidateAccessToken(accessToken)
+	if err != nil {
+		t.Fatalf("ValidateAccessToken: %v", err)
+	}
+
+	if claims.ApprovalLevel != nil {
+		t.Errorf("ApprovalLevel = %v, want nil", claims.ApprovalLevel)
+	}
+	if claims.SupervisorID != nil {
+		t.Errorf("SupervisorID = %v, want nil", claims.SupervisorID)
+	}
+}
+
 func TestTokenService_GenerateTokenPair_Valid(t *testing.T) {
 	bl := newMockBlacklist()
 	svc := NewTokenService(testTokenConfig(), bl)

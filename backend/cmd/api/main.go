@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/cimb-niaga/cms/backend/internal/approval"
+	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/handler"
@@ -92,6 +94,10 @@ func main() {
 
 	userRepo := repository.NewAuthRepository(dbPool)
 
+	// auditWriter is shared by every module that writes audit_logs (change-
+	// password here, approvals below) — one writer, one DB pool.
+	auditWriter := audit.NewWriter(dbPool)
+
 	rateLimiter := custommw.NewRateLimiter(redisClient, custommw.RateLimitConfig{
 		MaxPerUsername: cfg.RateLimitUsername,
 		MaxPerIP:       cfg.RateLimitIP,
@@ -106,10 +112,20 @@ func main() {
 		userRepo,
 		rateLimiter,
 	)
+	changePasswordService := auth.NewChangePasswordService(userRepo, auditWriter)
 
 	// Create and mount auth handler
-	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter)
+	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService)
 	r.Mount("/api/v1/auth", authHandler.Routes())
+
+	// APPACCESS-only: set a target user's initial password, forcing a
+	// change on their next login (Auth-Local-Lifecycle Task 6).
+	setInitialPasswordService := auth.NewSetInitialPasswordService(userRepo, auditWriter)
+	adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("APPACCESS"),
+	).Mount("/api/v1/admin/users", adminUserHandler.Routes())
 
 	// Create and mount ATM Portal handler, protected by RequireAuth
 	atmPortalService := service.NewAtmPortalService(db.New(dbPool))
@@ -136,6 +152,24 @@ func main() {
 	dsrService := service.NewDsrService(db.New(dbPool), redisClient, dsrHTTPClient, dsrUploadDir, dsrRetryBaseURL, dsrProcessAuth)
 	dsrHandler := handler.NewDsrUploadHandler(dsrService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr", dsrHandler.Routes())
+
+	// Create and mount the approval handler. Mounted behind RequireAuth only
+	// (no RequireRoles): submit must be reachable by any authenticated maker
+	// regardless of role, since role != approval hierarchy (RBAC-Setup). The
+	// real per-request authorization (maker != checker, actor == effective
+	// approver) is enforced inside the orchestrator itself, not at the route.
+	// (auditWriter created earlier, shared with the change-password service.)
+	approvalRepo := approval.NewRepository(dbPool)
+	approvalOrchestrator := approval.NewOrchestrator(approvalRepo, approvalRepo, approvalRepo, auditWriter, nil)
+	approvalHandler := handler.NewApprovalHandler(approvalOrchestrator, approvalRepo)
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/approvals", approvalHandler.Routes())
+
+	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8).
+	adminApprovalHandler := handler.NewAdminApprovalHandler(approvalRepo, auditWriter)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+	).Mount("/api/v1/admin/approval", adminApprovalHandler.Routes())
 
 	// Start HTTP server
 	addr := ":" + cfg.Port

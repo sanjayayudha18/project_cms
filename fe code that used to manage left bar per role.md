@@ -26,6 +26,7 @@ Here are the files that manage the left sidebar/navigation:
 **CompanyPortal (Internal)**
 - `frontend/CompanyPortal-Vite/src/components/layout/Sidebar.tsx` — dedicated sidebar component
 - `frontend/CompanyPortal-Vite/src/components/layout/AppShell.tsx` — shell layout that wraps the sidebar
+-  navigation.ts
 
 **VendorPortal**
 - `frontend/VendorPortal-Vite/src/app/AppShell.tsx` — sidebar is built inline within the shell (no separate Sidebar component)

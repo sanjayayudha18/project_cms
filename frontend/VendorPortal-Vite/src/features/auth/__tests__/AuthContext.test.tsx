@@ -162,7 +162,7 @@ describe("AuthContext", () => {
     });
 
     expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
-    expect(screen.getByTestId("error")).toHaveTextContent("Username atau password salah");
+    expect(screen.getByTestId("error")).toHaveTextContent("Email atau password salah");
   });
 
   it("login sends X-Portal-Type: vendor header", async () => {

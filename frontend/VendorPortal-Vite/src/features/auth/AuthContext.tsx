@@ -40,7 +40,7 @@ interface ApiErrorResponse {
 
 export interface AuthContextValue {
   readonly state: AuthState;
-  login(username: string, password: string): Promise<void>;
+  login(email: string, password: string): Promise<void>;
   logout(): Promise<void>;
   refreshToken(): Promise<boolean>;
 }
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // ─── Login ──────────────────────────────────────────────────────────────────
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setError(null);
     setRateLimitRetryAfter(null);
 
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           "Content-Type": "application/json",
           "X-Portal-Type": "vendor",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
         credentials: "include",
       });
 
@@ -158,8 +158,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Handle error responses
       switch (response.status) {
         case 401: {
-          setError("Username atau password salah");
-          throw new Error("Username atau password salah");
+          setError("Email atau password salah");
+          throw new Error("Email atau password salah");
         }
         case 403: {
           const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;

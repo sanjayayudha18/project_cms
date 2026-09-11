@@ -78,6 +78,10 @@ func (m *stubUserRepo) FindByUsername(_ context.Context, _ string) (*pkgauth.Use
 	return m.findResult, m.findErr
 }
 
+func (m *stubUserRepo) FindByEmail(_ context.Context, _ string) (*pkgauth.UserRecord, error) {
+	return m.findResult, m.findErr
+}
+
 func (m *stubUserRepo) UpdateLastLogin(_ context.Context, _ int64) error {
 	return m.updateLoginErr
 }
@@ -226,7 +230,7 @@ func TestService_Login_Success(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -281,7 +285,7 @@ func TestService_Login_InvalidCredentials(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "WrongPassword!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -310,7 +314,7 @@ func TestService_Login_UserNotFound_GenericError(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "nonexistent",
+		Email:      "nonexistent@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -340,7 +344,7 @@ func TestService_Login_DeletedUser_GenericError(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -368,7 +372,7 @@ func TestService_Login_InactiveUser(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -404,7 +408,7 @@ func TestService_Login_PortalMismatch(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "vendor", // mismatch: karyawan accessing vendor portal
 		IP:         "127.0.0.1",
@@ -422,7 +426,7 @@ func TestService_Login_PortalMismatch(t *testing.T) {
 }
 
 func TestService_Login_ValidationBeforeAuth(t *testing.T) {
-	// Empty username should return pkgauth.ValidationError before any auth logic runs.
+	// Empty email should return pkgauth.ValidationError before any auth logic runs.
 	provider := &stubProvider{
 		authenticateErr: errors.New("should not be called"),
 	}
@@ -436,7 +440,7 @@ func TestService_Login_ValidationBeforeAuth(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "",
+		Email:      "",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -449,15 +453,15 @@ func TestService_Login_ValidationBeforeAuth(t *testing.T) {
 		t.Error("expected empty refresh token for validation error")
 	}
 	if err == nil {
-		t.Fatal("expected an error for empty username")
+		t.Fatal("expected an error for empty email")
 	}
 
 	var validationErr *pkgauth.ValidationError
 	if !errors.As(err, &validationErr) {
 		t.Fatalf("expected *pkgauth.ValidationError, got: %T (%v)", err, err)
 	}
-	if validationErr.Field != "username" {
-		t.Errorf("expected Field=username, got %s", validationErr.Field)
+	if validationErr.Field != "email" {
+		t.Errorf("expected Field=email, got %s", validationErr.Field)
 	}
 }
 
@@ -472,7 +476,7 @@ func TestService_Login_RateLimitBlocks(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -511,7 +515,7 @@ func TestService_Login_LocalPassword_Expired_Rejected(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -548,7 +552,7 @@ func TestService_Login_LocalPassword_WarningWindow_IncludesDaysLeft(t *testing.T
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -587,7 +591,7 @@ func TestService_Login_LDAPAccount_SkipsPasswordExpiryPolicy(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -616,7 +620,7 @@ func TestService_Login_LocalPassword_FailedAttempts_BelowThreshold_NotLocked(t *
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	_, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "WrongPassword!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -646,7 +650,7 @@ func TestService_Login_LocalPassword_FailedAttempts_ReachesThreshold_Locked(t *t
 
 	before := time.Now()
 	_, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "WrongPassword!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -684,7 +688,7 @@ func TestService_Login_LocalPassword_Locked_RejectedEvenWithCorrectPassword(t *t
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, refreshToken, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!", // correct password
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -716,7 +720,7 @@ func TestService_Login_LocalPassword_LockExpired_AllowsRetry(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	resp, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -742,7 +746,7 @@ func TestService_Login_LocalPassword_Success_ResetsLockout(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	_, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "Password123!",
 		PortalType: "company",
 		IP:         "127.0.0.1",
@@ -775,7 +779,7 @@ func TestService_Login_LDAPAccount_NeverLocked(t *testing.T) {
 	svc := newServiceUnderTest(provider, repo, rl)
 
 	_, _, err := svc.Login(context.Background(), LoginRequest{
-		Username:   "john.admin",
+		Email:      "john.admin@crown.local",
 		Password:   "WrongPassword!",
 		PortalType: "company",
 		IP:         "127.0.0.1",

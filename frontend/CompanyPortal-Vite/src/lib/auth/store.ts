@@ -33,7 +33,7 @@ export interface AuthState {
 }
 
 export interface AuthActions {
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   initialize: () => Promise<void>;
@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
   error: null,
   rateLimitRetryAfter: null,
 
-  login: async (username: string, password: string) => {
+  login: async (email: string, password: string) => {
     set({ error: null, rateLimitRetryAfter: null });
 
     try {
@@ -105,7 +105,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
           "Content-Type": "application/json",
           "X-Portal-Type": "company",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
         credentials: "include",
       });
 
@@ -125,7 +125,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
       // Handle error responses
       switch (response.status) {
         case 401: {
-          set({ error: "Username atau password salah" });
+          set({ error: "Email atau password salah" });
           return;
         }
         case 403: {

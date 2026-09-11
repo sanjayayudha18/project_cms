@@ -39,8 +39,13 @@ const (
 	// testVendorUser has role VENDOR-USER, is_karyawan=false, vendor_id set (vendor portal).
 	// Both authenticate with testDevPassword — 003_seed_roles_users.sql's
 	// password_hash values are a verified bcrypt hash of "password123".
-	testCompanyUser = "Yudha"
-	testVendorUser  = "vendor.ssi"
+	// testCompanyUser/testVendorUser are the seeded usernames (still the
+	// returned identifier in resp.User.Username); login itself now goes by
+	// email, hence the matching *Email constants used in doLogin calls.
+	testCompanyUser  = "Yudha"
+	testVendorUser   = "vendor.ssi"
+	testCompanyEmail = "admin@cimbniaga.co.id"
+	testVendorEmail  = "ahmad.hidayat@ssi.co.id"
 )
 
 // ─── Test Harness ─────────────────────────────────────────────────────────────
@@ -186,8 +191,8 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 
 // ─── HTTP Helpers ─────────────────────────────────────────────────────────────
 
-func doLogin(h http.Handler, username, password, portal string) *httptest.ResponseRecorder {
-	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
+func doLogin(h http.Handler, email, password, portal string) *httptest.ResponseRecorder {
+	body := fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
 		strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -246,7 +251,7 @@ func TestIntegration_CompanyLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
 	// testCompanyUser is an internal user (is_karyawan=true), role ADMIN
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -281,7 +286,7 @@ func TestIntegration_VendorLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
 	// testVendorUser is a vendor user (is_karyawan=false, vendor_id set), role VENDOR-USER
-	w := doLogin(h.router, testVendorUser, testDevPassword, vendorPortal)
+	w := doLogin(h.router, testVendorEmail, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -310,7 +315,7 @@ func TestIntegration_PortalMismatch_InternalOnVendor(t *testing.T) {
 	h := setupHarness(t)
 
 	// Internal user trying to login via vendor portal
-	w := doLogin(h.router, testCompanyUser, testDevPassword, vendorPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -327,7 +332,7 @@ func TestIntegration_PortalMismatch_VendorOnCompany(t *testing.T) {
 	h := setupHarness(t)
 
 	// Vendor user trying to login via company portal
-	w := doLogin(h.router, testVendorUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testVendorEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -345,14 +350,14 @@ func TestIntegration_RateLimitEnforcement(t *testing.T) {
 
 	// Exhaust 5 failed attempts for a username
 	for i := 0; i < 5; i++ {
-		w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
+		w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: expected 401, got %d", i+1, w.Code)
 		}
 	}
 
 	// 6th attempt should be rate limited
-	w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
+	w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d: %s", w.Code, w.Body.String())
 	}
@@ -364,7 +369,7 @@ func TestIntegration_RateLimitEnforcement(t *testing.T) {
 	}
 
 	// Even correct password should be blocked
-	w = doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w = doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429 even with correct pw, got %d", w.Code)
 	}
@@ -374,7 +379,7 @@ func TestIntegration_TokenRefresh(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login first to get a refresh token
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d %s", w.Code, w.Body.String())
 	}
@@ -413,7 +418,7 @@ func TestIntegration_Logout_BlacklistsJTI(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -437,7 +442,7 @@ func TestIntegration_RefreshAfterLogout_Fails(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -517,7 +522,7 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
 	// Attempt login — should get 503 because Redis is unreachable (fail-closed)
-	w := doLogin(r, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(r, testCompanyEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when Redis down, got %d: %s",

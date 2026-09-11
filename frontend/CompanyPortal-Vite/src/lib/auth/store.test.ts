@@ -123,13 +123,13 @@ describe("useAuthStore", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        json: async () => ({ error: "auth_failed", message: "Username atau password salah" }),
+        json: async () => ({ error: "auth_failed", message: "Email atau password salah" }),
       });
 
       await useAuthStore.getState().login("wrong", "wrong");
 
       const state = useAuthStore.getState();
-      expect(state.error).toBe("Username atau password salah");
+      expect(state.error).toBe("Email atau password salah");
       expect(state.user).toBeNull();
       expect(state.isAuthenticated).toBe(false);
     });
@@ -169,7 +169,7 @@ describe("useAuthStore", () => {
           error: "validation_error",
           message: "Validasi gagal",
           details: [
-            { field: "username", message: "wajib diisi" },
+            { field: "email", message: "wajib diisi" },
             { field: "password", message: "wajib diisi" },
           ],
         }),
@@ -178,7 +178,7 @@ describe("useAuthStore", () => {
       await useAuthStore.getState().login("", "");
 
       const state = useAuthStore.getState();
-      expect(state.error).toContain("username");
+      expect(state.error).toContain("email");
       expect(state.error).toContain("password");
     });
 
@@ -268,7 +268,7 @@ describe("useAuthStore", () => {
       );
     });
 
-    it("sends username and password in body", async () => {
+    it("sends email and password in body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -290,7 +290,7 @@ describe("useAuthStore", () => {
 
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(options.body as string);
-      expect(body).toEqual({ username: "john.admin", password: "Password123!" });
+      expect(body).toEqual({ email: "john.admin", password: "Password123!" });
     });
   });
 

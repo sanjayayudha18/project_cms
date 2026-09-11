@@ -62,7 +62,7 @@ func (h *AuthHandler) Routes() chi.Router {
 
 // loginRequest is the expected JSON body for POST /login.
 type loginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -88,7 +88,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	clientIP := extractClientIP(r)
 
 	loginReq := auth.LoginRequest{
-		Username:   req.Username,
+		Email:      req.Email,
 		Password:   req.Password,
 		PortalType: portalType,
 		IP:         clientIP,

@@ -8,9 +8,11 @@ import { useForm } from "react-hook-form";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LoginFormData {
-  username: string;
+  email: string;
   password: string;
 }
+
+const EMAIL_PATTERN = /\S+@\S+\.\S+/;
 
 type LoginStatus = "idle" | "loading" | "done" | "error" | "locked";
 
@@ -90,14 +92,14 @@ export function LoginPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    defaultValues: { username: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
 
     try {
-      await login(data.username, data.password);
+      await login(data.email, data.password);
       // Use href so an arbitrary preserved path (possibly with dynamic segments,
       // e.g. /orders/123/evidence) resolves correctly.
       void navigate({ href: redirectTo, replace: true });
@@ -255,27 +257,27 @@ export function LoginPage() {
             noValidate
             className="mt-8 flex flex-col gap-5 lg:mt-10"
           >
-            {/* Username */}
+            {/* Email */}
             <div className="flex flex-col gap-[7px]">
               <label
                 htmlFor="user"
                 className="text-[13px] font-medium"
                 style={{ color: "var(--text)" }}
               >
-                Nama pengguna
+                Email
               </label>
               <input
                 id="user"
-                type="text"
-                autoComplete="username"
-                placeholder="gardanet.ops"
+                type="email"
+                autoComplete="email"
+                placeholder="ops@gardanet.co.id"
                 maxLength={128}
                 disabled={isSubmitDisabled}
-                aria-invalid={errors.username ? "true" : undefined}
-                aria-describedby={errors.username ? "user-err" : undefined}
+                aria-invalid={errors.email ? "true" : undefined}
+                aria-describedby={errors.email ? "user-err" : undefined}
                 className="h-11 w-full rounded-[4px] border px-3.5 text-sm outline-none transition-[border-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_3px_var(--primary-tint)]"
                 style={{
-                  borderColor: errors.username ? "var(--danger)" : "var(--border-strong)",
+                  borderColor: errors.email ? "var(--danger)" : "var(--border-strong)",
                   backgroundColor: "var(--surface)",
                   color: "var(--text)",
                 }}
@@ -283,24 +285,25 @@ export function LoginPage() {
                   e.currentTarget.style.borderColor = "var(--primary)";
                 }}
                 onBlurCapture={(e) => {
-                  if (!errors.username) {
+                  if (!errors.email) {
                     e.currentTarget.style.borderColor = "var(--border-strong)";
                   }
                 }}
-                {...register("username", {
-                  required: "Username wajib diisi",
-                  validate: (v) => isNonWhitespace(v) || "Username wajib diisi",
+                {...register("email", {
+                  required: "Email wajib diisi",
+                  validate: (v) => isNonWhitespace(v) || "Email wajib diisi",
                   maxLength: { value: 128, message: "Maksimal 128 karakter" },
+                  pattern: { value: EMAIL_PATTERN, message: "Format email tidak valid" },
                 })}
               />
-              {errors.username && (
+              {errors.email && (
                 <p
                   id="user-err"
                   className="m-0 flex items-start gap-1.5 text-xs font-medium"
                   style={{ color: "var(--danger)" }}
                 >
                   <WarningIcon />
-                  {errors.username.message}
+                  {errors.email.message}
                 </p>
               )}
             </div>
@@ -478,7 +481,7 @@ export function LoginPage() {
             className="mt-7 max-w-[52ch] border-t pt-5 text-xs leading-normal"
             style={{ borderColor: "var(--border-c)", color: "var(--text-muted)" }}
           >
-            Masukkan nama pengguna vendor, format nama.perusahaan.
+            Masukkan email vendor yang terdaftar di CIMB Niaga.
           </p>
         </div>
       </section>

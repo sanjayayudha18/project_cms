@@ -18,7 +18,7 @@ type Service struct {
 
 // LoginRequest holds the data required for a login attempt.
 type LoginRequest struct {
-	Username   string `json:"username" validate:"required,min=1,max=255"`
+	Email      string `json:"email" validate:"required,email,max=255"`
 	Password   string `json:"password" validate:"required,min=1,max=255"`
 	PortalType string // from X-Portal-Type header: "company" | "vendor"
 	IP         string // from request context
@@ -81,12 +81,12 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	}
 
 	// Step 2: Rate limit check
-	if err := s.rateLimiter.Check(ctx, req.Username, req.IP); err != nil {
+	if err := s.rateLimiter.Check(ctx, req.Email, req.IP); err != nil {
 		return nil, "", err
 	}
 
 	// Step 3: User lookup
-	user, err := s.userRepo.FindByUsername(ctx, req.Username)
+	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, "", auth.ErrServiceUnavailable
 	}
@@ -118,10 +118,12 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 		return nil, "", err
 	}
 
-	_, authErr := provider.Authenticate(ctx, req.Username, req.Password)
+	// Provider.Authenticate takes the DB username (not the email the user
+	// typed) — LocalProvider re-looks-up the account by username internally.
+	_, authErr := provider.Authenticate(ctx, user.Username, req.Password)
 	if authErr != nil {
 		// Increment rate limit on credential failure
-		_ = s.rateLimiter.IncrementFailed(ctx, req.Username, req.IP)
+		_ = s.rateLimiter.IncrementFailed(ctx, req.Email, req.IP)
 
 		// Per-account lockout counter (distinct from the per-IP/username rate
 		// limiter above). Only auth_source=local|local_dev is evaluated.
@@ -171,7 +173,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 
 	// Step 8: Update last_login_at + reset rate limit + reset lockout counter
 	_ = s.userRepo.UpdateLastLogin(ctx, user.ID)
-	_ = s.rateLimiter.ResetUsername(ctx, req.Username)
+	_ = s.rateLimiter.ResetUsername(ctx, req.Email)
 	_ = s.userRepo.ResetLockout(ctx, user.ID)
 
 	response := &LoginResponse{
@@ -192,15 +194,18 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResponse, 
 	return response, refreshToken, nil
 }
 
-// validateInput checks that username, password, and portal type are valid.
+// validateInput checks that email, password, and portal type are valid.
 // Returns a ValidationError for the first failing field.
 func (s *Service) validateInput(req LoginRequest) error {
-	// Username validation
-	if strings.TrimSpace(req.Username) == "" {
-		return &auth.ValidationError{Field: "username", Message: "wajib diisi"}
+	// Email validation
+	if strings.TrimSpace(req.Email) == "" {
+		return &auth.ValidationError{Field: "email", Message: "wajib diisi"}
 	}
-	if len(req.Username) > 255 {
-		return &auth.ValidationError{Field: "username", Message: "maksimal 255 karakter"}
+	if len(req.Email) > 255 {
+		return &auth.ValidationError{Field: "email", Message: "maksimal 255 karakter"}
+	}
+	if !strings.Contains(req.Email, "@") {
+		return &auth.ValidationError{Field: "email", Message: "format email tidak valid"}
 	}
 
 	// Password validation

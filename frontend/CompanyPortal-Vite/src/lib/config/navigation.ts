@@ -28,7 +28,7 @@ import type { DbRole } from "@/lib/auth/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type NavGroup = "general" | "monitoring" | "forecasting" | "invoice" | "cash-count";
+export type NavGroup = "general" | "monitoring" | "forecasting" | "replenish" | "invoice" | "cash-count";
 
 export interface NavItem {
   id: string;
@@ -45,9 +45,10 @@ export interface NavItem {
 export const GROUP_LABELS: Record<NavGroup, string> = {
   general: "Umum",
   monitoring: "Monitoring",
-  forecasting: "Peramalan",
+  forecasting: "Forecasting",
+  replenish: "Replenish",
   invoice: "Tagihan",
-  "cash-count": "Perhitungan Kas",
+  "cash-count": "Cash Count",
 };
 
 // ─── Navigation Configuration ─────────────────────────────────────────────────
@@ -120,6 +121,14 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV"],
     group: "monitoring",
   },
+  {
+    id: "eod-monitoring",
+    label: "EOD Monitoring",
+    icon: Activity,
+    href: "/eod-monitoring",
+    roles: ["ADMIN", "ADMIN_PARAM"],
+    group: "monitoring",
+  },
 
   // Forecasting
   {
@@ -138,14 +147,15 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
     group: "forecasting",
   },
-  {
-    id: "forecast",
-    label: "Forecasting",
-    icon: TrendingUp,
-    href: "/forecasting/forecast",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "forecasting",
-  },
+  // Manually hidden from sidebar — route still exists, just not listed in nav.
+  // {
+  //   id: "forecast",
+  //   label: "Forecasting",
+  //   icon: TrendingUp,
+  //   href: "/forecasting/forecast",
+  //   roles: ["ATM-USER", "ATM-SPV"],
+  //   group: "forecasting",
+  // },
   {
     id: "dmaa-forecast",
     label: "DMAA Forecast",
@@ -154,7 +164,7 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
     group: "forecasting",
   },
-  {
+  /*  {
     id: "fill-instruction",
     label: "Instruksi Pengisian",
     icon: FileText,
@@ -197,6 +207,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "forecasting",
     disabled: true,
   },
+  */
   {
     id: "holiday-calendar",
     label: "Kalender Libur",
@@ -234,6 +245,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "invoice",
     disabled: false,
   },
+  /*
   {
     id: "charge-calc",
     label: "Perhitungan Beban",
@@ -252,7 +264,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "invoice",
     disabled: true,
   },
-
+  */
   // Cash Count
   {
     id: "scheduling",
@@ -263,6 +275,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  /*
   {
     id: "tier-analysis",
     label: "Analisis Tier Saldo",
@@ -272,6 +285,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  */
   {
     id: "execution",
     label: "Pelaksanaan (BA)",
@@ -281,6 +295,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  /*
   {
     id: "checklists",
     label: "Checklist",
@@ -299,6 +314,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  */
   {
     id: "recapitulation",
     label: "Rekapitulasi",

@@ -121,7 +121,7 @@ func TestProperty_Service_AuthErrorUniformity(t *testing.T) {
 		svc := newServiceUnderTest(provider, repo, rl)
 
 		_, _, err := svc.Login(context.Background(), LoginRequest{
-			Username:   username,
+			Email:      username + "@example.com",
 			Password:   password,
 			PortalType: portalType,
 			IP:         "10.0.0.1",
@@ -187,7 +187,7 @@ func TestProperty_Service_PortalTypeIsolation(t *testing.T) {
 		svc := newServiceUnderTest(provider, repo, rl)
 
 		_, _, err := svc.Login(context.Background(), LoginRequest{
-			Username:   username,
+			Email:      username + "@example.com",
 			Password:   password,
 			PortalType: portalType,
 			IP:         "10.0.0.1",
@@ -264,7 +264,7 @@ func TestProperty_Service_AuthProviderSelection(t *testing.T) {
 		svc := newServiceUnderTest(provider, repo, rl)
 
 		_, _, err := svc.Login(context.Background(), LoginRequest{
-			Username:   username,
+			Email:      username + "@example.com",
 			Password:   password,
 			PortalType: "company",
 			IP:         "10.0.0.1",
@@ -303,13 +303,13 @@ func TestProperty_Service_InputValidationPriority(t *testing.T) {
 		// Pick which field to make invalid: 0=username whitespace, 1=password whitespace
 		invalidField := rapid.IntRange(0, 1).Draw(t, "invalidField")
 
-		var username, password string
+		var email, password string
 		switch invalidField {
 		case 0:
-			username = genWhitespaceString().Draw(t, "wsUsername")
+			email = genWhitespaceString().Draw(t, "wsEmail")
 			password = genNonWhitespaceString(1, 50).Draw(t, "password")
 		case 1:
-			username = genNonWhitespaceString(1, 50).Draw(t, "username")
+			email = genNonWhitespaceString(1, 50).Draw(t, "username") + "@example.com"
 			password = genWhitespaceString().Draw(t, "wsPassword")
 		}
 
@@ -325,7 +325,7 @@ func TestProperty_Service_InputValidationPriority(t *testing.T) {
 		svc := newServiceUnderTest(provider, repo, rl)
 
 		_, _, err := svc.Login(context.Background(), LoginRequest{
-			Username:   username,
+			Email:      email,
 			Password:   password,
 			PortalType: portalType,
 			IP:         "10.0.0.1",
@@ -339,8 +339,8 @@ func TestProperty_Service_InputValidationPriority(t *testing.T) {
 
 		switch invalidField {
 		case 0:
-			if validationErr.Field != "username" {
-				t.Fatalf("expected Field=username, got %s", validationErr.Field)
+			if validationErr.Field != "email" {
+				t.Fatalf("expected Field=email, got %s", validationErr.Field)
 			}
 		case 1:
 			if validationErr.Field != "password" {
@@ -372,7 +372,7 @@ func TestProperty_Service_PasswordLengthBoundaries(t *testing.T) {
 		svc := newServiceUnderTest(provider, repo, rl)
 
 		_, _, err := svc.Login(context.Background(), LoginRequest{
-			Username:   username,
+			Email:      username + "@example.com",
 			Password:   password,
 			PortalType: portalType,
 			IP:         "10.0.0.1",

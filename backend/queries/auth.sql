@@ -9,6 +9,18 @@ FROM users u
 JOIN roles r ON r.id = u.role_id
 WHERE u.username = $1 AND u.deleted_at IS NULL;
 
+-- name: FindUserByEmail :one
+-- Same shape as FindUserByUsername but keyed by email — used by the login
+-- flow now that users sign in with their email address instead of username.
+SELECT u.id, u.username, u.full_name, u.email, u.password_hash,
+       u.auth_source, u.role_id, r.role, u.is_karyawan,
+       u.vendor_id, u.is_active, u.deleted_at,
+       u.supervisor_id, u.approval_level, u.password_changed_at,
+       u.failed_login_attempts, u.locked_until, u.must_change_password
+FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.email = $1 AND u.deleted_at IS NULL;
+
 -- name: FindUserByID :one
 -- Same shape as FindUserByUsername but keyed by id — used by self-service
 -- actions (change-password) where the caller is already authenticated via

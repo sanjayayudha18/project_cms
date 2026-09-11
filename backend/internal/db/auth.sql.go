@@ -70,6 +70,65 @@ func (q *Queries) FindUserByUsername(ctx context.Context, username string) (Find
 	return i, err
 }
 
+const findUserByEmail = `-- name: FindUserByEmail :one
+SELECT u.id, u.username, u.full_name, u.email, u.password_hash,
+       u.auth_source, u.role_id, r.role, u.is_karyawan,
+       u.vendor_id, u.is_active, u.deleted_at,
+       u.supervisor_id, u.approval_level, u.password_changed_at,
+       u.failed_login_attempts, u.locked_until, u.must_change_password
+FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.email = $1 AND u.deleted_at IS NULL
+`
+
+type FindUserByEmailRow struct {
+	ID                  int64              `json:"id"`
+	Username            string             `json:"username"`
+	FullName            string             `json:"full_name"`
+	Email               string             `json:"email"`
+	PasswordHash        *string            `json:"password_hash"`
+	AuthSource          string             `json:"auth_source"`
+	RoleID              int64              `json:"role_id"`
+	Role                string             `json:"role"`
+	IsKaryawan          bool               `json:"is_karyawan"`
+	VendorID            *int64             `json:"vendor_id"`
+	IsActive            bool               `json:"is_active"`
+	DeletedAt           pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID        *int64             `json:"supervisor_id"`
+	ApprovalLevel       *int32             `json:"approval_level"`
+	PasswordChangedAt   pgtype.Timestamptz `json:"password_changed_at"`
+	FailedLoginAttempts int32              `json:"failed_login_attempts"`
+	LockedUntil         pgtype.Timestamptz `json:"locked_until"`
+	MustChangePassword  bool               `json:"must_change_password"`
+}
+
+// Retrieves user with joined role name, excluding soft-deleted users.
+func (q *Queries) FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, findUserByEmail, email)
+	var i FindUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FullName,
+		&i.Email,
+		&i.PasswordHash,
+		&i.AuthSource,
+		&i.RoleID,
+		&i.Role,
+		&i.IsKaryawan,
+		&i.VendorID,
+		&i.IsActive,
+		&i.DeletedAt,
+		&i.SupervisorID,
+		&i.ApprovalLevel,
+		&i.PasswordChangedAt,
+		&i.FailedLoginAttempts,
+		&i.LockedUntil,
+		&i.MustChangePassword,
+	)
+	return i, err
+}
+
 const findUserByID = `-- name: FindUserByID :one
 SELECT u.id, u.username, u.full_name, u.email, u.password_hash,
        u.auth_source, u.role_id, r.role, u.is_karyawan,

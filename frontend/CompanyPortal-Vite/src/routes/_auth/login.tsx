@@ -17,7 +17,10 @@ function credentialField(maxLen: number, maxMessage: string) {
 }
 
 export const loginSchema = z.object({
-  username: credentialField(128, "Maksimal 128 karakter"),
+  email: credentialField(128, "Maksimal 128 karakter").refine(
+    (value) => /\S+@\S+\.\S+/.test(value.trim()),
+    { message: "Format email tidak valid" },
+  ),
   password: credentialField(72, "Maksimal 72 karakter"),
 });
 
@@ -58,10 +61,10 @@ export function LoginPage() {
     setFocus,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
-  const usernameField = register("username");
+  const emailField = register("email");
   const passwordField = register("password");
 
   // Stable deadline from store Retry-After seconds
@@ -93,19 +96,19 @@ export function LoginPage() {
 
   // Focus first invalid field after validation failure
   useEffect(() => {
-    if (errors.username) {
-      setFocus("username");
+    if (errors.email) {
+      setFocus("email");
     } else if (errors.password) {
       setFocus("password");
     }
-  }, [errors.username, errors.password, setFocus]);
+  }, [errors.email, errors.password, setFocus]);
 
   if (!isAuthLoading && isAuthenticated) {
     return <Navigate to="/" />;
   }
 
   const onSubmit = async (data: LoginFormData) => {
-    await login(data.username, data.password);
+    await login(data.email, data.password);
 
     const state = useAuthStore.getState();
     if (state.isAuthenticated) {
@@ -150,23 +153,23 @@ export function LoginPage() {
       >
         <div className="login-form__field-stack">
           <div className="login-form__field">
-            <label htmlFor="username" className="login-form__label">
-              Username
+            <label htmlFor="email" className="login-form__label">
+              Email
             </label>
             <input
-              id="username"
-              type="text"
-              autoComplete="username"
-              placeholder="Username"
-              className={`login-form__input${errors.username ? " login-form__input--error" : ""}`}
-              aria-invalid={errors.username ? "true" : undefined}
-              aria-describedby={errors.username ? "username-error" : undefined}
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="Email"
+              className={`login-form__input${errors.email ? " login-form__input--error" : ""}`}
+              aria-invalid={errors.email ? "true" : undefined}
+              aria-describedby={errors.email ? "email-error" : undefined}
               disabled={isSubmitting}
-              {...usernameField}
+              {...emailField}
             />
-            {errors.username && (
-              <p id="username-error" className="login-form__field-error">
-                {errors.username.message}
+            {errors.email && (
+              <p id="email-error" className="login-form__field-error">
+                {errors.email.message}
               </p>
             )}
           </div>

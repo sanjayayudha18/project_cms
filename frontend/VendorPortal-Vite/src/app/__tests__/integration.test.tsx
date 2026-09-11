@@ -181,7 +181,7 @@ async function performLogin(
   username: string,
   password: string,
 ) {
-  const usernameInput = screen.getByLabelText("Nama pengguna");
+  const usernameInput = screen.getByLabelText("Email");
   const passwordInput = screen.getByLabelText("Kata sandi");
   const submitButton = screen.getByRole("button", { name: /masuk/i });
 
@@ -199,11 +199,11 @@ describe("Login → redirect → data display flow", () => {
 
     // Should redirect to login since unauthenticated (after isAuthLoading resolves)
     await waitFor(() => {
-      expect(screen.getByLabelText("Nama pengguna")).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
 
     // Fill in credentials and submit
-    await performLogin(user, "gardanet.admin", "password123");
+    await performLogin(user, "gardanet.admin@example.com", "password123");
 
     // Should redirect to orders page and display CIT Orders heading
     await waitFor(() => {
@@ -226,9 +226,9 @@ describe("Vendor scoping", () => {
 
     // Login as gardanet.admin
     await waitFor(() => {
-      expect(screen.getByLabelText("Nama pengguna")).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    await performLogin(user, "gardanet.admin", "password123");
+    await performLogin(user, "gardanet.admin@example.com", "password123");
 
     // Wait for orders page to render
     await waitFor(() => {
@@ -264,9 +264,9 @@ describe("Navigation between screens", () => {
 
     // Login first
     await waitFor(() => {
-      expect(screen.getByLabelText("Nama pengguna")).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    await performLogin(user, "gardanet.admin", "password123");
+    await performLogin(user, "gardanet.admin@example.com", "password123");
 
     // Wait for initial page (orders)
     await waitFor(() => {

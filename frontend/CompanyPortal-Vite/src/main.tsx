@@ -6,6 +6,7 @@ import { authRoute } from "./routes/_auth";
 import { protectedRoute } from "./routes/_protected";
 import { atmPortalRoute } from "./routes/atm-portal";
 import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
+import { auditLogsRoute } from "./routes/audit-logs";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { citRoute } from "./routes/cit";
@@ -52,6 +53,7 @@ const routeTree = rootRoute.addChildren([
     reconciliationRoute,
     cashCountRoute,
     eodMonitoringRoute,
+    auditLogsRoute,
   ]),
 ]);
 

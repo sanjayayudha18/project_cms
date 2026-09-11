@@ -34,6 +34,12 @@ type UserRepository interface {
 	// Returns nil, nil if no matching user is found.
 	FindByUsername(ctx context.Context, username string) (*UserRecord, error)
 
+	// FindByEmail retrieves a user by email where deleted_at IS NULL. Used
+	// by the login flow (users sign in with email; username stays the
+	// internal identifier used elsewhere — JWT claims, audit, rate limiting).
+	// Returns nil, nil if no matching user is found.
+	FindByEmail(ctx context.Context, email string) (*UserRecord, error)
+
 	// UpdateLastLogin sets last_login_at to the current time for the given user.
 	UpdateLastLogin(ctx context.Context, userID int64) error
 

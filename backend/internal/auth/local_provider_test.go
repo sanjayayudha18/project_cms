@@ -21,6 +21,10 @@ func (m *mockUserRepository) FindByUsername(_ context.Context, _ string) (*pkgau
 	return m.user, m.err
 }
 
+func (m *mockUserRepository) FindByEmail(_ context.Context, _ string) (*pkgauth.UserRecord, error) {
+	return m.user, m.err
+}
+
 func (m *mockUserRepository) UpdateLastLogin(_ context.Context, _ int64) error {
 	return nil
 }

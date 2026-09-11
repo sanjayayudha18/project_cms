@@ -66,6 +66,39 @@ func (r *AuthRepository) FindByUsername(ctx context.Context, username string) (*
 	}, nil
 }
 
+// FindByEmail retrieves a user by email where deleted_at IS NULL. Used by
+// the login flow now that users sign in with email instead of username.
+// Returns nil, nil if no matching user is found.
+func (r *AuthRepository) FindByEmail(ctx context.Context, email string) (*auth.UserRecord, error) {
+	row, err := r.queries.FindUserByEmail(ctx, email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &auth.UserRecord{
+		ID:            row.ID,
+		Username:      row.Username,
+		FullName:      row.FullName,
+		Email:         row.Email,
+		PasswordHash:  row.PasswordHash,
+		AuthSource:    row.AuthSource,
+		RoleID:        row.RoleID,
+		Role:          row.Role,
+		IsKaryawan:    row.IsKaryawan,
+		VendorID:      row.VendorID,
+		IsActive:      row.IsActive,
+		DeletedAt:     timestamptzToPtr(row.DeletedAt),
+		SupervisorID:  row.SupervisorID,
+		ApprovalLevel: row.ApprovalLevel,
+		PasswordChangedAt:   timestamptzToPtr(row.PasswordChangedAt),
+		FailedLoginAttempts: row.FailedLoginAttempts,
+		LockedUntil:         timestamptzToPtr(row.LockedUntil),
+		MustChangePassword:  row.MustChangePassword,
+	}, nil
+}
+
 // FindByID retrieves a user by ID where deleted_at IS NULL, including the
 // auth-related fields FindByUsername returns (password_hash, auth_source,
 // lockout state) — used by self-service actions like change-password.

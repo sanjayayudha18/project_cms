@@ -182,6 +182,16 @@ func main() {
 	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
 
+	// Create and mount the Audit Log Viewer handler (read-only, admin-only).
+	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL wiring lands
+	auditLogRepo := repository.NewAuditLogRepository(dbPool)
+	auditLogService := service.NewAuditLogReadService(auditLogRepo)
+	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+	).Mount("/api/v1/audit-logs", auditLogHandler.Routes())
+
 	// Start HTTP server
 	addr := ":" + cfg.Port
 	srv := &http.Server{

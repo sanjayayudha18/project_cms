@@ -36,14 +36,17 @@ Here's the sequence to update your running containers after code changes:
 
 Backend:
 
+cd backend-cit 
+docker compose down
+docker compose up -d --build
+
+----------------------------
+
 cd backend
 docker compose down
 docker compose up -d --build
 
 `````````
-cd backend-cit 
-docker compose down
-docker compose up -d --build
 
 Frontend:
 

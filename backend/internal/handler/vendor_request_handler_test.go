@@ -281,3 +281,96 @@ func TestVendorRequestHandler_Unauthenticated(t *testing.T) {
 		t.Fatalf("status = %d, want 401, body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+// TestVendorRequestHandler_BrowseForecast_IncludesNewContextFields covers
+// Task 3 (.kiro/specs/update-cit-forecast-browser): the four new context
+// columns must appear in the flat JSON response additively, alongside the
+// existing fields and the unchanged pagination wrapper (Req 4.1).
+func TestVendorRequestHandler_BrowseForecast_IncludesNewContextFields(t *testing.T) {
+	svc := &fakeVendorRequestServicer{
+		browseResult: &service.BrowseForecastResult{
+			Data: []service.ForecastRow{
+				{
+					TerminalID:      "1234",
+					PeriodePred:     time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC),
+					Denom:           50000,
+					AmountReplenish: 100000000,
+					AmountRefund:    0,
+					DmaaFileID:      1,
+					LokasiATM:       "Test Location",
+					Brand:           "Hyosung",
+					FLMVendor:       "TAG",
+					FLMVendorRegion: "TAG Jawa Barat",
+				},
+			},
+			Total: 1, Page: 1, PageSize: 25, TotalPages: 1,
+		},
+	}
+	router, ts := mountVendorRequestHandler(t, svc)
+
+	rec := vendorRequestDoRequest(router, http.MethodGet,
+		"/api/v1/vendor-requests/forecast?forecast_date=2027-01-15",
+		vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	var body forecastResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Data) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(body.Data))
+	}
+	row := body.Data[0]
+	if row.TerminalID != "1234" || row.AmountReplenish != 100000000 {
+		t.Errorf("existing fields not preserved: %+v", row)
+	}
+	if row.LokasiATM != "Test Location" || row.Brand != "Hyosung" ||
+		row.FLMVendor != "TAG" || row.FLMVendorRegion != "TAG Jawa Barat" {
+		t.Errorf("new context fields missing/wrong: %+v", row)
+	}
+	if body.Pagination.Page != 1 || body.Pagination.PageSize != 25 ||
+		body.Pagination.TotalCount != 1 || body.Pagination.TotalPages != 1 {
+		t.Errorf("pagination wrapper changed unexpectedly: %+v", body.Pagination)
+	}
+
+	// Additive check at the wire level too: the raw JSON must carry both the
+	// old and new keys, proving no rename/removal (Req 4.1).
+	var raw map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw: %v", err)
+	}
+	rawRow := raw["data"].([]any)[0].(map[string]any)
+	for _, key := range []string{"terminal_id", "periode_pred", "denom", "amount_replenish", "amount_refund", "dmaa_file_id", "lokasi_atm", "brand", "flm_vendor", "flm_vendor_region"} {
+		if _, ok := rawRow[key]; !ok {
+			t.Errorf("response JSON missing key %q", key)
+		}
+	}
+}
+
+func TestVendorRequestHandler_BrowseForecast_RoleGate(t *testing.T) {
+	router, ts := mountVendorRequestHandler(t, &fakeVendorRequestServicer{
+		browseResult: &service.BrowseForecastResult{Data: []service.ForecastRow{}},
+	})
+
+	// 401: no token.
+	rec := vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast", "", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no token: status = %d, want 401, body=%s", rec.Code, rec.Body.String())
+	}
+
+	// 403: authenticated but not in vendorRequestViewerRoles.
+	rec = vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast",
+		vendorRequestTokenFor(t, ts, 5, "VENDOR"), "")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("wrong role: status = %d, want 403, body=%s", rec.Code, rec.Body.String())
+	}
+
+	// 200: ATM-USER is an allowed viewer role.
+	rec = vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast",
+		vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("allowed role: status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+}

@@ -23,7 +23,10 @@ type CountForecastForDateParams struct {
 	TerminalID   string      `json:"terminal_id"`
 }
 
-// Mirrors ListForecastForDate's WHERE for pagination total.
+// Mirrors ListForecastForDate's WHERE for pagination total. No master-data
+// joins needed: it counts dmaa_atm_forecast rows only, and the LATERAL vendor
+// resolution in ListForecastForDate yields at most one row per forecast row,
+// so the joins never change the row count (Req 3.2 design note).
 func (q *Queries) CountForecastForDate(ctx context.Context, arg CountForecastForDateParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countForecastForDate, arg.ForecastDate, arg.TerminalID)
 	var count int64
@@ -324,11 +327,30 @@ func (q *Queries) InsertVendorRequestItem(ctx context.Context, arg InsertVendorR
 }
 
 const listForecastForDate = `-- name: ListForecastForDate :many
-SELECT terminal_id, periode_pred, denom, amount_replenish, amount_refund, dmaa_file_id
-FROM dmaa_atm_forecast
-WHERE periode_pred = $1::date
-  AND ($2::text = '' OR terminal_id ILIKE '%' || $2::text || '%')
-ORDER BY terminal_id ASC
+SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refund, f.dmaa_file_id,
+       l.name    AS lokasi_atm,
+       a.brand   AS brand,
+       v.name    AS flm_vendor,
+       vb.region AS flm_vendor_region
+FROM dmaa_atm_forecast f
+LEFT JOIN atms a ON a.terminal_id = f.terminal_id
+LEFT JOIN locations l ON l.id = a.location_id
+LEFT JOIN LATERAL (
+    SELECT vp.vendor_branch_id
+    FROM atm_vendor_packages avp
+    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    WHERE avp.atm_id = a.id
+      AND avp.is_active = true
+      AND avp.effective_start_date <= $1::date
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
+    ORDER BY avp.effective_start_date DESC
+    LIMIT 1
+) active_pkg ON true
+LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+LEFT JOIN vendors v ON v.id = vb.vendor_id
+WHERE f.periode_pred = $1::date
+  AND ($2::text = '' OR f.terminal_id ILIKE '%' || $2::text || '%')
+ORDER BY f.terminal_id ASC
 LIMIT $4::int OFFSET ($3::int - 1) * $4::int
 `
 
@@ -346,11 +368,22 @@ type ListForecastForDateRow struct {
 	AmountReplenish int64       `json:"amount_replenish"`
 	AmountRefund    int64       `json:"amount_refund"`
 	DmaaFileID      int64       `json:"dmaa_file_id"`
+	LokasiAtm       *string     `json:"lokasi_atm"`
+	Brand           *string     `json:"brand"`
+	FlmVendor       *string     `json:"flm_vendor"`
+	FlmVendorRegion *string     `json:"flm_vendor_region"`
 }
 
 // Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
 // periode_pred, optional terminal_id partial match, default sort terminal_id
-// ascending (Req 3.2).
+// ascending (Req 3.2). Extended with ATM/vendor context (Req 3.1): Lokasi ATM,
+// Brand, FLM Vendor, FLM Vendor Region, resolved via the ATM's single active
+// vendor package as of the forecast date (Req 3.2 — the LATERAL picks at most
+// one row so it cannot multiply forecast rows). All master-data joins are
+// LEFT JOIN so a missing atms/locations/vendor match never drops a
+// recommendation row (Req 3.3, 3.4). flm_vendor_region is vendor_branches.region
+// (migration 030), NOT regions.region (that is the ATM's geographic area) —
+// see .kiro/specs/update-cit-forecast-browser/design.md "Data model" note.
 func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDateParams) ([]ListForecastForDateRow, error) {
 	rows, err := q.db.Query(ctx, listForecastForDate,
 		arg.ForecastDate,
@@ -372,6 +405,10 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 			&i.AmountReplenish,
 			&i.AmountRefund,
 			&i.DmaaFileID,
+			&i.LokasiAtm,
+			&i.Brand,
+			&i.FlmVendor,
+			&i.FlmVendorRegion,
 		); err != nil {
 			return nil, err
 		}

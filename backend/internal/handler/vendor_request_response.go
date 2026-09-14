@@ -48,6 +48,10 @@ type forecastRowResponse struct {
 	AmountReplenish int64  `json:"amount_replenish"`
 	AmountRefund    int64  `json:"amount_refund"`
 	DmaaFileID      int64  `json:"dmaa_file_id"`
+	LokasiATM       string `json:"lokasi_atm"`
+	Brand           string `json:"brand"`
+	FLMVendor       string `json:"flm_vendor"`
+	FLMVendorRegion string `json:"flm_vendor_region"`
 }
 
 type forecastResponse struct {
@@ -65,6 +69,10 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			AmountReplenish: row.AmountReplenish,
 			AmountRefund:    row.AmountRefund,
 			DmaaFileID:      row.DmaaFileID,
+			LokasiATM:       row.LokasiATM,
+			Brand:           row.Brand,
+			FLMVendor:       row.FLMVendor,
+			FLMVendorRegion: row.FLMVendorRegion,
 		}
 	}
 	return forecastResponse{

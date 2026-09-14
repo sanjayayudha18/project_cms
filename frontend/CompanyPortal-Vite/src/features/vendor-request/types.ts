@@ -32,11 +32,27 @@ export interface ForecastRow {
   amount_replenish: number;
   amount_refund: number;
   dmaa_file_id: number;
+  /** Empty string when the ATM has no matching master-data row. */
+  lokasi_atm: string;
+  /** Empty string when the ATM has no matching master-data row. */
+  brand: string;
+  /** Empty string when the ATM has no active vendor package. */
+  flm_vendor: string;
+  /** Empty string when the ATM has no active vendor package. */
+  flm_vendor_region: string;
 }
 
 export interface ForecastResponse {
   data: ForecastRow[];
   pagination: PaginationMeta;
+}
+
+/** Result of fetchAllForecastForSelection — the cross-page select-all fetch (Req 2.2, 2.10). */
+export interface FetchAllForecastResult {
+  rows: ForecastRow[];
+  totalCount: number;
+  /** True when totalCount exceeds the Vendor Request item cap; rows is empty in that case. */
+  exceededCap: boolean;
 }
 
 // -- Vendor Request detail / list ------------------------------------------

@@ -12,6 +12,7 @@ import {
   approveVendorRequest,
   cancelVendorRequest,
   createVendorRequest,
+  fetchAllForecastForSelection,
   fetchForecast,
   fetchVendorRequest,
   fetchVendorRequestAuditLog,
@@ -25,6 +26,7 @@ import type {
   AuditLogResponse,
   BrowseForecastParams,
   CreateVendorRequestPayload,
+  FetchAllForecastResult,
   ForecastResponse,
   ListVendorRequestParams,
   VendorRequestDetail,
@@ -51,6 +53,25 @@ export function useForecastBrowse(params: BrowseForecastParams, enabled = true) 
     enabled: enabled && params.forecastDate !== "",
     staleTime: VENDOR_REQUEST_STALE_TIME,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Cross-page select-all fetch (Req 2.2, 2.8). Disabled by default — call
+ * `.refetch()` imperatively on button click, not on every render, since it
+ * can issue multiple requests (fetchAllForecastForSelection pages through
+ * at page_size=100). `gcTime: 0` so a stale result never lingers to be
+ * silently reused for a different date/filter.
+ */
+export function useForecastSelectAll(
+  params: Pick<BrowseForecastParams, "forecastDate" | "atmId">,
+  cap: number,
+) {
+  return useQuery<FetchAllForecastResult, ApiError>({
+    queryKey: ["vendor-requests", "forecast-select-all", params, cap],
+    queryFn: () => fetchAllForecastForSelection(params, cap),
+    enabled: false,
+    gcTime: 0,
   });
 }
 

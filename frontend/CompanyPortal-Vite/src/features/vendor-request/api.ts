@@ -9,7 +9,9 @@ import type {
   AuditLogResponse,
   BrowseForecastParams,
   CreateVendorRequestPayload,
+  FetchAllForecastResult,
   ForecastResponse,
+  ForecastRow,
   ListVendorRequestParams,
   VendorRequestDetail,
   VendorRequestItemInput,
@@ -17,6 +19,12 @@ import type {
 } from "./types";
 
 const BASE = "/vendor-requests";
+
+// The forecast endpoint rejects page_size > 100 (backend/internal/service/
+// vendor_request_actions.go: BrowseForecast validation) — it does not clamp,
+// it 400s. So a select-all fetch must page at this size, not request 1000
+// rows in one call.
+const SELECT_ALL_PAGE_SIZE = 100;
 
 function buildForecastQuery(params: BrowseForecastParams): string {
   const search = new URLSearchParams({ forecast_date: params.forecastDate });
@@ -31,6 +39,34 @@ export async function fetchForecast(params: BrowseForecastParams): Promise<Forec
     `${BASE}/forecast?${buildForecastQuery(params)}`,
   );
   return data;
+}
+
+/**
+ * Fetches every forecast row matching the date + ATM filter, across all
+ * pages, for the cross-page "Pilih Semua Rekomendasi" select-all (Req 2.2).
+ * The first page's `total_count` tells us the full match size up front, so
+ * when it exceeds `cap` this returns immediately with `exceededCap: true`
+ * and no rows — the caller must not apply a partial selection (Req 2.10:
+ * inform, never silently truncate). Only pages through the rest when the
+ * full set fits under the cap.
+ */
+export async function fetchAllForecastForSelection(
+  params: Pick<BrowseForecastParams, "forecastDate" | "atmId">,
+  cap: number,
+): Promise<FetchAllForecastResult> {
+  const first = await fetchForecast({ ...params, page: 1, pageSize: SELECT_ALL_PAGE_SIZE });
+  const totalCount = first.pagination.total_count;
+  if (totalCount > cap) {
+    return { rows: [], totalCount, exceededCap: true };
+  }
+
+  const rows: ForecastRow[] = [...first.data];
+  const totalPages = first.pagination.total_pages;
+  for (let page = 2; page <= totalPages; page++) {
+    const next = await fetchForecast({ ...params, page, pageSize: SELECT_ALL_PAGE_SIZE });
+    rows.push(...next.data);
+  }
+  return { rows, totalCount, exceededCap: false };
 }
 
 function buildListQuery(params: ListVendorRequestParams): string {

@@ -48,6 +48,10 @@ const ROW_A: ForecastRow = {
   amount_replenish: 5_000_000,
   amount_refund: 0,
   dmaa_file_id: 1,
+  lokasi_atm: "",
+  brand: "",
+  flm_vendor: "",
+  flm_vendor_region: "",
 };
 const ROW_B: ForecastRow = {
   terminal_id: "ATM002",
@@ -56,6 +60,10 @@ const ROW_B: ForecastRow = {
   amount_replenish: 2_000_000,
   amount_refund: 0,
   dmaa_file_id: 1,
+  lokasi_atm: "",
+  brand: "",
+  flm_vendor: "",
+  flm_vendor_region: "",
 };
 
 beforeEach(() => {

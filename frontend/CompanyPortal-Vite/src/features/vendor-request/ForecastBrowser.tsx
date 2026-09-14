@@ -7,27 +7,33 @@
 
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import { useNavigate } from "@tanstack/react-router";
 import type { OnChangeFn, RowSelectionState, SortingState } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 import { ForecastTable, forecastRowId } from "./ForecastTable";
-import { useForecastBrowse } from "./hooks";
+import { getVendorRequestErrorMessage, useForecastBrowse, useForecastSelectAll } from "./hooks";
 import { nextBusinessDayISO } from "./lib/nextBusinessDay";
 import { usePendingVendorRequestSelection } from "./selectionStore";
 import type { ForecastRow } from "./types";
 
-const PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 25;
 const ATM_FILTER_DEBOUNCE_MS = 300;
+// Vendor Request payloads are capped at 1000 items server-side
+// (request-replenish-to-vendor spec) — select-all must respect the same cap.
+const SELECT_ALL_ITEM_CAP = 1000;
 
 export function ForecastBrowser() {
   const navigate = useNavigate();
   const setPending = usePendingVendorRequestSelection((s) => s.setPending);
+  const { toast } = useToast();
 
   const [forecastDate, setForecastDate] = useState(() => nextBusinessDayISO());
   const [atmIdInput, setAtmIdInput] = useState("");
   const [debouncedAtmId, setDebouncedAtmId] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sorting, setSorting] = useState<SortingState>([{ id: "terminal_id", desc: false }]);
   const [rowSelection, setRowSelectionState] = useState<RowSelectionState>({});
   const [selectedRowsMap, setSelectedRowsMap] = useState<Record<string, ForecastRow>>({});
@@ -41,8 +47,13 @@ export function ForecastBrowser() {
     forecastDate,
     atmId: debouncedAtmId,
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
   });
+
+  const selectAllQuery = useForecastSelectAll(
+    { forecastDate, atmId: debouncedAtmId },
+    SELECT_ALL_ITEM_CAP,
+  );
 
   // Sorting applies to the currently fetched page only — the backend
   // guarantees atm_id ascending as the base order (Req 3.2); ForecastTable's
@@ -85,11 +96,60 @@ export function ForecastBrowser() {
   function handleAtmIdChange(value: string): void {
     setAtmIdInput(value);
     setPage(1);
+    // Req 2.6: the selection may include rows outside the new filter —
+    // clearing is simpler than reconciling and never misrepresents it.
+    setRowSelectionState({});
+    setSelectedRowsMap({});
+  }
+
+  function handlePageSizeChange(nextPageSize: number): void {
+    setPageSize(nextPageSize);
+    setPage(1);
   }
 
   function handleCreateClick(): void {
     setPending({ forecastDate, items: Object.values(selectedRowsMap) });
     navigate({ to: "/replenishment/vendor-requests/new" });
+  }
+
+  async function handleSelectAll(): Promise<void> {
+    const result = await selectAllQuery.refetch();
+    if (result.error) {
+      toast({ type: "error", message: getVendorRequestErrorMessage(result.error) });
+      return;
+    }
+    const payload = result.data;
+    if (!payload) return;
+
+    if (payload.exceededCap) {
+      toast({
+        type: "warning",
+        message: `Ditemukan ${payload.totalCount} rekomendasi, melebihi batas ${SELECT_ALL_ITEM_CAP} item per Vendor Request. Persempit tanggal atau filter ATM ID, lalu coba lagi.`,
+      });
+      return;
+    }
+
+    // Merge onto the existing map/selection (Req 2.8: preserve any manual
+    // ticks already made) rather than replacing it.
+    setSelectedRowsMap((prev) => {
+      const next = { ...prev };
+      for (const row of payload.rows) {
+        next[forecastRowId(row)] = row;
+      }
+      return next;
+    });
+    setRowSelectionState((prev) => {
+      const next = { ...prev };
+      for (const row of payload.rows) {
+        next[forecastRowId(row)] = true;
+      }
+      return next;
+    });
+  }
+
+  function handleClearSelection(): void {
+    setRowSelectionState({});
+    setSelectedRowsMap({});
   }
 
   return (
@@ -144,6 +204,11 @@ export function ForecastBrowser() {
         onSortingChange={setSorting}
         rowSelection={rowSelection}
         onRowSelectionChange={handleRowSelectionChange}
+        pagination={data?.pagination}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={handlePageSizeChange}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] px-4 py-3">
@@ -159,26 +224,23 @@ export function ForecastBrowser() {
             </span>
           </span>
         </div>
-        <Button onClick={handleCreateClick} disabled={rowSelectionEntries === 0}>
-          Buat Vendor Request
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-4 text-sm text-[var(--n-600)]">
-        <span>
-          Halaman {data?.pagination.page ?? page} dari{" "}
-          {Math.max(1, data?.pagination.total_pages ?? 1)}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Sebelumnya
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleSelectAll}
+            disabled={!data || data.pagination.total_count === 0 || selectAllQuery.isFetching}
+          >
+            {selectAllQuery.isFetching ? "Memilih…" : "Pilih Semua Rekomendasi"}
           </Button>
           <Button
             variant="secondary"
-            disabled={data ? page >= data.pagination.total_pages : true}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={handleClearSelection}
+            disabled={rowSelectionEntries === 0}
           >
-            Berikutnya
+            Bersihkan Pilihan
+          </Button>
+          <Button onClick={handleCreateClick} disabled={rowSelectionEntries === 0}>
+            Buat Vendor Request
           </Button>
         </div>
       </div>

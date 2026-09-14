@@ -12,7 +12,7 @@ The design deliberately reuses what already exists rather than inventing paralle
 - **Flat JSON** responses use the existing `writeJSON`/`writeError`/`writeValidationError`/`writeForbidden`/`extractClientIP` helpers in `internal/handler/error_response.go`.
 - **Frontend** reuses `protectedRoute` + `requireRoles`, `DataTable`, `PageHeader`, `Badge`, `FilterSelect`, `Toast`, the `api` client, and the auth store; adds one new accessible dialog primitive (none exists yet).
 
-> **Golden-rule gates (project-context Sec 3 rule 7).** This spec touches **auth-adjacent data** (users, roles, vendor linkage) and **master data**. Two decisions are surfaced in requirements.md "Open Decisions" and MUST be confirmed before the corresponding tasks: (1) which roles guard each screen, (2) whether add/edit/disable route through maker-checker. The default position — user mgmt under `APPACCESS`, vendor mgmt under `ADMIN`/`ADMIN_PARAM`, apply-immediately-with-audit (no maker-checker) matching the existing account-provisioning actions — is what the design below implements. A maker-checker variant is sketched in "Alternative: maker-checker" so the pivot is cheap if the team requires it.
+> **Golden-rule gates (project-context Sec 3 rule 7).** This spec touches **auth-adjacent data** (users, roles, vendor linkage) and **master data**. The three decisions are **resolved** (requirements.md "Resolved Decisions", confirmed 2026-09-11): (1) user mgmt under `APPACCESS`, vendor mgmt under `ADMIN`/`ADMIN_PARAM`; (2) **apply-immediately-with-audit, no maker-checker** — matching the existing account-provisioning actions; (3) local user create sets a **temporary password** with `must_change_password=true`. The design below implements those. The maker-checker path is retained only as a reference note ("Alternative: maker-checker") and is out of scope.
 
 ## Architecture
 
@@ -27,9 +27,10 @@ CompanyPortal-Vite  ──POST /api/v1/admin/users──▶  RequireAuth → Req
                                                     ▼
                                               UserAdminService.Create
                                                     │  validate, resolve role_id, uniqueness pre-checks
-                                                    │  (no password on create — Open Decision 3)
+                                                    │  local ⇒ validate+hash temporary_password,
+                                                    │          must_change_password=true (Resolved Decision 3)
                                                     ├──▶ UserAdminRepository.Create  (primary pool)
-                                                    └──▶ auditWriter.Write(Entry{action:"user_created", before:nil, after:<record>})
+                                                    └──▶ auditWriter.Write(Entry{action:"user_created", before:nil, after:<record, no password>})
                                                     ▼
                                               201 + created user (flat JSON, no password_hash)
 ```
@@ -96,7 +97,10 @@ Wrap `*db.Queries` (pattern from `auth_repository.go`). Return `db.*` row struct
 Define narrow interfaces (mirroring the `SetInitialPasswordService`/`ApprovalOrchestrator` narrow-interface pattern) so handler tests fake them without a DB.
 
 `UserAdminService`:
-- `Create(ctx, actorID, req CreateUserRequest, actorIP) (User, error)` — validate required fields + email format (`go-playground/validator` per tech.md, or explicit checks consistent with existing `ValidatePasswordStrength` style); resolve `role`→`role_id`; enforce auth_source rules (local ⇒ vendor_id required, no password; ldap ⇒ vendor_id absent, no password); reference-check vendor/supervisor; insert; then `auditWriter.Write(Entry{Action:"user_created", EntityType:"user", EntityID:new.ID, Before:nil, After:sanitize(new)})`.
+- `Create(ctx, actorID, req CreateUserRequest, actorIP) (User, error)` — validate required fields + email format (`go-playground/validator` per tech.md, or explicit checks consistent with existing `ValidatePasswordStrength` style); resolve `role`→`role_id`; enforce auth_source rules:
+  - **local** ⇒ `vendor_id` required; `temporary_password` required and run through the existing `auth.ValidatePasswordStrength`; bcrypt-hash it (existing `BcryptCost`); insert the user, then set the hash + `must_change_password=true` via the existing `SetInitialPassword` repository path (reuse, don't duplicate the hashing). The user can then log in and the existing `must_change_password` policy forces the change-password screen on first login.
+  - **ldap** ⇒ `vendor_id` must be absent, `temporary_password` must be absent (400 if present), no `password_hash` stored.
+  - reference-check vendor/supervisor; then `auditWriter.Write(Entry{Action:"user_created", EntityType:"user", EntityID:new.ID, Before:nil, After:sanitize(new)})`. The temporary password is NEVER placed in the audit payload.
 - `Update(ctx, actorID, id, req UpdateUserRequest, actorIP) (User, error)` — load existing (404 if absent); reject username/auth_source changes; self-supervision guard; reference checks; update; audit `user_updated` with before/after (sanitized).
 - Disable/enable are **not** re-implemented — the handler calls the existing `DeactivateUserService`.
 
@@ -137,6 +141,8 @@ Self-lockout guard (Requirement 5.7): in `Disable`, if `targetID == authCtx.User
 
 ### Route wiring — `cmd/api/main.go`
 
+Roles are final (Resolved Decision 1): users → `APPACCESS`, vendors → `ADMIN`/`ADMIN_PARAM`.
+
 ```go
 // users: extend existing APPACCESS group with the write/read admin service
 userAdminRepo := repository.NewUserAdminRepository(dbPool)
@@ -153,7 +159,6 @@ adminVendorHandler := handler.NewAdminVendorHandler(vendorAdminSvc)
 r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ADMIN","ADMIN_PARAM")).
     Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
 ```
-(Exact role sets pending Open Decision 1.)
 
 ## Frontend components
 
@@ -188,7 +193,7 @@ No modal/drawer exists in `components/ui/`. Add a minimal `Dialog` (native `<dia
 
 ### Forms
 
-React Hook Form + Zod (tech.md). The Zod schema encodes the auth_source conditional (local ⇒ vendor_id required) as a `superRefine`. Server 422/409 map onto RHF field errors via `setError` so the dialog shows the message inline and stays open. Follow the concrete RHF pattern already used in `features/vendor-request/VendorRequestCreate.tsx` for consistency.
+React Hook Form + Zod (tech.md). The Zod schema encodes the auth_source conditional (local ⇒ `vendor_id` **and** `temporary_password` required; ldap ⇒ both absent) as a `superRefine`. The Password Sementara field appears only for `auth_source=local` in create mode (edit mode never changes the password here — that stays on `set-initial-password` / self-service). Server 422/409 map onto RHF field errors via `setError` (including a weak-password 422 onto the Password Sementara field) so the dialog shows the message inline and stays open. Follow the concrete RHF pattern already used in `features/vendor-request/VendorRequestCreate.tsx` for consistency.
 
 ### Data & state
 
@@ -198,9 +203,9 @@ TanStack Query v5: list hooks use `placeholderData: keepPreviousData` for smooth
 
 "Merah Sirih" internal theme only. One primary action per view (the "Tambah …" button). Status as `Badge` with icon + label (`success` = Aktif, `neutral`/`danger` = Nonaktif) — never color alone. Amount/id/phone columns `tabular-nums`. No side-stripe borders, no gradient text (design-system Sec 10 bans).
 
-## Alternative: maker-checker (if Open Decision 2 requires it)
+## Reference only (OUT OF SCOPE): maker-checker
 
-If the team rules that master-data add/edit/disable must be two-person-approved, do **not** build a second state machine. Instead, per project-context Sec 2 "Approval integration pattern":
+Resolved Decision 2 is **no maker-checker** for this spec. This section is kept only as a future-reference sketch. If a later change requires two-person approval for master-data add/edit/disable, do **not** build a second state machine. Instead, per project-context Sec 2 "Approval integration pattern":
 
 1. Add `approval_policies` rows for `document_type` `user` and `vendor` (a level threshold; amount is 0/N-A for master data — confirm the policy shape works for non-monetary documents, since `SubmitForApproval` takes an `amount`).
 2. The service's `Create`/`Update`/`Disable` calls `orch.SubmitForApproval(ctx, makerID, "user"|"vendor", entityID, 0, ip)` and stores the *intended* change as a pending payload, applying the actual mutation only after the request reaches `approved` (never optimistically).
@@ -220,7 +225,7 @@ This is materially more work (pending-change storage, apply-on-approve worker/po
 
 - [ ] Matches module/table map — no new tables (optional additive index migration only, approve-first); users/vendors are canonical
 - [ ] Correct auth path + scoped RBAC at middleware AND route guard (roles per confirmed Open Decision 1)
-- [ ] Audit written for every create/update/disable/enable; maker-checker decision (Open Decision 2) explicitly resolved and reflected
+- [ ] Audit written for every create/update/disable/enable; no maker-checker (Resolved Decision 2); local-user create sets temporary password + `must_change_password=true` (Resolved Decision 3)
 - [ ] Reads on `dbPool` with documented replica TODO; writes on primary; no reads on replica in read-after-write flows
 - [ ] No `password_hash` in any response or audit payload; timestamps timestamptz UTC, displayed Asia/Jakarta
 - [ ] No hard delete for users or vendors (guard test extended to vendors)

@@ -29,13 +29,11 @@ Confirmed against the codebase at spec authoring time:
 - **Frontend**: no existing admin/user/vendor area. `routes/_protected.tsx` exports `protectedRoute` + `requireRoles(allowedRoles: DbRole[])`. Shared UI in `src/components/ui/`: `DataTable`, `PageHeader`, `Badge`, `FilterSelect`, `Button`, `Card`, `EmptyState`, `Toast`. **No Modal/Drawer component exists** — a form modal/drawer is new. `DbRole` in `lib/auth/store.ts` does **not** yet include `"APPACCESS"`.
 - **sqlc**: `.sql` sources in `backend/queries/*.sql`, generated `backend/internal/db/*.sql.go`. `sqlc generate` is currently blocked by a pre-existing bug in migration `017` (missing table name); new queries may need hand-written `.sql.go` matching sqlc output until `017` is fixed (see design.md).
 
-## Open Decisions (resolve before implementation — project-context Sec 3 rule 3)
+## Resolved Decisions (confirmed by product owner, 2026-09-11)
 
-These are flagged, not silently decided. The default position is stated for each; confirm with the team before the corresponding task.
-
-1. **Which role guards these screens?** Project-context makes `APPACCESS` the "sole authority for account provisioning". The existing `set-initial-password` route is already `APPACCESS`. **Default: user management under `APPACCESS`; vendor management under `ADMIN`/`ADMIN_PARAM`** (vendor company master data is not account provisioning). This split is reflected below and must be confirmed.
-2. **Does add/edit/disable of users and vendors go through maker-checker?** Golden Rule 3 says every state-changing action on financial or master data respects maker-checker; Sec 4 names master-data changes as maker-checker candidates. BUT the existing `set-initial-password` and `deactivate` actions apply **immediately** with audit only, no approval gate. **Default for this spec: apply immediately with mandatory audit (matching the existing account-provisioning actions), and treat maker-checker for master data as a separate, explicitly-approved follow-up.** Requirement 9 captures the audit guarantee; a maker-checker variant is described as an alternative in design.md. This MUST be confirmed because it is a golden-rule area.
-3. **Password on user create.** A local (vendor) user needs an initial password. **Default: create sets no password; the account is created disabled-for-login until APPACCESS runs the existing `set-initial-password` flow (`must_change_password=true`).** LDAP/internal users never get a local password.
+1. **Role guards — CONFIRMED.** User management (`Admin_Users_Page` + `User_Admin_API`) is guarded by `APPACCESS`; vendor management (`Admin_Vendors_Page` + `Vendor_Admin_API`) is guarded by `ADMIN`/`ADMIN_PARAM`. (`ADMIN`/`ADMIN_PARAM` also bypass the user-page `requireRoles` guard by the existing helper behavior.)
+2. **No maker-checker — CONFIRMED.** Add/edit/disable/enable of users and vendors **apply immediately with mandatory audit**, matching the existing account-provisioning actions (`set-initial-password`, `deactivate`). No approval gate. Requirement 9 is the binding audit guarantee. (A maker-checker variant remains sketched in design.md only as future reference; it is out of scope here.)
+3. **Temporary password on user create — CONFIRMED.** When creating a **local** user, the admin/APPACCESS sets a **temporary password** at creation time. The account is created with `must_change_password=true` so the user can log in and is then routed straight to the change-password screen on first login (reusing the existing `must_change_password` policy and self-service change-password flow). LDAP/internal users never get a local password.
 
 ## Glossary
 
@@ -64,11 +62,11 @@ These are flagged, not silently decided. The default position is stated for each
 
 1. THE Admin_Users_Page SHALL be registered as a file-based route under `protectedRoute` at path `/admin/users`.
 2. THE Admin_Vendors_Page SHALL be registered as a file-based route under `protectedRoute` at path `/admin/vendors`.
-3. THE Admin_Users_Page SHALL apply the `requireRoles` guard in `beforeLoad` with the allowed roles resolved from Open Decision 1 (default `APPACCESS`; `ADMIN`/`ADMIN_PARAM` bypass all role checks by the existing helper behavior).
-4. THE Admin_Vendors_Page SHALL apply the `requireRoles` guard in `beforeLoad` with allowed roles `ADMIN` and `ADMIN_PARAM` (default per Open Decision 1).
+3. THE Admin_Users_Page SHALL apply the `requireRoles` guard in `beforeLoad` with allowed role `APPACCESS` (`ADMIN`/`ADMIN_PARAM` bypass all role checks by the existing helper behavior).
+4. THE Admin_Vendors_Page SHALL apply the `requireRoles` guard in `beforeLoad` with allowed roles `ADMIN` and `ADMIN_PARAM`.
 5. WHEN a user whose role is not permitted attempts to access either page, THE page SHALL render the existing Forbidden (403) state and SHALL NOT render or fetch management data.
 6. WHEN an unauthenticated user attempts to access either page, THE page SHALL redirect to `/login` with the original path preserved in the `redirect` search parameter (existing `protectedRoute` behavior).
-7. THE User_Admin_API SHALL be mounted behind `RequireAuth` and `RequireRoles` with the roles from Open Decision 1 (default `APPACCESS`) in `cmd/api/main.go`.
+7. THE User_Admin_API SHALL be mounted behind `RequireAuth` and `RequireRoles("APPACCESS")` in `cmd/api/main.go`.
 8. THE Vendor_Admin_API SHALL be mounted behind `RequireAuth` and `RequireRoles("ADMIN","ADMIN_PARAM")` in `cmd/api/main.go`.
 9. WHEN either API receives a request without a valid token, IT SHALL respond with HTTP 401.
 10. WHEN either API receives a request from a role that is not permitted, IT SHALL respond with HTTP 403.
@@ -97,10 +95,10 @@ These are flagged, not silently decided. The default position is stated for each
 
 #### Acceptance Criteria
 
-1. THE User_Admin_API SHALL expose `POST /api/v1/admin/users` accepting: `username`, `full_name`, `email`, `role` (or `role_id`), `is_karyawan`, `auth_source` (`ldap` | `local`), `employee_id` (optional), `vendor_id` (optional), `supervisor_id` (optional), `approval_level` (optional).
+1. THE User_Admin_API SHALL expose `POST /api/v1/admin/users` accepting: `username`, `full_name`, `email`, `role` (or `role_id`), `is_karyawan`, `auth_source` (`ldap` | `local`), `temporary_password` (required when `auth_source=local`), `employee_id` (optional), `vendor_id` (optional), `supervisor_id` (optional), `approval_level` (optional).
 2. THE User_Admin_API SHALL validate that `username`, `full_name`, `email`, `role`, and `auth_source` are present and non-empty, and that `email` is a valid email format.
-3. WHEN `auth_source=local`, THE User_Admin_API SHALL require `vendor_id` to be present (vendor/local users are vendor-scoped per schema comment) and SHALL create the account with no password set and marked to require a password before login (per Open Decision 3).
-4. WHEN `auth_source=ldap`, THE User_Admin_API SHALL require `vendor_id` to be absent and SHALL store no `password_hash`.
+3. WHEN `auth_source=local`, THE User_Admin_API SHALL require `vendor_id` to be present (vendor/local users are vendor-scoped per schema comment) AND require a `temporary_password` that passes the existing `ValidatePasswordStrength` policy; IT SHALL store the bcrypt hash of that password (via the existing `SetInitialPassword` repository path) and set `must_change_password=true`, so the user can log in and is then routed to the change-password screen on first login (Resolved Decision 3).
+4. WHEN `auth_source=ldap`, THE User_Admin_API SHALL require `vendor_id` to be absent, SHALL reject any `temporary_password` in the request with HTTP 400, and SHALL store no `password_hash`.
 5. WHEN `username`, `email`, or `employee_id` collides with an existing record (including a soft-disabled one), THE User_Admin_API SHALL respond with HTTP 409 and a descriptive error identifying the conflicting field.
 6. WHEN `role` / `role_id` does not resolve to an existing role, THE User_Admin_API SHALL respond with HTTP 400.
 7. WHEN `vendor_id` or `supervisor_id` is provided but does not reference an existing record, THE User_Admin_API SHALL respond with HTTP 400.
@@ -217,8 +215,9 @@ These are flagged, not silently decided. The default position is stated for each
 #### Acceptance Criteria
 
 1. THE User_Form_Dialog SHALL be built with React Hook Form + Zod (project tech standard), validating required fields client-side before submit.
-2. THE User_Form_Dialog SHALL present fields: Username, Nama Lengkap, Email, Role (select), Auth Source (`ldap`/`local`), Karyawan (boolean), Employee ID (optional), Vendor (select, required when Auth Source = `local`), Supervisor (optional), Approval Level (optional).
-3. WHEN Auth Source = `local`, THE User_Form_Dialog SHALL require and show the Vendor field; WHEN `ldap`, it SHALL hide/disable Vendor and SHALL communicate that no password is set here.
+2. THE User_Form_Dialog SHALL present fields: Username, Nama Lengkap, Email, Role (select), Auth Source (`ldap`/`local`), Karyawan (boolean), Employee ID (optional), Vendor (select, required when Auth Source = `local`), Password Sementara (required when Auth Source = `local`, create mode only), Supervisor (optional), Approval Level (optional).
+3. WHEN Auth Source = `local`, THE User_Form_Dialog SHALL require and show the Vendor and Password Sementara fields, and SHALL communicate that the user will be forced to change this password on first login; WHEN `ldap`, it SHALL hide/disable Vendor and Password Sementara and SHALL communicate that no password is set here.
+3a. WHEN the server rejects the `temporary_password` for weak strength (422 via `ValidatePasswordStrength`), THE User_Form_Dialog SHALL surface the message against the Password Sementara field and SHALL NOT close.
 4. IN edit mode, THE User_Form_Dialog SHALL disable Username and Auth Source (immutable per Requirement 4.2).
 5. WHEN the server returns a field-level validation (422) or conflict (409) error, THE User_Form_Dialog SHALL surface the message against the relevant field and SHALL NOT close.
 6. WHEN submission succeeds, THE User_Form_Dialog SHALL close and the list SHALL refetch.

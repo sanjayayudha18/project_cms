@@ -2,24 +2,18 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
-  Calculator,
   Calendar,
   CalendarDays,
-  CheckCircle,
   ClipboardCheck,
   ClipboardList,
-  FileOutput,
   FileText,
   GitCompare,
   LayoutDashboard,
-  ListChecks,
   Monitor,
   Receipt,
-  Scale,
   Search,
   Settings,
   Table,
-  TrendingUp,
   Truck,
   Upload,
 } from "lucide-react";
@@ -72,38 +66,6 @@ export const NAV_CONFIG: NavItem[] = [
     group: "general",
   },
   {
-    id: "cit",
-    label: "CIT Tracker",
-    icon: Truck,
-    href: "/cit",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "general",
-  },
-  {
-    id: "replenishment",
-    label: "Pengisian Ulang",
-    icon: Truck,
-    href: "/replenishment",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "general",
-  },
-  {
-    id: "forecast-browser",
-    label: "Forecast Browser",
-    icon: Search,
-    href: "/replenishment/forecast-browser",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
-    group: "general",
-  },
-  {
-    id: "vendor-requests",
-    label: "Vendor Request",
-    icon: ClipboardList,
-    href: "/replenishment/vendor-requests",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
-    group: "general",
-  },
-  {
     id: "settings",
     label: "Pengaturan",
     icon: Settings,
@@ -112,6 +74,41 @@ export const NAV_CONFIG: NavItem[] = [
     group: "general",
   },
 
+  // Replenish
+  {
+    id: "forecast-browser",
+    label: "Rekomendasi CIT",
+    icon: Search,
+    href: "/replenishment/forecast-browser",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    group: "replenish",
+  },
+  {
+    id: "vendor-requests",
+    label: "Request CIT",
+    icon: ClipboardList,
+    href: "/replenishment/vendor-requests",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    group: "replenish",
+  },
+  {
+    id: "replenishment",
+    label: "Jadwal CIT",
+    icon: Truck,
+    href: "/replenishment",
+    roles: ["ATM-USER", "ATM-SPV"],
+    group: "replenish",
+  },
+  /*
+  {
+    id: "cit",
+    label: "CIT Tracker",
+    icon: Truck,
+    href: "/cit",
+    roles: ["ATM-USER", "ATM-SPV"],
+    group: "general",
+  },
+  */
   // Monitoring
   {
     id: "atm-portal",
@@ -131,6 +128,7 @@ export const NAV_CONFIG: NavItem[] = [
   },
 
   // Forecasting
+  /*
   {
     id: "dsr-upload",
     label: "Unggah DSR",
@@ -139,6 +137,7 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"],
     group: "forecasting",
   },
+  */
   {
     id: "dsr-dashboard",
     label: "DSR Dashboard",

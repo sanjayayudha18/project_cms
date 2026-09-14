@@ -343,5 +343,152 @@ docker exec userportal-vite-fe grep -l "atm-portal" /usr/share/nginx/html/assets
 ```
 If grep returns nothing, the build used stale source. This is especially insidious because nginx's `Cache-Control: no-cache` on HTML is working correctly — the problem is the JS bundle itself was built from old source inside Docker.
 
+### `noUnusedLocals` fails Docker builds on unused imports — check `navigation.ts` icons first
+The frontend `tsconfig.app.json` enables `noUnusedLocals`, so any unused import or local variable is a hard error under `tsc -b` (production/Docker build) even though `pnpm dev` ignores it. This bites most often in `src/lib/config/navigation.ts`: Lucide icons get imported in the big alphabetical import block, then a nav item is removed or never wired, leaving orphan icon imports (e.g. `Calculator`, `CheckCircle`, `FileOutput`, `ListChecks`, `Scale`, `TrendingUp` were all dead in one build).
+
+Symptoms:
+- `docker compose up -d --build` fails with `error TS6133: 'X' is declared but its value is never read.`
+- Errors point at production source (`navigation.ts`), NOT test files — this is a different failure from the `tsc -b` vs `tsc -b tsconfig.app.json` test-file issue documented above.
+
+Fast fix + verify before rebuilding (Docker builds are slow):
+1. Remove the flagged names from the import block.
+2. Run `get_diagnostics` on the file (or `pnpm tsc -b tsconfig.app.json` locally) to confirm zero unused-import errors.
+3. Only then rerun the Docker build.
+
+Applies to every frontend portal's config/icon-heavy files (CompanyPortal, VendorPortal, future portals).
+
 ### `machine_type` means different things in `itm_cashpos` vs `atms`
 The `itm_cashpos` table uses denomination-based classification: `ATM100K` (dispenses 100K only), `ATM50K` (50K only), `CRM` (recycler). The `atms` master table uses functional classification: `ATM`, `CRM`, `CDM`. These are NOT interchangeable — a single physical terminal in `atms` with `machine_type='ATM'` may appear as `ATM100K` or `ATM50K` in `itm_cashpos` depending on its cassette configuration. When joining across these tables, match on `terminal_id`, never on `machine_type`. When building UI that surfaces both (e.g., ATM Profile showing replenishment history), display the `itm_cashpos.machine_type` as "denomination config" and `atms.machine_type` as "device type."
+
+### User-lifecycle building blocks already exist but are partially unwired — check before speccing "new" CRUD
+Before writing a spec for user/account management, audit what's already in `internal/auth/` and `internal/repository/auth_repository.go`. Several account-lifecycle pieces exist and are unit-tested but are NOT wired into any route in `cmd/api/main.go`:
+- `DeactivateUserService.Deactivate/Reactivate` (audited soft-delete: `is_active=false, deleted_at=now()` / reverse) — implemented, tested, **unmounted**.
+- `AuthRepository.SetInitialPassword` (sets hash + `must_change_password=true`) and `SetPassword` (self-service).
+- `SetInitialPasswordService` (APPACCESS reset flow) — the only mounted admin-user route (`POST /api/v1/admin/users/{id}/set-initial-password`).
+
+What is genuinely absent: any `CreateUser`/`UpdateUser` and ALL vendor master CRUD (`vendor_requests` is replenishment orders, a different domain). So a "user/vendor admin" spec should *wire* the existing disable/enable + reuse `SetInitialPassword` for temp-password create, and only *add* create/update — not rebuild the lifecycle. `users` and `vendors` both already carry `is_active` + `deleted_at`, so soft-disable is the one consistent pattern for both.
+
+### Temporary-password onboarding: reuse `SetInitialPassword` + `must_change_password`, never invent a new flow
+When a spec calls for "admin creates a user with a temporary password, user must reset on first login," do NOT design a new password/reset mechanism. The pieces already compose:
+- Validate the temp password with the existing `auth.ValidatePasswordStrength` and hash with `BcryptCost`.
+- Store via the existing `SetInitialPassword` repo path, which sets `must_change_password=true`.
+- The existing local-password policy (migration `026`) + self-service change-password flow handle the forced first-login change.
+
+Golden rule for the audit trail: the temporary password (plaintext) and `password_hash` must NEVER appear in the `audit_logs` before/after payload — assert this in the service unit test on the marshalled entry. LDAP/internal users never get a local password; reject a `temporary_password` on `auth_source=ldap` with 400.
+
+### Spec authoring: surface auth/master-data policy questions as explicit "Open Decisions", don't silently default
+For specs touching golden-rule zones (auth, money, maker-checker, master data — project-context Sec 3 rule 7), write an "Open Decisions" section listing each ambiguous policy call with a stated default and a one-line rationale, and gate the affected tasks on confirming them (a Task 0 "confirm decisions" gate). Recurring decisions on this project:
+- **Role guard**: account provisioning (user create/edit/disable, set-password) → `APPACCESS`; other admin surfaces → `ADMIN`/`ADMIN_PARAM`. Vendor company master data is NOT account provisioning → `ADMIN`/`ADMIN_PARAM`.
+- **Maker-checker vs apply-immediately**: existing account-provisioning actions (`set-initial-password`, `deactivate`) apply immediately with audit only — no approval gate. Default new master-data admin actions to the same unless the owner asks for maker-checker; if they do, integrate `internal/approval` (never build a second state machine) per project-context Sec 2.
+Once confirmed, rewrite the section to "Resolved Decisions (confirmed <date>)" and collapse the Task 0 gate to only any still-open item (e.g. an optional index migration).
+
+### Frontend DbRole union lags the backend role vocabulary — check before role-gating a new screen
+`lib/auth/store.ts`'s `DbRole` union does not automatically track the DB `roles` vocabulary. `APPACCESS` (seeded backend-side in migration `027`) is NOT in the frontend union. Any new route guarded with `requireRoles([...])` or nav item in `navigation.ts` (whose `roles` field is typed `(DbRole | "*")[]`) that references a role missing from the union will fail `tsc -b`. When role-gating a new screen, first confirm the role exists in the `DbRole` union and add it if not. Note `requireRoles` and `filterNavByRoles` both let `ADMIN`/`ADMIN_PARAM` bypass/see everything, so an `APPACCESS`-only screen is still visible to admins.
+
+### `dmaa_atm_forecast` links to `atms` by `terminal_id` text, not a foreign key
+There is no FK from `dmaa_atm_forecast` to `atms`. The only join path is `dmaa_atm_forecast.terminal_id = atms.terminal_id` (both `text`; `atms.terminal_id` is UNIQUE). Any feature that enriches DMAA forecast/recommendation rows with ATM master data (location, brand, vendor, region) must join on this text column, and should `LEFT JOIN` so a forecast row whose `terminal_id` has no `atms` match is still returned rather than silently dropped. From `atms` the rest of the context is reachable: `atms.brand` (brand), `atms.location_id` → `locations.name` (location) → `locations.region_id` → `regions.region` (region).
+
+### Resolving "the current vendor" for an ATM needs active-package filtering via a LATERAL join
+`atm_vendor_packages` holds multiple rows per ATM (historical + current), keyed unique on `(atm_id, vendor_package_id, effective_start_date)`. A naive join through `atm_vendor_packages → vendor_packages → vendor_branches → vendors` multiplies forecast/ATM rows. To get exactly one current vendor per ATM, use a filtered `LEFT JOIN LATERAL (... LIMIT 1)`:
+```sql
+LEFT JOIN LATERAL (
+    SELECT vp.vendor_branch_id
+    FROM atm_vendor_packages avp
+    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    WHERE avp.atm_id = a.id
+      AND avp.is_active = true
+      AND avp.effective_start_date <= :as_of_date::date
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= :as_of_date::date)
+    ORDER BY avp.effective_start_date DESC
+    LIMIT 1
+) active_pkg ON true
+```
+This picks the package effective on the as-of date and cannot multiply rows. A COUNT query that only counts the base table does not need this join (the LATERAL yields ≤1 row, so it never changes the count). This pattern recurs for any ATM→vendor display (forecast browser, ATM profile, assignments).
+
+### "Region" is ambiguous in this schema — confirm before assuming
+Two different columns can plausibly answer "which region": `regions.region` (the ATM's *geographic* region, reached via `locations.region_id`) versus `vendor_branches.branch_name` (the vendor's *sub-region* branch, which the seed loaded from the source column literally named "FLMVendorSubRegion"). They mean different things. When a requirement says "region" / "FLMVendorRegion" without qualification, surface it as an Open Decision and confirm with the business owner rather than defaulting. Both are reachable once the ATM→location→region and ATM→active-package→vendor_branches joins are in place, so switching sources is a one-column change, not a re-architecture.
+
+### The `004`-`008` seed migrations are the de-facto schema for the MASTER_ATM_ESQ source
+There is no separate data dictionary for the MASTER_ATM_ESQ master-data spreadsheet. The four seed generators encode it: `004_seed_regions_locations.sql` (regions/locations), `005_seed_vendors.sql` (vendors), `006_seed_vendor_branches_fixed.sql` (vendor branches), `008_seed_atms.sql` (ATMs). Each file's header comment lists which source columns it consumed and what assumptions were made. To answer "does the schema handle the ESQ data?" read those four headers first — collectively they document every source column: `TerminalID → atms.terminal_id`, `TerminalAddress → locations.name`/`address_line1`, `Make → atms.brand`, `Model → atms.model`, `AreaMesin → regions.region`, `City → locations.city_or_regency`, `Province → locations.province`, `FLMVendor → vendors.name`, `FLMVendorSubRegion → vendor_branches.branch_name`.
+
+Known ingest gaps (schema has the column, seed left it NULL or derived — not a DDL problem, a data-completeness problem):
+- `atms.capacity_amount` / `low_threshold_amount` / `critical_threshold_amount` — seeded NULL (ESQ had no reliable values).
+- `atms.machine_type` / `deployment_type` / `operation_hours` — *inferred* from `TerminalAddress` keyword heuristics, not read from a source column.
+- `vendor_branches.location_id` — NULL (no branch-location master in source).
+- `atm_vendor_packages` (the ATM→FLM-vendor link, with price/priority/effective dates) — **not** generated from an ESQ seed. This is the join that powers "FLM Vendor per ATM" (e.g. the forecast browser column); confirm it is actually populated before relying on that relationship.
+
+### Attached Office files (xlsx/docx) arrive as binary in chat — save to disk before parsing
+When a user attaches an Excel/Word file, the content shows up as raw OOXML zip bytes inline, not a readable table and not a file on disk. Do not try to infer columns from the binary. Ask the user to save it into the repo (e.g. `documents/`), then parse with Python (`python -m pip install openpyxl` — note `pip` is not on PATH on this Windows box, use `python -m pip`). Until the file is on disk, reconstruct expected structure from the seed migrations above and state clearly that the actual file could not be read.
+
+### MASTER_ATM_ESQ actual columns (verified from the real file, 1913 rows × 14 cols)
+Parsed `MASTER_ATM_ESQ.csv.xlsx` (sheet `MASTER_ATM_ESQ`). The 14 source columns and their true DB destinations:
+
+| Source | DB destination | Notes |
+|---|---|---|
+| `TermId` | `atms.terminal_id` (text) | **mixed type**: 892 numeric + 1021 string (`ZZKM`, `H170`) — coerce to string on ingest |
+| `TerminalAddress` | `locations.name` + `address_line1` | 9 null |
+| `City` | `locations.city_or_regency` | |
+| `provinsi` | `locations.province` | 834 real null + 35 literal `'NULL'` strings + stray values (`JKT-Central`) — dirty |
+| `Make` | `atms.brand` | `Bijak` vs `BIJAK` dedup needed |
+| `Model` | `atms.model` | |
+| `PriorityClass` | `vendor_packages.priority_class` | `Non VIP`/`VIP`/`Industri` |
+| `AreaMesin` | `regions.region` (via `locations.region_id`) | 16 vals; `Jawa Timur`/`Jatim` inconsistency |
+| `FLMVendor` | `vendors.name`/`code` | |
+| `FLMVendorRegion` | **NO COLUMN — dropped today** | 51 distinct (`Jakarta Timur`, `Sumatera`) |
+| `FLMVendorSubRegion` | `vendor_branches.branch_name` | 349 distinct |
+| `PAKET` | `vendor_packages.code`? | `PAKET 5`/`Paket 5`/`NULL` — dirty |
+| `Escrow` | **NO COLUMN — dropped today** | 825 non-null 12-digit account numbers |
+| `BlackListed` | `atms.blacklisted` | uniformly 0 in this extract |
+
+**Corrects an earlier lessons-learned entry:** ESQ has **no** capacity/threshold columns at all, so `atms.capacity_amount`/`low_threshold_amount`/`critical_threshold_amount` being NULL is correct, not a dropped-data bug.
+
+### `FLMVendorRegion`, `FLMVendorSubRegion`, and `AreaMesin` are THREE distinct columns — resolves the "region" ambiguity
+The recurring "which region?" question (see earlier entry) is settled by the real file: these are three separate source columns with different cardinalities and meanings:
+- `AreaMesin` (16 vals, e.g. `JKT-East`) = the ATM's **geographic machine area** → `regions.region`.
+- `FLMVendorRegion` (51 vals, e.g. `Jakarta Timur`) = the **vendor's regional grouping** → currently has NO home column.
+- `FLMVendorSubRegion` (349 vals, e.g. `Jakarta - Kelapa Gading TN`) = the **vendor's branch** → `vendor_branches.branch_name`.
+
+So mapping a UI "FLM Vendor Region" column to `regions.region` (as the update-cit-forecast-browser design.md assumed) is **wrong** — that shows the geographic area, not the vendor's region. Faithful storage needs a new `vendor_branches.region` column (sub-region rolls up into it).
+
+### `atm_vendor_packages` (the ATM→vendor link) is NOT seeded from ESQ
+`vendors` (005), `vendor_branches` (006), `vendor_packages` seeds exist, but the per-ATM linking table `atm_vendor_packages` has no ESQ seed — even though every ESQ row carries the assignment (`TermId` + `FLMVendor` + `FLMVendorSubRegion` + `PriorityClass` + `PAKET`). Any feature resolving "the vendor servicing this ATM" (forecast browser FLM Vendor column, assignments, invoice reconciliation) will find nothing to join against until this seed is generated. Check this table is populated before building on the ATM↔vendor relationship.
+
+### `vendor_packages` is EMPTY in the live schema — only an archived dummy seed exists
+`vendors` (005), `vendor_branches` (006), and `atms` (008) are seeded, but `vendor_packages` is **not** seeded by any active migration (`grep "INSERT INTO public.vendor_packages" backend/migrations/*.sql` → no matches). The only insert lives in `backend/migrations/archives/006s_vendor_locations_branches_packages.sql` with dummy `VND001`/`VND002` data that does not even match the real vendor codes (`ROH`, `Bijak`, `TAG`, `Abacus`, `Advantage`, `SSI`), and uses a `type` column the live `vendor_packages` (migration 002) does not have.
+
+Consequence: the whole ATM→vendor chain is broken at the `vendor_packages` link, not just at `atm_vendor_packages`. Anything resolving "the vendor package / price / priority for an ATM" finds nothing. Before building on it you must seed BOTH `vendor_packages` and `atm_vendor_packages`, in that order (FK dependency).
+
+### MASTER_ATM_ESQ has no price column — `vendor_packages.price` (NOT NULL) has no source
+The ESQ extract carries `PAKET` (`PAKET 3/4/5`) and `PriorityClass` (`VIP`/`Non VIP`/`Industri`) but **no price**. `vendor_packages.price numeric NOT NULL` therefore cannot be populated from ESQ alone — a seed must get price from another source (contract/invoice doc) or use an explicit placeholder that is flagged as TODO. Do not invent prices. This is a STOP-and-confirm (money) decision.
+
+Related open modeling question when seeding from ESQ: `PriorityClass` is per-ATM in the source but `priority_class` lives on `vendor_packages` in the schema — so either a package is keyed `(vendor_branch, PAKET, PriorityClass)`, or PriorityClass belongs on `atms` (would need a new `atms.priority_class` column). And `atm_vendor_packages` needs `effective_start_date` (NOT NULL) which ESQ has no date for. Confirm all three with the business owner before generating the seed.
+
+### PAKET and PriorityClass are per-ATM in MASTER_ATM_ESQ, not per-vendor-branch
+Measured from the real file: `PAKET` varies within a single `(FLMVendor, FLMVendorSubRegion)` branch in **228 of 348** branches (e.g. `Bijak Jakarta` mixes PAKET 3/4/5), and `PriorityClass` (`VIP`/`Non VIP`/`Industri`) varies within a branch in **15 of 348**. So both describe an individual ATM's relationship to its vendor package, NOT a property of the branch or a single package row. Consequence when seeding: `vendor_packages.priority_class` cannot be filled faithfully from a `(branch, PAKET)` key — the honest model is PAKET on `vendor_packages` (593 distinct `(branch, PAKET)` combos) and PriorityClass on the ATM (needs an `atms.priority_class` column). By contrast `FLMVendorRegion` IS ~1-per-branch (only 2 of 348 branches vary, both dirty data), which is why it correctly lives on `vendor_branches.region`. Rule: before seeding a source column onto a table, check its cardinality *within* the parent group — don't assume a column sits at the grain its name suggests.
+
+### When a source spreadsheet drives a seed, verify grain/cardinality with a throwaway script before proposing the model
+For MASTER_ATM_ESQ seeding decisions, a short openpyxl script (count distinct combos, count parents with >1 distinct child value, cross-tab) turned four "ask the business owner" guesses into evidence-backed defaults in one pass. Do this analysis BEFORE writing a seed or a design proposal — the measured cardinalities (348 branches, 593 `(branch,PAKET)`, 624 with PriorityClass, 2 multi-region branches) directly decide the schema model. Keep the script throwaway (delete after), read the file from `document/MASTER_ATM_ESQ.csv.xlsx`, and normalize dirty values (`Bijak`/`BIJAK`, `Paket 5`/`PAKET 5`, trailing spaces, literal `'NULL'`) in the same pass.
+
+### `UPDATE ... FROM (VALUES) AS s JOIN other_table` is INVALID Postgres — use a comma-join
+A backfill written as `UPDATE t SET ... FROM (VALUES ...) AS s JOIN public.other o ON o.k = s.k WHERE t.fk = o.id` fails: you cannot attach an explicit `JOIN` to a `VALUES`-derived table in an UPDATE's `FROM` while the UPDATE target is referenced across it. The correct form lists both relations comma-separated and matches in `WHERE`:
+```sql
+UPDATE public.vendor_branches vb
+SET region = s.region
+FROM (VALUES (...), (...)) AS s(vendor_code, branch_name, region),
+     public.vendors v
+WHERE v.code = s.vendor_code
+  AND vb.vendor_id = v.id
+  AND vb.branch_name = s.branch_name;
+```
+Note the asymmetry: `INSERT ... SELECT ... FROM (VALUES) AS s JOIN other ON ...` IS valid (it's a plain SELECT), only the UPDATE-with-JOIN-off-VALUES form is not. This bit the MASTER_ATM_ESQ region backfill in migration 032. When generating seed SQL, use INSERT...SELECT+JOIN freely but write UPDATE backfills as comma-joins.
+
+### Seed generators: emit set-based SQL joined by natural key, never hardcoded IDENTITY ids
+`vendors`/`vendor_branches`/`atms`/`vendor_packages` all use `GENERATED ALWAYS AS IDENTITY` primary keys — the ids are unknown until the seed runs and differ per environment. A generated seed must therefore emit a `VALUES` list of *natural keys* (`vendor.code`, `vendor_branches.branch_name`, `atms.terminal_id`, `vendor_packages.code`) and resolve ids via `JOIN`/`INSERT...SELECT` at apply time, with `WHERE NOT EXISTS` on the real unique constraint for idempotency (e.g. `vendor_packages_branch_code_uq (vendor_branch_id, code)`, `atm_vendor_packages_atm_package_start_uq (atm_id, vendor_package_id, effective_start_date)`). Keep the generator in `scripts/` (one-off, re-runnable), read the source from `document/`, normalize dirty values in the same pass, and print row counts so the output can be checked against the measured cardinalities before anyone applies it. NOT-NULL columns with no source value need an explicit sentinel (e.g. `vendor_packages.priority_class = 'ALL'` when the real value moved to `atms.priority_class`), not a blank.
+
+### Never round-trip a UTF-8 file through PowerShell Get-Content/Set-Content -- it mangles em-dashes/arrows and adds a BOM
+On this Windows box, editing a UTF-8 file via `$c = Get-Content -Raw file; ...; Set-Content -Encoding UTF8 file` corrupts every multi-byte char: `Get-Content` decodes the bytes as the system codepage (cp1252), so U+2014 (em-dash) and U+2192 (arrow) become mojibake (`a-euro-...`), and `Set-Content -Encoding UTF8` adds a BOM the file did not have. The `.kiro` spec docs are full of em-dashes and arrows, so this WILL corrupt them.
+Rules: (1) Prefer the dedicated file-editing tool. (2) If only the terminal is available, edit via a Python script written with `Set-Content -Encoding ASCII` (keep the script ASCII-only; reference non-ASCII via `chr(0x2014)` etc.), and have Python read/write with explicit `encoding='utf-8'` + `newline='\n'` and NO BOM. (3) If corruption already happened, it is deterministically reversible: `text.encode('cp1252').decode('utf-8')` is the exact inverse -- recover, strip BOM, rewrite. Verify with a mojibake count (`text.count(chr(0xE2)+chr(0x20AC))`) before and after.
+Also: PowerShell here-docs (`python - <<'EOF'`) do NOT work (the `<` operator is reserved); multi-line `if/elseif/else` split across lines fails too. Write the script to a file, then run it.
+
+### The .kiro/specs task-file format is inconsistent across this repo -- validate before assuming
+`validate_spec_format` expects Kiro's checkbox format: `## Overview`, `## Tasks`, `## Task Dependency Graph`, `## Notes` sections with `- [ ] N. Description` task items (this is what the `done/` specs like `vendor-dsr-home` and `vendor-portal-tanstack-router-migration` use). But `update-cit-forecast-browser` and `audit-log-viewer` were authored in a non-compliant `## Task N -- Title` heading style and fail validation with `invalid-task-heading` + `missing-dependency-graph`. When editing these, match the file's existing style for a content edit, but know that a full format-compliance pass is a separate structural rewrite -- confirm scope with the user before converting, and expect sibling specs to need the same treatment.

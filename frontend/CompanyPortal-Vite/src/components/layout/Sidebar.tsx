@@ -19,7 +19,14 @@ interface SidebarProps {
 
 // ─── Group ordering ───────────────────────────────────────────────────────────
 
-const GROUP_ORDER: NavGroup[] = ["general", "monitoring", "forecasting", "invoice", "cash-count"];
+const GROUP_ORDER: NavGroup[] = [
+  "general",
+  "replenish",
+  "monitoring",
+  "forecasting",
+  "invoice",
+  "cash-count",
+];
 
 // ─── Sidebar Component ────────────────────────────────────────────────────────
 

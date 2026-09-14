@@ -70,6 +70,10 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 			AmountReplenish: r.AmountReplenish,
 			AmountRefund:    r.AmountRefund,
 			DmaaFileID:      r.DmaaFileID,
+			LokasiATM:       notesOrEmpty(r.LokasiAtm),
+			Brand:           notesOrEmpty(r.Brand),
+			FLMVendor:       notesOrEmpty(r.FlmVendor),
+			FLMVendorRegion: notesOrEmpty(r.FlmVendorRegion),
 		}
 	}
 

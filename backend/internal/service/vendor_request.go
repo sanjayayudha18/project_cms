@@ -186,6 +186,10 @@ type ForecastRow struct {
 	AmountReplenish int64
 	AmountRefund    int64
 	DmaaFileID      int64
+	LokasiATM       string
+	Brand           string
+	FLMVendor       string
+	FLMVendorRegion string
 }
 
 // BrowseForecastResult is the paginated forecast-browse response.

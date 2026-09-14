@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { AlertTriangle, CheckCircle2, Clock, Search, Truck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Search, Truck } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -9,6 +9,8 @@ import { DataTable } from "@/components/ui/DataTable";
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import schedulesData from "@/data/replenishment-schedules.json";
+import { CitSummary } from "@/features/cit/CitSummary";
+import { useCitData } from "@/features/cit/useCitData";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDRFull } from "@/lib/utils/formatters";
 import { filterSchedules, sortByStatusPriority } from "./replenishment.utils";
@@ -29,7 +31,7 @@ const STATUS_CONFIG: Record<
 
 const columnHelper = createColumnHelper<ReplenishmentSchedule>();
 
-const columns = [
+const baseColumns = [
   columnHelper.accessor("id", {
     header: "Jadwal",
     cell: (info) => (
@@ -70,14 +72,50 @@ const columns = [
   }),
 ];
 
+function buktiColumn(evidenceByVendor: Map<string, string | null>) {
+  return columnHelper.display({
+    id: "bukti",
+    header: "Bukti",
+    cell: ({ row }) => {
+      const url = evidenceByVendor.get(row.original.vendor);
+      if (!url) {
+        return <span className="text-[var(--n-400)]">&mdash;</span>;
+      }
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 text-sm text-[var(--red-600)] hover:text-[var(--red-700)] underline"
+          aria-label="Lihat bukti CIT (buka di tab baru)"
+        >
+          Lihat
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      );
+    },
+  });
+}
+
 /**
  * Replenishment schedules screen.
  * Displays filterable table of cash replenishment schedules with region/vendor filters.
  */
 export function ReplenishmentScreen() {
   const { toast } = useToast();
+  const { data: citOrders = [] } = useCitData();
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [vendorFilter, setVendorFilter] = useState<string | null>(null);
+
+  const evidenceByVendor = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const order of [...citOrders].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))) {
+      if (order.evidenceUrl) map.set(order.vendorName, order.evidenceUrl);
+    }
+    return map;
+  }, [citOrders]);
+
+  const columns = useMemo(() => [...baseColumns, buktiColumn(evidenceByVendor)], [evidenceByVendor]);
 
   const regions = useMemo(
     () =>
@@ -127,6 +165,8 @@ export function ReplenishmentScreen() {
           </>
         }
       />
+
+      <CitSummary data={citOrders} />
 
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-end gap-4">

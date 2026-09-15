@@ -12,6 +12,9 @@ const rowWithContext: ForecastRow = {
   dmaa_file_id: 1,
   lokasi_atm: "Test Location",
   brand: "Hyosung",
+  priority_class: "VIP",
+  paket: "PAKET-A",
+  escrow: "1000000.00",
   flm_vendor: "TAG",
   flm_vendor_region: "TAG Jawa Barat",
 };
@@ -77,24 +80,69 @@ describe("ForecastTable — four new context columns (Task 4)", () => {
     }
   });
 
-  it("spans all 9 columns on the empty-result row", () => {
+  // Task 17: 9 -> 11 (drops Amount Refund, adds Priority Class/Paket/Escrow).
+  it("spans all 11 columns on the empty-result row", () => {
     renderTable({ data: [] });
 
     const emptyCell = screen.getByText("Tidak ada data forecast untuk tanggal yang dipilih");
-    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "9");
+    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "11");
   });
 
-  it("spans all 9 columns on the error row", () => {
+  it("spans all 11 columns on the error row", () => {
     renderTable({ data: [], isError: true });
 
     const errorCell = screen.getByText("Gagal memuat data forecast");
-    expect(errorCell.closest("td")).toHaveAttribute("colspan", "9");
+    expect(errorCell.closest("td")).toHaveAttribute("colspan", "11");
   });
 
-  it("spans all 9 columns on skeleton rows while loading", () => {
+  it("spans all 11 columns on skeleton rows while loading", () => {
     const { container } = renderTable({ data: [], isLoading: true });
 
     const skeletonRow = container.querySelector("tbody tr");
-    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(9);
+    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(11);
+  });
+});
+
+describe("ForecastTable — PriorityClass/Paket/Escrow, Amount Refund dropped (Task 17)", () => {
+  it("has no Amount Refund column", () => {
+    renderTable({ data: [rowWithContext] });
+
+    expect(screen.queryByText("Amount Refund")).not.toBeInTheDocument();
+  });
+
+  it("renders headers for the three new columns", () => {
+    renderTable({ data: [rowWithContext] });
+
+    expect(screen.getByText("Priority Class")).toBeInTheDocument();
+    expect(screen.getByText("Paket")).toBeInTheDocument();
+    expect(screen.getByText("Escrow")).toBeInTheDocument();
+  });
+
+  it("renders PriorityClass/Paket values and escrow as right-aligned tabular-nums IDR", () => {
+    renderTable({ data: [rowWithContext] });
+
+    expect(screen.getByText("VIP")).toBeInTheDocument();
+    expect(screen.getByText("PAKET-A")).toBeInTheDocument();
+    const escrowCell = screen.getByText("1.000.000");
+    expect(escrowCell.closest("td")).toHaveClass("text-right", "tabular-nums");
+  });
+
+  it('renders "-" (never "0" or an em-dash) when escrow is null', () => {
+    renderTable({ data: [{ ...rowWithContext, escrow: null }] });
+
+    // Escrow is the last column, so its cell is the row's last <td>.
+    const row = screen.getByText("1234").closest("tr");
+    const escrowCell = row?.querySelector("td:last-child");
+    expect(escrowCell?.textContent).toBe("-");
+  });
+
+  it('renders "-" (never an em-dash) when priority_class/paket are empty', () => {
+    renderTable({ data: [{ ...rowWithContext, priority_class: "", paket: "" }] });
+
+    const dashCells = screen.getAllByText("-");
+    expect(dashCells.length).toBeGreaterThanOrEqual(2);
+    for (const el of dashCells) {
+      expect(el.textContent).not.toBe("—");
+    }
   });
 });

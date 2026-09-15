@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS vendor_requests_replenish_date_idx
 ```
 
 - `is_canceled boolean NOT NULL DEFAULT false` — Req 5.1, soft-cancel flag. Safe on existing rows (all default to `false`).
-- `request_category text` **nullable** with a CHECK that admits NULL — Req 3.9. Nullable (not defaulted) is deliberate: existing rows predate categories and must **not** be silently reclassified as `planned`. New DMAA-backed and manual requests always set it (see Q5 / service rules); only legacy rows keep NULL.
+- `request_category text` **nullable** with a CHECK that admits NULL — Req 3.9. Nullable is deliberate: `Request_Category` is a `Manual_Request`-only concept (per glossary). Only `Manual_Request` submissions (Req 3, `is_manual == true`) set it; the standard, non-manual Forecast-Browser create flow (Req 2) leaves it NULL, same as legacy rows.
 - `replenish_date date` **nullable** — Req 2.5 / 2.9 / 3. Nullable so existing rows backfill as NULL; new rows always set it. The detail/list responses render NULL as `null` (see handler).
 - `is_manual boolean NOT NULL DEFAULT false` — resolves Q4-adjacent read logic: distinguishes a manual request (skip DMAA re-derivation) from a DMAA-backed one, without inferring it from `request_category` (Emergency/Additional can technically match DMAA too). Existing rows are all DMAA-backed → `false`.
 
@@ -92,7 +92,7 @@ Populates the prefix for the six seeded vendors (`005_seed_vendors.sql`). This i
 UPDATE public.vendors SET request_prefix = 'TAG' WHERE code = 'TAG';
 UPDATE public.vendors SET request_prefix = 'ADV' WHERE code = 'ADVANTAGE';
 UPDATE public.vendors SET request_prefix = 'BJK' WHERE code = 'BIJAK';
-UPDATE public.vendors SET request_prefix = 'ABC' WHERE code = 'ABACUS';
+UPDATE public.vendors SET request_prefix = 'ABA' WHERE code = 'ABACUS';
 UPDATE public.vendors SET request_prefix = 'ROH' WHERE code = 'ROH';
 UPDATE public.vendors SET request_prefix = 'SSI' WHERE code = 'SSI';
 ```
@@ -149,7 +149,7 @@ The mapping:
 | `TAG` | `TAG` | requested directly (Req 4.2) |
 | `ADVANTAGE` | `ADV` | requested abbreviation (Req 4.2) |
 | `BIJAK` | `BJK` | requested abbreviation (Req 4.2) |
-| `ABACUS` | `ABC` | derived (no requested prefix) |
+| `ABACUS` | `ABA` | derived (no requested prefix); confirmed with user 2026-09-14 |
 | `ROH` | `ROH` | code already 3 chars |
 | `SSI` | `SSI` | code already 3 chars |
 
@@ -161,7 +161,7 @@ This guarantees a 3-uppercase-char prefix for any conceivable vendor and is full
 
 **Why a column, not a hardcoded map or code table:** A hardcoded Go map would drift from `vendors` (a new vendor added via master-data admin would have no prefix and silently hit the fallback with no way for ops to override). A separate code table is over-engineering for a one-column attribute of an existing entity. A nullable `request_prefix` on `vendors` (a) lets APPACCESS/ADMIN-PARAM set the intended prefix per vendor as master data, (b) keeps the fallback in code for safety, and (c) is a purely additive column. The seed (migration 036) sets the six known values; the fallback covers everything else.
 
-> **STOP-and-confirm:** the specific `ABC` for ABACUS is a design choice (ABACUS has no requested prefix) — confirm this exact value with the user before seeding, since a request number is an auditor-facing identifier.
+> **STOP-and-confirm (resolved 2026-09-14):** the specific value for ABACUS was a design choice (ABACUS has no requested prefix). The user chose `ABA` over the originally-proposed `ABC` — see migration 036.
 
 ### Q2 — Which vendor drives the number (Req 4.2) — RESOLVED
 
@@ -321,16 +321,18 @@ RETURNING *;
 
 #### Requirement 3 — Manual requests + category
 
-**Service — category & manual rules** (all enforced at service layer, Req 3.13):
-- `request_category` must be one of `planned|emergency|additional` → else `ValidationError{Field:"request_category"}` (Req 3.11).
+**Service — category & manual rules, scoped to `is_manual == true` only** (all enforced at service layer, Req 3.13). The standard, non-manual create flow (Req 2) does **not** send `request_category`, is not subject to any of the rules below, and leaves `request_category` NULL — its `replenish_date` is validated only by Req 2.6/2.7 (required, valid, not in the past), with no H+1 lock, and always goes through the unchanged `resolveItems` DMAA-validation path.
+
+For `is_manual == true` requests:
+- `request_category` is required and must be one of `planned|emergency|additional` → else `ValidationError{Field:"request_category"}` (Req 3.11).
 - Zero items → `ErrEmptyItems` (Req 3.12).
 - **Date-consistency (Req 3.10)** against `replenish_date` in Asia/Jakarta:
   - `planned` → `replenish_date` must equal H+1 (else conflict `ValidationError`).
   - `emergency` → must equal H+0.
   - `additional` → must be H+0, H+1, or H+2; any other rejected (Req 3.5).
-- **Item resolution branches on `is_manual` / category:**
-  - `planned` (or any DMAA-backed create) → call existing `resolveItems` (validates each item against `dmaa_atm_forecast`, rejecting unmatched with `InvalidItemsError`) — Req 3.8.
-  - `emergency`/`additional` manual → **accept items without DMAA match** (Req 3.7): a new `acceptManualItems` path that validates shape (terminal_id 1–64 chars, denom > 0, amount_replenish > 0 — Req 3.6, 3.14) and sets `amount_refund = 0` (no DMAA row to copy from), persisting operator-entered `brand`/`lokasi_atm`.
+- **Item resolution branches on category:**
+  - `planned` → call existing `resolveItems` (validates each item against `dmaa_atm_forecast`, rejecting unmatched with `InvalidItemsError`) — Req 3.8.
+  - `emergency`/`additional` → **accept items without DMAA match** (Req 3.7): a new `acceptManualItems` path that validates shape (terminal_id 1–64 chars, denom > 0, amount_replenish > 0 — Req 3.6, 3.14) and sets `amount_refund = 0` (no DMAA row to copy from), persisting operator-entered `brand`/`lokasi_atm`.
 - Persist `request_category` and `is_manual` on the header (Req 3.9).
 - **Audit (Req 3.13):** exactly one `audit_logs` "create" entry, `After` metadata includes `request_category` and `is_manual`.
 
@@ -419,7 +421,7 @@ All in `frontend/CompanyPortal-Vite/src/features/vendor-request/`, Merah Sirih t
   - Additional → date picker constrained to H+0/H+1/H+2 (Req 3.5).
 - **Vendor single-select** (required for manual, Q2) so the number prefix resolves.
 - **Manual item rows:** operator adds rows with terminal_id (1–64 chars), denom (positive int), amount_replenish (positive int) — Req 3.6. Zod schema extended; `is_manual: true` and `request_category` + `vendor_id` sent in payload.
-- The existing DMAA-selection path sends `is_manual: false` and (for Planned) is validated against DMAA server-side (Req 3.8).
+- The existing DMAA-selection path sends `is_manual: false` (no `request_category`, stays NULL) and is validated against DMAA server-side via the unchanged `resolveItems` path (Req 3.8).
 
 #### Requirement 5 — cancel + canceled badge (`VendorRequestDetail.tsx`, `VendorRequestList.tsx`, `StatusBadge.tsx`)
 

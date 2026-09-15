@@ -11,6 +11,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
+import { useState } from "react";
 import { StatusBadge } from "./StatusBadge";
 import { useVendorRequests } from "./hooks";
 import { VENDOR_REQUEST_STATUSES, type VendorRequestStatus } from "./types";
@@ -35,10 +36,13 @@ export function VendorRequestList() {
   const role = useAuthStore((s) => s.user?.role);
   const { params, searchInput, setSearchInput, setParams } = useVendorRequestListUrlState();
 
+  const [showCanceled, setShowCanceled] = useState(false);
+
   const { data, isLoading, isError, refetch } = useVendorRequests({
     status: params.status,
     forecastDate: params.forecastDate || undefined,
     requestNumber: params.search || undefined,
+    includeCanceled: showCanceled,
     page: params.page,
     pageSize: params.pageSize,
   });
@@ -129,6 +133,16 @@ export function VendorRequestList() {
             className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
           />
         </div>
+
+        <label className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--n-700)]">
+          <input
+            type="checkbox"
+            checked={showCanceled}
+            onChange={(e) => setShowCanceled(e.target.checked)}
+            className="h-4 w-4 accent-[var(--red-500)]"
+          />
+          Tampilkan yang dibatalkan
+        </label>
       </div>
 
       <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
@@ -138,6 +152,9 @@ export function VendorRequestList() {
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">No. Request</th>
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
                 Tanggal Forecast
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
+                Tanggal Replenish
               </th>
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">Status</th>
               <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">Jumlah Item</th>
@@ -167,7 +184,13 @@ export function VendorRequestList() {
                   <td className="px-3 py-2 font-mono">{row.request_number}</td>
                   <td className="px-3 py-2">{formatAtmDate(new Date(row.forecast_date))}</td>
                   <td className="px-3 py-2">
-                    <StatusBadge status={row.status} />
+                    {row.replenish_date ? formatAtmDate(new Date(row.replenish_date)) : "-"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      <StatusBadge status={row.status} />
+                      {row.is_canceled && <StatusBadge status={row.status} isCanceled />}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{row.item_count}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
@@ -231,7 +254,7 @@ export function VendorRequestList() {
   );
 }
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 9;
 
 function SkeletonRows() {
   return (

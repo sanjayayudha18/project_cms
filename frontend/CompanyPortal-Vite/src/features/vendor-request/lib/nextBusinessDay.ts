@@ -28,3 +28,31 @@ export function nextBusinessDayISO(from: Date = new Date()): string {
   }
   return toISODateLocal(next);
 }
+
+/**
+ * Calendar-day arithmetic in Asia/Jakarta (WIB, fixed UTC+7 offset — no DST)
+ * for CIT-2's Replenish_Date default and category locks (Req 2.4, 3.3-3.5).
+ * Distinct from nextBusinessDayISO above: that skips weekends for the
+ * unrelated Req 11.1 forecast-date default; this is plain calendar H+N,
+ * matching the backend's jakartaCalendarDate (vendor_request.go) so the
+ * client and server never disagree at the day boundary.
+ */
+const JAKARTA_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+export function jakartaCalendarDateISO(offsetDays: number, from: Date = new Date()): string {
+  const jakartaNow = new Date(from.getTime() + JAKARTA_OFFSET_MS);
+  const target = new Date(
+    Date.UTC(
+      jakartaNow.getUTCFullYear(),
+      jakartaNow.getUTCMonth(),
+      jakartaNow.getUTCDate() + offsetDays,
+    ),
+  );
+  return `${target.getUTCFullYear()}-${pad2(target.getUTCMonth() + 1)}-${pad2(target.getUTCDate())}`;
+}
+
+/** Calendar H+1 in Asia/Jakarta (Req 2.4's Replenish_Date default) — NOT the
+ * next business day; see nextBusinessDayISO above for that distinction. */
+export function tomorrowJakartaISO(from?: Date): string {
+  return jakartaCalendarDateISO(1, from);
+}

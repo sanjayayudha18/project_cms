@@ -15,7 +15,6 @@ import {
   Settings,
   Table,
   Truck,
-  Upload,
 } from "lucide-react";
 
 import type { DbRole } from "@/lib/auth/store";

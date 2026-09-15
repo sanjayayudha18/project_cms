@@ -80,6 +80,11 @@ const BASE_DETAIL: VendorRequestDetailType = {
     },
   ],
   total_amount: 5_000_000,
+  replenish_date: "2026-09-13",
+  request_category: null,
+  is_canceled: false,
+  is_manual: false,
+  cancellation_reason: null,
 };
 
 function mockDetail(overrides: Partial<VendorRequestDetailType>) {
@@ -150,7 +155,7 @@ describe("VendorRequestDetail", () => {
     expect(screen.queryByRole("button", { name: "Setujui" })).not.toBeInTheDocument();
   });
 
-  it("pending_approval + non-creator checker sees Approve/Reject — not Cancel", () => {
+  it("pending_approval + non-creator checker sees Approve/Reject (and Cancel, CIT-2 Task 13.3 union widening)", () => {
     mockDetail({ status: "pending_approval" });
     setUser(2, "ATM-SPV");
 
@@ -158,7 +163,6 @@ describe("VendorRequestDetail", () => {
 
     expect(screen.getByRole("button", { name: "Setujui" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tolak" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Batalkan" })).not.toBeInTheDocument();
   });
 
   it("pending_approval + creator sees Cancel only (union rule, not self-approval)", () => {
@@ -194,5 +198,94 @@ describe("VendorRequestDetail", () => {
 
     await user.type(screen.getByLabelText(/alasan penolakan/i), "Jumlah tidak sesuai");
     expect(confirmButton).toBeEnabled();
+  });
+});
+
+describe("VendorRequestDetail — CIT-2 replenish_date/category/canceled (Task 13)", () => {
+  it("shows Tanggal Replenish and Kategori as distinct labeled fields, '-' when null", () => {
+    mockDetail({ status: "draft", replenish_date: null, request_category: null });
+    setUser(1, "ATM-USER");
+
+    renderWithProviders();
+
+    expect(screen.getByText("Tanggal Replenish")).toBeInTheDocument();
+    expect(screen.getByText("Kategori")).toBeInTheDocument();
+    const replenishValue = screen.getByText("Tanggal Replenish").nextSibling;
+    expect(replenishValue).toHaveTextContent("-");
+    const categoryValue = screen.getByText("Kategori").nextSibling;
+    expect(categoryValue).toHaveTextContent("-");
+  });
+
+  it("shows the canceled badge (icon + text, not color alone) when is_canceled", () => {
+    mockDetail({ status: "draft", is_canceled: true });
+    setUser(1, "ATM-USER");
+
+    renderWithProviders();
+
+    expect(screen.getByText("Dibatalkan")).toBeInTheDocument();
+  });
+
+  it("draft: non-creator checker (SPV) sees Cancel too (widened Maker+SPV union)", () => {
+    mockDetail({ status: "draft" });
+    setUser(2, "ATM-SPV");
+
+    renderWithProviders();
+
+    expect(screen.getByRole("button", { name: "Batalkan" })).toBeInTheDocument();
+  });
+
+  it("pending_approval: non-creator checker (SPV) sees both Approve/Reject and Cancel", () => {
+    mockDetail({ status: "pending_approval" });
+    setUser(2, "ATM-SPV");
+
+    renderWithProviders();
+
+    expect(screen.getByRole("button", { name: "Setujui" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Batalkan" })).toBeInTheDocument();
+  });
+});
+
+describe("VendorRequestDetail — approved-cancel (Task 16, Req 3.1, 3.7)", () => {
+  it("approved + checker sees Batalkan", () => {
+    mockDetail({ status: "approved" });
+    setUser(2, "ATM-SPV");
+
+    renderWithProviders();
+
+    expect(screen.getByRole("button", { name: "Batalkan" })).toBeInTheDocument();
+  });
+
+  it("approved + non-checker creator does NOT see Batalkan (Checker-only, no four-eyes exemption)", () => {
+    mockDetail({ status: "approved" });
+    setUser(1, "ATM-USER");
+
+    renderWithProviders();
+
+    expect(screen.queryByRole("button", { name: "Batalkan" })).not.toBeInTheDocument();
+  });
+
+  it("cancel modal keeps Confirm disabled until a valid reason is typed", async () => {
+    mockDetail({ status: "approved" });
+    setUser(2, "ATM-SPV");
+    const user = userEvent.setup();
+
+    renderWithProviders();
+
+    await user.click(screen.getByRole("button", { name: "Batalkan" }));
+    const confirmButton = screen.getByRole("button", { name: /batalkan request/i });
+    expect(confirmButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/alasan pembatalan/i), "Order salah kirim");
+    expect(confirmButton).toBeEnabled();
+  });
+
+  it("shows Alasan Pembatalan when cancellation_reason is present (Req 3.11 Opsi B)", () => {
+    mockDetail({ status: "draft", is_canceled: true, cancellation_reason: "Vendor batal" });
+    setUser(1, "ATM-USER");
+
+    renderWithProviders();
+
+    expect(screen.getByText("Alasan Pembatalan")).toBeInTheDocument();
+    expect(screen.getByText("Vendor batal")).toBeInTheDocument();
   });
 });

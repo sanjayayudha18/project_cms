@@ -12,7 +12,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import { Link, useParams } from "@tanstack/react-router";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Ban, XCircle } from "lucide-react";
 import { useState } from "react";
 import { StatusBadge } from "./StatusBadge";
 import {
@@ -43,6 +43,8 @@ export function VendorRequestDetail() {
   const [editingItems, setEditingItems] = useState<VendorRequestItem[] | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const updateItemsMutation = useUpdateVendorRequestItems();
   const submitMutation = useSubmitVendorRequest();
@@ -109,12 +111,16 @@ export function VendorRequestDetail() {
   const canSubmit = data.status === "draft" && isCreator && isMaker;
   const canApproveReject = data.status === "pending_approval" && isChecker && !isCreator;
   const canRevise = data.status === "rejected" && isCreator && isMaker;
-  // Backend checkActor also allows a non-creator checker to cancel a
-  // pending request (union rule), but Req 14's action table only lists
-  // Cancel for the creator — the non-creator checker path to the same
-  // outcome is Reject. Restricting the button to isCreator here keeps the
-  // UI matching the spec; the backend stays the permission source of truth.
-  const canCancel = isCreator && (data.status === "draft" || data.status === "pending_approval");
+  // CIT-2 (Task 13.3, Req 5.3): union rule for draft/pending_approval —
+  // creator OR a non-creator checker may cancel. replenishment-request-
+  // enhancements (Req 3.1, 3.7) adds a second, stricter arm: an approved
+  // request is cancelable too, but Checker-only (no four-eyes here — direct
+  // cancellation, not an approve/reject pair — so a Checker who is also the
+  // creator is still allowed on this arm, mirroring the backend's checkActor).
+  const canCancel =
+    ((isCreator || (isChecker && !isCreator)) &&
+      (data.status === "draft" || data.status === "pending_approval")) ||
+    (isChecker && data.status === "approved");
 
   function startEditItems(): void {
     if (!data) return;
@@ -154,12 +160,27 @@ export function VendorRequestDetail() {
     });
   }
 
+  // replenishment-request-enhancements (Req 3.2, 3.3): same 1-500
+  // non-whitespace bound as reject, required before the mutation fires.
+  async function handleCancel(): Promise<void> {
+    if (!data) return;
+    const reason = cancelReason.trim();
+    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
+    await runAction(async () => {
+      await cancelMutation.mutateAsync({ id: data.id, reason });
+      setCancelOpen(false);
+      setCancelReason("");
+    });
+  }
+
   const editValid =
     editingItems?.every(
       (it) => Number.isInteger(it.amount_replenish) && it.amount_replenish >= AMOUNT_MIN,
     ) ?? false;
   const rejectValid =
     rejectReason.trim().length >= 1 && rejectReason.trim().length <= REJECTION_REASON_MAX;
+  const cancelValid =
+    cancelReason.trim().length >= 1 && cancelReason.trim().length <= REJECTION_REASON_MAX;
 
   const items = editingItems ?? data.items;
 
@@ -169,7 +190,12 @@ export function VendorRequestDetail() {
         eyebrow="Replenishment"
         title={data.request_number}
         description="Detail pengajuan vendor request"
-        actions={<StatusBadge status={data.status} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge status={data.status} />
+            {data.is_canceled && <StatusBadge status={data.status} isCanceled />}
+          </div>
+        }
       />
 
       <Link
@@ -251,7 +277,8 @@ export function VendorRequestDetail() {
               )}
               {canApproveReject && (
                 <>
-                  <Button variant="secondary" disabled={isBusy} onClick={() => setRejectOpen(true)}>
+                  <Button variant="danger" disabled={isBusy} onClick={() => setRejectOpen(true)}>
+                    <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     Tolak
                   </Button>
                   <Button
@@ -271,12 +298,9 @@ export function VendorRequestDetail() {
                 </Button>
               )}
               {canCancel && (
-                <Button
-                  variant="danger"
-                  disabled={isBusy}
-                  onClick={() => runAction(() => cancelMutation.mutateAsync(data.id))}
-                >
-                  {cancelMutation.isPending ? "Membatalkan..." : "Batalkan"}
+                <Button variant="danger" disabled={isBusy} onClick={() => setCancelOpen(true)}>
+                  <Ban className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  Batalkan
                 </Button>
               )}
             </>
@@ -285,7 +309,11 @@ export function VendorRequestDetail() {
       </div>
 
       {rejectOpen && (
-        <RejectModal
+        <ReasonModal
+          title="Tolak Vendor Request"
+          reasonLabel="Alasan Penolakan"
+          confirmLabel="Tolak Request"
+          busyLabel="Menolak..."
           reason={rejectReason}
           onReasonChange={setRejectReason}
           valid={rejectValid}
@@ -297,13 +325,41 @@ export function VendorRequestDetail() {
           }}
         />
       )}
+
+      {cancelOpen && (
+        <ReasonModal
+          title="Batalkan Vendor Request"
+          reasonLabel="Alasan Pembatalan"
+          confirmLabel="Batalkan Request"
+          busyLabel="Membatalkan..."
+          reason={cancelReason}
+          onReasonChange={setCancelReason}
+          valid={cancelValid}
+          busy={cancelMutation.isPending}
+          onConfirm={handleCancel}
+          onDismiss={() => {
+            setCancelOpen(false);
+            setCancelReason("");
+          }}
+        />
+      )}
     </div>
   );
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  planned: "Planned",
+  emergency: "Emergency",
+  additional: "Additional",
+};
+
 function DetailFields({ detail }: { detail: VendorRequestDetailType }) {
-  const fields: Array<[string, string | null]> = [
+  const alwaysShown: Array<[string, string]> = [
     ["Tanggal Forecast", detail.forecast_date],
+    ["Tanggal Replenish", detail.replenish_date ?? "-"],
+    ["Kategori", detail.request_category ? (CATEGORY_LABELS[detail.request_category] ?? "-") : "-"],
+  ];
+  const fields: Array<[string, string | null]> = [
     ["Dibuat Oleh", detail.created_by.full_name],
     ["Dibuat Pada", formatAtmDateTime(new Date(detail.created_at))],
     detail.submitted_at ? ["Dikirim Pada", formatAtmDateTime(new Date(detail.submitted_at))] : null,
@@ -312,12 +368,16 @@ function DetailFields({ detail }: { detail: VendorRequestDetailType }) {
     detail.rejected_by ? ["Ditolak Oleh", detail.rejected_by.full_name] : null,
     detail.rejected_at ? ["Ditolak Pada", formatAtmDateTime(new Date(detail.rejected_at))] : null,
     detail.rejection_reason ? ["Alasan Penolakan", detail.rejection_reason] : null,
+    // replenishment-request-enhancements (Req 3.11 Opsi B): populated from
+    // the response now that migration 038 persists it on vendor_requests.
+    detail.cancellation_reason ? ["Alasan Pembatalan", detail.cancellation_reason] : null,
     detail.notes ? ["Catatan", detail.notes] : null,
   ].filter((f): f is [string, string] => f !== null);
+  const allFields = [...alwaysShown, ...fields];
 
   return (
     <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-0)] p-4 sm:grid-cols-3">
-      {fields.map(([label, value]) => (
+      {allFields.map(([label, value]) => (
         <div key={label} className="flex flex-col gap-0.5">
           <span className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
             {label}
@@ -329,7 +389,11 @@ function DetailFields({ detail }: { detail: VendorRequestDetailType }) {
   );
 }
 
-interface RejectModalProps {
+interface ReasonModalProps {
+  title: string;
+  reasonLabel: string;
+  confirmLabel: string;
+  busyLabel: string;
   reason: string;
   onReasonChange: (value: string) => void;
   valid: boolean;
@@ -338,29 +402,38 @@ interface RejectModalProps {
   onDismiss: () => void;
 }
 
-function RejectModal({
+/**
+ * Shared 1-500-non-whitespace-char reason modal for both Reject (Req 2.3,
+ * 2.4) and Cancel (Req 3.2, 3.3) — same shape, different copy, so one
+ * component instead of two near-identical ones (was RejectModal).
+ */
+function ReasonModal({
+  title,
+  reasonLabel,
+  confirmLabel,
+  busyLabel,
   reason,
   onReasonChange,
   valid,
   busy,
   onConfirm,
   onDismiss,
-}: RejectModalProps) {
+}: ReasonModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="flex w-full max-w-md flex-col gap-4 rounded-[var(--radius-lg)] bg-[var(--n-0)] p-6 shadow-[var(--shadow-md)]">
-        <h2 className="text-lg font-semibold text-[var(--n-900)]">Tolak Vendor Request</h2>
+        <h2 className="text-lg font-semibold text-[var(--n-900)]">{title}</h2>
         <div className="flex flex-col gap-1">
-          <label htmlFor="reject-reason" className="text-sm text-[var(--n-700)]">
-            Alasan Penolakan
+          <label htmlFor="reason-modal-input" className="text-sm text-[var(--n-700)]">
+            {reasonLabel}
           </label>
           <textarea
-            id="reject-reason"
+            id="reason-modal-input"
             value={reason}
             onChange={(e) => onReasonChange(e.target.value.slice(0, REJECTION_REASON_MAX))}
             maxLength={REJECTION_REASON_MAX}
             rows={4}
-            // biome-ignore lint/a11y/noAutofocus: modal opens on explicit user action (Tolak button); focusing the only input is the expected behavior
+            // biome-ignore lint/a11y/noAutofocus: modal opens on explicit user action; focusing the only input is the expected behavior
             autoFocus
             className="rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 py-2 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
           />
@@ -373,7 +446,7 @@ function RejectModal({
             Batal
           </Button>
           <Button variant="danger" disabled={busy || !valid} onClick={onConfirm}>
-            {busy ? "Menolak..." : "Tolak Request"}
+            {busy ? busyLabel : confirmLabel}
           </Button>
         </div>
       </div>

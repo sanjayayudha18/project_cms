@@ -14,6 +14,7 @@ import {
   createVendorRequest,
   fetchAllForecastForSelection,
   fetchForecast,
+  fetchVendorOptions,
   fetchVendorRequest,
   fetchVendorRequestAuditLog,
   fetchVendorRequests,
@@ -29,6 +30,7 @@ import type {
   FetchAllForecastResult,
   ForecastResponse,
   ListVendorRequestParams,
+  VendorOptionsResponse,
   VendorRequestDetail,
   VendorRequestItemInput,
   VendorRequestListResponse,
@@ -45,6 +47,19 @@ export const vendorRequestKeys = {
 };
 
 // -- Reads ------------------------------------------------------------------
+
+/**
+ * Vendor + region option lists for the Forecast Browser's required FLM
+ * Vendor / FLM Vendor Region selects and the manual-request vendor select
+ * (CIT-2 Req 1.2, 1.3, 3 Q2). Master data — long staleTime, no pagination.
+ */
+export function useVendorOptions() {
+  return useQuery<VendorOptionsResponse, ApiError>({
+    queryKey: ["vendor-requests", "vendor-options"],
+    queryFn: fetchVendorOptions,
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useForecastBrowse(params: BrowseForecastParams, enabled = true) {
   return useQuery<ForecastResponse, ApiError>({
@@ -64,7 +79,10 @@ export function useForecastBrowse(params: BrowseForecastParams, enabled = true) 
  * silently reused for a different date/filter.
  */
 export function useForecastSelectAll(
-  params: Pick<BrowseForecastParams, "forecastDate" | "atmId">,
+  params: Pick<
+    BrowseForecastParams,
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion"
+  >,
   cap: number,
 ) {
   return useQuery<FetchAllForecastResult, ApiError>({
@@ -162,8 +180,8 @@ export function useReviseVendorRequest() {
 
 export function useCancelVendorRequest() {
   const invalidate = useInvalidateOnSuccess();
-  return useMutation<VendorRequestDetail, ApiError, number>({
-    mutationFn: cancelVendorRequest,
+  return useMutation<VendorRequestDetail, ApiError, { id: number; reason: string }>({
+    mutationFn: ({ id, reason }) => cancelVendorRequest(id, reason),
     onSuccess: invalidate,
   });
 }

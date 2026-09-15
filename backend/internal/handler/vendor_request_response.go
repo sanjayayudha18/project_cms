@@ -52,6 +52,14 @@ type forecastRowResponse struct {
 	Brand           string `json:"brand"`
 	FLMVendor       string `json:"flm_vendor"`
 	FLMVendorRegion string `json:"flm_vendor_region"`
+	// replenishment-request-enhancements (Req 5.6, 6.1): additive fields,
+	// appended behind the pre-existing ones — no renames/removals, and
+	// amount_refund above stays on the wire (Req 5.1 drops only the rendered
+	// column). Escrow is a decimal string (never a JSON number, Req 5.10);
+	// null when the terminal has no itm_replenish row (Req 5.11 renders "-").
+	PriorityClass string  `json:"priority_class"`
+	Paket         string  `json:"paket"`
+	Escrow        *string `json:"escrow"`
 }
 
 type forecastResponse struct {
@@ -73,6 +81,9 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			Brand:           row.Brand,
 			FLMVendor:       row.FLMVendor,
 			FLMVendorRegion: row.FLMVendorRegion,
+			PriorityClass:   row.PriorityClass,
+			Paket:           row.Paket,
+			Escrow:          row.Escrow,
 		}
 	}
 	return forecastResponse{
@@ -82,6 +93,26 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			TotalCount: result.Total, TotalPages: result.TotalPages,
 		},
 	}
+}
+
+// -- GET /vendors -----------------------------------------------------------
+
+type vendorOptionResponse struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+type vendorOptionsResponse struct {
+	Vendors []vendorOptionResponse `json:"vendors"`
+	Regions []string               `json:"regions"`
+}
+
+func toVendorOptionsResponse(result *service.VendorOptionsResult) vendorOptionsResponse {
+	vendors := make([]vendorOptionResponse, len(result.Vendors))
+	for i, v := range result.Vendors {
+		vendors[i] = vendorOptionResponse{ID: v.ID, Name: v.Name}
+	}
+	return vendorOptionsResponse{Vendors: vendors, Regions: result.Regions}
 }
 
 // -- vendor request detail (POST /, PUT items, transitions, GET /{id}) ----
@@ -96,22 +127,27 @@ type vendorRequestItemResponse struct {
 }
 
 type vendorRequestDetailResponse struct {
-	ID              int64                       `json:"id"`
-	RequestNumber   string                      `json:"request_number"`
-	ForecastDate    string                      `json:"forecast_date"`
-	Status          string                      `json:"status"`
-	Notes           string                      `json:"notes"`
-	CreatedBy       vendorRequestUserRef        `json:"created_by"`
-	ApprovedBy      *vendorRequestUserRef       `json:"approved_by"`
-	RejectedBy      *vendorRequestUserRef       `json:"rejected_by"`
-	RejectionReason string                      `json:"rejection_reason"`
-	CreatedAt       string                      `json:"created_at"`
-	UpdatedAt       string                      `json:"updated_at"`
-	SubmittedAt     *string                     `json:"submitted_at"`
-	ApprovedAt      *string                     `json:"approved_at"`
-	RejectedAt      *string                     `json:"rejected_at"`
-	Items           []vendorRequestItemResponse `json:"items"`
-	TotalAmount     int64                       `json:"total_amount"`
+	ID                 int64                       `json:"id"`
+	RequestNumber      string                      `json:"request_number"`
+	ForecastDate       string                      `json:"forecast_date"`
+	Status             string                      `json:"status"`
+	Notes              string                      `json:"notes"`
+	CreatedBy          vendorRequestUserRef        `json:"created_by"`
+	ApprovedBy         *vendorRequestUserRef       `json:"approved_by"`
+	RejectedBy         *vendorRequestUserRef       `json:"rejected_by"`
+	RejectionReason    string                      `json:"rejection_reason"`
+	CreatedAt          string                      `json:"created_at"`
+	UpdatedAt          string                      `json:"updated_at"`
+	SubmittedAt        *string                     `json:"submitted_at"`
+	ApprovedAt         *string                     `json:"approved_at"`
+	RejectedAt         *string                     `json:"rejected_at"`
+	Items              []vendorRequestItemResponse `json:"items"`
+	TotalAmount        int64                       `json:"total_amount"`
+	ReplenishDate      *string                     `json:"replenish_date"`
+	RequestCategory    *string                     `json:"request_category"`
+	IsCanceled         bool                        `json:"is_canceled"`
+	IsManual           bool                        `json:"is_manual"`
+	CancellationReason *string                     `json:"cancellation_reason"`
 }
 
 func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailResponse {
@@ -125,36 +161,46 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 	return vendorRequestDetailResponse{
 		ID: d.ID, RequestNumber: d.RequestNumber, ForecastDate: formatDate(d.ForecastDate),
 		Status: d.Status, Notes: d.Notes,
-		CreatedBy:       vendorRequestUserRef{ID: d.CreatedBy.ID, FullName: d.CreatedBy.FullName},
-		ApprovedBy:      toUserRefResponse(d.ApprovedBy),
-		RejectedBy:      toUserRefResponse(d.RejectedBy),
-		RejectionReason: d.RejectionReason,
-		CreatedAt:       formatTimestamp(d.CreatedAt),
-		UpdatedAt:       formatTimestamp(d.UpdatedAt),
-		SubmittedAt:     formatTimestampPtr(d.SubmittedAt),
-		ApprovedAt:      formatTimestampPtr(d.ApprovedAt),
-		RejectedAt:      formatTimestampPtr(d.RejectedAt),
-		Items:           items,
-		TotalAmount:     d.TotalAmount,
+		CreatedBy:          vendorRequestUserRef{ID: d.CreatedBy.ID, FullName: d.CreatedBy.FullName},
+		ApprovedBy:         toUserRefResponse(d.ApprovedBy),
+		RejectedBy:         toUserRefResponse(d.RejectedBy),
+		RejectionReason:    d.RejectionReason,
+		CreatedAt:          formatTimestamp(d.CreatedAt),
+		UpdatedAt:          formatTimestamp(d.UpdatedAt),
+		SubmittedAt:        formatTimestampPtr(d.SubmittedAt),
+		ApprovedAt:         formatTimestampPtr(d.ApprovedAt),
+		RejectedAt:         formatTimestampPtr(d.RejectedAt),
+		Items:              items,
+		TotalAmount:        d.TotalAmount,
+		ReplenishDate:      formatDatePtr(d.ReplenishDate),
+		RequestCategory:    d.RequestCategory,
+		IsCanceled:         d.IsCanceled,
+		IsManual:           d.IsManual,
+		CancellationReason: d.CancellationReason,
 	}
 }
 
 // -- GET / (list) ---------------------------------------------------------
 
 type vendorRequestSummaryResponse struct {
-	ID            int64                 `json:"id"`
-	RequestNumber string                `json:"request_number"`
-	ForecastDate  string                `json:"forecast_date"`
-	Status        string                `json:"status"`
-	Notes         string                `json:"notes"`
-	ItemCount     int64                 `json:"item_count"`
-	TotalAmount   int64                 `json:"total_amount"`
-	CreatedBy     vendorRequestUserRef  `json:"created_by"`
-	ApprovedBy    *vendorRequestUserRef `json:"approved_by"`
-	CreatedAt     string                `json:"created_at"`
-	SubmittedAt   *string               `json:"submitted_at"`
-	ApprovedAt    *string               `json:"approved_at"`
-	RejectedAt    *string               `json:"rejected_at"`
+	ID                 int64                 `json:"id"`
+	RequestNumber      string                `json:"request_number"`
+	ForecastDate       string                `json:"forecast_date"`
+	Status             string                `json:"status"`
+	Notes              string                `json:"notes"`
+	ItemCount          int64                 `json:"item_count"`
+	TotalAmount        int64                 `json:"total_amount"`
+	CreatedBy          vendorRequestUserRef  `json:"created_by"`
+	ApprovedBy         *vendorRequestUserRef `json:"approved_by"`
+	CreatedAt          string                `json:"created_at"`
+	SubmittedAt        *string               `json:"submitted_at"`
+	ApprovedAt         *string               `json:"approved_at"`
+	RejectedAt         *string               `json:"rejected_at"`
+	ReplenishDate      *string               `json:"replenish_date"`
+	RequestCategory    *string               `json:"request_category"`
+	IsCanceled         bool                  `json:"is_canceled"`
+	IsManual           bool                  `json:"is_manual"`
+	CancellationReason *string               `json:"cancellation_reason"`
 }
 
 type vendorRequestListResponse struct {
@@ -168,12 +214,17 @@ func toListResponse(result *service.ListVendorRequestResult) vendorRequestListRe
 		data[i] = vendorRequestSummaryResponse{
 			ID: r.ID, RequestNumber: r.RequestNumber, ForecastDate: formatDate(r.ForecastDate),
 			Status: r.Status, Notes: r.Notes, ItemCount: r.ItemCount, TotalAmount: r.TotalAmount,
-			CreatedBy:   vendorRequestUserRef{ID: r.CreatedBy.ID, FullName: r.CreatedBy.FullName},
-			ApprovedBy:  toUserRefResponse(r.ApprovedBy),
-			CreatedAt:   formatTimestamp(r.CreatedAt),
-			SubmittedAt: formatTimestampPtr(r.SubmittedAt),
-			ApprovedAt:  formatTimestampPtr(r.ApprovedAt),
-			RejectedAt:  formatTimestampPtr(r.RejectedAt),
+			CreatedBy:          vendorRequestUserRef{ID: r.CreatedBy.ID, FullName: r.CreatedBy.FullName},
+			ApprovedBy:         toUserRefResponse(r.ApprovedBy),
+			CreatedAt:          formatTimestamp(r.CreatedAt),
+			SubmittedAt:        formatTimestampPtr(r.SubmittedAt),
+			ApprovedAt:         formatTimestampPtr(r.ApprovedAt),
+			RejectedAt:         formatTimestampPtr(r.RejectedAt),
+			ReplenishDate:      formatDatePtr(r.ReplenishDate),
+			RequestCategory:    r.RequestCategory,
+			IsCanceled:         r.IsCanceled,
+			IsManual:           r.IsManual,
+			CancellationReason: r.CancellationReason,
 		}
 	}
 	return vendorRequestListResponse{

@@ -97,10 +97,33 @@ const columns: ColumnDef<ForecastRow>[] = [
     cell: ({ getValue }) => formatIDR(getValue<number>()),
     meta: { align: "right" },
   },
+  // replenishment-request-enhancements (Req 5.1, 6.1): Amount Refund's
+  // render column is dropped here (its wire field is untouched — additive
+  // response, ForecastRow.amount_refund stays on the type). Replaced by
+  // three additive columns below.
   {
-    accessorKey: "amount_refund",
-    header: "Amount Refund",
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    accessorKey: "priority_class",
+    header: "Priority Class",
+    cell: ({ getValue }) => getValue<string>() || "-",
+    enableSorting: false,
+  },
+  {
+    accessorKey: "paket",
+    header: "Paket",
+    cell: ({ getValue }) => getValue<string>() || "-",
+    enableSorting: false,
+  },
+  {
+    accessorKey: "escrow",
+    header: "Escrow",
+    // Decimal string parsed to Number only for display formatting (Req
+    // 5.9/5.10) — never used for computation, so the float imprecision this
+    // could theoretically introduce on very large values never compounds.
+    // null (no itm_replenish row) renders "-", not "0" (Req 5.11).
+    cell: ({ getValue }) => {
+      const escrow = getValue<string | null>();
+      return escrow === null ? "-" : formatIDR(Number(escrow));
+    },
     meta: { align: "right" },
     enableSorting: false,
   },

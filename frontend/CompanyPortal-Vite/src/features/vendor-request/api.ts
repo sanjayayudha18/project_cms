@@ -13,6 +13,7 @@ import type {
   ForecastResponse,
   ForecastRow,
   ListVendorRequestParams,
+  VendorOptionsResponse,
   VendorRequestDetail,
   VendorRequestItemInput,
   VendorRequestListResponse,
@@ -29,9 +30,21 @@ const SELECT_ALL_PAGE_SIZE = 100;
 function buildForecastQuery(params: BrowseForecastParams): string {
   const search = new URLSearchParams({ forecast_date: params.forecastDate });
   if (params.atmId) search.set("atm_id", params.atmId);
+  // Brand is optional (CIT-2 Req 1.9): omit entirely rather than sending "",
+  // matching the backend's empty-sentinel = no-filter convention.
+  if (params.brand) search.set("brand", params.brand);
+  search.set("flm_vendor", params.flmVendor);
+  search.set("flm_vendor_region", params.flmVendorRegion);
   search.set("page", String(params.page ?? 1));
   search.set("page_size", String(params.pageSize ?? 20));
   return search.toString();
+}
+
+/** Options for the required FLM Vendor / FLM Vendor Region selects and the
+ * manual-request vendor select (CIT-2 Req 1.2, 1.3, 3 Q2). */
+export async function fetchVendorOptions(): Promise<VendorOptionsResponse> {
+  const { data } = await api.get<VendorOptionsResponse>(`${BASE}/vendors`);
+  return data;
 }
 
 export async function fetchForecast(params: BrowseForecastParams): Promise<ForecastResponse> {
@@ -51,7 +64,10 @@ export async function fetchForecast(params: BrowseForecastParams): Promise<Forec
  * full set fits under the cap.
  */
 export async function fetchAllForecastForSelection(
-  params: Pick<BrowseForecastParams, "forecastDate" | "atmId">,
+  params: Pick<
+    BrowseForecastParams,
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion"
+  >,
   cap: number,
 ): Promise<FetchAllForecastResult> {
   const first = await fetchForecast({ ...params, page: 1, pageSize: SELECT_ALL_PAGE_SIZE });
@@ -75,6 +91,7 @@ function buildListQuery(params: ListVendorRequestParams): string {
   if (params.forecastDate) search.set("forecast_date", params.forecastDate);
   if (params.createdBy) search.set("created_by", String(params.createdBy));
   if (params.requestNumber) search.set("request_number", params.requestNumber);
+  if (params.includeCanceled) search.set("include_canceled", "true");
   search.set("page", String(params.page ?? 1));
   search.set("page_size", String(params.pageSize ?? 10));
   return search.toString();
@@ -137,7 +154,12 @@ export async function reviseVendorRequest(id: number): Promise<VendorRequestDeta
   return data;
 }
 
-export async function cancelVendorRequest(id: number): Promise<VendorRequestDetail> {
-  const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/cancel`);
+export async function cancelVendorRequest(
+  id: number,
+  reason: string,
+): Promise<VendorRequestDetail> {
+  const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/cancel`, {
+    cancellation_reason: reason,
+  });
   return data;
 }

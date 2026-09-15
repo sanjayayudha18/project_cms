@@ -8,6 +8,7 @@
  */
 
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { Ban } from "lucide-react";
 import type { VendorRequestStatus } from "./types";
 
 const STATUS_CONFIG: Record<VendorRequestStatus, { variant: BadgeVariant; label: string }> = {
@@ -23,9 +24,14 @@ const STATUS_CONFIG: Record<VendorRequestStatus, { variant: BadgeVariant; label:
 
 interface StatusBadgeProps {
   status: VendorRequestStatus;
+  /** CIT-2 soft-cancel flag (Req 5.6): distinct from the `cancelled` status enum value. */
+  isCanceled?: boolean;
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, isCanceled }: StatusBadgeProps) {
+  if (isCanceled) {
+    return <Badge variant="neutral" icon={Ban} label="Dibatalkan" />;
+  }
   const config = STATUS_CONFIG[status];
   return (
     <span className={status === "cancelled" ? "line-through" : undefined}>

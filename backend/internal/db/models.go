@@ -611,6 +611,18 @@ type VendorRequest struct {
 	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
 	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
 	RejectedAt      pgtype.Timestamptz `json:"rejected_at"`
+	// Soft-cancel flag (Req 5); row/items are never deleted on cancel.
+	IsCanceled bool `json:"is_canceled"`
+	// Manual_Request classification: planned | emergency | additional. NULL for legacy rows AND for standard non-manual (Forecast Browser) requests -- see design.md Q-resolution.
+	RequestCategory *string `json:"request_category"`
+	// Vendor-facing delivery date chosen by the operator (Req 2/3), distinct from forecast_date. NULL only for legacy rows.
+	ReplenishDate pgtype.Date `json:"replenish_date"`
+	// True when items were entered directly without a matching dmaa_atm_forecast row (Req 3).
+	IsManual bool `json:"is_manual"`
+	// Single resolved CIT vendor this request is constrained to (Req 4, Q2); drives the request-number vendor prefix. NULL only for legacy VR-... rows.
+	VendorID *int64 `json:"vendor_id"`
+	// Reason captured on cancel (Req 3.2/3.3). NULL for non-canceled rows and for rows canceled before this column existed (their reason lives only in audit_logs.after).
+	CancellationReason *string `json:"cancellation_reason"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
@@ -624,6 +636,10 @@ type VendorRequestItem struct {
 	AmountReplenish int64              `json:"amount_replenish"`
 	AmountRefund    int64              `json:"amount_refund"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	// Manual-request brand (Req 3, Q4); NULL for DMAA-backed rows, which derive it at read time.
+	Brand *string `json:"brand"`
+	// Manual-request ATM location (Req 3, Q4); NULL for DMAA-backed rows, which derive it at read time.
+	LokasiAtm *string `json:"lokasi_atm"`
 }
 
 type VendorVault struct {

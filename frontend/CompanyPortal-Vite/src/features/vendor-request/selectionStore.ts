@@ -13,6 +13,10 @@ import type { ForecastRow } from "./types";
 export interface PendingVendorRequestSelection {
   forecastDate: string;
   items: ForecastRow[];
+  /** Resolved from the Forecast Browser's required FLM Vendor filter (CIT-2
+   * Req 4, Q2): every create — DMAA-backed or manual — is constrained to one
+   * vendor, and the create payload always needs its numeric id. */
+  vendorId: number;
 }
 
 interface PendingSelectionState {

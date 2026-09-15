@@ -13,22 +13,51 @@ import (
 
 const countForecastForDate = `-- name: CountForecastForDate :one
 SELECT COUNT(*)
-FROM dmaa_atm_forecast
-WHERE periode_pred = $1::date
-  AND ($2::text = '' OR terminal_id ILIKE '%' || $2::text || '%')
+FROM dmaa_atm_forecast f
+LEFT JOIN atms a ON a.terminal_id = f.terminal_id
+LEFT JOIN LATERAL (
+    SELECT vp.vendor_branch_id
+    FROM atm_vendor_packages avp
+    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    WHERE avp.atm_id = a.id
+      AND avp.is_active = true
+      AND avp.effective_start_date <= $1::date
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
+    ORDER BY avp.effective_start_date DESC
+    LIMIT 1
+) active_pkg ON true
+LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+LEFT JOIN vendors v ON v.id = vb.vendor_id
+WHERE f.periode_pred = $1::date
+  AND ($2::text = '' OR f.terminal_id ILIKE '%' || $2::text || '%')
+  AND ($3::text = '' OR LOWER(a.brand) = LOWER($3::text))
+  AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
+  AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
 `
 
 type CountForecastForDateParams struct {
-	ForecastDate pgtype.Date `json:"forecast_date"`
-	TerminalID   string      `json:"terminal_id"`
+	ForecastDate    pgtype.Date `json:"forecast_date"`
+	TerminalID      string      `json:"terminal_id"`
+	Brand           string      `json:"brand"`
+	FlmVendor       string      `json:"flm_vendor"`
+	FlmVendorRegion string      `json:"flm_vendor_region"`
 }
 
-// Mirrors ListForecastForDate's WHERE for pagination total. No master-data
-// joins needed: it counts dmaa_atm_forecast rows only, and the LATERAL vendor
-// resolution in ListForecastForDate yields at most one row per forecast row,
-// so the joins never change the row count (Req 3.2 design note).
+// Mirrors ListForecastForDate's WHERE for pagination total. CIT-2 (Req 1):
+// unlike the pre-CIT-2 version, this now NEEDS the same
+// atms -> atm_vendor_packages (active) -> vendor_packages -> vendor_branches
+// -> vendors join chain as ListForecastForDate, because brand/flm_vendor/
+// flm_vendor_region filter on those joined columns. The LATERAL active-package
+// resolution still yields at most one row per forecast row, so the joins
+// still never change the row count for an unfiltered browse.
 func (q *Queries) CountForecastForDate(ctx context.Context, arg CountForecastForDateParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countForecastForDate, arg.ForecastDate, arg.TerminalID)
+	row := q.db.QueryRow(ctx, countForecastForDate,
+		arg.ForecastDate,
+		arg.TerminalID,
+		arg.Brand,
+		arg.FlmVendor,
+		arg.FlmVendorRegion,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -42,13 +71,15 @@ WHERE
     AND ($2::text = '' OR vr.forecast_date = $2::date)
     AND ($3::bigint = 0 OR vr.created_by = $3::bigint)
     AND ($4::text = '' OR vr.request_number ILIKE '%' || $4::text || '%')
+    AND ($5::boolean = true OR vr.is_canceled = false)
 `
 
 type CountVendorRequestsParams struct {
-	Status        string `json:"status"`
-	ForecastDate  string `json:"forecast_date"`
-	CreatedBy     int64  `json:"created_by"`
-	RequestNumber string `json:"request_number"`
+	Status          string `json:"status"`
+	ForecastDate    string `json:"forecast_date"`
+	CreatedBy       int64  `json:"created_by"`
+	RequestNumber   string `json:"request_number"`
+	IncludeCanceled bool   `json:"include_canceled"`
 }
 
 // Mirrors ListVendorRequests' WHERE exactly (minus joins that don't affect
@@ -59,6 +90,7 @@ func (q *Queries) CountVendorRequests(ctx context.Context, arg CountVendorReques
 		arg.ForecastDate,
 		arg.CreatedBy,
 		arg.RequestNumber,
+		arg.IncludeCanceled,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -67,16 +99,31 @@ func (q *Queries) CountVendorRequests(ctx context.Context, arg CountVendorReques
 
 const createVendorRequest = `-- name: CreateVendorRequest :one
 
-INSERT INTO vendor_requests (request_number, forecast_date, status, notes, created_by)
-VALUES ($1, $2, 'draft', $3, $4)
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at
+INSERT INTO vendor_requests
+    (request_number, forecast_date, replenish_date, request_category, is_manual, vendor_id, status, notes, created_by)
+VALUES (
+    $1::text,
+    $2::date,
+    $3::date,
+    $4::text,
+    $5::boolean,
+    $6::bigint,
+    'draft',
+    $7::text,
+    $8::bigint
+)
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
 `
 
 type CreateVendorRequestParams struct {
-	RequestNumber string      `json:"request_number"`
-	ForecastDate  pgtype.Date `json:"forecast_date"`
-	Notes         *string     `json:"notes"`
-	CreatedBy     int64       `json:"created_by"`
+	RequestNumber   string      `json:"request_number"`
+	ForecastDate    pgtype.Date `json:"forecast_date"`
+	ReplenishDate   pgtype.Date `json:"replenish_date"`
+	RequestCategory *string     `json:"request_category"`
+	IsManual        bool        `json:"is_manual"`
+	VendorID        int64       `json:"vendor_id"`
+	Notes           *string     `json:"notes"`
+	CreatedBy       int64       `json:"created_by"`
 }
 
 // Vendor Request (DMAA forecast -> CIT vendor replenishment order) queries.
@@ -84,13 +131,22 @@ type CreateVendorRequestParams struct {
 // .kiro/specs/request-replenish-to-vendor/design.md for the state machine,
 // API contract, and correctness properties these queries support.
 // Inserts the header row in draft status. request_number is generated by the
-// service (VR-YYYYMMDD-NNNN, see MaxRequestNumberSeqForDate below) before
-// this call, inside the same transaction, so a unique-constraint violation
-// here means a concurrent insert raced the number and the service retries.
+// service (REP-<prefix>-<YYYYMMDD>-<seq>, see NextRequestNumberSeq below)
+// before this call, inside the same transaction, so a unique-constraint
+// violation here means a concurrent insert raced the number and the service
+// retries. replenish_date/vendor_id are always set by new callers (Req 2, 4);
+// request_category is set by every new caller (replenishment-request-
+// enhancements Req 1.9, manual or Forecast-Browser alike); sqlc.narg keeps
+// legacy NULL rows representable -- see
+// .kiro/specs/cit-vendor-request-enhancements/design.md.
 func (q *Queries) CreateVendorRequest(ctx context.Context, arg CreateVendorRequestParams) (VendorRequest, error) {
 	row := q.db.QueryRow(ctx, createVendorRequest,
 		arg.RequestNumber,
 		arg.ForecastDate,
+		arg.ReplenishDate,
+		arg.RequestCategory,
+		arg.IsManual,
+		arg.VendorID,
 		arg.Notes,
 		arg.CreatedBy,
 	)
@@ -110,6 +166,12 @@ func (q *Queries) CreateVendorRequest(ctx context.Context, arg CreateVendorReque
 		&i.SubmittedAt,
 		&i.ApprovedAt,
 		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
 	)
 	return i, err
 }
@@ -161,8 +223,72 @@ func (q *Queries) ForecastRowExists(ctx context.Context, arg ForecastRowExistsPa
 	return i, err
 }
 
+const getActiveVendorForTerminal = `-- name: GetActiveVendorForTerminal :one
+SELECT v.id AS vendor_id
+FROM atms a
+JOIN LATERAL (
+    SELECT vp.vendor_branch_id
+    FROM atm_vendor_packages avp
+    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    WHERE avp.atm_id = a.id
+      AND avp.is_active = true
+      AND avp.effective_start_date <= $1::date
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
+    ORDER BY avp.effective_start_date DESC
+    LIMIT 1
+) active_pkg ON true
+JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+JOIN vendors v ON v.id = vb.vendor_id
+WHERE a.terminal_id = $2::text
+`
+
+type GetActiveVendorForTerminalParams struct {
+	AsOfDate   pgtype.Date `json:"as_of_date"`
+	TerminalID string      `json:"terminal_id"`
+}
+
+// Resolves an ATM terminal's active vendor as of a given date (Req 4, Q2
+// defence-in-depth): mirrors ListForecastForDate's active-package LATERAL
+// join chain, but for a single terminal, so the service can confirm every
+// create item actually belongs to the request's single resolved vendor_id
+// rather than trusting a possibly-stale Forecast Browser selection or a
+// manual entry against the wrong vendor's ATM. INNER JOINs (unlike
+// ListForecastForDate's LEFT JOINs) are deliberate: no resolvable active
+// vendor for the terminal is itself a mismatch here, surfaced to the caller
+// as pgx.ErrNoRows.
+func (q *Queries) GetActiveVendorForTerminal(ctx context.Context, arg GetActiveVendorForTerminalParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getActiveVendorForTerminal, arg.AsOfDate, arg.TerminalID)
+	var vendor_id int64
+	err := row.Scan(&vendor_id)
+	return vendor_id, err
+}
+
+const getVendorForRequestNumber = `-- name: GetVendorForRequestNumber :one
+SELECT id, code, request_prefix
+FROM vendors
+WHERE id = $1::bigint
+`
+
+type GetVendorForRequestNumberRow struct {
+	ID            int64   `json:"id"`
+	Code          string  `json:"code"`
+	RequestPrefix *string `json:"request_prefix"`
+}
+
+// Resolves vendors.code + request_prefix for the request-number generator
+// (Req 4, Q1): code feeds the deterministic fallback when request_prefix is
+// NULL. Deliberately separate from dsr.sql's GetVendorByID (a different
+// feature's narrower id/code/name lookup, filtered to active vendors only)
+// rather than widening that query's shape for an unrelated caller.
+func (q *Queries) GetVendorForRequestNumber(ctx context.Context, id int64) (GetVendorForRequestNumberRow, error) {
+	row := q.db.QueryRow(ctx, getVendorForRequestNumber, id)
+	var i GetVendorForRequestNumberRow
+	err := row.Scan(&i.ID, &i.Code, &i.RequestPrefix)
+	return i, err
+}
+
 const getVendorRequest = `-- name: GetVendorRequest :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at FROM vendor_requests WHERE id = $1
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason FROM vendor_requests WHERE id = $1
 `
 
 // Plain read, no joins -- used where only the request's own columns are
@@ -186,13 +312,19 @@ func (q *Queries) GetVendorRequest(ctx context.Context, id int64) (VendorRequest
 		&i.SubmittedAt,
 		&i.ApprovedAt,
 		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
 	)
 	return i, err
 }
 
 const getVendorRequestDetail = `-- name: GetVendorRequestDetail :one
 SELECT
-    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at,
+    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at, vr.is_canceled, vr.request_category, vr.replenish_date, vr.is_manual, vr.vendor_id, vr.cancellation_reason,
     cu.full_name AS created_by_name,
     au.full_name AS approved_by_name,
     ru.full_name AS rejected_by_name
@@ -204,23 +336,29 @@ WHERE vr.id = $1::bigint
 `
 
 type GetVendorRequestDetailRow struct {
-	ID              int64              `json:"id"`
-	RequestNumber   string             `json:"request_number"`
-	ForecastDate    pgtype.Date        `json:"forecast_date"`
-	Status          string             `json:"status"`
-	Notes           *string            `json:"notes"`
-	CreatedBy       int64              `json:"created_by"`
-	ApprovedBy      *int64             `json:"approved_by"`
-	RejectedBy      *int64             `json:"rejected_by"`
-	RejectionReason *string            `json:"rejection_reason"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
-	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
-	RejectedAt      pgtype.Timestamptz `json:"rejected_at"`
-	CreatedByName   string             `json:"created_by_name"`
-	ApprovedByName  *string            `json:"approved_by_name"`
-	RejectedByName  *string            `json:"rejected_by_name"`
+	ID                 int64              `json:"id"`
+	RequestNumber      string             `json:"request_number"`
+	ForecastDate       pgtype.Date        `json:"forecast_date"`
+	Status             string             `json:"status"`
+	Notes              *string            `json:"notes"`
+	CreatedBy          int64              `json:"created_by"`
+	ApprovedBy         *int64             `json:"approved_by"`
+	RejectedBy         *int64             `json:"rejected_by"`
+	RejectionReason    *string            `json:"rejection_reason"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	SubmittedAt        pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
+	RejectedAt         pgtype.Timestamptz `json:"rejected_at"`
+	IsCanceled         bool               `json:"is_canceled"`
+	RequestCategory    *string            `json:"request_category"`
+	ReplenishDate      pgtype.Date        `json:"replenish_date"`
+	IsManual           bool               `json:"is_manual"`
+	VendorID           *int64             `json:"vendor_id"`
+	CancellationReason *string            `json:"cancellation_reason"`
+	CreatedByName      string             `json:"created_by_name"`
+	ApprovedByName     *string            `json:"approved_by_name"`
+	RejectedByName     *string            `json:"rejected_by_name"`
 }
 
 // Detail response shape (Req 9.6): header plus created_by/approved_by/
@@ -245,6 +383,12 @@ func (q *Queries) GetVendorRequestDetail(ctx context.Context, id int64) (GetVend
 		&i.SubmittedAt,
 		&i.ApprovedAt,
 		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
 		&i.CreatedByName,
 		&i.ApprovedByName,
 		&i.RejectedByName,
@@ -253,7 +397,7 @@ func (q *Queries) GetVendorRequestDetail(ctx context.Context, id int64) (GetVend
 }
 
 const getVendorRequestForUpdate = `-- name: GetVendorRequestForUpdate :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at FROM vendor_requests WHERE id = $1 FOR UPDATE
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason FROM vendor_requests WHERE id = $1 FOR UPDATE
 `
 
 // Row-locking read for every state transition (submit/approve/reject/revise/
@@ -279,15 +423,21 @@ func (q *Queries) GetVendorRequestForUpdate(ctx context.Context, id int64) (Vend
 		&i.SubmittedAt,
 		&i.ApprovedAt,
 		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
 	)
 	return i, err
 }
 
 const insertVendorRequestItem = `-- name: InsertVendorRequestItem :one
 INSERT INTO vendor_request_items
-    (vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, created_at
+    (vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, brand, lokasi_atm)
+VALUES ($1, $2, $3, $4, $5, $6, $7::text, $8::text)
+RETURNING id, vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, created_at, brand, lokasi_atm
 `
 
 type InsertVendorRequestItemParams struct {
@@ -297,12 +447,17 @@ type InsertVendorRequestItemParams struct {
 	Denom           int32       `json:"denom"`
 	AmountReplenish int64       `json:"amount_replenish"`
 	AmountRefund    int64       `json:"amount_refund"`
+	Brand           *string     `json:"brand"`
+	LokasiAtm       *string     `json:"lokasi_atm"`
 }
 
 // amount_refund is not part of the client payload (Req 4.1) -- it is copied
 // from the matching dmaa_atm_forecast row (see ForecastRowsExist below) so
 // the item stays informationally consistent with the forecast it was drawn
 // from, even though amount_replenish itself may be a manual override.
+// brand/lokasi_atm (sqlc.narg) are set only for Manual_Request items (Req 3,
+// Q4) that have no dmaa_atm_forecast row to re-derive them from at read time;
+// DMAA-backed items leave them NULL.
 func (q *Queries) InsertVendorRequestItem(ctx context.Context, arg InsertVendorRequestItemParams) (VendorRequestItem, error) {
 	row := q.db.QueryRow(ctx, insertVendorRequestItem,
 		arg.VendorRequestID,
@@ -311,6 +466,8 @@ func (q *Queries) InsertVendorRequestItem(ctx context.Context, arg InsertVendorR
 		arg.Denom,
 		arg.AmountReplenish,
 		arg.AmountRefund,
+		arg.Brand,
+		arg.LokasiAtm,
 	)
 	var i VendorRequestItem
 	err := row.Scan(
@@ -322,8 +479,77 @@ func (q *Queries) InsertVendorRequestItem(ctx context.Context, arg InsertVendorR
 		&i.AmountReplenish,
 		&i.AmountRefund,
 		&i.CreatedAt,
+		&i.Brand,
+		&i.LokasiAtm,
 	)
 	return i, err
+}
+
+const listActiveVendors = `-- name: ListActiveVendors :many
+SELECT id, name
+FROM vendors
+WHERE is_active = true AND deleted_at IS NULL
+ORDER BY name ASC
+`
+
+type ListActiveVendorsRow struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// Backs GET /vendor-requests/vendors (CIT-2 Req 1.2, 3 Q2): populates the
+// required FLM Vendor select on the Forecast Browser and the manual-request
+// vendor select. id is needed for the manual create payload's vendor_id;
+// name is what the forecast filter and the Forecast Browser select match on.
+func (q *Queries) ListActiveVendors(ctx context.Context) ([]ListActiveVendorsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveVendors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveVendorsRow{}
+	for rows.Next() {
+		var i ListActiveVendorsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDistinctVendorBranchRegions = `-- name: ListDistinctVendorBranchRegions :many
+SELECT DISTINCT region
+FROM vendor_branches
+WHERE region IS NOT NULL AND is_active = true
+ORDER BY region ASC
+`
+
+// Backs GET /vendor-requests/vendors (CIT-2 Req 1.3): populates the required
+// FLM Vendor Region select. Distinct across all active vendor branches,
+// independent of which vendor is chosen (Req 1 does not cascade Brand/FLM
+// Vendor/FLM Vendor Region -- each is filtered independently).
+func (q *Queries) ListDistinctVendorBranchRegions(ctx context.Context) ([]*string, error) {
+	rows, err := q.db.Query(ctx, listDistinctVendorBranchRegions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*string{}
+	for rows.Next() {
+		var region *string
+		if err := rows.Scan(&region); err != nil {
+			return nil, err
+		}
+		items = append(items, region)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listForecastForDate = `-- name: ListForecastForDate :many
@@ -331,47 +557,67 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        l.name    AS lokasi_atm,
        a.brand   AS brand,
        v.name    AS flm_vendor,
-       vb.region AS flm_vendor_region
+       vb.region AS flm_vendor_region,
+       a.priority_class AS priority_class,
+       pkg.code         AS paket,
+       esc.escrow        AS escrow
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN locations l ON l.id = a.location_id
 LEFT JOIN LATERAL (
-    SELECT vp.vendor_branch_id
+    SELECT vp.vendor_branch_id, vp.id AS vendor_package_id
     FROM atm_vendor_packages avp
     JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= $1::date
       AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
-    ORDER BY avp.effective_start_date DESC
+    ORDER BY avp.effective_start_date DESC, avp.id DESC
     LIMIT 1
 ) active_pkg ON true
+LEFT JOIN vendor_packages pkg ON pkg.id = active_pkg.vendor_package_id
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
 LEFT JOIN vendors v ON v.id = vb.vendor_id
+LEFT JOIN LATERAL (
+    SELECT cp.escrow
+    FROM itm_replenish cp
+    WHERE cp.terminal_id = f.terminal_id
+    ORDER BY cp.replenish_date DESC, cp.replenish_time DESC
+    LIMIT 1
+) esc ON true
 WHERE f.periode_pred = $1::date
   AND ($2::text = '' OR f.terminal_id ILIKE '%' || $2::text || '%')
+  AND ($3::text = '' OR LOWER(a.brand) = LOWER($3::text))
+  AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
+  AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
 ORDER BY f.terminal_id ASC
-LIMIT $4::int OFFSET ($3::int - 1) * $4::int
+LIMIT $7::int OFFSET ($6::int - 1) * $7::int
 `
 
 type ListForecastForDateParams struct {
-	ForecastDate pgtype.Date `json:"forecast_date"`
-	TerminalID   string      `json:"terminal_id"`
-	Page         int32       `json:"page"`
-	PageSize     int32       `json:"page_size"`
+	ForecastDate    pgtype.Date `json:"forecast_date"`
+	TerminalID      string      `json:"terminal_id"`
+	Brand           string      `json:"brand"`
+	FlmVendor       string      `json:"flm_vendor"`
+	FlmVendorRegion string      `json:"flm_vendor_region"`
+	Page            int32       `json:"page"`
+	PageSize        int32       `json:"page_size"`
 }
 
 type ListForecastForDateRow struct {
-	TerminalID      string      `json:"terminal_id"`
-	PeriodePred     pgtype.Date `json:"periode_pred"`
-	Denom           int32       `json:"denom"`
-	AmountReplenish int64       `json:"amount_replenish"`
-	AmountRefund    int64       `json:"amount_refund"`
-	DmaaFileID      int64       `json:"dmaa_file_id"`
-	LokasiAtm       *string     `json:"lokasi_atm"`
-	Brand           *string     `json:"brand"`
-	FlmVendor       *string     `json:"flm_vendor"`
-	FlmVendorRegion *string     `json:"flm_vendor_region"`
+	TerminalID      string         `json:"terminal_id"`
+	PeriodePred     pgtype.Date    `json:"periode_pred"`
+	Denom           int32          `json:"denom"`
+	AmountReplenish int64          `json:"amount_replenish"`
+	AmountRefund    int64          `json:"amount_refund"`
+	DmaaFileID      int64          `json:"dmaa_file_id"`
+	LokasiAtm       *string        `json:"lokasi_atm"`
+	Brand           *string        `json:"brand"`
+	FlmVendor       *string        `json:"flm_vendor"`
+	FlmVendorRegion *string        `json:"flm_vendor_region"`
+	PriorityClass   *string        `json:"priority_class"`
+	Paket           *string        `json:"paket"`
+	Escrow          pgtype.Numeric `json:"escrow"`
 }
 
 // Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
@@ -384,10 +630,35 @@ type ListForecastForDateRow struct {
 // recommendation row (Req 3.3, 3.4). flm_vendor_region is vendor_branches.region
 // (migration 030), NOT regions.region (that is the ATM's geographic area) —
 // see .kiro/specs/update-cit-forecast-browser/design.md "Data model" note.
+// CIT-2 (Req 1): adds brand/flm_vendor/flm_vendor_region filters, exact
+// case-insensitive match via LOWER(...) = LOWER(...) (not ILIKE substring,
+// unlike terminal_id) against the already-joined a.brand/v.name/vb.region.
+// Empty-string sentinel = "no filter" for all three, matching the existing
+// terminal_id convention; the service requires a concrete flm_vendor/
+// flm_vendor_region before calling this (Req 1.4), so the SQL layer never
+// actually receives empty for those two in practice.
+// replenishment-request-enhancements (Req 5): three additive SELECT columns
+// -- priority_class (atms.priority_class, migration 030; Req 5.2), paket
+// (vendor_packages.code of the single active package, now deterministic with
+// the avp.id DESC tie-breaker -- OQ3; Req 5.3, 5.4), and escrow (latest
+// itm_replenish.escrow per terminal, numeric(20,2) the service carries as a
+// decimal string, never float -- OQ2; Req 5.5, 5.10). WHERE/ORDER BY/
+// pagination untouched so row count and the (terminal_id, periode_pred,
+// denom) identity are unchanged (Req 5.12); CountForecastForDate stays as-is
+// because every LATERAL is LIMIT 1 and cannot change the count.
+// paket is selected via the pkg LEFT JOIN (same outer-join pattern as vb)
+// rather than straight out of the active_pkg LATERAL: sqlc v1.31.1 does not
+// infer nullability on directly-scanned LATERAL subquery columns (it would
+// emit a non-nullable string that crashes pgx scan on the no-active-package
+// NULL -- Req 5.4/5.8 requires that case to render "-"), while a real-table
+// LEFT JOIN yields the nullable *string the service maps via notesOrEmpty.
 func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDateParams) ([]ListForecastForDateRow, error) {
 	rows, err := q.db.Query(ctx, listForecastForDate,
 		arg.ForecastDate,
 		arg.TerminalID,
+		arg.Brand,
+		arg.FlmVendor,
+		arg.FlmVendorRegion,
 		arg.Page,
 		arg.PageSize,
 	)
@@ -409,6 +680,9 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 			&i.Brand,
 			&i.FlmVendor,
 			&i.FlmVendorRegion,
+			&i.PriorityClass,
+			&i.Paket,
+			&i.Escrow,
 		); err != nil {
 			return nil, err
 		}
@@ -421,7 +695,7 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 }
 
 const listVendorRequestItems = `-- name: ListVendorRequestItems :many
-SELECT id, vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, created_at FROM vendor_request_items WHERE vendor_request_id = $1 ORDER BY id ASC
+SELECT id, vendor_request_id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, created_at, brand, lokasi_atm FROM vendor_request_items WHERE vendor_request_id = $1 ORDER BY id ASC
 `
 
 func (q *Queries) ListVendorRequestItems(ctx context.Context, vendorRequestID int64) ([]VendorRequestItem, error) {
@@ -442,6 +716,8 @@ func (q *Queries) ListVendorRequestItems(ctx context.Context, vendorRequestID in
 			&i.AmountReplenish,
 			&i.AmountRefund,
 			&i.CreatedAt,
+			&i.Brand,
+			&i.LokasiAtm,
 		); err != nil {
 			return nil, err
 		}
@@ -464,6 +740,11 @@ SELECT
     vr.submitted_at,
     vr.approved_at,
     vr.rejected_at,
+    vr.is_canceled,
+    vr.request_category,
+    vr.replenish_date,
+    vr.is_manual,
+    vr.cancellation_reason,
     cu.id AS created_by_id,
     cu.full_name AS created_by_name,
     au.id AS approved_by_id,
@@ -483,35 +764,42 @@ WHERE
     AND ($2::text = '' OR vr.forecast_date = $2::date)
     AND ($3::bigint = 0 OR vr.created_by = $3::bigint)
     AND ($4::text = '' OR vr.request_number ILIKE '%' || $4::text || '%')
+    AND ($5::boolean = true OR vr.is_canceled = false)
 ORDER BY vr.created_at DESC, vr.id DESC
-LIMIT $6::int OFFSET ($5::int - 1) * $6::int
+LIMIT $7::int OFFSET ($6::int - 1) * $7::int
 `
 
 type ListVendorRequestsParams struct {
-	Status        string `json:"status"`
-	ForecastDate  string `json:"forecast_date"`
-	CreatedBy     int64  `json:"created_by"`
-	RequestNumber string `json:"request_number"`
-	Page          int32  `json:"page"`
-	PageSize      int32  `json:"page_size"`
+	Status          string `json:"status"`
+	ForecastDate    string `json:"forecast_date"`
+	CreatedBy       int64  `json:"created_by"`
+	RequestNumber   string `json:"request_number"`
+	IncludeCanceled bool   `json:"include_canceled"`
+	Page            int32  `json:"page"`
+	PageSize        int32  `json:"page_size"`
 }
 
 type ListVendorRequestsRow struct {
-	ID             int64              `json:"id"`
-	RequestNumber  string             `json:"request_number"`
-	ForecastDate   pgtype.Date        `json:"forecast_date"`
-	Status         string             `json:"status"`
-	Notes          *string            `json:"notes"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	SubmittedAt    pgtype.Timestamptz `json:"submitted_at"`
-	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
-	RejectedAt     pgtype.Timestamptz `json:"rejected_at"`
-	CreatedByID    int64              `json:"created_by_id"`
-	CreatedByName  string             `json:"created_by_name"`
-	ApprovedByID   *int64             `json:"approved_by_id"`
-	ApprovedByName *string            `json:"approved_by_name"`
-	ItemCount      int64              `json:"item_count"`
-	TotalAmount    int64              `json:"total_amount"`
+	ID                 int64              `json:"id"`
+	RequestNumber      string             `json:"request_number"`
+	ForecastDate       pgtype.Date        `json:"forecast_date"`
+	Status             string             `json:"status"`
+	Notes              *string            `json:"notes"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	SubmittedAt        pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
+	RejectedAt         pgtype.Timestamptz `json:"rejected_at"`
+	IsCanceled         bool               `json:"is_canceled"`
+	RequestCategory    *string            `json:"request_category"`
+	ReplenishDate      pgtype.Date        `json:"replenish_date"`
+	IsManual           bool               `json:"is_manual"`
+	CancellationReason *string            `json:"cancellation_reason"`
+	CreatedByID        int64              `json:"created_by_id"`
+	CreatedByName      string             `json:"created_by_name"`
+	ApprovedByID       *int64             `json:"approved_by_id"`
+	ApprovedByName     *string            `json:"approved_by_name"`
+	ItemCount          int64              `json:"item_count"`
+	TotalAmount        int64              `json:"total_amount"`
 }
 
 // Paginated, filtered list (Req 9.1-9.5). Empty-string / 0 filter args mean
@@ -527,6 +815,7 @@ func (q *Queries) ListVendorRequests(ctx context.Context, arg ListVendorRequests
 		arg.ForecastDate,
 		arg.CreatedBy,
 		arg.RequestNumber,
+		arg.IncludeCanceled,
 		arg.Page,
 		arg.PageSize,
 	)
@@ -547,6 +836,11 @@ func (q *Queries) ListVendorRequests(ctx context.Context, arg ListVendorRequests
 			&i.SubmittedAt,
 			&i.ApprovedAt,
 			&i.RejectedAt,
+			&i.IsCanceled,
+			&i.RequestCategory,
+			&i.ReplenishDate,
+			&i.IsManual,
+			&i.CancellationReason,
 			&i.CreatedByID,
 			&i.CreatedByName,
 			&i.ApprovedByID,
@@ -564,20 +858,81 @@ func (q *Queries) ListVendorRequests(ctx context.Context, arg ListVendorRequests
 	return items, nil
 }
 
-const maxRequestNumberSeqForDate = `-- name: MaxRequestNumberSeqForDate :one
-SELECT COALESCE(MAX(SUBSTRING(request_number FROM '\d{4}$')::int), 0)::int AS max_seq
-FROM vendor_requests
-WHERE forecast_date = $1::date
+const nextRequestNumberSeq = `-- name: NextRequestNumberSeq :one
+INSERT INTO vendor_request_number_seq (vendor_id, seq_date, last_seq)
+VALUES ($1::bigint, $2::date, 1)
+ON CONFLICT (vendor_id, seq_date)
+DO UPDATE SET last_seq = vendor_request_number_seq.last_seq + 1
+RETURNING last_seq
 `
 
-// Next sequence number for VR-YYYYMMDD-NNNN (Req 15.1-15.2): request_number
-// already encodes forecast_date, so filtering by the forecast_date column
-// (rather than parsing the text) is enough to scope the max per date.
-func (q *Queries) MaxRequestNumberSeqForDate(ctx context.Context, forecastDate pgtype.Date) (int32, error) {
-	row := q.db.QueryRow(ctx, maxRequestNumberSeqForDate, forecastDate)
-	var max_seq int32
-	err := row.Scan(&max_seq)
-	return max_seq, err
+type NextRequestNumberSeqParams struct {
+	VendorID int64       `json:"vendor_id"`
+	SeqDate  pgtype.Date `json:"seq_date"`
+}
+
+// Atomic per-(vendor, replenish_date) increment backing the new
+// REP-<prefix>-<YYYYMMDD>-<seq> request-number format (Req 4, Q3). The
+// INSERT ... ON CONFLICT DO UPDATE ... RETURNING is a single atomic
+// statement: concurrent creates in the same (vendor_id, seq_date) scope
+// serialize on the row lock and each gets a distinct last_seq, stronger than
+// the old MaxRequestNumberSeqForDate MAX(SUBSTRING(...)) approach it
+// replaces (which races under concurrent creates). The
+// vendor_request_number_seq_last_chk CHECK (0..999) turns exhaustion at 1000
+// into a constraint violation the service maps to ErrNumberExhausted
+// (Req 4.7).
+func (q *Queries) NextRequestNumberSeq(ctx context.Context, arg NextRequestNumberSeqParams) (int32, error) {
+	row := q.db.QueryRow(ctx, nextRequestNumberSeq, arg.VendorID, arg.SeqDate)
+	var last_seq int32
+	err := row.Scan(&last_seq)
+	return last_seq, err
+}
+
+const softCancelVendorRequest = `-- name: SoftCancelVendorRequest :one
+UPDATE vendor_requests
+SET status = 'cancelled', is_canceled = true, cancellation_reason = $1::text
+WHERE id = $2::bigint
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
+`
+
+type SoftCancelVendorRequestParams struct {
+	CancellationReason string `json:"cancellation_reason"`
+	ID                 int64  `json:"id"`
+}
+
+// Soft-cancel (Req 5): sets status='cancelled' AND is_canceled=true in one
+// statement so old readers keying on status and new readers keying on
+// is_canceled agree; row/items are never deleted. Distinct from
+// UpdateVendorRequestStatus so that query's CASE-driven timestamp columns
+// stay untouched by cancel. cancellation_reason (replenishment-request-
+// enhancements Req 3.2/3.3/3.11, migration 038) is always set here -- Cancel
+// validates it non-empty before calling this query.
+func (q *Queries) SoftCancelVendorRequest(ctx context.Context, arg SoftCancelVendorRequestParams) (VendorRequest, error) {
+	row := q.db.QueryRow(ctx, softCancelVendorRequest, arg.CancellationReason, arg.ID)
+	var i VendorRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequestNumber,
+		&i.ForecastDate,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.ApprovedBy,
+		&i.RejectedBy,
+		&i.RejectionReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SubmittedAt,
+		&i.ApprovedAt,
+		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
+	)
+	return i, err
 }
 
 const updateVendorRequestStatus = `-- name: UpdateVendorRequestStatus :one
@@ -591,7 +946,7 @@ SET
     rejected_by = CASE WHEN $1::text = 'rejected' THEN $2::bigint ELSE rejected_by END,
     rejection_reason = CASE WHEN $1::text = 'rejected' THEN $3::text ELSE rejection_reason END
 WHERE id = $4::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
 `
 
 type UpdateVendorRequestStatusParams struct {
@@ -629,6 +984,12 @@ func (q *Queries) UpdateVendorRequestStatus(ctx context.Context, arg UpdateVendo
 		&i.SubmittedAt,
 		&i.ApprovedAt,
 		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
 	)
 	return i, err
 }

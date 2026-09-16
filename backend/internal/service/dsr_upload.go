@@ -248,7 +248,7 @@ func (s *DsrService) callProcess(ctx context.Context, path, filename string) (js
 	if err != nil {
 		return nil, fmt.Errorf("calling service_dsr_etl: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

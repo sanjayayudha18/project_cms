@@ -21,13 +21,17 @@ func stripSQLLineComments(content []byte) string {
 	return strings.Join(lines, "\n")
 }
 
-// TestQueries_NoHardDeleteFromUsers is the "guard di repo: tidak ada path
-// SQL DELETE FROM users" from Auth-Local-Lifecycle Task 7. There is no
-// runtime code path to test (there's simply no such method), so this test
-// guards the invariant at its source: no queries/*.sql file may ever define
-// one. A user row must never be physically removed — audit_logs.actor_id
-// rows referencing it would dangle otherwise.
-func TestQueries_NoHardDeleteFromUsers(t *testing.T) {
+// TestQueries_NoHardDelete is the "guard di repo: tidak ada path SQL DELETE
+// FROM <table>" guarantee, originally Auth-Local-Lifecycle Task 7 for users
+// and extended to vendors by the Admin User & Vendor Management spec (Req
+// 5.3, 8.3, 14.6). There is no runtime code path to test for either table
+// (there's simply no such method), so this test guards the invariant at its
+// source: no queries/*.sql file may ever define one. A user or vendor row
+// must never be physically removed — audit_logs rows (and, for users,
+// audit_logs.actor_id) referencing it would dangle otherwise. Disable/
+// enable (soft-delete via is_active/deleted_at) are the only lifecycle
+// transitions.
+func TestQueries_NoHardDelete(t *testing.T) {
 	files, err := filepath.Glob("../../queries/*.sql")
 	if err != nil {
 		t.Fatalf("glob queries/*.sql: %v", err)
@@ -36,8 +40,7 @@ func TestQueries_NoHardDeleteFromUsers(t *testing.T) {
 		t.Fatal("no query files found — check the glob path (expected backend/queries relative to this package)")
 	}
 
-	// \busers\b so "user_leaves"/"user_pics" etc. don't false-positive.
-	hardDelete := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\busers\b`)
+	tables := []string{"users", "vendors"}
 
 	for _, f := range files {
 		content, err := os.ReadFile(f)
@@ -45,8 +48,13 @@ func TestQueries_NoHardDeleteFromUsers(t *testing.T) {
 			t.Fatalf("read %s: %v", f, err)
 		}
 		sqlOnly := stripSQLLineComments(content)
-		if hardDelete.MatchString(sqlOnly) {
-			t.Errorf("%s defines a hard DELETE FROM users — forbidden by Task 7; use DeactivateUser (soft-delete) instead", f)
+
+		for _, table := range tables {
+			// \b<table>\b so "user_leaves"/"vendor_branches" etc. don't false-positive.
+			hardDelete := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)
+			if hardDelete.MatchString(sqlOnly) {
+				t.Errorf("%s defines a hard DELETE FROM %s — forbidden; use the existing soft-delete (Disable/Deactivate) path instead", f, table)
+			}
 		}
 	}
 }

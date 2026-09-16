@@ -5,6 +5,7 @@ import { create } from "zustand";
 export type DbRole =
   | "ADMIN"
   | "ADMIN_PARAM"
+  | "APPACCESS"
   | "ATM-USER"
   | "ATM-SPV"
   | "BRANCH-USER"

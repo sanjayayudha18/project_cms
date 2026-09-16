@@ -7,111 +7,76 @@ package db
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getUserApprovalInfo = `-- name: GetUserApprovalInfo :one
-SELECT id, supervisor_id, approval_level FROM users WHERE id = $1
+const createApprovalDelegation = `-- name: CreateApprovalDelegation :one
+INSERT INTO approval_delegations (from_user_id, to_user_id, start_at, end_at, reason)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, from_user_id, to_user_id, start_at, end_at, reason, created_at
 `
 
-type GetUserApprovalInfoRow struct {
-	ID            int64  `json:"id"`
-	SupervisorID  *int64 `json:"supervisor_id"`
-	ApprovalLevel *int32 `json:"approval_level"`
+type CreateApprovalDelegationParams struct {
+	FromUserID int64              `json:"from_user_id"`
+	ToUserID   int64              `json:"to_user_id"`
+	StartAt    pgtype.Timestamptz `json:"start_at"`
+	EndAt      pgtype.Timestamptz `json:"end_at"`
+	Reason     *string            `json:"reason"`
 }
 
-// Reads a user's position in the reporting-line hierarchy for chain walking.
-func (q *Queries) GetUserApprovalInfo(ctx context.Context, id int64) (GetUserApprovalInfoRow, error) {
-	row := q.db.QueryRow(ctx, getUserApprovalInfo, id)
-	var i GetUserApprovalInfoRow
-	err := row.Scan(&i.ID, &i.SupervisorID, &i.ApprovalLevel)
+// Rejected by approval_delegations_no_overlap (025) if the range overlaps an
+// existing delegation for the same from_user_id.
+func (q *Queries) CreateApprovalDelegation(ctx context.Context, arg CreateApprovalDelegationParams) (ApprovalDelegation, error) {
+	row := q.db.QueryRow(ctx, createApprovalDelegation,
+		arg.FromUserID,
+		arg.ToUserID,
+		arg.StartAt,
+		arg.EndAt,
+		arg.Reason,
+	)
+	var i ApprovalDelegation
+	err := row.Scan(
+		&i.ID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.StartAt,
+		&i.EndAt,
+		&i.Reason,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
-const findActiveLeave = `-- name: FindActiveLeave :one
-SELECT id FROM user_leaves
-WHERE user_id = $1 AND start_at <= $2 AND end_at > $2
-LIMIT 1
+const createApprovalPolicy = `-- name: CreateApprovalPolicy :one
+INSERT INTO approval_policies (document_type, min_amount, max_amount, required_level)
+VALUES ($1, $2, $3, $4)
+RETURNING id, document_type, min_amount, max_amount, required_level, is_active, created_at, updated_at
 `
 
-type FindActiveLeaveParams struct {
-	UserID int64     `json:"user_id"`
-	At     time.Time `json:"at"`
+type CreateApprovalPolicyParams struct {
+	DocumentType  string         `json:"document_type"`
+	MinAmount     pgtype.Numeric `json:"min_amount"`
+	MaxAmount     pgtype.Numeric `json:"max_amount"`
+	RequiredLevel int32          `json:"required_level"`
 }
 
-// Returns one row if the user has a leave window covering `at`, else pgx.ErrNoRows.
-func (q *Queries) FindActiveLeave(ctx context.Context, arg FindActiveLeaveParams) (int64, error) {
-	row := q.db.QueryRow(ctx, findActiveLeave, arg.UserID, arg.At)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
-}
-
-const findActiveDelegate = `-- name: FindActiveDelegate :one
-SELECT to_user_id FROM approval_delegations
-WHERE from_user_id = $1 AND start_at <= $2 AND end_at > $2
-ORDER BY start_at DESC
-LIMIT 1
-`
-
-type FindActiveDelegateParams struct {
-	FromUserID int64     `json:"from_user_id"`
-	At         time.Time `json:"at"`
-}
-
-// Returns the delegate covering `at` for the given approver, else pgx.ErrNoRows.
-// Most recently started delegation wins if more than one somehow overlaps.
-func (q *Queries) FindActiveDelegate(ctx context.Context, arg FindActiveDelegateParams) (int64, error) {
-	row := q.db.QueryRow(ctx, findActiveDelegate, arg.FromUserID, arg.At)
-	var toUserID int64
-	err := row.Scan(&toUserID)
-	return toUserID, err
-}
-
-const findApprovalPolicy = `-- name: FindApprovalPolicy :one
-SELECT required_level FROM approval_policies
-WHERE document_type = $1 AND $2 >= min_amount AND $2 < max_amount AND is_active
-LIMIT 1
-`
-
-type FindApprovalPolicyParams struct {
-	DocumentType string         `json:"document_type"`
-	Amount       pgtype.Numeric `json:"amount"`
-}
-
-// Resolves (document_type, amount) -> required_level. is_active + the
-// non-overlap constraint on approval_policies (022) guarantee at most one row.
-func (q *Queries) FindApprovalPolicy(ctx context.Context, arg FindApprovalPolicyParams) (int32, error) {
-	row := q.db.QueryRow(ctx, findApprovalPolicy, arg.DocumentType, arg.Amount)
-	var requiredLevel int32
-	err := row.Scan(&requiredLevel)
-	return requiredLevel, err
-}
-
-const findApprovalRequestByDocument = `-- name: FindApprovalRequestByDocument :one
-SELECT id, maker_id, document_type, document_id, amount, required_level, status, created_at, updated_at FROM approval_requests WHERE document_type = $1 AND document_id = $2
-`
-
-type FindApprovalRequestByDocumentParams struct {
-	DocumentType string `json:"document_type"`
-	DocumentID   int64  `json:"document_id"`
-}
-
-// Idempotency check for submit: an existing row for (document_type, document_id)
-// means "already submitted", not "submit again".
-func (q *Queries) FindApprovalRequestByDocument(ctx context.Context, arg FindApprovalRequestByDocumentParams) (ApprovalRequest, error) {
-	row := q.db.QueryRow(ctx, findApprovalRequestByDocument, arg.DocumentType, arg.DocumentID)
-	var i ApprovalRequest
+// RETURNING * so sqlc reuses db.ApprovalPolicy (see ListDelegations comment).
+func (q *Queries) CreateApprovalPolicy(ctx context.Context, arg CreateApprovalPolicyParams) (ApprovalPolicy, error) {
+	row := q.db.QueryRow(ctx, createApprovalPolicy,
+		arg.DocumentType,
+		arg.MinAmount,
+		arg.MaxAmount,
+		arg.RequiredLevel,
+	)
+	var i ApprovalPolicy
 	err := row.Scan(
 		&i.ID,
-		&i.MakerID,
 		&i.DocumentType,
-		&i.DocumentID,
-		&i.Amount,
+		&i.MinAmount,
+		&i.MaxAmount,
 		&i.RequiredLevel,
-		&i.Status,
+		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -155,6 +120,215 @@ func (q *Queries) CreateApprovalRequest(ctx context.Context, arg CreateApprovalR
 	return i, err
 }
 
+const createApprovalStep = `-- name: CreateApprovalStep :one
+INSERT INTO approval_steps (request_id, step_level, assigned_approver_id)
+VALUES ($1, $2, $3)
+RETURNING id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at
+`
+
+type CreateApprovalStepParams struct {
+	RequestID          int64 `json:"request_id"`
+	StepLevel          int32 `json:"step_level"`
+	AssignedApproverID int64 `json:"assigned_approver_id"`
+}
+
+func (q *Queries) CreateApprovalStep(ctx context.Context, arg CreateApprovalStepParams) (ApprovalStep, error) {
+	row := q.db.QueryRow(ctx, createApprovalStep, arg.RequestID, arg.StepLevel, arg.AssignedApproverID)
+	var i ApprovalStep
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.StepLevel,
+		&i.AssignedApproverID,
+		&i.ActedByID,
+		&i.Status,
+		&i.ActedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createUserLeave = `-- name: CreateUserLeave :one
+INSERT INTO user_leaves (user_id, start_at, end_at, reason)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, start_at, end_at, reason, created_at
+`
+
+type CreateUserLeaveParams struct {
+	UserID  int64              `json:"user_id"`
+	StartAt pgtype.Timestamptz `json:"start_at"`
+	EndAt   pgtype.Timestamptz `json:"end_at"`
+	Reason  *string            `json:"reason"`
+}
+
+// sqlc v1.31.1's inflector mis-singularizes "user_leaves" -> "UserLeave"
+// (wrongly applies the knife/knives "-fe" rule to the irregular
+// leaf/leaves). After every `sqlc generate`, hand-fix "UserLeave" ->
+// "UserLeave" in internal/db/models.go and internal/db/approval.sql.go
+// (same drift-revert discipline as the audit.sql.go "IP" casing) —
+// internal/approval/repository.go and admin.go depend on db.UserLeave.
+func (q *Queries) CreateUserLeave(ctx context.Context, arg CreateUserLeaveParams) (UserLeave, error) {
+	row := q.db.QueryRow(ctx, createUserLeave,
+		arg.UserID,
+		arg.StartAt,
+		arg.EndAt,
+		arg.Reason,
+	)
+	var i UserLeave
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.StartAt,
+		&i.EndAt,
+		&i.Reason,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const findActiveDelegate = `-- name: FindActiveDelegate :one
+SELECT to_user_id FROM approval_delegations
+WHERE from_user_id = $1 AND start_at <= $2 AND end_at > $2
+ORDER BY start_at DESC
+LIMIT 1
+`
+
+type FindActiveDelegateParams struct {
+	FromUserID int64              `json:"from_user_id"`
+	At         pgtype.Timestamptz `json:"at"`
+}
+
+// Returns the delegate covering `at` for the given approver, else pgx.ErrNoRows.
+// Most recently started delegation wins if more than one somehow overlaps.
+// Named args (from_user_id, at) so sqlc generates FindActiveDelegateParams{FromUserID, At}
+// matching internal/approval/repository.go's FindActiveDelegate call site.
+func (q *Queries) FindActiveDelegate(ctx context.Context, arg FindActiveDelegateParams) (int64, error) {
+	row := q.db.QueryRow(ctx, findActiveDelegate, arg.FromUserID, arg.At)
+	var to_user_id int64
+	err := row.Scan(&to_user_id)
+	return to_user_id, err
+}
+
+const findActiveLeave = `-- name: FindActiveLeave :one
+SELECT id FROM user_leaves
+WHERE user_id = $1 AND start_at <= $2 AND end_at > $2
+LIMIT 1
+`
+
+type FindActiveLeaveParams struct {
+	UserID int64              `json:"user_id"`
+	At     pgtype.Timestamptz `json:"at"`
+}
+
+// Returns one row if the user has a leave window covering `at`, else pgx.ErrNoRows.
+// Named args (user_id, at) so sqlc generates FindActiveLeaveParams{UserID, At}
+// matching internal/approval/repository.go's IsOnLeave call site.
+func (q *Queries) FindActiveLeave(ctx context.Context, arg FindActiveLeaveParams) (int64, error) {
+	row := q.db.QueryRow(ctx, findActiveLeave, arg.UserID, arg.At)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const findApprovalPolicy = `-- name: FindApprovalPolicy :one
+SELECT required_level FROM approval_policies
+WHERE document_type = $1
+  AND $2 >= min_amount AND $2 < max_amount AND is_active
+LIMIT 1
+`
+
+type FindApprovalPolicyParams struct {
+	DocumentType string         `json:"document_type"`
+	Amount       pgtype.Numeric `json:"amount"`
+}
+
+// Resolves (document_type, amount) -> required_level. is_active + the
+// non-overlap constraint on approval_policies (022) guarantee at most one row.
+// Named args (document_type, amount) so sqlc generates
+// FindApprovalPolicyParams{DocumentType, Amount} matching
+// internal/approval/repository.go's FindPolicy call site.
+func (q *Queries) FindApprovalPolicy(ctx context.Context, arg FindApprovalPolicyParams) (int32, error) {
+	row := q.db.QueryRow(ctx, findApprovalPolicy, arg.DocumentType, arg.Amount)
+	var required_level int32
+	err := row.Scan(&required_level)
+	return required_level, err
+}
+
+const findApprovalRequestByDocument = `-- name: FindApprovalRequestByDocument :one
+SELECT id, maker_id, document_type, document_id, amount, required_level, status, created_at, updated_at FROM approval_requests WHERE document_type = $1 AND document_id = $2
+`
+
+type FindApprovalRequestByDocumentParams struct {
+	DocumentType string `json:"document_type"`
+	DocumentID   int64  `json:"document_id"`
+}
+
+// Idempotency check for submit: an existing row for (document_type, document_id)
+// means "already submitted", not "submit again".
+func (q *Queries) FindApprovalRequestByDocument(ctx context.Context, arg FindApprovalRequestByDocumentParams) (ApprovalRequest, error) {
+	row := q.db.QueryRow(ctx, findApprovalRequestByDocument, arg.DocumentType, arg.DocumentID)
+	var i ApprovalRequest
+	err := row.Scan(
+		&i.ID,
+		&i.MakerID,
+		&i.DocumentType,
+		&i.DocumentID,
+		&i.Amount,
+		&i.RequiredLevel,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const findPendingApprovalStep = `-- name: FindPendingApprovalStep :one
+SELECT id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at FROM approval_steps
+WHERE request_id = $1 AND status = 'pending'
+ORDER BY step_level ASC
+LIMIT 1
+`
+
+// The lowest-level step still pending is the one currently active — steps are
+// approved strictly in step_level order.
+func (q *Queries) FindPendingApprovalStep(ctx context.Context, requestID int64) (ApprovalStep, error) {
+	row := q.db.QueryRow(ctx, findPendingApprovalStep, requestID)
+	var i ApprovalStep
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.StepLevel,
+		&i.AssignedApproverID,
+		&i.ActedByID,
+		&i.Status,
+		&i.ActedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getApprovalPolicy = `-- name: GetApprovalPolicy :one
+SELECT id, document_type, min_amount, max_amount, required_level, is_active, created_at, updated_at FROM approval_policies WHERE id = $1
+`
+
+// Before-state read for the audit trail on update. SELECT * so sqlc reuses
+// db.ApprovalPolicy (see ListDelegations comment).
+func (q *Queries) GetApprovalPolicy(ctx context.Context, id int64) (ApprovalPolicy, error) {
+	row := q.db.QueryRow(ctx, getApprovalPolicy, id)
+	var i ApprovalPolicy
+	err := row.Scan(
+		&i.ID,
+		&i.DocumentType,
+		&i.MinAmount,
+		&i.MaxAmount,
+		&i.RequiredLevel,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getApprovalRequest = `-- name: GetApprovalRequest :one
 SELECT id, maker_id, document_type, document_id, amount, required_level, status, created_at, updated_at FROM approval_requests WHERE id = $1
 `
@@ -170,6 +344,324 @@ func (q *Queries) GetApprovalRequest(ctx context.Context, id int64) (ApprovalReq
 		&i.Amount,
 		&i.RequiredLevel,
 		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserApprovalInfo = `-- name: GetUserApprovalInfo :one
+SELECT id, supervisor_id, approval_level FROM users WHERE id = $1
+`
+
+type GetUserApprovalInfoRow struct {
+	ID            int64  `json:"id"`
+	SupervisorID  *int64 `json:"supervisor_id"`
+	ApprovalLevel *int32 `json:"approval_level"`
+}
+
+// Reads a user's position in the reporting-line hierarchy for chain walking.
+func (q *Queries) GetUserApprovalInfo(ctx context.Context, id int64) (GetUserApprovalInfoRow, error) {
+	row := q.db.QueryRow(ctx, getUserApprovalInfo, id)
+	var i GetUserApprovalInfoRow
+	err := row.Scan(&i.ID, &i.SupervisorID, &i.ApprovalLevel)
+	return i, err
+}
+
+const listApprovalPolicies = `-- name: ListApprovalPolicies :many
+SELECT id, document_type, min_amount, max_amount, required_level, is_active, created_at, updated_at
+FROM approval_policies
+ORDER BY document_type, min_amount
+`
+
+// SELECT * so sqlc reuses db.ApprovalPolicy (see ListDelegations comment).
+func (q *Queries) ListApprovalPolicies(ctx context.Context) ([]ApprovalPolicy, error) {
+	rows, err := q.db.Query(ctx, listApprovalPolicies)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApprovalPolicy{}
+	for rows.Next() {
+		var i ApprovalPolicy
+		if err := rows.Scan(
+			&i.ID,
+			&i.DocumentType,
+			&i.MinAmount,
+			&i.MaxAmount,
+			&i.RequiredLevel,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listApprovalSteps = `-- name: ListApprovalSteps :many
+SELECT id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at FROM approval_steps WHERE request_id = $1 ORDER BY step_level ASC
+`
+
+func (q *Queries) ListApprovalSteps(ctx context.Context, requestID int64) ([]ApprovalStep, error) {
+	rows, err := q.db.Query(ctx, listApprovalSteps, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApprovalStep{}
+	for rows.Next() {
+		var i ApprovalStep
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequestID,
+			&i.StepLevel,
+			&i.AssignedApproverID,
+			&i.ActedByID,
+			&i.Status,
+			&i.ActedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDelegations = `-- name: ListDelegations :many
+SELECT id, from_user_id, to_user_id, start_at, end_at, reason, created_at
+FROM approval_delegations
+WHERE end_at > now()
+ORDER BY start_at DESC
+`
+
+// Active (non-revoked) delegations for the RBAC settings list view.
+// SELECT * (full table columns) so sqlc reuses the shared ApprovalDelegation
+// model type instead of generating a distinct Row type -- RbacReader and
+// internal/approval/repository.go both depend on db.ApprovalDelegation.
+func (q *Queries) ListDelegations(ctx context.Context) ([]ApprovalDelegation, error) {
+	rows, err := q.db.Query(ctx, listDelegations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApprovalDelegation{}
+	for rows.Next() {
+		var i ApprovalDelegation
+		if err := rows.Scan(
+			&i.ID,
+			&i.FromUserID,
+			&i.ToUserID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Reason,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLeaves = `-- name: ListLeaves :many
+SELECT id, user_id, start_at, end_at, reason, created_at
+FROM user_leaves
+ORDER BY start_at DESC
+`
+
+// SELECT * so sqlc reuses db.UserLeave (see ListDelegations comment).
+func (q *Queries) ListLeaves(ctx context.Context) ([]UserLeave, error) {
+	rows, err := q.db.Query(ctx, listLeaves)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserLeave{}
+	for rows.Next() {
+		var i UserLeave
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Reason,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingStepsForApprover = `-- name: ListPendingStepsForApprover :many
+SELECT s.id AS step_id, s.request_id, s.step_level,
+       r.document_type, r.document_id, r.amount, r.maker_id
+FROM approval_steps s
+JOIN approval_requests r ON r.id = s.request_id
+WHERE s.assigned_approver_id = $1 AND s.status = 'pending' AND r.status = 'pending'
+ORDER BY s.created_at ASC
+`
+
+type ListPendingStepsForApproverRow struct {
+	StepID       int64          `json:"step_id"`
+	RequestID    int64          `json:"request_id"`
+	StepLevel    int32          `json:"step_level"`
+	DocumentType string         `json:"document_type"`
+	DocumentID   int64          `json:"document_id"`
+	Amount       pgtype.Numeric `json:"amount"`
+	MakerID      int64          `json:"maker_id"`
+}
+
+// The caller's inbox: pending steps directly assigned to them on requests
+// that are still pending. Does not follow delegation — a delegate sees their
+// own inbox only, not the absent approver's (out of scope for Task 7).
+func (q *Queries) ListPendingStepsForApprover(ctx context.Context, assignedApproverID int64) ([]ListPendingStepsForApproverRow, error) {
+	rows, err := q.db.Query(ctx, listPendingStepsForApprover, assignedApproverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingStepsForApproverRow{}
+	for rows.Next() {
+		var i ListPendingStepsForApproverRow
+		if err := rows.Scan(
+			&i.StepID,
+			&i.RequestID,
+			&i.StepLevel,
+			&i.DocumentType,
+			&i.DocumentID,
+			&i.Amount,
+			&i.MakerID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserHierarchy = `-- name: ListUserHierarchy :many
+SELECT u.id, u.supervisor_id, u.approval_level, r.role, u.auth_source
+FROM users u
+JOIN roles r ON r.id = u.role_id
+ORDER BY u.id
+`
+
+type ListUserHierarchyRow struct {
+	ID            int64  `json:"id"`
+	SupervisorID  *int64 `json:"supervisor_id"`
+	ApprovalLevel *int32 `json:"approval_level"`
+	Role          string `json:"role"`
+	AuthSource    string `json:"auth_source"`
+}
+
+// RBAC settings menu: full user hierarchy + role for the read-only admin view.
+func (q *Queries) ListUserHierarchy(ctx context.Context) ([]ListUserHierarchyRow, error) {
+	rows, err := q.db.Query(ctx, listUserHierarchy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserHierarchyRow{}
+	for rows.Next() {
+		var i ListUserHierarchyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SupervisorID,
+			&i.ApprovalLevel,
+			&i.Role,
+			&i.AuthSource,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeApprovalDelegation = `-- name: RevokeApprovalDelegation :one
+UPDATE approval_delegations SET end_at = $2
+WHERE id = $1 AND end_at > $2
+RETURNING id, from_user_id, to_user_id, start_at, end_at, reason, created_at
+`
+
+type RevokeApprovalDelegationParams struct {
+	ID    int64              `json:"id"`
+	EndAt pgtype.Timestamptz `json:"end_at"`
+}
+
+// "Cabut": shortens end_at to now instead of deleting, so the delegation's
+// history stays auditable. No-op (0 rows) if it already ended.
+func (q *Queries) RevokeApprovalDelegation(ctx context.Context, arg RevokeApprovalDelegationParams) (ApprovalDelegation, error) {
+	row := q.db.QueryRow(ctx, revokeApprovalDelegation, arg.ID, arg.EndAt)
+	var i ApprovalDelegation
+	err := row.Scan(
+		&i.ID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.StartAt,
+		&i.EndAt,
+		&i.Reason,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateApprovalPolicy = `-- name: UpdateApprovalPolicy :one
+UPDATE approval_policies
+SET document_type = $2, min_amount = $3, max_amount = $4, required_level = $5, updated_at = now()
+WHERE id = $1
+RETURNING id, document_type, min_amount, max_amount, required_level, is_active, created_at, updated_at
+`
+
+type UpdateApprovalPolicyParams struct {
+	ID            int64          `json:"id"`
+	DocumentType  string         `json:"document_type"`
+	MinAmount     pgtype.Numeric `json:"min_amount"`
+	MaxAmount     pgtype.Numeric `json:"max_amount"`
+	RequiredLevel int32          `json:"required_level"`
+}
+
+// RETURNING * so sqlc reuses db.ApprovalPolicy (see ListDelegations comment).
+func (q *Queries) UpdateApprovalPolicy(ctx context.Context, arg UpdateApprovalPolicyParams) (ApprovalPolicy, error) {
+	row := q.db.QueryRow(ctx, updateApprovalPolicy,
+		arg.ID,
+		arg.DocumentType,
+		arg.MinAmount,
+		arg.MaxAmount,
+		arg.RequiredLevel,
+	)
+	var i ApprovalPolicy
+	err := row.Scan(
+		&i.ID,
+		&i.DocumentType,
+		&i.MinAmount,
+		&i.MaxAmount,
+		&i.RequiredLevel,
+		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -199,92 +691,6 @@ func (q *Queries) UpdateApprovalRequestStatus(ctx context.Context, arg UpdateApp
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const createApprovalStep = `-- name: CreateApprovalStep :one
-INSERT INTO approval_steps (request_id, step_level, assigned_approver_id)
-VALUES ($1, $2, $3)
-RETURNING id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at
-`
-
-type CreateApprovalStepParams struct {
-	RequestID          int64 `json:"request_id"`
-	StepLevel          int32 `json:"step_level"`
-	AssignedApproverID int64 `json:"assigned_approver_id"`
-}
-
-func (q *Queries) CreateApprovalStep(ctx context.Context, arg CreateApprovalStepParams) (ApprovalStep, error) {
-	row := q.db.QueryRow(ctx, createApprovalStep, arg.RequestID, arg.StepLevel, arg.AssignedApproverID)
-	var i ApprovalStep
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.StepLevel,
-		&i.AssignedApproverID,
-		&i.ActedByID,
-		&i.Status,
-		&i.ActedAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const listApprovalSteps = `-- name: ListApprovalSteps :many
-SELECT id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at FROM approval_steps WHERE request_id = $1 ORDER BY step_level ASC
-`
-
-func (q *Queries) ListApprovalSteps(ctx context.Context, requestID int64) ([]ApprovalStep, error) {
-	rows, err := q.db.Query(ctx, listApprovalSteps, requestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ApprovalStep
-	for rows.Next() {
-		var i ApprovalStep
-		if err := rows.Scan(
-			&i.ID,
-			&i.RequestID,
-			&i.StepLevel,
-			&i.AssignedApproverID,
-			&i.ActedByID,
-			&i.Status,
-			&i.ActedAt,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const findPendingApprovalStep = `-- name: FindPendingApprovalStep :one
-SELECT id, request_id, step_level, assigned_approver_id, acted_by_id, status, acted_at, created_at FROM approval_steps
-WHERE request_id = $1 AND status = 'pending'
-ORDER BY step_level ASC
-LIMIT 1
-`
-
-// The lowest-level step still pending is the one currently active — steps are
-// approved strictly in step_level order.
-func (q *Queries) FindPendingApprovalStep(ctx context.Context, requestID int64) (ApprovalStep, error) {
-	row := q.db.QueryRow(ctx, findPendingApprovalStep, requestID)
-	var i ApprovalStep
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.StepLevel,
-		&i.AssignedApproverID,
-		&i.ActedByID,
-		&i.Status,
-		&i.ActedAt,
-		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -346,123 +752,4 @@ func (q *Queries) UpdateUserHierarchy(ctx context.Context, arg UpdateUserHierarc
 	var i UpdateUserHierarchyRow
 	err := row.Scan(&i.ID, &i.SupervisorID, &i.ApprovalLevel)
 	return i, err
-}
-
-const createApprovalDelegation = `-- name: CreateApprovalDelegation :one
-INSERT INTO approval_delegations (from_user_id, to_user_id, start_at, end_at, reason)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, from_user_id, to_user_id, start_at, end_at, reason, created_at
-`
-
-type CreateApprovalDelegationParams struct {
-	FromUserID int64              `json:"from_user_id"`
-	ToUserID   int64              `json:"to_user_id"`
-	StartAt    pgtype.Timestamptz `json:"start_at"`
-	EndAt      pgtype.Timestamptz `json:"end_at"`
-	Reason     *string            `json:"reason"`
-}
-
-// Rejected by approval_delegations_no_overlap (025) if the range overlaps an
-// existing delegation for the same from_user_id.
-func (q *Queries) CreateApprovalDelegation(ctx context.Context, arg CreateApprovalDelegationParams) (ApprovalDelegation, error) {
-	row := q.db.QueryRow(ctx, createApprovalDelegation,
-		arg.FromUserID,
-		arg.ToUserID,
-		arg.StartAt,
-		arg.EndAt,
-		arg.Reason,
-	)
-	var i ApprovalDelegation
-	err := row.Scan(&i.ID, &i.FromUserID, &i.ToUserID, &i.StartAt, &i.EndAt, &i.Reason, &i.CreatedAt)
-	return i, err
-}
-
-const revokeApprovalDelegation = `-- name: RevokeApprovalDelegation :one
-UPDATE approval_delegations SET end_at = $2
-WHERE id = $1 AND end_at > $2
-RETURNING id, from_user_id, to_user_id, start_at, end_at, reason, created_at
-`
-
-type RevokeApprovalDelegationParams struct {
-	ID    int64              `json:"id"`
-	EndAt pgtype.Timestamptz `json:"end_at"`
-}
-
-// "Cabut": shortens end_at to now instead of deleting, so the delegation's
-// history stays auditable. No-op (0 rows) if it already ended.
-func (q *Queries) RevokeApprovalDelegation(ctx context.Context, arg RevokeApprovalDelegationParams) (ApprovalDelegation, error) {
-	row := q.db.QueryRow(ctx, revokeApprovalDelegation, arg.ID, arg.EndAt)
-	var i ApprovalDelegation
-	err := row.Scan(&i.ID, &i.FromUserID, &i.ToUserID, &i.StartAt, &i.EndAt, &i.Reason, &i.CreatedAt)
-	return i, err
-}
-
-const createUserLeave = `-- name: CreateUserLeave :one
-INSERT INTO user_leaves (user_id, start_at, end_at, reason)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, start_at, end_at, reason, created_at
-`
-
-type CreateUserLeaveParams struct {
-	UserID  int64              `json:"user_id"`
-	StartAt pgtype.Timestamptz `json:"start_at"`
-	EndAt   pgtype.Timestamptz `json:"end_at"`
-	Reason  *string            `json:"reason"`
-}
-
-func (q *Queries) CreateUserLeave(ctx context.Context, arg CreateUserLeaveParams) (UserLeave, error) {
-	row := q.db.QueryRow(ctx, createUserLeave, arg.UserID, arg.StartAt, arg.EndAt, arg.Reason)
-	var i UserLeave
-	err := row.Scan(&i.ID, &i.UserID, &i.StartAt, &i.EndAt, &i.Reason, &i.CreatedAt)
-	return i, err
-}
-
-const listPendingStepsForApprover = `-- name: ListPendingStepsForApprover :many
-SELECT s.id AS step_id, s.request_id, s.step_level,
-       r.document_type, r.document_id, r.amount, r.maker_id
-FROM approval_steps s
-JOIN approval_requests r ON r.id = s.request_id
-WHERE s.assigned_approver_id = $1 AND s.status = 'pending' AND r.status = 'pending'
-ORDER BY s.created_at ASC
-`
-
-type ListPendingStepsForApproverRow struct {
-	StepID       int64          `json:"step_id"`
-	RequestID    int64          `json:"request_id"`
-	StepLevel    int32          `json:"step_level"`
-	DocumentType string         `json:"document_type"`
-	DocumentID   int64          `json:"document_id"`
-	Amount       pgtype.Numeric `json:"amount"`
-	MakerID      int64          `json:"maker_id"`
-}
-
-// The caller's inbox: pending steps directly assigned to them on requests
-// that are still pending. Does not follow delegation — a delegate sees their
-// own inbox only, not the absent approver's (out of scope for Task 7).
-func (q *Queries) ListPendingStepsForApprover(ctx context.Context, assignedApproverID int64) ([]ListPendingStepsForApproverRow, error) {
-	rows, err := q.db.Query(ctx, listPendingStepsForApprover, assignedApproverID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListPendingStepsForApproverRow
-	for rows.Next() {
-		var i ListPendingStepsForApproverRow
-		if err := rows.Scan(
-			&i.StepID,
-			&i.RequestID,
-			&i.StepLevel,
-			&i.DocumentType,
-			&i.DocumentID,
-			&i.Amount,
-			&i.MakerID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

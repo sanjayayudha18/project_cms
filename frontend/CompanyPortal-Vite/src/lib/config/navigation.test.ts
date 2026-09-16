@@ -129,9 +129,20 @@ describe("NAV_CONFIG", () => {
     expect(dashboard?.roles).toContain("*");
   });
 
-  it("settings is restricted to ADMIN only", () => {
+  it("settings is restricted to ADMIN, ADMIN_PARAM, and APPACCESS", () => {
     const settings = NAV_CONFIG.find((i) => i.id === "settings");
-    expect(settings?.roles).toEqual(["ADMIN"]);
+    expect(settings?.roles).toEqual(["ADMIN", "ADMIN_PARAM", "APPACCESS"]);
+  });
+
+  it("filterNavByRoles shows settings to APPACCESS and omits it for non-authorized roles", () => {
+    const appAccessResult = filterNavByRoles(NAV_CONFIG, "APPACCESS");
+    expect(appAccessResult.map((i) => i.id)).toContain("settings");
+
+    const nonAuthorizedRoles: DbRole[] = ["ATM-USER", "BRANCH-USER", "VENDOR-USER"];
+    for (const role of nonAuthorizedRoles) {
+      const result = filterNavByRoles(NAV_CONFIG, role);
+      expect(result.map((i) => i.id)).not.toContain("settings");
+    }
   });
 
   it("atm-portal item has the Monitor icon, correct href, roles, and group", () => {
@@ -150,6 +161,7 @@ describe("NAV_CONFIG", () => {
       "*",
       "ADMIN",
       "ADMIN_PARAM",
+      "APPACCESS",
       "ATM-USER",
       "ATM-SPV",
       "BRANCH-USER",

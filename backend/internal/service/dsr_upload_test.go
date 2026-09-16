@@ -72,9 +72,9 @@ func TestWriteAndDryRun_WritesFileAndRelaysParsedPayload(t *testing.T) {
 		var body struct {
 			Filename string `json:"filename"`
 		}
-		json.NewDecoder(r.Body).Decode(&body)
+		_ = json.NewDecoder(r.Body).Decode(&body)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "success",
 			"data": map[string]any{
 				"checksum":        "abc123",
@@ -123,7 +123,7 @@ func TestConfirmUpload_ReadsBackAfterCommitSucceeds(t *testing.T) {
 			t.Errorf("expected commit endpoint, got %q", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "success",
 			"data":   map[string]any{"mode": "commit", "result": "daily=completed rencana_isi=completed"},
 			"error":  nil,
@@ -165,7 +165,7 @@ func TestConfirmUpload_ReadsBackAfterCommitSucceeds(t *testing.T) {
 func TestConfirmUpload_PropagatesCommitFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "error", "data": nil, "error": "staged file not found",
 		})
 	}))

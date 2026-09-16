@@ -43,7 +43,7 @@ func (r *Repository) GetApproverInfo(ctx context.Context, userID int64) (Approve
 
 // IsOnLeave implements AvailabilityRepository.
 func (r *Repository) IsOnLeave(ctx context.Context, userID int64, at time.Time) (bool, error) {
-	_, err := r.queries.FindActiveLeave(ctx, db.FindActiveLeaveParams{UserID: userID, At: at})
+	_, err := r.queries.FindActiveLeave(ctx, db.FindActiveLeaveParams{UserID: userID, At: pgtype.Timestamptz{Time: at, Valid: true}})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return false, nil
@@ -55,7 +55,7 @@ func (r *Repository) IsOnLeave(ctx context.Context, userID int64, at time.Time) 
 
 // FindActiveDelegate implements AvailabilityRepository.
 func (r *Repository) FindActiveDelegate(ctx context.Context, fromUserID int64, at time.Time) (*int64, error) {
-	toUserID, err := r.queries.FindActiveDelegate(ctx, db.FindActiveDelegateParams{FromUserID: fromUserID, At: at})
+	toUserID, err := r.queries.FindActiveDelegate(ctx, db.FindActiveDelegateParams{FromUserID: fromUserID, At: pgtype.Timestamptz{Time: at, Valid: true}})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil

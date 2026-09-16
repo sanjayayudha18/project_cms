@@ -12,7 +12,7 @@ The design deliberately reuses what already exists rather than inventing paralle
 - **Flat JSON** responses use the existing `writeJSON`/`writeError`/`writeValidationError`/`writeForbidden`/`extractClientIP` helpers in `internal/handler/error_response.go`.
 - **Frontend** reuses `protectedRoute` + `requireRoles`, `DataTable`, `PageHeader`, `Badge`, `FilterSelect`, `Toast`, the `api` client, and the auth store; adds one new accessible dialog primitive (none exists yet).
 
-> **Golden-rule gates (project-context Sec 3 rule 7).** This spec touches **auth-adjacent data** (users, roles, vendor linkage) and **master data**. The three decisions are **resolved** (requirements.md "Resolved Decisions", confirmed 2026-09-11): (1) user mgmt under `APPACCESS`, vendor mgmt under `ADMIN`/`ADMIN_PARAM`; (2) **apply-immediately-with-audit, no maker-checker** — matching the existing account-provisioning actions; (3) local user create sets a **temporary password** with `must_change_password=true`. The design below implements those. The maker-checker path is retained only as a reference note ("Alternative: maker-checker") and is out of scope.
+> **Golden-rule gates (project-context Sec 4 rule 7).** This spec touches **auth-adjacent data** (users, roles, vendor linkage) and **master data**. The three decisions are **resolved** (requirements.md "Resolved Decisions", confirmed 2026-09-11): (1) user mgmt under `APPACCESS`, vendor mgmt under `ADMIN`/`ADMIN_PARAM`; (2) **apply-immediately-with-audit, no maker-checker** — matching the existing account-provisioning actions; (3) local user create sets a **temporary password** with `must_change_password=true`. The design below implements those, plus Resolved Decisions 4 (search-index migration deferred) and 5 (spec clarifications, 2026-09-15). The maker-checker path is retained only as a reference note ("Alternative: maker-checker") and is out of scope.
 
 ## Architecture
 
@@ -29,13 +29,13 @@ CompanyPortal-Vite  ──POST /api/v1/admin/users──▶  RequireAuth → Req
                                                     │  validate, resolve role_id, uniqueness pre-checks
                                                     │  local ⇒ validate+hash temporary_password,
                                                     │          must_change_password=true (Resolved Decision 3)
-                                                    ├──▶ UserAdminRepository.Create  (primary pool)
+                                                    ├──▶ UserAdminRepository.Create  (primary pool; single INSERT incl. password_hash + must_change_password for local)
                                                     └──▶ auditWriter.Write(Entry{action:"user_created", before:nil, after:<record, no password>})
                                                     ▼
                                               201 + created user (flat JSON, no password_hash)
 ```
 
-Disable/enable reuse the existing `DeactivateUserService` unchanged. Vendor flow is structurally identical with `VendorAdminService`/`VendorAdminRepository` and `ADMIN`/`ADMIN_PARAM` guard.
+Disable/enable reuse the existing `DeactivateUserService` unchanged, preceded by an existence pre-check (`GetUserAdminByID`, which includes soft-deleted rows) so unknown ids return 404 without an audit entry. Vendor flow is structurally identical with `VendorAdminService`/`VendorAdminRepository` and `ADMIN`/`ADMIN_PARAM` guard.
 
 ### Layer responsibilities
 
@@ -54,9 +54,11 @@ All columns already exist. **No migration is needed for schema** — only, optio
 
 **`roles`** (from `002`,`027`): `id, role (uniq), description`. Read-only here (populate the Role select).
 
-#### Optional migration `030_admin_search_indexes.sql` (additive, needs approval)
+#### DEFERRED migration `039_admin_search_indexes.sql` (Resolved Decision 4 — not built in this spec)
 
-To keep `q` search off sequential scans as the tables grow, add trigram indexes (the `pg_trgm` extension is already listed in tech.md). Additive, `IF NOT EXISTS`, `BEGIN;…COMMIT;` with a WHY/SAFETY header, matching `014`/`029` style:
+> Kept as reference only. `030`–`038` are already taken; `039` is the next free number at time of writing (re-check before authoring). `pg_trgm` is listed in tech.md but **no migration installs it** — a future `039` must include `CREATE EXTENSION IF NOT EXISTS pg_trgm;` (privileged, confirm-first).
+
+To keep `q` search off sequential scans as the tables grow, add trigram indexes. Additive, `IF NOT EXISTS`, `BEGIN;…COMMIT;` with a WHY/SAFETY header, matching `014`/`029` style:
 
 ```
 CREATE INDEX IF NOT EXISTS users_fullname_trgm_idx  ON public.users  USING gin (full_name gin_trgm_ops);
@@ -66,20 +68,25 @@ CREATE INDEX IF NOT EXISTS vendors_code_trgm_idx    ON public.vendors USING gin 
 CREATE INDEX IF NOT EXISTS vendors_name_trgm_idx    ON public.vendors USING gin (name gin_trgm_ops);
 ```
 
-At current data volumes (hundreds of users, dozens of vendors) `ILIKE '%q%'` seq scans are fine, so this migration is **optional / deferrable**. If deferred, search still works. Because any schema change is a project-context STOP-and-confirm item, treat `030` as approve-before-apply; the feature does not otherwise require it. `pg_trgm` must be confirmed installed (`CREATE EXTENSION IF NOT EXISTS pg_trgm;` — itself a privileged, confirm-first op).
+At current data volumes (hundreds of users, dozens of vendors) `ILIKE '%q%'` seq scans are fine, so this migration is **deferred**. Search works without it. Revisit if list p95 exceeds the ≤3s NFR target.
 
-## Backend components
+## Components and Interfaces
 
-### sqlc queries — `backend/queries/users_admin.sql`, `backend/queries/vendors_admin.sql`
+This feature is organized into two component groups — the backend (handler → service → repository → sqlc) and the frontend (routes → feature modules → shared UI). The subsections below define each component and the interfaces between them.
+
+### Backend components
+
+#### sqlc queries — `backend/queries/users_admin.sql`, `backend/queries/vendors_admin.sql`
 
 New query files (kept separate from `auth.sql` to avoid churn on the auth queries). Representative set:
 
 Users:
-- `ListUsersAdmin` — filters `q` (ILIKE across username/full_name/email via `sqlc.narg`), `role`, `vendor_id`, status (via `deleted_at IS NULL` / `IS NOT NULL` toggled by a `sqlc.narg('status')` mapped in the query), `LIMIT`/`OFFSET`; joins `roles` to return the role text. Order `full_name ASC, id ASC`.
+- `ListUsersAdmin` — filters `q` (ILIKE across username/full_name/email via `sqlc.narg`), `role`, `vendor_id`, status (via `deleted_at IS NULL` / `IS NOT NULL` toggled by a `sqlc.narg('status')` mapped in the query; the handler maps absent `status` → `active`), `LIMIT`/`OFFSET`; joins `roles` to return the role text. Order `full_name ASC, id ASC`.
 - `CountUsersAdmin` — same filters, no limit.
-- `GetUserAdminByID` — full row incl. role text, excluding password_hash from the projection.
-- `CreateUserAdmin` — INSERT returning the row (no `password_hash` set).
-- `UpdateUserAdmin` — UPDATE editable columns by id, `updated_at = now()`, returning the row.
+- `GetUserAdminByID` — full row incl. role text and `deleted_at`, **including soft-deleted rows** (unlike `auth.sql` `FindUserByID`), excluding password_hash from the projection. Used for 404 pre-checks on update/disable/enable; update treats `deleted_at IS NOT NULL` as 404.
+- `CreateUserAdmin` — single INSERT returning the row; takes nullable `password_hash` and `must_change_password` (local: hash + true; ldap: NULL + false). No follow-up `SetInitialPassword` write.
+- `UpdateUserAdmin` — UPDATE editable columns by id `AND deleted_at IS NULL`, `updated_at = now()`, returning the row.
+- `GetRoleByName` — `SELECT id, role FROM roles WHERE role = $1` (role text → `role_id`; no role repository exists today). `ListRoles` — for the Role select.
 - (disable/enable reuse existing `DeactivateUser`/`ReactivateUser`.)
 - `FindUserByEmail` / `FindUserByEmployeeID` (incl. soft-deleted) for 409 pre-checks — or rely on the unique-constraint violation mapping (see error mapping).
 
@@ -88,27 +95,27 @@ Vendors:
 
 > **sqlc-generate blocker (steering + audit-log-viewer precedent).** `sqlc generate` is blocked by a pre-existing bug in migration `017` (missing table name) and a local sqlc version (v1.31.1) that rewrites unrelated files with different casing (`IP`→`Ip`). Follow the audit-log-viewer precedent: author the `.sql`, run generate, keep **only** the new `*.sql.go` files and revert unrelated drift, hand-fixing casing to match the checked-in convention. If generate cannot run at all, hand-write `internal/db/users_admin.sql.go` / `vendors_admin.sql.go` matching sqlc's exact output style (as `audit.sql.go`/`approval.sql.go` were). A follow-up to pin the sqlc version (`tools.go`/CI) and fix `017` is noted in tasks.
 
-### Repository — `internal/repository/user_admin_repository.go`, `vendor_admin_repository.go`
+#### Repository — `internal/repository/user_admin_repository.go`, `vendor_admin_repository.go`
 
 Wrap `*db.Queries` (pattern from `auth_repository.go`). Return `db.*` row structs where the service already depends on `internal/db` (matching the audit-log-viewer decision to avoid duplicate domain structs), converting nullable timestamps via `timestamptzToPtr`. Never project `password_hash` into any list/get result. Constructed with the primary `dbPool`; list methods carry a `ponytail:` TODO to swap to the replica pool once wired.
 
-### Service — `internal/auth/user_admin.go`, `internal/service/vendor_admin.go`
+#### Service — `internal/auth/user_admin.go`, `internal/service/vendor_admin.go`
 
 Define narrow interfaces (mirroring the `SetInitialPasswordService`/`ApprovalOrchestrator` narrow-interface pattern) so handler tests fake them without a DB.
 
 `UserAdminService`:
 - `Create(ctx, actorID, req CreateUserRequest, actorIP) (User, error)` — validate required fields + email format (`go-playground/validator` per tech.md, or explicit checks consistent with existing `ValidatePasswordStrength` style); resolve `role`→`role_id`; enforce auth_source rules:
-  - **local** ⇒ `vendor_id` required; `temporary_password` required and run through the existing `auth.ValidatePasswordStrength`; bcrypt-hash it (existing `BcryptCost`); insert the user, then set the hash + `must_change_password=true` via the existing `SetInitialPassword` repository path (reuse, don't duplicate the hashing). The user can then log in and the existing `must_change_password` policy forces the change-password screen on first login.
+  - **local** ⇒ `vendor_id` required; `temporary_password` required and run through the existing `auth.ValidatePasswordStrength` (failure → 422); bcrypt-hash it (existing `BcryptCost`); pass hash + `must_change_password=true` into the single `CreateUserAdmin` INSERT. Do **not** call `SetInitialPasswordService` (it writes its own `initial_password_set` audit → double audit, and a second write would be non-atomic, risking a local user with no password). The user can then log in and the existing `must_change_password` policy forces the change-password screen on first login.
   - **ldap** ⇒ `vendor_id` must be absent, `temporary_password` must be absent (400 if present), no `password_hash` stored.
   - reference-check vendor/supervisor; then `auditWriter.Write(Entry{Action:"user_created", EntityType:"user", EntityID:new.ID, Before:nil, After:sanitize(new)})`. The temporary password is NEVER placed in the audit payload.
-- `Update(ctx, actorID, id, req UpdateUserRequest, actorIP) (User, error)` — load existing (404 if absent); reject username/auth_source changes; self-supervision guard; reference checks; update; audit `user_updated` with before/after (sanitized).
-- Disable/enable are **not** re-implemented — the handler calls the existing `DeactivateUserService`.
+- `Update(ctx, actorID, id, req UpdateUserRequest, actorIP) (User, error)` — load existing (404 if absent or soft-disabled); reject username/auth_source changes; self-supervision guard; reference checks; update; audit `user_updated` with before/after (sanitized).
+- Disable/enable are **not** re-implemented — the handler calls the existing `DeactivateUserService`, after a `GetUserAdminByID` existence pre-check (404, no audit). This is required for enable because `Reactivate` itself no-ops on unknown ids but still audits.
 
 `VendorAdminService`: `Create`, `Update`, `Disable`, `Enable`, each audited (`vendor_created`/`vendor_updated`/`vendor_deactivated`/`vendor_reactivated`). `Disable` also calls `CountActiveUsersByVendor` and returns a `LinkedUsersWarning` count so the handler can include it.
 
 Sanitization rule: the audit `after`/`before` payload for users is a struct that **excludes** `password_hash` (Requirement 9.3). Marshalled to JSON by the `Writer`.
 
-### Handler — `internal/handler/admin_user_handler.go` (extend), `admin_vendor_handler.go` (new)
+#### Handler — `internal/handler/admin_user_handler.go` (extend), `admin_vendor_handler.go` (new)
 
 Extend `AdminUserHandler.Routes()`:
 ```
@@ -124,29 +131,30 @@ r.Post("/{id}/set-initial-password", h.SetInitialPassword)  // existing
 
 Self-lockout guard (Requirement 5.7): in `Disable`, if `targetID == authCtx.UserID` → `writeError(w, 400, "self_disable_forbidden", ...)`.
 
-### Error → HTTP mapping (flat JSON)
+#### Error → HTTP mapping (flat JSON)
 
 | Condition | Status | Helper |
 |---|---|---|
 | Missing/invalid token | 401 | `writeUnauthorized` |
 | Role not permitted | 403 | (middleware) / `writeForbidden` |
-| Field validation (required/format) | 422 | `writeValidationError` |
+| Field validation (required/format/password strength) | 422 | `writeValidationError` |
 | Bad query/path param, immutable-field change, self-supervision, bad status enum | 400 | `writeError(...,"bad_request",...)` |
 | Unknown role / missing referenced vendor/supervisor | 400 | `writeError(...,"invalid_reference",...)` |
-| Not found (id) | 404 | `writeError(...,"not_found",...)` |
+| Not found (id), or soft-disabled target on update | 404 | `writeError(...,"not_found",...)` |
 | Unique conflict (username/email/employee_id/code) | 409 | `writeError(...,"conflict",...)` |
 | DB/audit failure | 500 | `writeError(...,"internal_error",...)` |
 
 409 detection: prefer explicit pre-check queries (clear per-field message) OR map the Postgres unique-violation (`pgconn.PgError` code `23505`, matching on constraint name `users_username_key`/`users_email_key`/`users_employee_id_key`/`vendors_code_key`) to the offending field. Design chooses **pre-check for the create form's UX** (returns which field), falling back to constraint mapping to stay correct under races.
 
-### Route wiring — `cmd/api/main.go`
+#### Route wiring — `cmd/api/main.go`
 
 Roles are final (Resolved Decision 1): users → `APPACCESS`, vendors → `ADMIN`/`ADMIN_PARAM`.
 
 ```go
 // users: extend existing APPACCESS group with the write/read admin service
 userAdminRepo := repository.NewUserAdminRepository(dbPool)
-userAdminSvc  := auth.NewUserAdminService(userAdminRepo, roleRepo, auditWriter)
+userAdminSvc  := auth.NewUserAdminService(userAdminRepo, auditWriter) // role lookup via userAdminRepo.GetRoleByName (no separate role repo exists)
+// reuse the same auth.UserRepository instance already passed to NewSetInitialPasswordService
 deactivateSvc := auth.NewDeactivateUserService(userRepo, auditWriter) // now actually wired
 adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService, userAdminSvc, deactivateSvc)
 r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("APPACCESS")).
@@ -160,9 +168,9 @@ r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ADMIN","ADMIN_
     Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
 ```
 
-## Frontend components
+### Frontend components
 
-### Structure
+#### Structure
 
 ```
 src/features/admin-users/
@@ -178,34 +186,45 @@ src/features/admin-vendors/
   (parallel: types/api/hooks + AdminVendorsPage, VendorFilterBar, VendorsTable, VendorFormDialog)
 src/components/ui/
   Dialog.tsx          // NEW accessible modal primitive (focus trap, Escape, aria-modal, aria-live)
-src/routes/
-  admin.users.tsx     // requireRoles([...])  under protectedRoute
-  admin.vendors.tsx   // requireRoles(["ADMIN","ADMIN_PARAM"])
+src/routes/settings/admin/
+  users.tsx           // /settings/admin/users   requireRoles(["APPACCESS"])
+  vendors.tsx         // /settings/admin/vendors requireRoles(["ADMIN","ADMIN_PARAM"])
+src/main.tsx          // EDIT: register both routes in protectedRoute.addChildren([...])
+src/features/rbac-settings/components/
+  SettingsHubPage.tsx // EDIT: add "Manajemen Pengguna" + "Manajemen Vendor" hub cards
 ```
 
-### Routing & RBAC
+#### Routing & RBAC
 
-Register both routes under `protectedRoute` with `beforeLoad: requireRoles([...])`, exactly like `audit-logs.tsx`. If `APPACCESS` guards `/admin/users`, add `"APPACCESS"` to the `DbRole` union in `lib/auth/store.ts` (Requirement 1.11). `requireRoles` already returns `{ forbidden: true }` for the component to render the shared 403 state.
+Create both routes under `protectedRoute` with `beforeLoad: requireRoles([...])`, following `routes/settings/rbac/users.tsx`, and register them in the code-based route tree in `src/main.tsx` (the app does not use generated file-based routing). `"APPACCESS"` is already in the `DbRole` union (Requirement 1.11 — verify only). `requireRoles` already returns `{ forbidden: true }` for the component to render the shared 403 state.
 
-### Dialog primitive
+#### Menu placement — inside the Settings hub (confirmed 2026-09-15)
+
+These pages are surfaced as **cards inside the Settings hub** (`/settings`, `SettingsHubPage.tsx` in `features/rbac-settings/components/`), NOT as standalone top-level `NAV_CONFIG` items. The hub already renders a bento layout of cards linking to sub-pages; add "Manajemen Pengguna" (`/settings/admin/users`) and "Manajemen Vendor" (`/settings/admin/vendors`) alongside the existing RBAC cards. The hub already has "Hierarki Pengguna" (`/settings/rbac/users`, read-only hierarchy); the new card's description must make the difference explicit (e.g. "Tambah, ubah, dan nonaktifkan akun pengguna").
+
+**Access: `ADMIN` and `ADMIN_PARAM`.** The `/settings` route is already guarded by `requireRoles(["ADMIN","ADMIN_PARAM","APPACCESS"])`, and `ADMIN`/`ADMIN_PARAM` bypass every per-page `requireRoles` check via the existing helper, so both roles reach the hub and every card target. The per-page API/route guards are unchanged (Users still `APPACCESS` at the API + page guard; `ADMIN`/`ADMIN_PARAM` pass through by bypass), so no backend role change is needed — this is purely where the entry points live.
+
+> Because the hub is the entry point, the standalone `NAV_CONFIG` "Manajemen Pengguna"/"Manajemen Vendor" items are NOT added (avoids two competing entry points and keeps the top-level sidebar uncluttered). The hub card grid is the single place to discover these screens.
+
+#### Dialog primitive
 
 No modal/drawer exists in `components/ui/`. Add a minimal `Dialog` (native `<dialog>` or a portal + `role="dialog"`/`aria-modal="true"`): focus moves in on open, focus trap while open, Escape + outside-click close, focus returns to trigger, `aria-live` region for announcements. Transition per design-system Sec 9: `transform`+`opacity` only, ~200ms ease-out enter, exit ~75% of enter. Both form dialogs render inside it.
 
-### Forms
+#### Forms
 
 React Hook Form + Zod (tech.md). The Zod schema encodes the auth_source conditional (local ⇒ `vendor_id` **and** `temporary_password` required; ldap ⇒ both absent) as a `superRefine`. The Password Sementara field appears only for `auth_source=local` in create mode (edit mode never changes the password here — that stays on `set-initial-password` / self-service). Server 422/409 map onto RHF field errors via `setError` (including a weak-password 422 onto the Password Sementara field) so the dialog shows the message inline and stays open. Follow the concrete RHF pattern already used in `features/vendor-request/VendorRequestCreate.tsx` for consistency.
 
-### Data & state
+#### Data & state
 
 TanStack Query v5: list hooks use `placeholderData: keepPreviousData` for smooth pagination; mutations invalidate the list key on success and drive a `Toast`. Query keys namespaced (`adminUsersKeys.list(params)`, `.detail(id)`). Filters live in URL search params (shareable, survive refresh), and any filter change resets `page` to 1.
 
-### Design tokens
+#### Design tokens
 
 "Merah Sirih" internal theme only. One primary action per view (the "Tambah …" button). Status as `Badge` with icon + label (`success` = Aktif, `neutral`/`danger` = Nonaktif) — never color alone. Amount/id/phone columns `tabular-nums`. No side-stripe borders, no gradient text (design-system Sec 10 bans).
 
 ## Reference only (OUT OF SCOPE): maker-checker
 
-Resolved Decision 2 is **no maker-checker** for this spec. This section is kept only as a future-reference sketch. If a later change requires two-person approval for master-data add/edit/disable, do **not** build a second state machine. Instead, per project-context Sec 2 "Approval integration pattern":
+Resolved Decision 2 is **no maker-checker** for this spec. This section is kept only as a future-reference sketch. If a later change requires two-person approval for master-data add/edit/disable, do **not** build a second state machine. Instead, per project-context Sec 5 (maker-checker) and the existing `internal/approval` orchestrator:
 
 1. Add `approval_policies` rows for `document_type` `user` and `vendor` (a level threshold; amount is 0/N-A for master data — confirm the policy shape works for non-monetary documents, since `SubmitForApproval` takes an `amount`).
 2. The service's `Create`/`Update`/`Disable` calls `orch.SubmitForApproval(ctx, makerID, "user"|"vendor", entityID, 0, ip)` and stores the *intended* change as a pending payload, applying the actual mutation only after the request reaches `approved` (never optimistically).
@@ -223,8 +242,8 @@ This is materially more work (pending-change storage, apply-on-approve worker/po
 
 ## Definition of Done (project-context Sec 11)
 
-- [ ] Matches module/table map — no new tables (optional additive index migration only, approve-first); users/vendors are canonical
-- [ ] Correct auth path + scoped RBAC at middleware AND route guard (roles per confirmed Open Decision 1)
+- [ ] Matches module/table map — no new tables, no migrations (search-index migration deferred); users/vendors are canonical
+- [ ] Correct auth path + scoped RBAC at middleware AND route guard (roles per confirmed Resolved Decision 1)
 - [ ] Audit written for every create/update/disable/enable; no maker-checker (Resolved Decision 2); local-user create sets temporary password + `must_change_password=true` (Resolved Decision 3)
 - [ ] Reads on `dbPool` with documented replica TODO; writes on primary; no reads on replica in read-after-write flows
 - [ ] No `password_hash` in any response or audit payload; timestamps timestamptz UTC, displayed Asia/Jakarta

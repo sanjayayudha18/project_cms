@@ -252,6 +252,7 @@ LOG_LEVEL=info
 *   DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
 *   Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 3). Deployed together on ONE Compute Engine VM today (two containers); planned to split into two separate VMs in 2028 (Sec 10) — the module split already makes that a zero-code-change deployment change when it happens.
 *   Cash count (vault + selective machine) is confirmed in-scope per URS v0.3 Rev1, but its module/tables are a **proposal pending approval** (Sec 3a) — not yet part of the approved module/table map in Sec 3 until confirmed.
+*   **Admin CRUD for `users`/`vendors`** (`.kiro/specs/admin-user-vendor-management`): `backend/internal/handler/admin_user_handler.go` mounts `/api/v1/admin/users` (list/get/create/update/disable/enable), guarded `APPACCESS`; `admin_vendor_handler.go` mounts `/api/v1/admin/vendors` (same verbs), guarded `ADMIN`/`ADMIN_PARAM`. Disable is **soft-delete only** — `is_active=false` + `deleted_at`, never a hard `DELETE FROM`; `internal/repository/no_hard_delete_test.go` enforces this for both tables. A local (`auth_source=local`) user create issues a system-generated **temporary password** with `must_change_password=true` in the same insert, forcing a change on next login — no separate provisioning call. A search-index migration originally scoped for these screens was **deferred** (not applied); see the spec's own Task 0/1 notes and follow-ups.md for the exact status.
 
 * * *
 ## 13\. UI/UX & Brand

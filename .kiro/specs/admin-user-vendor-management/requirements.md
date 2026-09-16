@@ -10,11 +10,11 @@ Admin User & Vendor Management is an admin-facing capability in the CMS internal
 It has two parts:
 
 1. A set of **write + read APIs** on the ATM backend (`backend/`, port 8080) under `/api/v1/admin/users` and a new `/api/v1/admin/vendors` group, returning the ATM backend's existing **flat JSON** shape (not the `pkg/response` envelope) for wire compatibility.
-2. Two **admin screens** in `CompanyPortal-Vite`: a Users management screen at `/admin/users` and a Vendors management screen at `/admin/vendors`, each a filterable, paginated list with add / edit / disable-enable actions.
+2. Two **admin screens** in `CompanyPortal-Vite`: a Users management screen at `/settings/admin/users` and a Vendors management screen at `/settings/admin/vendors` (reached from the Settings hub), each a filterable, paginated list with add / edit / disable-enable actions.
 
 **Disable is a soft action, never a hard delete.** Users are disabled via the existing soft-delete pattern (`is_active=false`, `deleted_at=now()`); vendors have the same `is_active` + `deleted_at` columns and follow the same pattern. Hard `DELETE` on `users` is already forbidden and enforced by `backend/internal/repository/no_hard_delete_test.go`; this spec extends the same guarantee to `vendors`.
 
-Every state-changing action writes an entry to the append-only `audit_logs` trail (project-context Sec 4, non-negotiable), recording actor, action, before/after, and IP.
+Every state-changing action writes an entry to the append-only `audit_logs` trail (project-context Sec 5, non-negotiable), recording actor, action, before/after, and IP.
 
 ## Scope & Grounding Notes (what exists today)
 
@@ -22,11 +22,15 @@ Confirmed against the codebase at spec authoring time:
 
 - **Users**: schema exists (`002_cms_tables.sql`, altered by `016`, `021`, `026`). `users` has `is_active` + `deleted_at`. Soft-delete/reactivate is **implemented but unwired**: `internal/auth/deactivate_user.go` (`DeactivateUserService.Deactivate/Reactivate`, audited) + repo methods `AuthRepository.Deactivate/Reactivate` + sqlc `DeactivateUser`/`ReactivateUser`, but no route is mounted in `cmd/api/main.go`. `set-initial-password` (APPACCESS) is the only mounted admin-user route. **No CreateUser / UpdateUser exists anywhere.**
 - **Vendors**: schema exists (`002_cms_tables.sql`, seeded by `005`). `vendors` has `code` (UNIQUE), `name`, `contact_email`, `contact_phone`, `hq_address`, `is_active`, `deleted_at`. **No vendor CRUD of any kind exists** — `vendor_requests` (`028`) is a different domain (replenishment orders), not vendor master data.
-- **Roles**: `roles` table, vocabulary per `002` comment + `027` (`APPACCESS`). Seeded, read-only in this spec (no role CRUD).
+- **Roles**: `roles` table, vocabulary per `002` comment + `027` (`APPACCESS`). Seeded, read-only in this spec (no role CRUD). **No role repository/query exists in the backend** — a `GetRoleByName` (and `ListRoles` for the Role select) query must be added (Task 2).
+- **Existing reactivate has no existence check**: `DeactivateUserService.Reactivate` no-ops on an unknown id but still writes `user_reactivated` audit. This spec adds an existence pre-check in the handler/service before calling it (Req 5.4).
+- **Migrations**: latest is `038`; the next free number is `039`. `pg_trgm` is listed in `tech.md` but **no migration installs it** (only `btree_gist` in `022`).
+- **Settings hub**: already has a "Hierarki Pengguna" card (`/settings/rbac/users`, read-only hierarchy list). The new "Manajemen Pengguna" card must be described so the two are distinguishable.
+- **Routing**: the route tree is **code-registered** in `src/main.tsx` (`protectedRoute.addChildren([...])`) with nested folders (e.g. `routes/settings/rbac/users.tsx`), not generated file-based routing.
 - **RBAC wiring**: `r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles(...)).Mount(...)` in `cmd/api/main.go`. `/api/v1/admin/users` is guarded by `RequireRoles("APPACCESS")`; `/api/v1/admin/approval` and `/api/v1/audit-logs` by `RequireRoles("ADMIN","ADMIN_PARAM")`.
 - **Audit**: `auditWriter := audit.NewWriter(dbPool)` shared; `auditWriter.Write(ctx, audit.Entry{...})`.
-- **Approval / maker-checker**: `internal/approval` orchestrator exists and is the single approval state machine (project-context Sec 2 "Approval integration pattern").
-- **Frontend**: no existing admin/user/vendor area. `routes/_protected.tsx` exports `protectedRoute` + `requireRoles(allowedRoles: DbRole[])`. Shared UI in `src/components/ui/`: `DataTable`, `PageHeader`, `Badge`, `FilterSelect`, `Button`, `Card`, `EmptyState`, `Toast`. **No Modal/Drawer component exists** — a form modal/drawer is new. `DbRole` in `lib/auth/store.ts` does **not** yet include `"APPACCESS"`.
+- **Approval / maker-checker**: `internal/approval` orchestrator exists and is the single approval state machine (project-context Sec 5 maker-checker).
+- **Frontend**: no existing admin/user/vendor area. `routes/_protected.tsx` exports `protectedRoute` + `requireRoles(allowedRoles: DbRole[])`. Shared UI in `src/components/ui/`: `DataTable`, `PageHeader`, `Badge`, `FilterSelect`, `Button`, `Card`, `EmptyState`, `Toast`. **No Modal/Drawer component exists** — a form modal/drawer is new. `DbRole` in `lib/auth/store.ts` **already includes** `"APPACCESS"` (added by the RBAC Settings Menu work).
 - **sqlc**: `.sql` sources in `backend/queries/*.sql`, generated `backend/internal/db/*.sql.go`. `sqlc generate` is currently blocked by a pre-existing bug in migration `017` (missing table name); new queries may need hand-written `.sql.go` matching sqlc output until `017` is fixed (see design.md).
 
 ## Resolved Decisions (confirmed by product owner, 2026-09-11)
@@ -34,11 +38,18 @@ Confirmed against the codebase at spec authoring time:
 1. **Role guards — CONFIRMED.** User management (`Admin_Users_Page` + `User_Admin_API`) is guarded by `APPACCESS`; vendor management (`Admin_Vendors_Page` + `Vendor_Admin_API`) is guarded by `ADMIN`/`ADMIN_PARAM`. (`ADMIN`/`ADMIN_PARAM` also bypass the user-page `requireRoles` guard by the existing helper behavior.)
 2. **No maker-checker — CONFIRMED.** Add/edit/disable/enable of users and vendors **apply immediately with mandatory audit**, matching the existing account-provisioning actions (`set-initial-password`, `deactivate`). No approval gate. Requirement 9 is the binding audit guarantee. (A maker-checker variant remains sketched in design.md only as future reference; it is out of scope here.)
 3. **Temporary password on user create — CONFIRMED.** When creating a **local** user, the admin/APPACCESS sets a **temporary password** at creation time. The account is created with `must_change_password=true` so the user can log in and is then routed straight to the change-password screen on first login (reusing the existing `must_change_password` policy and self-service change-password flow). LDAP/internal users never get a local password.
+4. **Search-index migration — DEFERRED (2026-09-15).** No `039_admin_search_indexes.sql` / `pg_trgm` in this spec. `ILIKE '%q%'` is sufficient at current volume; revisit if list p95 exceeds the NFR dashboard target (≤3s).
+5. **Spec clarifications (2026-09-15):**
+   - Local user create stores `password_hash` + `must_change_password=true` in the **same INSERT** (single write, one `user_created` audit entry). The `SetInitialPasswordService` is NOT called on create (it writes its own `initial_password_set` audit and would double-audit).
+   - Absent `status` filter = `active`.
+   - Editing a soft-disabled user returns 404; the admin must enable it first.
+   - Enable on an unknown id returns 404 (existence pre-check), no audit written.
+   - Field validation (required/format/password strength) = 422; malformed params, immutable-field change, self-supervision, bad reference = 400.
 
 ## Glossary
 
-- **Admin_Users_Page**: The route at `/admin/users` in CompanyPortal-Vite listing and managing user records.
-- **Admin_Vendors_Page**: The route at `/admin/vendors` in CompanyPortal-Vite listing and managing vendor records.
+- **Admin_Users_Page**: The route at `/settings/admin/users` in CompanyPortal-Vite listing and managing user records.
+- **Admin_Vendors_Page**: The route at `/settings/admin/vendors` in CompanyPortal-Vite listing and managing vendor records.
 - **User_Form_Dialog**: The add/edit form (modal or drawer) for a single user record.
 - **Vendor_Form_Dialog**: The add/edit form (modal or drawer) for a single vendor record.
 - **User_Admin_API**: The ATM backend endpoints under `/api/v1/admin/users` (list, get, create, update, disable, enable).
@@ -60,8 +71,9 @@ Confirmed against the codebase at spec authoring time:
 
 #### Acceptance Criteria
 
-1. THE Admin_Users_Page SHALL be registered as a file-based route under `protectedRoute` at path `/admin/users`.
-2. THE Admin_Vendors_Page SHALL be registered as a file-based route under `protectedRoute` at path `/admin/vendors`.
+1. THE Admin_Users_Page SHALL be a route file `src/routes/settings/admin/users.tsx` under `protectedRoute` at path `/settings/admin/users`, registered in the route tree in `src/main.tsx`.
+2. THE Admin_Vendors_Page SHALL be a route file `src/routes/settings/admin/vendors.tsx` under `protectedRoute` at path `/settings/admin/vendors`, registered in the route tree in `src/main.tsx`.
+2a. THE Admin_Users_Page and Admin_Vendors_Page SHALL be reached from the **Settings hub** (`/settings`, `SettingsHubPage`) via dedicated cards ("Manajemen Pengguna" — described as add/edit/disable accounts, distinct from the existing read-only "Hierarki Pengguna" card; "Manajemen Vendor"), NOT via standalone top-level `NAV_CONFIG` sidebar items. The Settings hub is accessible to `ADMIN` and `ADMIN_PARAM` (already guarded by `requireRoles(["ADMIN","ADMIN_PARAM","APPACCESS"])`; `ADMIN`/`ADMIN_PARAM` bypass every per-page guard). (Confirmed 2026-09-15.)
 3. THE Admin_Users_Page SHALL apply the `requireRoles` guard in `beforeLoad` with allowed role `APPACCESS` (`ADMIN`/`ADMIN_PARAM` bypass all role checks by the existing helper behavior).
 4. THE Admin_Vendors_Page SHALL apply the `requireRoles` guard in `beforeLoad` with allowed roles `ADMIN` and `ADMIN_PARAM`.
 5. WHEN a user whose role is not permitted attempts to access either page, THE page SHALL render the existing Forbidden (403) state and SHALL NOT render or fetch management data.
@@ -70,7 +82,7 @@ Confirmed against the codebase at spec authoring time:
 8. THE Vendor_Admin_API SHALL be mounted behind `RequireAuth` and `RequireRoles("ADMIN","ADMIN_PARAM")` in `cmd/api/main.go`.
 9. WHEN either API receives a request without a valid token, IT SHALL respond with HTTP 401.
 10. WHEN either API receives a request from a role that is not permitted, IT SHALL respond with HTTP 403.
-11. IF the frontend `DbRole` union does not include a role required by these guards (e.g. `"APPACCESS"`), THEN that role SHALL be added to the `DbRole` union in `lib/auth/store.ts` as part of this feature.
+11. THE frontend `DbRole` union SHALL include every role used by these guards (`"APPACCESS"` is already present — verify only, no change expected).
 
 ### Requirement 2: List Users — Filtering and Pagination
 
@@ -82,7 +94,7 @@ Confirmed against the codebase at spec authoring time:
 2. WHEN `q` is provided, THE User_Admin_API SHALL return users whose username, full_name, or email matches the term (case-insensitive, substring).
 3. WHEN `role` is provided, THE User_Admin_API SHALL return only users whose role matches.
 4. WHEN `vendor_id` is provided, THE User_Admin_API SHALL return only users linked to that vendor.
-5. WHEN `status=active`, THE User_Admin_API SHALL return only users with `deleted_at IS NULL`; WHEN `status=disabled`, only users with `deleted_at IS NOT NULL`; WHEN `status=all` or absent, both, with a default of `active`.
+5. WHEN `status=active`, THE User_Admin_API SHALL return only users with `deleted_at IS NULL`; WHEN `status=disabled`, only users with `deleted_at IS NOT NULL`; WHEN `status=all`, both. WHEN `status` is absent, it SHALL default to `active`.
 6. THE User_Admin_API SHALL default `page` to 1 and `page_size` to 25, and SHALL cap `page_size` at 100.
 7. THE User_Admin_API SHALL order results by `full_name` ascending, with `id` ascending as a stable tiebreaker.
 8. THE User_Admin_API SHALL return, in the Flat_JSON_Shape, the page of users (id, username, full_name, email, role, is_karyawan, auth_source, vendor_id, is_active, deleted_at, supervisor_id, approval_level, last_login_at) plus pagination metadata `page`, `page_size`, `total`.
@@ -97,14 +109,14 @@ Confirmed against the codebase at spec authoring time:
 
 1. THE User_Admin_API SHALL expose `POST /api/v1/admin/users` accepting: `username`, `full_name`, `email`, `role` (or `role_id`), `is_karyawan`, `auth_source` (`ldap` | `local`), `temporary_password` (required when `auth_source=local`), `employee_id` (optional), `vendor_id` (optional), `supervisor_id` (optional), `approval_level` (optional).
 2. THE User_Admin_API SHALL validate that `username`, `full_name`, `email`, `role`, and `auth_source` are present and non-empty, and that `email` is a valid email format.
-3. WHEN `auth_source=local`, THE User_Admin_API SHALL require `vendor_id` to be present (vendor/local users are vendor-scoped per schema comment) AND require a `temporary_password` that passes the existing `ValidatePasswordStrength` policy; IT SHALL store the bcrypt hash of that password (via the existing `SetInitialPassword` repository path) and set `must_change_password=true`, so the user can log in and is then routed to the change-password screen on first login (Resolved Decision 3).
+3. WHEN `auth_source=local`, THE User_Admin_API SHALL require `vendor_id` to be present (vendor/local users are vendor-scoped per schema comment) AND require a `temporary_password` that passes the existing `ValidatePasswordStrength` policy; IT SHALL store the bcrypt hash of that password (existing `BcryptCost`) together with `must_change_password=true` in the **same INSERT** as the user row (no separate `SetInitialPassword` call, no second audit entry), so the user can log in and is then routed to the change-password screen on first login (Resolved Decision 3).
 4. WHEN `auth_source=ldap`, THE User_Admin_API SHALL require `vendor_id` to be absent, SHALL reject any `temporary_password` in the request with HTTP 400, and SHALL store no `password_hash`.
 5. WHEN `username`, `email`, or `employee_id` collides with an existing record (including a soft-disabled one), THE User_Admin_API SHALL respond with HTTP 409 and a descriptive error identifying the conflicting field.
 6. WHEN `role` / `role_id` does not resolve to an existing role, THE User_Admin_API SHALL respond with HTTP 400.
 7. WHEN `vendor_id` or `supervisor_id` is provided but does not reference an existing record, THE User_Admin_API SHALL respond with HTTP 400.
 8. WHEN creation succeeds, THE User_Admin_API SHALL respond with HTTP 201 and the created user (without `password_hash`) in the Flat_JSON_Shape.
 9. WHEN creation succeeds, THE User_Admin_API SHALL write an `audit_logs` entry with action `user_created`, entity_type `user`, entity_id = new user id, `before` null, `after` = the created record (excluding any password material), actor = the acting admin, and the actor IP.
-10. WHEN any validation fails, THE User_Admin_API SHALL respond with HTTP 400 (or 422 for field validation, matching the backend's existing `writeValidationError` convention) and SHALL NOT create the user or write an audit entry.
+10. WHEN field validation fails (required, email format, password strength), THE User_Admin_API SHALL respond with HTTP 422 via `writeValidationError`; WHEN a request is malformed or references are invalid, HTTP 400. In either case IT SHALL NOT create the user or write an audit entry.
 
 ### Requirement 4: Edit User
 
@@ -115,7 +127,7 @@ Confirmed against the codebase at spec authoring time:
 1. THE User_Admin_API SHALL expose `PUT /api/v1/admin/users/{id}` accepting the editable fields: `full_name`, `email`, `role`/`role_id`, `is_karyawan`, `employee_id`, `vendor_id`, `supervisor_id`, `approval_level`.
 2. THE User_Admin_API SHALL NOT allow editing `username` or `auth_source` via this endpoint (identity and auth-path are immutable post-creation); a request attempting to change them SHALL be rejected with HTTP 400.
 3. THE User_Admin_API SHALL NOT set or change `password_hash` via this endpoint (password changes go through the existing `set-initial-password` / self-service change-password flows).
-4. WHEN the target `id` does not exist (or is soft-disabled and not being edited by an enable action), THE User_Admin_API SHALL respond with HTTP 404.
+4. WHEN the target `id` does not exist OR is soft-disabled (`deleted_at IS NOT NULL`), THE User_Admin_API SHALL respond with HTTP 404; a disabled user must be enabled before it can be edited.
 5. WHEN `email` or `employee_id` is changed to a value that collides with a different existing record, THE User_Admin_API SHALL respond with HTTP 409.
 6. WHEN `supervisor_id` equals the user's own `id`, THE User_Admin_API SHALL respond with HTTP 400 (the schema CHECK forbids self-supervision).
 7. WHEN referenced `role`, `vendor_id`, or `supervisor_id` does not exist, THE User_Admin_API SHALL respond with HTTP 400.
@@ -131,7 +143,7 @@ Confirmed against the codebase at spec authoring time:
 1. THE User_Admin_API SHALL expose `POST /api/v1/admin/users/{id}/disable` performing Soft_Disable (`is_active=false`, `deleted_at=now()`) via the existing `DeactivateUserService.Deactivate` path.
 2. THE User_Admin_API SHALL expose `POST /api/v1/admin/users/{id}/enable` performing Enable (`is_active=true`, `deleted_at=NULL`) via the existing `DeactivateUserService.Reactivate` path.
 3. THE User_Admin_API SHALL NOT expose any hard-`DELETE` route for users; the append-only audit linkage (`audit_logs.actor_id -> users.id`) SHALL remain intact for disabled users.
-4. WHEN disable targets a non-existent user, THE User_Admin_API SHALL respond with HTTP 404.
+4. WHEN disable or enable targets a non-existent user (enable checks existence including soft-disabled rows, since the existing `Reactivate` does not), THE User_Admin_API SHALL respond with HTTP 404 and SHALL NOT write an audit entry.
 5. WHEN disable succeeds, THE User_Admin_API SHALL respond with HTTP 200 and write an `audit_logs` entry with action `user_deactivated` (existing action name), actor, and IP.
 6. WHEN enable succeeds, THE User_Admin_API SHALL respond with HTTP 200 and write an `audit_logs` entry with action `user_reactivated` (existing action name), actor, and IP.
 7. THE User_Admin_API SHALL prevent an administrator from disabling their own account (self-lockout guard), responding with HTTP 400 if `{id}` equals the acting user's id.
@@ -144,7 +156,7 @@ Confirmed against the codebase at spec authoring time:
 
 1. THE Vendor_Admin_API SHALL expose `GET /api/v1/admin/vendors` accepting optional query parameters: `q` (matches code or name), `status` (`active` | `disabled` | `all`), `page`, `page_size`.
 2. WHEN `q` is provided, THE Vendor_Admin_API SHALL return vendors whose `code` or `name` matches (case-insensitive, substring).
-3. WHEN `status=active`, THE Vendor_Admin_API SHALL return only vendors with `deleted_at IS NULL`; `status=disabled` returns only `deleted_at IS NOT NULL`; `status=all` or absent returns both, default `active`.
+3. WHEN `status=active`, THE Vendor_Admin_API SHALL return only vendors with `deleted_at IS NULL`; `status=disabled` returns only `deleted_at IS NOT NULL`; `status=all` returns both; absent `status` defaults to `active`.
 4. THE Vendor_Admin_API SHALL default `page` to 1 and `page_size` to 25, capping `page_size` at 100.
 5. THE Vendor_Admin_API SHALL order results by `name` ascending, `id` ascending as tiebreaker.
 6. THE Vendor_Admin_API SHALL return, in the Flat_JSON_Shape, the page of vendors (id, code, name, contact_email, contact_phone, hq_address, is_active, deleted_at) plus pagination metadata `page`, `page_size`, `total`.
@@ -162,7 +174,8 @@ Confirmed against the codebase at spec authoring time:
 4. WHEN creation succeeds, THE Vendor_Admin_API SHALL respond with HTTP 201 and the created vendor, and SHALL write an `audit_logs` entry with action `vendor_created`, entity_type `vendor`, `before` null, `after` = created record, actor, IP.
 5. THE Vendor_Admin_API SHALL expose `PUT /api/v1/admin/vendors/{id}` accepting `name`, `contact_email`, `contact_phone`, `hq_address`.
 6. THE Vendor_Admin_API SHALL NOT allow editing `code` via update (vendor code is the stable external identifier); a request attempting to change it SHALL be rejected with HTTP 400.
-7. WHEN the target vendor `id` does not exist, THE Vendor_Admin_API SHALL respond with HTTP 404.
+7. WHEN the target vendor `id` does not exist or is soft-disabled, THE Vendor_Admin_API SHALL respond with HTTP 404 (enable first, consistent with Requirement 4.4).
+7a. WHEN `code`/`name` are missing or `contact_email` is malformed, THE Vendor_Admin_API SHALL respond with HTTP 422 via `writeValidationError`.
 8. WHEN the update succeeds, THE Vendor_Admin_API SHALL respond with HTTP 200 and write an `audit_logs` entry with action `vendor_updated`, `before`/`after`, actor, IP.
 
 ### Requirement 8: Disable and Enable Vendor
@@ -174,7 +187,7 @@ Confirmed against the codebase at spec authoring time:
 1. THE Vendor_Admin_API SHALL expose `POST /api/v1/admin/vendors/{id}/disable` performing Soft_Disable (`is_active=false`, `deleted_at=now()`).
 2. THE Vendor_Admin_API SHALL expose `POST /api/v1/admin/vendors/{id}/enable` performing Enable (`is_active=true`, `deleted_at=NULL`).
 3. THE Vendor_Admin_API SHALL NOT expose any hard-`DELETE` route for vendors; existing rows referencing a vendor SHALL remain intact.
-4. WHEN disable targets a non-existent vendor, THE Vendor_Admin_API SHALL respond with HTTP 404.
+4. WHEN disable or enable targets a non-existent vendor, THE Vendor_Admin_API SHALL respond with HTTP 404 and SHALL NOT write an audit entry.
 5. WHEN a vendor is disabled WHILE it still has active (non-disabled) users linked to it, THE Vendor_Admin_API SHALL surface a warning in the response (the disable still succeeds), so the admin is aware linked users remain able to log in.
 6. WHEN disable succeeds, THE Vendor_Admin_API SHALL write an `audit_logs` entry with action `vendor_deactivated`, actor, IP; enable writes `vendor_reactivated`.
 

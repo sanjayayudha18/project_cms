@@ -232,14 +232,9 @@ func numericToDecimalString(n pgtype.Numeric) (string, error) {
 		neg = true
 		intStr = strings.TrimPrefix(intStr, "-")
 	}
-	if intStr == "" || intStr == "0" {
-		if neg {
-			// -0
-		}
-		// Fall through with "0" and apply exp for scale.
-		if intStr == "" {
-			intStr = "0"
-		}
+	// -0 is suppressed later (neg is dropped once body normalizes to "0"/"0.00").
+	if intStr == "" {
+		intStr = "0"
 	}
 
 	exp := int(n.Exp)

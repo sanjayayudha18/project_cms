@@ -21,7 +21,13 @@ import type { DbRole } from "@/lib/auth/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type NavGroup = "general" | "monitoring" | "forecasting" | "replenish" | "invoice" | "cash-count";
+export type NavGroup =
+  | "general"
+  | "monitoring"
+  | "forecasting"
+  | "replenish"
+  | "invoice"
+  | "cash-count";
 
 export interface NavItem {
   id: string;
@@ -38,10 +44,10 @@ export interface NavItem {
 export const GROUP_LABELS: Record<NavGroup, string> = {
   general: "Umum",
   monitoring: "Monitoring",
-  forecasting: "Forecasting",
+  forecasting: "Peramalan",
   replenish: "Replenish",
   invoice: "Tagihan",
-  "cash-count": "Cash Count",
+  "cash-count": "Perhitungan Kas",
 };
 
 // ─── Navigation Configuration ─────────────────────────────────────────────────
@@ -69,7 +75,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pengaturan",
     icon: Settings,
     href: "/settings",
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "ADMIN_PARAM", "APPACCESS"],
     group: "general",
   },
 

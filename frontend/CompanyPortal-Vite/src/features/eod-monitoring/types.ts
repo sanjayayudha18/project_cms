@@ -157,7 +157,7 @@ export const STATUS_LABELS: Record<ProcessingStatus, string> = {
   failed: "Failed",
   max_retries_exhausted: "Max Retries",
   processing: "Processing",
-  pending: "Pending",
+  pending: "Tertunda",
 };
 
 export const FILE_TYPE_LABELS: Record<FileType, string> = {
@@ -184,5 +184,5 @@ export const STATUS_BADGE_CONFIG: Record<ProcessingStatus, StatusBadgeConfig> = 
   failed: { variant: "danger", icon: XCircle, label: "Failed" },
   max_retries_exhausted: { variant: "danger", icon: AlertTriangle, label: "Max Retries" },
   processing: { variant: "info", icon: Loader, label: "Processing" },
-  pending: { variant: "neutral", icon: Clock, label: "Pending" },
+  pending: { variant: "neutral", icon: Clock, label: "Tertunda" },
 };

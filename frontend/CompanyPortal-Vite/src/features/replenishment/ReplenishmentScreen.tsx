@@ -109,13 +109,18 @@ export function ReplenishmentScreen() {
 
   const evidenceByVendor = useMemo(() => {
     const map = new Map<string, string | null>();
-    for (const order of [...citOrders].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))) {
+    for (const order of [...citOrders].sort((a, b) =>
+      a.scheduledDate.localeCompare(b.scheduledDate),
+    )) {
       if (order.evidenceUrl) map.set(order.vendorName, order.evidenceUrl);
     }
     return map;
   }, [citOrders]);
 
-  const columns = useMemo(() => [...baseColumns, buktiColumn(evidenceByVendor)], [evidenceByVendor]);
+  const columns = useMemo(
+    () => [...baseColumns, buktiColumn(evidenceByVendor)],
+    [evidenceByVendor],
+  );
 
   const regions = useMemo(
     () =>

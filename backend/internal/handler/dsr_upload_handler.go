@@ -100,7 +100,7 @@ func (h *DsrUploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "Field 'file' wajib diisi")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	content, err := io.ReadAll(file)
 	if err != nil {

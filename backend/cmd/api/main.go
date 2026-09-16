@@ -62,7 +62,7 @@ func main() {
 		os.Exit(1)
 	}
 	redisClient := redis.NewClient(redisOpts)
-	defer redisClient.Close()
+	defer func() { _ = redisClient.Close() }()
 
 	if err := redisClient.Ping(ctx).Err(); err != nil {
 		slog.Error("failed to ping Redis", "error", err)
@@ -81,7 +81,7 @@ func main() {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
 	// Initialize auth dependencies
@@ -119,13 +119,31 @@ func main() {
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
 	// APPACCESS-only: set a target user's initial password, forcing a
-	// change on their next login (Auth-Local-Lifecycle Task 6).
+	// change on their next login (Auth-Local-Lifecycle Task 6), plus the
+	// full admin user CRUD (Admin User & Vendor Management spec): list/get/
+	// create/update (UserAdminService) and disable/enable (the existing
+	// DeactivateUserService, previously unwired).
 	setInitialPasswordService := auth.NewSetInitialPasswordService(userRepo, auditWriter)
-	adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService)
+	userAdminRepo := repository.NewUserAdminRepository(dbPool)
+	userAdminService := auth.NewUserAdminService(userAdminRepo, auditWriter)
+	deactivateService := auth.NewDeactivateUserService(userRepo, auditWriter)
+	adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService, userAdminService, deactivateService)
 	r.With(
 		custommw.RequireAuth(tokenService),
 		custommw.RequireRoles("APPACCESS"),
 	).Mount("/api/v1/admin/users", adminUserHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: vendor master-data CRUD (Admin User & Vendor
+	// Management spec) — no vendor admin endpoints existed before this.
+	// ponytail: swap dbPool for the dbRead pool on List/Count when
+	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
+	vendorAdminRepo := repository.NewVendorAdminRepository(dbPool)
+	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, auditWriter)
+	adminVendorHandler := handler.NewAdminVendorHandler(vendorAdminService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+	).Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
 
 	// Create and mount ATM Portal handler, protected by RequireAuth
 	atmPortalService := service.NewAtmPortalService(db.New(dbPool))
@@ -164,12 +182,38 @@ func main() {
 	approvalHandler := handler.NewApprovalHandler(approvalOrchestrator, approvalRepo)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/approvals", approvalHandler.Routes())
 
-	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8).
+	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8),
+	// plus the RBAC settings menu's read-only list views + policy create/edit
+	// (RBAC Settings Menu spec). Widened to include APPACCESS alongside
+	// ADMIN/ADMIN_PARAM (Requirement 3).
+	//
+	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL
+	// wiring lands (same TODO convention as the audit-log repository above).
 	adminApprovalHandler := handler.NewAdminApprovalHandler(approvalRepo, auditWriter)
+	rbacReadRepo := repository.NewRbacReadRepository(dbPool)
+	rbacPolicyStore := repository.NewApprovalPolicyStore(dbPool)
+	rbacListHandler := handler.NewRbacListHandler(rbacReadRepo, rbacPolicyStore, auditWriter)
+	// AdminApprovalHandler.Routes() and RbacListHandler.Routes() cannot both be
+	// Mount()-ed at this prefix (chi panics: two mounts can't share one exact
+	// path). Register each handler's routes directly on the shared router
+	// instead — chi resolves the static "/users/hierarchy" ahead of the
+	// "/users/{id}/hierarchy" param route, so both sets coexist correctly.
 	r.With(
 		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
-	).Mount("/api/v1/admin/approval", adminApprovalHandler.Routes())
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM", "APPACCESS"),
+	).Route("/api/v1/admin/approval", func(ar chi.Router) {
+		ar.Put("/users/{id}/hierarchy", adminApprovalHandler.SetHierarchy)
+		ar.Post("/delegations", adminApprovalHandler.CreateDelegation)
+		ar.Delete("/delegations/{id}", adminApprovalHandler.RevokeDelegation)
+		ar.Post("/leaves", adminApprovalHandler.CreateLeave)
+
+		ar.Get("/users/hierarchy", rbacListHandler.ListUserHierarchy)
+		ar.Get("/delegations", rbacListHandler.ListDelegations)
+		ar.Get("/leaves", rbacListHandler.ListLeaves)
+		ar.Get("/policies", rbacListHandler.ListPolicies)
+		ar.Post("/policies", rbacListHandler.CreatePolicy)
+		ar.Put("/policies/{id}", rbacListHandler.UpdatePolicy)
+	})
 
 	// Create and mount the Vendor Request handler (DMAA forecast -> CIT
 	// vendor replenishment order, self-contained maker-checker state

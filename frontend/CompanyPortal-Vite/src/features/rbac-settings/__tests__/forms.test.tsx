@@ -73,13 +73,38 @@ beforeEach(() => {
 
 describe("RbacUsersPage — hierarchy form", () => {
   const usersResponse: RbacUsersResponse = {
-    users: [{ id: 5, supervisor_id: 2, approval_level: 3, role: "ADMIN", auth_source: "ldap" }],
+    users: [
+      {
+        id: 5,
+        username: "budi.santoso",
+        full_name: "Budi Santoso",
+        supervisor_id: 2,
+        approval_level: null,
+        role: "ATM-USER",
+        auth_source: "ldap",
+        vendor_id: null,
+        vendor_name: null,
+      },
+      {
+        id: 2,
+        username: "dewi.lestari",
+        full_name: "Dewi Lestari",
+        supervisor_id: null,
+        approval_level: 1,
+        role: "ATM-SPV",
+        auth_source: "ldap",
+        vendor_id: null,
+        vendor_name: null,
+      },
+    ],
   };
 
-  /** Renders the page and opens user 5's edit row. The mutation mock must be
-   *  set before render: the edit row captures useSetHierarchy()'s return value
-   *  at render time, so a later mockReturnValue would not reach it. */
-  async function openEditRow(mutation = idleMutation()) {
+  /** Renders the page and opens the given user's edit row (default: Budi
+   *  Santoso, id 5, a maker -- opens the supervisor select). The mutation
+   *  mock must be set before render: the edit row captures
+   *  useSetHierarchy()'s return value at render time, so a later
+   *  mockReturnValue would not reach it. */
+  async function openEditRow(mutation = idleMutation(), userName = "Budi Santoso") {
     mockUseUserHierarchy.mockReturnValue({
       data: usersResponse,
       isLoading: false,
@@ -88,35 +113,29 @@ describe("RbacUsersPage — hierarchy form", () => {
     mockUseSetHierarchy.mockReturnValue(mutation);
     const user = userEvent.setup();
     render(<RbacUsersPage />);
-    await user.click(screen.getByRole("button", { name: /ubah/i }));
+    await user.click(screen.getByRole("button", { name: new RegExp(`ubah ${userName}`, "i") }));
     return user;
   }
 
-  it("blocks a self-supervisor submit, keeps entered values, and does not call mutate", async () => {
-    const mutation = idleMutation();
-    const user = await openEditRow(mutation);
+  it("never offers a user as their own supervisor", async () => {
+    await openEditRow(idleMutation(), "Dewi Lestari");
 
-    const supervisorInput = screen.getByLabelText("Supervisor ID");
-    await user.clear(supervisorInput);
-    await user.type(supervisorInput, "5"); // user.id is 5
-    await user.click(screen.getByRole("button", { name: /simpan/i }));
-
-    expect(
-      screen.getByText("supervisor_id tidak boleh sama dengan user itu sendiri"),
-    ).toBeInTheDocument();
-    // Requirement 4.5: entered values are retained on rejection.
-    expect((supervisorInput as HTMLInputElement).value).toBe("5");
-    expect(mutation.mutate).not.toHaveBeenCalled();
+    // Dewi (id 2) is the only checker, so the supervisor select for makers
+    // would only ever list her -- opening her own row has no supervisor
+    // field (checkers edit approval level instead), confirming the split.
+    expect(screen.getByLabelText("Level Persetujuan")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Supervisor ID")).not.toBeInTheDocument();
   });
 
   it("submits a valid hierarchy change to the mutation", async () => {
     const mutation = idleMutation();
     const user = await openEditRow(mutation);
 
+    await user.selectOptions(screen.getByLabelText("Supervisor ID"), "2");
     await user.click(screen.getByRole("button", { name: /simpan/i }));
 
     expect(mutation.mutate).toHaveBeenCalledWith(
-      { userId: 5, values: { supervisor_id: 2, approval_level: 3 } },
+      { userId: 5, values: { supervisor_id: 2, approval_level: null } },
       expect.anything(),
     );
   });

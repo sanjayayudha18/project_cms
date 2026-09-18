@@ -1,7 +1,8 @@
 /**
- * Task 10: Settings hub gains "Manajemen Pengguna"/"Manajemen Vendor" cards
- * linking to the admin-users/admin-vendors routes, distinct from the
- * existing read-only "Hierarki Pengguna" card.
+ * Task 10 (admin-user-vendor-management): Settings hub gains "Manajemen
+ * Pengguna"/"Manajemen Vendor" cards linking to the admin-users/
+ * admin-vendors routes, distinct from the existing read-only "Hierarki
+ * Pengguna" card. Task 9 (admin-atm-management) adds "Manajemen ATM".
  */
 
 import { render, screen } from "@testing-library/react";
@@ -42,12 +43,19 @@ describe("SettingsHubPage — admin cards (Task 10)", () => {
     expect(link).toHaveAttribute("href", "/settings/admin/vendors");
   });
 
+  it("links Manajemen ATM to /settings/admin/atms", () => {
+    render(<SettingsHubPage />);
+    const link = screen.getByRole("link", { name: /Manajemen ATM/ });
+    expect(link).toHaveAttribute("href", "/settings/admin/atms");
+  });
+
   it("keeps the existing Hierarki Pengguna card distinct (read-only hierarchy vs CRUD)", () => {
     render(<SettingsHubPage />);
-    expect(screen.getByRole("link", { name: /Hierarki Pengguna/ })).toHaveAttribute(
+    expect(screen.getByText("Hierarki Pengguna")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Kelola hierarki/ })).toHaveAttribute(
       "href",
       "/settings/rbac/users",
     );
-    expect(screen.getByText(/Tambah, ubah, dan nonaktifkan akun pengguna/)).toBeInTheDocument();
+    expect(screen.getByText(/Kelola akun, peran, dan status aktif pengguna/)).toBeInTheDocument();
   });
 });

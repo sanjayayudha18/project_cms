@@ -44,12 +44,12 @@ func TestRbacReadRepository_ListUserHierarchy(t *testing.T) {
 		t.Fatalf("seed approval_level: %v", err)
 	}
 
-	var wantRole, wantAuthSource string
+	var wantRole, wantAuthSource, wantUsername, wantFullName string
 	if err := tx.QueryRow(ctx,
-		"SELECT r.role, u.auth_source FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1",
+		"SELECT r.role, u.auth_source, u.username, u.full_name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1",
 		userID,
-	).Scan(&wantRole, &wantAuthSource); err != nil {
-		t.Fatalf("fetch expected role/auth_source: %v", err)
+	).Scan(&wantRole, &wantAuthSource, &wantUsername, &wantFullName); err != nil {
+		t.Fatalf("fetch expected role/auth_source/username/full_name: %v", err)
 	}
 
 	repo := NewRbacReadRepository(tx)
@@ -72,6 +72,12 @@ func TestRbacReadRepository_ListUserHierarchy(t *testing.T) {
 		}
 		if row.AuthSource != wantAuthSource {
 			t.Errorf("AuthSource = %q, want %q", row.AuthSource, wantAuthSource)
+		}
+		if row.Username != wantUsername {
+			t.Errorf("Username = %q, want %q", row.Username, wantUsername)
+		}
+		if row.FullName != wantFullName {
+			t.Errorf("FullName = %q, want %q", row.FullName, wantFullName)
 		}
 	}
 	if !found {

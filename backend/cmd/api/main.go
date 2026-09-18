@@ -20,6 +20,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/handler"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/config"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
@@ -118,11 +119,12 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService)
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
-	// APPACCESS-only: set a target user's initial password, forcing a
-	// change on their next login (Auth-Local-Lifecycle Task 6), plus the
-	// full admin user CRUD (Admin User & Vendor Management spec): list/get/
-	// create/update (UserAdminService) and disable/enable (the existing
-	// DeactivateUserService, previously unwired).
+	// APPACCESS/ADMIN/ADMIN_PARAM: set a target user's initial password,
+	// forcing a change on their next login (Auth-Local-Lifecycle Task 6),
+	// plus the full admin user CRUD (Admin User & Vendor Management spec):
+	// list/get/create/update (UserAdminService) and disable/enable (the
+	// existing DeactivateUserService, previously unwired). ADMIN is the
+	// superuser role and must reach every admin area, matching vendors/atms.
 	setInitialPasswordService := auth.NewSetInitialPasswordService(userRepo, auditWriter)
 	userAdminRepo := repository.NewUserAdminRepository(dbPool)
 	userAdminService := auth.NewUserAdminService(userAdminRepo, auditWriter)
@@ -130,7 +132,7 @@ func main() {
 	adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService, userAdminService, deactivateService)
 	r.With(
 		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("APPACCESS"),
+		custommw.RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM"),
 	).Mount("/api/v1/admin/users", adminUserHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor master-data CRUD (Admin User & Vendor
@@ -144,6 +146,36 @@ func main() {
 		custommw.RequireAuth(tokenService),
 		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
 	).Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: ATM master-data CRUD (Admin ATM Management
+	// spec) — no admin ATM endpoints existed before this; the existing
+	// /api/v1/atm-portal mount below stays untouched (read-only monitoring).
+	// ponytail: swap dbPool for the dbRead pool on List/Get/ListLocations when
+	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
+	atmAdminRepo := repository.NewATMAdminRepository(dbPool)
+	atmAdminService := service.NewATMAdminService(atmAdminRepo, auditWriter)
+	adminATMHandler := handler.NewAdminATMHandler(atmAdminService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+	).Mount("/api/v1/admin/atms", adminATMHandler.Routes())
+
+	// APPACCESS/ADMIN-only: Role Management (.kiro/specs/role-management) —
+	// data-driven menu/feature permission catalog + mapping. Self-guarded by
+	// the static RequireRoles here (not by rolemgmt.RequirePermission itself)
+	// to avoid a bootstrap deadlock ("who grants APPACCESS permission to
+	// manage permissions") — see design.md "Middleware". Immediate-apply,
+	// audit-only (documented deviation from Golden Rule #3, recorded in
+	// project-context.md Sec 12).
+	// ponytail: swap dbPool for the dbRead pool on ListRoles/ListCatalog when
+	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
+	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbPool)
+	roleMgmtService := rolemgmt.NewPermissionService(roleMgmtRepo, dbPool)
+	roleMgmtHandler := handler.NewRoleMgmtHandler(roleMgmtService)
+	r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles("APPACCESS", "ADMIN"),
+	).Mount("/api/v1/admin/roles", roleMgmtHandler.Routes())
 
 	// Create and mount ATM Portal handler, protected by RequireAuth
 	atmPortalService := service.NewAtmPortalService(db.New(dbPool))

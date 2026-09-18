@@ -77,7 +77,19 @@ function expectLoading(loadingLabel: string, container: HTMLElement) {
 // ─── Test data ────────────────────────────────────────────────────────────────
 
 const usersResponse: RbacUsersResponse = {
-  users: [{ id: 5, supervisor_id: 2, approval_level: 3, role: "ADMIN", auth_source: "ldap" }],
+  users: [
+    {
+      id: 5,
+      username: "dewi.lestari",
+      full_name: "Dewi Lestari",
+      supervisor_id: null,
+      approval_level: 3,
+      role: "ATM-SPV",
+      auth_source: "ldap",
+      vendor_id: null,
+      vendor_name: null,
+    },
+  ],
 };
 
 const delegationsResponse: RbacDelegationsResponse = {
@@ -142,10 +154,10 @@ describe("RbacUsersPage", () => {
     expect(levelCell?.className).toContain("tabular-nums");
 
     // Requirement 9.2: role badge pairs a label with an icon.
-    const badge = screen.getByText("ADMIN").closest("span");
+    const badge = screen.getByText("ATM-SPV").closest("span");
     expect(badge?.querySelector("svg")).toBeInTheDocument();
 
-    expect(screen.getByText("ldap")).toBeInTheDocument();
+    expect(screen.getByText("dewi.lestari")).toBeInTheDocument();
   });
 });
 

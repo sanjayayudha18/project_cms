@@ -343,18 +343,6 @@ type ItmReplenishFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
-type LateDetection struct {
-	ID             pgtype.UUID        `json:"id"`
-	FileType       string             `json:"file_type"`
-	ProcessingDate pgtype.Date        `json:"processing_date"`
-	SlaDeadline    pgtype.Time        `json:"sla_deadline"`
-	DetectedAt     pgtype.Timestamptz `json:"detected_at"`
-	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
-	IsResolved     bool               `json:"is_resolved"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-}
-
 type Location struct {
 	ID            int64              `json:"id"`
 	RegionID      int64              `json:"region_id"`
@@ -374,51 +362,24 @@ type Location struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type MenuFeature struct {
+	ID        int64              `json:"id"`
+	ParentID  *int64             `json:"parent_id"`
+	Key       string             `json:"key"`
+	Label     string             `json:"label"`
+	Kind      string             `json:"kind"`
+	SortOrder int32              `json:"sort_order"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Region struct {
 	ID        int64              `json:"id"`
 	Code      string             `json:"code"`
 	Region    *string            `json:"region"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
-type RetryAuditLog struct {
-	ID pgtype.UUID `json:"id"`
-	// retry_initiated | retry_completed
-	EventType string `json:"event_type"`
-	// auto | manual
-	TriggerType    string             `json:"trigger_type"`
-	FileID         pgtype.UUID        `json:"file_id"`
-	FileType       string             `json:"file_type"`
-	FileChecksum   *string            `json:"file_checksum"`
-	ProcessingDate pgtype.Date        `json:"processing_date"`
-	InitiatedBy    string             `json:"initiated_by"`
-	Outcome        *string            `json:"outcome"`
-	DurationMs     *int32             `json:"duration_ms"`
-	ErrorDetail    *string            `json:"error_detail"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-}
-
-type RetryFileTracking struct {
-	ID pgtype.UUID `json:"id"`
-	// dmaa | itm_cashpos | itm_replenish
-	FileType       string      `json:"file_type"`
-	Filename       string      `json:"filename"`
-	FilePath       string      `json:"file_path"`
-	FileChecksum   string      `json:"file_checksum"`
-	ProcessingDate pgtype.Date `json:"processing_date"`
-	// not_processed | input_remaining
-	DetectionSource string  `json:"detection_source"`
-	FailureReason   *string `json:"failure_reason"`
-	// pending | processing | completed | failed | max_retries_exhausted
-	ProcessingStatus string             `json:"processing_status"`
-	AutoRetryCount   int32              `json:"auto_retry_count"`
-	MaxRetries       int32              `json:"max_retries"`
-	DetectedAt       pgtype.Timestamptz `json:"detected_at"`
-	LastRetryAt      pgtype.Timestamptz `json:"last_retry_at"`
-	CompletedAt      pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Role struct {
@@ -430,16 +391,11 @@ type Role struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
-type ScanRun struct {
-	ID pgtype.UUID `json:"id"`
-	// failure_detection | late_detection
-	ScanType   string             `json:"scan_type"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	// running | success | failed
-	Status        string             `json:"status"`
-	FilesDetected *int32             `json:"files_detected"`
-	ErrorMessage  *string            `json:"error_message"`
+type RolePermission struct {
+	ID            int64              `json:"id"`
+	RoleID        int64              `json:"role_id"`
+	MenuFeatureID int64              `json:"menu_feature_id"`
+	GrantedBy     int64              `json:"granted_by"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 

@@ -101,9 +101,12 @@ RETURNING *;
 
 -- name: ListUserHierarchy :many
 -- RBAC settings menu: full user hierarchy + role for the read-only admin view.
-SELECT u.id, u.supervisor_id, u.approval_level, r.role, u.auth_source
+-- vendor_name is null for internal (LDAP) users, matching users.vendor_id.
+SELECT u.id, u.username, u.full_name, u.supervisor_id, u.approval_level, r.role, u.auth_source,
+       u.vendor_id, v.name AS vendor_name
 FROM users u
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN vendors v ON v.id = u.vendor_id
 ORDER BY u.id;
 
 -- name: ListDelegations :many

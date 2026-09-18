@@ -20,7 +20,8 @@ func NewRbacReadRepository(dbConn db.DBTX) *RbacReadRepository {
 	return &RbacReadRepository{queries: db.New(dbConn)}
 }
 
-// ListUserHierarchy returns every user's supervisor_id, approval_level, role, and auth_source.
+// ListUserHierarchy returns every user's identity (username/full_name/vendor),
+// supervisor_id, approval_level, role, and auth_source.
 func (r *RbacReadRepository) ListUserHierarchy(ctx context.Context) ([]db.ListUserHierarchyRow, error) {
 	return r.queries.ListUserHierarchy(ctx)
 }

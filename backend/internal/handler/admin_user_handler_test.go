@@ -104,8 +104,8 @@ func (f *fakeDeactivateService) Reactivate(_ context.Context, _, targetUserID in
 }
 
 // mountAdminUserHandler mirrors the real mount in cmd/api/main.go:
-// RequireAuth + RequireRoles("APPACCESS") — needed to test the role gate
-// itself, not just the handler in isolation.
+// RequireAuth + RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM") — needed
+// to test the role gate itself, not just the handler in isolation.
 func mountAdminUserHandler(svc SetInitialPasswordService, userAdminSvc UserAdminServicer, deactivateSvc DeactivateService) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
@@ -117,7 +117,7 @@ func mountAdminUserHandler(svc SetInitialPasswordService, userAdminSvc UserAdmin
 	r := chi.NewRouter()
 	r.With(
 		custommw.RequireAuth(tokenSvc),
-		custommw.RequireRoles("APPACCESS"),
+		custommw.RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM"),
 	).Mount("/api/v1/admin/users", h.Routes())
 	return r, tokenSvc
 }
@@ -141,10 +141,10 @@ func TestAdminUserHandler_SetInitialPassword_HappyPath(t *testing.T) {
 	}
 }
 
-func TestAdminUserHandler_SetInitialPassword_NonAPPACCESSRole_Forbidden(t *testing.T) {
+func TestAdminUserHandler_SetInitialPassword_DisallowedRole_Forbidden(t *testing.T) {
 	fake := &fakeSetInitialPasswordService{}
 	router, tokenSvc := mountAdminUserHandler(fake, &fakeUserAdminServicer{}, &fakeDeactivateService{})
-	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+	token := tokenForRole(t, tokenSvc, 1, "VENDOR-USER")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/users/7/set-initial-password", token,
 		`{"new_password":"InitialPass1"}`)

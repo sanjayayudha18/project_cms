@@ -160,22 +160,11 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 		return
 	}
 
-	// Order matters: 001.1_vendor_vaults.sql adds an FK to vendor_branches,
-	// which is created in 002_cms_tables.sql, so it must run after it.
-	// 001_create_db_cms.sql is excluded — it issues CREATE DATABASE, which
-	// cannot run from a pool already connected to that database.
+	// Baseline = pg_dump of the fully migrated schema + reference seed data.
+	// Pre-baseline history lives in migrations/archives/2026-09-18_pre-baseline.
 	migrations := []string{
-		"../../migrations/002_cms_tables.sql",
-		"../../migrations/001.1_vendor_vaults.sql",
-		"../../migrations/003_seed_roles_users.sql",
-		"../../migrations/004_seed_regions_locations.sql",
-		"../../migrations/005_seed_vendors.sql",
-		"../../migrations/006_seed_vendor_branches_fixed.sql",
-		"../../migrations/007_seed_vendor_vaults_hardened.sql",
-		"../../migrations/008_seed_atms.sql",
-		"../../migrations/009_itm_cashpos.sql",
-		"../../migrations/010_rename_itm_cashpos_to_itm_replenish.sql",
-		"../../migrations/011_itm_cashpos.sql",
+		"../../migrations/001_baseline_schema.sql",
+		"../../migrations/002_baseline_seed.sql",
 	}
 
 	for _, path := range migrations {

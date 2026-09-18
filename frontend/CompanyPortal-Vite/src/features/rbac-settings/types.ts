@@ -13,10 +13,14 @@ import { z } from "zod";
 
 export interface RbacUser {
   id: number;
+  username: string;
+  full_name: string;
   supervisor_id: number | null;
   approval_level: number | null;
   role: string;
   auth_source: string;
+  vendor_id: number | null;
+  vendor_name: string | null;
 }
 
 export interface RbacUsersResponse {
@@ -85,6 +89,36 @@ export const ROLE_BADGE_VARIANT: Record<string, BadgeVariant> = {
   "BRANCH-ATM-USER": "neutral",
   "BRANCH-ATM-SPV": "neutral",
   "VENDOR-USER": "warning",
+};
+
+// ─── Role hierarchy helpers ──────────────────────────────────────────────────
+
+export type RoleLevel = "admin" | "checker" | "maker";
+
+/**
+ * ADMIN/ADMIN_PARAM/APPACCESS sit outside the maker-checker chain (Sec 5 of
+ * PROJECT_CONTEXT.md); every other seeded role (backend/migrations/002, 027)
+ * ends in "-SPV" (checker, approves) or "-USER" (maker, submits).
+ */
+export function roleLevel(role: string): RoleLevel {
+  if (role.endsWith("-SPV")) return "checker";
+  if (role.endsWith("-USER")) return "maker";
+  return "admin";
+}
+
+/** Domain a role belongs to, e.g. "ATM-SPV" -> "ATM", "BRANCH-ATM-USER" -> "BRANCH-ATM". */
+export function roleDomain(role: string): string {
+  const level = roleLevel(role);
+  if (level === "admin") return "admin";
+  return role.replace(/-(SPV|USER)$/, "");
+}
+
+export const DOMAIN_LABEL: Record<string, string> = {
+  ATM: "ATM",
+  BRANCH: "Cabang",
+  "BRANCH-ATM": "ATM Cabang",
+  VENDOR: "Vendor",
+  admin: "Admin & support",
 };
 
 // ─── Form schemas ──────────────────────────────────────────────────────────

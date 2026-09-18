@@ -59,11 +59,15 @@ func (h *RbacListHandler) Routes() chi.Router {
 }
 
 type userHierarchyResponse struct {
-	ID            int64  `json:"id"`
-	SupervisorID  *int64 `json:"supervisor_id"`
-	ApprovalLevel *int32 `json:"approval_level"`
-	Role          string `json:"role"`
-	AuthSource    string `json:"auth_source"`
+	ID            int64   `json:"id"`
+	Username      string  `json:"username"`
+	FullName      string  `json:"full_name"`
+	SupervisorID  *int64  `json:"supervisor_id"`
+	ApprovalLevel *int32  `json:"approval_level"`
+	Role          string  `json:"role"`
+	AuthSource    string  `json:"auth_source"`
+	VendorID      *int64  `json:"vendor_id"`
+	VendorName    *string `json:"vendor_name"`
 }
 
 // ListUserHierarchy handles GET /users/hierarchy.
@@ -77,10 +81,14 @@ func (h *RbacListHandler) ListUserHierarchy(w http.ResponseWriter, r *http.Reque
 	for i, row := range rows {
 		out[i] = userHierarchyResponse{
 			ID:            row.ID,
+			Username:      row.Username,
+			FullName:      row.FullName,
 			SupervisorID:  row.SupervisorID,
 			ApprovalLevel: row.ApprovalLevel,
 			Role:          row.Role,
 			AuthSource:    row.AuthSource,
+			VendorID:      row.VendorID,
+			VendorName:    row.VendorName,
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"users": out})

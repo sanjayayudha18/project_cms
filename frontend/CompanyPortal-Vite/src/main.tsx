@@ -27,12 +27,14 @@ import { vendorRequestDetailRoute } from "./routes/replenishment/vendor-requests
 import { vendorRequestListRoute } from "./routes/replenishment/vendor-requests/index";
 import { vendorRequestNewRoute } from "./routes/replenishment/vendor-requests/new";
 import { settingsRoute } from "./routes/settings";
+import { adminATMsRoute } from "./routes/settings/admin/atms";
 import { adminUsersRoute } from "./routes/settings/admin/users";
 import { adminVendorsRoute } from "./routes/settings/admin/vendors";
 import { rbacDelegationsRoute } from "./routes/settings/rbac/delegations";
 import { rbacLeavesRoute } from "./routes/settings/rbac/leaves";
 import { rbacPoliciesRoute } from "./routes/settings/rbac/policies";
 import { rbacUsersRoute } from "./routes/settings/rbac/users";
+import { rolesRoute } from "./routes/settings/roles";
 import "./styles/index.css";
 
 // ─── Route Tree ───────────────────────────────────────────────────────────────
@@ -64,10 +66,12 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     adminUsersRoute,
     adminVendorsRoute,
+    adminATMsRoute,
     rbacUsersRoute,
     rbacDelegationsRoute,
     rbacLeavesRoute,
     rbacPoliciesRoute,
+    rolesRoute,
   ]),
 ]);
 

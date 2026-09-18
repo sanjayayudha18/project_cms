@@ -100,8 +100,14 @@ func mountRbacListHandler(reader RbacReader, policyStore ApprovalPolicyWriter, a
 func TestRbacListHandler_ListUserHierarchy_HappyPath(t *testing.T) {
 	level := int32(2)
 	supervisorID := int64(9)
+	vendorID := int64(7)
+	vendorName := "PT Advantage SCM"
 	reader := &fakeRbacReader{usersResult: []db.ListUserHierarchyRow{
-		{ID: 5, SupervisorID: &supervisorID, ApprovalLevel: &level, Role: "ADMIN", AuthSource: "ldap"},
+		{
+			ID: 5, Username: "eko.juniarto", FullName: "Eko M Juniarto",
+			SupervisorID: &supervisorID, ApprovalLevel: &level, Role: "ADMIN", AuthSource: "ldap",
+			VendorID: &vendorID, VendorName: &vendorName,
+		},
 	}}
 	router, ts := mountRbacListHandler(reader, &fakeApprovalPolicyWriter{}, &fakeAdminAuditWriter{})
 
@@ -118,6 +124,12 @@ func TestRbacListHandler_ListUserHierarchy_HappyPath(t *testing.T) {
 	}
 	if len(body.Users) != 1 || body.Users[0].ID != 5 || body.Users[0].Role != "ADMIN" || body.Users[0].AuthSource != "ldap" {
 		t.Errorf("users = %+v, want one row for id=5 role=ADMIN auth_source=ldap", body.Users)
+	}
+	if body.Users[0].Username != "eko.juniarto" || body.Users[0].FullName != "Eko M Juniarto" {
+		t.Errorf("users[0] username/full_name = %q/%q, want eko.juniarto/Eko M Juniarto", body.Users[0].Username, body.Users[0].FullName)
+	}
+	if body.Users[0].VendorID == nil || *body.Users[0].VendorID != vendorID || body.Users[0].VendorName == nil || *body.Users[0].VendorName != vendorName {
+		t.Errorf("users[0] vendor_id/vendor_name = %v/%v, want %d/%q", body.Users[0].VendorID, body.Users[0].VendorName, vendorID, vendorName)
 	}
 }
 

@@ -561,21 +561,28 @@ func (q *Queries) ListPendingStepsForApprover(ctx context.Context, assignedAppro
 }
 
 const listUserHierarchy = `-- name: ListUserHierarchy :many
-SELECT u.id, u.supervisor_id, u.approval_level, r.role, u.auth_source
+SELECT u.id, u.username, u.full_name, u.supervisor_id, u.approval_level, r.role, u.auth_source,
+       u.vendor_id, v.name AS vendor_name
 FROM users u
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN vendors v ON v.id = u.vendor_id
 ORDER BY u.id
 `
 
 type ListUserHierarchyRow struct {
-	ID            int64  `json:"id"`
-	SupervisorID  *int64 `json:"supervisor_id"`
-	ApprovalLevel *int32 `json:"approval_level"`
-	Role          string `json:"role"`
-	AuthSource    string `json:"auth_source"`
+	ID            int64   `json:"id"`
+	Username      string  `json:"username"`
+	FullName      string  `json:"full_name"`
+	SupervisorID  *int64  `json:"supervisor_id"`
+	ApprovalLevel *int32  `json:"approval_level"`
+	Role          string  `json:"role"`
+	AuthSource    string  `json:"auth_source"`
+	VendorID      *int64  `json:"vendor_id"`
+	VendorName    *string `json:"vendor_name"`
 }
 
 // RBAC settings menu: full user hierarchy + role for the read-only admin view.
+// vendor_name is null for internal (LDAP) users, matching users.vendor_id.
 func (q *Queries) ListUserHierarchy(ctx context.Context) ([]ListUserHierarchyRow, error) {
 	rows, err := q.db.Query(ctx, listUserHierarchy)
 	if err != nil {
@@ -587,10 +594,14 @@ func (q *Queries) ListUserHierarchy(ctx context.Context) ([]ListUserHierarchyRow
 		var i ListUserHierarchyRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.Username,
+			&i.FullName,
 			&i.SupervisorID,
 			&i.ApprovalLevel,
 			&i.Role,
 			&i.AuthSource,
+			&i.VendorID,
+			&i.VendorName,
 		); err != nil {
 			return nil, err
 		}

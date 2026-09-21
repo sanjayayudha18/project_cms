@@ -51,15 +51,17 @@ func (q *Queries) CountVendorsAdmin(ctx context.Context, arg CountVendorsAdminPa
 }
 
 const createVendorAdmin = `-- name: CreateVendorAdmin :one
-INSERT INTO vendors (code, name, contact_email, contact_phone, hq_address)
-VALUES ($1, $2, $3,
-        $4, $5)
-RETURNING id, code, name, contact_email, contact_phone, hq_address, is_active, deleted_at
+INSERT INTO vendors (code, name, legal_name, npwp, contact_email, contact_phone, hq_address)
+VALUES ($1, $2, $3, $4,
+        $5, $6, $7)
+RETURNING id, code, name, legal_name, npwp, contact_email, contact_phone, hq_address, is_active, deleted_at
 `
 
 type CreateVendorAdminParams struct {
 	Code         string  `json:"code"`
 	Name         string  `json:"name"`
+	LegalName    *string `json:"legal_name"`
+	Npwp         *string `json:"npwp"`
 	ContactEmail *string `json:"contact_email"`
 	ContactPhone *string `json:"contact_phone"`
 	HqAddress    *string `json:"hq_address"`
@@ -69,6 +71,8 @@ type CreateVendorAdminRow struct {
 	ID           int64              `json:"id"`
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
+	LegalName    *string            `json:"legal_name"`
+	Npwp         *string            `json:"npwp"`
 	ContactEmail *string            `json:"contact_email"`
 	ContactPhone *string            `json:"contact_phone"`
 	HqAddress    *string            `json:"hq_address"`
@@ -80,6 +84,8 @@ func (q *Queries) CreateVendorAdmin(ctx context.Context, arg CreateVendorAdminPa
 	row := q.db.QueryRow(ctx, createVendorAdmin,
 		arg.Code,
 		arg.Name,
+		arg.LegalName,
+		arg.Npwp,
 		arg.ContactEmail,
 		arg.ContactPhone,
 		arg.HqAddress,
@@ -89,6 +95,8 @@ func (q *Queries) CreateVendorAdmin(ctx context.Context, arg CreateVendorAdminPa
 		&i.ID,
 		&i.Code,
 		&i.Name,
+		&i.LegalName,
+		&i.Npwp,
 		&i.ContactEmail,
 		&i.ContactPhone,
 		&i.HqAddress,
@@ -132,7 +140,7 @@ func (q *Queries) FindVendorAdminByCode(ctx context.Context, code string) (int64
 }
 
 const getVendorAdminByID = `-- name: GetVendorAdminByID :one
-SELECT id, code, name, contact_email, contact_phone, hq_address, is_active, deleted_at
+SELECT id, code, name, legal_name, npwp, contact_email, contact_phone, hq_address, is_active, deleted_at
 FROM vendors WHERE id = $1
 `
 
@@ -140,6 +148,8 @@ type GetVendorAdminByIDRow struct {
 	ID           int64              `json:"id"`
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
+	LegalName    *string            `json:"legal_name"`
+	Npwp         *string            `json:"npwp"`
 	ContactEmail *string            `json:"contact_email"`
 	ContactPhone *string            `json:"contact_phone"`
 	HqAddress    *string            `json:"hq_address"`
@@ -157,6 +167,8 @@ func (q *Queries) GetVendorAdminByID(ctx context.Context, id int64) (GetVendorAd
 		&i.ID,
 		&i.Code,
 		&i.Name,
+		&i.LegalName,
+		&i.Npwp,
 		&i.ContactEmail,
 		&i.ContactPhone,
 		&i.HqAddress,
@@ -168,7 +180,7 @@ func (q *Queries) GetVendorAdminByID(ctx context.Context, id int64) (GetVendorAd
 
 const listVendorsAdmin = `-- name: ListVendorsAdmin :many
 
-SELECT id, code, name, contact_email, contact_phone, hq_address, is_active, deleted_at
+SELECT id, code, name, legal_name, npwp, contact_email, contact_phone, hq_address, is_active, deleted_at
 FROM vendors
 WHERE ($1::text IS NULL
         OR code ILIKE '%' || $1::text || '%'
@@ -193,6 +205,8 @@ type ListVendorsAdminRow struct {
 	ID           int64              `json:"id"`
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
+	LegalName    *string            `json:"legal_name"`
+	Npwp         *string            `json:"npwp"`
 	ContactEmail *string            `json:"contact_email"`
 	ContactPhone *string            `json:"contact_phone"`
 	HqAddress    *string            `json:"hq_address"`
@@ -224,6 +238,8 @@ func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminPara
 			&i.ID,
 			&i.Code,
 			&i.Name,
+			&i.LegalName,
+			&i.Npwp,
 			&i.ContactEmail,
 			&i.ContactPhone,
 			&i.HqAddress,
@@ -243,16 +259,20 @@ func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminPara
 const updateVendorAdmin = `-- name: UpdateVendorAdmin :one
 UPDATE vendors
 SET name = $1,
-    contact_email = $2,
-    contact_phone = $3,
-    hq_address = $4,
+    legal_name = $2,
+    npwp = $3,
+    contact_email = $4,
+    contact_phone = $5,
+    hq_address = $6,
     updated_at = now()
-WHERE id = $5 AND deleted_at IS NULL
-RETURNING id, code, name, contact_email, contact_phone, hq_address, is_active, deleted_at
+WHERE id = $7 AND deleted_at IS NULL
+RETURNING id, code, name, legal_name, npwp, contact_email, contact_phone, hq_address, is_active, deleted_at
 `
 
 type UpdateVendorAdminParams struct {
 	Name         string  `json:"name"`
+	LegalName    *string `json:"legal_name"`
+	Npwp         *string `json:"npwp"`
 	ContactEmail *string `json:"contact_email"`
 	ContactPhone *string `json:"contact_phone"`
 	HqAddress    *string `json:"hq_address"`
@@ -263,6 +283,8 @@ type UpdateVendorAdminRow struct {
 	ID           int64              `json:"id"`
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
+	LegalName    *string            `json:"legal_name"`
+	Npwp         *string            `json:"npwp"`
 	ContactEmail *string            `json:"contact_email"`
 	ContactPhone *string            `json:"contact_phone"`
 	HqAddress    *string            `json:"hq_address"`
@@ -276,6 +298,8 @@ type UpdateVendorAdminRow struct {
 func (q *Queries) UpdateVendorAdmin(ctx context.Context, arg UpdateVendorAdminParams) (UpdateVendorAdminRow, error) {
 	row := q.db.QueryRow(ctx, updateVendorAdmin,
 		arg.Name,
+		arg.LegalName,
+		arg.Npwp,
 		arg.ContactEmail,
 		arg.ContactPhone,
 		arg.HqAddress,
@@ -286,6 +310,8 @@ func (q *Queries) UpdateVendorAdmin(ctx context.Context, arg UpdateVendorAdminPa
 		&i.ID,
 		&i.Code,
 		&i.Name,
+		&i.LegalName,
+		&i.Npwp,
 		&i.ContactEmail,
 		&i.ContactPhone,
 		&i.HqAddress,

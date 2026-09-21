@@ -362,6 +362,38 @@ type Location struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Generic maker-checker staging for master-data create/update/disable/enable. Row is written on submit; applied to the real entity only after approval_requests reaches final approval (see internal/approval.Orchestrator + internal/service/masterdata_change.go).
+type MasterDataChangeRequest struct {
+	ID         int64  `json:"id"`
+	EntityType string `json:"entity_type"`
+	// NULL for op=create (entity does not exist yet); required for update/disable/enable.
+	EntityID *int64 `json:"entity_id"`
+	Op       string `json:"op"`
+	// Proposed new state (for create/update) or the intended flag flip (for disable/enable). Shape is entity_type-specific, interpreted by the matching applier.
+	Payload []byte `json:"payload"`
+	// Snapshot of the entity's state at submit time, for diff display and staleness detection (T2.5). NULL for op=create.
+	Before            []byte `json:"before"`
+	Status            string `json:"status"`
+	MakerID           int64  `json:"maker_id"`
+	ApprovalRequestID *int64 `json:"approval_request_id"`
+	// Groups rows created together by a single CSV import (T5.4). NULL for single-entity submits.
+	BatchID *int64 `json:"batch_id"`
+	// Apply failure detail when status stays approved-but-not-applied due to a transactional apply error (T2.4).
+	Error     *string            `json:"error"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// One confirmed master-data CSV import. Idempotent per (entity, file_hash) while its changes are not rejected/stale; all its change requests share one approval_requests row (document_id = the first change request).
+type MasterDataImportBatch struct {
+	ID        int64              `json:"id"`
+	Entity    string             `json:"entity"`
+	FileHash  string             `json:"file_hash"`
+	MakerID   int64              `json:"maker_id"`
+	RowCount  int32              `json:"row_count"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type MenuFeature struct {
 	ID        int64              `json:"id"`
 	ParentID  *int64             `json:"parent_id"`
@@ -458,6 +490,10 @@ type Vendor struct {
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 	// 3-uppercase-char prefix embedded in vendor_requests.request_number (Req 4, Q1). NULL falls back to a deterministic service-side derivation from vendors.code.
 	RequestPrefix *string `json:"request_prefix"`
+	// Registered legal entity name (may differ from vendors.name, the operating/display name). NULL until captured for existing vendors.
+	LegalName *string `json:"legal_name"`
+	// Indonesian tax ID (NPWP), digits only, 15 (pre-2024 format) or 16 (2024+ format) digits. NULL for vendors not yet updated with legal identity.
+	Npwp *string `json:"npwp"`
 }
 
 type VendorBranch struct {
@@ -470,7 +506,8 @@ type VendorBranch struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 	// Vendor regional grouping from MASTER_ATM_ESQ.FLMVendorRegion (e.g. "Jakarta Timur"). Distinct from regions.region (ATM geographic area) and branch_name (vendor sub-region). See migration 030.
-	Region *string `json:"region"`
+	Region    *string            `json:"region"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type VendorPackage struct {
@@ -481,6 +518,26 @@ type VendorPackage struct {
 	Price          pgtype.Numeric     `json:"price"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	IsActive       bool               `json:"is_active"`
+	// Soft-disable timestamp (set with is_active=false). Never hard-delete: atm_vendor_packages references this table.
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Vendor contact persons (PIC). A PIC is either vendor-wide (vendor_branch_id NULL) or scoped to one branch.
+type VendorPic struct {
+	ID             int64   `json:"id"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	Name           string  `json:"name"`
+	Position       *string `json:"position"`
+	Phone          *string `json:"phone"`
+	Email          *string `json:"email"`
+	// Whether this PIC receives system notifications (late DSR, replenishment, etc.) for the vendor/branch. At least one active PIC per vendor should have this true (enforced as a warning at the service layer, not a DB constraint -- see plan.md T3.3).
+	IsNotificationRecipient bool               `json:"is_notification_recipient"`
+	IsActive                bool               `json:"is_active"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.
@@ -548,8 +605,15 @@ type VendorVault struct {
 	MaxCapacityAmount pgtype.Numeric `json:"max_capacity_amount"`
 	MinCapacityAmount pgtype.Numeric `json:"min_capacity_amount"`
 	// ISO 4217 currency code (e.g. IDR, USD)
-	CurrencyCode string             `json:"currency_code"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	CurrencyCode   string             `json:"currency_code"`
+	IsActive       bool               `json:"is_active"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	LocationID     *int64             `json:"location_id"`
+	Latitude       pgtype.Numeric     `json:"latitude"`
+	Longitude      pgtype.Numeric     `json:"longitude"`
+	OperatingHours *string            `json:"operating_hours"`
+	// ATM or CASH. Backfilled to ATM for all pre-existing rows (their legacy type column was uniformly ATM_CASH, which does not map to this binary split) -- see plan.md T0.1/T1.3.
+	Category  string             `json:"category"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }

@@ -1173,6 +1173,11 @@ func TestMasterDataApprovalService_RetryApply_Integration(t *testing.T) {
 	if err := svc.RetryApply(ctx, changeID, h.makerID, "127.0.0.1"); err != nil {
 		t.Fatalf("RetryApply() error = %v", err)
 	}
+	var vendorID int64
+	if err := h.pool.QueryRow(ctx, `SELECT id FROM vendors WHERE code = $1`, "RT-"+tag).Scan(&vendorID); err != nil {
+		t.Fatalf("load applied vendor: %v", err)
+	}
+	h.vendorIDs = append(h.vendorIDs, vendorID) // cleanup deletes it
 	change, err := svc.repo.GetByID(ctx, changeID)
 	if err != nil || change.Status != "applied" {
 		t.Fatalf("status = %q err = %v, want applied", change.Status, err)

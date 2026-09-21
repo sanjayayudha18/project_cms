@@ -70,3 +70,37 @@ export async function listLocationOptions(): Promise<LocationOptionsResponse> {
   const { data } = await api.get<LocationOptionsResponse>(`${BASE}/locations`);
   return data;
 }
+
+// ATM kelolaan (effective-dated vendor package assignments): admin_atm_assignment_handler.go,
+// mounted at /api/v1/admin/atms/{id}/assignments. Create is maker-checker (202).
+export interface ATMAssignment {
+  id: number;
+  atm_id: number;
+  vendor_package_id: number;
+  package_code: string;
+  priority_class: string;
+  effective_start_date: string;
+  effective_end_date: string | null;
+  is_active: boolean;
+}
+
+export interface CreateATMAssignmentPayload {
+  vendor_package_id: number;
+  effective_start_date: string;
+  effective_end_date: string | null;
+}
+
+export async function listATMAssignments(atmId: number): Promise<ATMAssignment[]> {
+  const { data } = await api.get<{ assignments: ATMAssignment[] }>(
+    `${BASE}/${atmId}/assignments?page=1&page_size=100&status=all`,
+  );
+  return data.assignments ?? [];
+}
+
+export async function createATMAssignment(
+  atmId: number,
+  payload: CreateATMAssignmentPayload,
+): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`${BASE}/${atmId}/assignments`, payload);
+  return data;
+}

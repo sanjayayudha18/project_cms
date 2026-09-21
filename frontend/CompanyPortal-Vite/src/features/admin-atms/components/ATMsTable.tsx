@@ -10,6 +10,7 @@ interface ATMsTableProps {
   onEdit: (atm: AdminATM) => void;
   onDisable: (atm: AdminATM) => void;
   onEnable: (atm: AdminATM) => void;
+  onAssignments?: (atm: AdminATM) => void;
 }
 
 const PRIORITY_BADGE_VARIANT = {
@@ -19,7 +20,7 @@ const PRIORITY_BADGE_VARIANT = {
 } as const;
 
 /** ATMs table (Req 8.1-8.11): status and priority badges always carry icon + label (Sec 13, a11y). */
-export function ATMsTable({ atms, onEdit, onDisable, onEnable }: ATMsTableProps) {
+export function ATMsTable({ atms, onEdit, onDisable, onEnable, onAssignments }: ATMsTableProps) {
   const columns: ColumnDef<AdminATM, unknown>[] = [
     { accessorKey: "terminal_id", header: "Terminal ID" },
     {
@@ -60,6 +61,11 @@ export function ATMsTable({ atms, onEdit, onDisable, onEnable }: ATMsTableProps)
             <Button variant="secondary" onClick={() => onEdit(atm)}>
               Ubah
             </Button>
+            {onAssignments && (
+              <Button variant="secondary" onClick={() => onAssignments(atm)}>
+                Kelolaan
+              </Button>
+            )}
             {atm.is_active ? (
               <Button variant="danger" onClick={() => onDisable(atm)}>
                 Nonaktifkan

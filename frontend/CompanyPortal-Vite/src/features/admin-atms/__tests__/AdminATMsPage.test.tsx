@@ -193,3 +193,5 @@ describe("AdminATMsPage", () => {
     expect(within(dialog).getByLabelText("Terminal ID")).toHaveValue(ACTIVE_ATM.terminal_id);
   });
 });
+
+vi.mock("../components/ATMAssignmentsDialog", () => ({ ATMAssignmentsDialog: () => null }));

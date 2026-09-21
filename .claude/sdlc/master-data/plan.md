@@ -144,7 +144,8 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
 - [x] **T6.1** Halaman detail vendor: tab Info (legal name, NPWP) · Cabang · Vault · PIC · Paket.
   - Catatan implementasi: rute `/settings/admin/vendors/$vendorId` (link dari kolom Kode); tab Info (legal name, NPWP) + Cabang/Vault/PIC/Paket **read-only** (daftar). Form vendor kini mengirim legal_name/npwp. Tambah/ubah anak vendor lewat impor CSV (T6.5) atau API; form per-anak belum ada.
   - **Model:** Sonnet, **Effort:** Medium — halaman tab + tabel/form beberapa entitas mengikuti pola `admin-atms`.
-- [ ] **T6.2** Tab Kelolaan di detail/form ATM (list periode + assign paket).
+- [x] **T6.2** Tab Kelolaan di detail/form ATM (list periode + assign paket).
+  - Catatan implementasi: tombol "Kelolaan" per baris ATM membuka dialog: daftar periode (paket, mulai, selesai/Terbuka, status ikon+label) + form tetapkan paket (vendor → paket aktif, tanggal mulai/akhir); submit → 202 (menunggu approval). Tumpang tindih ditolak server. Belum ada disable/ubah periode dari UI.
   - **Model:** Sonnet, **Effort:** Medium — UI periode + assign; perlu tangani respons overlap 409 dari T3.5.
 - [ ] **T6.3** Badge "Menunggu approval" (ikon + label, bukan warna saja) di list; form terkunci bila ada pending.
   - **Model:** Sonnet, **Effort:** Medium — badge (ikon+label per aturan aksesibilitas) + kondisi kunci form.

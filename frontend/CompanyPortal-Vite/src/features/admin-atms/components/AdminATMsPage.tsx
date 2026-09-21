@@ -9,6 +9,7 @@ import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useATMsList, useDisableATM, useEnableATM } from "../hooks";
 import type { AdminATM } from "../types";
 import { toListParams, useAdminATMsUrlState } from "../useAdminATMsUrlState";
+import { ATMAssignmentsDialog } from "./ATMAssignmentsDialog";
 import { ATMFilterBar } from "./ATMFilterBar";
 import { ATMFormDialog } from "./ATMFormDialog";
 import { ATMsTable } from "./ATMsTable";
@@ -26,6 +27,7 @@ export function AdminATMsPage() {
 
   const [formATM, setFormATM] = useState<AdminATM | null>(null);
   const [isFormOpen, setFormOpen] = useState(false);
+  const [assignmentsATM, setAssignmentsATM] = useState<AdminATM | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     type: "disable" | "enable";
     atm: AdminATM;
@@ -103,6 +105,7 @@ export function AdminATMsPage() {
           onEdit={openEdit}
           onDisable={(atm) => setPendingAction({ type: "disable", atm })}
           onEnable={(atm) => setPendingAction({ type: "enable", atm })}
+          onAssignments={setAssignmentsATM}
         />
       )}
 
@@ -128,6 +131,7 @@ export function AdminATMsPage() {
         </div>
       </div>
 
+      <ATMAssignmentsDialog atm={assignmentsATM} onClose={() => setAssignmentsATM(null)} />
       <ATMFormDialog open={isFormOpen} onClose={() => setFormOpen(false)} atm={formATM} />
 
       <ConfirmActionDialog

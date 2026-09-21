@@ -71,6 +71,14 @@ export const NAV_CONFIG: NavItem[] = [
     group: "general",
   },
   {
+    id: "approvals",
+    label: "Persetujuan",
+    icon: ClipboardCheck,
+    href: "/approvals",
+    roles: ["*"],
+    group: "general",
+  },
+  {
     id: "settings",
     label: "Pengaturan",
     icon: Settings,

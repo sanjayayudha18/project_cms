@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { rootRoute } from "./routes/__root";
 import { authRoute } from "./routes/_auth";
 import { protectedRoute } from "./routes/_protected";
+import { approvalsRoute } from "./routes/approvals";
 import { atmPortalRoute } from "./routes/atm-portal";
 import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { auditLogsRoute } from "./routes/audit-logs";
@@ -67,6 +68,7 @@ const routeTree = rootRoute.addChildren([
     adminUsersRoute,
     adminVendorsRoute,
     adminATMsRoute,
+    approvalsRoute,
     rbacUsersRoute,
     rbacDelegationsRoute,
     rbacLeavesRoute,

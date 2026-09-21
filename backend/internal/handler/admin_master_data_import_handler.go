@@ -26,7 +26,8 @@ type MasterDataImportServicer interface {
 // (T5.4, confirm). Mount at
 // /api/v1/admin/master-data/import behind the shared masterDataAdmin group.
 type AdminMasterDataImportHandler struct {
-	svc MasterDataImportServicer
+	svc     MasterDataImportServicer
+	limiter *importRateLimiter // nil = unlimited
 }
 
 // NewAdminMasterDataImportHandler creates a new AdminMasterDataImportHandler with the given dependency.
@@ -37,6 +38,7 @@ func NewAdminMasterDataImportHandler(svc MasterDataImportServicer) *AdminMasterD
 // Routes returns a chi.Router with the dry-run endpoint mounted.
 func (h *AdminMasterDataImportHandler) Routes() chi.Router {
 	r := chi.NewRouter()
+	r.Use(h.rateLimit)
 	r.Post("/{entity}/dry-run", h.DryRun)
 	r.Post("/{entity}/confirm", h.Confirm)
 	return r

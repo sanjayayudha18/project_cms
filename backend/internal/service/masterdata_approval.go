@@ -122,6 +122,28 @@ func (s *MasterDataApprovalService) Approve(ctx context.Context, requestID, acto
 	return request, nil
 }
 
+// ErrMasterDataNotRetryable means the change is not in the approved-but-not-applied
+// state (already applied, stale, rejected, or a rolled-back batch): nothing to retry.
+var ErrMasterDataNotRetryable = errors.New("change request is not awaiting apply")
+
+// RetryApply re-runs the apply step for a change whose approval passed but whose
+// apply failed (e.g. a transient DB error). The approval is not repeated. Only
+// master-data admins may retry; only status 'approved' is retryable -- stale and
+// rolled-back batches need a fresh submit instead.
+func (s *MasterDataApprovalService) RetryApply(ctx context.Context, changeID, actorID int64, actorIP string) error {
+	if err := authorizeMasterDataMaker(ctx, actorID); err != nil {
+		return err
+	}
+	head, err := s.repo.GetByID(ctx, changeID)
+	if err != nil {
+		return fmt.Errorf("load change request: %w", err)
+	}
+	if head.Status != "approved" {
+		return ErrMasterDataNotRetryable
+	}
+	return s.applyMasterDataChange(ctx, actorID, changeID, actorIP)
+}
+
 // Reject advances the approval chain's reject path for requestID. Rejecting
 // a master-data change makes no entity mutation (T2.6): the change request
 // is simply flipped to 'rejected', mirrored with its own audit entry

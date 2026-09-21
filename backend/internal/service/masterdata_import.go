@@ -19,7 +19,7 @@ import (
 // parser can never read an unbounded upload).
 const (
 	MasterDataImportMaxBytes = 5 << 20 // 5 MiB
-	MasterDataImportMaxRows  = 10000   // data rows, empty lines excluded
+	MasterDataImportMaxRows  = 2000    // data rows, empty lines excluded
 	masterDataImportMaxErrs  = 500     // errors reported; the rest are counted, not listed
 )
 

@@ -1150,3 +1150,34 @@ func jsonOrNil(t *testing.T, v any) []byte {
 func dbtx(svc *MasterDataApprovalService) db.DBTX {
 	return svc.pool.(db.DBTX)
 }
+
+// A change approved but not applied (transient failure) is re-applied by RetryApply;
+// a second retry is refused because the change is then 'applied'.
+func TestMasterDataApprovalService_RetryApply_Integration(t *testing.T) {
+	svc, tag, h := harness(t)
+	ctx := adminCtx(h.makerID)
+
+	changeID := h.insertPending("vendor", "create", nil, vendorCreatePayload{Code: "RT-" + tag, Name: "Retry Vendor " + tag})
+	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: changeID, Status: "approved"}}
+
+	registry := svc.appliers
+	svc.appliers = ApplierRegistry{} // simulate the apply failing
+	if _, err := svc.Approve(ctx, 999, h.makerID, "127.0.0.1"); err == nil {
+		t.Fatal("expected apply failure")
+	}
+	svc.appliers = registry
+
+	if err := svc.RetryApply(context.Background(), changeID, h.makerID, "127.0.0.1"); !errors.Is(err, ErrMasterDataForbidden) {
+		t.Fatalf("RetryApply without auth = %v, want ErrMasterDataForbidden", err)
+	}
+	if err := svc.RetryApply(ctx, changeID, h.makerID, "127.0.0.1"); err != nil {
+		t.Fatalf("RetryApply() error = %v", err)
+	}
+	change, err := svc.repo.GetByID(ctx, changeID)
+	if err != nil || change.Status != "applied" {
+		t.Fatalf("status = %q err = %v, want applied", change.Status, err)
+	}
+	if err := svc.RetryApply(ctx, changeID, h.makerID, "127.0.0.1"); !errors.Is(err, ErrMasterDataNotRetryable) {
+		t.Fatalf("second RetryApply = %v, want ErrMasterDataNotRetryable", err)
+	}
+}

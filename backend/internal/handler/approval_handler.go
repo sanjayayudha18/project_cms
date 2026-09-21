@@ -35,6 +35,7 @@ type ApprovalHandler struct {
 	orchestrator ApprovalOrchestrator
 	reader       ApprovalReader
 	mdDetail     MasterDataApprovalDetailReader // set by WithMasterDataDetail; nil = endpoint answers 404
+	retrier      MasterDataApplyRetrier         // set by WithApplyRetry; nil = endpoint answers 404
 }
 
 // NewApprovalHandler creates a new ApprovalHandler.
@@ -49,6 +50,7 @@ func (h *ApprovalHandler) Routes() chi.Router {
 	r.Get("/inbox", h.Inbox)
 	r.Post("/{id}/approve", h.Approve)
 	r.Post("/{id}/reject", h.Reject)
+	r.Post("/{id}/retry-apply", h.RetryApply)
 	r.Get("/{id}", h.Get)
 	r.Get("/{id}/master-data", h.MasterDataDetail)
 	return r
@@ -204,6 +206,10 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "conflict", service.ErrVendorVaultCodeConflict.Error())
 	case errors.Is(err, service.ErrATMNotFound), errors.Is(err, service.ErrATMInvalidReference):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, service.ErrMasterDataForbidden):
+		writeForbidden(w, "Anda tidak berhak melakukan aksi ini")
+	case errors.Is(err, service.ErrMasterDataNotRetryable):
+		writeError(w, http.StatusConflict, "conflict", "Perubahan tidak menunggu penerapan")
 	case errors.Is(err, service.ErrMasterDataChangeStale):
 		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangeStale.Error())
 	default:

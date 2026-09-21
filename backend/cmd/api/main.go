@@ -242,7 +242,7 @@ func main() {
 	approvalRepo := approval.NewRepository(dbPool)
 	approvalOrchestrator := approval.NewOrchestrator(approvalRepo, approvalRepo, approvalRepo, auditWriter, nil)
 	masterDataApprovalService := service.NewMasterDataApprovalService(approvalOrchestrator, masterDataChangeRepo, dbPool, masterDataApplierRegistry, auditWriter)
-	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo).WithMasterDataDetail(masterDataChangeRepo)
+	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo).WithMasterDataDetail(masterDataChangeRepo).WithApplyRetry(masterDataApprovalService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/approvals", approvalHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: read access to the master-data maker-checker
@@ -353,7 +353,7 @@ func main() {
 			}
 		},
 	})
-	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).Routes())
+	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).Routes())
 
 	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8),
 	// plus the RBAC settings menu's read-only list views + policy create/edit

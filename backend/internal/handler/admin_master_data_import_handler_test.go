@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
@@ -225,5 +227,26 @@ func TestAdminMasterDataImportHandler_Confirm_RouteGuard(t *testing.T) {
 	}
 	if rec := upload(router, confirmPath, "", "file", "x"); rec.Code != http.StatusUnauthorized {
 		t.Errorf("anonymous: expected 401, got %d", rec.Code)
+	}
+}
+
+func TestImportRateLimit_BlocksAfterCap(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
+		SecretKey: []byte("test-secret-minimum-32-bytes-long!!"), AccessTokenExpiry: 15 * time.Minute, RefreshTokenExpiry: time.Hour,
+	}, noopBlacklist{})
+	r := chi.NewRouter()
+	r.With(custommw.RequireAuth(tokenSvc)).Mount("/i", NewAdminMasterDataImportHandler(&fakeImportServicer{err: errors.New("x")}).WithRateLimit(rdb).Routes())
+
+	tok := tokenForRole(t, tokenSvc, 1, "ADMIN")
+	for i := 1; i <= importRateLimit+1; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/i/vendors/dry-run", nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if limited := rec.Code == http.StatusTooManyRequests; limited != (i > importRateLimit) {
+			t.Fatalf("call %d: status %d", i, rec.Code)
+		}
 	}
 }

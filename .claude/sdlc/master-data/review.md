@@ -15,8 +15,8 @@ Dua review independen (security + Go correctness) atas commit `2173a5a..HEAD`, p
 Batas upload (`MaxBytesReader` + `LimitReader`), SQL parameterized, formula injection (`csvSafe` / satu apostrof), race upload sama (advisory lock + re-`FindOpen`), RBAC dua lapis (`masterDataAdmin` + `authorizeMasterData*`), `GET /approvals/{id}/master-data` hanya maker atau approver dengan step pending (tanpa IDOR).
 
 ## Risiko sisa (diterima / tindak lanjut)
-- **Tidak ada re-apply** untuk change `approved` yang gagal apply karena error transien (bukan stale/konflik); approval sudah final sehingga `Approve` kedua → 409. Perlu operasi "re-apply" idempoten bila ini terjadi di produksi.
-- **Beban impor**: maks 10.000 baris/5 MiB, "before" dibaca per baris, satu transaksi dengan advisory lock; belum ada rate limit per-user di `/import`. Pertimbangkan turunkan batas (~2.000) + batch read + rate limit.
+- ~~Tidak ada re-apply~~ **Ditutup**: `POST /api/v1/approvals/{id}/retry-apply` (ADMIN/ADMIN_PARAM) menjalankan ulang apply untuk change berstatus `approved`; status lain → 409 (stale/batch rollback = submit ulang). Belum ada tombol UI.
+- **Beban impor** (sebagian ditutup): batas diturunkan ke 2.000 baris (BE + FE) dan rate limit 20 panggilan/jam/user pada `/import` (Redis, fail-open). Masih terbuka: "before" dibaca per baris (batch read).
 - `Reject` (batch) belum transaksional (retry aman/idempoten).
 - 403 vs 404 pada endpoint detail approval membocorkan keberadaan id (rendah).
 - Pending badge FE hanya membaca 100 pending terbaru; create pending tidak ter-badge.

@@ -22,7 +22,7 @@ export type ExportStatus = "active" | "disabled" | "all";
 
 /** Mirrors backend MasterDataImportMaxBytes / MasterDataImportMaxRows. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const IMPORT_MAX_ROWS = 10_000;
+export const IMPORT_MAX_ROWS = 2_000;
 
 export interface ImportRowError {
   row: number;

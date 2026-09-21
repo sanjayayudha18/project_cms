@@ -78,3 +78,4 @@ feature-specific slice of these in each `intent.md` / `spec.md`:
 | Feature | Folder | Status |
 |---------|--------|--------|
 | Vendor upload DSR | `vendor-upload-dsr/` | intent drafted |
+| Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | plan approved, not started |

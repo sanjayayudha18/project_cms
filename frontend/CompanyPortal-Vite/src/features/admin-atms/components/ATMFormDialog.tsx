@@ -247,7 +247,7 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
 
         <Field
           id="capacity_amount"
-          label="Kapasitas"
+          label="Kapasitas (IDR)"
           error={form.formState.errors.capacity_amount?.message}
         >
           <input
@@ -261,7 +261,7 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
 
         <Field
           id="low_threshold_amount"
-          label="Batas Rendah"
+          label="Batas Rendah (IDR)"
           error={form.formState.errors.low_threshold_amount?.message}
         >
           <input
@@ -275,7 +275,7 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
 
         <Field
           id="critical_threshold_amount"
-          label="Batas Kritis"
+          label="Batas Kritis (IDR)"
           error={form.formState.errors.critical_threshold_amount?.message}
         >
           <input

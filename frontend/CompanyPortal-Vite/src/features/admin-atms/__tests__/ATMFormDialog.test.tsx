@@ -147,7 +147,7 @@ describe("ATMFormDialog", () => {
     render(<ATMFormDialog open onClose={vi.fn()} atm={null} />);
 
     await fillAllRequiredFields(user, "TATM777");
-    await user.type(screen.getByLabelText("Kapasitas"), "1234567890123456.78");
+    await user.type(screen.getByLabelText("Kapasitas (IDR)"), "1234567890123456.78");
     await user.click(screen.getByRole("button", { name: "Simpan" }));
 
     expect(createMutateAsync).toHaveBeenCalledWith(

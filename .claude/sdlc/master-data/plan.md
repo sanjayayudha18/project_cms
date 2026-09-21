@@ -154,7 +154,8 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
   - **Model:** Sonnet, **Effort:** Medium — render diff before/after dari payload; perlu judgment presentasi.
 - [x] **T6.5** Tombol Export / Download template / Import (dry-run preview tabel error → konfirmasi).
   - **Model:** Sonnet, **Effort:** Medium — alur upload → preview error → konfirmasi; beberapa state UI.
-- [ ] **T6.6** Tema "Merah Sirih" OKLCH, `tabular-nums` untuk kapasitas/harga, IDR eksplisit.
+- [x] **T6.6** Tema "Merah Sirih" OKLCH, `tabular-nums` untuk kapasitas/harga, IDR eksplisit.
+  - Catatan implementasi: audit layar baru/lama — tema memakai token Merah Sirih yang ada; angka uang `tabular-nums` rata kanan dengan "IDR" eksplisit (tab Vault/Paket, form ATM: label Kapasitas/Batas Rendah/Batas Kritis kini "(IDR)"); status selalu ikon+label.
   - **Model:** Haiku, **Effort:** Low — terapkan token tema + format angka sesuai design system yang sudah ada.
   - Validate Fase 6: `pnpm lint` · `pnpm test --run` (komponen: form validasi, badge pending, preview import) · `pnpm build` · cek di browser.
 

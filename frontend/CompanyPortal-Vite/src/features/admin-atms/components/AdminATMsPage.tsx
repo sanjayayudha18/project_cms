@@ -6,6 +6,7 @@ import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
+import { usePendingEntityIds } from "../../master-data/pending";
 import { useATMsList, useDisableATM, useEnableATM } from "../hooks";
 import type { AdminATM } from "../types";
 import { toListParams, useAdminATMsUrlState } from "../useAdminATMsUrlState";
@@ -22,6 +23,7 @@ export function AdminATMsPage() {
   const { toast } = useToast();
 
   const atmsQuery = useATMsList(toListParams(params));
+  const pendingIds = usePendingEntityIds("atm");
   const disableMutation = useDisableATM();
   const enableMutation = useEnableATM();
 
@@ -102,6 +104,7 @@ export function AdminATMsPage() {
       {!atmsQuery.isLoading && !atmsQuery.isError && atms.length > 0 && (
         <ATMsTable
           atms={atms}
+          pendingIds={pendingIds}
           onEdit={openEdit}
           onDisable={(atm) => setPendingAction({ type: "disable", atm })}
           onEnable={(atm) => setPendingAction({ type: "enable", atm })}

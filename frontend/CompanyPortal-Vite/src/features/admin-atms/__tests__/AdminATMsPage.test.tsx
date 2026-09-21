@@ -195,3 +195,4 @@ describe("AdminATMsPage", () => {
 });
 
 vi.mock("../components/ATMAssignmentsDialog", () => ({ ATMAssignmentsDialog: () => null }));
+vi.mock("../../master-data/pending", () => ({ usePendingEntityIds: () => new Set<number>() }));

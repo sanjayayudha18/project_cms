@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, Star, XCircle } from "lucide-react";
+import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import type { AdminATM } from "../types";
 
 interface ATMsTableProps {
@@ -10,6 +11,8 @@ interface ATMsTableProps {
   onEdit: (atm: AdminATM) => void;
   onDisable: (atm: AdminATM) => void;
   onEnable: (atm: AdminATM) => void;
+  /** Records with a change waiting for approval: badged, and their actions locked. */
+  pendingIds?: Set<number>;
   onAssignments?: (atm: AdminATM) => void;
 }
 
@@ -20,7 +23,14 @@ const PRIORITY_BADGE_VARIANT = {
 } as const;
 
 /** ATMs table (Req 8.1-8.11): status and priority badges always carry icon + label (Sec 13, a11y). */
-export function ATMsTable({ atms, onEdit, onDisable, onEnable, onAssignments }: ATMsTableProps) {
+export function ATMsTable({
+  atms,
+  onEdit,
+  onDisable,
+  onEnable,
+  onAssignments,
+  pendingIds,
+}: ATMsTableProps) {
   const columns: ColumnDef<AdminATM, unknown>[] = [
     { accessorKey: "terminal_id", header: "Terminal ID" },
     {
@@ -43,12 +53,16 @@ export function ATMsTable({ atms, onEdit, onDisable, onEnable, onAssignments }: 
     {
       id: "status",
       header: "Status",
-      cell: ({ row }) =>
-        row.original.is_active ? (
-          <Badge variant="success" icon={CheckCircle} label="Aktif" />
-        ) : (
-          <Badge variant="danger" icon={XCircle} label="Nonaktif" />
-        ),
+      cell: ({ row }) => (
+        <span className="inline-flex flex-wrap items-center gap-1">
+          {row.original.is_active ? (
+            <Badge variant="success" icon={CheckCircle} label="Aktif" />
+          ) : (
+            <Badge variant="danger" icon={XCircle} label="Nonaktif" />
+          )}
+          {pendingIds?.has(row.original.id) && <PendingApprovalBadge />}
+        </span>
+      ),
     },
     {
       id: "actions",
@@ -58,7 +72,11 @@ export function ATMsTable({ atms, onEdit, onDisable, onEnable, onAssignments }: 
         const atm = row.original;
         return (
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => onEdit(atm)}>
+            <Button
+              variant="secondary"
+              disabled={pendingIds?.has(atm.id)}
+              onClick={() => onEdit(atm)}
+            >
               Ubah
             </Button>
             {onAssignments && (
@@ -67,11 +85,19 @@ export function ATMsTable({ atms, onEdit, onDisable, onEnable, onAssignments }: 
               </Button>
             )}
             {atm.is_active ? (
-              <Button variant="danger" onClick={() => onDisable(atm)}>
+              <Button
+                variant="danger"
+                disabled={pendingIds?.has(atm.id)}
+                onClick={() => onDisable(atm)}
+              >
                 Nonaktifkan
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => onEnable(atm)}>
+              <Button
+                variant="secondary"
+                disabled={pendingIds?.has(atm.id)}
+                onClick={() => onEnable(atm)}
+              >
                 Aktifkan
               </Button>
             )}

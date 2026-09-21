@@ -147,7 +147,8 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
 - [x] **T6.2** Tab Kelolaan di detail/form ATM (list periode + assign paket).
   - Catatan implementasi: tombol "Kelolaan" per baris ATM membuka dialog: daftar periode (paket, mulai, selesai/Terbuka, status ikon+label) + form tetapkan paket (vendor → paket aktif, tanggal mulai/akhir); submit → 202 (menunggu approval). Tumpang tindih ditolak server. Belum ada disable/ubah periode dari UI.
   - **Model:** Sonnet, **Effort:** Medium — UI periode + assign; perlu tangani respons overlap 409 dari T3.5.
-- [ ] **T6.3** Badge "Menunggu approval" (ikon + label, bukan warna saja) di list; form terkunci bila ada pending.
+- [x] **T6.3** Badge "Menunggu approval" (ikon + label, bukan warna saja) di list; form terkunci bila ada pending.
+  - Catatan implementasi: tanpa perubahan backend — `usePendingEntityIds` membaca `GET /admin/master-data/changes?status=pending` (maks 100 terbaru) dan mem-badge baris vendor/ATM yang punya perubahan update/disable/enable tertunda (ikon+label "Menunggu approval"); tombol Ubah/Nonaktifkan/Aktifkan baris itu dikunci. Batas: perubahan create belum punya id sehingga tidak bisa di-badge; >100 pending tidak semuanya tampil (server tetap menolak dengan 409).
   - **Model:** Sonnet, **Effort:** Medium — badge (ikon+label per aturan aksesibilitas) + kondisi kunci form.
 - [x] **T6.4** Inbox approval: tampilkan diff before/after untuk `master_data`.
   - **Model:** Sonnet, **Effort:** Medium — render diff before/after dari payload; perlu judgment presentasi.

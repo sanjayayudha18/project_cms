@@ -6,6 +6,7 @@ import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
+import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendor, useEnableVendor, useVendorsList } from "../hooks";
 import type { AdminVendor } from "../types";
 import { useAdminVendorsUrlState } from "../useAdminVendorsUrlState";
@@ -21,6 +22,7 @@ export function AdminVendorsPage() {
   const { toast } = useToast();
 
   const vendorsQuery = useVendorsList(params);
+  const pendingIds = usePendingEntityIds("vendor");
   const disableMutation = useDisableVendor();
   const enableMutation = useEnableVendor();
 
@@ -119,6 +121,7 @@ export function AdminVendorsPage() {
       {!vendorsQuery.isLoading && !vendorsQuery.isError && vendors.length > 0 && (
         <VendorsTable
           vendors={vendors}
+          pendingIds={pendingIds}
           onEdit={openEdit}
           onDisable={(vendor) => setPendingAction({ type: "disable", vendor })}
           onEnable={(vendor) => setPendingAction({ type: "enable", vendor })}

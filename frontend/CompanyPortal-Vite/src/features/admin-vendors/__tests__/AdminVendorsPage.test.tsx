@@ -101,3 +101,4 @@ describe("AdminVendorsPage — linked-active-users warning on disable (Task 9, R
     });
   });
 });
+vi.mock("../../master-data/pending", () => ({ usePendingEntityIds: () => new Set<number>() }));

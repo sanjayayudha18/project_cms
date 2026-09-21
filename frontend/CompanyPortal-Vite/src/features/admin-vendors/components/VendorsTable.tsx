@@ -4,6 +4,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
+import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import type { AdminVendor } from "../types";
 
 interface VendorsTableProps {
@@ -11,10 +12,18 @@ interface VendorsTableProps {
   onEdit: (vendor: AdminVendor) => void;
   onDisable: (vendor: AdminVendor) => void;
   onEnable: (vendor: AdminVendor) => void;
+  /** Records with a change waiting for approval: badged, and their actions locked. */
+  pendingIds?: Set<number>;
 }
 
 /** Vendors table (Req 6.1-6.4): status badge always carries icon + label (Sec 13, a11y). */
-export function VendorsTable({ vendors, onEdit, onDisable, onEnable }: VendorsTableProps) {
+export function VendorsTable({
+  vendors,
+  onEdit,
+  onDisable,
+  onEnable,
+  pendingIds,
+}: VendorsTableProps) {
   const columns: ColumnDef<AdminVendor, unknown>[] = [
     {
       accessorKey: "code",
@@ -35,12 +44,16 @@ export function VendorsTable({ vendors, onEdit, onDisable, onEnable }: VendorsTa
     {
       id: "status",
       header: "Status",
-      cell: ({ row }) =>
-        row.original.is_active ? (
-          <Badge variant="success" icon={CheckCircle} label="Aktif" />
-        ) : (
-          <Badge variant="danger" icon={XCircle} label="Nonaktif" />
-        ),
+      cell: ({ row }) => (
+        <span className="inline-flex flex-wrap items-center gap-1">
+          {row.original.is_active ? (
+            <Badge variant="success" icon={CheckCircle} label="Aktif" />
+          ) : (
+            <Badge variant="danger" icon={XCircle} label="Nonaktif" />
+          )}
+          {pendingIds?.has(row.original.id) && <PendingApprovalBadge />}
+        </span>
+      ),
     },
     {
       id: "actions",
@@ -50,15 +63,27 @@ export function VendorsTable({ vendors, onEdit, onDisable, onEnable }: VendorsTa
         const vendor = row.original;
         return (
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => onEdit(vendor)}>
+            <Button
+              variant="secondary"
+              disabled={pendingIds?.has(vendor.id)}
+              onClick={() => onEdit(vendor)}
+            >
               Ubah
             </Button>
             {vendor.is_active ? (
-              <Button variant="danger" onClick={() => onDisable(vendor)}>
+              <Button
+                variant="danger"
+                disabled={pendingIds?.has(vendor.id)}
+                onClick={() => onDisable(vendor)}
+              >
                 Nonaktifkan
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => onEnable(vendor)}>
+              <Button
+                variant="secondary"
+                disabled={pendingIds?.has(vendor.id)}
+                onClick={() => onEnable(vendor)}
+              >
                 Aktifkan
               </Button>
             )}

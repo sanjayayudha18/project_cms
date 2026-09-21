@@ -11,6 +11,8 @@ const ACTIVE_VENDOR: AdminVendor = {
   name: "PT Vendor Aktif",
   contact_email: "aktif@vendor.com",
   contact_phone: "021-555-0199",
+  legal_name: "PT Vendor Satu",
+  npwp: "012345678901000",
   hq_address: "Jl. Gatot Subroto",
   is_active: true,
   deleted_at: null,
@@ -33,6 +35,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
     ...actual,
     useNavigate: () => vi.fn(),
     useSearch: () => ({}),
+    Link: ({ children }: { children: React.ReactNode }) => <a href="/x">{children}</a>,
   };
 });
 

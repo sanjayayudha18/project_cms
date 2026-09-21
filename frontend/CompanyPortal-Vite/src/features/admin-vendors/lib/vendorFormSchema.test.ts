@@ -5,6 +5,8 @@ function baseValues(overrides: Partial<Record<string, string>> = {}) {
   return {
     code: "VDR001",
     name: "PT Vendor Sejahtera",
+    legal_name: "",
+    npwp: "",
     contact_email: "",
     contact_phone: "",
     hq_address: "",

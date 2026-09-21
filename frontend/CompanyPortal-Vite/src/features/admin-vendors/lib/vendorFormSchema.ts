@@ -10,6 +10,8 @@ import { z } from "zod";
 export const vendorFormSchema = z.object({
   code: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
   name: z.string().min(1, "Wajib diisi").max(200, "Maksimal 200 karakter"),
+  legal_name: z.string().max(200, "Maksimal 200 karakter"),
+  npwp: z.string().max(25, "Maksimal 25 karakter"),
   contact_email: z
     .string()
     .max(200, "Maksimal 200 karakter")

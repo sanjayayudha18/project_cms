@@ -14,6 +14,8 @@ export interface AdminVendor {
   id: number;
   code: string;
   name: string;
+  legal_name: string;
+  npwp: string;
   contact_email: string;
   contact_phone: string;
   hq_address: string;
@@ -38,6 +40,8 @@ export interface AdminVendorsListResponse {
 export interface CreateVendorPayload {
   code: string;
   name: string;
+  legal_name: string;
+  npwp: string;
   contact_email: string;
   contact_phone: string;
   hq_address: string;
@@ -46,6 +50,8 @@ export interface CreateVendorPayload {
 export interface UpdateVendorPayload {
   code?: string;
   name: string;
+  legal_name: string;
+  npwp: string;
   contact_email: string;
   contact_phone: string;
   hq_address: string;

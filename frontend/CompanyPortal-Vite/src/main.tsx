@@ -31,6 +31,7 @@ import { settingsRoute } from "./routes/settings";
 import { adminATMsRoute } from "./routes/settings/admin/atms";
 import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
 import { adminUsersRoute } from "./routes/settings/admin/users";
+import { adminVendorDetailRoute } from "./routes/settings/admin/vendor-detail";
 import { adminVendorsRoute } from "./routes/settings/admin/vendors";
 import { rbacDelegationsRoute } from "./routes/settings/rbac/delegations";
 import { rbacLeavesRoute } from "./routes/settings/rbac/leaves";
@@ -68,6 +69,7 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     adminUsersRoute,
     adminVendorsRoute,
+    adminVendorDetailRoute,
     adminMasterDataIORoute,
     adminATMsRoute,
     approvalsRoute,

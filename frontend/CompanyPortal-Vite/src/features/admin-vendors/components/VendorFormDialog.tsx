@@ -18,11 +18,21 @@ interface VendorFormDialogProps {
 
 function toDefaultValues(vendor: AdminVendor | null): VendorFormValues {
   if (!vendor) {
-    return { code: "", name: "", contact_email: "", contact_phone: "", hq_address: "" };
+    return {
+      code: "",
+      name: "",
+      legal_name: "",
+      npwp: "",
+      contact_email: "",
+      contact_phone: "",
+      hq_address: "",
+    };
   }
   return {
     code: vendor.code,
     name: vendor.name,
+    legal_name: vendor.legal_name ?? "",
+    npwp: vendor.npwp ?? "",
     contact_email: vendor.contact_email,
     contact_phone: vendor.contact_phone,
     hq_address: vendor.hq_address,
@@ -58,6 +68,8 @@ export function VendorFormDialog({ open, onClose, vendor }: VendorFormDialogProp
         if (!vendor) return;
         const payload: UpdateVendorPayload = {
           name: values.name,
+          legal_name: values.legal_name,
+          npwp: values.npwp,
           contact_email: values.contact_email,
           contact_phone: values.contact_phone,
           hq_address: values.hq_address,
@@ -94,6 +106,14 @@ export function VendorFormDialog({ open, onClose, vendor }: VendorFormDialogProp
 
         <Field label="Nama" error={form.formState.errors.name?.message}>
           <input {...form.register("name")} className={inputClass} />
+        </Field>
+
+        <Field label="Nama Badan Hukum" error={form.formState.errors.legal_name?.message}>
+          <input {...form.register("legal_name")} className={inputClass} />
+        </Field>
+
+        <Field label="NPWP" error={form.formState.errors.npwp?.message}>
+          <input {...form.register("npwp")} inputMode="numeric" className={inputClass} />
         </Field>
 
         <Field label="Email Kontak" error={form.formState.errors.contact_email?.message}>

@@ -62,3 +62,16 @@ export async function enableVendor(id: number): Promise<ChangeRequestAccepted> {
   const { data } = await api.post<ChangeRequestAccepted>(`${BASE}/${id}/enable`);
   return data;
 }
+
+// Read-only child lists of a vendor (backend admin_vendor_{branch,vault,pic,package}_handler.go).
+export type VendorChildKind = "branches" | "vaults" | "pics" | "packages";
+
+export async function listVendorChildren(
+  vendorId: number,
+  kind: VendorChildKind,
+): Promise<Record<string, unknown>[]> {
+  const { data } = await api.get<Record<string, unknown>>(
+    `${BASE}/${vendorId}/${kind}?page=1&page_size=100&status=all`,
+  );
+  return (data[kind] as Record<string, unknown>[]) ?? [];
+}

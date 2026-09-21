@@ -141,7 +141,8 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
   - Validate Fase 5: test parser (header salah, baris kosong, numeric invalid, BOM UTF-8, pemisah `;` vs `,`) · round-trip export→import menghasilkan 0 perubahan.
 
 ### Fase 6 — Frontend CompanyPortal-Vite
-- [ ] **T6.1** Halaman detail vendor: tab Info (legal name, NPWP) · Cabang · Vault · PIC · Paket.
+- [x] **T6.1** Halaman detail vendor: tab Info (legal name, NPWP) · Cabang · Vault · PIC · Paket.
+  - Catatan implementasi: rute `/settings/admin/vendors/$vendorId` (link dari kolom Kode); tab Info (legal name, NPWP) + Cabang/Vault/PIC/Paket **read-only** (daftar). Form vendor kini mengirim legal_name/npwp. Tambah/ubah anak vendor lewat impor CSV (T6.5) atau API; form per-anak belum ada.
   - **Model:** Sonnet, **Effort:** Medium — halaman tab + tabel/form beberapa entitas mengikuti pola `admin-atms`.
 - [ ] **T6.2** Tab Kelolaan di detail/form ATM (list periode + assign paket).
   - **Model:** Sonnet, **Effort:** Medium — UI periode + assign; perlu tangani respons overlap 409 dari T3.5.

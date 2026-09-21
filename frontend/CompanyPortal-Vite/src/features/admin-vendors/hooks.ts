@@ -8,10 +8,12 @@ import type { ApiError } from "@/lib/api/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 import {
+  type VendorChildKind,
   createVendor,
   disableVendor,
   enableVendor,
   getVendor,
+  listVendorChildren,
   listVendors,
   updateVendor,
 } from "./api";
@@ -82,5 +84,12 @@ export function useEnableVendor() {
   return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: enableVendor,
     onSuccess: invalidate,
+  });
+}
+
+export function useVendorChildren(vendorId: number, kind: VendorChildKind) {
+  return useQuery({
+    queryKey: ["admin-vendors", "children", vendorId, kind],
+    queryFn: () => listVendorChildren(vendorId, kind),
   });
 }

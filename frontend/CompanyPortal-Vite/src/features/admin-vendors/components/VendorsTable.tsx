@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
 import type { AdminVendor } from "../types";
@@ -15,7 +16,19 @@ interface VendorsTableProps {
 /** Vendors table (Req 6.1-6.4): status badge always carries icon + label (Sec 13, a11y). */
 export function VendorsTable({ vendors, onEdit, onDisable, onEnable }: VendorsTableProps) {
   const columns: ColumnDef<AdminVendor, unknown>[] = [
-    { accessorKey: "code", header: "Kode" },
+    {
+      accessorKey: "code",
+      header: "Kode",
+      cell: ({ row }) => (
+        <Link
+          to="/settings/admin/vendors/$vendorId"
+          params={{ vendorId: String(row.original.id) }}
+          className="font-medium text-[var(--red-600)] underline"
+        >
+          {row.original.code}
+        </Link>
+      ),
+    },
     { accessorKey: "name", header: "Nama" },
     { accessorKey: "contact_email", header: "Email Kontak" },
     { accessorKey: "contact_phone", header: "Telepon" },

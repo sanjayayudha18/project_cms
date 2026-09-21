@@ -186,7 +186,7 @@ func (i *MasterDataImporter) finish(ctx context.Context, makerID int64, entity, 
 	if err := amount.Scan("0"); err != nil {
 		return nil, fmt.Errorf("build zero amount: %w", err)
 	}
-	approval, _, err := i.confirm.Orchestrator.SubmitForApproval(ctx, makerID, masterDataDocumentType, batch.HeadID, amount, actorIP)
+	approval, _, err := i.confirm.Orchestrator.SubmitForApproval(ctx, batch.MakerID, masterDataDocumentType, batch.HeadID, amount, actorIP)
 	if err != nil {
 		return nil, fmt.Errorf("submit import batch %d for approval: %w", batch.ID, err)
 	}

@@ -94,7 +94,7 @@ func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fi
 	if err != nil {
 		return nil, false, fmt.Errorf("create batch: %w", err)
 	}
-	out := &ImportBatch{ID: b.ID, RowCount: b.RowCount}
+	out := &ImportBatch{ID: b.ID, MakerID: makerID, RowCount: b.RowCount}
 	for i, row := range rows {
 		row.BatchID = &b.ID
 		change, err := q.CreateMasterDataChangeRequest(ctx, row)

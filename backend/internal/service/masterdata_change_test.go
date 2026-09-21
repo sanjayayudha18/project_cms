@@ -22,6 +22,12 @@ type fakeMasterDataChangeRepo struct {
 	findPendingCalled         bool
 	createCalled              bool
 	setApprovalRequestIDCalls []struct{ id, approvalRequestID int64 }
+	rejected                  []int64
+}
+
+func (f *fakeMasterDataChangeRepo) MarkRejected(ctx context.Context, id int64) error {
+	f.rejected = append(f.rejected, id)
+	return nil
 }
 
 func (f *fakeMasterDataChangeRepo) FindPending(ctx context.Context, entityType string, entityID int64) (*int64, error) {
@@ -276,5 +282,24 @@ func TestMasterDataChangeService_Submit_OrchestratorError_NoAuditWritten(t *test
 	}
 	if len(auditWriter.entries) != 0 {
 		t.Errorf("expected no audit entry written on orchestrator failure, got %d", len(auditWriter.entries))
+	}
+}
+
+// A submit whose approval routing fails must not leave an orphan pending row:
+// the pending-unique index would block every later change to that entity.
+func TestMasterDataChangeService_Submit_ApprovalFailureReleasesPendingSlot(t *testing.T) {
+	repo := &fakeMasterDataChangeRepo{}
+	orch := &fakeMasterDataOrchestrator{submitFunc: func(context.Context, int64, string, int64, pgtype.Numeric, string) (db.ApprovalRequest, bool, error) {
+		return db.ApprovalRequest{}, false, errors.New("no approver")
+	}}
+	svc := NewMasterDataChangeService(repo, orch, &fakeMasterDataAuditWriter{})
+
+	_, err := svc.Submit(adminCtx(7), 7, SubmitRequest{EntityType: "vendor", Op: "create", Payload: map[string]string{"code": "V1"}}, "127.0.0.1")
+
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if len(repo.rejected) != 1 || repo.rejected[0] != 42 {
+		t.Errorf("rejected = %v, want [42]", repo.rejected)
 	}
 }

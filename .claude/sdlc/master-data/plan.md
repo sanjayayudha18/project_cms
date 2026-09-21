@@ -105,7 +105,8 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
   - **Model:** Opus, **Effort:** High — retrofit jalur `atms` yang sudah live + jaga immutability `terminal_id`; sama berisiko dengan T4.1.
 - [x] **T4.3** Tambah field NPWP & legal name ke request/response vendor.
   - **Model:** Haiku, **Effort:** Low — tambah field ke DTO request/response, mekanis.
-- [ ] **T4.4** Update test handler/service lama yang mengasumsikan "langsung tersimpan".
+- [x] **T4.4** Update test handler/service lama yang mengasumsikan "langsung tersimpan".
+  - Catatan: tes lama sudah diperbarui saat T4.1–T4.3 (handler/service/frontend memakai respons 202); `go vet ./...` + `go test ./...` hijau.
   - Validate Fase 4: test lama + baru hijau · manual: create vendor → belum muncul di list sampai di-approve.
   - **Model:** Sonnet, **Effort:** Medium — sesuaikan test ke perilaku baru; perlu judgment untuk membedakan regresi asli vs ekspektasi usang.
 
@@ -160,11 +161,11 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
   - Validate Fase 6: `pnpm lint` · `pnpm test --run` (komponen: form validasi, badge pending, preview import) · `pnpm build` · cek di browser.
 
 ### Fase 7 — Penutup
-- [ ] **T7.1** Code review (bug/security) atas seluruh diff.
+- [x] **T7.1** Code review (bug/security) atas seluruh diff.
   - **Model:** Opus, **Effort:** High — review lintas maker-checker/uang/RBAC; butuh penalaran mendalam untuk menangkap cacat halus sebelum merge.
-- [ ] **T7.2** Update `.claude/development-progress.md` (baris 01 → ✅ untuk scope D3) dan `graphify update .`.
+- [x] **T7.2** Update `.claude/development-progress.md` (baris 01 → ✅ untuk scope D3) dan `graphify update .`.
   - **Model:** Haiku, **Effort:** Low — update tracker + jalankan perintah graphify, mekanis.
-- [ ] **T7.3** Tulis `tests.md` + `review.md` di folder ini sesuai konvensi `.claude/sdlc/README.md`.
+- [x] **T7.3** Tulis `tests.md` + `review.md` di folder ini sesuai konvensi `.claude/sdlc/README.md`.
   - **Model:** Sonnet, **Effort:** Medium — dokumentasi ringkasan test/review; perlu merangkum apa yang dikerjakan.
 
 ---

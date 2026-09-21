@@ -200,6 +200,10 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "conflict", service.ErrATMTerminalIDConflict.Error())
 	case errors.Is(err, service.ErrATMAssignmentDuplicate):
 		writeError(w, http.StatusConflict, "conflict", service.ErrATMAssignmentDuplicate.Error())
+	case errors.Is(err, service.ErrVendorVaultCodeConflict):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorVaultCodeConflict.Error())
+	case errors.Is(err, service.ErrATMNotFound), errors.Is(err, service.ErrATMInvalidReference):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, service.ErrMasterDataChangeStale):
 		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangeStale.Error())
 	default:

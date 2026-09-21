@@ -4,7 +4,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -171,7 +173,8 @@ func TestMasterDataImportConfirm_OneBatchOneApproval_IdempotentPerFile_AppliedAt
 
 func TestMasterDataImportConfirm_OneBadRowRollsBackTheWholeBatch_Integration(t *testing.T) {
 	f := newImportFixture(t)
-	res := f.confirm(f.vendorsCSV("A", "B"))
+	csv := f.vendorsCSV("A", "B")
+	res := f.confirm(csv)
 
 	// Between confirm and approval someone creates B directly: applying row B must fail...
 	f.h.seedVendor("IT-"+f.tag+"B", "Sneaked in")
@@ -190,6 +193,14 @@ func TestMasterDataImportConfirm_OneBadRowRollsBackTheWholeBatch_Integration(t *
 	}
 	if n := f.count(`SELECT count(*) FROM master_data_change_requests WHERE batch_id = $1 AND error IS NOT NULL`, res.BatchID); n == 0 {
 		t.Errorf("the failure was not recorded on any row")
+	}
+	// The batch is retired (stale), so the same file is no longer treated as "open"
+	// and can be uploaded again once the cause is fixed.
+	if n := f.count(`SELECT count(*) FROM master_data_change_requests WHERE batch_id = $1 AND status <> 'stale'`, res.BatchID); n != 0 {
+		t.Errorf("%d rows of a rolled-back batch are not stale", n)
+	}
+	if open, err := f.importer.confirm.Batches.FindOpen(context.Background(), "vendors", fmt.Sprintf("%x", sha256.Sum256([]byte(csv)))); err != nil || open != nil {
+		t.Errorf("FindOpen after rollback = %v, %v; want nil", open, err)
 	}
 }
 

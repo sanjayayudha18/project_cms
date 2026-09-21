@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -73,6 +74,7 @@ type MasterDataChangeRepo interface {
 	GetByID(ctx context.Context, id int64) (db.MasterDataChangeRequest, error)
 	List(ctx context.Context, arg db.ListMasterDataChangeRequestsParams) ([]db.MasterDataChangeRequest, error)
 	Count(ctx context.Context, arg db.CountMasterDataChangeRequestsParams) (int64, error)
+	MarkRejected(ctx context.Context, id int64) error
 }
 
 // MasterDataChangeService is the generic maker-checker entrypoint for every
@@ -170,10 +172,12 @@ func (s *MasterDataChangeService) Submit(ctx context.Context, makerID int64, req
 
 	approvalRequest, _, err := s.orchestrator.SubmitForApproval(ctx, makerID, masterDataDocumentType, change.ID, amount, actorIP)
 	if err != nil {
+		s.abandon(ctx, change.ID)
 		return db.MasterDataChangeRequest{}, fmt.Errorf("submit for approval: %w", err)
 	}
 
 	if err := s.repo.SetApprovalRequestID(ctx, change.ID, approvalRequest.ID); err != nil {
+		s.abandon(ctx, change.ID)
 		return db.MasterDataChangeRequest{}, fmt.Errorf("link approval request: %w", err)
 	}
 	change.ApprovalRequestID = &approvalRequest.ID
@@ -234,4 +238,12 @@ func marshalOrNilJSON(v any) ([]byte, error) {
 		return nil, nil
 	}
 	return json.Marshal(v)
+}
+
+// abandon frees the pending-unique slot of a change whose approval routing
+// failed; without it the entity would be blocked by a request nobody can approve.
+func (s *MasterDataChangeService) abandon(ctx context.Context, id int64) {
+	if err := s.repo.MarkRejected(ctx, id); err != nil {
+		slog.Error("master-data: could not release change after failed submit", "change_id", id, "error", err)
+	}
 }

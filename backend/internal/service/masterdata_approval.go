@@ -138,7 +138,11 @@ func (s *MasterDataApprovalService) Reject(ctx context.Context, requestID, actor
 	}
 
 	ids := []int64{request.DocumentID}
-	if head, err := s.repo.GetByID(ctx, request.DocumentID); err == nil && head.BatchID != nil {
+	head, err := s.repo.GetByID(ctx, request.DocumentID)
+	if err != nil {
+		return request, fmt.Errorf("load change request: %w", err)
+	}
+	if head.BatchID != nil {
 		// Rejecting an import batch's single approval rejects every row of it (T5.4).
 		rows, err := s.repo.ListByBatch(ctx, *head.BatchID)
 		if err != nil {
@@ -207,8 +211,13 @@ func (s *MasterDataApprovalService) applyMasterDataChange(ctx context.Context, a
 
 	for _, change := range changes {
 		if err := s.applyOne(ctx, tx, actorID, change, actorIP); err != nil {
-			if change.ID != changeID {
-				_ = s.repo.MarkApplyFailed(ctx, changeID, fmt.Sprintf("batch rolled back: change request %d failed: %v", change.ID, err))
+			if head.BatchID != nil {
+				// Nothing of the batch landed: retire every row so the same file can be
+				// uploaded again (FindOpen skips stale batches) once the cause is fixed.
+				msg := fmt.Sprintf("batch rolled back: change request %d failed: %v", change.ID, err)
+				for _, c := range changes {
+					_ = s.repo.MarkStale(ctx, c.ID, msg)
+				}
 			}
 			return err
 		}

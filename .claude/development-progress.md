@@ -15,7 +15,7 @@
 
 | # | Fitur URS | Status | Yang sudah ada | Gap utama |
 |---|---|---|---|---|
-| 01 | Master data (vendor, vault, PIC, ATM, kelolaan) | 🟡 | Admin CRUD users / vendors / ATMs (soft-delete, audit) | Vault, vendor PIC, assignment belum ada CRUD; belum lewat maker-checker; import/export CSV/XLSX belum ada |
+| 01 | Master data (vendor, vault, PIC, ATM, kelolaan) | ✅ (scope D3: vendor → ATM) | API admin vendor/cabang/vault/PIC/paket/ATM/kelolaan ATM, semua lewat maker-checker (202 → approval → applier); ekspor/template/impor CSV (dry-run, 1 batch = 1 approval, apply all-or-nothing); FE: detail vendor (tab), dialog kelolaan ATM, inbox persetujuan, badge menunggu approval, halaman ekspor/impor | Kelolaan branch/customer ditunda (D3); XLSX/PDF ditunda (D2); `vendor_packages` belum bisa diimpor; form tambah/ubah anak vendor di UI belum ada (lewat CSV/API); inbox belum menampilkan nama maker |
 | 02 | Upload DSR harian & rekap keterlambatan | 🟡 | Vendor upload DSR (upload → confirm), list upload, detail daily & rencana isi | Status OK/TELAT (deadline 09:00), notifikasi telat, rekap bulanan penalty |
 | 03 | ATM Cash Forecasting (Order ATM) | 🟡 | DMAA forecast viewer; Request Replenish ke vendor (draft → submit → approve/reject/revise/cancel, nomor request, audit log) | Upload data tambahan (complaint, project, problem ATM, adjustment), formula Order ATM penuh, approval berjenjang |
 | 04 | Pemenuhan & pengambilan dana, surat tugas, serah terima | ⬜ | — | Semua |

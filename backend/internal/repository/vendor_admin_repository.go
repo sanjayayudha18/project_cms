@@ -9,8 +9,12 @@ import (
 )
 
 // VendorAdminRepository is the primary-pool repository backing the admin
-// vendor CRUD endpoints (Req 6-8): list/get/create/update/disable/enable,
-// plus the linked-active-users count for the Req 8.5 warning.
+// vendor endpoints (Req 6-8): list/get and the submit-time lookups
+// (FindByCode, CountActiveUsers for the Req 8.5 warning). It has no write
+// methods on purpose -- since T4.1 every vendor create/update/disable/enable
+// goes through MasterDataChangeService.Submit and is applied by
+// service.VendorApplier inside the approval transaction, so a direct write
+// path here would be a way around maker-checker.
 //
 // ponytail: uses dbPool for both reads and writes; swap List/Count to the
 // dbRead pool when DATABASE_REPLICA_URL wiring lands (same TODO convention
@@ -60,28 +64,6 @@ func (r *VendorAdminRepository) FindByCode(ctx context.Context, code string) (*i
 		return nil, err
 	}
 	return &id, nil
-}
-
-// Create inserts a new vendor (Req 7.1).
-func (r *VendorAdminRepository) Create(ctx context.Context, arg db.CreateVendorAdminParams) (db.CreateVendorAdminRow, error) {
-	return r.queries.CreateVendorAdmin(ctx, arg)
-}
-
-// Update overwrites a vendor's editable fields (Req 7.5). Returns
-// pgx.ErrNoRows if the target id does not exist or is soft-disabled (the
-// query filters deleted_at IS NULL) -- the caller maps that to 404 (Req 7.7).
-func (r *VendorAdminRepository) Update(ctx context.Context, arg db.UpdateVendorAdminParams) (db.UpdateVendorAdminRow, error) {
-	return r.queries.UpdateVendorAdmin(ctx, arg)
-}
-
-// Disable soft-disables a vendor: is_active=false, deleted_at=now() (Req 8.1).
-func (r *VendorAdminRepository) Disable(ctx context.Context, id int64) error {
-	return r.queries.DisableVendor(ctx, id)
-}
-
-// Enable reverses Disable: is_active=true, deleted_at=NULL (Req 8.2).
-func (r *VendorAdminRepository) Enable(ctx context.Context, id int64) error {
-	return r.queries.EnableVendor(ctx, id)
 }
 
 // CountActiveUsers returns the number of active (non-disabled) users linked

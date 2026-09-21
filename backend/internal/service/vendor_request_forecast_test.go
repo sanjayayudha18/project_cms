@@ -70,7 +70,7 @@ func (f *fakeForecastRepo) ForecastRowExists(context.Context, db.ForecastRowExis
 func (f *fakeForecastRepo) UpdateVendorRequestStatus(context.Context, db.UpdateVendorRequestStatusParams) (db.VendorRequest, error) {
 	return db.VendorRequest{}, nil
 }
-func (f *fakeForecastRepo) ListAuditLogsByEntity(context.Context, string, int64) ([]db.AuditLog, error) {
+func (f *fakeForecastRepo) ListAuditLogsByEntity(context.Context, db.ListAuditLogsByEntityParams) ([]db.AuditLog, error) {
 	return nil, nil
 }
 

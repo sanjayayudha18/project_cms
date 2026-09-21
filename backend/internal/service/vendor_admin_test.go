@@ -2,34 +2,26 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
 // --- fakes ------------------------------------------------------------
 
+// fakeVendorAdminRepo is read-only, like VendorAdminRepo itself: the service
+// has no write path to the vendors table (T4.1), so there is nothing to
+// record other than what the fake Submitter sees.
 type fakeVendorAdminRepo struct {
 	listFunc             func(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
 	countFunc            func(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
 	getByIDFunc          func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	findByCodeFunc       func(ctx context.Context, code string) (*int64, error)
-	createFunc           func(ctx context.Context, arg db.CreateVendorAdminParams) (db.CreateVendorAdminRow, error)
-	updateFunc           func(ctx context.Context, arg db.UpdateVendorAdminParams) (db.UpdateVendorAdminRow, error)
-	disableFunc          func(ctx context.Context, id int64) error
-	enableFunc           func(ctx context.Context, id int64) error
 	countActiveUsersFunc func(ctx context.Context, vendorID int64) (int64, error)
-
-	createCalled  bool
-	updateCalled  bool
-	disableCalled bool
-	enableCalled  bool
 }
 
 func (f *fakeVendorAdminRepo) List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
@@ -60,53 +52,11 @@ func (f *fakeVendorAdminRepo) FindByCode(ctx context.Context, code string) (*int
 	return nil, nil
 }
 
-func (f *fakeVendorAdminRepo) Create(ctx context.Context, arg db.CreateVendorAdminParams) (db.CreateVendorAdminRow, error) {
-	f.createCalled = true
-	if f.createFunc != nil {
-		return f.createFunc(ctx, arg)
-	}
-	return db.CreateVendorAdminRow{ID: 1, Code: arg.Code, Name: arg.Name, ContactEmail: arg.ContactEmail, ContactPhone: arg.ContactPhone, HqAddress: arg.HqAddress, IsActive: true}, nil
-}
-
-func (f *fakeVendorAdminRepo) Update(ctx context.Context, arg db.UpdateVendorAdminParams) (db.UpdateVendorAdminRow, error) {
-	f.updateCalled = true
-	if f.updateFunc != nil {
-		return f.updateFunc(ctx, arg)
-	}
-	return db.UpdateVendorAdminRow{ID: arg.ID, Name: arg.Name, ContactEmail: arg.ContactEmail, ContactPhone: arg.ContactPhone, HqAddress: arg.HqAddress, IsActive: true}, nil
-}
-
-func (f *fakeVendorAdminRepo) Disable(ctx context.Context, id int64) error {
-	f.disableCalled = true
-	if f.disableFunc != nil {
-		return f.disableFunc(ctx, id)
-	}
-	return nil
-}
-
-func (f *fakeVendorAdminRepo) Enable(ctx context.Context, id int64) error {
-	f.enableCalled = true
-	if f.enableFunc != nil {
-		return f.enableFunc(ctx, id)
-	}
-	return nil
-}
-
 func (f *fakeVendorAdminRepo) CountActiveUsers(ctx context.Context, vendorID int64) (int64, error) {
 	if f.countActiveUsersFunc != nil {
 		return f.countActiveUsersFunc(ctx, vendorID)
 	}
 	return 0, nil
-}
-
-type fakeVendorAuditWriter struct {
-	calls []audit.Entry
-	err   error
-}
-
-func (f *fakeVendorAuditWriter) Write(ctx context.Context, entry audit.Entry) error {
-	f.calls = append(f.calls, entry)
-	return f.err
 }
 
 func activeVendor(id int64, code string) *db.GetVendorAdminByIDRow {
@@ -117,10 +67,8 @@ func disabledVendor(id int64, code string) *db.GetVendorAdminByIDRow {
 	return &db.GetVendorAdminByIDRow{ID: id, Code: code, Name: "Vendor " + code, IsActive: false, DeletedAt: pgtype.Timestamptz{Valid: true}}
 }
 
-// fakePgUniqueViolation builds an error isUniqueViolation() recognizes,
-// simulating a race the pre-check missed.
-func fakePgUniqueViolation() error {
-	return &pgconn.PgError{Code: pgUniqueViolation}
+func vendorRepoWith(row func(id int64) *db.GetVendorAdminByIDRow) *fakeVendorAdminRepo {
+	return &fakeVendorAdminRepo{getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) { return row(id), nil }}
 }
 
 // --- Create -------------------------------------------------------------
@@ -138,9 +86,8 @@ func TestVendorAdminService_Create_Validation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeVendorAdminRepo{}
-			auditW := &fakeVendorAuditWriter{}
-			svc := NewVendorAdminService(repo, auditW)
+			sub := &fakeVendorBranchSubmitter{}
+			svc := NewVendorAdminService(&fakeVendorAdminRepo{}, sub)
 
 			_, err := svc.Create(context.Background(), 1, tt.req, "10.0.0.1")
 			var valErr *ValidationError
@@ -150,88 +97,57 @@ func TestVendorAdminService_Create_Validation(t *testing.T) {
 			if valErr.Field != tt.wantErr {
 				t.Errorf("ValidationError.Field = %q, want %q", valErr.Field, tt.wantErr)
 			}
-			if repo.createCalled {
-				t.Error("repo.Create was called despite validation failure")
-			}
-			if len(auditW.calls) != 0 {
-				t.Error("audit.Write was called despite validation failure")
+			if sub.submitCalled {
+				t.Error("a change request was staged despite validation failure")
 			}
 		})
 	}
 }
 
-func TestVendorAdminService_Create_CodeConflict(t *testing.T) {
-	t.Run("pre-check finds an existing code", func(t *testing.T) {
-		existingID := int64(42)
-		repo := &fakeVendorAdminRepo{
-			findByCodeFunc: func(ctx context.Context, code string) (*int64, error) { return &existingID, nil },
-		}
-		auditW := &fakeVendorAuditWriter{}
-		svc := NewVendorAdminService(repo, auditW)
+func TestVendorAdminService_Create_CodeConflict_StagesNothing(t *testing.T) {
+	existingID := int64(42)
+	repo := &fakeVendorAdminRepo{findByCodeFunc: func(ctx context.Context, code string) (*int64, error) { return &existingID, nil }}
+	sub := &fakeVendorBranchSubmitter{}
 
-		_, err := svc.Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme"}, "10.0.0.1")
-		if !errors.Is(err, ErrVendorCodeConflict) {
-			t.Fatalf("err = %v, want ErrVendorCodeConflict", err)
-		}
-		if repo.createCalled {
-			t.Error("repo.Create was called despite a pre-check conflict")
-		}
-		if len(auditW.calls) != 0 {
-			t.Error("audit.Write was called despite a conflict")
-		}
-	})
+	_, err := NewVendorAdminService(repo, sub).Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme"}, "10.0.0.1")
 
-	t.Run("DB unique violation surfaces on a missed race", func(t *testing.T) {
-		repo := &fakeVendorAdminRepo{
-			createFunc: func(ctx context.Context, arg db.CreateVendorAdminParams) (db.CreateVendorAdminRow, error) {
-				return db.CreateVendorAdminRow{}, fakePgUniqueViolation()
-			},
-		}
-		auditW := &fakeVendorAuditWriter{}
-		svc := NewVendorAdminService(repo, auditW)
-
-		_, err := svc.Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme"}, "10.0.0.1")
-		if !errors.Is(err, ErrVendorCodeConflict) {
-			t.Fatalf("err = %v, want ErrVendorCodeConflict", err)
-		}
-		if len(auditW.calls) != 0 {
-			t.Error("audit.Write was called despite a conflict")
-		}
-	})
+	if !errors.Is(err, ErrVendorCodeConflict) {
+		t.Fatalf("err = %v, want ErrVendorCodeConflict", err)
+	}
+	if sub.submitCalled {
+		t.Error("a change request was staged despite a code conflict")
+	}
 }
 
-func TestVendorAdminService_Create_Success_AuditsOnce(t *testing.T) {
-	repo := &fakeVendorAdminRepo{}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+func TestVendorAdminService_Create_StagesTrimmedPayload(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(&fakeVendorAdminRepo{}, sub)
 
-	got, err := svc.Create(context.Background(), 7, CreateVendorRequest{Code: "ACM", Name: "Acme", ContactEmail: "ops@acme.test"}, "10.0.0.1")
+	change, err := svc.Create(context.Background(), 7, CreateVendorRequest{
+		Code: "  ACM ", Name: " Acme ", ContactEmail: " ops@acme.test ", ContactPhone: " 0812 ", HqAddress: "  Jl. A ",
+	}, "10.0.0.1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if got.Code != "ACM" {
-		t.Errorf("got.Code = %q, want ACM", got.Code)
+	if change.ID == 0 || change.Status != "pending" {
+		t.Errorf("want the staged pending change returned, got %+v", change)
 	}
-	if len(auditW.calls) != 1 {
-		t.Fatalf("audit.Write called %d times, want exactly 1", len(auditW.calls))
+	if sub.lastRequest.EntityType != "vendor" || sub.lastRequest.Op != "create" || sub.lastRequest.EntityID != nil {
+		t.Errorf("unexpected submit: %+v", sub.lastRequest)
 	}
-	entry := auditW.calls[0]
-	if entry.Action != "vendor_created" || entry.EntityType != "vendor" || entry.ActorID != 7 || entry.Before != nil {
-		t.Errorf("audit entry = %+v, want action=vendor_created entity_type=vendor actor_id=7 before=nil", entry)
+	want := vendorCreatePayload{Code: "ACM", Name: "Acme", ContactEmail: "ops@acme.test", ContactPhone: "0812", HqAddress: "Jl. A"}
+	if got, ok := sub.lastRequest.Payload.(vendorCreatePayload); !ok || got != want {
+		t.Errorf("payload = %+v, want trimmed %+v", sub.lastRequest.Payload, want)
 	}
 }
 
-func TestVendorAdminService_Create_AuditFailureSurfacesError(t *testing.T) {
-	repo := &fakeVendorAdminRepo{}
-	auditW := &fakeVendorAuditWriter{err: errors.New("audit db down")}
-	svc := NewVendorAdminService(repo, auditW)
-
-	_, err := svc.Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme"}, "10.0.0.1")
-	if err == nil {
-		t.Fatal("Create: want an error when the audit write fails, got nil")
-	}
-	if !repo.createCalled {
-		t.Error("repo.Create was not called -- the vendor row itself should still have been inserted")
+func TestVendorAdminService_Create_SubmitErrorPropagates(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{submitFunc: func(context.Context, int64, SubmitRequest, string) (db.MasterDataChangeRequest, error) {
+		return db.MasterDataChangeRequest{}, ErrMasterDataForbidden
+	}}
+	_, err := NewVendorAdminService(&fakeVendorAdminRepo{}, sub).Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme"}, "ip")
+	if !errors.Is(err, ErrMasterDataForbidden) {
+		t.Fatalf("err = %v, want ErrMasterDataForbidden passed through", err)
 	}
 }
 
@@ -239,83 +155,56 @@ func TestVendorAdminService_Create_AuditFailureSurfacesError(t *testing.T) {
 
 func TestVendorAdminService_Update_NotFound(t *testing.T) {
 	tests := []struct {
-		name    string
-		getByID func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
+		name string
+		repo *fakeVendorAdminRepo
 	}{
-		{"missing id", func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) { return nil, nil }},
-		{"soft-disabled target", func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return disabledVendor(id, "ACM"), nil
-		}},
+		{"missing id", &fakeVendorAdminRepo{}},
+		{"soft-disabled target", vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return disabledVendor(id, "ACM") })},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeVendorAdminRepo{getByIDFunc: tt.getByID}
-			auditW := &fakeVendorAuditWriter{}
-			svc := NewVendorAdminService(repo, auditW)
-
-			_, err := svc.Update(context.Background(), 1, 99, UpdateVendorRequest{Name: "New Name"}, "10.0.0.1")
+			sub := &fakeVendorBranchSubmitter{}
+			_, err := NewVendorAdminService(tt.repo, sub).Update(context.Background(), 1, 99, UpdateVendorRequest{Name: "New Name"}, "10.0.0.1")
 			if !errors.Is(err, ErrVendorNotFound) {
 				t.Fatalf("err = %v, want ErrVendorNotFound", err)
 			}
-			if repo.updateCalled {
-				t.Error("repo.Update was called despite a not-found target")
-			}
-			if len(auditW.calls) != 0 {
-				t.Error("audit.Write was called despite a not-found target")
+			if sub.submitCalled {
+				t.Error("a change request was staged despite a not-found target")
 			}
 		})
 	}
 }
 
 func TestVendorAdminService_Update_ImmutableCodeGuard(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") }), sub)
 
 	newCode := "DIFFERENT"
 	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Code: &newCode, Name: "Acme"}, "10.0.0.1")
+
 	if !errors.Is(err, ErrVendorCodeImmutable) {
 		t.Fatalf("err = %v, want ErrVendorCodeImmutable", err)
 	}
-	if repo.updateCalled {
-		t.Error("repo.Update was called despite an immutable-code change attempt")
-	}
-	if len(auditW.calls) != 0 {
-		t.Error("audit.Write was called despite a rejected update")
+	if sub.submitCalled {
+		t.Error("a change request was staged despite an immutable-code change attempt")
 	}
 }
 
 func TestVendorAdminService_Update_SameCodeInPayloadIsAllowed(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") }), sub)
 
-	sameCode := "ACM"
-	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Code: &sameCode, Name: "Acme Renamed"}, "10.0.0.1")
-	if err != nil {
+	sameCode := " ACM "
+	if _, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Code: &sameCode, Name: "Acme Renamed"}, "10.0.0.1"); err != nil {
 		t.Fatalf("Update with unchanged code: %v", err)
 	}
-	if !repo.updateCalled {
-		t.Error("repo.Update was not called")
+	if !sub.submitCalled {
+		t.Error("expected a change request to be staged")
 	}
 }
 
 func TestVendorAdminService_Update_Validation(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") }), &fakeVendorBranchSubmitter{})
 
 	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Name: "", ContactEmail: ""}, "10.0.0.1")
 	var valErr *ValidationError
@@ -329,86 +218,45 @@ func TestVendorAdminService_Update_Validation(t *testing.T) {
 	}
 }
 
-func TestVendorAdminService_Update_Success_AuditsOnceWithBeforeAfter(t *testing.T) {
+// The "before" snapshot is what the T2.5 staleness check compares against, so
+// it must be the vendor row exactly as loaded, and the payload the trimmed new
+// values.
+func TestVendorAdminService_Update_StagesPayloadWithBeforeSnapshot(t *testing.T) {
 	before := activeVendor(1, "ACM")
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) { return before, nil },
-	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return before }), sub)
 
-	_, err := svc.Update(context.Background(), 7, 1, UpdateVendorRequest{Name: "Acme Renamed"}, "10.0.0.1")
-	if err != nil {
+	if _, err := svc.Update(context.Background(), 7, 1, UpdateVendorRequest{Name: " Acme Renamed ", ContactPhone: " 0812 "}, "10.0.0.1"); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if len(auditW.calls) != 1 {
-		t.Fatalf("audit.Write called %d times, want exactly 1", len(auditW.calls))
-	}
-	entry := auditW.calls[0]
-	if entry.Action != "vendor_updated" || entry.Before == nil || entry.After == nil {
-		t.Errorf("audit entry = %+v, want action=vendor_updated with before and after set", entry)
-	}
-}
 
-func TestVendorAdminService_Update_RepoNoRowsMapsToNotFound(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-		updateFunc: func(ctx context.Context, arg db.UpdateVendorAdminParams) (db.UpdateVendorAdminRow, error) {
-			return db.UpdateVendorAdminRow{}, pgx.ErrNoRows
-		},
+	req := sub.lastRequest
+	if req.EntityType != "vendor" || req.Op != "update" || req.EntityID == nil || *req.EntityID != 1 {
+		t.Errorf("unexpected submit: %+v", req)
 	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
-
-	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Name: "Acme"}, "10.0.0.1")
-	if !errors.Is(err, ErrVendorNotFound) {
-		t.Fatalf("err = %v, want ErrVendorNotFound", err)
+	if req.Before != before {
+		t.Errorf("Before = %+v, want the loaded vendor row %+v", req.Before, before)
 	}
-	if len(auditW.calls) != 0 {
-		t.Error("audit.Write was called despite the update affecting 0 rows")
-	}
-}
-
-func TestVendorAdminService_Update_AuditFailureSurfacesError(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{err: errors.New("audit db down")}
-	svc := NewVendorAdminService(repo, auditW)
-
-	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Name: "Acme"}, "10.0.0.1")
-	if err == nil {
-		t.Fatal("Update: want an error when the audit write fails, got nil")
-	}
-	if !repo.updateCalled {
-		t.Error("repo.Update was not called -- the row itself should still have been updated")
+	want := vendorUpdatePayload{Name: "Acme Renamed", ContactPhone: "0812"}
+	if got, ok := req.Payload.(vendorUpdatePayload); !ok || got != want {
+		t.Errorf("payload = %+v, want %+v", req.Payload, want)
 	}
 }
 
 // --- Disable / Enable -------------------------------------------------
 
 func TestVendorAdminService_Disable_NotFound(t *testing.T) {
-	repo := &fakeVendorAdminRepo{}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
-
-	_, err := svc.Disable(context.Background(), 1, 99, "10.0.0.1")
+	sub := &fakeVendorBranchSubmitter{}
+	_, err := NewVendorAdminService(&fakeVendorAdminRepo{}, sub).Disable(context.Background(), 1, 99, "10.0.0.1")
 	if !errors.Is(err, ErrVendorNotFound) {
 		t.Fatalf("err = %v, want ErrVendorNotFound", err)
 	}
-	if repo.disableCalled {
-		t.Error("repo.Disable was called despite a not-found target")
-	}
-	if len(auditW.calls) != 0 {
-		t.Error("audit.Write was called despite a not-found target")
+	if sub.submitCalled {
+		t.Error("a change request was staged despite a not-found target")
 	}
 }
 
-func TestVendorAdminService_Disable_Success_AuditsOnceAndSurfacesLinkedUsersWarning(t *testing.T) {
+func TestVendorAdminService_Disable_StagesAndSurfacesLinkedUsersWarning(t *testing.T) {
 	tests := []struct {
 		name         string
 		linkedActive int64
@@ -418,108 +266,178 @@ func TestVendorAdminService_Disable_Success_AuditsOnceAndSurfacesLinkedUsersWarn
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeVendorAdminRepo{
-				getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-					return activeVendor(id, "ACM"), nil
-				},
-				countActiveUsersFunc: func(ctx context.Context, vendorID int64) (int64, error) { return tt.linkedActive, nil },
-			}
-			auditW := &fakeVendorAuditWriter{}
-			svc := NewVendorAdminService(repo, auditW)
+			repo := vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") })
+			repo.countActiveUsersFunc = func(ctx context.Context, vendorID int64) (int64, error) { return tt.linkedActive, nil }
+			sub := &fakeVendorBranchSubmitter{}
 
-			result, err := svc.Disable(context.Background(), 7, 1, "10.0.0.1")
+			result, err := NewVendorAdminService(repo, sub).Disable(context.Background(), 7, 1, "10.0.0.1")
 			if err != nil {
 				t.Fatalf("Disable: %v", err)
 			}
-			if !repo.disableCalled {
-				t.Error("repo.Disable was not called")
-			}
 			if result.LinkedUsersWarning != tt.linkedActive {
-				t.Errorf("LinkedUsersWarning = %d, want %d", result.LinkedUsersWarning, tt.linkedActive)
+				t.Errorf("LinkedUsersWarning = %d, want %d (staging must still succeed)", result.LinkedUsersWarning, tt.linkedActive)
 			}
-			if len(auditW.calls) != 1 {
-				t.Fatalf("audit.Write called %d times, want exactly 1", len(auditW.calls))
+			if result.Change.Status != "pending" {
+				t.Errorf("Change = %+v, want the pending staged change", result.Change)
 			}
-			if auditW.calls[0].Action != "vendor_deactivated" {
-				t.Errorf("audit action = %q, want vendor_deactivated", auditW.calls[0].Action)
+			if sub.lastRequest.Op != "disable" || sub.lastRequest.EntityType != "vendor" || sub.lastRequest.Before == nil {
+				t.Errorf("unexpected submit: %+v", sub.lastRequest)
 			}
 		})
 	}
 }
 
-func TestVendorAdminService_Disable_AuditFailureSurfacesError(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return activeVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{err: errors.New("audit db down")}
-	svc := NewVendorAdminService(repo, auditW)
-
-	_, err := svc.Disable(context.Background(), 1, 1, "10.0.0.1")
-	if err == nil {
-		t.Fatal("Disable: want an error when the audit write fails, got nil")
-	}
-	if !repo.disableCalled {
-		t.Error("repo.Disable was not called -- the vendor should still have been disabled")
-	}
-}
-
-func TestVendorAdminService_Enable_NotFound_NoAudit(t *testing.T) {
-	repo := &fakeVendorAdminRepo{}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
-
-	err := svc.Enable(context.Background(), 1, 99, "10.0.0.1")
+func TestVendorAdminService_Enable_NotFound_StagesNothing(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	_, err := NewVendorAdminService(&fakeVendorAdminRepo{}, sub).Enable(context.Background(), 1, 99, "10.0.0.1")
 	if !errors.Is(err, ErrVendorNotFound) {
 		t.Fatalf("err = %v, want ErrVendorNotFound", err)
 	}
-	if repo.enableCalled {
-		t.Error("repo.Enable was called despite a not-found target")
-	}
-	if len(auditW.calls) != 0 {
-		t.Error("audit.Write was called despite a not-found target -- Enable must never audit a non-existent id")
+	if sub.submitCalled {
+		t.Error("a change request was staged for a non-existent id")
 	}
 }
 
-func TestVendorAdminService_Enable_Success_AuditsOnce(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return disabledVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{}
-	svc := NewVendorAdminService(repo, auditW)
+func TestVendorAdminService_Enable_Stages(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return disabledVendor(id, "ACM") }), sub)
 
-	if err := svc.Enable(context.Background(), 7, 1, "10.0.0.1"); err != nil {
+	change, err := svc.Enable(context.Background(), 7, 1, "10.0.0.1")
+	if err != nil {
 		t.Fatalf("Enable: %v", err)
 	}
-	if !repo.enableCalled {
-		t.Error("repo.Enable was not called")
-	}
-	if len(auditW.calls) != 1 {
-		t.Fatalf("audit.Write called %d times, want exactly 1", len(auditW.calls))
-	}
-	if auditW.calls[0].Action != "vendor_reactivated" {
-		t.Errorf("audit action = %q, want vendor_reactivated", auditW.calls[0].Action)
+	if change.Status != "pending" || sub.lastRequest.Op != "enable" || sub.lastRequest.EntityID == nil || *sub.lastRequest.EntityID != 1 || sub.lastRequest.Before == nil {
+		t.Errorf("unexpected: change=%+v submit=%+v", change, sub.lastRequest)
 	}
 }
 
-func TestVendorAdminService_Enable_AuditFailureSurfacesError(t *testing.T) {
-	repo := &fakeVendorAdminRepo{
-		getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-			return disabledVendor(id, "ACM"), nil
-		},
-	}
-	auditW := &fakeVendorAuditWriter{err: errors.New("audit db down")}
-	svc := NewVendorAdminService(repo, auditW)
+// --- NPWP / legal name (T4.3) ------------------------------------------
 
-	err := svc.Enable(context.Background(), 1, 1, "10.0.0.1")
-	if err == nil {
-		t.Fatal("Enable: want an error when the audit write fails, got nil")
+func TestNormalizeNPWP(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"", "", false},
+		{"   ", "", false},
+		{"012345678901234", "012345678901234", false},   // 15 digits
+		{"0123456789012345", "0123456789012345", false}, // 16 digits
+		{"01.234.567.8-901.000", "012345678901000", false},
+		{" 01 234 567 8 901 000 ", "012345678901000", false},
+		{"01234567890123", "", true},    // 14 digits
+		{"01234567890123456", "", true}, // 17 digits
+		{"01.234.567.8-901.00A", "", true},
+		{"abcdefghijklmno", "", true},
+		{"0123456789012３４", "", true}, // full-width digits are not ASCII digits
 	}
-	if !repo.enableCalled {
-		t.Error("repo.Enable was not called -- the vendor should still have been enabled")
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := normalizeNPWP(tt.in)
+			var valErr *ValidationError
+			if tt.wantErr {
+				if !errors.As(err, &valErr) || valErr.Field != "npwp" {
+					t.Fatalf("normalizeNPWP(%q) err = %v, want *ValidationError{npwp}", tt.in, err)
+				}
+				return
+			}
+			if err != nil || got != tt.want {
+				t.Errorf("normalizeNPWP(%q) = %q, %v; want %q", tt.in, got, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestVendorAdminService_Create_StagesLegalNameAndNormalizedNPWP(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(&fakeVendorAdminRepo{}, sub)
+
+	_, err := svc.Create(context.Background(), 7, CreateVendorRequest{
+		Code: "ACM", Name: "Acme", LegalName: "  PT Acme Sejahtera ", NPWP: "01.234.567.8-901.000",
+	}, "ip")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	got := sub.lastRequest.Payload.(vendorCreatePayload)
+	if got.LegalName != "PT Acme Sejahtera" || got.NPWP != "012345678901000" {
+		t.Errorf("payload legal_name=%q npwp=%q, want trimmed name and digits-only NPWP", got.LegalName, got.NPWP)
+	}
+}
+
+func TestVendorAdminService_Create_InvalidNPWP_StagesNothing(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	_, err := NewVendorAdminService(&fakeVendorAdminRepo{}, sub).Create(context.Background(), 1, CreateVendorRequest{Code: "ACM", Name: "Acme", NPWP: "123"}, "ip")
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) || valErr.Field != "npwp" || sub.submitCalled {
+		t.Fatalf("err = %v submitCalled=%v, want *ValidationError{npwp} and nothing staged", err, sub.submitCalled)
+	}
+}
+
+// PUT is a full overwrite for most fields, but legal_name/npwp are tri-state so
+// a client that predates them (sends neither) cannot wipe them.
+func TestVendorAdminService_Update_LegalNameAndNPWP_TriState(t *testing.T) {
+	existing := activeVendor(1, "ACM")
+	existing.LegalName, existing.Npwp = sp("PT Lama"), sp("012345678901000")
+
+	tests := []struct {
+		name      string
+		legal     *string
+		npwp      *string
+		wantLegal string
+		wantNPWP  string
+	}{
+		{"omitted keeps both", nil, nil, "PT Lama", "012345678901000"},
+		{"blank clears both", sp(""), sp("  "), "", ""},
+		{"value replaces both (npwp normalized)", sp(" PT Baru "), sp("99.999.999.9-999.999"), "PT Baru", "999999999999999"},
+		{"only npwp sent, legal_name kept", nil, sp("0123456789012345"), "PT Lama", "0123456789012345"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &fakeVendorBranchSubmitter{}
+			svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return existing }), sub)
+
+			if _, err := svc.Update(context.Background(), 7, 1, UpdateVendorRequest{Name: "Acme", LegalName: tt.legal, NPWP: tt.npwp}, "ip"); err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+			got := sub.lastRequest.Payload.(vendorUpdatePayload)
+			if got.LegalName != tt.wantLegal || got.NPWP != tt.wantNPWP {
+				t.Errorf("payload legal_name=%q npwp=%q, want %q / %q", got.LegalName, got.NPWP, tt.wantLegal, tt.wantNPWP)
+			}
+		})
+	}
+}
+
+func TestVendorAdminService_Update_InvalidNPWP_StagesNothing(t *testing.T) {
+	sub := &fakeVendorBranchSubmitter{}
+	svc := NewVendorAdminService(vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") }), sub)
+
+	_, err := svc.Update(context.Background(), 1, 1, UpdateVendorRequest{Name: "Acme", NPWP: sp("12345")}, "ip")
+
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) || valErr.Field != "npwp" || sub.submitCalled {
+		t.Fatalf("err = %v submitCalled=%v, want *ValidationError{npwp} and nothing staged", err, sub.submitCalled)
+	}
+}
+
+// A vendor change staged before T4.3 has a "before" snapshot without the
+// legal_name/npwp keys. It must compare as NOT equal to the current (new-shape)
+// row, so ApproveMasterData marks it stale instead of applying an update whose
+// payload would null those columns.
+func TestVendorSnapshotPreT43_IsStaleNotApplied(t *testing.T) {
+	preT43 := []byte(`{"id":1,"code":"ACM","name":"Vendor ACM","contact_email":null,"contact_phone":null,"hq_address":null,"is_active":true,"deleted_at":null}`)
+
+	equal, err := statesEqual(preT43, activeVendor(1, "ACM"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if equal {
+		t.Error("a pre-T4.3 snapshot must not equal the current row: it has to be marked stale, not applied")
+	}
+
+	// Sanity: a snapshot captured from the current shape does match.
+	raw, _ := json.Marshal(activeVendor(1, "ACM"))
+	if equal, err := statesEqual(raw, activeVendor(1, "ACM")); err != nil || !equal {
+		t.Errorf("a current-shape snapshot must equal itself, got equal=%v err=%v", equal, err)
 	}
 }
 
@@ -533,9 +451,8 @@ func TestVendorAdminService_List_PassesThroughToRepo(t *testing.T) {
 		}
 		return want, nil
 	}}
-	svc := NewVendorAdminService(repo, &fakeVendorAuditWriter{})
 
-	got, err := svc.List(context.Background(), db.ListVendorsAdminParams{Status: "active"})
+	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).List(context.Background(), db.ListVendorsAdminParams{Status: "active"})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -546,9 +463,8 @@ func TestVendorAdminService_List_PassesThroughToRepo(t *testing.T) {
 
 func TestVendorAdminService_Count_PassesThroughToRepo(t *testing.T) {
 	repo := &fakeVendorAdminRepo{countFunc: func(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) { return 42, nil }}
-	svc := NewVendorAdminService(repo, &fakeVendorAuditWriter{})
 
-	got, err := svc.Count(context.Background(), db.CountVendorsAdminParams{Status: "all"})
+	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).Count(context.Background(), db.CountVendorsAdminParams{Status: "all"})
 	if err != nil {
 		t.Fatalf("Count: %v", err)
 	}
@@ -558,10 +474,8 @@ func TestVendorAdminService_Count_PassesThroughToRepo(t *testing.T) {
 }
 
 func TestVendorAdminService_Get_PassesThroughToRepo(t *testing.T) {
-	repo := &fakeVendorAdminRepo{getByIDFunc: func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
-		return activeVendor(id, "ACM"), nil
-	}}
-	svc := NewVendorAdminService(repo, &fakeVendorAuditWriter{})
+	repo := vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") })
+	svc := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{})
 
 	got, err := svc.Get(context.Background(), 1)
 	if err != nil {

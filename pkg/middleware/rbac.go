@@ -93,6 +93,13 @@ func RequireRoles(allowedRoles ...string) func(http.Handler) http.Handler {
 	}
 }
 
+// WithAuthContext returns ctx carrying authCtx, as RequireAuth does after
+// validating a token. Lets service-layer RBAC re-checks (which read the
+// caller from ctx) be exercised without an HTTP round trip.
+func WithAuthContext(ctx context.Context, authCtx *AuthContext) context.Context {
+	return context.WithValue(ctx, authContextKey, authCtx)
+}
+
 // GetAuthContext extracts AuthContext from the request context.
 func GetAuthContext(ctx context.Context) (*AuthContext, bool) {
 	authCtx, ok := ctx.Value(authContextKey).(*AuthContext)

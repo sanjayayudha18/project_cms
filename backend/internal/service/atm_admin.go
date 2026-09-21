@@ -8,10 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
@@ -33,40 +31,38 @@ var (
 
 var validATMPriorityClasses = map[string]bool{"VIP": true, "Non VIP": true, "Industri": true}
 
-// ATMAdminAuditWriter is the narrow audit-write dependency ATMAdminService
-// needs, mirroring VendorAdminAuditWriter -- lets tests fake it without a DB.
-type ATMAdminAuditWriter interface {
-	Write(ctx context.Context, entry audit.Entry) error
+// ATMAdminSubmitter is the narrow MasterDataChangeService surface
+// ATMAdminService needs (maker-checker, D1 / plan.md T4.2).
+type ATMAdminSubmitter interface {
+	Submit(ctx context.Context, makerID int64, req SubmitRequest, actorIP string) (db.MasterDataChangeRequest, error)
 }
 
-// ATMAdminRepo is the repository surface ATMAdminService needs.
-// *repository.ATMAdminRepository satisfies this automatically. Narrow so
-// tests can fake it without a DB (mirrors VendorAdminRepo).
+// ATMAdminRepo is the read-only repository surface ATMAdminService needs.
+// *repository.ATMAdminRepository satisfies this automatically. Deliberately
+// has no write methods: every ATM mutation goes through
+// MasterDataChangeService.Submit and is applied by ATMApplier.
 type ATMAdminRepo interface {
 	List(ctx context.Context, arg db.ListATMsAdminParams) ([]db.ListATMsAdminRow, error)
 	Count(ctx context.Context, arg db.CountATMsAdminParams) (int64, error)
 	GetByID(ctx context.Context, id int64) (*db.GetATMAdminByIDRow, error)
 	FindByTerminalID(ctx context.Context, terminalID string) (*int64, error)
-	Create(ctx context.Context, arg db.CreateATMAdminParams) (db.CreateATMAdminRow, error)
-	Update(ctx context.Context, arg db.UpdateATMAdminParams) (db.UpdateATMAdminRow, error)
-	Disable(ctx context.Context, id int64) error
-	Enable(ctx context.Context, id int64) error
 	ListLocations(ctx context.Context) ([]db.ListLocationsForSelectRow, error)
 	LocationExists(ctx context.Context, locationID int64) (bool, error)
 }
 
-// ATMAdminService owns validation, reference resolution, uniqueness
-// resolution, and the audit-write guarantee for ATM create/update/disable/
-// enable (Req 3-5, 7). Apply-immediately-with-audit, no maker-checker
-// (inherited decision, .kiro/specs/admin-atm-management/tasks.md Task 0).
+// ATMAdminService owns validation, reference resolution and uniqueness
+// pre-checks for ATM create/update/disable/enable (Req 3-5) and stages each
+// change via MasterDataChangeService.Submit. Since T4.2 nothing is applied
+// here: the atms row is written by ATMApplier once the change is approved,
+// and the audit trail is the engine's (submit + apply), not this service's.
 type ATMAdminService struct {
-	repo  ATMAdminRepo
-	audit ATMAdminAuditWriter
+	repo    ATMAdminRepo
+	changes ATMAdminSubmitter
 }
 
 // NewATMAdminService creates an ATMAdminService with the given dependencies.
-func NewATMAdminService(repo ATMAdminRepo, auditWriter ATMAdminAuditWriter) *ATMAdminService {
-	return &ATMAdminService{repo: repo, audit: auditWriter}
+func NewATMAdminService(repo ATMAdminRepo, changes ATMAdminSubmitter) *ATMAdminService {
+	return &ATMAdminService{repo: repo, changes: changes}
 }
 
 // ATM is the admin-facing ATM record: money as decimal strings and
@@ -140,6 +136,32 @@ type UpdateATMRequest struct {
 	PriorityClass           *string
 }
 
+// atmUpdatePayload is the jsonb payload ATMApplier unmarshals for op=update,
+// and the embedded tail of atmCreatePayload. terminal_id is deliberately not
+// part of it: it is immutable after create. Money travels as trimmed decimal
+// strings (never float) and is parsed to numeric only in the applier; blank
+// optionals are nil.
+type atmUpdatePayload struct {
+	LocationID              int64   `json:"location_id"`
+	MachineType             string  `json:"machine_type"`
+	Brand                   string  `json:"brand"`
+	Model                   string  `json:"model"`
+	OperationHours          string  `json:"operation_hours"`
+	DeploymentType          string  `json:"deployment_type"`
+	CapacityAmount          *string `json:"capacity_amount"`
+	LowThresholdAmount      *string `json:"low_threshold_amount"`
+	CriticalThresholdAmount *string `json:"critical_threshold_amount"`
+	Blacklisted             bool    `json:"blacklisted"`
+	EscrowAccount           *string `json:"escrow_account"`
+	PriorityClass           *string `json:"priority_class"`
+}
+
+// atmCreatePayload is the jsonb payload ATMApplier unmarshals for op=create.
+type atmCreatePayload struct {
+	TerminalID string `json:"terminal_id"`
+	atmUpdatePayload
+}
+
 // List returns a page of ATMs matching the given filters (Req 8). Read-only,
 // never writes an audit entry (Req 6.3, 7.4).
 func (s *ATMAdminService) List(ctx context.Context, arg db.ListATMsAdminParams) ([]ATM, error) {
@@ -192,221 +214,129 @@ func (s *ATMAdminService) ListLocations(ctx context.Context) ([]LocationOption, 
 	return out, nil
 }
 
-// Create validates and inserts a new ATM, then writes an atm_created audit
-// entry (Req 3.1-3.9, 7.1-7.3). Never creates an ATM and skips the audit
-// write, or vice versa -- a failed audit write after a successful insert
-// surfaces as an error (Req 7.3) rather than silently swallowing it, same
-// convention as VendorAdminService.Create.
-func (s *ATMAdminService) Create(ctx context.Context, actorID int64, req CreateATMRequest, actorIP string) (ATM, error) {
+// Create validates and stages a new ATM (Req 3.1-3.9). The terminal_id
+// uniqueness check here is an early answer only; the DB unique constraint is
+// re-enforced at apply time (a duplicate that was pending twice surfaces then
+// as ErrATMTerminalIDConflict).
+func (s *ATMAdminService) Create(ctx context.Context, actorID int64, req CreateATMRequest, actorIP string) (db.MasterDataChangeRequest, error) {
 	terminalID := strings.TrimSpace(req.TerminalID)
 	if terminalID == "" {
-		return ATM{}, &ValidationError{Field: "terminal_id", Message: "wajib diisi"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "terminal_id", Message: "wajib diisi"}
 	}
-	fields, priorityClass, capacity, lowThreshold, criticalThreshold, err := validateATMEditableFields(
-		req.LocationID, req.MachineType, req.Brand, req.Model, req.OperationHours, req.DeploymentType,
-		req.PriorityClass, req.CapacityAmount, req.LowThresholdAmount, req.CriticalThresholdAmount,
-	)
+	payload, err := s.validateEditable(ctx, atmEditableInput{
+		locationID: req.LocationID, machineType: req.MachineType, brand: req.Brand, model: req.Model,
+		operationHours: req.OperationHours, deploymentType: req.DeploymentType, priorityClass: req.PriorityClass,
+		capacity: req.CapacityAmount, lowThreshold: req.LowThresholdAmount, criticalThreshold: req.CriticalThresholdAmount,
+		blacklisted: req.Blacklisted, escrowAccount: req.EscrowAccount,
+	})
 	if err != nil {
-		return ATM{}, err
-	}
-
-	exists, err := s.repo.LocationExists(ctx, fields.locationID)
-	if err != nil {
-		return ATM{}, fmt.Errorf("checking location reference: %w", err)
-	}
-	if !exists {
-		return ATM{}, ErrATMInvalidReference
+		return db.MasterDataChangeRequest{}, err
 	}
 
 	existing, err := s.repo.FindByTerminalID(ctx, terminalID)
 	if err != nil {
-		return ATM{}, fmt.Errorf("checking terminal_id uniqueness: %w", err)
+		return db.MasterDataChangeRequest{}, fmt.Errorf("checking terminal_id uniqueness: %w", err)
 	}
 	if existing != nil {
-		return ATM{}, ErrATMTerminalIDConflict
+		return db.MasterDataChangeRequest{}, ErrATMTerminalIDConflict
 	}
 
-	created, err := s.repo.Create(ctx, db.CreateATMAdminParams{
-		TerminalID:              terminalID,
-		LocationID:              fields.locationID,
-		MachineType:             fields.machineType,
-		Brand:                   fields.brand,
-		Model:                   fields.model,
-		OperationHours:          fields.operationHours,
-		DeploymentType:          fields.deploymentType,
-		CapacityAmount:          capacity,
-		LowThresholdAmount:      lowThreshold,
-		CriticalThresholdAmount: criticalThreshold,
-		Blacklisted:             req.Blacklisted,
-		EscrowAccount:           nilIfEmpty(strings.TrimSpace(derefOrEmpty(req.EscrowAccount))),
-		PriorityClass:           priorityClass,
-	})
-	if err != nil {
-		if isUniqueViolation(err) {
-			// Pre-check above missed a race; the DB constraint is the source of truth.
-			return ATM{}, ErrATMTerminalIDConflict
-		}
-		return ATM{}, fmt.Errorf("creating atm: %w", err)
-	}
-
-	result, err := atmFromCreateRow(created)
-	if err != nil {
-		return ATM{}, err
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "atm_created",
-		EntityType: "atm",
-		EntityID:   result.ID,
-		After:      result,
-		IP:         actorIP,
-	}); err != nil {
-		return ATM{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return result, nil
+	return s.changes.Submit(ctx, actorID, SubmitRequest{
+		EntityType: "atm", Op: "create",
+		Payload: atmCreatePayload{TerminalID: terminalID, atmUpdatePayload: payload},
+	}, actorIP)
 }
 
-// Update validates and overwrites an ATM's editable fields, rejecting any
-// attempt to change terminal_id (Req 4.1-4.7, 7.1-7.3). A missing or
-// soft-disabled target id is a 404 (ErrATMNotFound) -- a disabled ATM must
-// be enabled before it can be edited, same convention as
-// VendorAdminService.Update.
-func (s *ATMAdminService) Update(ctx context.Context, actorID, id int64, req UpdateATMRequest, actorIP string) (ATM, error) {
+// Update validates and stages an overwrite of an ATM's editable fields,
+// rejecting any attempt to change terminal_id (Req 4.1-4.7). A missing or
+// soft-disabled target id is a 404 (ErrATMNotFound) -- a disabled ATM must be
+// enabled before it can be edited. The ATM row as loaded here is the change's
+// "before" snapshot, so an edit that lands after someone else changed the ATM
+// is marked stale rather than silently overwriting (T2.5).
+func (s *ATMAdminService) Update(ctx context.Context, actorID, id int64, req UpdateATMRequest, actorIP string) (db.MasterDataChangeRequest, error) {
 	before, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return ATM{}, fmt.Errorf("loading atm: %w", err)
+		return db.MasterDataChangeRequest{}, fmt.Errorf("loading atm: %w", err)
 	}
 	if before == nil || before.DeletedAt.Valid {
-		return ATM{}, ErrATMNotFound
+		return db.MasterDataChangeRequest{}, ErrATMNotFound
 	}
 	if req.TerminalID != nil && strings.TrimSpace(*req.TerminalID) != before.TerminalID {
-		return ATM{}, ErrATMTerminalIDImmutable
+		return db.MasterDataChangeRequest{}, ErrATMTerminalIDImmutable
 	}
 
-	fields, priorityClass, capacity, lowThreshold, criticalThreshold, err := validateATMEditableFields(
-		req.LocationID, req.MachineType, req.Brand, req.Model, req.OperationHours, req.DeploymentType,
-		req.PriorityClass, req.CapacityAmount, req.LowThresholdAmount, req.CriticalThresholdAmount,
+	payload, err := s.validateEditable(ctx, atmEditableInput{
+		locationID: req.LocationID, machineType: req.MachineType, brand: req.Brand, model: req.Model,
+		operationHours: req.OperationHours, deploymentType: req.DeploymentType, priorityClass: req.PriorityClass,
+		capacity: req.CapacityAmount, lowThreshold: req.LowThresholdAmount, criticalThreshold: req.CriticalThresholdAmount,
+		blacklisted: req.Blacklisted, escrowAccount: req.EscrowAccount,
+	})
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+
+	return s.changes.Submit(ctx, actorID, SubmitRequest{EntityType: "atm", Op: "update", EntityID: &id, Before: before, Payload: payload}, actorIP)
+}
+
+// Disable stages a soft-disable of an ATM (Req 5.1, 5.4-5.5). A non-existent
+// id is a 404 and stages nothing.
+func (s *ATMAdminService) Disable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error) {
+	return s.toggle(ctx, actorID, id, "disable", actorIP)
+}
+
+// Enable stages the reverse of Disable (Req 5.2, 5.6). A non-existent id is a
+// 404 and stages nothing.
+func (s *ATMAdminService) Enable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error) {
+	return s.toggle(ctx, actorID, id, "enable", actorIP)
+}
+
+func (s *ATMAdminService) toggle(ctx context.Context, actorID, id int64, op, actorIP string) (db.MasterDataChangeRequest, error) {
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, fmt.Errorf("loading atm: %w", err)
+	}
+	if existing == nil {
+		return db.MasterDataChangeRequest{}, ErrATMNotFound
+	}
+	return s.changes.Submit(ctx, actorID, SubmitRequest{EntityType: "atm", Op: op, EntityID: &id, Before: existing}, actorIP)
+}
+
+// atmEditableInput is the raw editable field set shared by Create and Update.
+type atmEditableInput struct {
+	locationID                                                              int64
+	machineType, brand, model, operationHours, deploymentType               string
+	priorityClass, capacity, lowThreshold, criticalThreshold, escrowAccount *string
+	blacklisted                                                             bool
+}
+
+// validateEditable runs the Req 3.2/3.5/3.6 (and identical 4.1/4.5)
+// validation shared by Create and Update -- required text fields, priority
+// enum, non-negative exact decimals -- checks the location reference, and
+// returns the normalized (trimmed, blank->nil) payload to stage.
+func (s *ATMAdminService) validateEditable(ctx context.Context, in atmEditableInput) (atmUpdatePayload, error) {
+	fields, priorityClass, _, _, _, err := validateATMEditableFields(
+		in.locationID, in.machineType, in.brand, in.model, in.operationHours, in.deploymentType,
+		in.priorityClass, in.capacity, in.lowThreshold, in.criticalThreshold,
 	)
 	if err != nil {
-		return ATM{}, err
+		return atmUpdatePayload{}, err
 	}
 
 	exists, err := s.repo.LocationExists(ctx, fields.locationID)
 	if err != nil {
-		return ATM{}, fmt.Errorf("checking location reference: %w", err)
+		return atmUpdatePayload{}, fmt.Errorf("checking location reference: %w", err)
 	}
 	if !exists {
-		return ATM{}, ErrATMInvalidReference
+		return atmUpdatePayload{}, ErrATMInvalidReference
 	}
 
-	beforeATM, err := atmFromGetRow(*before)
-	if err != nil {
-		return ATM{}, err
-	}
-
-	updated, err := s.repo.Update(ctx, db.UpdateATMAdminParams{
-		ID:                      id,
-		LocationID:              fields.locationID,
-		MachineType:             fields.machineType,
-		Brand:                   fields.brand,
-		Model:                   fields.model,
-		OperationHours:          fields.operationHours,
-		DeploymentType:          fields.deploymentType,
-		CapacityAmount:          capacity,
-		LowThresholdAmount:      lowThreshold,
-		CriticalThresholdAmount: criticalThreshold,
-		Blacklisted:             req.Blacklisted,
-		EscrowAccount:           nilIfEmpty(strings.TrimSpace(derefOrEmpty(req.EscrowAccount))),
-		PriorityClass:           priorityClass,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// The query filters deleted_at IS NULL -- a race where the ATM
-			// was disabled between the pre-check and this UPDATE lands here too.
-			return ATM{}, ErrATMNotFound
-		}
-		return ATM{}, fmt.Errorf("updating atm: %w", err)
-	}
-
-	result, err := atmFromUpdateRow(updated)
-	if err != nil {
-		return ATM{}, err
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "atm_updated",
-		EntityType: "atm",
-		EntityID:   id,
-		Before:     beforeATM,
-		After:      result,
-		IP:         actorIP,
-	}); err != nil {
-		return ATM{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return result, nil
-}
-
-// Disable soft-disables an ATM and writes an atm_deactivated audit entry
-// (Req 5.1, 5.4-5.5, 7.1-7.3).
-func (s *ATMAdminService) Disable(ctx context.Context, actorID, id int64, actorIP string) error {
-	existing, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("loading atm: %w", err)
-	}
-	if existing == nil {
-		return ErrATMNotFound
-	}
-
-	if err := s.repo.Disable(ctx, id); err != nil {
-		return fmt.Errorf("disabling atm: %w", err)
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "atm_deactivated",
-		EntityType: "atm",
-		EntityID:   id,
-		IP:         actorIP,
-	}); err != nil {
-		return fmt.Errorf("write audit log: %w", err)
-	}
-
-	return nil
-}
-
-// Enable reverses Disable and writes an atm_reactivated audit entry (Req
-// 5.2, 5.6, 7.1-7.3). A non-existent id is a 404 with NO audit entry
-// written -- an explicit existence pre-check, since the underlying
-// EnableATM UPDATE silently no-ops on 0 rows affected and would otherwise
-// let this method report success for an id that was never real.
-func (s *ATMAdminService) Enable(ctx context.Context, actorID, id int64, actorIP string) error {
-	existing, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("loading atm: %w", err)
-	}
-	if existing == nil {
-		return ErrATMNotFound
-	}
-
-	if err := s.repo.Enable(ctx, id); err != nil {
-		return fmt.Errorf("enabling atm: %w", err)
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "atm_reactivated",
-		EntityType: "atm",
-		EntityID:   id,
-		IP:         actorIP,
-	}); err != nil {
-		return fmt.Errorf("write audit log: %w", err)
-	}
-
-	return nil
+	return atmUpdatePayload{
+		LocationID: fields.locationID, MachineType: fields.machineType, Brand: fields.brand, Model: fields.model,
+		OperationHours: fields.operationHours, DeploymentType: fields.deploymentType,
+		CapacityAmount: trimOptional(in.capacity), LowThresholdAmount: trimOptional(in.lowThreshold),
+		CriticalThresholdAmount: trimOptional(in.criticalThreshold), Blacklisted: in.blacklisted,
+		EscrowAccount: trimOptional(in.escrowAccount), PriorityClass: priorityClass,
+	}, nil
 }
 
 // atmEditableFields holds the trimmed, presence-validated shared fields
@@ -426,7 +356,8 @@ type atmEditableFields struct {
 // 4.1/4.5) validation shared by Create and Update: required text fields
 // present, priority_class enum, and each monetary amount parses as a
 // non-negative exact decimal. Returns the parsed pgtype.Numeric values
-// ready for the repository params.
+// (the staging path only needs the validity check and re-parses in
+// ATMApplier).
 func validateATMEditableFields(
 	locationID int64, machineType, brand, model, operationHours, deploymentType string,
 	priorityClass, capacityAmount, lowThresholdAmount, criticalThresholdAmount *string,
@@ -530,18 +461,9 @@ func parseNonNegativeDecimal(field string, amount *string) (pgtype.Numeric, erro
 	return n, nil
 }
 
-// derefOrEmpty returns "" for a nil *string, otherwise the pointed-to value.
-func derefOrEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-// atmFromListRow/atmFromGetRow/atmFromCreateRow/atmFromUpdateRow convert the
-// sqlc row types (identical field sets except LocationName, which only List
-// and Get join in) into the shared ATM domain struct, decimal-stringifying
-// money via the existing numericToDecimalStringPtr helper.
+// atmFromListRow/atmFromGetRow convert the sqlc row types (identical field
+// sets) into the shared ATM domain struct, decimal-stringifying money via the
+// existing numericToDecimalStringPtr helper.
 
 func atmFromListRow(row db.ListATMsAdminRow) (ATM, error) {
 	capacity, low, critical, err := decimalStrings(row.CapacityAmount, row.LowThresholdAmount, row.CriticalThresholdAmount)
@@ -565,36 +487,6 @@ func atmFromGetRow(row db.GetATMAdminByIDRow) (ATM, error) {
 	}
 	return ATM{
 		ID: row.ID, TerminalID: row.TerminalID, LocationID: row.LocationID, LocationName: row.LocationName,
-		MachineType: row.MachineType, Brand: row.Brand, Model: row.Model, OperationHours: row.OperationHours,
-		DeploymentType: row.DeploymentType, CapacityAmount: capacity, LowThresholdAmount: low,
-		CriticalThresholdAmount: critical, Blacklisted: row.Blacklisted, EscrowAccount: row.EscrowAccount,
-		PriorityClass: row.PriorityClass, IsActive: row.IsActive,
-		CreatedAt: timestamptzToPtr(row.CreatedAt), UpdatedAt: timestamptzToPtr(row.UpdatedAt), DeletedAt: timestamptzToPtr(row.DeletedAt),
-	}, nil
-}
-
-func atmFromCreateRow(row db.CreateATMAdminRow) (ATM, error) {
-	capacity, low, critical, err := decimalStrings(row.CapacityAmount, row.LowThresholdAmount, row.CriticalThresholdAmount)
-	if err != nil {
-		return ATM{}, err
-	}
-	return ATM{
-		ID: row.ID, TerminalID: row.TerminalID, LocationID: row.LocationID,
-		MachineType: row.MachineType, Brand: row.Brand, Model: row.Model, OperationHours: row.OperationHours,
-		DeploymentType: row.DeploymentType, CapacityAmount: capacity, LowThresholdAmount: low,
-		CriticalThresholdAmount: critical, Blacklisted: row.Blacklisted, EscrowAccount: row.EscrowAccount,
-		PriorityClass: row.PriorityClass, IsActive: row.IsActive,
-		CreatedAt: timestamptzToPtr(row.CreatedAt), UpdatedAt: timestamptzToPtr(row.UpdatedAt), DeletedAt: timestamptzToPtr(row.DeletedAt),
-	}, nil
-}
-
-func atmFromUpdateRow(row db.UpdateATMAdminRow) (ATM, error) {
-	capacity, low, critical, err := decimalStrings(row.CapacityAmount, row.LowThresholdAmount, row.CriticalThresholdAmount)
-	if err != nil {
-		return ATM{}, err
-	}
-	return ATM{
-		ID: row.ID, TerminalID: row.TerminalID, LocationID: row.LocationID,
 		MachineType: row.MachineType, Brand: row.Brand, Model: row.Model, OperationHours: row.OperationHours,
 		DeploymentType: row.DeploymentType, CapacityAmount: capacity, LowThresholdAmount: low,
 		CriticalThresholdAmount: critical, Blacklisted: row.Blacklisted, EscrowAccount: row.EscrowAccount,

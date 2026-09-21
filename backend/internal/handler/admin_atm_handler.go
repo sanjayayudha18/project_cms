@@ -21,10 +21,12 @@ type ATMAdminServicer interface {
 	List(ctx context.Context, arg db.ListATMsAdminParams) ([]service.ATM, error)
 	Count(ctx context.Context, arg db.CountATMsAdminParams) (int64, error)
 	Get(ctx context.Context, id int64) (service.ATM, error)
-	Create(ctx context.Context, actorID int64, req service.CreateATMRequest, actorIP string) (service.ATM, error)
-	Update(ctx context.Context, actorID, id int64, req service.UpdateATMRequest, actorIP string) (service.ATM, error)
-	Disable(ctx context.Context, actorID, id int64, actorIP string) error
-	Enable(ctx context.Context, actorID, id int64, actorIP string) error
+	// Mutations stage a maker-checker change request (T4.2) and return it
+	// pending; the atms row itself changes only after approval.
+	Create(ctx context.Context, actorID int64, req service.CreateATMRequest, actorIP string) (db.MasterDataChangeRequest, error)
+	Update(ctx context.Context, actorID, id int64, req service.UpdateATMRequest, actorIP string) (db.MasterDataChangeRequest, error)
+	Disable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
+	Enable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 	ListLocations(ctx context.Context) ([]service.LocationOption, error)
 }
 
@@ -173,7 +175,7 @@ type createATMAdminRequestBody struct {
 	PriorityClass           *string `json:"priority_class"`
 }
 
-// Create handles POST / (Req 3.1-3.9).
+// Create handles POST / (Req 3.1-3.9) -- stages the ATM for approval (202).
 func (h *AdminATMHandler) Create(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
@@ -187,7 +189,7 @@ func (h *AdminATMHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.svc.Create(r.Context(), authCtx.UserID, service.CreateATMRequest{
+	change, err := h.svc.Create(r.Context(), authCtx.UserID, service.CreateATMRequest{
 		TerminalID: body.TerminalID, LocationID: body.LocationID, MachineType: body.MachineType,
 		Brand: body.Brand, Model: body.Model, OperationHours: body.OperationHours,
 		DeploymentType: body.DeploymentType, CapacityAmount: body.CapacityAmount,
@@ -199,7 +201,7 @@ func (h *AdminATMHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, atmToResponse(created))
+	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
 }
 
 type updateATMAdminRequestBody struct {
@@ -218,10 +220,10 @@ type updateATMAdminRequestBody struct {
 	PriorityClass           *string `json:"priority_class"`
 }
 
-// Update handles PUT /{id} (Req 4.1-4.7). TerminalID is accepted only so an
-// attempt to change it can be detected and rejected by the service --
-// omitting it from the body entirely is treated the same as resending the
-// current value.
+// Update handles PUT /{id} (Req 4.1-4.7) -- stages the edit for approval
+// (202). TerminalID is accepted only so an attempt to change it can be
+// detected and rejected by the service -- omitting it from the body entirely
+// is treated the same as resending the current value.
 func (h *AdminATMHandler) Update(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
@@ -241,7 +243,7 @@ func (h *AdminATMHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.UpdateATMRequest{
+	change, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.UpdateATMRequest{
 		TerminalID: body.TerminalID, LocationID: body.LocationID, MachineType: body.MachineType,
 		Brand: body.Brand, Model: body.Model, OperationHours: body.OperationHours,
 		DeploymentType: body.DeploymentType, CapacityAmount: body.CapacityAmount,
@@ -253,10 +255,10 @@ func (h *AdminATMHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, atmToResponse(updated))
+	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
 }
 
-// Disable handles POST /{id}/disable (Req 5.1, 5.4-5.5).
+// Disable handles POST /{id}/disable (Req 5.1, 5.4-5.5) -- stages the disable for approval (202).
 func (h *AdminATMHandler) Disable(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
@@ -270,15 +272,16 @@ func (h *AdminATMHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Disable(r.Context(), authCtx.UserID, id, extractClientIP(r)); err != nil {
+	change, err := h.svc.Disable(r.Context(), authCtx.UserID, id, extractClientIP(r))
+	if err != nil {
 		h.handleATMAdminError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"message": "ATM berhasil dinonaktifkan"})
+	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
 }
 
-// Enable handles POST /{id}/enable (Req 5.2, 5.6).
+// Enable handles POST /{id}/enable (Req 5.2, 5.6) -- stages the re-enable for approval (202).
 func (h *AdminATMHandler) Enable(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
@@ -292,12 +295,13 @@ func (h *AdminATMHandler) Enable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Enable(r.Context(), authCtx.UserID, id, extractClientIP(r)); err != nil {
+	change, err := h.svc.Enable(r.Context(), authCtx.UserID, id, extractClientIP(r))
+	if err != nil {
 		h.handleATMAdminError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"message": "ATM berhasil diaktifkan kembali"})
+	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
 }
 
 // handleATMAdminError maps ATMAdminService errors to HTTP responses per
@@ -316,6 +320,10 @@ func (h *AdminATMHandler) handleATMAdminError(w http.ResponseWriter, err error) 
 		writeError(w, http.StatusBadRequest, "bad_request", service.ErrATMTerminalIDImmutable.Error())
 	case errors.Is(err, service.ErrATMInvalidReference):
 		writeError(w, http.StatusBadRequest, "invalid_reference", service.ErrATMInvalidReference.Error())
+	case errors.Is(err, service.ErrMasterDataForbidden):
+		writeForbidden(w, "Anda tidak berhak mengubah master data")
+	case errors.Is(err, service.ErrMasterDataChangePending):
+		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangePending.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 	}

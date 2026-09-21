@@ -8,26 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
-// numeric parses a decimal string into a pgtype.Numeric for test params,
-// same convention as rbac_list_handler_test.go's numeric() helper.
-func numeric(t *testing.T, s string) pgtype.Numeric {
-	t.Helper()
-	var n pgtype.Numeric
-	if err := n.Scan(s); err != nil {
-		t.Fatalf("parsing numeric %q: %v", s, err)
-	}
-	return n
-}
-
-// TestATMAdminRepository exercises List/Count/GetByID/Create/Update/
-// Disable/Enable/ListLocations/LocationExists against a real DB transaction
+// TestATMAdminRepository exercises List/Count/GetByID/FindByTerminalID/
+// ListLocations/LocationExists against a real DB transaction
 // rolled back on cleanup — same harness convention as
 // vendor_admin_repository_test.go / user_admin_repository_test.go.
 func TestATMAdminRepository(t *testing.T) {
@@ -193,105 +180,25 @@ func TestATMAdminRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("Create -> FindByTerminalID -> GetByID roundtrip, terminal_id unique violation surfaces", func(t *testing.T) {
-		term := "TATM_NEW_" + tag
-		created, err := repo.Create(ctx, db.CreateATMAdminParams{
-			TerminalID: term, LocationID: locationID, MachineType: "ATM", Brand: "NCR",
-			Model: "SelfServ", OperationHours: "24 Hours", DeploymentType: "Onsite",
-			CapacityAmount: numeric(t, "100000000.00"), Blacklisted: false,
-		})
+	// The repository has no write methods since T4.2 (writes happen in
+	// service.ATMApplier, covered by the masterdata approval integration
+	// tests); FindByTerminalID is the submit-time uniqueness lookup that remains.
+	t.Run("FindByTerminalID finds active and soft-disabled terminals, nil for an unknown one", func(t *testing.T) {
+		for term, want := range map[string]int64{termActive: activeID, termDisabled: disabledID} {
+			foundID, err := repo.FindByTerminalID(ctx, term)
+			if err != nil {
+				t.Fatalf("FindByTerminalID(%s): %v", term, err)
+			}
+			if foundID == nil || *foundID != want {
+				t.Errorf("FindByTerminalID(%s) = %v, want %d (soft-disabled terminal_ids stay reserved)", term, foundID, want)
+			}
+		}
+		foundID, err := repo.FindByTerminalID(ctx, "TATM_NOPE_"+tag)
 		if err != nil {
-			t.Fatalf("Create: %v", err)
+			t.Fatalf("FindByTerminalID(unknown): %v", err)
 		}
-		foundID, err := repo.FindByTerminalID(ctx, term)
-		if err != nil {
-			t.Fatalf("FindByTerminalID: %v", err)
-		}
-		if foundID == nil || *foundID != created.ID {
-			t.Fatalf("FindByTerminalID = %v, want %d", foundID, created.ID)
-		}
-		got, err := repo.GetByID(ctx, created.ID)
-		if err != nil {
-			t.Fatalf("GetByID: %v", err)
-		}
-		if got == nil || got.TerminalID != term || !got.IsActive {
-			t.Fatalf("GetByID(created) = %+v, want active row with terminal_id %s", got, term)
-		}
-	})
-
-	t.Run("Create with a duplicate terminal_id surfaces a unique violation", func(t *testing.T) {
-		// Runs inside a pgx savepoint (tx.Begin on an existing Tx) so the
-		// expected Postgres error does not abort the outer shared tx for
-		// the subtests that follow — a plain failed statement leaves a
-		// pgx.Tx in "current transaction is aborted" (25P02) until rolled
-		// back, unlike a fresh top-level transaction per test.
-		sp, err := tx.Begin(ctx)
-		if err != nil {
-			t.Fatalf("begin savepoint: %v", err)
-		}
-		_, err = NewATMAdminRepository(sp).Create(ctx, db.CreateATMAdminParams{
-			TerminalID: termActive, LocationID: locationID, MachineType: "ATM", Brand: "NCR",
-			Model: "SelfServ", OperationHours: "24 Hours", DeploymentType: "Onsite",
-		})
-		if err == nil {
-			t.Error("Create with duplicate terminal_id: want a unique-violation error, got nil")
-		}
-		if err := sp.Rollback(ctx); err != nil {
-			t.Fatalf("rollback savepoint: %v", err)
-		}
-	})
-
-	t.Run("Update overwrites editable fields, not-found on soft-disabled target", func(t *testing.T) {
-		newBrand := "Diebold"
-		priority := "VIP"
-		updated, err := repo.Update(ctx, db.UpdateATMAdminParams{
-			ID: activeID, LocationID: locationID, MachineType: "ATM", Brand: newBrand,
-			Model: "SelfServ", OperationHours: "24 Hours", DeploymentType: "Onsite",
-			PriorityClass: &priority,
-		})
-		if err != nil {
-			t.Fatalf("Update: %v", err)
-		}
-		if updated.TerminalID != termActive {
-			t.Errorf("Update changed terminal_id to %q, want unchanged %q", updated.TerminalID, termActive)
-		}
-		if updated.Brand != newBrand {
-			t.Errorf("Update Brand = %q, want %q", updated.Brand, newBrand)
-		}
-		if updated.PriorityClass == nil || *updated.PriorityClass != priority {
-			t.Errorf("Update PriorityClass = %v, want %s", updated.PriorityClass, priority)
-		}
-
-		_, err = repo.Update(ctx, db.UpdateATMAdminParams{
-			ID: disabledID, LocationID: locationID, MachineType: "ATM", Brand: "NCR",
-			Model: "SelfServ", OperationHours: "24 Hours", DeploymentType: "Onsite",
-		})
-		if err != pgx.ErrNoRows {
-			t.Errorf("Update(disabled target) err = %v, want pgx.ErrNoRows", err)
-		}
-	})
-
-	t.Run("Disable then Enable toggles is_active and deleted_at", func(t *testing.T) {
-		if err := repo.Disable(ctx, activeID); err != nil {
-			t.Fatalf("Disable: %v", err)
-		}
-		got, err := repo.GetByID(ctx, activeID)
-		if err != nil {
-			t.Fatalf("GetByID after Disable: %v", err)
-		}
-		if got.IsActive || !got.DeletedAt.Valid {
-			t.Fatalf("after Disable, got %+v, want IsActive=false and DeletedAt set", got)
-		}
-
-		if err := repo.Enable(ctx, activeID); err != nil {
-			t.Fatalf("Enable: %v", err)
-		}
-		got, err = repo.GetByID(ctx, activeID)
-		if err != nil {
-			t.Fatalf("GetByID after Enable: %v", err)
-		}
-		if !got.IsActive || got.DeletedAt.Valid {
-			t.Fatalf("after Enable, got %+v, want IsActive=true and DeletedAt NULL", got)
+		if foundID != nil {
+			t.Errorf("FindByTerminalID(unknown) = %v, want nil", foundID)
 		}
 	})
 

@@ -9,9 +9,12 @@ import (
 )
 
 // ATMAdminRepository is the primary-pool repository backing the admin ATM
-// CRUD endpoints (.kiro/specs/admin-atm-management Req 2-6): list/get/
-// create/update/disable/enable, plus the location reference lookups the
-// service layer needs before writing.
+// endpoints (.kiro/specs/admin-atm-management Req 2-6): list/get and the
+// submit-time lookups (FindByTerminalID, location reference checks). It has
+// no write methods on purpose -- since T4.2 every ATM create/update/
+// disable/enable goes through MasterDataChangeService.Submit and is applied
+// by service.ATMApplier inside the approval transaction, so a direct write
+// path here would be a way around maker-checker.
 //
 // Money columns (capacity_amount/low_threshold_amount/critical_threshold_
 // amount) and timestamps pass through as pgtype.Numeric/pgtype.Timestamptz
@@ -69,29 +72,6 @@ func (r *ATMAdminRepository) FindByTerminalID(ctx context.Context, terminalID st
 		return nil, err
 	}
 	return &id, nil
-}
-
-// Create inserts a new ATM.
-func (r *ATMAdminRepository) Create(ctx context.Context, arg db.CreateATMAdminParams) (db.CreateATMAdminRow, error) {
-	return r.queries.CreateATMAdmin(ctx, arg)
-}
-
-// Update overwrites an ATM's editable fields (terminal_id excluded --
-// immutable). Returns pgx.ErrNoRows if the target id does not exist or is
-// soft-disabled (the query filters deleted_at IS NULL) -- the caller maps
-// that to 404.
-func (r *ATMAdminRepository) Update(ctx context.Context, arg db.UpdateATMAdminParams) (db.UpdateATMAdminRow, error) {
-	return r.queries.UpdateATMAdmin(ctx, arg)
-}
-
-// Disable soft-disables an ATM: is_active=false, deleted_at=now().
-func (r *ATMAdminRepository) Disable(ctx context.Context, id int64) error {
-	return r.queries.DisableATM(ctx, id)
-}
-
-// Enable reverses Disable: is_active=true, deleted_at=NULL.
-func (r *ATMAdminRepository) Enable(ctx context.Context, id int64) error {
-	return r.queries.EnableATM(ctx, id)
 }
 
 // ListLocations returns every location for the ATM form's Location select,

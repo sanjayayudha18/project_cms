@@ -13,6 +13,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/approval"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -187,6 +188,18 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "conflict", "Approval request tidak dalam status pending")
 	case errors.Is(err, approval.ErrPolicyNotFound):
 		writeError(w, http.StatusBadRequest, "bad_request", "Tidak ada kebijakan approval untuk jenis dokumen ini")
+	// Master-data apply-on-approve failures a checker can act on (T3.5): the
+	// approval decision is already recorded; the change itself could not land.
+	case errors.Is(err, service.ErrATMAssignmentOverlap):
+		writeError(w, http.StatusConflict, "conflict", service.ErrATMAssignmentOverlap.Error())
+	case errors.Is(err, service.ErrVendorCodeConflict):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorCodeConflict.Error())
+	case errors.Is(err, service.ErrATMTerminalIDConflict):
+		writeError(w, http.StatusConflict, "conflict", service.ErrATMTerminalIDConflict.Error())
+	case errors.Is(err, service.ErrATMAssignmentDuplicate):
+		writeError(w, http.StatusConflict, "conflict", service.ErrATMAssignmentDuplicate.Error())
+	case errors.Is(err, service.ErrMasterDataChangeStale):
+		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangeStale.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 	}

@@ -42,7 +42,16 @@ func TestQueries_NoHardDelete(t *testing.T) {
 		t.Fatal("no query files found — check the glob path (expected backend/queries relative to this package)")
 	}
 
-	tables := []string{"users", "vendors", "atms"}
+	// Master-data tables (plan.md T3.7): vendor_branches/vaults/pics/packages
+	// soft-disable via is_active/deleted_at; atm_vendor_packages (ATM
+	// assignments) via is_active alone (no deleted_at) -- a disabled row is
+	// what frees its period from the no-overlap exclusion constraint, and
+	// deleting one would erase kelolaan history that audit_logs and
+	// master_data_change_requests still reference.
+	tables := []string{
+		"users", "vendors", "atms",
+		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages", "atm_vendor_packages",
+	}
 
 	for _, f := range files {
 		content, err := os.ReadFile(f)
@@ -57,6 +66,35 @@ func TestQueries_NoHardDelete(t *testing.T) {
 			if hardDelete.MatchString(sqlOnly) {
 				t.Errorf("%s defines a hard DELETE FROM %s — forbidden; use the existing soft-delete (Disable/Deactivate) path instead", f, table)
 			}
+		}
+	}
+}
+
+// TestNoHardDeletePattern_ActuallyFires keeps TestQueries_NoHardDelete from
+// passing vacuously: the exact pattern it builds must match a real hard
+// DELETE on every guarded table (incl. schema prefix, mixed case, line breaks)
+// and must NOT match a look-alike table name or a commented-out mention.
+func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
+	guarded := []string{
+		"users", "vendors", "atms",
+		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages", "atm_vendor_packages",
+	}
+	for _, table := range guarded {
+		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)
+		for _, sql := range []string{
+			"DELETE FROM " + table + " WHERE id = $1;",
+			"delete from public." + table + " where id = $1",
+			"DELETE\n  FROM   " + table,
+		} {
+			if !re.MatchString(stripSQLLineComments([]byte(sql))) {
+				t.Errorf("pattern failed to flag %q", sql)
+			}
+		}
+		if re.MatchString(stripSQLLineComments([]byte("-- DELETE FROM " + table + " is forbidden\nSELECT 1;"))) {
+			t.Errorf("pattern must ignore a commented-out mention for %s", table)
+		}
+		if re.MatchString("DELETE FROM " + table + "_archive WHERE id = $1") {
+			t.Errorf("pattern must not flag look-alike table %s_archive", table)
 		}
 	}
 }

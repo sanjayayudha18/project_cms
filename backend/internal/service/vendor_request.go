@@ -302,7 +302,7 @@ type VendorRequestRepository interface {
 	CountForecastForDate(ctx context.Context, arg db.CountForecastForDateParams) (int64, error)
 	ForecastRowExists(ctx context.Context, arg db.ForecastRowExistsParams) (db.ForecastRowExistsRow, error)
 	UpdateVendorRequestStatus(ctx context.Context, arg db.UpdateVendorRequestStatusParams) (db.VendorRequest, error)
-	ListAuditLogsByEntity(ctx context.Context, entityType string, entityID int64) ([]db.AuditLog, error)
+	ListAuditLogsByEntity(ctx context.Context, arg db.ListAuditLogsByEntityParams) ([]db.AuditLog, error)
 	// CIT-2 additions (Req 4, 5). GetVendorForRequestNumber is not listed
 	// here: like ForecastRowExists's sibling resolveItems, the number
 	// generator (createWithRetryingNumber) takes the tx-scoped *db.Queries

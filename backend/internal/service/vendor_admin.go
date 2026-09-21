@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"regexp"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
-
-	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
@@ -22,47 +20,47 @@ var (
 	ErrVendorCodeImmutable = errors.New("vendor code cannot be changed")
 )
 
-// VendorAdminAuditWriter is the narrow audit-write dependency
-// VendorAdminService needs, mirroring auth.AuditWriter -- lets tests fake it
-// without a DB.
-type VendorAdminAuditWriter interface {
-	Write(ctx context.Context, entry audit.Entry) error
+// VendorAdminSubmitter is the narrow MasterDataChangeService surface
+// VendorAdminService needs (maker-checker, D1 / plan.md T4.1).
+type VendorAdminSubmitter interface {
+	Submit(ctx context.Context, makerID int64, req SubmitRequest, actorIP string) (db.MasterDataChangeRequest, error)
 }
 
-// VendorAdminRepo is the repository surface VendorAdminService needs.
-// *repository.VendorAdminRepository satisfies this automatically. Narrow so
-// tests can fake it without a DB (mirrors the SetInitialPasswordService /
-// ApprovalOrchestrator narrow-interface pattern, design.md "Service" section).
+// VendorAdminRepo is the read-only repository surface VendorAdminService
+// needs. *repository.VendorAdminRepository satisfies this automatically.
+// Deliberately has no write methods: every vendor mutation goes through
+// MasterDataChangeService.Submit and is applied by VendorApplier.
 type VendorAdminRepo interface {
 	List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
 	Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
-	Create(ctx context.Context, arg db.CreateVendorAdminParams) (db.CreateVendorAdminRow, error)
-	Update(ctx context.Context, arg db.UpdateVendorAdminParams) (db.UpdateVendorAdminRow, error)
-	Disable(ctx context.Context, id int64) error
-	Enable(ctx context.Context, id int64) error
 	CountActiveUsers(ctx context.Context, vendorID int64) (int64, error)
 }
 
-// VendorAdminService owns validation, uniqueness resolution, and the
-// audit-write guarantee for vendor create/update/disable/enable (Req 7-8).
-// Apply-immediately-with-audit, no maker-checker (Resolved Decision 2).
+// VendorAdminService owns validation and uniqueness pre-checks for vendor
+// create/update/disable/enable (Req 7-8) and stages each change via
+// MasterDataChangeService.Submit. Since T4.1 nothing is applied here: the
+// vendor row is written by VendorApplier once the change is approved, and the
+// audit trail is the engine's (submit + apply), not this service's.
 type VendorAdminService struct {
-	repo  VendorAdminRepo
-	audit VendorAdminAuditWriter
+	repo    VendorAdminRepo
+	changes VendorAdminSubmitter
 }
 
 // NewVendorAdminService creates a VendorAdminService with the given dependencies.
-func NewVendorAdminService(repo VendorAdminRepo, auditWriter VendorAdminAuditWriter) *VendorAdminService {
-	return &VendorAdminService{repo: repo, audit: auditWriter}
+func NewVendorAdminService(repo VendorAdminRepo, changes VendorAdminSubmitter) *VendorAdminService {
+	return &VendorAdminService{repo: repo, changes: changes}
 }
 
 // CreateVendorRequest holds the data for a POST /api/v1/admin/vendors
-// request (Req 7.1).
+// request (Req 7.1). LegalName and NPWP (T4.3) are optional: blank is stored
+// as NULL.
 type CreateVendorRequest struct {
 	Code         string
 	Name         string
+	LegalName    string
+	NPWP         string
 	ContactEmail string
 	ContactPhone string
 	HqAddress    string
@@ -71,17 +69,52 @@ type CreateVendorRequest struct {
 // UpdateVendorRequest holds the data for a PUT /api/v1/admin/vendors/{id}
 // request (Req 7.5). Code is accepted only so an attempt to change it can be
 // detected and rejected (Req 7.6) -- nil means the field was not sent at all.
+//
+// LegalName and NPWP (T4.3) are tri-state, unlike the other fields (which an
+// update always overwrites): nil = not sent, keep the vendor's current value;
+// blank = clear it (NULL); otherwise set it. A client that predates these
+// fields therefore cannot wipe them by omission.
 type UpdateVendorRequest struct {
 	Code         *string
 	Name         string
+	LegalName    *string
+	NPWP         *string
 	ContactEmail string
 	ContactPhone string
 	HqAddress    string
 }
 
-// DisableVendorResult carries the Req 8.5 linked-active-users warning: the
-// disable still succeeds even when LinkedUsersWarning > 0.
+// npwpRe is the shape vendors_npwp_chk enforces: 15 or 16 ASCII digits.
+var npwpRe = regexp.MustCompile(`^[0-9]{15,16}$`)
+
+// normalizeNPWP accepts an NPWP as people write it ("01.234.567.8-901.000"),
+// strips the punctuation and spaces, and returns the digits only -- what the
+// column stores. Blank returns "" (NULL). Anything that isn't 15 or 16 digits
+// after stripping is a ValidationError, so the DB CHECK is never the thing that
+// rejects it.
+func normalizeNPWP(raw string) (string, error) {
+	s := strings.NewReplacer(".", "", "-", "", " ", "").Replace(strings.TrimSpace(raw))
+	if s == "" {
+		return "", nil
+	}
+	if !npwpRe.MatchString(s) {
+		return "", &ValidationError{Field: "npwp", Message: "harus 15 atau 16 digit (titik, strip, dan spasi diabaikan)"}
+	}
+	return s, nil
+}
+
+func valueOrEmpty(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+// DisableVendorResult carries the staged disable change plus the Req 8.5
+// linked-active-users warning: staging still succeeds even when
+// LinkedUsersWarning > 0. The count is as of submit time.
 type DisableVendorResult struct {
+	Change             db.MasterDataChangeRequest
 	LinkedUsersWarning int64
 }
 
@@ -103,124 +136,96 @@ func (s *VendorAdminService) Get(ctx context.Context, id int64) (*db.GetVendorAd
 	return s.repo.GetByID(ctx, id)
 }
 
-// Create validates and inserts a new vendor, then writes a vendor_created
-// audit entry (Req 7.1-7.4, 9.1-9.4). Never creates a vendor and skips the
-// audit write, or vice versa outside of the pre-checked path -- a failed
-// audit write after a successful insert surfaces as an error (Req 9.4)
-// rather than silently swallowing it, matching DeactivateUserService's
-// convention.
-func (s *VendorAdminService) Create(ctx context.Context, actorID int64, req CreateVendorRequest, actorIP string) (db.CreateVendorAdminRow, error) {
+// Create validates and stages a new vendor (Req 7.1-7.4). The code
+// uniqueness check here is an early answer only; the DB unique constraint is
+// re-enforced at apply time (a duplicate that was pending twice surfaces then
+// as ErrVendorCodeConflict).
+func (s *VendorAdminService) Create(ctx context.Context, actorID int64, req CreateVendorRequest, actorIP string) (db.MasterDataChangeRequest, error) {
 	code := strings.TrimSpace(req.Code)
 	name := strings.TrimSpace(req.Name)
 	if code == "" {
-		return db.CreateVendorAdminRow{}, &ValidationError{Field: "code", Message: "wajib diisi"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "code", Message: "wajib diisi"}
 	}
 	if name == "" {
-		return db.CreateVendorAdminRow{}, &ValidationError{Field: "name", Message: "wajib diisi"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "name", Message: "wajib diisi"}
 	}
 	contactEmail := strings.TrimSpace(req.ContactEmail)
 	if contactEmail != "" && !isValidEmail(contactEmail) {
-		return db.CreateVendorAdminRow{}, &ValidationError{Field: "contact_email", Message: "format email tidak valid"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "contact_email", Message: "format email tidak valid"}
+	}
+	npwp, err := normalizeNPWP(req.NPWP)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
 	}
 
 	existing, err := s.repo.FindByCode(ctx, code)
 	if err != nil {
-		return db.CreateVendorAdminRow{}, fmt.Errorf("checking vendor code uniqueness: %w", err)
+		return db.MasterDataChangeRequest{}, fmt.Errorf("checking vendor code uniqueness: %w", err)
 	}
 	if existing != nil {
-		return db.CreateVendorAdminRow{}, ErrVendorCodeConflict
+		return db.MasterDataChangeRequest{}, ErrVendorCodeConflict
 	}
 
-	created, err := s.repo.Create(ctx, db.CreateVendorAdminParams{
-		Code:         code,
-		Name:         name,
-		ContactEmail: nilIfEmpty(contactEmail),
-		ContactPhone: nilIfEmpty(strings.TrimSpace(req.ContactPhone)),
-		HqAddress:    nilIfEmpty(strings.TrimSpace(req.HqAddress)),
-	})
-	if err != nil {
-		if isUniqueViolation(err) {
-			// Pre-check above missed a race; the DB constraint is the source of truth.
-			return db.CreateVendorAdminRow{}, ErrVendorCodeConflict
-		}
-		return db.CreateVendorAdminRow{}, fmt.Errorf("creating vendor: %w", err)
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "vendor_created",
-		EntityType: "vendor",
-		EntityID:   created.ID,
-		After:      created,
-		IP:         actorIP,
-	}); err != nil {
-		return db.CreateVendorAdminRow{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return created, nil
+	return s.changes.Submit(ctx, actorID, SubmitRequest{
+		EntityType: "vendor", Op: "create",
+		Payload: vendorCreatePayload{
+			Code: code, Name: name, LegalName: strings.TrimSpace(req.LegalName), NPWP: npwp, ContactEmail: contactEmail,
+			ContactPhone: strings.TrimSpace(req.ContactPhone), HqAddress: strings.TrimSpace(req.HqAddress),
+		},
+	}, actorIP)
 }
 
-// Update validates and overwrites a vendor's editable fields, rejecting any
-// attempt to change code (Req 7.5-7.8, 9.1-9.4). A missing or soft-disabled
-// target id is a 404 (ErrVendorNotFound) -- a disabled vendor must be
-// enabled before it can be edited, consistent with the user-admin Update
-// convention (requirements.md Resolved Decision 5).
-func (s *VendorAdminService) Update(ctx context.Context, actorID, id int64, req UpdateVendorRequest, actorIP string) (db.UpdateVendorAdminRow, error) {
+// Update validates and stages an overwrite of a vendor's editable fields,
+// rejecting any attempt to change code (Req 7.5-7.8). A missing or
+// soft-disabled target id is a 404 (ErrVendorNotFound) -- a disabled vendor
+// must be enabled before it can be edited (requirements.md Resolved Decision
+// 5). The vendor row as loaded here is the change's "before" snapshot, so an
+// edit that lands after someone else changed the vendor is marked stale
+// rather than silently overwriting (T2.5).
+func (s *VendorAdminService) Update(ctx context.Context, actorID, id int64, req UpdateVendorRequest, actorIP string) (db.MasterDataChangeRequest, error) {
 	before, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return db.UpdateVendorAdminRow{}, fmt.Errorf("loading vendor: %w", err)
+		return db.MasterDataChangeRequest{}, fmt.Errorf("loading vendor: %w", err)
 	}
 	if before == nil || before.DeletedAt.Valid {
-		return db.UpdateVendorAdminRow{}, ErrVendorNotFound
+		return db.MasterDataChangeRequest{}, ErrVendorNotFound
 	}
 
 	if req.Code != nil && strings.TrimSpace(*req.Code) != before.Code {
-		return db.UpdateVendorAdminRow{}, ErrVendorCodeImmutable
+		return db.MasterDataChangeRequest{}, ErrVendorCodeImmutable
 	}
 
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return db.UpdateVendorAdminRow{}, &ValidationError{Field: "name", Message: "wajib diisi"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "name", Message: "wajib diisi"}
 	}
 	contactEmail := strings.TrimSpace(req.ContactEmail)
 	if contactEmail != "" && !isValidEmail(contactEmail) {
-		return db.UpdateVendorAdminRow{}, &ValidationError{Field: "contact_email", Message: "format email tidak valid"}
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "contact_email", Message: "format email tidak valid"}
 	}
 
-	updated, err := s.repo.Update(ctx, db.UpdateVendorAdminParams{
-		ID:           id,
-		Name:         name,
-		ContactEmail: nilIfEmpty(contactEmail),
-		ContactPhone: nilIfEmpty(strings.TrimSpace(req.ContactPhone)),
-		HqAddress:    nilIfEmpty(strings.TrimSpace(req.HqAddress)),
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// The query filters deleted_at IS NULL -- a race where the vendor
-			// was disabled between the pre-check and this UPDATE lands here too.
-			return db.UpdateVendorAdminRow{}, ErrVendorNotFound
+	// Tri-state fields (see UpdateVendorRequest): absent keeps the loaded value.
+	legalName, npwp := valueOrEmpty(before.LegalName), valueOrEmpty(before.Npwp)
+	if req.LegalName != nil {
+		legalName = strings.TrimSpace(*req.LegalName)
+	}
+	if req.NPWP != nil {
+		if npwp, err = normalizeNPWP(*req.NPWP); err != nil {
+			return db.MasterDataChangeRequest{}, err
 		}
-		return db.UpdateVendorAdminRow{}, fmt.Errorf("updating vendor: %w", err)
 	}
 
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "vendor_updated",
-		EntityType: "vendor",
-		EntityID:   id,
-		Before:     before,
-		After:      updated,
-		IP:         actorIP,
-	}); err != nil {
-		return db.UpdateVendorAdminRow{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return updated, nil
+	return s.changes.Submit(ctx, actorID, SubmitRequest{
+		EntityType: "vendor", Op: "update", EntityID: &id, Before: before,
+		Payload: vendorUpdatePayload{
+			Name: name, LegalName: legalName, NPWP: npwp, ContactEmail: contactEmail,
+			ContactPhone: strings.TrimSpace(req.ContactPhone), HqAddress: strings.TrimSpace(req.HqAddress),
+		},
+	}, actorIP)
 }
 
-// Disable soft-disables a vendor and writes a vendor_deactivated audit entry
-// (Req 8.1, 8.4-8.6, 9.1-9.4). The disable still succeeds even when the
-// vendor has active linked users -- the caller gets back
+// Disable stages a soft-disable of a vendor (Req 8.1, 8.4-8.6). Staging still
+// succeeds when the vendor has active linked users -- the caller gets back
 // DisableVendorResult.LinkedUsersWarning so the handler/UI can surface the
 // warning (Req 8.5).
 func (s *VendorAdminService) Disable(ctx context.Context, actorID, id int64, actorIP string) (DisableVendorResult, error) {
@@ -237,52 +242,24 @@ func (s *VendorAdminService) Disable(ctx context.Context, actorID, id int64, act
 		return DisableVendorResult{}, fmt.Errorf("counting linked active users: %w", err)
 	}
 
-	if err := s.repo.Disable(ctx, id); err != nil {
-		return DisableVendorResult{}, fmt.Errorf("disabling vendor: %w", err)
+	change, err := s.changes.Submit(ctx, actorID, SubmitRequest{EntityType: "vendor", Op: "disable", EntityID: &id, Before: existing}, actorIP)
+	if err != nil {
+		return DisableVendorResult{}, err
 	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "vendor_deactivated",
-		EntityType: "vendor",
-		EntityID:   id,
-		IP:         actorIP,
-	}); err != nil {
-		return DisableVendorResult{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return DisableVendorResult{LinkedUsersWarning: linked}, nil
+	return DisableVendorResult{Change: change, LinkedUsersWarning: linked}, nil
 }
 
-// Enable reverses Disable and writes a vendor_reactivated audit entry (Req
-// 8.2, 8.4, 8.6, 9.1-9.4). A non-existent id is a 404 with NO audit entry
-// written -- an explicit existence pre-check, since the underlying
-// EnableVendor UPDATE silently no-ops on 0 rows affected and would
-// otherwise let this method report success for an id that was never real.
-func (s *VendorAdminService) Enable(ctx context.Context, actorID, id int64, actorIP string) error {
+// Enable stages the reverse of Disable (Req 8.2, 8.4, 8.6). A non-existent id
+// is a 404 and stages nothing.
+func (s *VendorAdminService) Enable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error) {
 	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("loading vendor: %w", err)
+		return db.MasterDataChangeRequest{}, fmt.Errorf("loading vendor: %w", err)
 	}
 	if existing == nil {
-		return ErrVendorNotFound
+		return db.MasterDataChangeRequest{}, ErrVendorNotFound
 	}
-
-	if err := s.repo.Enable(ctx, id); err != nil {
-		return fmt.Errorf("enabling vendor: %w", err)
-	}
-
-	if err := s.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "vendor_reactivated",
-		EntityType: "vendor",
-		EntityID:   id,
-		IP:         actorIP,
-	}); err != nil {
-		return fmt.Errorf("write audit log: %w", err)
-	}
-
-	return nil
+	return s.changes.Submit(ctx, actorID, SubmitRequest{EntityType: "vendor", Op: "enable", EntityID: &id, Before: existing}, actorIP)
 }
 
 // nilIfEmpty converts an already-trimmed string into a *string for optional

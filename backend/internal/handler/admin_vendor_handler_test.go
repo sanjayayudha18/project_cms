@@ -26,18 +26,21 @@ type fakeVendorAdminServicer struct {
 	getResult   *db.GetVendorAdminByIDRow
 	getErr      error
 
-	createResult db.CreateVendorAdminRow
+	createResult db.MasterDataChangeRequest
 	createErr    error
 	createCalled bool
+	lastCreate   service.CreateVendorRequest
 
-	updateResult db.UpdateVendorAdminRow
+	updateResult db.MasterDataChangeRequest
 	updateErr    error
 	updateCalled bool
+	lastUpdate   service.UpdateVendorRequest
 
 	disableResult service.DisableVendorResult
 	disableErr    error
 	disableCalled bool
 
+	enableResult db.MasterDataChangeRequest
 	enableErr    error
 	enableCalled bool
 }
@@ -54,13 +57,15 @@ func (f *fakeVendorAdminServicer) Get(context.Context, int64) (*db.GetVendorAdmi
 	return f.getResult, f.getErr
 }
 
-func (f *fakeVendorAdminServicer) Create(context.Context, int64, service.CreateVendorRequest, string) (db.CreateVendorAdminRow, error) {
+func (f *fakeVendorAdminServicer) Create(_ context.Context, _ int64, req service.CreateVendorRequest, _ string) (db.MasterDataChangeRequest, error) {
 	f.createCalled = true
+	f.lastCreate = req
 	return f.createResult, f.createErr
 }
 
-func (f *fakeVendorAdminServicer) Update(context.Context, int64, int64, service.UpdateVendorRequest, string) (db.UpdateVendorAdminRow, error) {
+func (f *fakeVendorAdminServicer) Update(_ context.Context, _ int64, _ int64, req service.UpdateVendorRequest, _ string) (db.MasterDataChangeRequest, error) {
 	f.updateCalled = true
+	f.lastUpdate = req
 	return f.updateResult, f.updateErr
 }
 
@@ -69,9 +74,9 @@ func (f *fakeVendorAdminServicer) Disable(context.Context, int64, int64, string)
 	return f.disableResult, f.disableErr
 }
 
-func (f *fakeVendorAdminServicer) Enable(context.Context, int64, int64, string) error {
+func (f *fakeVendorAdminServicer) Enable(context.Context, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	f.enableCalled = true
-	return f.enableErr
+	return f.enableResult, f.enableErr
 }
 
 // mountAdminVendorHandler mirrors the real mount in cmd/api/main.go:
@@ -166,18 +171,158 @@ func TestAdminVendorHandler_Get_NotFound(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_Create_HappyPath(t *testing.T) {
-	svc := &fakeVendorAdminServicer{createResult: db.CreateVendorAdminRow{ID: 1, Code: "ACM", Name: "Acme", IsActive: true}}
+// T4.1: create no longer returns the vendor row (nothing exists until the
+// change is approved) -- it returns 202 with the pending change request.
+func TestAdminVendorHandler_Create_Accepted202(t *testing.T) {
+	svc := &fakeVendorAdminServicer{createResult: db.MasterDataChangeRequest{ID: 11, EntityType: "vendor", Op: "create", Status: "pending"}}
 	router, tokenSvc := mountAdminVendorHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors", token, `{"code":"ACM","name":"Acme"}`)
 
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`"change_request_id":11`, `"status":"pending"`, `"entity_type":"vendor"`, `"op":"create"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %s in body, got: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `"code":"ACM"`) {
+		t.Errorf("202 body must not pretend a vendor row exists yet, got: %s", body)
 	}
 	if !svc.createCalled {
 		t.Error("expected VendorAdminServicer.Create to be called")
+	}
+}
+
+// T4.3: legal_name and npwp are accepted on create and appear in list/get.
+func TestAdminVendorHandler_LegalNameAndNPWP_RequestAndResponse(t *testing.T) {
+	legal, npwp := "PT Acme Sejahtera", "012345678901000"
+	svc := &fakeVendorAdminServicer{
+		createResult: db.MasterDataChangeRequest{ID: 30, Status: "pending"},
+		getResult:    &db.GetVendorAdminByIDRow{ID: 1, Code: "ACM", Name: "Acme", LegalName: &legal, Npwp: &npwp, IsActive: true},
+		listResult:   []db.ListVendorsAdminRow{{ID: 1, Code: "ACM", Name: "Acme", LegalName: &legal, Npwp: &npwp, IsActive: true}},
+		countResult:  1,
+	}
+	router, tokenSvc := mountAdminVendorHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors", token, `{"code":"ACM","name":"Acme","legal_name":"PT Acme Sejahtera","npwp":"01.234.567.8-901.000"}`)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("create: expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if svc.lastCreate.LegalName != "PT Acme Sejahtera" || svc.lastCreate.NPWP != "01.234.567.8-901.000" {
+		t.Errorf("create request = %+v, want legal_name/npwp passed through untouched (service normalizes)", svc.lastCreate)
+	}
+
+	for _, path := range []string{"/api/v1/admin/vendors/1", "/api/v1/admin/vendors"} {
+		body := doRequest(router, http.MethodGet, path, token, "").Body.String()
+		if !strings.Contains(body, `"legal_name":"PT Acme Sejahtera"`) || !strings.Contains(body, `"npwp":"012345678901000"`) {
+			t.Errorf("GET %s should include legal_name and npwp, got: %s", path, body)
+		}
+	}
+}
+
+// T4.3: a vendor without these values serializes them as null (not omitted, not "").
+func TestAdminVendorHandler_Get_LegalNameNPWPNullWhenUnset(t *testing.T) {
+	svc := &fakeVendorAdminServicer{getResult: &db.GetVendorAdminByIDRow{ID: 1, Code: "ACM", Name: "Acme", IsActive: true}}
+	router, tokenSvc := mountAdminVendorHandler(svc)
+
+	body := doRequest(router, http.MethodGet, "/api/v1/admin/vendors/1", tokenForRole(t, tokenSvc, 1, "ADMIN"), "").Body.String()
+
+	if !strings.Contains(body, `"legal_name":null`) || !strings.Contains(body, `"npwp":null`) {
+		t.Errorf("expected explicit nulls, got: %s", body)
+	}
+}
+
+// T4.3: on update, absent/null legal_name+npwp mean "keep" (nil pointer) while ""
+// means "clear" (non-nil blank) -- the wire semantics ATM/vendor clients rely on
+// so a PUT from a client that predates the fields cannot wipe them.
+func TestAdminVendorHandler_Update_LegalNameNPWP_TriStateWire(t *testing.T) {
+	cases := []struct {
+		name      string
+		body      string
+		wantLegal *string
+		wantNPWP  *string
+	}{
+		{"omitted", `{"name":"Acme"}`, nil, nil},
+		{"explicit null", `{"name":"Acme","legal_name":null,"npwp":null}`, nil, nil},
+		{"empty string clears", `{"name":"Acme","legal_name":"","npwp":""}`, strPtr(""), strPtr("")},
+		{"values set", `{"name":"Acme","legal_name":"PT Baru","npwp":"0123456789012345"}`, strPtr("PT Baru"), strPtr("0123456789012345")},
+		{"only npwp", `{"name":"Acme","npwp":"0123456789012345"}`, nil, strPtr("0123456789012345")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &fakeVendorAdminServicer{updateResult: db.MasterDataChangeRequest{ID: 31, Status: "pending"}}
+			router, tokenSvc := mountAdminVendorHandler(svc)
+
+			rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/1", tokenForRole(t, tokenSvc, 1, "ADMIN"), tc.body)
+
+			if rec.Code != http.StatusAccepted {
+				t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+			}
+			if !equalStrPtr(svc.lastUpdate.LegalName, tc.wantLegal) || !equalStrPtr(svc.lastUpdate.NPWP, tc.wantNPWP) {
+				t.Errorf("update request legal_name=%v npwp=%v, want %v / %v", deref(svc.lastUpdate.LegalName), deref(svc.lastUpdate.NPWP), deref(tc.wantLegal), deref(tc.wantNPWP))
+			}
+		})
+	}
+}
+
+func TestAdminVendorHandler_Create_InvalidNPWP_422(t *testing.T) {
+	svc := &fakeVendorAdminServicer{createErr: &service.ValidationError{Field: "npwp", Message: "harus 15 atau 16 digit"}}
+	router, tokenSvc := mountAdminVendorHandler(svc)
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"code":"ACM","name":"Acme","npwp":"123"}`)
+
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "npwp") {
+		t.Fatalf("expected 422 naming the npwp field, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func equalStrPtr(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func deref(p *string) string {
+	if p == nil {
+		return "<nil>"
+	}
+	return "'" + *p + "'"
+}
+
+// T4.1 / T3.6: the service-layer RBAC and pending-change guards reach the
+// client as 403 / 409 on every vendor mutation, not a 500.
+func TestAdminVendorHandler_Mutations_ForbiddenAndPending(t *testing.T) {
+	cases := []struct {
+		name string
+		svc  *fakeVendorAdminServicer
+		want int
+	}{
+		{"forbidden", &fakeVendorAdminServicer{createErr: service.ErrMasterDataForbidden, updateErr: service.ErrMasterDataForbidden, disableErr: service.ErrMasterDataForbidden, enableErr: service.ErrMasterDataForbidden}, http.StatusForbidden},
+		{"pending change exists", &fakeVendorAdminServicer{createErr: service.ErrMasterDataChangePending, updateErr: service.ErrMasterDataChangePending, disableErr: service.ErrMasterDataChangePending, enableErr: service.ErrMasterDataChangePending}, http.StatusConflict},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			router, tokenSvc := mountAdminVendorHandler(tc.svc)
+			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+			for _, req := range []struct{ method, path, body string }{
+				{http.MethodPost, "/api/v1/admin/vendors", `{"code":"ACM","name":"Acme"}`},
+				{http.MethodPut, "/api/v1/admin/vendors/1", `{"name":"Acme"}`},
+				{http.MethodPost, "/api/v1/admin/vendors/1/disable", ""},
+				{http.MethodPost, "/api/v1/admin/vendors/1/enable", ""},
+			} {
+				if rec := doRequest(router, req.method, req.path, token, req.body); rec.Code != tc.want {
+					t.Errorf("%s %s: expected %d, got %d: %s", req.method, req.path, tc.want, rec.Code, rec.Body.String())
+				}
+			}
+		})
 	}
 }
 
@@ -205,15 +350,18 @@ func TestAdminVendorHandler_Create_CodeConflict_409(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_Update_HappyPath(t *testing.T) {
-	svc := &fakeVendorAdminServicer{updateResult: db.UpdateVendorAdminRow{ID: 1, Code: "ACM", Name: "Renamed", IsActive: true}}
+func TestAdminVendorHandler_Update_Accepted202(t *testing.T) {
+	svc := &fakeVendorAdminServicer{updateResult: db.MasterDataChangeRequest{ID: 12, EntityType: "vendor", Op: "update", Status: "pending"}}
 	router, tokenSvc := mountAdminVendorHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/1", token, `{"name":"Renamed"}`)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":12`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.updateCalled {
 		t.Error("expected VendorAdminServicer.Update to be called")
@@ -244,15 +392,20 @@ func TestAdminVendorHandler_Update_NotFound_404(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_Disable_HappyPath_NoWarning(t *testing.T) {
-	svc := &fakeVendorAdminServicer{disableResult: service.DisableVendorResult{LinkedUsersWarning: 0}}
+func TestAdminVendorHandler_Disable_Accepted202_NoWarning(t *testing.T) {
+	svc := &fakeVendorAdminServicer{disableResult: service.DisableVendorResult{
+		Change: db.MasterDataChangeRequest{ID: 13, EntityType: "vendor", Op: "disable", Status: "pending"},
+	}}
 	router, tokenSvc := mountAdminVendorHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/1/disable", token, "")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":13`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.disableCalled {
 		t.Error("expected VendorAdminServicer.Disable to be called")
@@ -263,17 +416,21 @@ func TestAdminVendorHandler_Disable_HappyPath_NoWarning(t *testing.T) {
 }
 
 func TestAdminVendorHandler_Disable_SurfacesLinkedUsersWarning(t *testing.T) {
-	svc := &fakeVendorAdminServicer{disableResult: service.DisableVendorResult{LinkedUsersWarning: 3}}
+	svc := &fakeVendorAdminServicer{disableResult: service.DisableVendorResult{
+		Change:             db.MasterDataChangeRequest{ID: 14, EntityType: "vendor", Op: "disable", Status: "pending"},
+		LinkedUsersWarning: 3,
+	}}
 	router, tokenSvc := mountAdminVendorHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/1/disable", token, "")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"linked_active_users":3`) {
-		t.Errorf("expected linked_active_users=3 warning in body, got: %s", rec.Body.String())
+	body := rec.Body.String()
+	if !strings.Contains(body, `"linked_active_users":3`) || !strings.Contains(body, `"change_request_id":14`) {
+		t.Errorf("expected linked_active_users=3 warning alongside the change request, got: %s", body)
 	}
 }
 
@@ -289,15 +446,18 @@ func TestAdminVendorHandler_Disable_NotFound_404(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_Enable_HappyPath(t *testing.T) {
-	svc := &fakeVendorAdminServicer{}
+func TestAdminVendorHandler_Enable_Accepted202(t *testing.T) {
+	svc := &fakeVendorAdminServicer{enableResult: db.MasterDataChangeRequest{ID: 15, EntityType: "vendor", Op: "enable", Status: "pending"}}
 	router, tokenSvc := mountAdminVendorHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/1/enable", token, "")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":15`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.enableCalled {
 		t.Error("expected VendorAdminServicer.Enable to be called")

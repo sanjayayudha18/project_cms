@@ -261,7 +261,7 @@ func (s *VendorRequestService) AuditLog(ctx context.Context, id int64) ([]AuditE
 		return nil, fmt.Errorf("check vendor request %d exists: %w", id, err)
 	}
 
-	rows, err := s.read.ListAuditLogsByEntity(ctx, "vendor_request", id)
+	rows, err := s.read.ListAuditLogsByEntity(ctx, db.ListAuditLogsByEntityParams{EntityType: "vendor_request", EntityID: id})
 	if err != nil {
 		return nil, fmt.Errorf("list audit log for vendor request %d: %w", id, err)
 	}

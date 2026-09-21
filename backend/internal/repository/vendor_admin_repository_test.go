@@ -8,14 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
-// TestVendorAdminRepository exercises List/Count/GetByID/Create/Update/
-// Disable/Enable/CountActiveUsers against a real DB transaction rolled back
+// TestVendorAdminRepository exercises List/Count/GetByID/FindByCode/
+// CountActiveUsers against a real DB transaction rolled back
 // on cleanup — same harness convention as audit_log_repository_test.go. Row
 // values are uniquely tagged by run timestamp so this test never collides
 // with existing data or a concurrent run.
@@ -141,81 +140,25 @@ func TestVendorAdminRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("Create -> FindByCode -> GetByID roundtrip", func(t *testing.T) {
-		code := "TVA_NEW_" + tag
-		created, err := repo.Create(ctx, db.CreateVendorAdminParams{
-			Code: code, Name: "New Vendor " + tag,
-		})
+	// The repository has no write methods since T4.1 (writes happen in
+	// service.VendorApplier, covered by the masterdata approval integration
+	// tests); FindByCode is the submit-time uniqueness lookup that remains.
+	t.Run("FindByCode finds active and soft-disabled codes, nil for an unknown one", func(t *testing.T) {
+		for code, want := range map[string]int64{codeActive: activeID, codeDisabled: disabledID} {
+			foundID, err := repo.FindByCode(ctx, code)
+			if err != nil {
+				t.Fatalf("FindByCode(%s): %v", code, err)
+			}
+			if foundID == nil || *foundID != want {
+				t.Errorf("FindByCode(%s) = %v, want %d (soft-disabled codes stay reserved)", code, foundID, want)
+			}
+		}
+		foundID, err := repo.FindByCode(ctx, "TVA_NOPE_"+tag)
 		if err != nil {
-			t.Fatalf("Create: %v", err)
+			t.Fatalf("FindByCode(unknown): %v", err)
 		}
-		foundID, err := repo.FindByCode(ctx, code)
-		if err != nil {
-			t.Fatalf("FindByCode: %v", err)
-		}
-		if foundID == nil || *foundID != created.ID {
-			t.Fatalf("FindByCode = %v, want %d", foundID, created.ID)
-		}
-		got, err := repo.GetByID(ctx, created.ID)
-		if err != nil {
-			t.Fatalf("GetByID: %v", err)
-		}
-		if got == nil || got.Code != code || !got.IsActive {
-			t.Fatalf("GetByID(created) = %+v, want active row with code %s", got, code)
-		}
-	})
-
-	t.Run("Create with a duplicate code surfaces a unique violation", func(t *testing.T) {
-		_, err := repo.Create(ctx, db.CreateVendorAdminParams{
-			Code: codeActive, Name: "Duplicate Code Vendor",
-		})
-		if err == nil {
-			t.Fatal("Create with duplicate code: want a unique-violation error, got nil")
-		}
-	})
-
-	t.Run("Update overwrites editable fields, code untouched, not-found on soft-disabled target", func(t *testing.T) {
-		newEmail := "updated." + tag + "@example.com"
-		updated, err := repo.Update(ctx, db.UpdateVendorAdminParams{
-			ID: activeID, Name: "Renamed Vendor " + tag, ContactEmail: &newEmail,
-		})
-		if err != nil {
-			t.Fatalf("Update: %v", err)
-		}
-		if updated.Code != codeActive {
-			t.Errorf("Update changed code to %q, want unchanged %q", updated.Code, codeActive)
-		}
-		if updated.ContactEmail == nil || *updated.ContactEmail != newEmail {
-			t.Errorf("Update ContactEmail = %v, want %s", updated.ContactEmail, newEmail)
-		}
-
-		_, err = repo.Update(ctx, db.UpdateVendorAdminParams{ID: disabledID, Name: "Should Not Apply"})
-		if err != pgx.ErrNoRows {
-			t.Errorf("Update(disabled target) err = %v, want pgx.ErrNoRows", err)
-		}
-	})
-
-	t.Run("Disable then Enable toggles is_active and deleted_at", func(t *testing.T) {
-		if err := repo.Disable(ctx, activeID); err != nil {
-			t.Fatalf("Disable: %v", err)
-		}
-		got, err := repo.GetByID(ctx, activeID)
-		if err != nil {
-			t.Fatalf("GetByID after Disable: %v", err)
-		}
-		if got.IsActive || !got.DeletedAt.Valid {
-			t.Fatalf("after Disable, got %+v, want IsActive=false and DeletedAt set", got)
-		}
-
-		if err := repo.Enable(ctx, activeID); err != nil {
-			t.Fatalf("Enable: %v", err)
-		}
-		got, err = repo.GetByID(ctx, activeID)
-		if err != nil {
-			t.Fatalf("GetByID after Enable: %v", err)
-		}
-		if !got.IsActive || got.DeletedAt.Valid {
-			t.Fatalf("after Enable, got %+v, want IsActive=true and DeletedAt NULL", got)
+		if foundID != nil {
+			t.Errorf("FindByCode(unknown) = %v, want nil", foundID)
 		}
 	})
 

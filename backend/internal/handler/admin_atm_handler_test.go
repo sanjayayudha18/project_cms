@@ -27,17 +27,19 @@ type fakeATMAdminServicer struct {
 	getResult   service.ATM
 	getErr      error
 
-	createResult service.ATM
+	createResult db.MasterDataChangeRequest
 	createErr    error
 	createCalled bool
 
-	updateResult service.ATM
+	updateResult db.MasterDataChangeRequest
 	updateErr    error
 	updateCalled bool
 
+	disableResult db.MasterDataChangeRequest
 	disableErr    error
 	disableCalled bool
 
+	enableResult db.MasterDataChangeRequest
 	enableErr    error
 	enableCalled bool
 
@@ -57,24 +59,24 @@ func (f *fakeATMAdminServicer) Get(context.Context, int64) (service.ATM, error) 
 	return f.getResult, f.getErr
 }
 
-func (f *fakeATMAdminServicer) Create(context.Context, int64, service.CreateATMRequest, string) (service.ATM, error) {
+func (f *fakeATMAdminServicer) Create(context.Context, int64, service.CreateATMRequest, string) (db.MasterDataChangeRequest, error) {
 	f.createCalled = true
 	return f.createResult, f.createErr
 }
 
-func (f *fakeATMAdminServicer) Update(context.Context, int64, int64, service.UpdateATMRequest, string) (service.ATM, error) {
+func (f *fakeATMAdminServicer) Update(context.Context, int64, int64, service.UpdateATMRequest, string) (db.MasterDataChangeRequest, error) {
 	f.updateCalled = true
 	return f.updateResult, f.updateErr
 }
 
-func (f *fakeATMAdminServicer) Disable(context.Context, int64, int64, string) error {
+func (f *fakeATMAdminServicer) Disable(context.Context, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	f.disableCalled = true
-	return f.disableErr
+	return f.disableResult, f.disableErr
 }
 
-func (f *fakeATMAdminServicer) Enable(context.Context, int64, int64, string) error {
+func (f *fakeATMAdminServicer) Enable(context.Context, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	f.enableCalled = true
-	return f.enableErr
+	return f.enableResult, f.enableErr
 }
 
 func (f *fakeATMAdminServicer) ListLocations(context.Context) ([]service.LocationOption, error) {
@@ -207,19 +209,60 @@ func TestAdminATMHandler_Get_NotFound(t *testing.T) {
 	}
 }
 
-func TestAdminATMHandler_Create_HappyPath(t *testing.T) {
-	svc := &fakeATMAdminServicer{createResult: service.ATM{ID: 1, TerminalID: "TATM001", IsActive: true}}
+// T4.2: create no longer returns the ATM row (nothing exists until the change
+// is approved) -- it returns 202 with the pending change request.
+func TestAdminATMHandler_Create_Accepted202(t *testing.T) {
+	svc := &fakeATMAdminServicer{createResult: db.MasterDataChangeRequest{ID: 21, EntityType: "atm", Op: "create", Status: "pending"}}
 	router, tokenSvc := mountAdminATMHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	body := `{"terminal_id":"TATM001","location_id":10,"machine_type":"ATM","brand":"NCR","model":"SelfServ","operation_hours":"24 Hours","deployment_type":"Onsite"}`
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/atms", token, body)
 
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	got := rec.Body.String()
+	for _, want := range []string{`"change_request_id":21`, `"status":"pending"`, `"entity_type":"atm"`, `"op":"create"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %s in body, got: %s", want, got)
+		}
+	}
+	if strings.Contains(got, `"terminal_id"`) {
+		t.Errorf("202 body must not pretend an ATM row exists yet, got: %s", got)
 	}
 	if !svc.createCalled {
 		t.Error("expected ATMAdminServicer.Create to be called")
+	}
+}
+
+// T4.2 / T3.6: the service-layer RBAC and pending-change guards reach the
+// client as 403 / 409 on every ATM mutation, not a 500.
+func TestAdminATMHandler_Mutations_ForbiddenAndPending(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"forbidden", service.ErrMasterDataForbidden, http.StatusForbidden},
+		{"pending change exists", service.ErrMasterDataChangePending, http.StatusConflict},
+	}
+	body := `{"terminal_id":"TATM001","location_id":10,"machine_type":"ATM","brand":"NCR","model":"SelfServ","operation_hours":"24 Hours","deployment_type":"Onsite"}`
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			router, tokenSvc := mountAdminATMHandler(&fakeATMAdminServicer{createErr: tc.err, updateErr: tc.err, disableErr: tc.err, enableErr: tc.err})
+			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+			for _, req := range []struct{ method, path, body string }{
+				{http.MethodPost, "/api/v1/admin/atms", body},
+				{http.MethodPut, "/api/v1/admin/atms/1", body},
+				{http.MethodPost, "/api/v1/admin/atms/1/disable", ""},
+				{http.MethodPost, "/api/v1/admin/atms/1/enable", ""},
+			} {
+				if rec := doRequest(router, req.method, req.path, token, req.body); rec.Code != tc.want {
+					t.Errorf("%s %s: expected %d, got %d: %s", req.method, req.path, tc.want, rec.Code, rec.Body.String())
+				}
+			}
+		})
 	}
 }
 
@@ -262,15 +305,18 @@ func TestAdminATMHandler_Create_InvalidReference_400(t *testing.T) {
 	}
 }
 
-func TestAdminATMHandler_Update_HappyPath(t *testing.T) {
-	svc := &fakeATMAdminServicer{updateResult: service.ATM{ID: 1, TerminalID: "TATM001", Brand: "Diebold", IsActive: true}}
+func TestAdminATMHandler_Update_Accepted202(t *testing.T) {
+	svc := &fakeATMAdminServicer{updateResult: db.MasterDataChangeRequest{ID: 22, EntityType: "atm", Op: "update", Status: "pending"}}
 	router, tokenSvc := mountAdminATMHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPut, "/api/v1/admin/atms/1", token, `{"location_id":10,"machine_type":"ATM","brand":"Diebold","model":"SelfServ","operation_hours":"24 Hours","deployment_type":"Onsite"}`)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":22`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.updateCalled {
 		t.Error("expected ATMAdminServicer.Update to be called")
@@ -301,15 +347,18 @@ func TestAdminATMHandler_Update_NotFound_404(t *testing.T) {
 	}
 }
 
-func TestAdminATMHandler_Disable_HappyPath(t *testing.T) {
-	svc := &fakeATMAdminServicer{}
+func TestAdminATMHandler_Disable_Accepted202(t *testing.T) {
+	svc := &fakeATMAdminServicer{disableResult: db.MasterDataChangeRequest{ID: 23, EntityType: "atm", Op: "disable", Status: "pending"}}
 	router, tokenSvc := mountAdminATMHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/atms/1/disable", token, "")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":23`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.disableCalled {
 		t.Error("expected ATMAdminServicer.Disable to be called")
@@ -328,15 +377,18 @@ func TestAdminATMHandler_Disable_NotFound_404(t *testing.T) {
 	}
 }
 
-func TestAdminATMHandler_Enable_HappyPath(t *testing.T) {
-	svc := &fakeATMAdminServicer{}
+func TestAdminATMHandler_Enable_Accepted202(t *testing.T) {
+	svc := &fakeATMAdminServicer{enableResult: db.MasterDataChangeRequest{ID: 24, EntityType: "atm", Op: "enable", Status: "pending"}}
 	router, tokenSvc := mountAdminATMHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/atms/1/enable", token, "")
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"change_request_id":24`) {
+		t.Errorf("expected change_request_id in body, got: %s", rec.Body.String())
 	}
 	if !svc.enableCalled {
 		t.Error("expected ATMAdminServicer.Enable to be called")

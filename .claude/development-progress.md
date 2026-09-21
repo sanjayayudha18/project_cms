@@ -38,7 +38,7 @@
 | Admin CRUD vendors | ✅ | `/api/v1/admin/vendors` | `admin-vendors` | `done/admin-user-vendor-management` |
 | Admin CRUD ATM | ✅ | `/api/v1/admin/atms` | `admin-atms` (Settings hub) | `admin-atm-management` (47/47 task) |
 | Role management (menu/feature permission) | 🟡 | `/api/v1/admin/roles` (list, catalog, create, set permissions) | `role-management` | `role-management` — 47/52; sisa: task 0 (approval tabel di project-context), beberapa test opsional |
-| Audit log viewer | 🟡 | `/api/v1/audit-logs` (list, detail) | `audit-log` (sebagian) | `audit-log-viewer` — 18/39; sisa: FilterBar, Table, DetailDrawer, BeforeAfterDiff, menu sidebar, verifikasi migration |
+| Audit log viewer | ✅ | `/api/v1/audit-logs` (list, detail), index `006_audit_logs_read_indexes.sql` | `audit-log` (filter, tabel, detail + diff before/after, menu "Log Audit" di Monitoring) | `audit-log-viewer` — semua task tercentang; sisa: pin versi sqlc (drift `IP`→`Ip`), detail berupa modal bukan slide-in panel; deep link + hard load sudah jalan (lihat `deep-links.md`) |
 | Migration baseline | ✅ | `001_baseline_schema.sql` + `002_baseline_seed.sql` | — | CLAUDE.md §12 |
 
 ### ATM Operations
@@ -80,3 +80,4 @@ Vendor portal: `orders`, `schedule`, `invoices`, `evidence`, `notifications`.
 | Tanggal | Perubahan |
 |---|---|
 | 2026-09-18 | Dokumen dibuat dari audit kode (route `backend/cmd/api/main.go`, fitur frontend, `tasks.md` tiap spec). |
+| 2026-09-21 | Audit log viewer selesai: migration index `006_audit_logs_read_indexes.sql` diterapkan (029 lama hilang saat squash baseline); UI filter/tabel/detail + diff; perbaikan `actionBadgeVariant` (aksi nyata berupa kata kerja polos, bukan `x.y`). Terverifikasi di browser dengan data API sungguhan. |

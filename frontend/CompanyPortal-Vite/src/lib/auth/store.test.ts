@@ -495,6 +495,42 @@ describe("useAuthStore", () => {
       expect(loadingDuringFetch).toBe(true);
     });
 
+    it("is single-flight: a concurrent second initialize() must not re-hit /refresh and clobber the session", async () => {
+      // Refresh tokens rotate: the first call succeeds, any further call would get a 401.
+      // React StrictMode fires the root effect twice, so this is a real hard-load scenario.
+      mockFetch.mockReset();
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token: "restored-token",
+            user: {
+              id: 1,
+              username: "john.admin",
+              full_name: "John Admin",
+              email: "john.admin@cimb.local",
+              role: "ADMIN",
+              is_karyawan: true,
+              vendor_id: null,
+            },
+          }),
+        })
+        .mockResolvedValue({ ok: false, status: 401 });
+
+      await Promise.all([
+        useAuthStore.getState().initialize(),
+        useAuthStore.getState().initialize(),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+
+      // The in-flight marker is cleared afterwards, so a later initialize() runs again.
+      await useAuthStore.getState().initialize();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
     it("handles network error gracefully during init", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 

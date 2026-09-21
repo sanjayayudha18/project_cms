@@ -51,19 +51,21 @@ export const EMPTY_AUDIT_LOG_FILTERS: AuditLogFilters = {
 export type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
 
 /**
- * action -> badge variant. Suffix convention: *.delete/reject/fail -> danger,
- * *.approve/complete/create -> success, *.submit/request -> info,
- * *.update/edit -> warning, else neutral.
+ * action -> badge variant. Real actions are bare verbs or snake_case
+ * (`create`, `approve`, `admin_set_hierarchy`), older dotted names also
+ * appear (`approval.reject`), so a verb counts when it starts the string or
+ * follows a `.`/`_`: reject/delete/fail -> danger, approve/complete/create ->
+ * success, submit/request -> info, update/edit/revise/cancel/set -> warning,
+ * else neutral.
  *
- * Heuristic on the `action` string convention. As real action names
- * stabilize (from the internal/audit writer + module wiring), replace the
- * regex with an explicit lookup table. Every badge still renders icon +
- * label (AuditLogTable, Task 7), so a wrong color never hides meaning.
+ * Heuristic on the `action` string convention; replace with an explicit
+ * lookup once action names stabilise. Every badge still renders icon + label
+ * (AuditLogTable), so a wrong color never hides meaning.
  */
 export function actionBadgeVariant(action: string): BadgeVariant {
-  if (/\.(delete|reject|fail)/.test(action)) return "danger";
-  if (/\.(approve|complete|create)/.test(action)) return "success";
-  if (/\.(submit|request)/.test(action)) return "info";
-  if (/\.(update|edit)/.test(action)) return "warning";
+  if (/(^|[._])(delete|reject|fail)/.test(action)) return "danger";
+  if (/(^|[._])(approve|complete|create)/.test(action)) return "success";
+  if (/(^|[._])(submit|request)/.test(action)) return "info";
+  if (/(^|[._])(update|edit|revise|cancel|set)/.test(action)) return "warning";
   return "neutral";
 }

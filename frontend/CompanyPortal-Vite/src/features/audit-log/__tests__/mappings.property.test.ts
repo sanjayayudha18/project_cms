@@ -18,6 +18,18 @@ describe("actionBadgeVariant — Property 9: action-to-badge mapping", () => {
     );
   });
 
+  // Regression: real audit_logs actions are bare verbs / snake_case, not dotted, and used to
+  // all fall through to "neutral" because the regexes required a leading ".".
+  it("classifies the bare-verb actions actually written to audit_logs", () => {
+    expect(actionBadgeVariant("approve")).toBe("success");
+    expect(actionBadgeVariant("create")).toBe("success");
+    expect(actionBadgeVariant("reject")).toBe("danger");
+    expect(actionBadgeVariant("submit")).toBe("info");
+    expect(actionBadgeVariant("revise")).toBe("warning");
+    expect(actionBadgeVariant("cancel")).toBe("warning");
+    expect(actionBadgeVariant("admin_set_hierarchy")).toBe("warning");
+  });
+
   it("classifies known suffixes correctly", () => {
     expect(actionBadgeVariant("approval.reject")).toBe("danger");
     expect(actionBadgeVariant("atm.delete")).toBe("danger");

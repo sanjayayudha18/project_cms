@@ -15,6 +15,8 @@ interface DataTableProps<T> {
   columns: ColumnDef<T, any>[];
   defaultSorting?: SortingState;
   emptyMessage?: string;
+  /** Optional row click handler (mouse convenience; put a real button in a cell for keyboard access). */
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T>({
@@ -22,6 +24,7 @@ export function DataTable<T>({
   columns,
   defaultSorting = [],
   emptyMessage = "Tidak ada data tersedia",
+  onRowClick,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>(defaultSorting);
 
@@ -97,9 +100,14 @@ export function DataTable<T>({
             </tr>
           ) : (
             table.getRowModel().rows.map((row) => (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: onRowClick is mouse-only sugar; callers give keyboard users a real button in a cell (see DataTableProps.onRowClick).
               <tr
                 key={row.id}
-                className="border-b border-[var(--n-100)] transition-colors duration-100 hover:bg-[var(--red-50)]"
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                className={[
+                  "border-b border-[var(--n-100)] transition-colors duration-100 hover:bg-[var(--red-50)]",
+                  onRowClick ? "cursor-pointer" : "",
+                ].join(" ")}
               >
                 {row.getVisibleCells().map((cell) => {
                   const align = (cell.column.columnDef.meta as { align?: string } | undefined)

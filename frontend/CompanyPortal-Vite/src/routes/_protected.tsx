@@ -67,7 +67,12 @@ function ProtectedLayout() {
  */
 export function requireRoles(allowedRoles: DbRole[]) {
   return () => {
-    const { user } = useAuthStore.getState();
+    const { user, isAuthLoading } = useAuthStore.getState();
+
+    // Hard load: the session is still being restored from the refresh cookie, so `user` is
+    // null for a moment. Redirecting now would bounce a signed-in user to /login -> /.
+    // RootComponent re-runs the guards (router.invalidate) once auth has resolved.
+    if (isAuthLoading) return;
 
     if (!user) {
       throw redirect({ to: "/login" });

@@ -20,8 +20,8 @@
 - [x] Create `backend/migrations/029_audit_logs_read_indexes.sql` (additive, style of `014`: `BEGIN; ... COMMIT;` + WHY/SAFETY header).
   - Table already exists (Task 0), so no table creation here.
   - `actor_idx` and `entity_idx` already exist from `023_audit_logs.sql`. This migration adds only the two still missing: `audit_logs_created_at_id_idx (created_at DESC, id DESC)` and `audit_logs_action_idx (action)` — both `IF NOT EXISTS`.
-- [ ] **Test:** migration up/down clean; `\d audit_logs` shows the four indexes; a seeded set of rows returns in `created_at DESC, id DESC` order. — **Not run:** `DATABASE_URL` in `backend/.env` points at `host.docker.internal`, unreachable from this session (connection refused). Needs to be applied and verified against a reachable Postgres instance before Task 2.
-- **Demo:** `EXPLAIN` on a filtered+ordered query shows an index used, not a full seq scan on a large seed. — pending the same DB access.
+- [x] **Test:** migration up/down clean; `\d audit_logs` shows the four indexes; a seeded set of rows returns in `created_at DESC, id DESC` order. — **Done (2026-09-21):** the 2026-09-18 baseline squash had dropped `029` (baseline only kept `actor_idx`/`entity_idx`), so it was re-issued as `backend/migrations/006_audit_logs_read_indexes.sql` and applied to the live DB via `localhost:5432` (`host.docker.internal` only resolves inside Docker). `pg_indexes` now lists `audit_logs_action_idx`, `audit_logs_actor_idx`, `audit_logs_created_at_id_idx`, `audit_logs_entity_idx`, `audit_logs_pkey`. Forward-only (project convention), so no down migration; ordering is covered by the Task 2 integration test.
+- **Demo:** `EXPLAIN` on a filtered+ordered query shows an index used, not a full seq scan on a large seed. — **Done:** `EXPLAIN select * from audit_logs where action='submit' order by created_at desc, id desc limit 25` → `Index Scan using audit_logs_created_at_id_idx`. Only 763 rows locally, so this shows the index is chosen, not large-scale timing.
 - _Requirements: 2.8, 2.11; design "audit_logs schema"_
 - _Model: Opus, Effort: High — a DB migration that may create the append-only `audit_logs` table; schema changes to the audit trail are a project-context STOP-and-confirm zone._
 
@@ -30,8 +30,8 @@
 - [x] Add `backend/queries/audit_log.sql`: `ListAuditLogs`, `CountAuditLogs`, `GetAuditLogByID` with `sqlc.narg` nullable filters (actor_id, action, entity_type, entity_id, date_from, date_to) + `LIMIT`/`OFFSET`, per design.md.
 - [x] Run `sqlc generate` (config `backend/sqlc.yaml`). Used named `sqlc.arg('limit')`/`sqlc.arg('offset')` from the start (avoided the positional/named mixing question entirely). **Note:** local `sqlc` is v1.31.1 and regenerated 4 unrelated files (`approval.sql.go`, `audit.sql.go`, `auth.sql.go`, `models.go`) with different casing (`IP`→`Ip`) than whatever generated the checked-in code — those were reverted (`git checkout --`) to stay in scope; only `internal/db/audit_log.sql.go` was kept, hand-fixed to use the existing `AuditLog.IP` field name so it compiles against the current struct. Worth a follow-up to pin the project's sqlc version (e.g. in `tools.go` or CI) so this doesn't recur.
 - [x] Add `internal/repository/audit_log_repository.go` wrapping `*db.Queries` (pattern from `auth_repository.go`). Returns `db.AuditLog` rows directly rather than a duplicate domain struct — `internal/service` already depends on `internal/db` elsewhere in this codebase (e.g. `atm_portal` service), so a parallel domain type would be pure duplication; `before`/`after` → `json.RawMessage` mapping is Task 3's job (service layer), per design.md's own layer split. Uses `dbPool` (via the `db.DBTX` param) with a `ponytail:` TODO comment for the replica-pool swap, matching `cmd/api/main.go`'s existing convention.
-- [x] **Test (integration, real Postgres):** `internal/repository/audit_log_repository_test.go` (`//go:build integration`) seeds 5 rows under a randomized `entity_type` tag and asserts: no-filter ordering (`created_at DESC, id DESC`), `actor_id` filter, `action` filter, combined `entity_type`+`entity_id` filter, inclusive date-range boundaries, `Count` vs `List` length, `Count` vs summed-pages consistency, and `GetByID` (found + before/after passthrough + not-found → nil). Builds and `go vet -tags integration` clean; **not run against a live DB** — same `DATABASE_URL`/`host.docker.internal` unreachability noted in Task 1. Needs to be run for real before Task 3.
-- **Demo:** repository test prints a filtered page + total for a seeded dataset. — pending live DB access.
+- [x] **Test (integration, real Postgres):** `internal/repository/audit_log_repository_test.go` (`//go:build integration`) seeds 5 rows under a randomized `entity_type` tag and asserts: no-filter ordering (`created_at DESC, id DESC`), `actor_id` filter, `action` filter, combined `entity_type`+`entity_id` filter, inclusive date-range boundaries, `Count` vs `List` length, `Count` vs summed-pages consistency, and `GetByID` (found + before/after passthrough + not-found → nil). Builds and `go vet -tags integration` clean. **Run against the live DB (2026-09-21, `DATABASE_URL` with host `localhost`): `go test -tags integration ./internal/repository/ -run AuditLog` → 9/9 subtests PASS.**
+- **Demo:** repository test prints a filtered page + total for a seeded dataset. — **Done:** the 9 subtests above exercise filtered pages, totals and page consistency on a seeded dataset.
 - _Requirements: 2.1–2.9, 3.1, 3.4_
 - _Model: Sonnet, Effort: Medium — sqlc queries + read-only repository over one table following the existing repository pattern._
 
@@ -48,7 +48,7 @@
 - [x] Add `internal/handler/audit_log_handler.go`: `Routes()` with `GET /` (list) and `GET /{id}` (detail); parses query params (`actor_id`/`entity_id` as optional int64, `action`/`entity_type` as optional string); converts `date_from`/`date_to` (`YYYY-MM-DD` or RFC3339) from WIB (`time.FixedZone`, not `time.LoadLocation` — Asia/Jakarta has no DST and this avoids depending on the distroless image shipping tzdata) to UTC — a bare `date_to` is anchored to end-of-day WIB so the inclusive `created_at <= date_to` filter covers the whole calendar day; flat JSON via `writeJSON`/`writeError`; 400/404/500 mapping per design.md's error table (`*service.ValidationError` → 400, everything else → 500, matching `atm_portal_handler.go`'s `handleServiceError` convention — not DMAA's 503, since this table has no replica-unavailability concern yet).
 - [x] Wire in `cmd/api/main.go`: `repository.NewAuditLogRepository(dbPool)` → `service.NewAuditLogReadService(...)` → `handler.NewAuditLogHandler(...)`, mounted at `/api/v1/audit-logs` behind `RequireAuth` + `RequireRoles("ADMIN","ADMIN_PARAM")` (same stack as `/api/v1/admin/approval`), with the same `ponytail:` replica-pool TODO comment used elsewhere in this file.
 - [x] **Test (httptest):** `audit_log_handler_test.go` — 200 list happy path + shape (list omits before/after, includes `page`/`page_size`/`total`); all filters + page/page_size pass through correctly, including the WIB→UTC date conversion (verified against exact UTC instants); defaults left at 0 when absent (service clamps, per Task 3); 400 for non-numeric `page`/`page_size`/`actor_id`/`entity_id` and bad date format; 400 for `date_from > date_to` (`*ValidationError` from the service); 500 for other service errors; 200 detail includes `before`/`after` as real JSON objects (round-tripped through `json.Unmarshal` to prove they aren't escaped strings); 400 non-integer `id`; 404 missing id. `audit_log_handler_rbac_test.go` — 401 no token, 403 non-admin role (`ATM-USER`), 200 for `ADMIN_PARAM`, against the real `RequireAuth`/`RequireRoles` middleware (same pattern as `admin_approval_handler_test.go`). All pass; full backend suite (`go build ./...`, `go test ./...`) green, no regressions.
-- **Demo:** curl list + detail as ADMIN returns flat JSON; a non-admin token returns 403. — logic verified via httptest against the real middleware; an actual curl demo still needs a reachable server + DB (same `DATABASE_URL`/`host.docker.internal` gap as Tasks 1–2).
+- **Demo:** curl list + detail as ADMIN returns flat JSON; a non-admin token returns 403. — logic verified via httptest against the real middleware, and **live (2026-09-21)** through the running app: signed in as `ADMIN`, `GET /api/v1/audit-logs?page=1&page_size=25` and `...&action=reject` returned 200 with the real rows (16 `reject` entries, matching the DB), and detail rows returned real before/after. No curl demo of the 403: it needs a non-admin token, and the 403 is covered by `audit_log_handler_rbac_test.go`.
 - _Requirements: 1.5–1.7, 2.1, 2.9, 2.10, 3.1–3.4, 4.1, 4.2, 5 (data source)_
 - _Model: Sonnet, Effort: Medium — HTTP handler + route wiring applying existing RequireAuth/RequireRoles middleware; RBAC is by-the-book here, not novel auth logic._
 
@@ -71,33 +71,33 @@
 
 ## Task 7 — Filter bar + table
 
-- [ ] `AuditFilterBar.tsx`: Action + Entity Type FilterSelects, Actor input, Date range (date_from/date_to), Reset; client-side `date_from > date_to` validation (Req 6.5); write filters + page to URL search (Req 6.4); any change resets page to 1 (Req 6.2).
-- [ ] `AuditLogTable.tsx`: DataTable with the 6 columns, WIB timestamp formatting, action Badge (icon + label), pagination controls from `{page,page_size,total}`, loading skeleton, EmptyState ("Tidak ada log audit"), row click → open drawer.
-- [ ] **Test:** filter change resets to page 1 and refetches with correct params; URL round-trip reconstructs identical filters (Property 12); empty + loading states; pagination next/prev; badges carry icon + label; date-range validation blocks request.
+- [x] `AuditFilterBar.tsx`: Action + Entity Type FilterSelects, Actor input, Date range (date_from/date_to), Reset; client-side `date_from > date_to` validation (Req 6.5); write filters + page to URL search (Req 6.4); any change resets page to 1 (Req 6.2). — Actor is a numeric-ID input (the API filters by `actor_id`; the list has no user names). The Action/Entity Type option lists are fixed to the values in `audit_logs` today (a `ponytail:` comment marks the upgrade path); URL state in `useAuditLogUrlState.ts`, route `validateSearch` = `AUDIT_LOG_SEARCH_SCHEMA`.
+- [x] `AuditLogTable.tsx`: DataTable with the 6 columns, WIB timestamp formatting, action Badge (icon + label), pagination controls from `{page,page_size,total}`, loading skeleton, EmptyState ("Tidak ada log audit"), row click → open drawer. — Added an optional `onRowClick` to the shared `DataTable`; the timestamp is also a real `<button>` so keyboard users can open a row. Client-side column sorting is off (server order is authoritative). Columns are `useMemo`'d: unmemoized, TanStack remounts the row buttons every render and focus can never return to the trigger.
+- [x] **Test:** filter change resets to page 1 and refetches with correct params; URL round-trip reconstructs identical filters (Property 12); empty + loading states; pagination next/prev; badges carry icon + label; date-range validation blocks request. — `AuditLogPage.test.tsx`, `useAuditLogUrlState.test.tsx`; also verified live in the browser (filter → `?action=reject` + request `action=reject`; invalid range leaves the URL unchanged and shows the alert).
 - _Requirements: 5.2–5.7, 6.1–6.5, 8.1, 8.2, 9.3, 9.4, 9.7_
 - _Model: Sonnet, Effort: Medium — filter bar + table with URL sync and pagination; standard React data-table work._
 
 ## Task 8 — Detail drawer + before/after diff
 
-- [ ] `AuditDetailDrawer.tsx`: fetch on `selectedId`; render metadata (actor, action badge, entity type/id, IP, WIB timestamp); slide-in transition (transform/opacity, 300ms enter / 225ms exit); focus trap; Escape/outside close; loading skeleton; inline error + retry without closing.
-- [ ] `BeforeAfterDiff.tsx`: both present → per-top-level-key classification (added/removed/modified/unchanged) with `+ / − / ~` marker + icon + semantic tint; before null → "Dibuat" (after only); after null → "Dihapus" (before only).
-- [ ] **Test:** diff classification correctness across added/removed/modified/unchanged and the null-before / null-after cases (Property 11); drawer opens on row click, closes on Escape, returns focus to trigger; detail error state.
+- [x] `AuditDetailDrawer.tsx`: fetch on `selectedId`; render metadata (actor, action badge, entity type/id, IP, WIB timestamp); slide-in transition (transform/opacity, 300ms enter / 225ms exit); focus trap; Escape/outside close; loading skeleton; inline error + retry without closing. — **Deviation:** built on the shared `Dialog` (focus trap, Escape/outside close, focus return already there), so it is a centered modal with `Dialog`'s 200ms enter, **not** a slide-in panel with 300/225ms timings. Build a side panel only if the design needs one.
+- [x] `BeforeAfterDiff.tsx`: both present → per-top-level-key classification (added/removed/modified/unchanged) with `+ / − / ~` marker + icon + semantic tint; before null → "Dibuat" (after only); after null → "Dihapus" (before only). — pure logic in `lib/diffAuditValues.ts`; nested values compare structurally (one "Berubah" row, no recursive diff).
+- [x] **Test:** diff classification correctness across added/removed/modified/unchanged and the null-before / null-after cases (Property 11); drawer opens on row click, closes on Escape, returns focus to trigger; detail error state. — `diffAuditValues.test.ts`, `AuditLogPage.test.tsx` (incl. a focus-return regression test that failed before the `useMemo` fix). Verified live: a real `reject` row shows `state: pending_approval → rejected` (Berubah) and `rejection_reason` (Ditambah).
 - _Requirements: 7.1–7.9, 8.3, 9.1, 9.2, 9.6_
 - _Model: Sonnet, Effort: High — detail drawer with focus trap plus before/after diff classification; several interacting concerns (a11y, transitions, diff logic) reward extra deliberation even though each is contained and test-covered._
 
 ## Task 9 — Frontend quality gate + navigation
 
-- [ ] Add the "Audit Log" entry to the internal app sidebar/nav, visible only to ADMIN/ADMIN_PARAM (match existing role-gated nav pattern).
-- [ ] `pnpm lint`, `pnpm test --run`, `pnpm build` for CompanyPortal-Vite.
-- [ ] Verify OKLCH "Merah Sirih" tokens only (no hardcoded hex/rgb); 44px touch targets; semantic landmarks.
-- **Test:** frontend suite green; a11y assertions pass; coverage ≥ 80% on the feature module.
+- [x] Add the "Audit Log" entry to the internal app sidebar/nav, visible only to ADMIN/ADMIN_PARAM (match existing role-gated nav pattern). — `NAV_CONFIG` item `audit-logs` ("Log Audit", Monitoring group).
+- [x] `pnpm lint`, `pnpm test --run`, `pnpm build` for CompanyPortal-Vite. — `pnpm build` passes. `biome check` on every file this spec touched is clean. **The project-wide gate is not fully green, for reasons outside this spec** (files untouched here): 2 `lint/a11y/useSemanticElements` errors in `components/ui/Dialog.tsx:77` and `features/eod-monitoring/components/RetryDrawer.tsx:81`, and 4 failing tests in `features/rbac-settings/__tests__/SettingsHubPage.test.tsx` ("Task 10" admin-card links).
+- [x] Verify OKLCH "Merah Sirih" tokens only (no hardcoded hex/rgb); 44px touch targets; semantic landmarks. — no hex/rgb/hsl in the feature (grep); inputs/selects/buttons use `min-h-[44px]`; the page relies on `AppShell`'s `<main>` (no nested landmark).
+- **Test:** frontend suite green; a11y assertions pass; coverage ≥ 80% on the feature module. — audit-log suite: 33 tests pass; feature coverage 84% statements / 85% lines (hooks file is 17% because the page tests mock it; its query-key logic is covered by `hooks.test.ts`).
 - _Requirements: 9.1–9.7, 10.4, 10.5; DoD_
 - _Model: Sonnet, Effort: Medium — role-gated nav entry plus a frontend quality gate (lint/test/build + token/a11y checks) needing failure triage._
 
 ## Task 10 — Docs
 
-- [ ] Update `project-context.md` if the base `audit_logs` table was created here (mark proposed → exists; note the read-path indexes). Note that module wiring to *write* audit entries remains per-module future work.
-- [ ] Short note in the spec folder on how other pages can deep-link into the viewer filtered by `entity_type` + `entity_id` (single-entity history), for reuse from invoice/DSR/approval detail screens later.
+- [x] Update `project-context.md` if the base `audit_logs` table was created here (mark proposed → exists; note the read-path indexes). Note that module wiring to *write* audit entries remains per-module future work. — **No change needed:** the table was not created here (it predates this spec and is already in the Sec 3 Core group). The read-path indexes are in `backend/migrations/006_audit_logs_read_indexes.sql`; status is tracked in `.claude/development-progress.md`.
+- [x] Short note in the spec folder on how other pages can deep-link into the viewer filtered by `entity_type` + `entity_id` (single-entity history), for reuse from invoice/DSR/approval detail screens later. — see [deep-links.md](./deep-links.md) (includes the observed hard-load redirect limitation).
 - _Requirements: dependency note; Req 2.5_
 - _Model: Haiku, Effort: Low — doc updates only (mark table proposed→exists, add a deep-link note); no code, low judgment._
 
@@ -111,12 +111,12 @@
 
 ## Definition of Done (project-context Sec 11)
 
-- [ ] Matches module/table map — `audit_logs` is canonical; no new tables invented; read-only over it
-- [ ] Correct auth path + scoped RBAC (ADMIN/ADMIN_PARAM at middleware AND route guard)
-- [ ] No maker-checker needed (read-only, non-state-changing); the viewer itself writes no audit
-- [ ] Reads use `dbPool` with documented replica TODO; no writes
-- [ ] Timestamps timestamptz stored UTC, displayed Asia/Jakarta; entity/IP columns tabular-nums
-- [ ] Tests green incl. RBAC denial (401/403), filter/pagination, date validation, diff classification
-- [ ] No secrets hardcoded
-- [ ] ATM backend keeps flat JSON shape
-- [ ] Builds clean (`go build`, `sqlc generate`, `pnpm build`)
+- [x] Matches module/table map — `audit_logs` is canonical; no new tables invented; read-only over it
+- [x] Correct auth path + scoped RBAC (ADMIN/ADMIN_PARAM at middleware AND route guard)
+- [x] No maker-checker needed (read-only, non-state-changing); the viewer itself writes no audit
+- [x] Reads use `dbPool` with documented replica TODO; no writes
+- [x] Timestamps timestamptz stored UTC, displayed Asia/Jakarta; entity/IP columns tabular-nums
+- [x] Tests green incl. RBAC denial (401/403), filter/pagination, date validation, diff classification — for this spec's tests; see the Task 9 note for unrelated project-wide failures
+- [x] No secrets hardcoded
+- [x] ATM backend keeps flat JSON shape
+- [ ] Builds clean (`go build`, `sqlc generate`, `pnpm build`) — `go build` and `pnpm build` pass; `sqlc generate` was not re-run in this pass and still has the version-drift issue from Tasks 2/5 (pin the sqlc version)

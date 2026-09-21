@@ -6,6 +6,8 @@
  * ADMIN/ADMIN_PARAM-only.
  */
 
+import type { ChangeRequestAccepted } from "../master-data/changeRequest";
+
 export type VendorStatus = "active" | "disabled" | "all";
 
 export interface AdminVendor {
@@ -49,8 +51,5 @@ export interface UpdateVendorPayload {
   hq_address: string;
 }
 
-export interface DisableVendorResponse {
-  message: string;
-  warning?: string;
-  linked_active_users?: number;
-}
+/** Disable is staged for approval (202); `warning` is set when the vendor still has linked active users. */
+export type DisableVendorResponse = ChangeRequestAccepted;

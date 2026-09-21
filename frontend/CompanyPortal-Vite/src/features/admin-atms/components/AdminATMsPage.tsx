@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useATMsList, useDisableATM, useEnableATM } from "../hooks";
 import type { AdminATM } from "../types";
 import { toListParams, useAdminATMsUrlState } from "../useAdminATMsUrlState";
@@ -49,7 +50,7 @@ export function AdminATMsPage() {
     const mutation = pendingAction.type === "disable" ? disableMutation : enableMutation;
     mutation.mutate(pendingAction.atm.id, {
       onSuccess: (res) => {
-        toast({ type: "success", message: res.message });
+        toast({ type: "success", message: pendingApprovalMessage(res) });
         setPendingAction(null);
       },
       onError: (err) => {

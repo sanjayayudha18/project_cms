@@ -6,6 +6,7 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 import {
   createVendor,
   disableVendor,
@@ -52,7 +53,7 @@ function useInvalidateList() {
 
 export function useCreateVendor() {
   const invalidate = useInvalidateList();
-  return useMutation<AdminVendor, ApiError, CreateVendorPayload>({
+  return useMutation<ChangeRequestAccepted, ApiError, CreateVendorPayload>({
     mutationFn: createVendor,
     onSuccess: invalidate,
   });
@@ -60,10 +61,12 @@ export function useCreateVendor() {
 
 export function useUpdateVendor() {
   const invalidate = useInvalidateList();
-  return useMutation<AdminVendor, ApiError, { id: number; payload: UpdateVendorPayload }>({
-    mutationFn: ({ id, payload }) => updateVendor(id, payload),
-    onSuccess: invalidate,
-  });
+  return useMutation<ChangeRequestAccepted, ApiError, { id: number; payload: UpdateVendorPayload }>(
+    {
+      mutationFn: ({ id, payload }) => updateVendor(id, payload),
+      onSuccess: invalidate,
+    },
+  );
 }
 
 export function useDisableVendor() {
@@ -76,7 +79,7 @@ export function useDisableVendor() {
 
 export function useEnableVendor() {
   const invalidate = useInvalidateList();
-  return useMutation<{ message: string }, ApiError, number>({
+  return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: enableVendor,
     onSuccess: invalidate,
   });

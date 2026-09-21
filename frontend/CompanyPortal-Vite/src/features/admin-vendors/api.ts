@@ -5,6 +5,7 @@
  */
 
 import { api } from "@/lib/api/client";
+import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 import type {
   AdminVendor,
   AdminVendorsListParams,
@@ -37,13 +38,18 @@ export async function getVendor(id: number): Promise<AdminVendor> {
   return data;
 }
 
-export async function createVendor(payload: CreateVendorPayload): Promise<AdminVendor> {
-  const { data } = await api.post<AdminVendor>(BASE, payload);
+// Writes are maker-checker (plan.md D1): they answer 202 with the staged change
+// request, not the saved vendor. The list only changes once it is approved.
+export async function createVendor(payload: CreateVendorPayload): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(BASE, payload);
   return data;
 }
 
-export async function updateVendor(id: number, payload: UpdateVendorPayload): Promise<AdminVendor> {
-  const { data } = await api.put<AdminVendor>(`${BASE}/${id}`, payload);
+export async function updateVendor(
+  id: number,
+  payload: UpdateVendorPayload,
+): Promise<ChangeRequestAccepted> {
+  const { data } = await api.put<ChangeRequestAccepted>(`${BASE}/${id}`, payload);
   return data;
 }
 
@@ -52,7 +58,7 @@ export async function disableVendor(id: number): Promise<DisableVendorResponse> 
   return data;
 }
 
-export async function enableVendor(id: number): Promise<{ message: string }> {
-  const { data } = await api.post<{ message: string }>(`${BASE}/${id}/enable`);
+export async function enableVendor(id: number): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`${BASE}/${id}/enable`);
   return data;
 }

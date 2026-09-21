@@ -5,6 +5,7 @@
  */
 
 import { api } from "@/lib/api/client";
+import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 import type {
   AdminATM,
   AdminATMsListParams,
@@ -40,23 +41,28 @@ export async function getATM(id: number): Promise<AdminATM> {
   return data;
 }
 
-export async function createATM(payload: CreateATMPayload): Promise<AdminATM> {
-  const { data } = await api.post<AdminATM>(BASE, payload);
+// Writes are maker-checker (plan.md D1): they answer 202 with the staged change
+// request, not the saved ATM. The list only changes once it is approved.
+export async function createATM(payload: CreateATMPayload): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(BASE, payload);
   return data;
 }
 
-export async function updateATM(id: number, payload: UpdateATMPayload): Promise<AdminATM> {
-  const { data } = await api.put<AdminATM>(`${BASE}/${id}`, payload);
+export async function updateATM(
+  id: number,
+  payload: UpdateATMPayload,
+): Promise<ChangeRequestAccepted> {
+  const { data } = await api.put<ChangeRequestAccepted>(`${BASE}/${id}`, payload);
   return data;
 }
 
-export async function disableATM(id: number): Promise<{ message: string }> {
-  const { data } = await api.post<{ message: string }>(`${BASE}/${id}/disable`);
+export async function disableATM(id: number): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`${BASE}/${id}/disable`);
   return data;
 }
 
-export async function enableATM(id: number): Promise<{ message: string }> {
-  const { data } = await api.post<{ message: string }>(`${BASE}/${id}/enable`);
+export async function enableATM(id: number): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`${BASE}/${id}/enable`);
   return data;
 }
 

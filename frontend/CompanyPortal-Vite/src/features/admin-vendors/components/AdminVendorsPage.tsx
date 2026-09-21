@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useDisableVendor, useEnableVendor, useVendorsList } from "../hooks";
 import type { AdminVendor } from "../types";
 import { useAdminVendorsUrlState } from "../useAdminVendorsUrlState";
@@ -51,7 +52,12 @@ export function AdminVendorsPage() {
         onSuccess: (res) => {
           // Req 8.5: disable still succeeds when the vendor has linked active
           // users -- surface that as a warning toast instead of success.
-          toast({ type: res.warning ? "warning" : "success", message: res.warning ?? res.message });
+          toast({
+            type: res.warning ? "warning" : "success",
+            message: res.warning
+              ? `${pendingApprovalMessage(res)}. ${res.warning}`
+              : pendingApprovalMessage(res),
+          });
           setPendingAction(null);
         },
         onError: (err) => {
@@ -63,7 +69,7 @@ export function AdminVendorsPage() {
     }
     enableMutation.mutate(pendingAction.vendor.id, {
       onSuccess: (res) => {
-        toast({ type: "success", message: res.message });
+        toast({ type: "success", message: pendingApprovalMessage(res) });
         setPendingAction(null);
       },
       onError: (err) => {

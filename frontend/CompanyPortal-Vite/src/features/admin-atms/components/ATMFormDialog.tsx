@@ -6,6 +6,7 @@ import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateATM, useLocationOptions, useUpdateATM } from "../hooks";
 import { type ATMFormValues, PRIORITY_CLASS_VALUES, atmFormSchema } from "../lib/atmFormSchema";
 import type { AdminATM, CreateATMPayload, UpdateATMPayload } from "../types";
@@ -116,8 +117,8 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
           escrow_account: values.escrow_account || null,
           priority_class: values.priority_class || null,
         };
-        await createMutation.mutateAsync(payload);
-        toast({ type: "success", message: "ATM berhasil dibuat" });
+        const res = await createMutation.mutateAsync(payload);
+        toast({ type: "success", message: pendingApprovalMessage(res) });
       } else {
         if (!atm) return;
         const payload: UpdateATMPayload = {
@@ -134,8 +135,8 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
           escrow_account: values.escrow_account || null,
           priority_class: values.priority_class || null,
         };
-        await updateMutation.mutateAsync({ id: atm.id, payload });
-        toast({ type: "success", message: "ATM berhasil diperbarui" });
+        const res = await updateMutation.mutateAsync({ id: atm.id, payload });
+        toast({ type: "success", message: pendingApprovalMessage(res) });
       }
       onClose();
     } catch (err) {

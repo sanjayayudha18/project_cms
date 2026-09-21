@@ -8,6 +8,7 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 import {
   createATM,
   disableATM,
@@ -66,7 +67,7 @@ function useInvalidateList() {
 
 export function useCreateATM() {
   const invalidate = useInvalidateList();
-  return useMutation<AdminATM, ApiError, CreateATMPayload>({
+  return useMutation<ChangeRequestAccepted, ApiError, CreateATMPayload>({
     mutationFn: createATM,
     onSuccess: invalidate,
   });
@@ -74,7 +75,7 @@ export function useCreateATM() {
 
 export function useUpdateATM() {
   const invalidate = useInvalidateList();
-  return useMutation<AdminATM, ApiError, { id: number; payload: UpdateATMPayload }>({
+  return useMutation<ChangeRequestAccepted, ApiError, { id: number; payload: UpdateATMPayload }>({
     mutationFn: ({ id, payload }) => updateATM(id, payload),
     onSuccess: invalidate,
   });
@@ -82,7 +83,7 @@ export function useUpdateATM() {
 
 export function useDisableATM() {
   const invalidate = useInvalidateList();
-  return useMutation<{ message: string }, ApiError, number>({
+  return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: disableATM,
     onSuccess: invalidate,
   });
@@ -90,7 +91,7 @@ export function useDisableATM() {
 
 export function useEnableATM() {
   const invalidate = useInvalidateList();
-  return useMutation<{ message: string }, ApiError, number>({
+  return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: enableATM,
     onSuccess: invalidate,
   });

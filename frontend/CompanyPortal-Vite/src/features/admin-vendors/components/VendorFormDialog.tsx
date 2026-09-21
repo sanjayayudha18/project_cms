@@ -5,6 +5,7 @@ import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateVendor, useUpdateVendor } from "../hooks";
 import { type VendorFormValues, vendorFormSchema } from "../lib/vendorFormSchema";
 import type { AdminVendor, CreateVendorPayload, UpdateVendorPayload } from "../types";
@@ -51,8 +52,8 @@ export function VendorFormDialog({ open, onClose, vendor }: VendorFormDialogProp
     try {
       if (mode === "create") {
         const payload: CreateVendorPayload = values;
-        await createMutation.mutateAsync(payload);
-        toast({ type: "success", message: "Vendor berhasil dibuat" });
+        const res = await createMutation.mutateAsync(payload);
+        toast({ type: "success", message: pendingApprovalMessage(res) });
       } else {
         if (!vendor) return;
         const payload: UpdateVendorPayload = {
@@ -61,8 +62,8 @@ export function VendorFormDialog({ open, onClose, vendor }: VendorFormDialogProp
           contact_phone: values.contact_phone,
           hq_address: values.hq_address,
         };
-        await updateMutation.mutateAsync({ id: vendor.id, payload });
-        toast({ type: "success", message: "Vendor berhasil diperbarui" });
+        const res = await updateMutation.mutateAsync({ id: vendor.id, payload });
+        toast({ type: "success", message: pendingApprovalMessage(res) });
       }
       onClose();
     } catch (err) {

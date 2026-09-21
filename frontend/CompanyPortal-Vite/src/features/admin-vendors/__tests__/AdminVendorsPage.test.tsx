@@ -53,7 +53,10 @@ describe("AdminVendorsPage — linked-active-users warning on disable (Task 9, R
     const user = userEvent.setup();
     disableMutate.mockImplementation((_id, { onSuccess }) => {
       onSuccess({
-        message: "Vendor berhasil dinonaktifkan",
+        change_request_id: 12,
+        status: "pending",
+        entity_type: "vendor",
+        op: "disable",
         warning: "Vendor masih memiliki 3 pengguna aktif yang terhubung",
         linked_active_users: 3,
       });
@@ -70,14 +73,15 @@ describe("AdminVendorsPage — linked-active-users warning on disable (Task 9, R
     expect(toasts).toHaveLength(1);
     expect(toasts[0]).toMatchObject({
       type: "warning",
-      message: "Vendor masih memiliki 3 pengguna aktif yang terhubung",
+      message:
+        "Perubahan diajukan dan menunggu persetujuan (#12). Vendor masih memiliki 3 pengguna aktif yang terhubung",
     });
   });
 
   it("shows a plain success toast when there is no linked-users warning", async () => {
     const user = userEvent.setup();
     disableMutate.mockImplementation((_id, { onSuccess }) => {
-      onSuccess({ message: "Vendor berhasil dinonaktifkan" });
+      onSuccess({ change_request_id: 12, status: "pending", entity_type: "vendor", op: "disable" });
     });
 
     render(<AdminVendorsPage />);
@@ -90,7 +94,7 @@ describe("AdminVendorsPage — linked-active-users warning on disable (Task 9, R
     expect(toasts).toHaveLength(1);
     expect(toasts[0]).toMatchObject({
       type: "success",
-      message: "Vendor berhasil dinonaktifkan",
+      message: "Perubahan diajukan dan menunggu persetujuan (#12)",
     });
   });
 });

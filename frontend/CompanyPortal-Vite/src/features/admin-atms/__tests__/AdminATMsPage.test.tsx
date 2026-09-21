@@ -92,7 +92,7 @@ describe("AdminATMsPage", () => {
   it("disable confirmation flow: confirm calls the mutation and shows a success toast", async () => {
     const user = userEvent.setup();
     disableMutate.mockImplementation((_id, { onSuccess }) => {
-      onSuccess({ message: "ATM berhasil dinonaktifkan" });
+      onSuccess({ change_request_id: 21, status: "pending", entity_type: "atm", op: "disable" });
     });
 
     render(<AdminATMsPage />);
@@ -104,7 +104,10 @@ describe("AdminATMsPage", () => {
     expect(disableMutate).toHaveBeenCalledWith(ACTIVE_ATM.id, expect.anything());
     const toasts = useToastStore.getState().toasts;
     expect(toasts).toHaveLength(1);
-    expect(toasts[0]).toMatchObject({ type: "success", message: "ATM berhasil dinonaktifkan" });
+    expect(toasts[0]).toMatchObject({
+      type: "success",
+      message: "Perubahan diajukan dan menunggu persetujuan (#21)",
+    });
   });
 
   it("disable confirmation flow: cancel does not call the mutation", async () => {

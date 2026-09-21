@@ -50,7 +50,11 @@ export function useVendor(id: number | null) {
 
 function useInvalidateList() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: adminVendorKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: adminVendorKeys.all });
+    // a submitted change is pending: refresh the row badges too
+    queryClient.invalidateQueries({ queryKey: ["master-data", "pending"] });
+  };
 }
 
 export function useCreateVendor() {

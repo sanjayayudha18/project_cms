@@ -62,7 +62,11 @@ export function useLocationOptions() {
 
 function useInvalidateList() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: adminATMsKeys.all });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: adminATMsKeys.all });
+    // a submitted change is pending: refresh the row badges too
+    queryClient.invalidateQueries({ queryKey: ["master-data", "pending"] });
+  };
 }
 
 export function useCreateATM() {

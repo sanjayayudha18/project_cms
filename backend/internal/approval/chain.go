@@ -35,7 +35,7 @@ func BuildChain(ctx context.Context, repo ChainRepository, makerID int64, requir
 			return nil, fmt.Errorf("load approval info for user %d: %w", currentID, err)
 		}
 		if current.SupervisorID == nil {
-			return nil, fmt.Errorf("approval chain incomplete: reached top of hierarchy at user %d before required level %d", currentID, requiredLevel)
+			return nil, fmt.Errorf("%w: reached top of hierarchy at user %d before required level %d", ErrChainIncomplete, currentID, requiredLevel)
 		}
 
 		supervisor, err := repo.GetApproverInfo(ctx, *current.SupervisorID)

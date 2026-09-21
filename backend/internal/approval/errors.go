@@ -16,3 +16,7 @@ var (
 	// the same from_user_id (approval_delegations_no_overlap, migration 025).
 	ErrDelegationOverlap = errors.New("delegation range overlaps an existing delegation for this user")
 )
+
+// ErrChainIncomplete means the maker's supervisor chain ends before reaching an
+// approver of the required level, so the request cannot be routed.
+var ErrChainIncomplete = errors.New("approval chain incomplete")

@@ -236,6 +236,6 @@ func (h *AdminVendorPicHandler) handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrMasterDataChangePending):
 		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangePending.Error())
 	default:
-		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		writeUnexpectedError(w, err)
 	}
 }

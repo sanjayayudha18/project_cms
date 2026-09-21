@@ -224,7 +224,13 @@ func TestUserAdminRepository(t *testing.T) {
 	})
 
 	t.Run("Create with a duplicate username surfaces a unique violation", func(t *testing.T) {
-		_, err := repo.Create(ctx, db.CreateUserAdminParams{
+		// Savepoint: the failed insert aborts its nested tx, not the shared tx.
+		sp, err := tx.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin savepoint: %v", err)
+		}
+		defer sp.Rollback(ctx)
+		_, err = NewUserAdminRepository(sp).Create(ctx, db.CreateUserAdminParams{
 			RoleID: roleAID, Username: "tuat_a_" + tag, FullName: "Duplicate", Email: "dup." + tag + "@example.com",
 			AuthSource: "ldap",
 		})

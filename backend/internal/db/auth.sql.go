@@ -11,63 +11,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const findUserByUsername = `-- name: FindUserByUsername :one
-SELECT u.id, u.username, u.full_name, u.email, u.password_hash,
-       u.auth_source, u.role_id, r.role, u.is_karyawan,
-       u.vendor_id, u.is_active, u.deleted_at,
-       u.supervisor_id, u.approval_level, u.password_changed_at,
-       u.failed_login_attempts, u.locked_until, u.must_change_password
-FROM users u
-JOIN roles r ON r.id = u.role_id
-WHERE u.username = $1 AND u.deleted_at IS NULL
+const deactivateUser = `-- name: DeactivateUser :exec
+UPDATE users SET is_active = false, deleted_at = now() WHERE id = $1
 `
 
-type FindUserByUsernameRow struct {
-	ID                  int64              `json:"id"`
-	Username            string             `json:"username"`
-	FullName            string             `json:"full_name"`
-	Email               string             `json:"email"`
-	PasswordHash        *string            `json:"password_hash"`
-	AuthSource          string             `json:"auth_source"`
-	RoleID              int64              `json:"role_id"`
-	Role                string             `json:"role"`
-	IsKaryawan          bool               `json:"is_karyawan"`
-	VendorID            *int64             `json:"vendor_id"`
-	IsActive            bool               `json:"is_active"`
-	DeletedAt           pgtype.Timestamptz `json:"deleted_at"`
-	SupervisorID        *int64             `json:"supervisor_id"`
-	ApprovalLevel       *int32             `json:"approval_level"`
-	PasswordChangedAt   pgtype.Timestamptz `json:"password_changed_at"`
-	FailedLoginAttempts int32              `json:"failed_login_attempts"`
-	LockedUntil         pgtype.Timestamptz `json:"locked_until"`
-	MustChangePassword  bool               `json:"must_change_password"`
-}
-
-// Retrieves user with joined role name, excluding soft-deleted users.
-func (q *Queries) FindUserByUsername(ctx context.Context, username string) (FindUserByUsernameRow, error) {
-	row := q.db.QueryRow(ctx, findUserByUsername, username)
-	var i FindUserByUsernameRow
-	err := row.Scan(
-		&i.ID,
-		&i.Username,
-		&i.FullName,
-		&i.Email,
-		&i.PasswordHash,
-		&i.AuthSource,
-		&i.RoleID,
-		&i.Role,
-		&i.IsKaryawan,
-		&i.VendorID,
-		&i.IsActive,
-		&i.DeletedAt,
-		&i.SupervisorID,
-		&i.ApprovalLevel,
-		&i.PasswordChangedAt,
-		&i.FailedLoginAttempts,
-		&i.LockedUntil,
-		&i.MustChangePassword,
-	)
-	return i, err
+// Soft-delete only (Task 7). Sets is_active=false, deleted_at=now(). There
+// is no DELETE FROM users query anywhere in this codebase: audit_logs rows
+// (actor_id -> users.id) must stay linked forever, so a user row is never
+// physically removed, audited or not. FindUserByUsername already filters
+// deleted_at IS NULL, so a deactivated user's login is closed automatically.
+func (q *Queries) DeactivateUser(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deactivateUser, id)
+	return err
 }
 
 const findUserByEmail = `-- name: FindUserByEmail :one
@@ -102,7 +57,8 @@ type FindUserByEmailRow struct {
 	MustChangePassword  bool               `json:"must_change_password"`
 }
 
-// Retrieves user with joined role name, excluding soft-deleted users.
+// Same shape as FindUserByUsername but keyed by email — used by the login
+// flow now that users sign in with their email address instead of username.
 func (q *Queries) FindUserByEmail(ctx context.Context, email string) (FindUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, findUserByEmail, email)
 	var i FindUserByEmailRow
@@ -162,10 +118,70 @@ type FindUserByIDRow struct {
 }
 
 // Same shape as FindUserByUsername but keyed by id — used by self-service
-// actions (change-password) where the caller only has UserID from JWT.
+// actions (change-password) where the caller is already authenticated via
+// JWT and only has UserID, not username.
 func (q *Queries) FindUserByID(ctx context.Context, id int64) (FindUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, findUserByID, id)
 	var i FindUserByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.FullName,
+		&i.Email,
+		&i.PasswordHash,
+		&i.AuthSource,
+		&i.RoleID,
+		&i.Role,
+		&i.IsKaryawan,
+		&i.VendorID,
+		&i.IsActive,
+		&i.DeletedAt,
+		&i.SupervisorID,
+		&i.ApprovalLevel,
+		&i.PasswordChangedAt,
+		&i.FailedLoginAttempts,
+		&i.LockedUntil,
+		&i.MustChangePassword,
+	)
+	return i, err
+}
+
+const findUserByUsername = `-- name: FindUserByUsername :one
+SELECT u.id, u.username, u.full_name, u.email, u.password_hash,
+       u.auth_source, u.role_id, r.role, u.is_karyawan,
+       u.vendor_id, u.is_active, u.deleted_at,
+       u.supervisor_id, u.approval_level, u.password_changed_at,
+       u.failed_login_attempts, u.locked_until, u.must_change_password
+FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.username = $1 AND u.deleted_at IS NULL
+`
+
+type FindUserByUsernameRow struct {
+	ID                  int64              `json:"id"`
+	Username            string             `json:"username"`
+	FullName            string             `json:"full_name"`
+	Email               string             `json:"email"`
+	PasswordHash        *string            `json:"password_hash"`
+	AuthSource          string             `json:"auth_source"`
+	RoleID              int64              `json:"role_id"`
+	Role                string             `json:"role"`
+	IsKaryawan          bool               `json:"is_karyawan"`
+	VendorID            *int64             `json:"vendor_id"`
+	IsActive            bool               `json:"is_active"`
+	DeletedAt           pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID        *int64             `json:"supervisor_id"`
+	ApprovalLevel       *int32             `json:"approval_level"`
+	PasswordChangedAt   pgtype.Timestamptz `json:"password_changed_at"`
+	FailedLoginAttempts int32              `json:"failed_login_attempts"`
+	LockedUntil         pgtype.Timestamptz `json:"locked_until"`
+	MustChangePassword  bool               `json:"must_change_password"`
+}
+
+// Retrieves user with joined role name, excluding soft-deleted users.
+func (q *Queries) FindUserByUsername(ctx context.Context, username string) (FindUserByUsernameRow, error) {
+	row := q.db.QueryRow(ctx, findUserByUsername, username)
+	var i FindUserByUsernameRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
@@ -228,27 +244,6 @@ func (q *Queries) GetUserProfile(ctx context.Context, id int64) (GetUserProfileR
 	return i, err
 }
 
-const updateLastLogin = `-- name: UpdateLastLogin :exec
-UPDATE users SET last_login_at = now() WHERE id = $1
-`
-
-// Updates last_login_at timestamp after successful authentication.
-func (q *Queries) UpdateLastLogin(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, updateLastLogin, id)
-	return err
-}
-
-const markPasswordExpired = `-- name: MarkPasswordExpired :exec
-UPDATE users SET must_change_password = true WHERE id = $1
-`
-
-// Forces a password change on next login when the local-password 90-day
-// expiry policy rejects a login attempt (auth_source=local|local_dev only).
-func (q *Queries) MarkPasswordExpired(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, markPasswordExpired, id)
-	return err
-}
-
 const incrementFailedLogin = `-- name: IncrementFailedLogin :one
 UPDATE users SET failed_login_attempts = failed_login_attempts + 1
 WHERE id = $1
@@ -282,6 +277,28 @@ func (q *Queries) LockAccount(ctx context.Context, arg LockAccountParams) error 
 	return err
 }
 
+const markPasswordExpired = `-- name: MarkPasswordExpired :exec
+UPDATE users SET must_change_password = true WHERE id = $1
+`
+
+// Forces a password change on next login when the local-password 90-day
+// expiry policy rejects a login attempt (auth_source=local|local_dev only).
+func (q *Queries) MarkPasswordExpired(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, markPasswordExpired, id)
+	return err
+}
+
+const reactivateUser = `-- name: ReactivateUser :exec
+UPDATE users SET is_active = true, deleted_at = NULL WHERE id = $1
+`
+
+// Reverses DeactivateUser (optional admin action): clears deleted_at, sets
+// is_active back to true.
+func (q *Queries) ReactivateUser(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, reactivateUser, id)
+	return err
+}
+
 const resetLockout = `-- name: ResetLockout :exec
 UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1
 `
@@ -289,6 +306,30 @@ UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1
 // Clears failed_login_attempts and locked_until after a successful login.
 func (q *Queries) ResetLockout(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, resetLockout, id)
+	return err
+}
+
+const setInitialPassword = `-- name: SetInitialPassword :exec
+UPDATE users
+SET password_hash = $2,
+    password_changed_at = now(),
+    must_change_password = true,
+    failed_login_attempts = 0,
+    locked_until = NULL
+WHERE id = $1
+`
+
+type SetInitialPasswordParams struct {
+	ID           int64   `json:"id"`
+	PasswordHash *string `json:"password_hash"`
+}
+
+// APPACCESS admin action (Task 6): sets a new bcrypt hash for a target user
+// and forces a change on their next login (must_change_password=true) —
+// the opposite of SetPassword's must_change_password=false. No old password
+// required; this is a set, not a self-service change.
+func (q *Queries) SetInitialPassword(ctx context.Context, arg SetInitialPasswordParams) error {
+	_, err := q.db.Exec(ctx, setInitialPassword, arg.ID, arg.PasswordHash)
 	return err
 }
 
@@ -309,51 +350,19 @@ type SetPasswordParams struct {
 
 // Self-service change-password (Task 5): sets a new bcrypt hash, marks it as
 // freshly changed, clears must_change_password, and resets the lockout
-// counters.
+// counters — a legitimate password change is as good as a successful login
+// for lockout-recovery purposes.
 func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
 	_, err := q.db.Exec(ctx, setPassword, arg.ID, arg.PasswordHash)
 	return err
 }
 
-const setInitialPassword = `-- name: SetInitialPassword :exec
-UPDATE users
-SET password_hash = $2,
-    password_changed_at = now(),
-    must_change_password = true,
-    failed_login_attempts = 0,
-    locked_until = NULL
-WHERE id = $1
+const updateLastLogin = `-- name: UpdateLastLogin :exec
+UPDATE users SET last_login_at = now() WHERE id = $1
 `
 
-type SetInitialPasswordParams struct {
-	ID           int64   `json:"id"`
-	PasswordHash *string `json:"password_hash"`
-}
-
-// APPACCESS admin action (Task 6): sets a new bcrypt hash for a target user
-// and forces a change on their next login (must_change_password=true).
-func (q *Queries) SetInitialPassword(ctx context.Context, arg SetInitialPasswordParams) error {
-	_, err := q.db.Exec(ctx, setInitialPassword, arg.ID, arg.PasswordHash)
-	return err
-}
-
-const deactivateUser = `-- name: DeactivateUser :exec
-UPDATE users SET is_active = false, deleted_at = now() WHERE id = $1
-`
-
-// Soft-delete only (Task 7): sets is_active=false, deleted_at=now(). There
-// is no DELETE FROM users query anywhere in this codebase.
-func (q *Queries) DeactivateUser(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deactivateUser, id)
-	return err
-}
-
-const reactivateUser = `-- name: ReactivateUser :exec
-UPDATE users SET is_active = true, deleted_at = NULL WHERE id = $1
-`
-
-// Reverses DeactivateUser (optional admin action).
-func (q *Queries) ReactivateUser(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, reactivateUser, id)
+// Updates last_login_at timestamp after successful authentication.
+func (q *Queries) UpdateLastLogin(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateLastLogin, id)
 	return err
 }

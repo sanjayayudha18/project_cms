@@ -57,12 +57,17 @@ WHERE entity_type = $1 AND entity_id = $2
 ORDER BY created_at ASC
 `
 
+type ListAuditLogsByEntityParams struct {
+	EntityType string `json:"entity_type"`
+	EntityID   int64  `json:"entity_id"`
+}
+
 // Generic append-only audit trail read for any (entity_type, entity_id) pair
 // -- backs GET /{id}/audit-log for vendor_request (Req 16.4) and is reusable
 // by any future entity without a new query. Ascending by created_at so the
 // trail reads chronologically (oldest first).
-func (q *Queries) ListAuditLogsByEntity(ctx context.Context, entityType string, entityID int64) ([]AuditLog, error) {
-	rows, err := q.db.Query(ctx, listAuditLogsByEntity, entityType, entityID)
+func (q *Queries) ListAuditLogsByEntity(ctx context.Context, arg ListAuditLogsByEntityParams) ([]AuditLog, error) {
+	rows, err := q.db.Query(ctx, listAuditLogsByEntity, arg.EntityType, arg.EntityID)
 	if err != nil {
 		return nil, err
 	}

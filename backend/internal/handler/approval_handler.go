@@ -34,6 +34,7 @@ type ApprovalReader interface {
 type ApprovalHandler struct {
 	orchestrator ApprovalOrchestrator
 	reader       ApprovalReader
+	mdDetail     MasterDataApprovalDetailReader // set by WithMasterDataDetail; nil = endpoint answers 404
 }
 
 // NewApprovalHandler creates a new ApprovalHandler.
@@ -49,6 +50,7 @@ func (h *ApprovalHandler) Routes() chi.Router {
 	r.Post("/{id}/approve", h.Approve)
 	r.Post("/{id}/reject", h.Reject)
 	r.Get("/{id}", h.Get)
+	r.Get("/{id}/master-data", h.MasterDataDetail)
 	return r
 }
 

@@ -242,7 +242,7 @@ func main() {
 	approvalRepo := approval.NewRepository(dbPool)
 	approvalOrchestrator := approval.NewOrchestrator(approvalRepo, approvalRepo, approvalRepo, auditWriter, nil)
 	masterDataApprovalService := service.NewMasterDataApprovalService(approvalOrchestrator, masterDataChangeRepo, dbPool, masterDataApplierRegistry, auditWriter)
-	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo)
+	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo).WithMasterDataDetail(masterDataChangeRepo)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/approvals", approvalHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: read access to the master-data maker-checker

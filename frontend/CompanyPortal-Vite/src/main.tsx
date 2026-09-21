@@ -29,6 +29,7 @@ import { vendorRequestListRoute } from "./routes/replenishment/vendor-requests/i
 import { vendorRequestNewRoute } from "./routes/replenishment/vendor-requests/new";
 import { settingsRoute } from "./routes/settings";
 import { adminATMsRoute } from "./routes/settings/admin/atms";
+import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
 import { adminUsersRoute } from "./routes/settings/admin/users";
 import { adminVendorsRoute } from "./routes/settings/admin/vendors";
 import { rbacDelegationsRoute } from "./routes/settings/rbac/delegations";
@@ -67,6 +68,7 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     adminUsersRoute,
     adminVendorsRoute,
+    adminMasterDataIORoute,
     adminATMsRoute,
     approvalsRoute,
     rbacUsersRoute,

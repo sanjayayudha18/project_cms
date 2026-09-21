@@ -147,9 +147,9 @@ Legenda: `[ ]` todo · `[~]` in progress · `[x]` done · **Validate** = bukti t
   - **Model:** Sonnet, **Effort:** Medium — UI periode + assign; perlu tangani respons overlap 409 dari T3.5.
 - [ ] **T6.3** Badge "Menunggu approval" (ikon + label, bukan warna saja) di list; form terkunci bila ada pending.
   - **Model:** Sonnet, **Effort:** Medium — badge (ikon+label per aturan aksesibilitas) + kondisi kunci form.
-- [ ] **T6.4** Inbox approval: tampilkan diff before/after untuk `master_data`.
+- [x] **T6.4** Inbox approval: tampilkan diff before/after untuk `master_data`.
   - **Model:** Sonnet, **Effort:** Medium — render diff before/after dari payload; perlu judgment presentasi.
-- [ ] **T6.5** Tombol Export / Download template / Import (dry-run preview tabel error → konfirmasi).
+- [x] **T6.5** Tombol Export / Download template / Import (dry-run preview tabel error → konfirmasi).
   - **Model:** Sonnet, **Effort:** Medium — alur upload → preview error → konfirmasi; beberapa state UI.
 - [ ] **T6.6** Tema "Merah Sirih" OKLCH, `tabular-nums` untuk kapasitas/harga, IDR eksplisit.
   - **Model:** Haiku, **Effort:** Low — terapkan token tema + format angka sesuai design system yang sudah ada.

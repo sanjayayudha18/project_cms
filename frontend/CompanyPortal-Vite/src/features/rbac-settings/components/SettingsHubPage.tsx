@@ -17,6 +17,7 @@ import {
   ArrowUpRight,
   Building2,
   CalendarOff,
+  FileSpreadsheet,
   GitBranch,
   HelpCircle,
   KeyRound,
@@ -111,6 +112,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Pelihara data master dan status aktif ATM.",
     href: "/settings/admin/atms",
     icon: Landmark,
+    category: "master",
+  },
+  {
+    id: "admin-master-data-io",
+    title: "Ekspor & Impor CSV",
+    description: "Unduh, ubah massal, dan impor data master vendor dan ATM.",
+    href: "/settings/admin/master-data-io",
+    icon: FileSpreadsheet,
     category: "master",
   },
 ];
@@ -393,7 +402,11 @@ export function SettingsHubPage() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Cari pengaturan..."
           className="min-h-[44px] w-full rounded-[var(--radius-md)] border py-2.5 pr-4 pl-11 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)]"
-          style={{ borderColor: "var(--n-200)", backgroundColor: "var(--n-0)", color: "var(--n-800)" }}
+          style={{
+            borderColor: "var(--n-200)",
+            backgroundColor: "var(--n-0)",
+            color: "var(--n-800)",
+          }}
         />
       </div>
 

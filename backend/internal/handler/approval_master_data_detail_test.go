@@ -33,7 +33,7 @@ func mountMasterDataDetail(reader ApprovalReader, detail MasterDataApprovalDetai
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}, noopBlacklist{})
 	h := NewApprovalHandler(&fakeApprovalOrchestrator{}, reader).WithMasterDataDetail(detail)
 	r := chi.NewRouter()
@@ -148,7 +148,7 @@ func TestApprovalMasterDataDetail_NotMasterDataOrUnwired_404_Anonymous_401(t *te
 	}
 
 	// Endpoint not enabled (no detail reader) answers 404, never a nil dereference.
-	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{SecretKey: []byte("test-secret-minimum-32-bytes-long!!"), AccessTokenExpiry: time.Minute, RefreshTokenExpiry: time.Hour}, noopBlacklist{})
+	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{SecretKey: []byte("test-secret-minimum-32-bytes-long!!"), AccessTokenExpiry: time.Minute, SessionMaxLifetime: time.Hour}, noopBlacklist{})
 	r := chi.NewRouter()
 	r.With(custommw.RequireAuth(tokenSvc)).Mount("/api/v1/approvals", NewApprovalHandler(&fakeApprovalOrchestrator{}, &fakeApprovalReader{getResult: mdRequest(5)}).Routes())
 	if rec := doRequest(r, http.MethodGet, "/api/v1/approvals/7/master-data", tokenFor(t, tokenSvc, 5), ""); rec.Code != http.StatusNotFound {

@@ -47,6 +47,10 @@ export type AuthStore = AuthState & AuthActions;
 
 const AUTH_API_BASE = "/api/v1/auth";
 
+/** Query param the login page reads to show the "session ended" notice. */
+export const SESSION_EXPIRED_REASON = "session_expired";
+export const SESSION_EXPIRED_MESSAGE = "Sesi berakhir, silakan login kembali";
+
 // ─── Single-flight refresh ────────────────────────────────────────────────────
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -223,7 +227,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
             rateLimitRetryAfter: null,
           });
           const currentPath = window.location.pathname + window.location.search;
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=${SESSION_EXPIRED_REASON}`;
           return false;
         }
 

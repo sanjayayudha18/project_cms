@@ -27,8 +27,8 @@ func TestLoad_Success_WithDefaults(t *testing.T) {
 	if cfg.AccessTokenExpiry != 15*time.Minute {
 		t.Errorf("AccessTokenExpiry = %v, want 15m", cfg.AccessTokenExpiry)
 	}
-	if cfg.RefreshTokenExpiry != 7*24*time.Hour {
-		t.Errorf("RefreshTokenExpiry = %v, want 7 days", cfg.RefreshTokenExpiry)
+	if cfg.SessionMaxLifetime != time.Hour {
+		t.Errorf("SessionMaxLifetime = %v, want 1h", cfg.SessionMaxLifetime)
 	}
 	if cfg.RedisURL != "redis://localhost:6379" {
 		t.Errorf("RedisURL = %q, want redis://localhost:6379", cfg.RedisURL)
@@ -78,7 +78,7 @@ func TestLoad_PortEnvOverridesDefault(t *testing.T) {
 func TestLoad_Success_WithCustomValues(t *testing.T) {
 	setEnvForTest(t)
 	t.Setenv("ACCESS_TOKEN_EXPIRY", "30m")
-	t.Setenv("REFRESH_TOKEN_EXPIRY", "24h")
+	t.Setenv("SESSION_MAX_LIFETIME", "2h")
 	t.Setenv("RATE_LIMIT_USERNAME", "10")
 	t.Setenv("RATE_LIMIT_IP", "50")
 	t.Setenv("RATE_LIMIT_WINDOW", "30m")
@@ -91,8 +91,8 @@ func TestLoad_Success_WithCustomValues(t *testing.T) {
 	if cfg.AccessTokenExpiry != 30*time.Minute {
 		t.Errorf("AccessTokenExpiry = %v, want 30m", cfg.AccessTokenExpiry)
 	}
-	if cfg.RefreshTokenExpiry != 24*time.Hour {
-		t.Errorf("RefreshTokenExpiry = %v, want 24h", cfg.RefreshTokenExpiry)
+	if cfg.SessionMaxLifetime != 2*time.Hour {
+		t.Errorf("SessionMaxLifetime = %v, want 2h", cfg.SessionMaxLifetime)
 	}
 	if cfg.RateLimitUsername != 10 {
 		t.Errorf("RateLimitUsername = %d, want 10", cfg.RateLimitUsername)
@@ -176,6 +176,23 @@ func TestLoad_InvalidDuration_FallsBackToDefault(t *testing.T) {
 	}
 	if cfg.RateLimitWindow != 15*time.Minute {
 		t.Errorf("RateLimitWindow = %v, want 15m (default on invalid input)", cfg.RateLimitWindow)
+	}
+}
+
+func TestLoad_SessionMaxLifetime_InvalidOrTooShortFallsBackToDefault(t *testing.T) {
+	for _, val := range []string{"garbage", "10s", "0", "-1h"} {
+		t.Run(val, func(t *testing.T) {
+			setEnvForTest(t)
+			t.Setenv("SESSION_MAX_LIFETIME", val)
+
+			cfg, err := Load("8080")
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+			if cfg.SessionMaxLifetime != time.Hour {
+				t.Errorf("SessionMaxLifetime = %v, want 1h fallback", cfg.SessionMaxLifetime)
+			}
+		})
 	}
 }
 

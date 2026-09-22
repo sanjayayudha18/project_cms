@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -25,11 +26,11 @@ type ChangePasswordService interface {
 
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
-	authService        *auth.Service
-	tokenService       *pkgauth.TokenService
-	userRepo           pkgauth.UserRepository
-	rateLimiter        *middleware.RateLimiter
-	changePasswordSvc  ChangePasswordService
+	authService       *auth.Service
+	tokenService      *pkgauth.TokenService
+	userRepo          pkgauth.UserRepository
+	rateLimiter       *middleware.RateLimiter
+	changePasswordSvc ChangePasswordService
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
@@ -101,7 +102,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set refresh token as httpOnly cookie
-	setRefreshCookie(w, refreshToken)
+	setRefreshCookie(w, refreshToken, h.tokenService.RefreshDeadline(refreshToken))
 
 	writeJSON(w, http.StatusOK, loginResponse{
 		AccessToken:        resp.AccessToken,
@@ -121,7 +122,11 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.tokenService.ValidateRefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		writeUnauthorized(w, "Sesi telah berakhir")
+		if !errors.Is(err, pkgauth.ErrServiceUnavailable) {
+			// Session over (or token dead): stop the browser resending it.
+			clearRefreshCookie(w)
+		}
+		writeUnauthorized(w, "Sesi berakhir, silakan login kembali")
 		return
 	}
 
@@ -144,14 +149,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		VendorID:   user.VendorID,
 	}
 
-	accessToken, refreshTokenNew, err := h.tokenService.GenerateTokenPair(identity)
+	accessToken, refreshTokenNew, err := h.tokenService.RotateTokenPair(identity, claims.ExpiresAt.Time)
 	if err != nil {
 		writeServiceUnavailable(w, "Gagal memperbarui sesi")
 		return
 	}
 
 	// Set new refresh cookie
-	setRefreshCookie(w, refreshTokenNew)
+	setRefreshCookie(w, refreshTokenNew, h.tokenService.RefreshDeadline(refreshTokenNew))
 
 	writeJSON(w, http.StatusOK, loginResponse{
 		AccessToken: accessToken,
@@ -300,13 +305,15 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 	}
 }
 
-// setRefreshCookie sets the refresh_token httpOnly cookie.
-func setRefreshCookie(w http.ResponseWriter, token string) {
+// setRefreshCookie sets the refresh_token httpOnly cookie, living until the
+// absolute session deadline.
+func setRefreshCookie(w http.ResponseWriter, token string, deadline time.Time) {
+	maxAge := max(int(time.Until(deadline).Seconds()), 0)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,
 		Path:     "/api/v1/auth",
-		MaxAge:   604800, // 7 days in seconds
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,

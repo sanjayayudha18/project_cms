@@ -1,4 +1,5 @@
 import { useAuthStore } from "@/lib/auth";
+import { SESSION_EXPIRED_MESSAGE, SESSION_EXPIRED_REASON } from "@/lib/auth/store";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Navigate, useRouter } from "@tanstack/react-router";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -122,7 +123,9 @@ export function LoginPage() {
     ? isRateLimited
       ? `${storeError}. Coba lagi dalam ${formatRetryAfter(rateLimitRemaining)}`
       : storeError
-    : null;
+    : new URLSearchParams(window.location.search).get("reason") === SESSION_EXPIRED_REASON
+      ? SESSION_EXPIRED_MESSAGE
+      : null;
 
   const togglePassword = () => {
     setShowPassword((prev) => !prev);

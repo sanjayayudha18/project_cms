@@ -14,7 +14,7 @@ import (
 type TokenConfig struct {
 	SecretKey          []byte        // min 32 bytes, from env
 	AccessTokenExpiry  time.Duration // 15 minutes
-	RefreshTokenExpiry time.Duration // 7 days
+	SessionMaxLifetime time.Duration // absolute session limit from login
 }
 
 // AccessTokenClaims represents the claims embedded in an access token.
@@ -49,22 +49,31 @@ func NewTokenService(config TokenConfig, blacklist TokenBlacklist) *TokenService
 	}
 }
 
-// GenerateTokenPair creates both an access token and a refresh token for the given identity.
-// The access token contains user claims and expires in 15 minutes.
-// The refresh token contains the user ID and a unique JTI, expiring in 7 days.
+// GenerateTokenPair starts a new session: the refresh token's exp (the session
+// deadline) is now + SessionMaxLifetime.
 func (ts *TokenService) GenerateTokenPair(identity *AuthIdentity) (accessToken, refreshToken string, err error) {
+	return ts.RotateTokenPair(identity, time.Time{})
+}
+
+// RotateTokenPair issues a new pair inside an existing session. The refresh
+// token inherits deadline (the old refresh token's exp) instead of extending it,
+// clamped to now + SessionMaxLifetime so legacy long-lived tokens and a shortened
+// SESSION_MAX_LIFETIME both take effect. A zero deadline starts a new session.
+// The access token never outlives the session deadline.
+func (ts *TokenService) RotateTokenPair(identity *AuthIdentity, deadline time.Time) (accessToken, refreshToken string, err error) {
 	if identity == nil {
 		return "", "", fmt.Errorf("identity cannot be nil")
 	}
 
 	now := time.Now()
+	deadline = ts.effectiveDeadline(now, deadline)
 
-	accessToken, err = ts.generateAccessToken(identity, now)
+	accessToken, err = ts.generateAccessToken(identity, now, deadline)
 	if err != nil {
 		return "", "", fmt.Errorf("generating access token: %w", err)
 	}
 
-	refreshToken, err = ts.generateRefreshToken(identity, now)
+	refreshToken, err = ts.generateRefreshToken(identity, now, deadline)
 	if err != nil {
 		return "", "", fmt.Errorf("generating refresh token: %w", err)
 	}
@@ -72,8 +81,16 @@ func (ts *TokenService) GenerateTokenPair(identity *AuthIdentity) (accessToken, 
 	return accessToken, refreshToken, nil
 }
 
+func (ts *TokenService) effectiveDeadline(now, inherited time.Time) time.Time {
+	max := now.Add(ts.config.SessionMaxLifetime)
+	if inherited.IsZero() || inherited.After(max) {
+		return max
+	}
+	return inherited
+}
+
 // generateAccessToken creates a signed access token with user identity claims.
-func (ts *TokenService) generateAccessToken(identity *AuthIdentity, now time.Time) (string, error) {
+func (ts *TokenService) generateAccessToken(identity *AuthIdentity, now, deadline time.Time) (string, error) {
 	claims := AccessTokenClaims{
 		UserID:        identity.UserID,
 		Username:      identity.Username,
@@ -84,7 +101,7 @@ func (ts *TokenService) generateAccessToken(identity *AuthIdentity, now time.Tim
 		ApprovalLevel: identity.ApprovalLevel,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(ts.config.AccessTokenExpiry)),
+			ExpiresAt: jwt.NewNumericDate(minTime(now.Add(ts.config.AccessTokenExpiry), deadline)),
 		},
 	}
 
@@ -98,7 +115,7 @@ func (ts *TokenService) generateAccessToken(identity *AuthIdentity, now time.Tim
 }
 
 // generateRefreshToken creates a signed refresh token with a unique JTI for revocation tracking.
-func (ts *TokenService) generateRefreshToken(identity *AuthIdentity, now time.Time) (string, error) {
+func (ts *TokenService) generateRefreshToken(identity *AuthIdentity, now, deadline time.Time) (string, error) {
 	jti := uuid.New().String()
 
 	claims := RefreshTokenClaims{
@@ -106,7 +123,7 @@ func (ts *TokenService) generateRefreshToken(identity *AuthIdentity, now time.Ti
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(ts.config.RefreshTokenExpiry)),
+			ExpiresAt: jwt.NewNumericDate(deadline),
 		},
 	}
 
@@ -223,4 +240,21 @@ func (ts *TokenService) BlacklistRefreshToken(ctx context.Context, refreshTokenS
 	}
 
 	return ts.blacklist.Add(ctx, claims.ID, remaining)
+}
+
+func minTime(a, b time.Time) time.Time {
+	if b.Before(a) {
+		return b
+	}
+	return a
+}
+
+// RefreshDeadline returns the exp of a refresh token this service just issued
+// (signature is not re-verified). Zero time if it can't be read.
+func (ts *TokenService) RefreshDeadline(refreshTokenStr string) time.Time {
+	claims := &RefreshTokenClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(refreshTokenStr, claims); err != nil || claims.ExpiresAt == nil {
+		return time.Time{}
+	}
+	return claims.ExpiresAt.Time
 }

@@ -1,0 +1,700 @@
+// =====================================================================
+// CMS ATM & CIT — Current Database Schema (dbdiagram.io / DBML)
+// =====================================================================
+// Source of truth: backend/migrations/
+//   001_baseline_schema.sql (2026-09-18 pg_dump baseline)
+//   003_master_data.sql, 004_vendor_packages_soft_disable.sql,
+//   005_master_data_import_batches.sql, 006_audit_logs_read_indexes.sql
+//
+// Paste into https://dbdiagram.io to render the ERD.
+// Money = numeric(20,2). Timestamps = timestamptz. No floats.
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// Auth / RBAC
+// ---------------------------------------------------------------------
+
+Table roles {
+  id bigint [pk, increment]
+  role text [not null, note: 'ADMIN | ADMIN_PARAM | ATM-USER | ATM-SPV | BRANCH-USER | BRANCH-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | VENDOR-USER | APPACCESS']
+  description text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table users {
+  id bigint [pk, increment]
+  role_id bigint [not null]
+  employee_id text [note: 'Nullable for external/vendor users']
+  username text [not null]
+  full_name text [not null]
+  email text [not null]
+  is_karyawan boolean [not null]
+  auth_source text [not null, note: 'ldap | local']
+  password_hash text [note: 'Only for auth_source=local']
+  vendor_id bigint [note: 'Required for vendor/local users']
+  is_active boolean [not null, default: true]
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  vendor_branch_id bigint
+  supervisor_id bigint [note: 'Direct supervisor (self-FK, reporting line tree)']
+  approval_level integer [note: 'Maker-checker level, independent of role_id']
+  password_changed_at timestamptz
+  must_change_password boolean [not null, default: false]
+  failed_login_attempts integer [not null, default: 0]
+  locked_until timestamptz
+
+  Note: 'CHECK supervisor_id IS DISTINCT FROM id'
+}
+
+Table menu_features {
+  id bigint [pk, increment]
+  parent_id bigint [note: 'self-FK; NULL = top-level menu']
+  key text [not null, unique]
+  label text [not null]
+  kind text [not null, note: 'menu | feature (menu<=>parent_id NULL)']
+  sort_order integer [not null, default: 0]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table role_permissions {
+  id bigint [pk, increment]
+  role_id bigint [not null]
+  menu_feature_id bigint [not null]
+  granted_by bigint [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (role_id, menu_feature_id) [unique]
+  }
+}
+
+// ---------------------------------------------------------------------
+// Approval / Audit (maker-checker)
+// ---------------------------------------------------------------------
+
+Table approval_policies {
+  id bigint [pk, increment]
+  document_type text [not null]
+  min_amount "numeric(20,2)" [not null, note: 'inclusive lower bound']
+  max_amount "numeric(20,2)" [not null, note: 'exclusive upper bound']
+  required_level integer [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'EXCLUDE no-overlap on (document_type, [min,max)) WHERE is_active'
+}
+
+Table approval_requests {
+  id bigint [pk, increment]
+  maker_id bigint [not null]
+  document_type text [not null]
+  document_id bigint [not null]
+  amount "numeric(20,2)" [not null]
+  required_level integer [not null]
+  status text [not null, default: 'draft', note: 'draft | pending | approved | rejected']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (document_type, document_id) [unique]
+  }
+}
+
+Table approval_steps {
+  id bigint [pk, increment]
+  request_id bigint [not null]
+  step_level integer [not null]
+  assigned_approver_id bigint [not null]
+  acted_by_id bigint [note: 'delegate if on leave; NULL until acted']
+  status text [not null, default: 'pending', note: 'pending | approved | rejected']
+  acted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (request_id, step_level) [unique]
+  }
+}
+
+Table approval_delegations {
+  id bigint [pk, increment]
+  from_user_id bigint [not null]
+  to_user_id bigint [not null]
+  start_at timestamptz [not null]
+  end_at timestamptz [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'EXCLUDE no-overlap on (from_user_id, tstzrange[start,end)); CHECK from<>to; CHECK start<end'
+}
+
+Table user_leaves {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  start_at timestamptz [not null]
+  end_at timestamptz [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'CHECK start_at < end_at'
+}
+
+Table audit_logs {
+  id bigint [pk, increment]
+  actor_id bigint [not null]
+  action text [not null, note: 'submit | approve | reject | create | update']
+  entity_type text [not null]
+  entity_id bigint [not null]
+  before jsonb
+  after jsonb
+  ip text
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: 'Append-only'
+}
+
+// ---------------------------------------------------------------------
+// Master data — geography / currency
+// ---------------------------------------------------------------------
+
+Table regions {
+  id bigint [pk, increment]
+  code text [not null]
+  region text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table locations {
+  id bigint [pk, increment]
+  region_id bigint [not null]
+  type text [not null]
+  name text [not null]
+  address_line1 text [not null]
+  address_line2 text
+  rt text
+  rw text
+  kelurahan text
+  kecamatan text
+  city_or_regency text [not null]
+  province text [not null]
+  postal_code text
+  country_code "char(2)" [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table currencies {
+  id bigint [pk, increment]
+  code text [not null, unique]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table denoms {
+  id bigint [pk, increment]
+  curr_id bigint [not null]
+  denom "numeric(20,2)" [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (curr_id, denom) [unique]
+  }
+}
+
+// ---------------------------------------------------------------------
+// Master data — vendors
+// ---------------------------------------------------------------------
+
+Table vendors {
+  id bigint [pk, increment]
+  code text [not null]
+  name text [not null]
+  contact_email text
+  contact_phone text
+  hq_address text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  request_prefix "char(3)" [note: '3 uppercase chars for request_number; CHECK ^[A-Z]{3}$']
+  legal_name text [note: 'migration 003']
+  npwp text [note: 'migration 003; CHECK 15 or 16 digits']
+}
+
+Table vendor_branches {
+  id bigint [pk, increment]
+  vendor_id bigint [not null]
+  branch_code text [not null]
+  branch_name text [not null]
+  location_id bigint
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  region text [note: 'FLM vendor region']
+  deleted_at timestamptz [note: 'migration 003 soft-delete']
+}
+
+Table vendor_pics {
+  id bigint [pk, increment]
+  vendor_id bigint [not null]
+  vendor_branch_id bigint [note: 'NULL = vendor-wide']
+  name text [not null]
+  position text
+  phone text
+  email text
+  is_notification_recipient boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  Note: 'migration 003'
+}
+
+Table vendor_vaults {
+  id bigint [pk, increment]
+  vendor_branch_id bigint [not null]
+  vault_code text [not null]
+  type text [note: 'main | transit | buffer']
+  amount "numeric(20,2)"
+  max_capacity_amount "numeric(20,2)"
+  min_capacity_amount "numeric(20,2)"
+  currency_code "char(3)" [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  location_id bigint [note: 'migration 003']
+  latitude "numeric(9,6)" [note: 'migration 003; CHECK -90..90']
+  longitude "numeric(9,6)" [note: 'migration 003; CHECK -180..180']
+  operating_hours text [note: 'migration 003']
+  category text [not null, note: 'migration 003; ATM | CASH']
+  deleted_at timestamptz [note: 'migration 003']
+}
+
+Table vendor_packages {
+  id bigint [pk, increment]
+  vendor_branch_id bigint [not null]
+  code text [not null]
+  priority_class text [not null]
+  price "numeric(20,2)" [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  is_active boolean [not null, default: true, note: 'migration 004']
+  deleted_at timestamptz [note: 'migration 004 soft-disable']
+}
+
+// ---------------------------------------------------------------------
+// Master data — ATMs
+// ---------------------------------------------------------------------
+
+Table atms {
+  id bigint [pk, increment]
+  terminal_id text [not null, unique]
+  location_id bigint [not null]
+  machine_type text [not null]
+  brand text [not null]
+  model text [not null]
+  operation_hours text [not null]
+  deployment_type text [not null]
+  capacity_amount "numeric(20,2)"
+  low_threshold_amount "numeric(20,2)"
+  critical_threshold_amount "numeric(20,2)"
+  blacklisted boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  escrow_account text [note: 'escrow account per ATM']
+  priority_class text [note: 'VIP | Non VIP | Industri']
+}
+
+Table atm_denoms {
+  id bigint [pk, increment]
+  atm_id bigint [not null]
+  denom_id bigint [not null]
+
+  indexes {
+    (atm_id, denom_id) [unique]
+  }
+}
+
+Table atm_vendor_packages {
+  id bigint [pk, increment]
+  atm_id bigint [not null]
+  vendor_package_id bigint [not null]
+  effective_start_date date [not null]
+  effective_end_date date
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (atm_id, vendor_package_id, effective_start_date) [unique]
+  }
+  Note: 'EXCLUDE no-overlap on (atm_id, daterange) WHERE is_active (migration 003)'
+}
+
+// ---------------------------------------------------------------------
+// Master-data change control (maker-checker staging) — migrations 003 / 005
+// ---------------------------------------------------------------------
+
+Table master_data_change_requests {
+  id bigint [pk, increment]
+  entity_type text [not null]
+  entity_id bigint [note: 'NULL for op=create']
+  op text [not null, note: 'create | update | disable | enable']
+  payload jsonb [not null]
+  before jsonb
+  status text [not null, default: 'pending', note: 'pending | approved | rejected | applied | stale']
+  maker_id bigint [not null]
+  approval_request_id bigint
+  batch_id bigint
+  error text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id) [unique, note: 'partial WHERE status=pending']
+  }
+}
+
+Table master_data_import_batches {
+  id bigint [pk, increment]
+  entity text [not null]
+  file_hash text [not null, note: 'CHECK ^[0-9a-f]{64}$ (SHA-256)']
+  maker_id bigint [not null]
+  row_count integer [not null, note: 'CHECK > 0']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// DMAA forecast (viewer)
+// ---------------------------------------------------------------------
+
+Table dmaa_files {
+  id bigint [pk, increment]
+  name text [not null]
+  status text [not null]
+  is_valid boolean [not null, default: true]
+  file_date date
+  source_system text
+  checksum text
+  row_count integer
+  success_count integer
+  error_count integer
+  error_message text
+  processed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table dmaa_atm_forecast {
+  terminal_id text [not null]
+  dmaa_file_id bigint [not null]
+  periode_pred date [not null]
+  denom integer [not null]
+  amount_replenish bigint [not null, default: 0]
+  amount_refund bigint [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// DSR (Daily Status Report) upload
+// ---------------------------------------------------------------------
+
+Table dsr_uploads {
+  id bigint [pk, increment]
+  filename text [not null]
+  checksum text [unique]
+  vendor text [not null]
+  report_date date [not null]
+  uploaded_by_user_id bigint
+  bank text
+  company text
+  recipient text
+  sender text
+  subject text
+  prepared_by text
+  checked_by text
+  approved_by text
+  currency text [not null, default: 'IDR']
+  daily_status text [not null, default: 'pending', note: 'pending | processing | completed | failed']
+  daily_row_count integer
+  daily_error_count integer
+  rencana_isi_status text [not null, default: 'pending', note: 'pending | processing | completed | failed']
+  rencana_isi_row_count integer
+  rencana_isi_error_count integer
+  error_message text
+  daily_status_date date
+  rencana_isi_plan_date date
+  saldo_akhir_0000_idr "numeric(20,2)"
+  saldo_sementara_0900_idr "numeric(20,2)"
+  status_cadangan_idr "numeric(20,2)"
+  saldo_gabungan_idr "numeric(20,2)"
+  rencana_isi_subtotal_idr "numeric(20,2)"
+  processed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (report_date, vendor) [unique]
+  }
+}
+
+Table dsr_daily_rows {
+  id bigint [pk, increment]
+  upload_id bigint [not null]
+  row_no integer [not null]
+  location text
+  section text [not null, note: 'd0 | d1']
+  flow text [not null, note: 'saldo_awal | penerimaan | pengeluaran | status_cadangan']
+  line_label text [not null]
+  memo_no text
+  denom_100k_idr "numeric(20,2)"
+  denom_50k_idr "numeric(20,2)"
+  denom_20k_idr "numeric(20,2)"
+  denom_10k_idr "numeric(20,2)"
+  denom_5k_idr "numeric(20,2)"
+  denom_2k_idr "numeric(20,2)"
+  denom_1k_idr "numeric(20,2)"
+  line_total_idr "numeric(20,2)"
+  remarks text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (upload_id, row_no) [unique]
+  }
+}
+
+Table dsr_rencana_isi_rows {
+  id bigint [pk, increment]
+  upload_id bigint [not null]
+  row_no integer [not null]
+  atm_terminal_id text [not null, note: 'verbatim vendor claim']
+  atm_id bigint [note: 'resolved at ingest; NULL = not in master']
+  atm_location text
+  denom_config text [note: '50 | 100 | TST']
+  fill_100k_idr "numeric(20,2)"
+  fill_50k_idr "numeric(20,2)"
+  splank_balance_0800_idr "numeric(20,2)"
+  remarks text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (upload_id, row_no) [unique]
+  }
+}
+
+// ---------------------------------------------------------------------
+// ITM cash position / replenishment ingest
+// ---------------------------------------------------------------------
+
+Table itm_cashpos_files {
+  id bigint [pk, increment]
+  filename text [not null]
+  file_date date [not null]
+  checksum text [unique]
+  status text [not null, default: 'pending', note: 'pending | processing | completed | failed']
+  row_count integer
+  success_count integer
+  error_count integer
+  error_message text
+  processed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table itm_cashpos {
+  id bigint [pk, increment]
+  file_id bigint [not null]
+  cashpos_date date [not null]
+  terminal_id text [not null]
+  machine_type text [not null, note: 'ATM50K | ATM100K | CRM']
+  teller_id text [not null]
+  branch_code text [not null]
+  starting_cash_10k "numeric(20,2)" [not null, default: 0]
+  cash_in_10k "numeric(20,2)" [not null, default: 0]
+  cash_out_10k "numeric(20,2)" [not null, default: 0]
+  cash_position_10k "numeric(20,2)" [not null, default: 0]
+  starting_cash_20k "numeric(20,2)" [not null, default: 0]
+  cash_in_20k "numeric(20,2)" [not null, default: 0]
+  cash_out_20k "numeric(20,2)" [not null, default: 0]
+  cash_position_20k "numeric(20,2)" [not null, default: 0]
+  starting_cash_50k "numeric(20,2)" [not null, default: 0]
+  cash_in_50k "numeric(20,2)" [not null, default: 0]
+  cash_out_50k "numeric(20,2)" [not null, default: 0]
+  cash_position_50k "numeric(20,2)" [not null, default: 0]
+  starting_cash_100k "numeric(20,2)" [not null, default: 0]
+  cash_in_100k "numeric(20,2)" [not null, default: 0]
+  cash_out_100k "numeric(20,2)" [not null, default: 0]
+  cash_position_100k "numeric(20,2)" [not null, default: 0]
+  position_source text [not null, note: 'CURRENT | REPLENISH']
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table itm_replenish_files {
+  id bigint [pk, increment]
+  filename text [not null]
+  file_date date [not null]
+  checksum text
+  status text [not null, default: 'pending', note: 'pending | processing | completed | failed']
+  row_count integer
+  success_count integer
+  error_count integer
+  error_message text
+  processed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table itm_replenish {
+  id bigint [pk, increment]
+  file_id bigint [not null]
+  replenish_date date [not null]
+  replenish_time time [not null]
+  terminal_id text [not null]
+  machine_type text [not null, note: 'ATM50K | ATM100K | CRM']
+  teller_id text [not null]
+  branch_code text [not null]
+  escrow "numeric(20,2)" [not null, default: 0]
+  refund_denom_10k "numeric(20,2)" [not null, default: 0]
+  refund_denom_20k "numeric(20,2)" [not null, default: 0]
+  refund_denom_50k "numeric(20,2)" [not null, default: 0]
+  refund_denom_100k "numeric(20,2)" [not null, default: 0]
+  refund_total "numeric(20,2)" [not null, default: 0]
+  replenish_denom_10k "numeric(20,2)" [not null, default: 0]
+  replenish_denom_20k "numeric(20,2)" [not null, default: 0]
+  replenish_denom_50k "numeric(20,2)" [not null, default: 0]
+  replenish_denom_100k "numeric(20,2)" [not null, default: 0]
+  replenish_total "numeric(20,2)" [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// Vendor replenishment requests (DMAA -> CIT, state machine + maker-checker)
+// ---------------------------------------------------------------------
+
+Table vendor_requests {
+  id bigint [pk, increment]
+  request_number text [not null]
+  forecast_date date [not null]
+  status text [not null, default: 'draft', note: 'draft | pending_approval | approved | rejected | processing | completed | failed | cancelled']
+  notes text
+  created_by bigint [not null]
+  approved_by bigint
+  rejected_by bigint
+  rejection_reason text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  submitted_at timestamptz
+  approved_at timestamptz
+  rejected_at timestamptz
+  is_canceled boolean [not null, default: false]
+  request_category text [note: 'planned | emergency | additional']
+  replenish_date date
+  is_manual boolean [not null, default: false]
+  vendor_id bigint
+  cancellation_reason text
+}
+
+Table vendor_request_items {
+  id bigint [pk, increment]
+  vendor_request_id bigint [not null]
+  terminal_id text [not null, note: 'ATM ID']
+  periode_pred date [not null]
+  denom integer [not null, note: 'CHECK > 0']
+  amount_replenish bigint [not null, default: 0, note: 'CHECK >= 0']
+  amount_refund bigint [not null, default: 0, note: 'CHECK >= 0']
+  created_at timestamptz [not null, default: `now()`]
+  brand text [note: 'manual request; NULL for DMAA-backed']
+  lokasi_atm text [note: 'manual request; NULL for DMAA-backed']
+}
+
+Table vendor_request_number_seq {
+  vendor_id bigint [not null]
+  seq_date date [not null]
+  last_seq integer [not null, default: 0, note: 'CHECK 0..999']
+
+  indexes {
+    (vendor_id, seq_date) [pk]
+  }
+}
+
+// =====================================================================
+// References (foreign keys)
+// =====================================================================
+
+// Auth / RBAC
+Ref: users.role_id > roles.id
+Ref: users.vendor_id > vendors.id
+Ref: users.vendor_branch_id > vendor_branches.id
+Ref: users.supervisor_id > users.id
+Ref: menu_features.parent_id > menu_features.id
+Ref: role_permissions.role_id > roles.id
+Ref: role_permissions.menu_feature_id > menu_features.id
+Ref: role_permissions.granted_by > users.id
+
+// Approval / audit
+Ref: approval_requests.maker_id > users.id
+Ref: approval_steps.request_id > approval_requests.id
+Ref: approval_steps.assigned_approver_id > users.id
+Ref: approval_steps.acted_by_id > users.id
+Ref: approval_delegations.from_user_id > users.id
+Ref: approval_delegations.to_user_id > users.id
+Ref: user_leaves.user_id > users.id
+Ref: audit_logs.actor_id > users.id
+
+// Master data — geography / currency
+Ref: locations.region_id > regions.id
+Ref: denoms.curr_id > currencies.id
+
+// Master data — vendors
+Ref: vendor_branches.vendor_id > vendors.id
+Ref: vendor_branches.location_id > locations.id
+Ref: vendor_pics.vendor_id > vendors.id
+Ref: vendor_pics.vendor_branch_id > vendor_branches.id
+Ref: vendor_vaults.vendor_branch_id > vendor_branches.id
+Ref: vendor_vaults.location_id > locations.id
+Ref: vendor_packages.vendor_branch_id > vendor_branches.id
+
+// Master data — ATMs
+Ref: atms.location_id > locations.id
+Ref: atm_denoms.atm_id > atms.id
+Ref: atm_denoms.denom_id > denoms.id
+Ref: atm_vendor_packages.atm_id > atms.id
+Ref: atm_vendor_packages.vendor_package_id > vendor_packages.id
+
+// Master-data change control
+Ref: master_data_change_requests.maker_id > users.id
+Ref: master_data_change_requests.approval_request_id > approval_requests.id
+Ref: master_data_change_requests.batch_id > master_data_import_batches.id
+Ref: master_data_import_batches.maker_id > users.id
+
+// DMAA forecast
+Ref: dmaa_atm_forecast.dmaa_file_id > dmaa_files.id
+Ref: dmaa_atm_forecast.terminal_id > atms.terminal_id
+
+// DSR
+Ref: dsr_uploads.uploaded_by_user_id > users.id
+Ref: dsr_daily_rows.upload_id > dsr_uploads.id
+Ref: dsr_rencana_isi_rows.upload_id > dsr_uploads.id
+Ref: dsr_rencana_isi_rows.atm_id > atms.id
+
+// ITM
+Ref: itm_cashpos.file_id > itm_cashpos_files.id
+Ref: itm_replenish.file_id > itm_replenish_files.id
+
+// Vendor requests
+Ref: vendor_requests.created_by > users.id
+Ref: vendor_requests.approved_by > users.id
+Ref: vendor_requests.rejected_by > users.id
+Ref: vendor_requests.vendor_id > vendors.id
+Ref: vendor_request_items.vendor_request_id > vendor_requests.id
+Ref: vendor_request_number_seq.vendor_id > vendors.id

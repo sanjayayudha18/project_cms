@@ -248,6 +248,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!response.ok) {
           setAccessToken(null);
           setUser(null);
+          setError("Sesi berakhir, silakan login kembali");
           return false;
         }
 

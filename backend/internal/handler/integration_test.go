@@ -103,7 +103,7 @@ func setupHarness(t *testing.T) *testHarness {
 	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}
 	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 
@@ -487,7 +487,7 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}
 	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 	localProvider := auth.NewLocalProvider(repo)

@@ -39,7 +39,7 @@ func mountRequirePermission(reader ReplicaReader) (http.Handler, *pkgauth.TokenS
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}, noopBlacklist{})
 
 	evaluator := NewPermissionEvaluator(reader)

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -14,7 +15,7 @@ type Config struct {
 	// JWT
 	JWTSecret          []byte
 	AccessTokenExpiry  time.Duration
-	RefreshTokenExpiry time.Duration
+	SessionMaxLifetime time.Duration // absolute session limit, counted from login
 
 	// Database
 	DatabaseURL        string
@@ -73,7 +74,7 @@ func Load(defaultPort string) (*Config, error) {
 	cfg := &Config{
 		JWTSecret:          []byte(secret),
 		AccessTokenExpiry:  parseDuration("ACCESS_TOKEN_EXPIRY", 15*time.Minute),
-		RefreshTokenExpiry: parseDuration("REFRESH_TOKEN_EXPIRY", 7*24*time.Hour),
+		SessionMaxLifetime: parseSessionLifetime(),
 		DatabaseURL:        dbURL,
 		DatabaseReplicaURL: os.Getenv("DATABASE_REPLICA_URL"),
 		RedisURL:           redisURL,
@@ -88,6 +89,22 @@ func Load(defaultPort string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+const (
+	defaultSessionMaxLifetime = time.Hour
+	minSessionMaxLifetime     = 5 * time.Minute
+)
+
+// parseSessionLifetime reads SESSION_MAX_LIFETIME. Values below the minimum are
+// treated as typos and fall back to the default so sessions never die instantly.
+func parseSessionLifetime() time.Duration {
+	d := parseDuration("SESSION_MAX_LIFETIME", defaultSessionMaxLifetime)
+	if d < minSessionMaxLifetime {
+		log.Printf("WARN: SESSION_MAX_LIFETIME=%v is below minimum %v; using %v", d, minSessionMaxLifetime, defaultSessionMaxLifetime)
+		return defaultSessionMaxLifetime
+	}
+	return d
 }
 
 // parseDuration reads a duration from an environment variable.

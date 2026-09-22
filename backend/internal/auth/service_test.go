@@ -172,7 +172,7 @@ func testTokenConfig() pkgauth.TokenConfig {
 	return pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-key-minimum-32-bytes!"),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: 7 * 24 * time.Hour,
 	}
 }
 

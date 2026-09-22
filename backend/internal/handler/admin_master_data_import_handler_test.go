@@ -49,7 +49,7 @@ func importRouter(svc MasterDataImportServicer) (http.Handler, *pkgauth.TokenSer
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}, noopBlacklist{})
 	r := chi.NewRouter()
 	r.With(
@@ -234,7 +234,7 @@ func TestImportRateLimit_BlocksAfterCap(t *testing.T) {
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
-		SecretKey: []byte("test-secret-minimum-32-bytes-long!!"), AccessTokenExpiry: 15 * time.Minute, RefreshTokenExpiry: time.Hour,
+		SecretKey: []byte("test-secret-minimum-32-bytes-long!!"), AccessTokenExpiry: 15 * time.Minute, SessionMaxLifetime: time.Hour,
 	}, noopBlacklist{})
 	r := chi.NewRouter()
 	r.With(custommw.RequireAuth(tokenSvc)).Mount("/i", NewAdminMasterDataImportHandler(&fakeImportServicer{err: errors.New("x")}).WithRateLimit(rdb).Routes())

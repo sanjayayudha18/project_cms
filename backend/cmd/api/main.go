@@ -113,7 +113,7 @@ func main() {
 	tokenService := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          cfg.JWTSecret,
 		AccessTokenExpiry:  cfg.AccessTokenExpiry,
-		RefreshTokenExpiry: cfg.RefreshTokenExpiry,
+		SessionMaxLifetime: cfg.SessionMaxLifetime,
 	}, tokenBlacklist)
 
 	userRepo := repository.NewAuthRepository(dbPool)

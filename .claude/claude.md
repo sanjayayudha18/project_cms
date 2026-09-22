@@ -202,6 +202,7 @@ DATABASE_URL=postgres://user:pass@primary-host:5432/cms
 DATABASE_REPLICA_URL=postgres://user:pass@replica-host:5432/cms
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=change_me
+SESSION_MAX_LIFETIME=1h
 LDAP_URL=ldap://ldap.company.local:389
 LDAP_BASE_DN=dc=company,dc=local
 LDAP_BIND_DN=

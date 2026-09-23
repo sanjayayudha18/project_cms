@@ -24,26 +24,50 @@ func (q *Queries) CountActiveNotificationPics(ctx context.Context, vendorID int6
 	return count, err
 }
 
+const countActiveVendorPicsByBranch = `-- name: CountActiveVendorPicsByBranch :one
+SELECT COUNT(*) FROM vendor_pics WHERE vendor_branch_id = $1 AND deleted_at IS NULL
+`
+
+// Backs the branch-disable guard: refuse disabling a branch with active
+// branch-scoped PICs. Vendor-wide PICs (vendor_branch_id IS NULL) are
+// excluded -- they don't belong to any single branch.
+func (q *Queries) CountActiveVendorPicsByBranch(ctx context.Context, vendorBranchID *int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveVendorPicsByBranch, vendorBranchID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countVendorPicsAdmin = `-- name: CountVendorPicsAdmin :one
 SELECT COUNT(*)
 FROM vendor_pics
 WHERE vendor_id = $1
-  AND ($2::text IS NULL OR name ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR vendor_branch_id = $2::bigint)
+  AND ($3::boolean IS NOT TRUE OR vendor_branch_id IS NULL)
+  AND ($4::text IS NULL OR name ILIKE '%' || $4::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND deleted_at IS NOT NULL)
+        $5::text = 'all'
+        OR ($5::text = 'active' AND deleted_at IS NULL)
+        OR ($5::text = 'disabled' AND deleted_at IS NOT NULL)
       )
 `
 
 type CountVendorPicsAdminParams struct {
-	VendorID int64   `json:"vendor_id"`
-	Q        *string `json:"q"`
-	Status   string  `json:"status"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	VendorWideOnly *bool   `json:"vendor_wide_only"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
 }
 
 func (q *Queries) CountVendorPicsAdmin(ctx context.Context, arg CountVendorPicsAdminParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendorPicsAdmin, arg.VendorID, arg.Q, arg.Status)
+	row := q.db.QueryRow(ctx, countVendorPicsAdmin,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.VendorWideOnly,
+		arg.Q,
+		arg.Status,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -169,22 +193,26 @@ SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
        is_notification_recipient, is_active, deleted_at
 FROM vendor_pics
 WHERE vendor_id = $1
-  AND ($2::text IS NULL OR name ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR vendor_branch_id = $2::bigint)
+  AND ($3::boolean IS NOT TRUE OR vendor_branch_id IS NULL)
+  AND ($4::text IS NULL OR name ILIKE '%' || $4::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND deleted_at IS NOT NULL)
+        $5::text = 'all'
+        OR ($5::text = 'active' AND deleted_at IS NULL)
+        OR ($5::text = 'disabled' AND deleted_at IS NOT NULL)
       )
 ORDER BY name ASC, id ASC
-LIMIT $5::bigint OFFSET $4::bigint
+LIMIT $7::bigint OFFSET $6::bigint
 `
 
 type ListVendorPicsAdminParams struct {
-	VendorID   int64   `json:"vendor_id"`
-	Q          *string `json:"q"`
-	Status     string  `json:"status"`
-	PageOffset int64   `json:"page_offset"`
-	PageLimit  int64   `json:"page_limit"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	VendorWideOnly *bool   `json:"vendor_wide_only"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
+	PageOffset     int64   `json:"page_offset"`
+	PageLimit      int64   `json:"page_limit"`
 }
 
 type ListVendorPicsAdminRow struct {
@@ -205,10 +233,15 @@ type ListVendorPicsAdminRow struct {
 // create/update/disable/enable queries below are only run by
 // VendorPicApplier inside the apply-on-approve transaction.
 // Filters: q (name substring), status ('active'|'disabled'|'all', caller
-// resolves absent to 'active').
+// resolves absent to 'active'), vendor_branch_id (optional branch drill-down,
+// NULL = no branch filter), vendor_wide_only (true = only PICs with no
+// branch, i.e. vendor_branch_id IS NULL). vendor_branch_id and
+// vendor_wide_only are mutually exclusive; caller picks one or neither.
 func (q *Queries) ListVendorPicsAdmin(ctx context.Context, arg ListVendorPicsAdminParams) ([]ListVendorPicsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorPicsAdmin,
 		arg.VendorID,
+		arg.VendorBranchID,
+		arg.VendorWideOnly,
 		arg.Q,
 		arg.Status,
 		arg.PageOffset,

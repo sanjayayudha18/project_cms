@@ -116,7 +116,10 @@ UPDATE atms SET is_active = true, deleted_at = NULL WHERE id = $1;
 
 -- name: ListLocationsForSelect :many
 -- Backs the Location select on the ATM form (Req 6). Ordered by name.
-SELECT id, name, city_or_regency, province FROM locations ORDER BY name ASC;
+SELECT l.id, l.name, l.city_or_regency, l.province, l.region_id, r.region AS region_name
+FROM locations l
+JOIN regions r ON r.id = l.region_id
+ORDER BY l.name ASC;
 
 -- name: LocationExists :one
 -- Existence check for location_id references (400 invalid_reference if false).

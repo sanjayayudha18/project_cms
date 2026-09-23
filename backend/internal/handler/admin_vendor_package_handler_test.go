@@ -35,9 +35,6 @@ func (f *fakeVendorPackageAdminServicer) Get(context.Context, int64, int64) (*se
 func (f *fakeVendorPackageAdminServicer) Create(context.Context, int64, int64, service.VendorPackagePayload, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 7, EntityType: "vendor_package", Op: "create", Status: "pending"}, f.createErr
 }
-func (f *fakeVendorPackageAdminServicer) Update(context.Context, int64, int64, int64, service.VendorPackageUpdatePayload, string) (db.MasterDataChangeRequest, error) {
-	return db.MasterDataChangeRequest{ID: 8, Status: "pending"}, nil
-}
 func (f *fakeVendorPackageAdminServicer) Disable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 9, Status: "pending"}, nil
 }
@@ -59,8 +56,9 @@ func mountAdminVendorPackageHandler(svc VendorPackageAdminServicer) (http.Handle
 	return r, tokenSvc
 }
 
-func TestAdminVendorPackageHandler_List_PriceIsExactDecimalString(t *testing.T) {
-	svc := &fakeVendorPackageAdminServicer{listResult: []service.VendorPackage{{ID: 1, VendorBranchID: 9, Code: "PKG1", PriorityClass: "ALL", Price: "1500000.50", IsActive: true}}}
+func TestAdminVendorPackageHandler_List(t *testing.T) {
+	branchID := int64(9)
+	svc := &fakeVendorPackageAdminServicer{listResult: []service.VendorPackage{{ID: 1, VendorBranchID: &branchID, Code: "PKG1", IsActive: true}}}
 	router, tokenSvc := mountAdminVendorPackageHandler(svc)
 
 	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors/3/packages", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
@@ -68,8 +66,8 @@ func TestAdminVendorPackageHandler_List_PriceIsExactDecimalString(t *testing.T) 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if body := rec.Body.String(); !strings.Contains(body, `"price":"1500000.50"`) || !strings.Contains(body, `"code":"PKG1"`) {
-		t.Errorf("expected exact decimal string + package row, got: %s", body)
+	if body := rec.Body.String(); !strings.Contains(body, `"code":"PKG1"`) {
+		t.Errorf("expected package row, got: %s", body)
 	}
 }
 

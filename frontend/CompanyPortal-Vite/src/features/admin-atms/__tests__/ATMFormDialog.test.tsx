@@ -47,8 +47,17 @@ beforeEach(() => {
           name: "Jakarta Pusat",
           city_or_regency: "Jakarta Pusat",
           province: "DKI Jakarta",
+          region_id: 1,
+          region_name: "Jakarta",
         },
-        { id: 20, name: "Bandung", city_or_regency: "Bandung", province: "Jawa Barat" },
+        {
+          id: 20,
+          name: "Bandung",
+          city_or_regency: "Bandung",
+          province: "Jawa Barat",
+          region_id: 2,
+          region_name: "Jawa Barat",
+        },
       ],
     },
   });
@@ -62,7 +71,7 @@ function fillRequiredFields() {
 
 async function fillAllRequiredFields(user: ReturnType<typeof userEvent.setup>, terminalId: string) {
   await user.type(screen.getByLabelText("Terminal ID"), terminalId);
-  await user.selectOptions(screen.getByLabelText("Lokasi"), "10");
+  await user.type(screen.getByLabelText("Lokasi"), "Jakarta Pusat");
   await user.type(screen.getByLabelText("Tipe Mesin"), "ATM");
   await user.type(screen.getByLabelText("Brand"), "NCR");
   await user.type(screen.getByLabelText("Model"), "SelfServ");
@@ -71,11 +80,13 @@ async function fillAllRequiredFields(user: ReturnType<typeof userEvent.setup>, t
 }
 
 describe("ATMFormDialog", () => {
-  it("populates the Location select from useLocationOptions", () => {
+  it("populates the Location datalist from useLocationOptions", () => {
     render(<ATMFormDialog open onClose={vi.fn()} atm={null} />);
 
-    expect(screen.getByRole("option", { name: "Jakarta Pusat" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Bandung" })).toBeInTheDocument();
+    const values = Array.from(document.querySelectorAll("#location-options option")).map(
+      (o) => (o as HTMLOptionElement).value,
+    );
+    expect(values).toEqual(["Jakarta Pusat", "Bandung"]);
   });
 
   it("disables Terminal ID in edit mode", () => {

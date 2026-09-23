@@ -96,6 +96,8 @@ type LocationOption struct {
 	Name          string
 	CityOrRegency string
 	Province      string
+	RegionID      int64
+	RegionName    string
 }
 
 // CreateATMRequest holds the data for a POST /api/v1/admin/atms request
@@ -209,7 +211,14 @@ func (s *ATMAdminService) ListLocations(ctx context.Context) ([]LocationOption, 
 	}
 	out := make([]LocationOption, len(rows))
 	for i, row := range rows {
-		out[i] = LocationOption{ID: row.ID, Name: row.Name, CityOrRegency: row.CityOrRegency, Province: row.Province}
+		regionName := ""
+		if row.RegionName != nil {
+			regionName = *row.RegionName
+		}
+		out[i] = LocationOption{
+			ID: row.ID, Name: row.Name, CityOrRegency: row.CityOrRegency, Province: row.Province,
+			RegionID: row.RegionID, RegionName: regionName,
+		}
 	}
 	return out, nil
 }

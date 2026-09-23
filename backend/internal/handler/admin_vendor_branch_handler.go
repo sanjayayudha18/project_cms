@@ -95,7 +95,7 @@ func (h *AdminVendorBranchHandler) List(w http.ResponseWriter, r *http.Request) 
 	for i, b := range branches {
 		items[i] = map[string]any{
 			"id": b.ID, "vendor_id": b.VendorID, "branch_code": b.BranchCode, "branch_name": b.BranchName,
-			"location_id": b.LocationID, "region": b.Region, "is_active": b.IsActive,
+			"location_id": b.LocationID, "region": b.Region, "category": b.Category, "is_active": b.IsActive,
 			"deleted_at": formatTimestamptz(b.DeletedAt),
 		}
 	}
@@ -123,7 +123,7 @@ func (h *AdminVendorBranchHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": branch.ID, "vendor_id": branch.VendorID, "branch_code": branch.BranchCode, "branch_name": branch.BranchName,
-		"location_id": branch.LocationID, "region": branch.Region, "is_active": branch.IsActive,
+		"location_id": branch.LocationID, "region": branch.Region, "category": branch.Category, "is_active": branch.IsActive,
 		"deleted_at": formatTimestamptz(branch.DeletedAt),
 	})
 }
@@ -133,6 +133,7 @@ type createVendorBranchRequestBody struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 }
 
 // Create handles POST / -- stages a new branch for approval (202).
@@ -157,7 +158,7 @@ func (h *AdminVendorBranchHandler) Create(w http.ResponseWriter, r *http.Request
 
 	change, err := h.svc.Create(r.Context(), authCtx.UserID, service.VendorBranchPayload{
 		VendorID: vendorID, BranchCode: body.BranchCode, BranchName: body.BranchName,
-		LocationID: body.LocationID, Region: body.Region,
+		LocationID: body.LocationID, Region: body.Region, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)
@@ -171,6 +172,7 @@ type updateVendorBranchRequestBody struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 }
 
 // Update handles PUT /{id} -- stages a branch update for approval (202).
@@ -194,7 +196,7 @@ func (h *AdminVendorBranchHandler) Update(w http.ResponseWriter, r *http.Request
 	}
 
 	change, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.VendorBranchUpdatePayload{
-		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region,
+		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)
@@ -261,6 +263,8 @@ func (h *AdminVendorBranchHandler) handleVendorBranchAdminError(w http.ResponseW
 		writeError(w, http.StatusNotFound, "not_found", service.ErrVendorBranchNotFound.Error())
 	case errors.Is(err, service.ErrVendorBranchCodeConflict):
 		writeError(w, http.StatusConflict, "conflict", service.ErrVendorBranchCodeConflict.Error())
+	case errors.Is(err, service.ErrVendorBranchHasActiveChildren):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorBranchHasActiveChildren.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):
 		writeForbidden(w, "Anda tidak berhak mengubah master data")
 	case errors.Is(err, service.ErrMasterDataChangePending):

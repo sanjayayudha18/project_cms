@@ -56,10 +56,13 @@ UPDATE master_data_change_requests SET status = 'rejected'
 WHERE id = sqlc.arg('id');
 
 -- name: ListMasterDataChangeRequests :many
--- Read endpoint (T2.7): filter by entity_type and/or status, both optional.
+-- Read endpoint (T2.7): filter by entity_type, entity_id, and/or status, all
+-- optional. entity_id lets a caller look up the pending/applied change
+-- history for one specific row (e.g. a per-row "pending approval" badge).
 SELECT id, entity_type, entity_id, op, payload, before, status, maker_id, approval_request_id, batch_id, error, created_at, updated_at
 FROM master_data_change_requests
 WHERE (sqlc.narg('entity_type')::text IS NULL OR entity_type = sqlc.narg('entity_type')::text)
+  AND (sqlc.narg('entity_id')::bigint IS NULL OR entity_id = sqlc.narg('entity_id')::bigint)
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text)
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
@@ -68,6 +71,7 @@ LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 -- Same filters as ListMasterDataChangeRequests, for pagination total.
 SELECT COUNT(*) FROM master_data_change_requests
 WHERE (sqlc.narg('entity_type')::text IS NULL OR entity_type = sqlc.narg('entity_type')::text)
+  AND (sqlc.narg('entity_id')::bigint IS NULL OR entity_id = sqlc.narg('entity_id')::bigint)
   AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text);
 
 -- name: CreateMasterDataImportBatch :one

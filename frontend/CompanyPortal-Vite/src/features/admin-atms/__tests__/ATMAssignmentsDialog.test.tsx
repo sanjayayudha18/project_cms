@@ -11,7 +11,6 @@ vi.mock("../api", () => ({
       atm_id: 3,
       vendor_package_id: 8,
       package_code: "PKG-A",
-      priority_class: "VIP",
       effective_start_date: "2026-01-01",
       effective_end_date: null,
       is_active: true,

@@ -11,9 +11,18 @@ import (
 
 // Sentinel errors for VendorBranchAdminService.
 var (
-	ErrVendorBranchNotFound     = errors.New("vendor branch not found")
-	ErrVendorBranchCodeConflict = errors.New("branch code already exists")
+	ErrVendorBranchNotFound          = errors.New("vendor branch not found")
+	ErrVendorBranchCodeConflict      = errors.New("branch code already exists")
+	ErrVendorBranchHasActiveChildren = errors.New("branch still has active vaults, PICs, or packages")
 )
+
+// validVendorBranchCategories mirrors vendor_vaults' category enum
+// (migration 008) -- see .claude/sdlc/vendor-branch-tipe/plan.md D1/D2.
+var validVendorBranchCategories = map[string]bool{
+	"ATM":      true,
+	"CASH":     true,
+	"ATM_CASH": true,
+}
 
 // VendorBranchSubmitter is the narrow MasterDataChangeService surface
 // VendorBranchAdminService needs to route mutations into the maker-checker
@@ -34,6 +43,16 @@ type VendorBranchAdminRepo interface {
 	FindByCode(ctx context.Context, code string) (*int64, error)
 }
 
+// VendorBranchChildCounter checks whether a branch still has active
+// vaults/PICs/packages -- backs the Disable guard: a branch with any active
+// child is not disableable until those children are handled first (plan.md
+// Fase 3 revision, "Validasi mutation dan approval": no silent cascade).
+type VendorBranchChildCounter interface {
+	CountActiveVaultsByBranch(ctx context.Context, branchID int64) (int64, error)
+	CountActivePicsByBranch(ctx context.Context, branchID int64) (int64, error)
+	CountActivePackagesByBranch(ctx context.Context, branchID int64) (int64, error)
+}
+
 // VendorBranchAdminService owns validation and uniqueness resolution for
 // vendor branch create/update/disable/enable, then stages the change via
 // MasterDataChangeService.Submit. Unlike VendorAdminService (built before
@@ -42,13 +61,14 @@ type VendorBranchAdminRepo interface {
 // every mutation returns a pending db.MasterDataChangeRequest, never the
 // entity itself.
 type VendorBranchAdminService struct {
-	repo    VendorBranchAdminRepo
-	changes VendorBranchSubmitter
+	repo     VendorBranchAdminRepo
+	changes  VendorBranchSubmitter
+	children VendorBranchChildCounter
 }
 
 // NewVendorBranchAdminService creates a VendorBranchAdminService with the given dependencies.
-func NewVendorBranchAdminService(repo VendorBranchAdminRepo, changes VendorBranchSubmitter) *VendorBranchAdminService {
-	return &VendorBranchAdminService{repo: repo, changes: changes}
+func NewVendorBranchAdminService(repo VendorBranchAdminRepo, changes VendorBranchSubmitter, children VendorBranchChildCounter) *VendorBranchAdminService {
+	return &VendorBranchAdminService{repo: repo, changes: changes, children: children}
 }
 
 // VendorBranchPayload is both the create request shape and the jsonb
@@ -60,6 +80,7 @@ type VendorBranchPayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 }
 
 // VendorBranchUpdatePayload is update's payload shape. branch_code and
@@ -69,6 +90,7 @@ type VendorBranchUpdatePayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 }
 
 // List returns a page of a vendor's branches matching the given filters.
@@ -102,6 +124,9 @@ func (s *VendorBranchAdminService) Create(ctx context.Context, makerID int64, re
 	if req.BranchName == "" {
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "branch_name", Message: "wajib diisi"}
 	}
+	if !validVendorBranchCategories[req.Category] {
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "category", Message: "harus ATM, CASH, atau ATM_CASH"}
+	}
 
 	existing, err := s.repo.FindByCode(ctx, req.BranchCode)
 	if err != nil {
@@ -133,6 +158,9 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 	if req.BranchName == "" {
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "branch_name", Message: "wajib diisi"}
 	}
+	if !validVendorBranchCategories[req.Category] {
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "category", Message: "harus ATM, CASH, atau ATM_CASH"}
+	}
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{
 		EntityType: "vendor_branch",
@@ -143,7 +171,9 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 	}, actorIP)
 }
 
-// Disable stages a soft-disable of a vendor branch.
+// Disable stages a soft-disable of a vendor branch. Refuses if the branch
+// still has any active vault, PIC, or package -- those must be disabled (or
+// reassigned) first; disabling never cascades silently.
 func (s *VendorBranchAdminService) Disable(ctx context.Context, makerID, id int64, actorIP string) (db.MasterDataChangeRequest, error) {
 	before, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -151,6 +181,22 @@ func (s *VendorBranchAdminService) Disable(ctx context.Context, makerID, id int6
 	}
 	if before == nil {
 		return db.MasterDataChangeRequest{}, ErrVendorBranchNotFound
+	}
+
+	vaults, err := s.children.CountActiveVaultsByBranch(ctx, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, fmt.Errorf("checking active vaults: %w", err)
+	}
+	pics, err := s.children.CountActivePicsByBranch(ctx, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, fmt.Errorf("checking active pics: %w", err)
+	}
+	pkgs, err := s.children.CountActivePackagesByBranch(ctx, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, fmt.Errorf("checking active packages: %w", err)
+	}
+	if vaults+pics+pkgs > 0 {
+		return db.MasterDataChangeRequest{}, ErrVendorBranchHasActiveChildren
 	}
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{

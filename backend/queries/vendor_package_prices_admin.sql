@@ -1,0 +1,100 @@
+-- Admin vendor package price management (vendor-pricing plan.md P20).
+-- Mutations route through the master-data maker-checker engine, same as
+-- vendor_packages_admin.sql: the create/update/disable queries below are only
+-- run by VendorPackagePriceApplier inside the apply-on-approve transaction.
+--
+-- No is_active/deleted_at here (unlike other master-data tables): a price row
+-- is effective-dated history, not a togglable entity. "Disable" ends its
+-- validity (effective_end_date = yesterday) instead of soft-deleting it -- the
+-- row stays visible as a closed historical period. There is no "enable" of a
+-- price row; a new period is a new row.
+
+-- name: GetVendorKindForPackagePrice :one
+-- Submit-time guard: INTERNAL vendors (ROH) never get a price row (009's
+-- table comment) -- ATMs they manage are staffed by branch personnel, never
+-- billed.
+SELECT kind, is_active FROM vendors WHERE id = $1;
+
+-- name: ListVendorPackagePricesAdmin :many
+-- Filters: package_code/machine_group/price_class (exact, optional), status
+-- ('active' = current or open-ended, 'disabled' = effective_end_date in the
+-- past, 'all' -- caller resolves absent status to 'active', same convention
+-- as parseStatusParam).
+SELECT id, vendor_id, package_code, machine_group, price_class, tier_min, tier_max,
+       base_price,
+       vendor_branch_id, atm_id, sla_note, currency,
+       effective_start_date, effective_end_date
+FROM vendor_package_prices
+WHERE vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('package_code')::text IS NULL OR package_code = sqlc.narg('package_code')::text)
+  AND (sqlc.narg('machine_group')::text IS NULL OR machine_group = sqlc.narg('machine_group')::text)
+  AND (sqlc.narg('price_class')::text IS NULL OR price_class = sqlc.narg('price_class')::text)
+  AND (
+        sqlc.arg('status')::text = 'all'
+        OR (sqlc.arg('status')::text = 'active' AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE))
+        OR (sqlc.arg('status')::text = 'disabled' AND effective_end_date < CURRENT_DATE)
+      )
+ORDER BY package_code ASC, machine_group ASC, price_class ASC, tier_min ASC, id ASC
+LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
+
+-- name: CountVendorPackagePricesAdmin :one
+SELECT COUNT(*)
+FROM vendor_package_prices
+WHERE vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('package_code')::text IS NULL OR package_code = sqlc.narg('package_code')::text)
+  AND (sqlc.narg('machine_group')::text IS NULL OR machine_group = sqlc.narg('machine_group')::text)
+  AND (sqlc.narg('price_class')::text IS NULL OR price_class = sqlc.narg('price_class')::text)
+  AND (
+        sqlc.arg('status')::text = 'all'
+        OR (sqlc.arg('status')::text = 'active' AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE))
+        OR (sqlc.arg('status')::text = 'disabled' AND effective_end_date < CURRENT_DATE)
+      );
+
+-- name: GetVendorPackagePriceAdminByID :one
+-- Includes expired rows; doubles as the "before" snapshot / CurrentState.
+SELECT id, vendor_id, package_code, machine_group, price_class, tier_min, tier_max,
+       base_price,
+       vendor_branch_id, atm_id, sla_note, currency,
+       effective_start_date, effective_end_date
+FROM vendor_package_prices WHERE id = $1;
+
+-- name: CreateVendorPackagePriceAdmin :one
+INSERT INTO vendor_package_prices
+    (vendor_id, package_code, machine_group, price_class, tier_min, tier_max,
+     base_price,
+     vendor_branch_id, atm_id, sla_note, currency,
+     effective_start_date, effective_end_date)
+VALUES (sqlc.arg('vendor_id'), sqlc.arg('package_code'), sqlc.arg('machine_group'), sqlc.arg('price_class'),
+        sqlc.arg('tier_min'), sqlc.narg('tier_max'),
+        sqlc.narg('base_price'),
+        sqlc.narg('vendor_branch_id'), sqlc.narg('atm_id'), sqlc.narg('sla_note'), sqlc.arg('currency'),
+        sqlc.arg('effective_start_date'), sqlc.narg('effective_end_date'))
+RETURNING id, vendor_id, package_code, machine_group, price_class, tier_min, tier_max,
+          base_price,
+          vendor_branch_id, atm_id, sla_note, currency,
+          effective_start_date, effective_end_date;
+
+-- name: UpdateVendorPackagePriceAdmin :one
+-- Grain (vendor/package/machine_group/price_class/tier/level/start date) is
+-- immutable -- a grain change is a new price period, not an edit. Only the
+-- content fields (prices, extra, sla_note, end date) can change.
+-- `AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE)`
+-- makes an already-ended row's update 0 rows (mapped to not-found).
+UPDATE vendor_package_prices
+SET base_price = sqlc.narg('base_price'),
+    sla_note = sqlc.narg('sla_note'),
+    effective_end_date = sqlc.narg('effective_end_date'),
+    updated_at = now()
+WHERE id = sqlc.arg('id')
+  AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE)
+RETURNING id, vendor_id, package_code, machine_group, price_class, tier_min, tier_max,
+          base_price,
+          vendor_branch_id, atm_id, sla_note, currency,
+          effective_start_date, effective_end_date;
+
+-- name: DisableVendorPackagePriceAdmin :exec
+-- Ends the price period as of yesterday. No-op on an already-ended row.
+UPDATE vendor_package_prices
+SET effective_end_date = CURRENT_DATE - 1, updated_at = now()
+WHERE id = $1
+  AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE);

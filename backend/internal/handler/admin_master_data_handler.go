@@ -70,9 +70,15 @@ func (h *AdminMasterDataChangeHandler) List(w http.ResponseWriter, r *http.Reque
 		}
 		status = &v
 	}
+	entityID, err := parseOptionalIDParam(q, "entity_id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
 
 	filters := db.ListMasterDataChangeRequestsParams{
 		EntityType: entityType,
+		EntityID:   entityID,
 		Status:     status,
 		PageLimit:  int64(pageSize),
 		PageOffset: int64((page - 1) * pageSize),
@@ -82,7 +88,7 @@ func (h *AdminMasterDataChangeHandler) List(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountMasterDataChangeRequestsParams{EntityType: entityType, Status: status})
+	total, err := h.svc.Count(r.Context(), db.CountMasterDataChangeRequestsParams{EntityType: entityType, EntityID: entityID, Status: status})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return

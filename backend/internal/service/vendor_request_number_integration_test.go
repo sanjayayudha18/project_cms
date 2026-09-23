@@ -68,7 +68,7 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 		t.Fatalf("insert vendor branch: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO vendor_packages (vendor_branch_id, code, priority_class, price)
+		INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price)
 		VALUES ($1, 'PAKET TEST', 'ALL', 0) RETURNING id`, branchID).Scan(&packageID); err != nil {
 		t.Fatalf("insert vendor package: %v", err)
 	}
@@ -84,7 +84,7 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_requests WHERE vendor_id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_request_number_seq WHERE vendor_id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM atm_vendor_packages WHERE atm_id = $1`, atmID)
-		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_packages WHERE id = $1`, packageID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_packages_branch WHERE id = $1`, packageID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_branches WHERE id = $1`, branchID)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendors WHERE id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM atms WHERE id = $1`, atmID)

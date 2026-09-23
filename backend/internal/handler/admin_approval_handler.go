@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -241,6 +242,20 @@ func parsePathID(r *http.Request, param string) (int64, error) {
 		return 0, fmt.Errorf("%s tidak valid", param)
 	}
 	return id, nil
+}
+
+// parseOptionalIDParam reads an optional positive-integer query param
+// (e.g. branch_id) -- nil, nil if absent or blank.
+func parseOptionalIDParam(q url.Values, name string) (*int64, error) {
+	raw := q.Get(name)
+	if raw == "" {
+		return nil, nil
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		return nil, fmt.Errorf("%s tidak valid", name)
+	}
+	return &id, nil
 }
 
 func parseRange(startRaw, endRaw string) (time.Time, time.Time, error) {

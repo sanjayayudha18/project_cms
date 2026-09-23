@@ -73,12 +73,14 @@ export async function listLocationOptions(): Promise<LocationOptionsResponse> {
 
 // ATM kelolaan (effective-dated vendor package assignments): admin_atm_assignment_handler.go,
 // mounted at /api/v1/admin/atms/{id}/assignments. Create is maker-checker (202).
+// No priority_class -- vendor_packages lost it in migration 010 (price/class
+// now live in vendor_package_prices, keyed off the ATM's own machine_type/
+// priority_class instead of the package).
 export interface ATMAssignment {
   id: number;
   atm_id: number;
   vendor_package_id: number;
   package_code: string;
-  priority_class: string;
   effective_start_date: string;
   effective_end_date: string | null;
   is_active: boolean;

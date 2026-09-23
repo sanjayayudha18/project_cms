@@ -32,54 +32,10 @@ func (f *fakeVendorPackageAdminRepo) BranchVendorID(context.Context, int64) (*in
 	return f.branchVendorID, nil
 }
 
-func TestValidatePackageFields(t *testing.T) {
-	cases := []struct {
-		name  string
-		mut   func(*VendorPackageUpdatePayload)
-		field string // "" = valid
-	}{
-		{"valid", func(p *VendorPackageUpdatePayload) {}, ""},
-		{"zero price ok", func(p *VendorPackageUpdatePayload) { p.Price = "0" }, ""},
-		{"integer price ok", func(p *VendorPackageUpdatePayload) { p.Price = "150000" }, ""},
-		{"blank class", func(p *VendorPackageUpdatePayload) { p.PriorityClass = " " }, "priority_class"},
-		{"blank price", func(p *VendorPackageUpdatePayload) { p.Price = "" }, "price"},
-		{"negative", func(p *VendorPackageUpdatePayload) { p.Price = "-1" }, "price"},
-		{"three decimals rejected, not rounded", func(p *VendorPackageUpdatePayload) { p.Price = "1.234" }, "price"},
-		{"non-numeric", func(p *VendorPackageUpdatePayload) { p.Price = "abc" }, "price"},
-		{"fraction syntax", func(p *VendorPackageUpdatePayload) { p.Price = "1/2" }, "price"},
-		{"exponent syntax", func(p *VendorPackageUpdatePayload) { p.Price = "1e3" }, "price"},
-		{"19 integer digits too big", func(p *VendorPackageUpdatePayload) { p.Price = "1000000000000000000" }, "price"},
-		{"18 integer digits ok", func(p *VendorPackageUpdatePayload) { p.Price = "999999999999999999.99" }, ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := VendorPackageUpdatePayload{PriorityClass: "ALL", Price: "100000.00"}
-			tc.mut(&p)
-			err := validatePackageFields(&p)
-			if tc.field == "" {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-			var ve *ValidationError
-			if !errors.As(err, &ve) || ve.Field != tc.field {
-				t.Fatalf("want ValidationError on %s, got %v", tc.field, err)
-			}
-		})
-	}
-
-	t.Run("inputs are trimmed", func(t *testing.T) {
-		p := VendorPackageUpdatePayload{PriorityClass: " ALL ", Price: " 10.5 "}
-		if err := validatePackageFields(&p); err != nil || p.PriorityClass != "ALL" || p.Price != "10.5" {
-			t.Errorf("want trimmed ALL/10.5 with no error, got %+v err=%v", p, err)
-		}
-	})
-}
-
 func TestVendorPackageAdminService_Create(t *testing.T) {
 	owner, other := int64(3), int64(4)
-	req := VendorPackagePayload{VendorBranchID: 9, Code: " PKG1 ", VendorPackageUpdatePayload: VendorPackageUpdatePayload{PriorityClass: "ALL", Price: "100.00"}}
+	branchID := int64(9)
+	req := VendorPackagePayload{VendorBranchID: &branchID, Code: " PKG1 "}
 
 	t.Run("happy path submits vendor_package create with trimmed code", func(t *testing.T) {
 		sub := &fakeVendorBranchSubmitter{}
@@ -125,14 +81,11 @@ func TestVendorPackageAdminService_Create(t *testing.T) {
 	})
 }
 
-func TestVendorPackageAdminService_UpdateAndToggle_Scoping(t *testing.T) {
-	req := VendorPackageUpdatePayload{PriorityClass: "ALL", Price: "1.00"}
-	mine := &db.GetVendorPackageAdminByIDRow{ID: 1, VendorID: 3}
+func TestVendorPackageAdminService_Toggle_Scoping(t *testing.T) {
 	foreign := &db.GetVendorPackageAdminByIDRow{ID: 1, VendorID: 4}
 	disabled := &db.GetVendorPackageAdminByIDRow{ID: 1, VendorID: 3, DeletedAt: pgtype.Timestamptz{Valid: true}}
 	ctx := context.Background()
 
-	update := func(s *VendorPackageAdminService) error { _, e := s.Update(ctx, 7, 3, 1, req, "ip"); return e }
 	disable := func(s *VendorPackageAdminService) error { _, e := s.Disable(ctx, 7, 3, 1, "ip"); return e }
 	enable := func(s *VendorPackageAdminService) error { _, e := s.Enable(ctx, 7, 3, 1, "ip"); return e }
 
@@ -142,12 +95,9 @@ func TestVendorPackageAdminService_UpdateAndToggle_Scoping(t *testing.T) {
 		call func(*VendorPackageAdminService) error
 		want error
 	}{
-		{"update missing", nil, update, ErrVendorPackageNotFound},
-		{"update foreign vendor", foreign, update, ErrVendorPackageNotFound},
-		{"update soft-disabled", disabled, update, ErrVendorPackageNotFound},
+		{"disable missing", nil, disable, ErrVendorPackageNotFound},
 		{"disable foreign vendor", foreign, disable, ErrVendorPackageNotFound},
 		{"enable soft-disabled ok", disabled, enable, nil},
-		{"update own ok", mine, update, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

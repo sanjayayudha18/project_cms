@@ -19,7 +19,7 @@ import (
 // back via t.Cleanup, and returns db.Queries scoped to it. Task 1
 // (.kiro/specs/update-cit-forecast-browser) extends ListForecastForDate with
 // a multi-hop LEFT JOIN LATERAL chain (atms -> locations, atm_vendor_packages
-// -> vendor_packages -> vendor_branches -> vendors); these tests exercise
+// -> vendor_packages_branch -> vendor_branches -> vendors); these tests exercise
 // that join against real Postgres rather than a mock, since a wrong join
 // multiplies forecast rows or silently drops recommendations (money-adjacent).
 func setupForecastQueryHarness(t *testing.T) (*db.Queries, pgx.Tx) {
@@ -111,7 +111,7 @@ func seedForecastVendorPackage(t *testing.T, tx pgx.Tx, marker, vendorName strin
 
 	var packageID int64
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO vendor_packages (vendor_branch_id, code, priority_class, price)
+		INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price)
 		VALUES ($1, 'PAKET TEST', 'ALL', 0)
 		RETURNING id
 	`, branchID).Scan(&packageID); err != nil {

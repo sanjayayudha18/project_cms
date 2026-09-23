@@ -52,8 +52,8 @@ func (h *AdminATMAssignmentHandler) Routes() chi.Router {
 func assignmentToResponse(a service.ATMAssignment) map[string]any {
 	return map[string]any{
 		"id": a.ID, "atm_id": a.ATMID, "vendor_package_id": a.VendorPackageID, "package_code": a.PackageCode,
-		"priority_class": a.PriorityClass, "effective_start_date": a.EffectiveStartDate,
-		"effective_end_date": a.EffectiveEndDate, "is_active": a.IsActive,
+		"effective_start_date": a.EffectiveStartDate,
+		"effective_end_date":   a.EffectiveEndDate, "is_active": a.IsActive,
 	}
 }
 

@@ -127,7 +127,7 @@ SELECT av.id,
        av.is_active
 FROM atm_vendor_packages av
 JOIN atms a ON a.id = av.atm_id
-JOIN vendor_packages p ON p.id = av.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = av.vendor_package_id
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE av.id > sqlc.arg('after_id')::bigint
@@ -141,7 +141,7 @@ LIMIT sqlc.arg('batch_size')::int;
 -- Active vendor packages by natural key, for the import dry-run's FK check on
 -- atm-assignments (plan.md T5.3). Read on the PRIMARY (validation of a write flow).
 SELECT p.id, v.code AS vendor_code, b.branch_code, p.code AS package_code
-FROM vendor_packages p
+FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE p.is_active AND p.deleted_at IS NULL;

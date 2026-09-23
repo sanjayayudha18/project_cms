@@ -140,10 +140,10 @@ func (q *Queries) FindOverlappingATMAssignment(ctx context.Context, arg FindOver
 }
 
 const getATMAssignmentAdminByID = `-- name: GetATMAssignmentAdminByID :one
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code, p.priority_class,
+SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
-JOIN vendor_packages p ON p.id = a.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.id = $1
 `
 
@@ -152,7 +152,6 @@ type GetATMAssignmentAdminByIDRow struct {
 	AtmID              int64       `json:"atm_id"`
 	VendorPackageID    int64       `json:"vendor_package_id"`
 	PackageCode        string      `json:"package_code"`
-	PriorityClass      string      `json:"priority_class"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
@@ -167,7 +166,6 @@ func (q *Queries) GetATMAssignmentAdminByID(ctx context.Context, id int64) (GetA
 		&i.AtmID,
 		&i.VendorPackageID,
 		&i.PackageCode,
-		&i.PriorityClass,
 		&i.EffectiveStartDate,
 		&i.EffectiveEndDate,
 		&i.IsActive,
@@ -177,10 +175,10 @@ func (q *Queries) GetATMAssignmentAdminByID(ctx context.Context, id int64) (GetA
 
 const listATMAssignmentsAdmin = `-- name: ListATMAssignmentsAdmin :many
 
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code, p.priority_class,
+SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
-JOIN vendor_packages p ON p.id = a.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.atm_id = $1
   AND (
         $2::text = 'all'
@@ -203,7 +201,6 @@ type ListATMAssignmentsAdminRow struct {
 	AtmID              int64       `json:"atm_id"`
 	VendorPackageID    int64       `json:"vendor_package_id"`
 	PackageCode        string      `json:"package_code"`
-	PriorityClass      string      `json:"priority_class"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
@@ -219,6 +216,7 @@ type ListATMAssignmentsAdminRow struct {
 // early, friendly submit-time check.
 // status: 'active'|'disabled'|'all' on is_active (the table has no deleted_at;
 // is_active=false is what releases the period from the exclusion constraint).
+// No priority_class here since migration 010 dropped vendor_packages_branch.priority_class.
 func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssignmentsAdminParams) ([]ListATMAssignmentsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listATMAssignmentsAdmin,
 		arg.AtmID,
@@ -238,7 +236,6 @@ func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssign
 			&i.AtmID,
 			&i.VendorPackageID,
 			&i.PackageCode,
-			&i.PriorityClass,
 			&i.EffectiveStartDate,
 			&i.EffectiveEndDate,
 			&i.IsActive,

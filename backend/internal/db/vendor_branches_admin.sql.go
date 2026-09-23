@@ -40,10 +40,10 @@ func (q *Queries) CountVendorBranchesAdmin(ctx context.Context, arg CountVendorB
 }
 
 const createVendorBranchAdmin = `-- name: CreateVendorBranchAdmin :one
-INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region)
+INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region, category)
 VALUES ($1, $2, $3,
-        $4, $5)
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+        $4, $5, $6)
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 `
 
 type CreateVendorBranchAdminParams struct {
@@ -52,6 +52,7 @@ type CreateVendorBranchAdminParams struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 }
 
 type CreateVendorBranchAdminRow struct {
@@ -61,6 +62,7 @@ type CreateVendorBranchAdminRow struct {
 	BranchName string             `json:"branch_name"`
 	LocationID *int64             `json:"location_id"`
 	Region     *string            `json:"region"`
+	Category   string             `json:"category"`
 	IsActive   bool               `json:"is_active"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -72,6 +74,7 @@ func (q *Queries) CreateVendorBranchAdmin(ctx context.Context, arg CreateVendorB
 		arg.BranchName,
 		arg.LocationID,
 		arg.Region,
+		arg.Category,
 	)
 	var i CreateVendorBranchAdminRow
 	err := row.Scan(
@@ -81,6 +84,7 @@ func (q *Queries) CreateVendorBranchAdmin(ctx context.Context, arg CreateVendorB
 		&i.BranchName,
 		&i.LocationID,
 		&i.Region,
+		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
 	)
@@ -123,7 +127,7 @@ func (q *Queries) FindVendorBranchAdminByCode(ctx context.Context, branchCode st
 }
 
 const getVendorBranchAdminByID = `-- name: GetVendorBranchAdminByID :one
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 FROM vendor_branches WHERE id = $1
 `
 
@@ -134,6 +138,7 @@ type GetVendorBranchAdminByIDRow struct {
 	BranchName string             `json:"branch_name"`
 	LocationID *int64             `json:"location_id"`
 	Region     *string            `json:"region"`
+	Category   string             `json:"category"`
 	IsActive   bool               `json:"is_active"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -150,6 +155,7 @@ func (q *Queries) GetVendorBranchAdminByID(ctx context.Context, id int64) (GetVe
 		&i.BranchName,
 		&i.LocationID,
 		&i.Region,
+		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
 	)
@@ -158,7 +164,7 @@ func (q *Queries) GetVendorBranchAdminByID(ctx context.Context, id int64) (GetVe
 
 const listVendorBranchesAdmin = `-- name: ListVendorBranchesAdmin :many
 
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 FROM vendor_branches
 WHERE vendor_id = $1
   AND ($2::text IS NULL
@@ -188,6 +194,7 @@ type ListVendorBranchesAdminRow struct {
 	BranchName string             `json:"branch_name"`
 	LocationID *int64             `json:"location_id"`
 	Region     *string            `json:"region"`
+	Category   string             `json:"category"`
 	IsActive   bool               `json:"is_active"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -223,6 +230,7 @@ func (q *Queries) ListVendorBranchesAdmin(ctx context.Context, arg ListVendorBra
 			&i.BranchName,
 			&i.LocationID,
 			&i.Region,
+			&i.Category,
 			&i.IsActive,
 			&i.DeletedAt,
 		); err != nil {
@@ -241,15 +249,17 @@ UPDATE vendor_branches
 SET branch_name = $1,
     location_id = $2,
     region = $3,
+    category = $4,
     updated_at = now()
-WHERE id = $4 AND deleted_at IS NULL
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+WHERE id = $5 AND deleted_at IS NULL
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 `
 
 type UpdateVendorBranchAdminParams struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	Category   string  `json:"category"`
 	ID         int64   `json:"id"`
 }
 
@@ -260,6 +270,7 @@ type UpdateVendorBranchAdminRow struct {
 	BranchName string             `json:"branch_name"`
 	LocationID *int64             `json:"location_id"`
 	Region     *string            `json:"region"`
+	Category   string             `json:"category"`
 	IsActive   bool               `json:"is_active"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -273,6 +284,7 @@ func (q *Queries) UpdateVendorBranchAdmin(ctx context.Context, arg UpdateVendorB
 		arg.BranchName,
 		arg.LocationID,
 		arg.Region,
+		arg.Category,
 		arg.ID,
 	)
 	var i UpdateVendorBranchAdminRow
@@ -283,6 +295,7 @@ func (q *Queries) UpdateVendorBranchAdmin(ctx context.Context, arg UpdateVendorB
 		&i.BranchName,
 		&i.LocationID,
 		&i.Region,
+		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
 	)

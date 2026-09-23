@@ -96,7 +96,7 @@ func (h *testHelpers) seedVendorBranch(vendorID int64, code, name string) int64 
 func (h *testHelpers) seedVendorPackage(branchID int64, code string) int64 {
 	h.t.Helper()
 	var id int64
-	if err := h.pool.QueryRow(h.ctx, `INSERT INTO vendor_packages (vendor_branch_id, code, priority_class, price) VALUES ($1, $2, 'ALL', 1) RETURNING id`, branchID, code).Scan(&id); err != nil {
+	if err := h.pool.QueryRow(h.ctx, `INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price) VALUES ($1, $2, 'ALL', 1) RETURNING id`, branchID, code).Scan(&id); err != nil {
 		h.t.Fatalf("seed vendor package: %v", err)
 	}
 	h.vendorPkgIDs = append(h.vendorPkgIDs, id)
@@ -130,10 +130,10 @@ func (h *testHelpers) cleanup() {
 	}
 	if len(h.vendorPkgIDs) > 0 {
 		if _, err := h.pool.Exec(h.ctx, `DELETE FROM audit_logs WHERE entity_type = 'vendor_package' AND entity_id = ANY($1)`, h.vendorPkgIDs); err != nil {
-			h.t.Logf("cleanup: delete audit_logs (vendor_packages): %v", err)
+			h.t.Logf("cleanup: delete audit_logs (vendor_packages_branch): %v", err)
 		}
-		if _, err := h.pool.Exec(h.ctx, `DELETE FROM vendor_packages WHERE id = ANY($1)`, h.vendorPkgIDs); err != nil {
-			h.t.Logf("cleanup: delete vendor_packages: %v", err)
+		if _, err := h.pool.Exec(h.ctx, `DELETE FROM vendor_packages_branch WHERE id = ANY($1)`, h.vendorPkgIDs); err != nil {
+			h.t.Logf("cleanup: delete vendor_packages_branch: %v", err)
 		}
 	}
 	if len(h.vendorPicIDs) > 0 {
@@ -597,7 +597,7 @@ func TestVendorBranchApplier_Approve_Create_Integration(t *testing.T) {
 
 	vendorID := h.seedVendor("ITVB-"+tag, "Vendor For Branch Test "+tag)
 	changeID := h.insertPending("vendor_branch", "create", nil, VendorBranchPayload{
-		VendorID: vendorID, BranchCode: "ITVBR-" + tag, BranchName: "Branch " + tag,
+		VendorID: vendorID, BranchCode: "ITVBR-" + tag, BranchName: "Branch " + tag, Category: "ATM",
 	})
 	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: changeID, Status: "approved"}}
 
@@ -645,7 +645,7 @@ func TestVendorBranchApplier_Approve_UpdateThenDisable_Integration(t *testing.T)
 	vendorID := h.seedVendor("ITVB2-"+tag, "Vendor For Branch Test 2 "+tag)
 	branchID := h.seedVendorBranch(vendorID, "ITVBR2-"+tag, "Before Update "+tag)
 
-	updateChangeID := h.insertPending("vendor_branch", "update", &branchID, VendorBranchUpdatePayload{BranchName: "After Update " + tag})
+	updateChangeID := h.insertPending("vendor_branch", "update", &branchID, VendorBranchUpdatePayload{BranchName: "After Update " + tag, Category: "ATM"})
 	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: updateChangeID, Status: "approved"}}
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
 		t.Fatalf("Approve(update) error = %v", err)
@@ -812,7 +812,7 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 	var pkgID int64
 	var class, price string
 	var active bool
-	if err := dbtx(svc).QueryRow(ctx, `SELECT id, priority_class, price::text, is_active FROM vendor_packages WHERE vendor_branch_id = $1 AND code = $2`,
+	if err := dbtx(svc).QueryRow(ctx, `SELECT id, priority_class, price::text, is_active FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND code = $2`,
 		branchID, "ITVK-P-"+tag).Scan(&pkgID, &class, &price, &active); err != nil {
 		t.Fatalf("querying created package: %v", err)
 	}
@@ -826,7 +826,7 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
 		t.Fatalf("Approve(update) error = %v", err)
 	}
-	if err := dbtx(svc).QueryRow(ctx, `SELECT priority_class, price::text FROM vendor_packages WHERE id = $1`, pkgID).Scan(&class, &price); err != nil {
+	if err := dbtx(svc).QueryRow(ctx, `SELECT priority_class, price::text FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&class, &price); err != nil {
 		t.Fatalf("querying updated package: %v", err)
 	}
 	if class != "VIP" || price != "2000000.00" {
@@ -839,7 +839,7 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 		t.Fatalf("Approve(disable) error = %v", err)
 	}
 	var deleted bool
-	if err := dbtx(svc).QueryRow(ctx, `SELECT is_active, deleted_at IS NOT NULL FROM vendor_packages WHERE id = $1`, pkgID).Scan(&active, &deleted); err != nil {
+	if err := dbtx(svc).QueryRow(ctx, `SELECT is_active, deleted_at IS NOT NULL FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&active, &deleted); err != nil {
 		t.Fatalf("querying disabled package: %v", err)
 	}
 	if active || !deleted {

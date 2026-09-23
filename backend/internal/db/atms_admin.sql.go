@@ -363,14 +363,19 @@ func (q *Queries) ListATMsAdmin(ctx context.Context, arg ListATMsAdminParams) ([
 }
 
 const listLocationsForSelect = `-- name: ListLocationsForSelect :many
-SELECT id, name, city_or_regency, province FROM locations ORDER BY name ASC
+SELECT l.id, l.name, l.city_or_regency, l.province, l.region_id, r.region AS region_name
+FROM locations l
+JOIN regions r ON r.id = l.region_id
+ORDER BY l.name ASC
 `
 
 type ListLocationsForSelectRow struct {
-	ID            int64  `json:"id"`
-	Name          string `json:"name"`
-	CityOrRegency string `json:"city_or_regency"`
-	Province      string `json:"province"`
+	ID            int64   `json:"id"`
+	Name          string  `json:"name"`
+	CityOrRegency string  `json:"city_or_regency"`
+	Province      string  `json:"province"`
+	RegionID      int64   `json:"region_id"`
+	RegionName    *string `json:"region_name"`
 }
 
 // Backs the Location select on the ATM form (Req 6). Ordered by name.
@@ -388,6 +393,8 @@ func (q *Queries) ListLocationsForSelect(ctx context.Context) ([]ListLocationsFo
 			&i.Name,
 			&i.CityOrRegency,
 			&i.Province,
+			&i.RegionID,
+			&i.RegionName,
 		); err != nil {
 			return nil, err
 		}

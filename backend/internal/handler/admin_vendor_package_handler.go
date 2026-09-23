@@ -20,7 +20,6 @@ type VendorPackageAdminServicer interface {
 	Count(ctx context.Context, arg db.CountVendorPackagesAdminParams) (int64, error)
 	Get(ctx context.Context, vendorID, id int64) (*service.VendorPackage, error)
 	Create(ctx context.Context, makerID, vendorID int64, req service.VendorPackagePayload, actorIP string) (db.MasterDataChangeRequest, error)
-	Update(ctx context.Context, makerID, vendorID, id int64, req service.VendorPackageUpdatePayload, actorIP string) (db.MasterDataChangeRequest, error)
 	Disable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 	Enable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 }
@@ -43,7 +42,6 @@ func (h *AdminVendorPackageHandler) Routes() chi.Router {
 	r.Get("/", h.List)
 	r.Post("/", h.Create)
 	r.Get("/{id}", h.Get)
-	r.Put("/{id}", h.Update)
 	r.Post("/{id}/disable", h.Disable)
 	r.Post("/{id}/enable", h.Enable)
 	return r
@@ -51,8 +49,8 @@ func (h *AdminVendorPackageHandler) Routes() chi.Router {
 
 func packageToResponse(p service.VendorPackage) map[string]any {
 	return map[string]any{
-		"id": p.ID, "vendor_branch_id": p.VendorBranchID, "code": p.Code, "priority_class": p.PriorityClass,
-		"price": p.Price, "is_active": p.IsActive, "deleted_at": formatTimePtr(p.DeletedAt),
+		"id": p.ID, "vendor_branch_id": p.VendorBranchID, "code": p.Code,
+		"is_active": p.IsActive, "deleted_at": formatTimePtr(p.DeletedAt),
 	}
 }
 
@@ -78,16 +76,21 @@ func (h *AdminVendorPackageHandler) List(w http.ResponseWriter, r *http.Request)
 	if v := q.Get("q"); v != "" {
 		qParam = &v
 	}
+	branchID, err := parseOptionalIDParam(q, "branch_id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
 
 	pkgs, err := h.svc.List(r.Context(), db.ListVendorPackagesAdminParams{
-		VendorID: vendorID, Q: qParam, Status: status,
+		VendorID: vendorID, VendorBranchID: branchID, Q: qParam, Status: status,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorPackagesAdminParams{VendorID: vendorID, Q: qParam, Status: status})
+	total, err := h.svc.Count(r.Context(), db.CountVendorPackagesAdminParams{VendorID: vendorID, VendorBranchID: branchID, Q: qParam, Status: status})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
@@ -143,37 +146,6 @@ func (h *AdminVendorPackageHandler) Create(w http.ResponseWriter, r *http.Reques
 	}
 
 	change, err := h.svc.Create(r.Context(), authCtx.UserID, vendorID, body, extractClientIP(r))
-	if err != nil {
-		h.handleError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
-}
-
-// Update handles PUT /{id} -- stages an update for approval (202).
-func (h *AdminVendorPackageHandler) Update(w http.ResponseWriter, r *http.Request) {
-	authCtx, ok := middleware.GetAuthContext(r.Context())
-	if !ok {
-		writeUnauthorized(w, "Token tidak valid")
-		return
-	}
-	vendorID, err := parsePathID(r, "vendorID")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	id, err := parsePathID(r, "id")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	var body service.VendorPackageUpdatePayload
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
-		return
-	}
-
-	change, err := h.svc.Update(r.Context(), authCtx.UserID, vendorID, id, body, extractClientIP(r))
 	if err != nil {
 		h.handleError(w, err)
 		return

@@ -1,0 +1,195 @@
+// =====================================================================
+// CMS ATM & CIT — USULAN skema harga paket vendor FLM (dbdiagram.io / DBML)
+// =====================================================================
+// STATUS: PROPOSAL — belum ada migration, belum diterapkan ke DB.
+// Skema yang BERLAKU SEKARANG: backend/migrations/CMS_DB_dbdiagramio.dbml
+//   (file itu jangan disunting sampai migration ini benar-benar dijalankan)
+//
+// Keputusan: .claude/sdlc/vendor-pricing/plan.md (P1-P20)
+// Sumber requirement: archives/Harga Paket per vendor FLM.docx
+//
+// Paste into https://dbdiagram.io to render the ERD.
+// Money = numeric(20,2). Timestamps = timestamptz. No floats.
+//
+// Legenda: [BARU] tabel/kolom baru · [UBAH] berubah dari skema sekarang
+// =====================================================================
+
+// ---------------------------------------------------------------------
+// Master data — vendor & unit internal
+// ---------------------------------------------------------------------
+
+Table vendors {
+  id bigint [pk, increment]
+  code text [not null]
+  name text [not null]
+  kind text [not null, default: 'FLM_VENDOR', note: '[BARU] P15: FLM_VENDOR | INTERNAL. ROH = INTERNAL — penanda ATM di kantor cabang CIMB, bukan vendor FLM. P17: disembunyikan dari daftar vendor admin, tetap muncul di dropdown assignment, tidak pernah muncul di tabel harga']
+  contact_email text
+  contact_phone text
+  hq_address text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  request_prefix "char(3)" [note: '3 uppercase chars for request_number; CHECK ^[A-Z]{3}$']
+  legal_name text [note: 'migration 003']
+  npwp text [note: 'migration 003; CHECK 15 or 16 digits']
+}
+
+Table vendor_branches {
+  id bigint [pk, increment]
+  vendor_id bigint [not null]
+  branch_code text [not null]
+  branch_name text [not null]
+  location_id bigint
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  region text [note: 'FLM vendor region']
+  deleted_at timestamptz [note: 'migration 003 soft-delete']
+  Note: '[UBAH] P16: 300 cabang ROH pindah ke cimb_branches; tersisa 48 cabang vendor asli'
+}
+
+Table cimb_branches {
+  id bigint [pk, increment]
+  branch_code text [not null, unique]
+  branch_name text [not null]
+  region_id bigint
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  Note: '[BARU] P16: 300 kantor cabang CIMB yang selama ini menyamar sebagai vendor_branches di bawah ROH (ROH_001 = Aceh - Bireun, dst). Sebelumnya tidak ada rumah untuk data ini: locations seluruhnya type=ATM_SITE'
+}
+
+// ---------------------------------------------------------------------
+// Master data — ATMs
+// ---------------------------------------------------------------------
+
+Table atms {
+  id bigint [pk, increment]
+  terminal_id text [not null, unique]
+  location_id bigint [not null]
+  cimb_branch_id bigint [note: '[BARU] P16: terisi untuk ATM internal, NULL untuk ATM vendor']
+  machine_type text [not null, note: 'ATM 1246 | CRM 628 | CDM 30']
+  brand text [not null]
+  model text [not null]
+  operation_hours text [not null]
+  deployment_type text [not null, note: 'ONSITE 730 | OFFSITE 1174']
+  capacity_amount "numeric(20,2)"
+  low_threshold_amount "numeric(20,2)"
+  critical_threshold_amount "numeric(20,2)"
+  blacklisted boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  escrow_account text [note: 'escrow account per ATM']
+  priority_class text [note: 'VIP 128 | Non VIP 1734 | Industri 42']
+  price_machine_group text [note: '[BARU] P11 GENERATED STORED: machine_type=ATM -> ATM, selainnya -> CDM_CRM']
+  price_class text [note: '[BARU] P11 GENERATED STORED: priority_class=Non VIP -> REGULAR, selainnya -> VIP_INDUSTRI']
+  Note: 'P11: dua generated column menjembatani 3 nilai machine_type + 3 nilai priority_class di DB dengan 2x2 kelompok tarif di dokumen. Postgres yang menjaga sinkronisasi, jadi lookup harga tetap equality join murni dan tidak ada tarif kembar yang bisa drift. CEILING: mengunci asumsi tidak ada vendor yang menghargai CDM beda dari CRM atau VIP beda dari Industri — benar untuk kelima vendor di dokumen ini; kalau berubah perlu migration'
+}
+
+// ---------------------------------------------------------------------
+// Paket & kelolaan — berlaku untuk ATM vendor MAUPUN internal
+// ---------------------------------------------------------------------
+
+Table service_packages {
+  id bigint [pk, increment]
+  vendor_branch_id bigint [note: '[UBAH] P10: NOT NULL -> NULLABLE. NULL = paket internal (tanpa vendor, tanpa harga)']
+  code text [not null, note: 'PAKET 3 | PAKET 4 | PAKET 5 | PAKET 6 — untuk tampilan (P9)']
+  cr_frequency integer [not null, note: '[BARU] P9: jumlah Cash Replenishment per bulan']
+  flm_frequency integer [not null, note: '[BARU] P9: jumlah First Line Maintenance per bulan']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  is_active boolean [not null, default: true, note: 'migration 004']
+  deleted_at timestamptz [note: 'migration 004 soft-disable']
+  Note: '[UBAH] RENAME dari vendor_packages (P10). price DIBUANG -> pindah ke vendor_package_prices. priority_class DIBUANG -> jadi kunci lookup, bukan atribut paket. Kondisi awal: 560 baris SELURUHNYA price=0.00 + priority_class=ALL, bukti tabel ini belum pernah dipakai sebagai daftar harga. Digeneralisasi karena frekuensi adalah properti PAKET bukan properti ATM, dan 692 ATM internal tetap butuh frekuensi untuk forecast/penjadwalan. Paket 4 = (CR 4x, FLM 4x): Advantage menulis 4x4, TAG punya Paket 6 — menyimpan frekuensinya membuat ketiganya muat tanpa penerjemahan, dan membuat tagihan Additional CR/FLM bisa dihitung (realisasi trip - frekuensi kontrak)'
+}
+
+Table atm_vendor_packages {
+  id bigint [pk, increment]
+  atm_id bigint [not null]
+  service_package_id bigint [not null, note: '[UBAH] rename dari vendor_package_id']
+  effective_start_date date [not null]
+  effective_end_date date
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (atm_id, service_package_id, effective_start_date) [unique]
+  }
+  Note: 'PETA KELOLAAN — 1862 baris, dipertahankan seluruhnya (P1). Berlaku untuk ATM vendor maupun internal; pembedanya hanya apakah paketnya punya vendor_branch_id. EXCLUDE no-overlap on (atm_id, daterange) WHERE is_active SUDAH ADA dari migration 003 — tidak perlu dibuat ulang. Anomali saat migrasi (P18): 18 ATM ROH berstatus OFFSITE + 42 ATM tanpa kelolaan = 60 dari 1904 (3%), masuk daftar pengecualian manual, DILARANG ditebak dari coverage area'
+}
+
+// ---------------------------------------------------------------------
+// Harga — satu tabel, tiga tingkat
+// ---------------------------------------------------------------------
+
+Table vendor_package_prices {
+  id bigint [pk, increment]
+  vendor_id bigint [not null, note: 'tingkat dasar: kontrak PT (P2)']
+  package_code text [not null, note: 'PAKET 3 | PAKET 4 | PAKET 5 | PAKET 6']
+  machine_group text [not null, note: 'ATM | CDM_CRM — dicocokkan ke atms.price_machine_group']
+  price_class text [not null, note: 'REGULAR | VIP_INDUSTRI — dicocokkan ke atms.price_class']
+  tier_min integer [not null, default: 1, note: 'batas bawah jumlah kelolaan']
+  tier_max integer [note: 'NULL = tanpa batas atas. Vendor tanpa tier pakai satu baris 1..NULL']
+  base_price "numeric(20,2)" [note: 'NULLABLE (P3) — override boleh mengisi sebagian field saja']
+  vendor_branch_id bigint [note: 'terisi = override tingkat cabang (P4)']
+  atm_id bigint [note: 'terisi = override tingkat ATM, mis. Harga Khusus luar service area (P4)']
+  sla_note text [note: 'mis. Tidak dikenakan penalty downtime']
+  currency "char(3)" [not null, default: 'IDR']
+  effective_start_date date [not null]
+  effective_end_date date [note: 'NULL = terbuka']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (vendor_id, package_code, machine_group, price_class) [name: 'vpp_lookup_idx']
+  }
+  Note: '[BARU] Menggantikan vendor_packages.price yang hanya muat satu angka, padahal harga bergantung pada ENAM dimensi: paket, kelompok mesin, kelas prioritas, tier jumlah kelolaan, periode berlaku, pengecualian per-ATM. TIGA TINGKAT DALAM SATU TABEL (P4), ditentukan kolom mana yang terisi: keduanya NULL = tingkat PT (dasar) · vendor_branch_id terisi = override cabang · atm_id terisi = override ATM. add_cr_price/add_flm_price/extra_amount DIHAPUS (migration 012, explicit user request) — base_price sekarang satu-satunya kolom harga. CONSTRAINT yang tidak bisa digambar DBML: CHECK vpp_amount_chk (base_price IS NULL OR base_price >= 0) · CHECK vpp_one_level (atm_id IS NULL OR vendor_branch_id IS NULL) · CHECK tier_max >= tier_min · CHECK effective_end_date >= effective_start_date · EXCLUDE USING gist vpp_no_overlap mencegah dua harga cocok untuk kombinasi+tanggal yang sama per tingkat, WAJIB pakai COALESCE(vendor_branch_id,0) dan COALESCE(atm_id,0) karena EXCLUDE memperlakukan NULL sebagai tidak-bertabrakan sehingga baris tingkat-PT tidak akan terjaga tanpa itu; btree_gist sudah terpasang di baseline. ATM internal tidak pernah punya baris di sini — service_packages.vendor_branch_id NULL berarti tidak ada baris harga yang bisa cocok, jadi aturan internal-tidak-ditagih terbaca dari skema bukan dari aturan yang harus diingat orang. Maker-checker (P13) lewat master_data_change_requests, endpoint balas 202. RBAC (P14): internal role finance/admin saja; vendor hanya harganya sendiri'
+}
+
+// ---------------------------------------------------------------------
+// Relasi
+// ---------------------------------------------------------------------
+
+Ref: vendor_branches.vendor_id              > vendors.id
+Ref: atms.cimb_branch_id                    > cimb_branches.id
+Ref: service_packages.vendor_branch_id      > vendor_branches.id
+Ref: atm_vendor_packages.atm_id             > atms.id
+Ref: atm_vendor_packages.service_package_id > service_packages.id
+Ref: vendor_package_prices.vendor_id        > vendors.id
+Ref: vendor_package_prices.vendor_branch_id > vendor_branches.id
+Ref: vendor_package_prices.atm_id           > atms.id
+
+// =====================================================================
+// ALUR LOOKUP HARGA — untuk satu ATM pada satu tanggal
+// =====================================================================
+//
+// 1. package_code  <- atm_vendor_packages -> service_packages.code
+//    machine_group <- atms.price_machine_group   (generated)
+//    price_class   <- atms.price_class           (generated)
+//
+// 2. Ambil semua baris vendor_package_prices yang cocok & aktif pada tanggal
+//    itu, di ketiga tingkat sekaligus.
+//
+// 3. Resolusi PER FIELD (P3, P5): base_price = nilai dari baris paling spesifik
+//    yang tidak NULL (ATM -> cabang -> PT).
+//
+// 4. base_price tidak terdefinisi di tingkat manapun => ERROR, baris invoice
+//    ditolak dengan pesan menyebut kombinasi yang hilang (P12). Tanpa fallback nol.
+//
+// NOTE: add_cr_price, add_flm_price, extra_amount DIHAPUS dari
+// vendor_package_prices (migration 012, explicit user request) -- P6 (extra
+// dijumlahkan, tidak di-override) tidak lagi berlaku, tidak ada kolom itu.
+//
+// =====================================================================
+// BELUM TERJAWAB — memblokir kalkulator, bukan skema
+// =====================================================================
+// Semantik tier "Penambahan jumlah kelolaan" (Abacus & SSI): marginal seperti
+// bracket pajak, atau flat? Dihitung per vendor nasional, per cabang, atau per
+// tipe mesin? Skema identik untuk semua kemungkinan, jadi migration boleh jalan
+// duluan — kalkulator invoice tidak. Catatan: Bijak punya 588 ATM di SATU cabang,
+// jadi "per cabang" vs "per vendor" berbeda nyata di sana.

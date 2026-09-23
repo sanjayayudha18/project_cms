@@ -4,12 +4,12 @@ import type { ApiError } from "@/lib/api/client";
 import { useToast } from "@/lib/hooks/useToast";
 import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateATM, useLocationOptions, useUpdateATM } from "../hooks";
 import { type ATMFormValues, PRIORITY_CLASS_VALUES, atmFormSchema } from "../lib/atmFormSchema";
-import type { AdminATM, CreateATMPayload, UpdateATMPayload } from "../types";
+import type { AdminATM, CreateATMPayload, LocationOption, UpdateATMPayload } from "../types";
 
 interface ATMFormDialogProps {
   open: boolean;
@@ -79,6 +79,8 @@ function applyATMConflictOrReferenceError(
   return false;
 }
 
+const NO_REGION_FILTER = "";
+
 /** Create/edit form for admin ATMs (Req 3-4). Terminal ID is immutable once created (Req 4.2). */
 export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
   const mode = atm ? "edit" : "create";
@@ -86,16 +88,54 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
   const createMutation = useCreateATM();
   const updateMutation = useUpdateATM();
   const locationOptionsQuery = useLocationOptions();
+  const locations = useMemo(
+    () => locationOptionsQuery.data?.locations ?? [],
+    [locationOptionsQuery.data],
+  );
 
   const form = useForm<ATMFormValues>({
     resolver: zodResolver(atmFormSchema),
     defaultValues: toDefaultValues(atm),
   });
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog (re)opens for a given atm, not on every render
+  // Location is a free-text field backed by a datalist of valid locations
+  // (Req: no plain dropdown), narrowed by the Region select. The typed text
+  // is local state; it resolves to a real location_id (the FK the backend
+  // requires) by exact name match, kept in sync with the form field below.
+  const [locationText, setLocationText] = useState(atm?.location_name ?? "");
+  const [regionFilter, setRegionFilter] = useState(NO_REGION_FILTER);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog (re)opens for a given atm, not on every render or every time `locations` gets a new (but equivalent) array identity from the query cache
   useEffect(() => {
-    if (open) form.reset(toDefaultValues(atm));
+    if (!open) return;
+    form.reset(toDefaultValues(atm));
+    setLocationText(atm?.location_name ?? "");
+    const currentLocation = locations.find((loc) => loc.id === atm?.location_id);
+    setRegionFilter(currentLocation ? String(currentLocation.region_id) : NO_REGION_FILTER);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, atm]);
+
+  const regionOptions = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const loc of locations) seen.set(loc.region_id, loc.region_name);
+    return Array.from(seen, ([region_id, region_name]) => ({ region_id, region_name })).sort(
+      (a, b) => a.region_name.localeCompare(b.region_name),
+    );
+  }, [locations]);
+
+  const locationChoices = useMemo(
+    () =>
+      regionFilter === NO_REGION_FILTER
+        ? locations
+        : locations.filter((loc) => String(loc.region_id) === regionFilter),
+    [locations, regionFilter],
+  );
+
+  function handleLocationTextChange(value: string) {
+    setLocationText(value);
+    const match = locations.find((loc) => loc.name.toLowerCase() === value.trim().toLowerCase());
+    form.setValue("location_id", match?.id ?? 0, { shouldValidate: form.formState.isSubmitted });
+  }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -157,148 +197,168 @@ export function ATMFormDialog({ open, onClose, atm }: ATMFormDialogProps) {
     }
   }
 
-  const locations = locationOptionsQuery.data?.locations ?? [];
-
   return (
     <Dialog open={open} onClose={onClose} title={mode === "create" ? "Tambah ATM" : "Ubah ATM"}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <Field
-          id="terminal_id"
-          label="Terminal ID"
-          error={form.formState.errors.terminal_id?.message}
-        >
-          <input
+        <div className="grid max-h-[60vh] grid-cols-1 gap-x-4 gap-y-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <Field
             id="terminal_id"
-            {...form.register("terminal_id")}
-            disabled={mode === "edit"}
-            className={inputClass}
-          />
-        </Field>
-
-        <Field id="location_id" label="Lokasi" error={form.formState.errors.location_id?.message}>
-          <select
-            id="location_id"
-            {...form.register("location_id", { valueAsNumber: true })}
-            className={inputClass}
+            label="Terminal ID"
+            error={form.formState.errors.terminal_id?.message}
           >
-            <option value={0}>Pilih lokasi</option>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+            <input
+              id="terminal_id"
+              {...form.register("terminal_id")}
+              disabled={mode === "edit"}
+              className={inputClass}
+            />
+          </Field>
 
-        <Field
-          id="machine_type"
-          label="Tipe Mesin"
-          error={form.formState.errors.machine_type?.message}
-        >
-          <input id="machine_type" {...form.register("machine_type")} className={inputClass} />
-        </Field>
+          <Field id="region_filter" label="Region">
+            <select
+              id="region_filter"
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              className={inputClass}
+            >
+              <option value={NO_REGION_FILTER}>Semua region</option>
+              {regionOptions.map((r) => (
+                <option key={r.region_id} value={r.region_id}>
+                  {r.region_name}
+                </option>
+              ))}
+            </select>
+          </Field>
 
-        <Field id="brand" label="Brand" error={form.formState.errors.brand?.message}>
-          <input id="brand" {...form.register("brand")} className={inputClass} />
-        </Field>
+          <div className="sm:col-span-2">
+            <Field
+              id="location_id"
+              label="Lokasi"
+              error={form.formState.errors.location_id?.message}
+            >
+              <input
+                id="location_id"
+                list="location-options"
+                value={locationText}
+                onChange={(e) => handleLocationTextChange(e.target.value)}
+                placeholder="Ketik nama lokasi"
+                className={inputClass}
+              />
+              <datalist id="location-options">
+                {locationChoices.map((loc: LocationOption) => (
+                  <option key={loc.id} value={loc.name} />
+                ))}
+              </datalist>
+            </Field>
+          </div>
 
-        <Field id="model" label="Model" error={form.formState.errors.model?.message}>
-          <input id="model" {...form.register("model")} className={inputClass} />
-        </Field>
+          <Field
+            id="machine_type"
+            label="Tipe Mesin"
+            error={form.formState.errors.machine_type?.message}
+          >
+            <input id="machine_type" {...form.register("machine_type")} className={inputClass} />
+          </Field>
 
-        <Field
-          id="operation_hours"
-          label="Jam Operasional"
-          error={form.formState.errors.operation_hours?.message}
-        >
-          <input
+          <Field id="brand" label="Brand" error={form.formState.errors.brand?.message}>
+            <input id="brand" {...form.register("brand")} className={inputClass} />
+          </Field>
+
+          <Field id="model" label="Model" error={form.formState.errors.model?.message}>
+            <input id="model" {...form.register("model")} className={inputClass} />
+          </Field>
+
+          <Field
             id="operation_hours"
-            {...form.register("operation_hours")}
-            className={inputClass}
-          />
-        </Field>
+            label="Jam Operasional"
+            error={form.formState.errors.operation_hours?.message}
+          >
+            <input
+              id="operation_hours"
+              {...form.register("operation_hours")}
+              className={inputClass}
+            />
+          </Field>
 
-        <Field
-          id="deployment_type"
-          label="Deployment"
-          error={form.formState.errors.deployment_type?.message}
-        >
-          <input
+          <Field
             id="deployment_type"
-            {...form.register("deployment_type")}
-            className={inputClass}
-          />
-        </Field>
+            label="Deployment"
+            error={form.formState.errors.deployment_type?.message}
+          >
+            <input
+              id="deployment_type"
+              {...form.register("deployment_type")}
+              className={inputClass}
+            />
+          </Field>
 
-        <Field
-          id="priority_class"
-          label="Prioritas"
-          error={form.formState.errors.priority_class?.message}
-        >
-          <select id="priority_class" {...form.register("priority_class")} className={inputClass}>
-            <option value="">Tidak ditentukan</option>
-            {PRIORITY_CLASS_VALUES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
+          <Field
+            id="priority_class"
+            label="Prioritas"
+            error={form.formState.errors.priority_class?.message}
+          >
+            <select id="priority_class" {...form.register("priority_class")} className={inputClass}>
+              <option value="">Tidak ditentukan</option>
+              {PRIORITY_CLASS_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </Field>
 
-        <Field
-          id="capacity_amount"
-          label="Kapasitas (IDR)"
-          error={form.formState.errors.capacity_amount?.message}
-        >
-          <input
+          <Field
             id="capacity_amount"
-            {...form.register("capacity_amount")}
-            inputMode="decimal"
-            placeholder="0.00"
-            className={`${inputClass} text-right tabular-nums`}
-          />
-        </Field>
+            label="Kapasitas (IDR)"
+            error={form.formState.errors.capacity_amount?.message}
+          >
+            <input
+              id="capacity_amount"
+              {...form.register("capacity_amount")}
+              inputMode="decimal"
+              placeholder="0.00"
+              className={`${inputClass} text-right tabular-nums`}
+            />
+          </Field>
 
-        <Field
-          id="low_threshold_amount"
-          label="Batas Rendah (IDR)"
-          error={form.formState.errors.low_threshold_amount?.message}
-        >
-          <input
+          <Field
             id="low_threshold_amount"
-            {...form.register("low_threshold_amount")}
-            inputMode="decimal"
-            placeholder="0.00"
-            className={`${inputClass} text-right tabular-nums`}
-          />
-        </Field>
+            label="Batas Rendah (IDR)"
+            error={form.formState.errors.low_threshold_amount?.message}
+          >
+            <input
+              id="low_threshold_amount"
+              {...form.register("low_threshold_amount")}
+              inputMode="decimal"
+              placeholder="0.00"
+              className={`${inputClass} text-right tabular-nums`}
+            />
+          </Field>
 
-        <Field
-          id="critical_threshold_amount"
-          label="Batas Kritis (IDR)"
-          error={form.formState.errors.critical_threshold_amount?.message}
-        >
-          <input
+          <Field
             id="critical_threshold_amount"
-            {...form.register("critical_threshold_amount")}
-            inputMode="decimal"
-            placeholder="0.00"
-            className={`${inputClass} text-right tabular-nums`}
-          />
-        </Field>
+            label="Batas Kritis (IDR)"
+            error={form.formState.errors.critical_threshold_amount?.message}
+          >
+            <input
+              id="critical_threshold_amount"
+              {...form.register("critical_threshold_amount")}
+              inputMode="decimal"
+              placeholder="0.00"
+              className={`${inputClass} text-right tabular-nums`}
+            />
+          </Field>
 
-        <Field
-          id="escrow_account"
-          label="Nomor Rekening Escrow"
-          error={form.formState.errors.escrow_account?.message}
-        >
-          <input id="escrow_account" {...form.register("escrow_account")} className={inputClass} />
-        </Field>
+          {/* Nomor Rekening Escrow moved to the Kelolaan ATM dialog (ATMAssignmentsDialog) --
+              kept registered below (hidden) so its current value round-trips unchanged
+              through create/update instead of being edited here. */}
+          <input type="hidden" {...form.register("escrow_account")} />
 
-        <label className="flex items-center gap-2 text-sm text-[var(--n-700)]">
-          <input type="checkbox" {...form.register("blacklisted")} />
-          Blacklist
-        </label>
+          <label className="flex items-center gap-2 text-sm text-[var(--n-700)] sm:col-span-2">
+            <input type="checkbox" {...form.register("blacklisted")} />
+            Blacklist
+          </label>
+        </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" disabled={isPending} onClick={onClose}>

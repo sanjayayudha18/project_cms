@@ -11,7 +11,16 @@ interface PendingList {
   changes: { entity_id: number | null }[];
 }
 
-export function usePendingEntityIds(entityType: "vendor" | "atm"): Set<number> {
+export function usePendingEntityIds(
+  entityType:
+    | "vendor"
+    | "atm"
+    | "vendor_branch"
+    | "vendor_vault"
+    | "vendor_pic"
+    | "vendor_package"
+    | "vendor_package_price",
+): Set<number> {
   const { data } = useQuery({
     queryKey: ["master-data", "pending", entityType],
     queryFn: async () => {

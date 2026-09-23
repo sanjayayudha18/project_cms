@@ -141,6 +141,12 @@ func (s *MasterDataChangeService) Submit(ctx context.Context, makerID int64, req
 	if err != nil {
 		return db.MasterDataChangeRequest{}, fmt.Errorf("marshal payload: %w", err)
 	}
+	if payload == nil {
+		// payload is NOT NULL in the DB; disable/enable ops carry no field
+		// changes (Before holds the pre-toggle snapshot instead), so there is
+		// nothing to marshal -- use an empty object rather than a NULL.
+		payload = []byte("{}")
+	}
 	before, err := marshalOrNilJSON(req.Before)
 	if err != nil {
 		return db.MasterDataChangeRequest{}, fmt.Errorf("marshal before snapshot: %w", err)

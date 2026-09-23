@@ -20,7 +20,7 @@ SELECT av.id,
        av.is_active
 FROM atm_vendor_packages av
 JOIN atms a ON a.id = av.atm_id
-JOIN vendor_packages p ON p.id = av.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = av.vendor_package_id
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE av.id > $1::bigint
@@ -482,7 +482,7 @@ func (q *Queries) ImportLocationIDs(ctx context.Context) ([]int64, error) {
 
 const importPackageKeys = `-- name: ImportPackageKeys :many
 SELECT p.id, v.code AS vendor_code, b.branch_code, p.code AS package_code
-FROM vendor_packages p
+FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE p.is_active AND p.deleted_at IS NULL

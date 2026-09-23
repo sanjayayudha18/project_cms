@@ -188,7 +188,7 @@ RETURNING *;
 -- actually receives empty for those two in practice.
 -- replenishment-request-enhancements (Req 5): three additive SELECT columns
 -- -- priority_class (atms.priority_class, migration 030; Req 5.2), paket
--- (vendor_packages.code of the single active package, now deterministic with
+-- (vendor_packages_branch.code of the single active package, now deterministic with
 -- the avp.id DESC tie-breaker -- OQ3; Req 5.3, 5.4), and escrow (latest
 -- itm_replenish.escrow per terminal, numeric(20,2) the service carries as a
 -- decimal string, never float -- OQ2; Req 5.5, 5.10). WHERE/ORDER BY/
@@ -215,7 +215,7 @@ LEFT JOIN locations l ON l.id = a.location_id
 LEFT JOIN LATERAL (
     SELECT vp.vendor_branch_id, vp.id AS vendor_package_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
@@ -223,7 +223,7 @@ LEFT JOIN LATERAL (
     ORDER BY avp.effective_start_date DESC, avp.id DESC
     LIMIT 1
 ) active_pkg ON true
-LEFT JOIN vendor_packages pkg ON pkg.id = active_pkg.vendor_package_id
+LEFT JOIN vendor_packages_branch pkg ON pkg.id = active_pkg.vendor_package_id
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
 LEFT JOIN vendors v ON v.id = vb.vendor_id
 LEFT JOIN LATERAL (
@@ -244,7 +244,7 @@ LIMIT sqlc.arg('page_size')::int OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('
 -- name: CountForecastForDate :one
 -- Mirrors ListForecastForDate's WHERE for pagination total. CIT-2 (Req 1):
 -- unlike the pre-CIT-2 version, this now NEEDS the same
--- atms -> atm_vendor_packages (active) -> vendor_packages -> vendor_branches
+-- atms -> atm_vendor_packages (active) -> vendor_packages_branch -> vendor_branches
 -- -> vendors join chain as ListForecastForDate, because brand/flm_vendor/
 -- flm_vendor_region filter on those joined columns. The LATERAL active-package
 -- resolution still yields at most one row per forecast row, so the joins
@@ -255,7 +255,7 @@ LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN LATERAL (
     SELECT vp.vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
@@ -333,7 +333,7 @@ FROM atms a
 JOIN LATERAL (
     SELECT vp.vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages vp ON vp.id = avp.vendor_package_id
+    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('as_of_date')::date

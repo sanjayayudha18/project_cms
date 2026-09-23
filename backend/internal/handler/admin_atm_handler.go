@@ -138,7 +138,10 @@ func (h *AdminATMHandler) ListLocations(w http.ResponseWriter, r *http.Request) 
 	}
 	items := make([]map[string]any, len(opts))
 	for i, o := range opts {
-		items[i] = map[string]any{"id": o.ID, "name": o.Name, "city_or_regency": o.CityOrRegency, "province": o.Province}
+		items[i] = map[string]any{
+			"id": o.ID, "name": o.Name, "city_or_regency": o.CityOrRegency, "province": o.Province,
+			"region_id": o.RegionID, "region_name": o.RegionName,
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"locations": items})
 }

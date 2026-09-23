@@ -83,6 +83,12 @@ type Atm struct {
 	EscrowAccount *string `json:"escrow_account"`
 	// ATM priority tier from MASTER_ATM_ESQ.PriorityClass: VIP | Non VIP | Industri. Per-ATM (varies within a vendor branch), so stored on atms not vendor_packages. See migration 030.
 	PriorityClass *string `json:"priority_class"`
+	// Terisi untuk ATM internal (dikelola petugas cabang CIMB, tidak ditagih); NULL untuk ATM yang divendorkan. Di-backfill di migrasi 010.
+	CimbBranchID *int64 `json:"cimb_branch_id"`
+	// Turunan machine_type untuk lookup harga: ATM -> ATM; CRM/CDM -> CDM_CRM; lainnya -> NULL (gagal keras). CEILING: mengunci asumsi tidak ada vendor yang menghargai CDM beda dari CRM - benar untuk kelima vendor di dokumen harga. Migrasi 009.
+	PriceMachineGroup *string `json:"price_machine_group"`
+	// Turunan priority_class untuk lookup harga: Non VIP -> REGULAR; VIP/Industri -> VIP_INDUSTRI; lainnya/NULL -> NULL (gagal keras). Dokumen harga menyatukan VIP & Industri dalam satu tarif. Migrasi 009.
+	PriceClass *string `json:"price_class"`
 }
 
 type AtmDenom struct {
@@ -115,6 +121,27 @@ type AuditLog struct {
 	After      []byte             `json:"after"`
 	IP         *string            `json:"ip"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Kota yang dilayani sebuah cabang vendor. Many-to-many: satu cabang melayani banyak kota, satu kota dilayani banyak cabang vendor.
+type BranchCoverageArea struct {
+	ID             int64              `json:"id"`
+	VendorBranchID int64              `json:"vendor_branch_id"`
+	City           string             `json:"city"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+// Kantor cabang CIMB tempat ATM internal berdiri. Diisi dari 300 baris ROH_0xx di vendor_branches (migrasi 010). Bukan cabang vendor. Migrasi 009.
+type CimbBranch struct {
+	ID         int64  `json:"id"`
+	BranchCode string `json:"branch_code"`
+	BranchName string `json:"branch_name"`
+	// NULL untuk baris hasil migrasi 010: vendor_branches (sumber data) tidak punya atribusi region_id yang bisa dipercaya. Isi manual bila diperlukan, jangan ditebak dari region text bebas.
+	RegionID  *int64             `json:"region_id"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Currency struct {
@@ -406,6 +433,16 @@ type MenuFeature struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Frekuensi CR & FLM per bulan untuk tiap (kode paket, kelompok mesin). Grainnya (kode, kelompok mesin) - bukan kolom di vendor_packages - karena FLM berbeda menurut tipe mesin: PAKET 3 ATM = FLM 4, PAKET 3 CDM/CRM = FLM 6. Nilai dari archives/Harga Paket per vendor FLM.docx. Migrasi 009.
+type PackageFrequency struct {
+	PackageCode  string             `json:"package_code"`
+	MachineGroup string             `json:"machine_group"`
+	CrFrequency  int32              `json:"cr_frequency"`
+	FlmFrequency int32              `json:"flm_frequency"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Region struct {
 	ID        int64              `json:"id"`
 	Code      string             `json:"code"`
@@ -494,6 +531,8 @@ type Vendor struct {
 	LegalName *string `json:"legal_name"`
 	// Indonesian tax ID (NPWP), digits only, 15 (pre-2024 format) or 16 (2024+ format) digits. NULL for vendors not yet updated with legal identity.
 	Npwp *string `json:"npwp"`
+	// FLM_VENDOR | INTERNAL. ROH = INTERNAL (ATM di kantor cabang CIMB, diisi petugas cabang sendiri, tidak ditagih). Unit INTERNAL tidak pernah punya baris di vendor_package_prices. Migrasi 009.
+	Kind string `json:"kind"`
 }
 
 type VendorBranch struct {
@@ -508,14 +547,38 @@ type VendorBranch struct {
 	// Vendor regional grouping from MASTER_ATM_ESQ.FLMVendorRegion (e.g. "Jakarta Timur"). Distinct from regions.region (ATM geographic area) and branch_name (vendor sub-region). See migration 030.
 	Region    *string            `json:"region"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	// Tipe cabang: ATM, CASH, or ATM_CASH -- mirrors vendor_vaults.category. Added per .claude/sdlc/vendor-branch-tipe/plan.md; existing rows default to ATM pending re-seed.
+	Category string `json:"category"`
 }
 
-type VendorPackage struct {
-	ID             int64              `json:"id"`
-	VendorBranchID int64              `json:"vendor_branch_id"`
+// Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
+type VendorPackagePrice struct {
+	ID           int64  `json:"id"`
+	VendorID     int64  `json:"vendor_id"`
+	PackageCode  string `json:"package_code"`
+	MachineGroup string `json:"machine_group"`
+	PriceClass   string `json:"price_class"`
+	TierMin      int32  `json:"tier_min"`
+	TierMax      *int32 `json:"tier_max"`
+	// NULLABLE: override tingkat cabang/ATM boleh mengisi sebagian field saja; yang NULL diambil dari tingkat di atasnya (ATM -> cabang -> PT). Tidak terdefinisi di tingkat manapun = error, baris invoice ditolak.
+	BasePrice      pgtype.Numeric `json:"base_price"`
+	VendorBranchID *int64         `json:"vendor_branch_id"`
+	// Terisi = Harga Khusus di luar service area untuk ATM ini. Punya periode berlaku sendiri, tidak mengikuti periode kontrak PT.
+	AtmID              *int64             `json:"atm_id"`
+	SlaNote            *string            `json:"sla_note"`
+	Currency           string             `json:"currency"`
+	EffectiveStartDate pgtype.Date        `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date        `json:"effective_end_date"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Paket layanan (frekuensi kontrak) yang dipetakan ke ATM lewat atm_vendor_packages. Namanya menyebut "vendor" karena alasan historis (keputusan D4: nama tabel ikuti DB yang ada), tetapi sejak migrasi 009 baris dengan vendor_branch_id NULL adalah paket INTERNAL - dipakai ATM di kantor cabang CIMB, tanpa vendor dan tanpa harga. Harga ada di vendor_package_prices, frekuensi di package_frequencies.
+type VendorPackagesBranch struct {
+	ID int64 `json:"id"`
+	// NULL = paket internal (ATM kantor cabang CIMB, tidak ditagih). Terisi = paket kontrak vendor FLM. Migrasi 009.
+	VendorBranchID *int64             `json:"vendor_branch_id"`
 	Code           string             `json:"code"`
-	PriorityClass  string             `json:"priority_class"`
-	Price          pgtype.Numeric     `json:"price"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	IsActive       bool               `json:"is_active"`
@@ -613,7 +676,7 @@ type VendorVault struct {
 	Latitude       pgtype.Numeric     `json:"latitude"`
 	Longitude      pgtype.Numeric     `json:"longitude"`
 	OperatingHours *string            `json:"operating_hours"`
-	// ATM or CASH. Backfilled to ATM for all pre-existing rows (their legacy type column was uniformly ATM_CASH, which does not map to this binary split) -- see plan.md T0.1/T1.3.
+	// ATM, CASH, atau ATM_CASH (melayani keduanya). Diisi dari daftar master vendor di migrasi 008; sebelumnya biner dengan seluruh baris di-backfill ke ATM.
 	Category  string             `json:"category"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }

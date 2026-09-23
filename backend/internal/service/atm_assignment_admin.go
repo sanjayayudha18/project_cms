@@ -76,7 +76,6 @@ type ATMAssignment struct {
 	ATMID              int64
 	VendorPackageID    int64
 	PackageCode        string
-	PriorityClass      string
 	EffectiveStartDate string
 	EffectiveEndDate   *string
 	IsActive           bool
@@ -90,8 +89,8 @@ func dateToStringPtr(d pgtype.Date) *string {
 	return &s
 }
 
-func newATMAssignment(id, atmID, pkgID int64, code, class string, start, end pgtype.Date, active bool) ATMAssignment {
-	a := ATMAssignment{ID: id, ATMID: atmID, VendorPackageID: pkgID, PackageCode: code, PriorityClass: class,
+func newATMAssignment(id, atmID, pkgID int64, code string, start, end pgtype.Date, active bool) ATMAssignment {
+	a := ATMAssignment{ID: id, ATMID: atmID, VendorPackageID: pkgID, PackageCode: code,
 		EffectiveEndDate: dateToStringPtr(end), IsActive: active}
 	if s := dateToStringPtr(start); s != nil {
 		a.EffectiveStartDate = *s
@@ -107,7 +106,7 @@ func (s *ATMAssignmentAdminService) List(ctx context.Context, arg db.ListATMAssi
 	}
 	out := make([]ATMAssignment, len(rows))
 	for i, r := range rows {
-		out[i] = newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.PriorityClass, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+		out[i] = newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
 	}
 	return out, nil
 }
@@ -124,7 +123,7 @@ func (s *ATMAssignmentAdminService) Get(ctx context.Context, atmID, id int64) (*
 	if err != nil || r == nil || r.AtmID != atmID {
 		return nil, err
 	}
-	a := newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.PriorityClass, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+	a := newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
 	return &a, nil
 }
 

@@ -82,16 +82,26 @@ func (h *AdminVendorPicHandler) List(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("q"); v != "" {
 		qParam = &v
 	}
+	branchID, err := parseOptionalIDParam(q, "branch_id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	var vendorWideOnly *bool
+	if q.Get("vendor_wide_only") == "true" {
+		v := true
+		vendorWideOnly = &v
+	}
 
 	pics, err := h.svc.List(r.Context(), db.ListVendorPicsAdminParams{
-		VendorID: vendorID, Q: qParam, Status: status,
+		VendorID: vendorID, VendorBranchID: branchID, VendorWideOnly: vendorWideOnly, Q: qParam, Status: status,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorPicsAdminParams{VendorID: vendorID, Q: qParam, Status: status})
+	total, err := h.svc.Count(r.Context(), db.CountVendorPicsAdminParams{VendorID: vendorID, VendorBranchID: branchID, VendorWideOnly: vendorWideOnly, Q: qParam, Status: status})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return

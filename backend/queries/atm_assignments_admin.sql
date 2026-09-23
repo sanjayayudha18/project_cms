@@ -10,10 +10,11 @@
 -- name: ListATMAssignmentsAdmin :many
 -- status: 'active'|'disabled'|'all' on is_active (the table has no deleted_at;
 -- is_active=false is what releases the period from the exclusion constraint).
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code, p.priority_class,
+-- No priority_class here since migration 010 dropped vendor_packages_branch.priority_class.
+SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
-JOIN vendor_packages p ON p.id = a.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.atm_id = sqlc.arg('atm_id')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -35,10 +36,10 @@ WHERE a.atm_id = sqlc.arg('atm_id')
 
 -- name: GetATMAssignmentAdminByID :one
 -- Doubles as the "before" snapshot / CurrentState (T2.5).
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code, p.priority_class,
+SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
-JOIN vendor_packages p ON p.id = a.vendor_package_id
+JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.id = $1;
 
 -- name: FindOverlappingATMAssignment :one

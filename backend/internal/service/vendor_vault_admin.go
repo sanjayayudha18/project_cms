@@ -210,14 +210,14 @@ func (s *VendorVaultAdminService) toggle(ctx context.Context, makerID, id int64,
 }
 
 // validateVaultFields normalizes (trims) and validates the editable fields:
-// category ATM|CASH, currency = 3 uppercase letters, capacities >= 0 with
+// category ATM|CASH|ATM_CASH, currency = 3 uppercase letters, capacities >= 0 with
 // min <= max, coordinates within range. Decimals are checked via big.Rat --
 // never float.
 func validateVaultFields(p *VendorVaultUpdatePayload) error {
 	p.Category = strings.TrimSpace(p.Category)
 	p.CurrencyCode = strings.ToUpper(strings.TrimSpace(p.CurrencyCode))
-	if p.Category != "ATM" && p.Category != "CASH" {
-		return &ValidationError{Field: "category", Message: "harus ATM atau CASH"}
+	if p.Category != "ATM" && p.Category != "CASH" && p.Category != "ATM_CASH" {
+		return &ValidationError{Field: "category", Message: "harus ATM, CASH, atau ATM_CASH"}
 	}
 	if !currencyCodeRe.MatchString(p.CurrencyCode) {
 		return &ValidationError{Field: "currency_code", Message: "wajib 3 huruf (mis. IDR)"}

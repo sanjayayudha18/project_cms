@@ -29,6 +29,7 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
 			Region:     p.Region,
+			Category:   p.Category,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor branch: %w", err)
@@ -48,6 +49,7 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
 			Region:     p.Region,
+			Category:   p.Category,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor branch: %w", err)

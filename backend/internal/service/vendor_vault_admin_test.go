@@ -43,7 +43,9 @@ func TestValidateVaultFields(t *testing.T) {
 		field string // "" = valid
 	}{
 		{"valid, currency upper-cased", func(p *VendorVaultUpdatePayload) {}, ""},
-		{"bad category", func(p *VendorVaultUpdatePayload) { p.Category = "ATM_CASH" }, "category"},
+		{"category ATM_CASH ok", func(p *VendorVaultUpdatePayload) { p.Category = "ATM_CASH" }, ""},
+		{"category CASH ok", func(p *VendorVaultUpdatePayload) { p.Category = "CASH" }, ""},
+		{"bad category", func(p *VendorVaultUpdatePayload) { p.Category = "VAULT" }, "category"},
 		{"missing currency", func(p *VendorVaultUpdatePayload) { p.CurrencyCode = "" }, "currency_code"},
 		{"min > max", func(p *VendorVaultUpdatePayload) { p.MinCapacityAmount = sp("600") }, "min_capacity_amount"},
 		{"min == max ok", func(p *VendorVaultUpdatePayload) { p.MinCapacityAmount = sp("500") }, ""},

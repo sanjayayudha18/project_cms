@@ -48,7 +48,7 @@ func (r *VendorPackageAdminRepository) GetByID(ctx context.Context, id int64) (*
 
 // FindByBranchCode returns the id of the package with (branchID, code) incl. soft-disabled; nil, nil if none.
 func (r *VendorPackageAdminRepository) FindByBranchCode(ctx context.Context, branchID int64, code string) (*int64, error) {
-	id, err := r.queries.FindVendorPackageAdminByBranchCode(ctx, db.FindVendorPackageAdminByBranchCodeParams{VendorBranchID: branchID, Code: code})
+	id, err := r.queries.FindVendorPackageAdminByBranchCode(ctx, db.FindVendorPackageAdminByBranchCodeParams{VendorBranchID: &branchID, Code: code})
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -56,6 +56,12 @@ func (r *VendorPackageAdminRepository) FindByBranchCode(ctx context.Context, bra
 		return nil, err
 	}
 	return &id, nil
+}
+
+// CountActiveByBranch returns the number of active (non-disabled) packages under branchID.
+// Backs the branch-disable guard (VendorBranchAdminService.Disable).
+func (r *VendorPackageAdminRepository) CountActiveByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return r.queries.CountActiveVendorPackagesByBranch(ctx, &branchID)
 }
 
 // BranchVendorID returns the vendor_id owning branchID; nil, nil if the branch doesn't exist.

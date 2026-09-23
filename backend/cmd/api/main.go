@@ -215,13 +215,14 @@ func main() {
 	// ponytail: swap dbPool for the dbRead pool on List/Count when
 	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
 	masterDataApplierRegistry := service.ApplierRegistry{
-		"vendor":         service.VendorApplier{},
-		"vendor_branch":  service.VendorBranchApplier{},
-		"vendor_vault":   service.VendorVaultApplier{},
-		"vendor_pic":     service.VendorPicApplier{},
-		"atm":            service.ATMApplier{},
-		"vendor_package": service.VendorPackageApplier{},
-		"atm_assignment": service.ATMAssignmentApplier{},
+		"vendor":               service.VendorApplier{},
+		"vendor_branch":        service.VendorBranchApplier{},
+		"vendor_vault":         service.VendorVaultApplier{},
+		"vendor_pic":           service.VendorPicApplier{},
+		"atm":                  service.ATMApplier{},
+		"vendor_package":       service.VendorPackageApplier{},
+		"vendor_package_price": service.VendorPackagePriceApplier{},
+		"atm_assignment":       service.ATMAssignmentApplier{},
 	}
 	masterDataChangeRepo := repository.NewMasterDataChangeRepository(dbPool)
 
@@ -294,16 +295,10 @@ func main() {
 	adminMasterDataExportHandler := handler.NewAdminMasterDataExportHandler(masterDataExporter)
 	masterDataAdmin.Mount("/api/v1/admin/master-data/export", adminMasterDataExportHandler.Routes())
 
-	// ADMIN/ADMIN_PARAM-only: vendor branch CRUD (plan.md T3.1) -- staged via
-	// masterDataChangeService.Submit (maker-checker-native, D1), applied by
-	// VendorBranchApplier once approved via /api/v1/approvals above.
-	vendorBranchAdminRepo := repository.NewVendorBranchAdminRepository(dbPool)
-	vendorBranchAdminService := service.NewVendorBranchAdminService(vendorBranchAdminRepo, masterDataChangeService)
-	adminVendorBranchHandler := handler.NewAdminVendorBranchHandler(vendorBranchAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches", adminVendorBranchHandler.Routes())
-
 	// ADMIN/ADMIN_PARAM-only: vendor vault CRUD (plan.md T3.2), same
-	// maker-checker-native flow as branches above.
+	// maker-checker-native flow as branches below. Built before the branch
+	// service so its repo can back the branch-disable "no active children"
+	// guard (branchChildCounter below).
 	vendorVaultAdminRepo := repository.NewVendorVaultAdminRepository(dbPool)
 	vendorVaultAdminService := service.NewVendorVaultAdminService(vendorVaultAdminRepo, masterDataChangeService)
 	adminVendorVaultHandler := handler.NewAdminVendorVaultHandler(vendorVaultAdminService)
@@ -322,6 +317,27 @@ func main() {
 	vendorPackageAdminService := service.NewVendorPackageAdminService(vendorPackageAdminRepo, masterDataChangeService)
 	adminVendorPackageHandler := handler.NewAdminVendorPackageHandler(vendorPackageAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/packages", adminVendorPackageHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: vendor package price CRUD (vendor-pricing
+	// plan.md P20), same maker-checker-native flow. Prices are decimal
+	// strings (numeric(20,2)); there is no Enable since a price row is
+	// effective-dated history, not a togglable entity -- Disable ends its
+	// validity, a new period is a new row.
+	vendorPackagePriceAdminRepo := repository.NewVendorPackagePriceAdminRepository(dbPool)
+	vendorPackagePriceAdminService := service.NewVendorPackagePriceAdminService(vendorPackagePriceAdminRepo, masterDataChangeService)
+	adminVendorPackagePriceHandler := handler.NewAdminVendorPackagePriceHandler(vendorPackagePriceAdminService)
+	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/package-prices", adminVendorPackagePriceHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: vendor branch CRUD (plan.md T3.1) -- staged via
+	// masterDataChangeService.Submit (maker-checker-native, D1), applied by
+	// VendorBranchApplier once approved via /api/v1/approvals above.
+	// branchChildCounter backs Disable's "no active vault/PIC/package" guard
+	// (perbaikan-rbac plan.md): reuses the vault/pic/package repos built above.
+	vendorBranchAdminRepo := repository.NewVendorBranchAdminRepository(dbPool)
+	branchChildCounter := branchChildCounterAdapter{vaults: vendorVaultAdminRepo, pics: vendorPicAdminRepo, packages: vendorPackageAdminRepo}
+	vendorBranchAdminService := service.NewVendorBranchAdminService(vendorBranchAdminRepo, masterDataChangeService, branchChildCounter)
+	adminVendorBranchHandler := handler.NewAdminVendorBranchHandler(vendorBranchAdminService)
+	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches", adminVendorBranchHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: ATM assignment (kelolaan) CRUD (plan.md T3.5),
 	// same maker-checker-native flow; overlap is a clean 409 at submit time and
@@ -345,7 +361,7 @@ func main() {
 		Services: func(sub service.ImportSubmitter) service.ImportServices {
 			return service.ImportServices{
 				Vendors:     service.NewVendorAdminService(vendorAdminRepo, sub),
-				Branches:    service.NewVendorBranchAdminService(vendorBranchAdminRepo, sub),
+				Branches:    service.NewVendorBranchAdminService(vendorBranchAdminRepo, sub, branchChildCounter),
 				Vaults:      service.NewVendorVaultAdminService(vendorVaultAdminRepo, sub),
 				PICs:        service.NewVendorPicAdminService(vendorPicAdminRepo, sub),
 				ATMs:        service.NewATMAdminService(atmAdminRepo, sub),
@@ -443,6 +459,29 @@ func main() {
 	}
 
 	slog.Info("server stopped gracefully")
+}
+
+// branchChildCounterAdapter composes the vault/pic/package admin repos into
+// the single service.VendorBranchChildCounter surface VendorBranchAdminService
+// needs for its disable guard (perbaikan-rbac plan.md) -- each repo already
+// exposes a CountActiveByBranch method, this just gives each one a distinct
+// name on the shared interface.
+type branchChildCounterAdapter struct {
+	vaults   *repository.VendorVaultAdminRepository
+	pics     *repository.VendorPicAdminRepository
+	packages *repository.VendorPackageAdminRepository
+}
+
+func (a branchChildCounterAdapter) CountActiveVaultsByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return a.vaults.CountActiveByBranch(ctx, branchID)
+}
+
+func (a branchChildCounterAdapter) CountActivePicsByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return a.pics.CountActiveByBranch(ctx, branchID)
+}
+
+func (a branchChildCounterAdapter) CountActivePackagesByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return a.packages.CountActiveByBranch(ctx, branchID)
 }
 
 // getenvDefault reads an environment variable, returning def when unset/empty.

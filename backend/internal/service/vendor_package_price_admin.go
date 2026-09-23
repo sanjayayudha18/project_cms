@@ -1,0 +1,340 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/cimb-niaga/cms/backend/internal/db"
+)
+
+// Sentinel errors for VendorPackagePriceAdminService.
+var (
+	ErrVendorPackagePriceNotFound = errors.New("vendor package price not found")
+	ErrVendorPackagePriceOverlap  = errors.New("harga tumpang tindih dengan periode aktif lain untuk kombinasi paket/kelompok mesin/kelas/tingkat yang sama")
+	ErrVendorPackagePriceInternal = errors.New("vendor internal (ROH) tidak pernah punya baris harga")
+	ErrVendorPackagePriceNoVendor = errors.New("vendor tidak ditemukan atau nonaktif")
+)
+
+const priceDateLayout = "2006-01-02"
+
+// VendorPackagePriceSubmitter is the narrow MasterDataChangeService surface
+// VendorPackagePriceAdminService needs (maker-checker-native, D1).
+type VendorPackagePriceSubmitter interface {
+	Submit(ctx context.Context, makerID int64, req SubmitRequest, actorIP string) (db.MasterDataChangeRequest, error)
+}
+
+// VendorPackagePriceAdminRepo is the read-only repository surface
+// VendorPackagePriceAdminService needs. *repository.VendorPackagePriceAdminRepository satisfies it.
+type VendorPackagePriceAdminRepo interface {
+	List(ctx context.Context, arg db.ListVendorPackagePricesAdminParams) ([]db.ListVendorPackagePricesAdminRow, error)
+	Count(ctx context.Context, arg db.CountVendorPackagePricesAdminParams) (int64, error)
+	GetByID(ctx context.Context, id int64) (*db.GetVendorPackagePriceAdminByIDRow, error)
+	VendorKind(ctx context.Context, vendorID int64) (*db.GetVendorKindForPackagePriceRow, error)
+}
+
+// VendorPackagePriceAdminService validates package price create/update/disable
+// and stages each via MasterDataChangeService.Submit; VendorPackagePriceApplier
+// writes the row once approved (vendor-pricing plan.md P20). Unlike other
+// master-data entities there is no Enable: a price row is effective-dated
+// history, not a togglable entity -- "disable" ends its validity, a new
+// period is a new row.
+type VendorPackagePriceAdminService struct {
+	repo    VendorPackagePriceAdminRepo
+	changes VendorPackagePriceSubmitter
+}
+
+// NewVendorPackagePriceAdminService creates a VendorPackagePriceAdminService with the given dependencies.
+func NewVendorPackagePriceAdminService(repo VendorPackagePriceAdminRepo, changes VendorPackagePriceSubmitter) *VendorPackagePriceAdminService {
+	return &VendorPackagePriceAdminService{repo: repo, changes: changes}
+}
+
+// VendorPackagePriceContentPayload is the editable field set on Update; also
+// embedded in the create payload. Price fields are nullable decimal strings
+// (never float) -- NULL means "inherit from the level above" (PT -> branch ->
+// ATM), which is why overrides can touch one field and leave the rest NULL.
+type VendorPackagePriceContentPayload struct {
+	BasePrice        *string `json:"base_price"`
+	SlaNote          *string `json:"sla_note"`
+	EffectiveEndDate *string `json:"effective_end_date"`
+}
+
+// VendorPackagePriceCreatePayload is the create request shape (vendor_id comes
+// from the URL, not the body). Grain fields (package_code, machine_group,
+// price_class, tier_min/max, vendor_branch_id/atm_id, currency,
+// effective_start_date) are immutable after create -- a grain change is a new
+// price period.
+type VendorPackagePriceCreatePayload struct {
+	PackageCode        string `json:"package_code"`
+	MachineGroup       string `json:"machine_group"`
+	PriceClass         string `json:"price_class"`
+	TierMin            int64  `json:"tier_min"`
+	TierMax            *int64 `json:"tier_max"`
+	VendorBranchID     *int64 `json:"vendor_branch_id"`
+	AtmID              *int64 `json:"atm_id"`
+	Currency           string `json:"currency"`
+	EffectiveStartDate string `json:"effective_start_date"`
+	VendorPackagePriceContentPayload
+}
+
+// VendorPackagePricePayload is the jsonb payload VendorPackagePriceApplier
+// unmarshals for op=create.
+type VendorPackagePricePayload struct {
+	VendorID int64 `json:"vendor_id"`
+	VendorPackagePriceCreatePayload
+}
+
+// VendorPackagePrice is the read DTO: money as exact decimal strings.
+type VendorPackagePrice struct {
+	ID                 int64
+	VendorID           int64
+	PackageCode        string
+	MachineGroup       string
+	PriceClass         string
+	TierMin            int64
+	TierMax            *int64
+	BasePrice          *string
+	VendorBranchID     *int64
+	AtmID              *int64
+	SlaNote            *string
+	Currency           string
+	EffectiveStartDate string
+	EffectiveEndDate   *string
+}
+
+func priceDateToStringPtr(d pgtype.Date) *string {
+	if !d.Valid {
+		return nil
+	}
+	s := d.Time.Format(priceDateLayout)
+	return &s
+}
+
+func newVendorPackagePrice(
+	id, vendorID int64, packageCode, machineGroup, priceClass string, tierMin int32, tierMax *int32,
+	basePrice pgtype.Numeric,
+	vendorBranchID, atmID *int64, slaNote *string, currency string,
+	start, end pgtype.Date,
+) (VendorPackagePrice, error) {
+	base, err := numericToDecimalStringPtr(basePrice)
+	if err != nil {
+		return VendorPackagePrice{}, fmt.Errorf("base_price: %w", err)
+	}
+	var tierMax64 *int64
+	if tierMax != nil {
+		v := int64(*tierMax)
+		tierMax64 = &v
+	}
+	return VendorPackagePrice{
+		ID: id, VendorID: vendorID, PackageCode: packageCode, MachineGroup: machineGroup, PriceClass: priceClass,
+		TierMin: int64(tierMin), TierMax: tierMax64,
+		BasePrice:      base,
+		VendorBranchID: vendorBranchID, AtmID: atmID, SlaNote: slaNote, Currency: currency,
+		EffectiveStartDate: *priceDateToStringPtr(start), EffectiveEndDate: priceDateToStringPtr(end),
+	}, nil
+}
+
+func fromListRow(r db.ListVendorPackagePricesAdminRow) (VendorPackagePrice, error) {
+	return newVendorPackagePrice(r.ID, r.VendorID, r.PackageCode, r.MachineGroup, r.PriceClass, r.TierMin, r.TierMax,
+		r.BasePrice, r.VendorBranchID, r.AtmID, r.SlaNote, r.Currency,
+		r.EffectiveStartDate, r.EffectiveEndDate)
+}
+
+func fromGetRow(r *db.GetVendorPackagePriceAdminByIDRow) (VendorPackagePrice, error) {
+	return newVendorPackagePrice(r.ID, r.VendorID, r.PackageCode, r.MachineGroup, r.PriceClass, r.TierMin, r.TierMax,
+		r.BasePrice, r.VendorBranchID, r.AtmID, r.SlaNote, r.Currency,
+		r.EffectiveStartDate, r.EffectiveEndDate)
+}
+
+// List returns a page of a vendor's package prices. Read-only, no audit.
+func (s *VendorPackagePriceAdminService) List(ctx context.Context, arg db.ListVendorPackagePricesAdminParams) ([]VendorPackagePrice, error) {
+	rows, err := s.repo.List(ctx, arg)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VendorPackagePrice, len(rows))
+	for i, r := range rows {
+		if out[i], err = fromListRow(r); err != nil {
+			return nil, fmt.Errorf("package price %d: %w", r.ID, err)
+		}
+	}
+	return out, nil
+}
+
+// Count returns the total matching List's filters. Read-only, no audit.
+func (s *VendorPackagePriceAdminService) Count(ctx context.Context, arg db.CountVendorPackagePricesAdminParams) (int64, error) {
+	return s.repo.Count(ctx, arg)
+}
+
+// Get returns vendorID's package price by id incl. expired; nil, nil if
+// absent or owned by another vendor. Read-only, no audit.
+func (s *VendorPackagePriceAdminService) Get(ctx context.Context, vendorID, id int64) (*VendorPackagePrice, error) {
+	r, err := s.repo.GetByID(ctx, id)
+	if err != nil || r == nil || r.VendorID != vendorID {
+		return nil, err
+	}
+	p, err := fromGetRow(r)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// Create validates and stages a new price row for vendorID.
+func (s *VendorPackagePriceAdminService) Create(ctx context.Context, makerID, vendorID int64, req VendorPackagePriceCreatePayload, actorIP string) (db.MasterDataChangeRequest, error) {
+	if err := s.checkVendor(ctx, vendorID); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	if _, err := validatePriceGrain(&req); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	if err := validatePriceContent(&req.VendorPackagePriceContentPayload); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	return s.changes.Submit(ctx, makerID, SubmitRequest{
+		EntityType: "vendor_package_price", Op: "create",
+		Payload: VendorPackagePricePayload{VendorID: vendorID, VendorPackagePriceCreatePayload: req},
+	}, actorIP)
+}
+
+// Update validates and stages an edit of the content fields; a missing,
+// already-ended or other-vendor target is ErrVendorPackagePriceNotFound.
+func (s *VendorPackagePriceAdminService) Update(ctx context.Context, makerID, vendorID, id int64, req VendorPackagePriceContentPayload, actorIP string) (db.MasterDataChangeRequest, error) {
+	before, err := s.load(ctx, vendorID, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	if before.EffectiveEndDate.Valid && before.EffectiveEndDate.Time.Before(time.Now()) {
+		return db.MasterDataChangeRequest{}, ErrVendorPackagePriceNotFound
+	}
+	if err := validatePriceContent(&req); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	if req.EffectiveEndDate != nil {
+		end, err := time.Parse(priceDateLayout, *req.EffectiveEndDate)
+		if err == nil && end.Before(before.EffectiveStartDate.Time) {
+			return db.MasterDataChangeRequest{}, &ValidationError{Field: "effective_end_date", Message: "tidak boleh sebelum tanggal mulai"}
+		}
+	}
+	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_package_price", Op: "update", EntityID: &id, Payload: req, Before: before}, actorIP)
+}
+
+// Disable stages ending the price period as of yesterday.
+func (s *VendorPackagePriceAdminService) Disable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error) {
+	before, err := s.load(ctx, vendorID, id)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_package_price", Op: "disable", EntityID: &id, Before: before}, actorIP)
+}
+
+func (s *VendorPackagePriceAdminService) load(ctx context.Context, vendorID, id int64) (*db.GetVendorPackagePriceAdminByIDRow, error) {
+	before, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("loading vendor package price: %w", err)
+	}
+	if before == nil || before.VendorID != vendorID {
+		return nil, ErrVendorPackagePriceNotFound
+	}
+	return before, nil
+}
+
+// checkVendor rejects a price submitted for an unknown or INTERNAL vendor
+// (ROH) -- 009's table comment: internal units are never billed.
+func (s *VendorPackagePriceAdminService) checkVendor(ctx context.Context, vendorID int64) error {
+	v, err := s.repo.VendorKind(ctx, vendorID)
+	if err != nil {
+		return fmt.Errorf("checking vendor: %w", err)
+	}
+	if v == nil {
+		return ErrVendorPackagePriceNoVendor
+	}
+	if v.Kind == "INTERNAL" {
+		return ErrVendorPackagePriceInternal
+	}
+	return nil
+}
+
+// validatePriceGrain normalizes and validates the identity fields: package
+// code required; machine_group/price_class match the CHECK constraints
+// (friendlier than a raw DB error); tier_min >= 1, tier_max >= tier_min if
+// present; at most one of vendor_branch_id/atm_id (vpp_one_level_chk);
+// currency defaults to IDR; effective_start_date required YYYY-MM-DD.
+func validatePriceGrain(p *VendorPackagePriceCreatePayload) (time.Time, error) {
+	p.PackageCode = strings.TrimSpace(p.PackageCode)
+	if p.PackageCode == "" {
+		return time.Time{}, &ValidationError{Field: "package_code", Message: "wajib diisi"}
+	}
+	p.MachineGroup = strings.TrimSpace(p.MachineGroup)
+	if p.MachineGroup != "ATM" && p.MachineGroup != "CDM_CRM" {
+		return time.Time{}, &ValidationError{Field: "machine_group", Message: "harus ATM atau CDM_CRM"}
+	}
+	p.PriceClass = strings.TrimSpace(p.PriceClass)
+	if p.PriceClass != "REGULAR" && p.PriceClass != "VIP_INDUSTRI" {
+		return time.Time{}, &ValidationError{Field: "price_class", Message: "harus REGULAR atau VIP_INDUSTRI"}
+	}
+	if p.TierMin == 0 {
+		p.TierMin = 1
+	}
+	if p.TierMin < 1 {
+		return time.Time{}, &ValidationError{Field: "tier_min", Message: "minimal 1"}
+	}
+	if p.TierMax != nil && *p.TierMax < p.TierMin {
+		return time.Time{}, &ValidationError{Field: "tier_max", Message: "tidak boleh kurang dari tier_min"}
+	}
+	if p.VendorBranchID != nil && p.AtmID != nil {
+		return time.Time{}, &ValidationError{Field: "atm_id", Message: "tidak boleh diisi bersamaan dengan vendor_branch_id"}
+	}
+	p.Currency = strings.TrimSpace(strings.ToUpper(p.Currency))
+	if p.Currency == "" {
+		p.Currency = "IDR"
+	}
+	if len(p.Currency) != 3 {
+		return time.Time{}, &ValidationError{Field: "currency", Message: "harus kode 3 huruf"}
+	}
+	p.EffectiveStartDate = strings.TrimSpace(p.EffectiveStartDate)
+	start, err := time.Parse(priceDateLayout, p.EffectiveStartDate)
+	if err != nil {
+		return time.Time{}, &ValidationError{Field: "effective_start_date", Message: "wajib format YYYY-MM-DD"}
+	}
+	return start, nil
+}
+
+// validatePriceContent normalizes and validates the editable fields: base_price
+// is either absent (inherit from the level above) or a non-negative decimal,
+// at most 18 integer digits and 2 decimals (same numeric(20,2) shape as
+// vendor_packages.price used to be).
+func validatePriceContent(p *VendorPackagePriceContentPayload) error {
+	if p.BasePrice != nil {
+		trimmed := strings.TrimSpace(*p.BasePrice)
+		if trimmed != "" {
+			if !packagePriceRe.MatchString(trimmed) {
+				return &ValidationError{Field: "base_price", Message: "harus angka desimal tidak negatif, maksimal 18 digit bulat dan 2 desimal"}
+			}
+			*p.BasePrice = trimmed
+		}
+	}
+	if p.SlaNote != nil {
+		trimmed := strings.TrimSpace(*p.SlaNote)
+		if trimmed == "" {
+			p.SlaNote = nil
+		} else {
+			p.SlaNote = &trimmed
+		}
+	}
+	if p.EffectiveEndDate != nil {
+		trimmed := strings.TrimSpace(*p.EffectiveEndDate)
+		if trimmed == "" {
+			p.EffectiveEndDate = nil
+		} else if _, err := time.Parse(priceDateLayout, trimmed); err != nil {
+			return &ValidationError{Field: "effective_end_date", Message: "wajib format YYYY-MM-DD"}
+		} else {
+			p.EffectiveEndDate = &trimmed
+		}
+	}
+	return nil
+}

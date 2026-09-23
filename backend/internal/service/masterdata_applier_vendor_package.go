@@ -23,37 +23,13 @@ func (VendorPackageApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Mast
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor package create payload: %w", err)
 		}
-		price, err := numericFromDecimalPtr(&p.Price)
-		if err != nil {
-			return 0, nil, err
-		}
 		created, err := q.CreateVendorPackageAdmin(ctx, db.CreateVendorPackageAdminParams{
-			VendorBranchID: p.VendorBranchID, Code: p.Code, PriorityClass: p.PriorityClass, Price: price,
+			VendorBranchID: p.VendorBranchID, Code: p.Code,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor package: %w", err)
 		}
 		return created.ID, created, nil
-
-	case "update":
-		if change.EntityID == nil {
-			return 0, nil, fmt.Errorf("update requires entity_id")
-		}
-		var p VendorPackageUpdatePayload
-		if err := json.Unmarshal(change.Payload, &p); err != nil {
-			return 0, nil, fmt.Errorf("unmarshal vendor package update payload: %w", err)
-		}
-		price, err := numericFromDecimalPtr(&p.Price)
-		if err != nil {
-			return 0, nil, err
-		}
-		updated, err := q.UpdateVendorPackageAdmin(ctx, db.UpdateVendorPackageAdminParams{
-			ID: *change.EntityID, PriorityClass: p.PriorityClass, Price: price,
-		})
-		if err != nil {
-			return 0, nil, fmt.Errorf("update vendor package: %w", err)
-		}
-		return *change.EntityID, updated, nil
 
 	case "disable":
 		if change.EntityID == nil {

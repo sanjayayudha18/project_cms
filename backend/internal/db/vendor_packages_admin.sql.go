@@ -11,69 +11,80 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveVendorPackagesByBranch = `-- name: CountActiveVendorPackagesByBranch :one
+SELECT COUNT(*) FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND deleted_at IS NULL
+`
+
+// Backs the branch-disable guard: refuse disabling a branch with active packages.
+func (q *Queries) CountActiveVendorPackagesByBranch(ctx context.Context, vendorBranchID *int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveVendorPackagesByBranch, vendorBranchID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countVendorPackagesAdmin = `-- name: CountVendorPackagesAdmin :one
 SELECT COUNT(*)
-FROM vendor_packages p
+FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE b.vendor_id = $1
-  AND ($2::text IS NULL OR p.code ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
+  AND ($3::text IS NULL OR p.code ILIKE '%' || $3::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND p.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND p.deleted_at IS NOT NULL)
+        $4::text = 'all'
+        OR ($4::text = 'active' AND p.deleted_at IS NULL)
+        OR ($4::text = 'disabled' AND p.deleted_at IS NOT NULL)
       )
 `
 
 type CountVendorPackagesAdminParams struct {
-	VendorID int64   `json:"vendor_id"`
-	Q        *string `json:"q"`
-	Status   string  `json:"status"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
 }
 
 func (q *Queries) CountVendorPackagesAdmin(ctx context.Context, arg CountVendorPackagesAdminParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendorPackagesAdmin, arg.VendorID, arg.Q, arg.Status)
+	row := q.db.QueryRow(ctx, countVendorPackagesAdmin,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.Q,
+		arg.Status,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createVendorPackageAdmin = `-- name: CreateVendorPackageAdmin :one
-INSERT INTO vendor_packages (vendor_branch_id, code, priority_class, price)
-VALUES ($1, $2, $3, $4)
-RETURNING id, vendor_branch_id, code, priority_class, price, is_active, deleted_at
+INSERT INTO vendor_packages_branch (vendor_branch_id, code)
+VALUES ($1, $2)
+RETURNING id, vendor_branch_id, code, is_active, deleted_at
 `
 
 type CreateVendorPackageAdminParams struct {
-	VendorBranchID int64          `json:"vendor_branch_id"`
-	Code           string         `json:"code"`
-	PriorityClass  string         `json:"priority_class"`
-	Price          pgtype.Numeric `json:"price"`
+	VendorBranchID *int64 `json:"vendor_branch_id"`
+	Code           string `json:"code"`
 }
 
 type CreateVendorPackageAdminRow struct {
 	ID             int64              `json:"id"`
-	VendorBranchID int64              `json:"vendor_branch_id"`
+	VendorBranchID *int64             `json:"vendor_branch_id"`
 	Code           string             `json:"code"`
-	PriorityClass  string             `json:"priority_class"`
-	Price          pgtype.Numeric     `json:"price"`
 	IsActive       bool               `json:"is_active"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
 }
 
+// vendor_branch_id and code are the only fields left (migration 010 dropped
+// price/priority_class) -- both immutable after create, so there is no
+// UpdateVendorPackageAdmin anymore; a code/branch change is a new package.
 func (q *Queries) CreateVendorPackageAdmin(ctx context.Context, arg CreateVendorPackageAdminParams) (CreateVendorPackageAdminRow, error) {
-	row := q.db.QueryRow(ctx, createVendorPackageAdmin,
-		arg.VendorBranchID,
-		arg.Code,
-		arg.PriorityClass,
-		arg.Price,
-	)
+	row := q.db.QueryRow(ctx, createVendorPackageAdmin, arg.VendorBranchID, arg.Code)
 	var i CreateVendorPackageAdminRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorBranchID,
 		&i.Code,
-		&i.PriorityClass,
-		&i.Price,
 		&i.IsActive,
 		&i.DeletedAt,
 	)
@@ -81,7 +92,7 @@ func (q *Queries) CreateVendorPackageAdmin(ctx context.Context, arg CreateVendor
 }
 
 const disableVendorPackage = `-- name: DisableVendorPackage :exec
-UPDATE vendor_packages SET is_active = false, deleted_at = now() WHERE id = $1
+UPDATE vendor_packages_branch SET is_active = false, deleted_at = now() WHERE id = $1
 `
 
 // Soft-disable only (no_hard_delete_test.go extended in T3.7).
@@ -91,7 +102,7 @@ func (q *Queries) DisableVendorPackage(ctx context.Context, id int64) error {
 }
 
 const enableVendorPackage = `-- name: EnableVendorPackage :exec
-UPDATE vendor_packages SET is_active = true, deleted_at = NULL WHERE id = $1
+UPDATE vendor_packages_branch SET is_active = true, deleted_at = NULL WHERE id = $1
 `
 
 func (q *Queries) EnableVendorPackage(ctx context.Context, id int64) error {
@@ -100,11 +111,11 @@ func (q *Queries) EnableVendorPackage(ctx context.Context, id int64) error {
 }
 
 const findVendorPackageAdminByBranchCode = `-- name: FindVendorPackageAdminByBranchCode :one
-SELECT id FROM vendor_packages WHERE vendor_branch_id = $1 AND code = $2
+SELECT id FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND code = $2
 `
 
 type FindVendorPackageAdminByBranchCodeParams struct {
-	VendorBranchID int64  `json:"vendor_branch_id"`
+	VendorBranchID *int64 `json:"vendor_branch_id"`
 	Code           string `json:"code"`
 }
 
@@ -117,19 +128,17 @@ func (q *Queries) FindVendorPackageAdminByBranchCode(ctx context.Context, arg Fi
 }
 
 const getVendorPackageAdminByID = `-- name: GetVendorPackageAdminByID :one
-SELECT p.id, p.vendor_branch_id, b.vendor_id, p.code, p.priority_class, p.price, p.is_active, p.deleted_at
-FROM vendor_packages p
+SELECT p.id, p.vendor_branch_id, b.vendor_id, p.code, p.is_active, p.deleted_at
+FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE p.id = $1
 `
 
 type GetVendorPackageAdminByIDRow struct {
 	ID             int64              `json:"id"`
-	VendorBranchID int64              `json:"vendor_branch_id"`
+	VendorBranchID *int64             `json:"vendor_branch_id"`
 	VendorID       int64              `json:"vendor_id"`
 	Code           string             `json:"code"`
-	PriorityClass  string             `json:"priority_class"`
-	Price          pgtype.Numeric     `json:"price"`
 	IsActive       bool               `json:"is_active"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -144,8 +153,6 @@ func (q *Queries) GetVendorPackageAdminByID(ctx context.Context, id int64) (GetV
 		&i.VendorBranchID,
 		&i.VendorID,
 		&i.Code,
-		&i.PriorityClass,
-		&i.Price,
 		&i.IsActive,
 		&i.DeletedAt,
 	)
@@ -154,34 +161,34 @@ func (q *Queries) GetVendorPackageAdminByID(ctx context.Context, id int64) (GetV
 
 const listVendorPackagesAdmin = `-- name: ListVendorPackagesAdmin :many
 
-SELECT p.id, p.vendor_branch_id, p.code, p.priority_class, p.price, p.is_active, p.deleted_at
-FROM vendor_packages p
+SELECT p.id, p.vendor_branch_id, p.code, p.is_active, p.deleted_at
+FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE b.vendor_id = $1
-  AND ($2::text IS NULL OR p.code ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
+  AND ($3::text IS NULL OR p.code ILIKE '%' || $3::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND p.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND p.deleted_at IS NOT NULL)
+        $4::text = 'all'
+        OR ($4::text = 'active' AND p.deleted_at IS NULL)
+        OR ($4::text = 'disabled' AND p.deleted_at IS NOT NULL)
       )
 ORDER BY p.code ASC, p.id ASC
-LIMIT $5::bigint OFFSET $4::bigint
+LIMIT $6::bigint OFFSET $5::bigint
 `
 
 type ListVendorPackagesAdminParams struct {
-	VendorID   int64   `json:"vendor_id"`
-	Q          *string `json:"q"`
-	Status     string  `json:"status"`
-	PageOffset int64   `json:"page_offset"`
-	PageLimit  int64   `json:"page_limit"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
+	PageOffset     int64   `json:"page_offset"`
+	PageLimit      int64   `json:"page_limit"`
 }
 
 type ListVendorPackagesAdminRow struct {
 	ID             int64              `json:"id"`
-	VendorBranchID int64              `json:"vendor_branch_id"`
+	VendorBranchID *int64             `json:"vendor_branch_id"`
 	Code           string             `json:"code"`
-	PriorityClass  string             `json:"priority_class"`
-	Price          pgtype.Numeric     `json:"price"`
 	IsActive       bool               `json:"is_active"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
 }
@@ -191,10 +198,14 @@ type ListVendorPackagesAdminRow struct {
 // create/update/disable/enable queries below are only run by
 // VendorPackageApplier inside the apply-on-approve transaction.
 // Scoped to one vendor via its branches. Filters: q (code substring),
-// status ('active'|'disabled'|'all', caller resolves absent to 'active').
+// status ('active'|'disabled'|'all', caller resolves absent to 'active'),
+// vendor_branch_id (optional branch drill-down, NULL = all branches).
+// No price/priority_class here since migration 010: this table is now a
+// pure kelolaan/frequency link, prices moved to vendor_package_prices.
 func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPackagesAdminParams) ([]ListVendorPackagesAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorPackagesAdmin,
 		arg.VendorID,
+		arg.VendorBranchID,
 		arg.Q,
 		arg.Status,
 		arg.PageOffset,
@@ -211,8 +222,6 @@ func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPac
 			&i.ID,
 			&i.VendorBranchID,
 			&i.Code,
-			&i.PriorityClass,
-			&i.Price,
 			&i.IsActive,
 			&i.DeletedAt,
 		); err != nil {
@@ -224,46 +233,4 @@ func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPac
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateVendorPackageAdmin = `-- name: UpdateVendorPackageAdmin :one
-UPDATE vendor_packages
-SET priority_class = $1,
-    price = $2,
-    updated_at = now()
-WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, vendor_branch_id, code, priority_class, price, is_active, deleted_at
-`
-
-type UpdateVendorPackageAdminParams struct {
-	PriorityClass string         `json:"priority_class"`
-	Price         pgtype.Numeric `json:"price"`
-	ID            int64          `json:"id"`
-}
-
-type UpdateVendorPackageAdminRow struct {
-	ID             int64              `json:"id"`
-	VendorBranchID int64              `json:"vendor_branch_id"`
-	Code           string             `json:"code"`
-	PriorityClass  string             `json:"priority_class"`
-	Price          pgtype.Numeric     `json:"price"`
-	IsActive       bool               `json:"is_active"`
-	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
-}
-
-// vendor_branch_id and code are immutable. `AND deleted_at IS NULL` makes a
-// soft-disabled target update 0 rows (mapped to not-found).
-func (q *Queries) UpdateVendorPackageAdmin(ctx context.Context, arg UpdateVendorPackageAdminParams) (UpdateVendorPackageAdminRow, error) {
-	row := q.db.QueryRow(ctx, updateVendorPackageAdmin, arg.PriorityClass, arg.Price, arg.ID)
-	var i UpdateVendorPackageAdminRow
-	err := row.Scan(
-		&i.ID,
-		&i.VendorBranchID,
-		&i.Code,
-		&i.PriorityClass,
-		&i.Price,
-		&i.IsActive,
-		&i.DeletedAt,
-	)
-	return i, err
 }

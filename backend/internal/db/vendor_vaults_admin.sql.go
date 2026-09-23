@@ -11,27 +11,46 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveVendorVaultsByBranch = `-- name: CountActiveVendorVaultsByBranch :one
+SELECT COUNT(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND deleted_at IS NULL
+`
+
+// Backs the branch-disable guard: refuse disabling a branch with active vaults.
+func (q *Queries) CountActiveVendorVaultsByBranch(ctx context.Context, vendorBranchID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveVendorVaultsByBranch, vendorBranchID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countVendorVaultsAdmin = `-- name: CountVendorVaultsAdmin :one
 SELECT COUNT(*)
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = $1
-  AND ($2::text IS NULL OR v.vault_code ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR v.vendor_branch_id = $2::bigint)
+  AND ($3::text IS NULL OR v.vault_code ILIKE '%' || $3::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND v.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL)
+        $4::text = 'all'
+        OR ($4::text = 'active' AND v.deleted_at IS NULL)
+        OR ($4::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
 `
 
 type CountVendorVaultsAdminParams struct {
-	VendorID int64   `json:"vendor_id"`
-	Q        *string `json:"q"`
-	Status   string  `json:"status"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
 }
 
 func (q *Queries) CountVendorVaultsAdmin(ctx context.Context, arg CountVendorVaultsAdminParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendorVaultsAdmin, arg.VendorID, arg.Q, arg.Status)
+	row := q.db.QueryRow(ctx, countVendorVaultsAdmin,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.Q,
+		arg.Status,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -208,22 +227,24 @@ SELECT v.id, v.vendor_branch_id, v.vault_code, v.category, v.currency_code,
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = $1
-  AND ($2::text IS NULL OR v.vault_code ILIKE '%' || $2::text || '%')
+  AND ($2::bigint IS NULL OR v.vendor_branch_id = $2::bigint)
+  AND ($3::text IS NULL OR v.vault_code ILIKE '%' || $3::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND v.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL)
+        $4::text = 'all'
+        OR ($4::text = 'active' AND v.deleted_at IS NULL)
+        OR ($4::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
 ORDER BY v.vault_code ASC, v.id ASC
-LIMIT $5::bigint OFFSET $4::bigint
+LIMIT $6::bigint OFFSET $5::bigint
 `
 
 type ListVendorVaultsAdminParams struct {
-	VendorID   int64   `json:"vendor_id"`
-	Q          *string `json:"q"`
-	Status     string  `json:"status"`
-	PageOffset int64   `json:"page_offset"`
-	PageLimit  int64   `json:"page_limit"`
+	VendorID       int64   `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	Q              *string `json:"q"`
+	Status         string  `json:"status"`
+	PageOffset     int64   `json:"page_offset"`
+	PageLimit      int64   `json:"page_limit"`
 }
 
 type ListVendorVaultsAdminRow struct {
@@ -247,10 +268,12 @@ type ListVendorVaultsAdminRow struct {
 // create/update/disable/enable queries below are only run by
 // VendorVaultApplier inside the apply-on-approve transaction.
 // Scoped to one vendor via its branches. Filters: q (vault_code substring),
-// status ('active'|'disabled'|'all', caller resolves absent to 'active').
+// status ('active'|'disabled'|'all', caller resolves absent to 'active'),
+// vendor_branch_id (optional branch drill-down, NULL = all branches).
 func (q *Queries) ListVendorVaultsAdmin(ctx context.Context, arg ListVendorVaultsAdminParams) ([]ListVendorVaultsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorVaultsAdmin,
 		arg.VendorID,
+		arg.VendorBranchID,
 		arg.Q,
 		arg.Status,
 		arg.PageOffset,

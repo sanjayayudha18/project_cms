@@ -5,11 +5,16 @@
 
 -- name: ListVendorPicsAdmin :many
 -- Filters: q (name substring), status ('active'|'disabled'|'all', caller
--- resolves absent to 'active').
+-- resolves absent to 'active'), vendor_branch_id (optional branch drill-down,
+-- NULL = no branch filter), vendor_wide_only (true = only PICs with no
+-- branch, i.e. vendor_branch_id IS NULL). vendor_branch_id and
+-- vendor_wide_only are mutually exclusive; caller picks one or neither.
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
        is_notification_recipient, is_active, deleted_at
 FROM vendor_pics
 WHERE vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
+  AND (sqlc.narg('vendor_wide_only')::boolean IS NOT TRUE OR vendor_branch_id IS NULL)
   AND (sqlc.narg('q')::text IS NULL OR name ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -23,6 +28,8 @@ LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 SELECT COUNT(*)
 FROM vendor_pics
 WHERE vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
+  AND (sqlc.narg('vendor_wide_only')::boolean IS NOT TRUE OR vendor_branch_id IS NULL)
   AND (sqlc.narg('q')::text IS NULL OR name ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -35,6 +42,12 @@ WHERE vendor_id = sqlc.arg('vendor_id')
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
        is_notification_recipient, is_active, deleted_at
 FROM vendor_pics WHERE id = $1;
+
+-- name: CountActiveVendorPicsByBranch :one
+-- Backs the branch-disable guard: refuse disabling a branch with active
+-- branch-scoped PICs. Vendor-wide PICs (vendor_branch_id IS NULL) are
+-- excluded -- they don't belong to any single branch.
+SELECT COUNT(*) FROM vendor_pics WHERE vendor_branch_id = $1 AND deleted_at IS NULL;
 
 -- name: CountActiveNotificationPics :one
 -- Backs the "vendor has no notification recipient" warning (T3.3).

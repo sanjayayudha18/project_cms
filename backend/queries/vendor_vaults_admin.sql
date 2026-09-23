@@ -5,13 +5,15 @@
 
 -- name: ListVendorVaultsAdmin :many
 -- Scoped to one vendor via its branches. Filters: q (vault_code substring),
--- status ('active'|'disabled'|'all', caller resolves absent to 'active').
+-- status ('active'|'disabled'|'all', caller resolves absent to 'active'),
+-- vendor_branch_id (optional branch drill-down, NULL = all branches).
 SELECT v.id, v.vendor_branch_id, v.vault_code, v.category, v.currency_code,
        v.min_capacity_amount, v.max_capacity_amount, v.latitude, v.longitude,
        v.operating_hours, v.location_id, v.is_active, v.deleted_at
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR v.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
   AND (sqlc.narg('q')::text IS NULL OR v.vault_code ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -26,12 +28,17 @@ SELECT COUNT(*)
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = sqlc.arg('vendor_id')
+  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR v.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
   AND (sqlc.narg('q')::text IS NULL OR v.vault_code ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (
         sqlc.arg('status')::text = 'all'
         OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
         OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
       );
+
+-- name: CountActiveVendorVaultsByBranch :one
+-- Backs the branch-disable guard: refuse disabling a branch with active vaults.
+SELECT COUNT(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND deleted_at IS NULL;
 
 -- name: GetVendorVaultAdminByID :one
 -- Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).

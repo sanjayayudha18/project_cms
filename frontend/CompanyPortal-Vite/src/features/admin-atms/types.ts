@@ -86,6 +86,8 @@ export interface LocationOption {
   name: string;
   city_or_regency: string;
   province: string;
+  region_id: number;
+  region_name: string;
 }
 
 export interface LocationOptionsResponse {

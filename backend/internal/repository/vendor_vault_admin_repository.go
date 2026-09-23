@@ -58,6 +58,12 @@ func (r *VendorVaultAdminRepository) FindByCode(ctx context.Context, code string
 	return &id, nil
 }
 
+// CountActiveByBranch returns the number of active (non-disabled) vaults under branchID.
+// Backs the branch-disable guard (VendorBranchAdminService.Disable).
+func (r *VendorVaultAdminRepository) CountActiveByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return r.queries.CountActiveVendorVaultsByBranch(ctx, branchID)
+}
+
 // BranchVendorID returns the vendor_id owning branchID; nil, nil if the branch doesn't exist.
 func (r *VendorVaultAdminRepository) BranchVendorID(ctx context.Context, branchID int64) (*int64, error) {
 	id, err := r.queries.GetVendorBranchVendorID(ctx, branchID)

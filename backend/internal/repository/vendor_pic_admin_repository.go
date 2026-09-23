@@ -51,6 +51,13 @@ func (r *VendorPicAdminRepository) CountNotificationRecipients(ctx context.Conte
 	return r.queries.CountActiveNotificationPics(ctx, vendorID)
 }
 
+// CountActiveByBranch returns the number of active (non-disabled) branch-scoped
+// PICs under branchID (vendor-wide PICs, vendor_branch_id IS NULL, are excluded).
+// Backs the branch-disable guard (VendorBranchAdminService.Disable).
+func (r *VendorPicAdminRepository) CountActiveByBranch(ctx context.Context, branchID int64) (int64, error) {
+	return r.queries.CountActiveVendorPicsByBranch(ctx, &branchID)
+}
+
 // BranchVendorID returns the vendor_id owning branchID; nil, nil if the branch doesn't exist.
 func (r *VendorPicAdminRepository) BranchVendorID(ctx context.Context, branchID int64) (*int64, error) {
 	id, err := r.queries.GetVendorBranchVendorID(ctx, branchID)

@@ -69,8 +69,8 @@ func mountAdminATMAssignmentHandler(svc ATMAssignmentAdminServicer) (http.Handle
 func TestAdminATMAssignmentHandler_List_DatesAndOpenEnd(t *testing.T) {
 	end := "2026-12-31"
 	svc := &fakeATMAssignmentAdminServicer{listResult: []service.ATMAssignment{
-		{ID: 1, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", PriorityClass: "ALL", EffectiveStartDate: "2026-01-01", IsActive: true},
-		{ID: 2, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", PriorityClass: "ALL", EffectiveStartDate: "2025-01-01", EffectiveEndDate: &end},
+		{ID: 1, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", EffectiveStartDate: "2026-01-01", IsActive: true},
+		{ID: 2, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", EffectiveStartDate: "2025-01-01", EffectiveEndDate: &end},
 	}}
 	router, tokenSvc := mountAdminATMAssignmentHandler(svc)
 

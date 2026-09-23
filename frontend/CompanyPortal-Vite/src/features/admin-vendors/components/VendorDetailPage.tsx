@@ -1,123 +1,66 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
-import type { VendorChildKind } from "../api";
-import { useVendor, useVendorChildren } from "../hooks";
+import { useVendor } from "../hooks";
+import { BranchesPanel } from "./BranchesPanel";
+import { PackagePricesPanel } from "./PackagePricesPanel";
+import { PicsPanel } from "./PicsPanel";
 
-type Row = Record<string, unknown>;
+const TOP_TABS = [
+  { id: "info", label: "Info" },
+  { id: "branches", label: "Cabang" },
+  { id: "vendorWidePics", label: "PIC Vendor-wide" },
+  { id: "packagePrices", label: "Harga Paket" },
+] as const;
 
-const statusCol: ColumnDef<Row, unknown> = {
-  id: "status",
-  header: "Status",
-  cell: ({ row }) =>
-    row.original.is_active ? (
-      <Badge variant="success" icon={CheckCircle} label="Aktif" />
-    ) : (
-      <Badge variant="danger" icon={XCircle} label="Nonaktif" />
-    ),
-};
+type TopTab = (typeof TOP_TABS)[number]["id"];
 
-const col = (key: string, header: string): ColumnDef<Row, unknown> => ({
-  accessorKey: key,
-  header,
-  cell: ({ getValue }) => {
-    const v = getValue();
-    return v === null || v === undefined || v === "" ? "—" : String(v);
-  },
-});
-
-const yesNo = (key: string, header: string): ColumnDef<Row, unknown> => ({
-  accessorKey: key,
-  header,
-  cell: ({ getValue }) => (getValue() ? "Ya" : "Tidak"),
-});
-
-const money = (key: string, header: string): ColumnDef<Row, unknown> => ({
-  accessorKey: key,
-  header,
-  meta: { align: "right" },
-  cell: ({ getValue }) => <span className="tabular-nums">IDR {String(getValue() ?? "—")}</span>,
-});
-
-const TABS: { id: "info" | VendorChildKind; label: string; columns?: ColumnDef<Row, unknown>[] }[] =
-  [
-    { id: "info", label: "Info" },
-    {
-      id: "branches",
-      label: "Cabang",
-      columns: [
-        col("branch_code", "Kode"),
-        col("branch_name", "Nama"),
-        col("region", "Wilayah"),
-        statusCol,
-      ],
-    },
-    {
-      id: "vaults",
-      label: "Vault",
-      columns: [
-        col("vault_code", "Kode"),
-        col("category", "Kategori"),
-        money("max_capacity_amount", "Kapasitas maks"),
-        col("operating_hours", "Jam operasional"),
-        statusCol,
-      ],
-    },
-    {
-      id: "pics",
-      label: "PIC",
-      columns: [
-        col("name", "Nama"),
-        col("position", "Jabatan"),
-        col("phone", "Telepon"),
-        col("email", "Email"),
-        yesNo("is_notification_recipient", "Penerima notifikasi"),
-        statusCol,
-      ],
-    },
-    {
-      id: "packages",
-      label: "Paket",
-      columns: [
-        col("code", "Kode"),
-        col("priority_class", "Kelas prioritas"),
-        money("price", "Harga"),
-        statusCol,
-      ],
-    },
-  ];
-
-function ChildTab({
-  vendorId,
-  kind,
-  columns,
-}: { vendorId: number; kind: VendorChildKind; columns: ColumnDef<Row, unknown>[] }) {
-  const q = useVendorChildren(vendorId, kind);
-  if (q.isLoading) return <p className="text-sm text-[var(--n-500)]">Memuat…</p>;
-  if (q.isError)
-    return (
-      <p role="alert" className="text-sm text-[var(--danger-fg)]">
-        Gagal memuat data
-      </p>
-    );
-  return <DataTable data={q.data ?? []} columns={columns} />;
+function TabBar<T extends string>({
+  tabs,
+  active,
+  onChange,
+  label,
+}: {
+  tabs: readonly { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+  label: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className="flex gap-1 border-b border-[var(--n-200)]">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={active === t.id}
+          onClick={() => onChange(t.id)}
+          className={`px-4 py-2 text-sm font-medium ${
+            active === t.id
+              ? "border-b-2 border-[var(--red-600)] text-[var(--n-900)]"
+              : "text-[var(--n-500)]"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /**
- * Vendor detail: Info + read-only Cabang / Vault / PIC / Paket tabs.
- * Changes to child records go through CSV import (T6.5) or the API; each is
- * still a maker-checker change request (plan D1).
+ * Vendor detail: Info, a clickable Cabang list that navigates to that
+ * branch's own Vault/PIC/Paket page (each with full create/edit/disable/
+ * enable, all maker-checker via 202-staged change requests), and a separate
+ * PIC Vendor-wide tab for PICs with no branch (vendor_branch_id NULL).
  */
 export function VendorDetailPage({ vendorId }: { vendorId: number }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("info");
+  const [tab, setTab] = useState<TopTab>("info");
   const vendorQuery = useVendor(vendorId);
   const vendor = vendorQuery.data;
-  const active = TABS.find((t) => t.id === tab);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -130,28 +73,7 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
         <Button variant="ghost">← Kembali ke daftar</Button>
       </Link>
 
-      <div
-        role="tablist"
-        aria-label="Detail vendor"
-        className="flex gap-1 border-b border-[var(--n-200)]"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium ${
-              tab === t.id
-                ? "border-b-2 border-[var(--red-600)] text-[var(--n-900)]"
-                : "text-[var(--n-500)]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <TabBar label="Detail vendor" tabs={TOP_TABS} active={tab} onChange={setTab} />
 
       {vendorQuery.isError && (
         <p role="alert" className="text-sm text-[var(--danger-fg)]">
@@ -188,13 +110,11 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
         </dl>
       )}
 
-      {active?.columns && (
-        <ChildTab
-          vendorId={vendorId}
-          kind={active.id as VendorChildKind}
-          columns={active.columns}
-        />
-      )}
+      {tab === "branches" && <BranchesPanel vendorId={vendorId} />}
+
+      {tab === "vendorWidePics" && <PicsPanel vendorId={vendorId} branchId={null} />}
+
+      {tab === "packagePrices" && <PackagePricesPanel vendorId={vendorId} />}
     </div>
   );
 }

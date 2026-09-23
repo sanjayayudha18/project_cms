@@ -9,7 +9,7 @@
 -- q (case-insensitive substring across branch_code/branch_name) and status
 -- ('active' | 'disabled' | 'all') -- caller resolves absent status to
 -- 'active' (mirrors ListVendorsAdmin's convention).
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 FROM vendor_branches
 WHERE vendor_id = sqlc.arg('vendor_id')
   AND (sqlc.narg('q')::text IS NULL
@@ -40,7 +40,7 @@ WHERE vendor_id = sqlc.arg('vendor_id')
 -- name: GetVendorBranchAdminByID :one
 -- Includes soft-deleted rows -- used both for the read endpoint and as the
 -- "before" snapshot / CurrentState staleness check (T2.5).
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at
 FROM vendor_branches WHERE id = $1;
 
 -- name: FindVendorBranchAdminByCode :one
@@ -49,10 +49,10 @@ FROM vendor_branches WHERE id = $1;
 SELECT id FROM vendor_branches WHERE branch_code = $1;
 
 -- name: CreateVendorBranchAdmin :one
-INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region)
+INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region, category)
 VALUES (sqlc.arg('vendor_id'), sqlc.arg('branch_code'), sqlc.arg('branch_name'),
-        sqlc.narg('location_id'), sqlc.narg('region'))
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at;
+        sqlc.narg('location_id'), sqlc.narg('region'), sqlc.arg('category'))
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at;
 
 -- name: UpdateVendorBranchAdmin :one
 -- branch_code is immutable (not editable here, mirrors vendors.code /
@@ -63,9 +63,10 @@ UPDATE vendor_branches
 SET branch_name = sqlc.arg('branch_name'),
     location_id = sqlc.narg('location_id'),
     region = sqlc.narg('region'),
+    category = sqlc.arg('category'),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND deleted_at IS NULL
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, is_active, deleted_at;
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, category, is_active, deleted_at;
 
 -- name: DisableVendorBranch :exec
 -- Soft-disable only: is_active=false, deleted_at=now(). No hard DELETE

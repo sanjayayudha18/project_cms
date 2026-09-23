@@ -14,17 +14,19 @@ import (
 const countMasterDataChangeRequests = `-- name: CountMasterDataChangeRequests :one
 SELECT COUNT(*) FROM master_data_change_requests
 WHERE ($1::text IS NULL OR entity_type = $1::text)
-  AND ($2::text IS NULL OR status = $2::text)
+  AND ($2::bigint IS NULL OR entity_id = $2::bigint)
+  AND ($3::text IS NULL OR status = $3::text)
 `
 
 type CountMasterDataChangeRequestsParams struct {
 	EntityType *string `json:"entity_type"`
+	EntityID   *int64  `json:"entity_id"`
 	Status     *string `json:"status"`
 }
 
 // Same filters as ListMasterDataChangeRequests, for pagination total.
 func (q *Queries) CountMasterDataChangeRequests(ctx context.Context, arg CountMasterDataChangeRequestsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countMasterDataChangeRequests, arg.EntityType, arg.Status)
+	row := q.db.QueryRow(ctx, countMasterDataChangeRequests, arg.EntityType, arg.EntityID, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -225,22 +227,27 @@ const listMasterDataChangeRequests = `-- name: ListMasterDataChangeRequests :man
 SELECT id, entity_type, entity_id, op, payload, before, status, maker_id, approval_request_id, batch_id, error, created_at, updated_at
 FROM master_data_change_requests
 WHERE ($1::text IS NULL OR entity_type = $1::text)
-  AND ($2::text IS NULL OR status = $2::text)
+  AND ($2::bigint IS NULL OR entity_id = $2::bigint)
+  AND ($3::text IS NULL OR status = $3::text)
 ORDER BY created_at DESC, id DESC
-LIMIT $4::bigint OFFSET $3::bigint
+LIMIT $5::bigint OFFSET $4::bigint
 `
 
 type ListMasterDataChangeRequestsParams struct {
 	EntityType *string `json:"entity_type"`
+	EntityID   *int64  `json:"entity_id"`
 	Status     *string `json:"status"`
 	PageOffset int64   `json:"page_offset"`
 	PageLimit  int64   `json:"page_limit"`
 }
 
-// Read endpoint (T2.7): filter by entity_type and/or status, both optional.
+// Read endpoint (T2.7): filter by entity_type, entity_id, and/or status, all
+// optional. entity_id lets a caller look up the pending/applied change
+// history for one specific row (e.g. a per-row "pending approval" badge).
 func (q *Queries) ListMasterDataChangeRequests(ctx context.Context, arg ListMasterDataChangeRequestsParams) ([]MasterDataChangeRequest, error) {
 	rows, err := q.db.Query(ctx, listMasterDataChangeRequests,
 		arg.EntityType,
+		arg.EntityID,
 		arg.Status,
 		arg.PageOffset,
 		arg.PageLimit,

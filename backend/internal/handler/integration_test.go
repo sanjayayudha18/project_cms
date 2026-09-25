@@ -86,6 +86,12 @@ func setupHarness(t *testing.T) *testHarness {
 	// Run migrations against the test DB
 	runMigrations(t, pool)
 
+	// The seeded accounts are real rows on the shared dev DB and login
+	// failures commit real lockouts (no tx rollback here) — reset both
+	// before every test so a prior run's lockout never leaks in.
+	resetAccountLockout(t, pool, testCompanyEmail)
+	resetAccountLockout(t, pool, testVendorEmail)
+
 	// Start miniredis
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -189,6 +195,19 @@ func doLogin(h http.Handler, email, password, portal string) *httptest.ResponseR
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	return w
+}
+
+// resetAccountLockout clears failed_login_attempts/locked_until for the given
+// user on the shared dev DB. TestIntegration_RateLimitEnforcement trips a real
+// lockout on the seeded testCompanyEmail account; without resetting it, the
+// lockout survives past the test (no tx rollback here, real commits) and
+// fails every other test in this file that logs in as the same user.
+func resetAccountLockout(t *testing.T, pool *pgxpool.Pool, email string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE email = $1`, email); err != nil {
+		t.Fatalf("resetting account lockout for %s: %v", email, err)
+	}
 }
 
 func doRefresh(h http.Handler, refreshCookie string) *httptest.ResponseRecorder {
@@ -334,33 +353,31 @@ func TestIntegration_PortalMismatch_VendorOnCompany(t *testing.T) {
 	}
 }
 
-func TestIntegration_RateLimitEnforcement(t *testing.T) {
+func TestIntegration_AccountLockoutEnforcement(t *testing.T) {
 	h := setupHarness(t)
+	t.Cleanup(func() { resetAccountLockout(t, h.pool, testCompanyEmail) })
 
-	// Exhaust 5 failed attempts for a username
-	for i := 0; i < 5; i++ {
+	// pkgauth.MaxFailedLogins is 3: the account-level lockout (DB-persisted,
+	// keyed on the user) trips before the username rate limiter's 5-attempt
+	// threshold ever can, so exhausting failed attempts on a real account
+	// always surfaces as a lockout, not a 429. Exhaust exactly MaxFailedLogins.
+	for i := 0; i < pkgauth.MaxFailedLogins; i++ {
 		w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: expected 401, got %d", i+1, w.Code)
 		}
 	}
 
-	// 6th attempt should be rate limited
+	// The attempt after the threshold should be locked out.
 	w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected 429, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 (account_locked), got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Retry-After header should be present
-	retryAfter := w.Header().Get("Retry-After")
-	if retryAfter == "" {
-		t.Error("Retry-After header should be set on 429")
-	}
-
-	// Even correct password should be blocked
+	// Even correct password should be blocked while locked out.
 	w = doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected 429 even with correct pw, got %d", w.Code)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 (account_locked) even with correct pw, got %d", w.Code)
 	}
 }
 

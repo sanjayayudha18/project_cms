@@ -4,31 +4,48 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { DataTable } from "@/components/ui/DataTable";
 import { useToast } from "@/lib/hooks/useToast";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle, XCircle } from "lucide-react";
-import { useState } from "react";
+import { CalendarClock, CheckCircle, XCircle } from "lucide-react";
+import { useMemo, useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPackagePrice, useVendorPackagePrices } from "../hooks";
+import {
+  type PriceStatus,
+  classLabel,
+  formatIDR,
+  levelLabel,
+  machineLabel,
+  periodLabel,
+  priceStatus,
+  tierLabel,
+} from "../lib/packagePrice";
 import type { AdminVendorPackagePrice } from "../types";
+import { PriceFilterBar, type PriceFilters } from "./PriceFilterBar";
 import { VendorPackagePriceFormDialog } from "./VendorPackagePriceFormDialog";
 
 interface PackagePricesPanelProps {
   vendorId: number;
 }
 
-function levelLabel(price: AdminVendorPackagePrice): string {
-  if (price.atm_id !== null) return `ATM #${price.atm_id}`;
-  if (price.vendor_branch_id !== null) return `Cabang #${price.vendor_branch_id}`;
-  return "PT (dasar)";
+const STATUS_BADGE: Record<
+  PriceStatus,
+  { variant: "success" | "warning" | "neutral"; icon: typeof CheckCircle }
+> = {
+  Berlaku: { variant: "success", icon: CheckCircle },
+  Dijadwalkan: { variant: "warning", icon: CalendarClock },
+  Berakhir: { variant: "neutral", icon: XCircle },
+};
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function tierLabel(price: AdminVendorPackagePrice): string {
-  return price.tier_max === null ? `${price.tier_min}+` : `${price.tier_min}-${price.tier_max}`;
-}
-
-function money(value: string | null): string {
-  return value === null ? "—" : `IDR ${value}`;
+function matchesFilters(p: AdminVendorPackagePrice, filters: PriceFilters, today: string): boolean {
+  if (filters.package !== null && p.package !== filters.package) return false;
+  if (filters.machine_group !== null && p.machine_group !== filters.machine_group) return false;
+  if (filters.status !== null && priceStatus(p, today) !== filters.status) return false;
+  return true;
 }
 
 /**
@@ -46,8 +63,40 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
   const [formPrice, setFormPrice] = useState<AdminVendorPackagePrice | null>(null);
   const [isFormOpen, setFormOpen] = useState(false);
   const [pendingDisable, setPendingDisable] = useState<AdminVendorPackagePrice | null>(null);
+  const [filters, setFilters] = useState<PriceFilters>({
+    package: null,
+    machine_group: null,
+    status: null,
+  });
 
   const prices = query.data?.package_prices ?? [];
+  const today = todayISO();
+
+  const packageOptions = useMemo(
+    () => Array.from(new Set(prices.map((p) => p.package))).sort(),
+    [prices],
+  );
+  const machineOptions = useMemo(
+    () => Array.from(new Set(prices.map((p) => p.machine_group))).sort() as ("ATM" | "CDM_CRM")[],
+    [prices],
+  );
+
+  const filtered = useMemo(
+    () => prices.filter((p) => matchesFilters(p, filters, today)),
+    [prices, filters, today],
+  );
+
+  const sorted = useMemo(
+    () =>
+      [...filtered].sort((a, b) => {
+        if (a.package !== b.package) return a.package.localeCompare(b.package);
+        if (a.machine_group !== b.machine_group)
+          return a.machine_group.localeCompare(b.machine_group);
+        if (a.price_class !== b.price_class) return a.price_class.localeCompare(b.price_class);
+        return a.tier_min - b.tier_min;
+      }),
+    [filtered],
+  );
 
   function confirmDisable(): void {
     if (!pendingDisable) return;
@@ -64,45 +113,49 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
   }
 
   const columns: ColumnDef<AdminVendorPackagePrice, unknown>[] = [
-    { accessorKey: "package_code", header: "Paket" },
     {
-      id: "machine_class",
-      header: "Mesin / Kelas",
+      accessorKey: "package_code",
+      header: "Kode Paket",
       cell: ({ row }) => (
-        <span>
-          {row.original.machine_group === "ATM" ? "ATM" : "CDM/CRM"} ·{" "}
-          {row.original.price_class === "REGULAR" ? "Regular" : "VIP/Industri"}
-        </span>
+        <span className="font-mono tabular-nums">{row.original.package_code}</span>
       ),
     },
-    { id: "tier", header: "Tingkat", cell: ({ row }) => tierLabel(row.original) },
+    { accessorKey: "package", header: "Paket" },
+    { id: "machine", header: "Mesin", cell: ({ row }) => machineLabel(row.original.machine_group) },
+    { id: "class", header: "Kelas", cell: ({ row }) => classLabel(row.original.price_class) },
     { id: "level", header: "Tingkat Harga", cell: ({ row }) => levelLabel(row.original) },
+    { id: "tier", header: "Tingkat", cell: ({ row }) => tierLabel(row.original) },
     {
       id: "base_price",
       header: "Harga Dasar",
       meta: { align: "right" },
-      cell: ({ row }) => <span className="tabular-nums">{money(row.original.base_price)}</span>,
+      cell: ({ row }) => (
+        <span className="tabular-nums">
+          {row.original.base_price === null ? "—" : formatIDR(row.original.base_price)}
+        </span>
+      ),
     },
-    { accessorKey: "effective_start_date", header: "Mulai" },
     {
-      id: "effective_end_date",
-      header: "Berakhir",
-      cell: ({ row }) => row.original.effective_end_date ?? "Terbuka",
+      id: "period",
+      header: "Periode",
+      cell: ({ row }) => {
+        const period = periodLabel(row.original);
+        return (
+          <span>
+            {period.start} → {period.end}
+          </span>
+        );
+      },
     },
     {
       id: "status",
       header: "Status",
       cell: ({ row }) => {
-        const isOpenEnded =
-          row.original.effective_end_date === null ||
-          row.original.effective_end_date >= new Date().toISOString().slice(0, 10);
+        const status = priceStatus(row.original, today);
+        const { variant, icon } = STATUS_BADGE[status];
         return (
           <span className="inline-flex flex-wrap items-center gap-1">
-            {isOpenEnded ? (
-              <Badge variant="success" icon={CheckCircle} label="Berlaku" />
-            ) : (
-              <Badge variant="danger" icon={XCircle} label="Berakhir" />
-            )}
+            <Badge variant={variant} icon={icon} label={status} />
             {pendingIds.has(row.original.id) && <PendingApprovalBadge />}
           </span>
         );
@@ -115,14 +168,19 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
       cell: ({ row }) => {
         const price = row.original;
         const isPending = pendingIds.has(price.id);
-        const isOpenEnded =
-          price.effective_end_date === null ||
-          price.effective_end_date >= new Date().toISOString().slice(0, 10);
+        const status = priceStatus(price, today);
+
+        if (status === "Berakhir") {
+          return (
+            <span className="text-sm text-[var(--n-500)]">Diakhiri {price.effective_end_date}</span>
+          );
+        }
+
         return (
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
-              disabled={isPending || !isOpenEnded}
+              disabled={isPending}
               onClick={() => {
                 setFormPrice(price);
                 setFormOpen(true);
@@ -130,7 +188,7 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
             >
               Ubah
             </Button>
-            {isOpenEnded && (
+            {status === "Berlaku" && (
               <Button
                 variant="danger"
                 disabled={isPending}
@@ -145,6 +203,8 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
     },
   ];
 
+  const noMatchesFromNonEmptyList = prices.length > 0 && filtered.length === 0;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
@@ -158,6 +218,14 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
         </Button>
       </div>
 
+      <PriceFilterBar
+        packageOptions={packageOptions}
+        machineOptions={machineOptions}
+        value={filters}
+        onChange={setFilters}
+        matchCount={filtered.length}
+      />
+
       {query.isLoading && <p className="text-sm text-[var(--n-500)]">Memuat…</p>}
       {query.isError && (
         <p role="alert" className="text-sm text-[var(--danger-fg)]">
@@ -166,9 +234,13 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
       )}
       {!query.isLoading && !query.isError && (
         <DataTable
-          data={prices}
+          data={sorted}
           columns={columns}
-          emptyMessage="Vendor ini belum punya harga paket"
+          emptyMessage={
+            noMatchesFromNonEmptyList
+              ? "Tidak ada tingkat yang cocok dengan filter."
+              : "Vendor ini belum punya harga paket"
+          }
         />
       )}
 
@@ -182,7 +254,7 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
       <ConfirmActionDialog
         open={pendingDisable !== null}
         title="Akhiri Periode Harga"
-        message={`Akhiri harga paket "${pendingDisable?.package_code}" per hari ini? Periode ini menjadi riwayat, tidak bisa diaktifkan kembali -- buat baris baru untuk periode berikutnya.`}
+        message={`Akhiri harga paket "${pendingDisable?.package}" per hari ini? Periode ini menjadi riwayat, tidak bisa diaktifkan kembali -- buat baris baru untuk periode berikutnya.`}
         confirmLabel="Akhiri"
         isPending={disableMutation.isPending}
         onConfirm={confirmDisable}

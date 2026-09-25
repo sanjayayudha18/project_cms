@@ -449,6 +449,9 @@ type Region struct {
 	Region    *string            `json:"region"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	IsActive  bool               `json:"is_active"`
+	// Soft-disable timestamp (set with is_active=false). Never hard-delete: locations.region_id references this table.
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type Role struct {
@@ -553,9 +556,10 @@ type VendorBranch struct {
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
 type VendorPackagePrice struct {
-	ID           int64  `json:"id"`
-	VendorID     int64  `json:"vendor_id"`
-	PackageCode  string `json:"package_code"`
+	ID       int64 `json:"id"`
+	VendorID int64 `json:"vendor_id"`
+	// Label paket yang dibagi banyak baris harga ("PAKET 3"), kunci pengelompokan. Sebelum migrasi 017 bernama package_code. Bergabung ke package_frequencies.package_code.
+	Package      string `json:"package"`
 	MachineGroup string `json:"machine_group"`
 	PriceClass   string `json:"price_class"`
 	TierMin      int32  `json:"tier_min"`
@@ -571,19 +575,34 @@ type VendorPackagePrice struct {
 	EffectiveEndDate   pgtype.Date        `json:"effective_end_date"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	// Kode unik per baris ("PKG3_ABA_001"), dibuat server saat apply-on-approve. Format PKG<digit-label>_<vendor.code>_<urutan-3-digit>. Migrasi 017.
+	PackageCode string `json:"package_code"`
 }
 
-// Paket layanan (frekuensi kontrak) yang dipetakan ke ATM lewat atm_vendor_packages. Namanya menyebut "vendor" karena alasan historis (keputusan D4: nama tabel ikuti DB yang ada), tetapi sejak migrasi 009 baris dengan vendor_branch_id NULL adalah paket INTERNAL - dipakai ATM di kantor cabang CIMB, tanpa vendor dan tanpa harga. Harga ada di vendor_package_prices, frekuensi di package_frequencies.
+// Branch-specific special/custom package price ("harga khusus cabang"), effective-dated with history (never hard-deleted -- "disable" closes the period via effective_end_date, no re-enable). Distinct from vendor_package_prices, which holds the vendor-wide PT/branch/ATM-override price tree shown on the vendor page. Migrasi 016.
 type VendorPackagesBranch struct {
 	ID int64 `json:"id"`
 	// NULL = paket internal (ATM kantor cabang CIMB, tidak ditagih). Terisi = paket kontrak vendor FLM. Migrasi 009.
 	VendorBranchID *int64             `json:"vendor_branch_id"`
-	Code           string             `json:"code"`
+	PackageCode    string             `json:"package_code"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	IsActive       bool               `json:"is_active"`
-	// Soft-disable timestamp (set with is_active=false). Never hard-delete: atm_vendor_packages references this table.
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	// Kelolaan-count tier lower bound, same grain as vendor_package_prices.tier_min. Migrasi 015.
+	TierMin int32 `json:"tier_min"`
+	// Kelolaan-count tier upper bound, inclusive; NULL = open-ended. Migrasi 015.
+	TierMax *int32 `json:"tier_max"`
+	// Package period start, same grain as vendor_package_prices.effective_start_date. Migrasi 015.
+	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
+	// Package period end; NULL = open-ended. Migrasi 015.
+	EffectiveEndDate pgtype.Date `json:"effective_end_date"`
+	MachineGroup     string      `json:"machine_group"`
+	PriceClass       string      `json:"price_class"`
+	// NULLABLE like vendor_package_prices.base_price -- not defined here means this branch has no special price for this grain (falls back to vendor_package_prices).
+	BasePrice pgtype.Numeric `json:"base_price"`
+	// Optional further override: this branch price applies to one specific ATM only. Migrasi 016.
+	AtmID    *int64  `json:"atm_id"`
+	SlaNote  *string `json:"sla_note"`
+	Currency string  `json:"currency"`
 }
 
 // Vendor contact persons (PIC). A PIC is either vendor-wide (vendor_branch_id NULL) or scoped to one branch.

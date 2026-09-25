@@ -42,15 +42,19 @@ func TestQueries_NoHardDelete(t *testing.T) {
 		t.Fatal("no query files found — check the glob path (expected backend/queries relative to this package)")
 	}
 
-	// Master-data tables (plan.md T3.7): vendor_branches/vaults/pics/packages
-	// soft-disable via is_active/deleted_at; atm_vendor_packages (ATM
-	// assignments) via is_active alone (no deleted_at) -- a disabled row is
-	// what frees its period from the no-overlap exclusion constraint, and
-	// deleting one would erase kelolaan history that audit_logs and
-	// master_data_change_requests still reference.
+	// Master-data tables (plan.md T3.7): vendor_branches/vaults/pics soft-
+	// disable via is_active/deleted_at; atm_vendor_packages (ATM assignments)
+	// via is_active alone (no deleted_at); vendor_packages_branch (migration
+	// 016: branch special price) is effective-dated history like
+	// vendor_package_prices -- "disable" closes effective_end_date, never a
+	// row toggle. All of them: deleting a row would erase kelolaan/pricing
+	// history that audit_logs and master_data_change_requests still reference.
+	// regions (.kiro/specs/region-management, migration 018): soft-disable via
+	// is_active/deleted_at -- locations.region_id references it.
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
+		"regions",
 	}
 
 	for _, f := range files {
@@ -78,6 +82,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 	guarded := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
+		"regions",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

@@ -92,11 +92,18 @@ func (h *testHelpers) seedVendorBranch(vendorID int64, code, name string) int64 
 	return id
 }
 
-// seedVendorPackage inserts a package under an existing branch (see seedVendorBranch).
+// seedVendorPackage inserts a package under an existing branch (see
+// seedVendorBranch). Migration 016 shape: package_code/machine_group/
+// price_class/tier_min/effective_start_date replace the old code/
+// priority_class/price columns (see forecast_query_integration_test.go's
+// seedForecastVendorPackage for the same shape).
 func (h *testHelpers) seedVendorPackage(branchID int64, code string) int64 {
 	h.t.Helper()
 	var id int64
-	if err := h.pool.QueryRow(h.ctx, `INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price) VALUES ($1, $2, 'ALL', 1) RETURNING id`, branchID, code).Scan(&id); err != nil {
+	if err := h.pool.QueryRow(h.ctx, `
+		INSERT INTO vendor_packages_branch (vendor_branch_id, package_code, machine_group, price_class, tier_min, base_price, currency, effective_start_date)
+		VALUES ($1, $2, 'ATM', 'REGULAR', 1, 1, 'IDR', CURRENT_DATE - 365)
+		RETURNING id`, branchID, code).Scan(&id); err != nil {
 		h.t.Fatalf("seed vendor package: %v", err)
 	}
 	h.vendorPkgIDs = append(h.vendorPkgIDs, id)
@@ -793,6 +800,12 @@ func TestVendorPicApplier_Approve_CreateUpdateDisable_Integration(t *testing.T) 
 	}
 }
 
+// Rewritten for migration 016 (vendor_packages_branch is now a branch-scoped
+// special/custom price table: package_code/machine_group/price_class/tier/
+// atm_id grain + base_price/sla_note/effective_start_date/effective_end_date
+// content, no is_active/deleted_at -- "disable" closes effective_end_date
+// instead of a row toggle). See VendorPackagePayload/VendorPackageContentPayload
+// (vendor_package_admin.go) and VendorPackageApplier (masterdata_applier_vendor_package.go).
 func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing.T) {
 	svc, tag, h := harness(t)
 	ctx := context.Background()
@@ -800,9 +813,16 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 	vendorID := h.seedVendor("ITVK-"+tag, "Vendor For Package Test "+tag)
 	branchID := h.seedVendorBranch(vendorID, "ITVKB-"+tag, "Branch "+tag)
 
+	basePrice := "1500000.50"
 	changeID := h.insertPending("vendor_package", "create", nil, VendorPackagePayload{
-		VendorBranchID: branchID, Code: "ITVK-P-" + tag,
-		VendorPackageUpdatePayload: VendorPackageUpdatePayload{PriorityClass: "ALL", Price: "1500000.50"},
+		VendorBranchID:              branchID,
+		PackageCode:                 "ITVK-P-" + tag,
+		MachineGroup:                "ATM",
+		PriceClass:                  "REGULAR",
+		TierMin:                     1,
+		Currency:                    "IDR",
+		EffectiveStartDate:          "2026-01-01",
+		VendorPackageContentPayload: VendorPackageContentPayload{BasePrice: &basePrice},
 	})
 	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: changeID, Status: "approved"}}
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
@@ -810,27 +830,28 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 	}
 
 	var pkgID int64
-	var class, price string
-	var active bool
-	if err := dbtx(svc).QueryRow(ctx, `SELECT id, priority_class, price::text, is_active FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND code = $2`,
-		branchID, "ITVK-P-"+tag).Scan(&pkgID, &class, &price, &active); err != nil {
+	var price string
+	var endDate *time.Time
+	if err := dbtx(svc).QueryRow(ctx, `SELECT id, base_price::text, effective_end_date FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND package_code = $2`,
+		branchID, "ITVK-P-"+tag).Scan(&pkgID, &price, &endDate); err != nil {
 		t.Fatalf("querying created package: %v", err)
 	}
 	h.vendorPkgIDs = append(h.vendorPkgIDs, pkgID)
-	if class != "ALL" || price != "1500000.50" || !active {
-		t.Errorf("unexpected package row: class=%s price=%s active=%v", class, price, active)
+	if price != "1500000.50" || endDate != nil {
+		t.Errorf("unexpected package row: price=%s effective_end_date=%v, want 1500000.50/nil (open-ended)", price, endDate)
 	}
 
-	updateID := h.insertPending("vendor_package", "update", &pkgID, VendorPackageUpdatePayload{PriorityClass: "VIP", Price: "2000000"})
+	updatedPrice := "2000000"
+	updateID := h.insertPending("vendor_package", "update", &pkgID, VendorPackageContentPayload{BasePrice: &updatedPrice})
 	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: updateID, Status: "approved"}}
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
 		t.Fatalf("Approve(update) error = %v", err)
 	}
-	if err := dbtx(svc).QueryRow(ctx, `SELECT priority_class, price::text FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&class, &price); err != nil {
+	if err := dbtx(svc).QueryRow(ctx, `SELECT base_price::text FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&price); err != nil {
 		t.Fatalf("querying updated package: %v", err)
 	}
-	if class != "VIP" || price != "2000000.00" {
-		t.Errorf("after update: class=%s price=%s, want VIP/2000000.00", class, price)
+	if price != "2000000.00" {
+		t.Errorf("after update: price=%s, want 2000000.00", price)
 	}
 
 	disableID := h.insertPending("vendor_package", "disable", &pkgID, nil)
@@ -838,12 +859,11 @@ func TestVendorPackageApplier_Approve_CreateUpdateDisable_Integration(t *testing
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
 		t.Fatalf("Approve(disable) error = %v", err)
 	}
-	var deleted bool
-	if err := dbtx(svc).QueryRow(ctx, `SELECT is_active, deleted_at IS NOT NULL FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&active, &deleted); err != nil {
+	if err := dbtx(svc).QueryRow(ctx, `SELECT effective_end_date FROM vendor_packages_branch WHERE id = $1`, pkgID).Scan(&endDate); err != nil {
 		t.Fatalf("querying disabled package: %v", err)
 	}
-	if active || !deleted {
-		t.Errorf("expected soft-disabled package, got is_active=%v deleted=%v", active, deleted)
+	if endDate == nil {
+		t.Error("expected effective_end_date to be closed (non-NULL) after disable")
 	}
 }
 

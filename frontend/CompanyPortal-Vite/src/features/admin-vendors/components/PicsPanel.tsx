@@ -4,7 +4,7 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { DataTable } from "@/components/ui/DataTable";
 import { useToast } from "@/lib/hooks/useToast";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle, XCircle } from "lucide-react";
+import { BellRing, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
@@ -69,7 +69,12 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
     {
       accessorKey: "is_notification_recipient",
       header: "Penerima Notifikasi",
-      cell: ({ getValue }) => (getValue() ? "Ya" : "Tidak"),
+      cell: ({ getValue }) =>
+        getValue() ? (
+          <Badge variant="info" icon={BellRing} label="Penerima notifikasi" />
+        ) : (
+          <span className="text-[var(--n-500)]">—</span>
+        ),
     },
     {
       id: "status",
@@ -128,7 +133,7 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-4">
       <div className="flex justify-end">
         <Button
           onClick={() => {

@@ -1,10 +1,12 @@
 /**
  * Zod schema for the admin Vendor Package Price create/edit form, mirroring
  * backend/internal/service/vendor_package_price_admin.go's
- * validatePriceGrain/validatePriceContent. Grain fields (package_code,
+ * validatePriceGrain/validatePriceContent. Grain fields (package,
  * machine_group, price_class, tier_min/max, vendor_branch_id/atm_id,
  * currency, effective_start_date) are immutable after create -- the dialog
  * disables their inputs in edit mode rather than using a separate schema.
+ * `package` is the human label the operator picks ("PAKET 3"); the per-row
+ * `package_code` is server-generated and has no form field.
  */
 
 import { z } from "zod";
@@ -17,7 +19,7 @@ const optionalDecimal = z
 
 export const vendorPackagePriceFormSchema = z
   .object({
-    package_code: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
+    package: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
     machine_group: z.enum(["ATM", "CDM_CRM"]),
     price_class: z.enum(["REGULAR", "VIP_INDUSTRI"]),
     tier_min: z.string().regex(/^\d+$/, "Wajib angka bulat, minimal 1"),

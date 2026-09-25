@@ -23,6 +23,7 @@ import {
   KeyRound,
   Landmark,
   Lock,
+  Map as MapIcon,
   Scale,
   Search,
   Shield,
@@ -120,6 +121,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Unduh, ubah massal, dan impor data master vendor dan ATM.",
     href: "/settings/admin/master-data-io",
     icon: FileSpreadsheet,
+    category: "master",
+  },
+  {
+    id: "admin-regions",
+    title: "Manajemen Region",
+    description: "Kelola region dan status aktifnya.",
+    href: "/settings/admin/regions",
+    icon: MapIcon,
     category: "master",
   },
 ];

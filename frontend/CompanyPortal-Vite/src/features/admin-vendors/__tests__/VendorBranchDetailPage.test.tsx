@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { VendorBranchDetailPage } from "../components/VendorBranchDetailPage";
+import { useBranchATMs } from "../hooks";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/x">{children}</a>,
@@ -75,6 +76,11 @@ vi.mock("../hooks", () => ({
   useCreateVendorPackage: () => noopMutation,
   useDisableVendorPackage: () => noopMutation,
   useEnableVendorPackage: () => noopMutation,
+  useBranchATMs: vi.fn(() => ({
+    isLoading: false,
+    isError: false,
+    data: { atms: [], page: 1, page_size: 100, total: 0 },
+  })),
 }));
 
 describe("VendorBranchDetailPage", () => {
@@ -88,5 +94,14 @@ describe("VendorBranchDetailPage", () => {
     render(<VendorBranchDetailPage vendorId={1} branchId={10} />);
     await userEvent.click(screen.getByRole("tab", { name: "PIC Cabang" }));
     expect(screen.getByText("Cabang ini belum punya PIC")).toBeTruthy();
+  });
+
+  it("shows an ATM sub-tab alongside the others and fetches on selection", async () => {
+    render(<VendorBranchDetailPage vendorId={1} branchId={10} />);
+    expect(screen.getByRole("tab", { name: "ATM" })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("tab", { name: "ATM" }));
+    expect(screen.getByText("Cabang ini belum mengelola ATM")).toBeTruthy();
+    expect(useBranchATMs).toHaveBeenCalledWith(1, 10, { page: 1, page_size: 100 });
   });
 });

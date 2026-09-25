@@ -15,18 +15,21 @@ import (
 
 // VendorPackageAdminServicer is the subset of service.VendorPackageAdminService
 // the handler needs. Mutations return a pending db.MasterDataChangeRequest.
+// No Enable: a row is effective-dated history (migration 016), not a
+// togglable entity.
 type VendorPackageAdminServicer interface {
 	List(ctx context.Context, arg db.ListVendorPackagesAdminParams) ([]service.VendorPackage, error)
 	Count(ctx context.Context, arg db.CountVendorPackagesAdminParams) (int64, error)
 	Get(ctx context.Context, vendorID, id int64) (*service.VendorPackage, error)
-	Create(ctx context.Context, makerID, vendorID int64, req service.VendorPackagePayload, actorIP string) (db.MasterDataChangeRequest, error)
+	Create(ctx context.Context, makerID, vendorID int64, req service.VendorPackageCreatePayload, actorIP string) (db.MasterDataChangeRequest, error)
+	Update(ctx context.Context, makerID, vendorID, id int64, req service.VendorPackageContentPayload, actorIP string) (db.MasterDataChangeRequest, error)
 	Disable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
-	Enable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 }
 
-// AdminVendorPackageHandler handles ADMIN/ADMIN_PARAM-only vendor package
-// management (T3.4). Mount at /api/v1/admin/vendors/{vendorID}/packages behind
-// RequireAuth + RequireRoles("ADMIN", "ADMIN_PARAM") -- see cmd/api/main.go.
+// AdminVendorPackageHandler handles ADMIN/ADMIN_PARAM-only branch special
+// price management ("harga khusus cabang", migration 016). Mount at
+// /api/v1/admin/vendors/{vendorID}/packages behind RequireAuth +
+// RequireRoles("ADMIN", "ADMIN_PARAM") -- see cmd/api/main.go.
 type AdminVendorPackageHandler struct {
 	svc VendorPackageAdminServicer
 }
@@ -42,19 +45,22 @@ func (h *AdminVendorPackageHandler) Routes() chi.Router {
 	r.Get("/", h.List)
 	r.Post("/", h.Create)
 	r.Get("/{id}", h.Get)
+	r.Put("/{id}", h.Update)
 	r.Post("/{id}/disable", h.Disable)
-	r.Post("/{id}/enable", h.Enable)
 	return r
 }
 
 func packageToResponse(p service.VendorPackage) map[string]any {
 	return map[string]any{
-		"id": p.ID, "vendor_branch_id": p.VendorBranchID, "code": p.Code,
-		"is_active": p.IsActive, "deleted_at": formatTimePtr(p.DeletedAt),
+		"id": p.ID, "vendor_branch_id": p.VendorBranchID, "package_code": p.PackageCode,
+		"machine_group": p.MachineGroup, "price_class": p.PriceClass,
+		"tier_min": p.TierMin, "tier_max": p.TierMax,
+		"base_price": p.BasePrice, "atm_id": p.AtmID, "sla_note": p.SlaNote, "currency": p.Currency,
+		"effective_start_date": p.EffectiveStartDate, "effective_end_date": p.EffectiveEndDate,
 	}
 }
 
-// List handles GET / -- filterable, paginated package list for one vendor.
+// List handles GET / -- filterable, paginated branch price list for one vendor.
 func (h *AdminVendorPackageHandler) List(w http.ResponseWriter, r *http.Request) {
 	vendorID, err := parsePathID(r, "vendorID")
 	if err != nil {
@@ -127,7 +133,7 @@ func (h *AdminVendorPackageHandler) Get(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, packageToResponse(*p))
 }
 
-// Create handles POST / -- stages a new package for approval (202).
+// Create handles POST / -- stages a new branch special price for approval (202).
 func (h *AdminVendorPackageHandler) Create(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
@@ -139,7 +145,7 @@ func (h *AdminVendorPackageHandler) Create(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	var body service.VendorPackagePayload
+	var body service.VendorPackageCreatePayload
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
 		return
@@ -153,17 +159,8 @@ func (h *AdminVendorPackageHandler) Create(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
 }
 
-// Disable handles POST /{id}/disable -- stages a disable for approval (202).
-func (h *AdminVendorPackageHandler) Disable(w http.ResponseWriter, r *http.Request) {
-	h.toggle(w, r, h.svc.Disable)
-}
-
-// Enable handles POST /{id}/enable -- stages a re-enable for approval (202).
-func (h *AdminVendorPackageHandler) Enable(w http.ResponseWriter, r *http.Request) {
-	h.toggle(w, r, h.svc.Enable)
-}
-
-func (h *AdminVendorPackageHandler) toggle(w http.ResponseWriter, r *http.Request, fn func(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error)) {
+// Update handles PUT /{id} -- stages an edit of the content fields for approval (202).
+func (h *AdminVendorPackageHandler) Update(w http.ResponseWriter, r *http.Request) {
 	authCtx, ok := middleware.GetAuthContext(r.Context())
 	if !ok {
 		writeUnauthorized(w, "Token tidak valid")
@@ -179,7 +176,38 @@ func (h *AdminVendorPackageHandler) toggle(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	change, err := fn(r.Context(), authCtx.UserID, vendorID, id, extractClientIP(r))
+	var body service.VendorPackageContentPayload
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
+		return
+	}
+
+	change, err := h.svc.Update(r.Context(), authCtx.UserID, vendorID, id, body, extractClientIP(r))
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
+}
+
+// Disable handles POST /{id}/disable -- stages ending the price period for approval (202).
+func (h *AdminVendorPackageHandler) Disable(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+	vendorID, err := parsePathID(r, "vendorID")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	change, err := h.svc.Disable(r.Context(), authCtx.UserID, vendorID, id, extractClientIP(r))
 	if err != nil {
 		h.handleError(w, err)
 		return
@@ -194,8 +222,8 @@ func (h *AdminVendorPackageHandler) handleError(w http.ResponseWriter, err error
 		writeValidationError(w, validationErr.Field, validationErr.Message)
 	case errors.Is(err, service.ErrVendorPackageNotFound):
 		writeError(w, http.StatusNotFound, "not_found", service.ErrVendorPackageNotFound.Error())
-	case errors.Is(err, service.ErrVendorPackageCodeConflict):
-		writeError(w, http.StatusConflict, "conflict", service.ErrVendorPackageCodeConflict.Error())
+	case errors.Is(err, service.ErrVendorPackageOverlap):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorPackageOverlap.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):
 		writeForbidden(w, "Anda tidak berhak mengubah master data")
 	case errors.Is(err, service.ErrMasterDataChangePending):

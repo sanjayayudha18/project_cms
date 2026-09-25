@@ -140,7 +140,7 @@ func (q *Queries) FindOverlappingATMAssignment(ctx context.Context, arg FindOver
 }
 
 const getATMAssignmentAdminByID = `-- name: GetATMAssignmentAdminByID :one
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
+SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
 JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
@@ -175,7 +175,7 @@ func (q *Queries) GetATMAssignmentAdminByID(ctx context.Context, id int64) (GetA
 
 const listATMAssignmentsAdmin = `-- name: ListATMAssignmentsAdmin :many
 
-SELECT a.id, a.atm_id, a.vendor_package_id, p.code AS package_code,
+SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
        a.effective_start_date, a.effective_end_date, a.is_active
 FROM atm_vendor_packages a
 JOIN vendor_packages_branch p ON p.id = a.vendor_package_id

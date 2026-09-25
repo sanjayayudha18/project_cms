@@ -14,7 +14,7 @@ SELECT av.id,
        a.terminal_id,
        v.code                                  AS vendor_code,
        b.branch_code,
-       p.code                                  AS package_code,
+       p.package_code,
        av.effective_start_date::text           AS effective_start_date,
        COALESCE(av.effective_end_date::text, '')::text AS effective_end_date,
        av.is_active
@@ -481,11 +481,11 @@ func (q *Queries) ImportLocationIDs(ctx context.Context) ([]int64, error) {
 }
 
 const importPackageKeys = `-- name: ImportPackageKeys :many
-SELECT p.id, v.code AS vendor_code, b.branch_code, p.code AS package_code
+SELECT p.id, v.code AS vendor_code, b.branch_code, p.package_code
 FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
-WHERE p.is_active AND p.deleted_at IS NULL
+WHERE p.effective_end_date IS NULL OR p.effective_end_date >= CURRENT_DATE
 `
 
 type ImportPackageKeysRow struct {
@@ -497,6 +497,9 @@ type ImportPackageKeysRow struct {
 
 // Active vendor packages by natural key, for the import dry-run's FK check on
 // atm-assignments (plan.md T5.3). Read on the PRIMARY (validation of a write flow).
+// Migration 016 dropped is_active/deleted_at from vendor_packages_branch --
+// "active" now means an open (or not-yet-ended) price period, same
+// convention as DisableVendorPackage's own WHERE guard.
 func (q *Queries) ImportPackageKeys(ctx context.Context) ([]ImportPackageKeysRow, error) {
 	rows, err := q.db.Query(ctx, importPackageKeys)
 	if err != nil {

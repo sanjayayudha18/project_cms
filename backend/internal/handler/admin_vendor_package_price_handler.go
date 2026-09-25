@@ -52,7 +52,8 @@ func (h *AdminVendorPackagePriceHandler) Routes() chi.Router {
 
 func packagePriceToResponse(p service.VendorPackagePrice) map[string]any {
 	return map[string]any{
-		"id": p.ID, "vendor_id": p.VendorID, "package_code": p.PackageCode, "machine_group": p.MachineGroup,
+		"id": p.ID, "vendor_id": p.VendorID,
+		"package": p.Package, "package_code": p.PackageCode, "machine_group": p.MachineGroup,
 		"price_class": p.PriceClass, "tier_min": p.TierMin, "tier_max": p.TierMax,
 		"base_price":       p.BasePrice,
 		"vendor_branch_id": p.VendorBranchID, "atm_id": p.AtmID, "sla_note": p.SlaNote, "currency": p.Currency,
@@ -78,18 +79,18 @@ func (h *AdminVendorPackagePriceHandler) List(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	var packageCode, machineGroup, priceClass *string
+	var pkg, machineGroup, priceClass *string
 	for _, f := range []struct {
 		name string
 		dst  **string
-	}{{"package_code", &packageCode}, {"machine_group", &machineGroup}, {"price_class", &priceClass}} {
+	}{{"package", &pkg}, {"machine_group", &machineGroup}, {"price_class", &priceClass}} {
 		if v := q.Get(f.name); v != "" {
 			*f.dst = &v
 		}
 	}
 
 	arg := db.ListVendorPackagePricesAdminParams{
-		VendorID: vendorID, PackageCode: packageCode, MachineGroup: machineGroup, PriceClass: priceClass, Status: status,
+		VendorID: vendorID, Package: pkg, MachineGroup: machineGroup, PriceClass: priceClass, Status: status,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	}
 	prices, err := h.svc.List(r.Context(), arg)
@@ -98,7 +99,7 @@ func (h *AdminVendorPackagePriceHandler) List(w http.ResponseWriter, r *http.Req
 		return
 	}
 	total, err := h.svc.Count(r.Context(), db.CountVendorPackagePricesAdminParams{
-		VendorID: vendorID, PackageCode: packageCode, MachineGroup: machineGroup, PriceClass: priceClass, Status: status,
+		VendorID: vendorID, Package: pkg, MachineGroup: machineGroup, PriceClass: priceClass, Status: status,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")

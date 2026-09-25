@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useVendorBranch } from "../hooks";
+import { ATMsPanel } from "./ATMsPanel";
 import { PackagesPanel } from "./PackagesPanel";
 import { PicsPanel } from "./PicsPanel";
 import { VaultsPanel } from "./VaultsPanel";
@@ -12,7 +13,8 @@ import { VaultsPanel } from "./VaultsPanel";
 const BRANCH_SUB_TABS = [
   { id: "vaults", label: "Vault" },
   { id: "pics", label: "PIC Cabang" },
-  { id: "packages", label: "Paket" },
+  { id: "packages", label: "Paket Cabang" },
+  { id: "atms", label: "ATM" },
 ] as const;
 
 type BranchSubTab = (typeof BRANCH_SUB_TABS)[number]["id"];
@@ -85,6 +87,7 @@ export function VendorBranchDetailPage({
       {subTab === "vaults" && <VaultsPanel vendorId={vendorId} branchId={branchId} />}
       {subTab === "pics" && <PicsPanel vendorId={vendorId} branchId={branchId} />}
       {subTab === "packages" && <PackagesPanel vendorId={vendorId} branchId={branchId} />}
+      {subTab === "atms" && <ATMsPanel vendorId={vendorId} branchId={branchId} />}
     </div>
   );
 }

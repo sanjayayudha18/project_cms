@@ -13,6 +13,7 @@ import {
   createVendorBranch,
   createVendorPackage,
   createVendorPackagePrice,
+  updateVendorPackage,
   createVendorPic,
   createVendorVault,
   disableVendor,
@@ -23,11 +24,11 @@ import {
   disableVendorVault,
   enableVendor,
   enableVendorBranch,
-  enableVendorPackage,
   enableVendorPic,
   enableVendorVault,
   getVendor,
   getVendorBranch,
+  listBranchATMs,
   listVendorBranches,
   listVendorChildren,
   listVendorPackagePrices,
@@ -56,6 +57,8 @@ import type {
   AdminVendorVaultsListResponse,
   AdminVendorsListParams,
   AdminVendorsListResponse,
+  BranchATMsListParams,
+  BranchATMsListResponse,
   CreateVendorBranchPayload,
   CreateVendorPackagePayload,
   CreateVendorPackagePricePayload,
@@ -64,6 +67,7 @@ import type {
   CreateVendorVaultPayload,
   DisableVendorResponse,
   UpdateVendorBranchPayload,
+  UpdateVendorPackagePayload,
   UpdateVendorPackagePricePayload,
   UpdateVendorPayload,
   UpdateVendorPicPayload,
@@ -302,18 +306,22 @@ export function useCreateVendorPackage(vendorId: number) {
   });
 }
 
-export function useDisableVendorPackage(vendorId: number) {
+export function useUpdateVendorPackage(vendorId: number) {
   const invalidate = useInvalidateList();
-  return useMutation<ChangeRequestAccepted, ApiError, number>({
-    mutationFn: (packageId) => disableVendorPackage(vendorId, packageId),
+  return useMutation<
+    ChangeRequestAccepted,
+    ApiError,
+    { packageId: number; payload: UpdateVendorPackagePayload }
+  >({
+    mutationFn: ({ packageId, payload }) => updateVendorPackage(vendorId, packageId, payload),
     onSuccess: invalidate,
   });
 }
 
-export function useEnableVendorPackage(vendorId: number) {
+export function useDisableVendorPackage(vendorId: number) {
   const invalidate = useInvalidateList();
   return useMutation<ChangeRequestAccepted, ApiError, number>({
-    mutationFn: (packageId) => enableVendorPackage(vendorId, packageId),
+    mutationFn: (packageId) => disableVendorPackage(vendorId, packageId),
     onSuccess: invalidate,
   });
 }
@@ -356,5 +364,20 @@ export function useDisableVendorPackagePrice(vendorId: number) {
   return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: (priceId) => disableVendorPackagePrice(vendorId, priceId),
     onSuccess: invalidate,
+  });
+}
+
+// Read-only "ATM" sub-tab (.kiro/specs/vendor-branch-atms) -- no mutations,
+// no maker-checker; the "children" prefix keeps it covered by
+// useInvalidateList's ["admin-vendors"] key prefix like the siblings above.
+export function useBranchATMs(
+  vendorId: number,
+  branchId: number,
+  params: BranchATMsListParams,
+) {
+  return useQuery<BranchATMsListResponse, ApiError>({
+    queryKey: ["admin-vendors", "children", vendorId, "branches", branchId, "atms", params],
+    queryFn: () => listBranchATMs(vendorId, branchId, params),
+    placeholderData: keepPreviousData,
   });
 }

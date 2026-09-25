@@ -287,6 +287,17 @@ func main() {
 
 	masterDataAdmin.Mount("/api/v1/admin/master-data/changes", adminMasterDataChangeHandler.Routes())
 
+	// ADMIN/ADMIN_PARAM-only: region master-data CRUD (.kiro/specs/region-management).
+	// Unlike the maker-checker flows above, region mutations apply
+	// immediately with an audit-in-tx guarantee (design.md "Documented
+	// Deviation", same pattern as rolemgmt.PermissionService) -- no
+	// masterDataChangeService involved. List/Count read the replica
+	// (dbReadPool); writes + read-after-write use the primary (dbPool).
+	regionAdminRepo := repository.NewRegionAdminRepository(dbPool, dbReadPool)
+	regionAdminService := service.NewRegionAdminService(regionAdminRepo, dbPool)
+	adminRegionHandler := handler.NewAdminRegionHandler(regionAdminService)
+	masterDataAdmin.Mount("/api/v1/admin/regions", adminRegionHandler.Routes())
+
 	// CSV export of master data (plan.md T5.1): streamed in keyset pages from the
 	// read-replica pool (primary when no replica is configured); read-only, no
 	// approval involved. Same masterDataAdmin guard, re-checked in the exporter.
@@ -338,6 +349,14 @@ func main() {
 	vendorBranchAdminService := service.NewVendorBranchAdminService(vendorBranchAdminRepo, masterDataChangeService, branchChildCounter)
 	adminVendorBranchHandler := handler.NewAdminVendorBranchHandler(vendorBranchAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches", adminVendorBranchHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: read-only "ATM" sub-tab on the vendor branch
+	// detail page (.kiro/specs/vendor-branch-atms). Display-only, no
+	// maker-checker -- reads the REPLICA (dbReadPool), never the primary.
+	branchATMRepo := repository.NewBranchATMRepository(dbReadPool)
+	branchATMService := service.NewBranchATMService(branchATMRepo)
+	adminBranchATMHandler := handler.NewAdminBranchATMHandler(branchATMService)
+	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches/{branchID}/atms", adminBranchATMHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: ATM assignment (kelolaan) CRUD (plan.md T3.5),
 	// same maker-checker-native flow; overlap is a clean 409 at submit time and

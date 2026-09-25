@@ -21,6 +21,7 @@ type fakeVendorPackageAdminServicer struct {
 	listResult []service.VendorPackage
 	getResult  *service.VendorPackage
 	createErr  error
+	updateErr  error
 }
 
 func (f *fakeVendorPackageAdminServicer) List(context.Context, db.ListVendorPackagesAdminParams) ([]service.VendorPackage, error) {
@@ -32,14 +33,14 @@ func (f *fakeVendorPackageAdminServicer) Count(context.Context, db.CountVendorPa
 func (f *fakeVendorPackageAdminServicer) Get(context.Context, int64, int64) (*service.VendorPackage, error) {
 	return f.getResult, nil
 }
-func (f *fakeVendorPackageAdminServicer) Create(context.Context, int64, int64, service.VendorPackagePayload, string) (db.MasterDataChangeRequest, error) {
+func (f *fakeVendorPackageAdminServicer) Create(context.Context, int64, int64, service.VendorPackageCreatePayload, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 7, EntityType: "vendor_package", Op: "create", Status: "pending"}, f.createErr
+}
+func (f *fakeVendorPackageAdminServicer) Update(context.Context, int64, int64, int64, service.VendorPackageContentPayload, string) (db.MasterDataChangeRequest, error) {
+	return db.MasterDataChangeRequest{ID: 8, EntityType: "vendor_package", Op: "update", Status: "pending"}, f.updateErr
 }
 func (f *fakeVendorPackageAdminServicer) Disable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 9, Status: "pending"}, nil
-}
-func (f *fakeVendorPackageAdminServicer) Enable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
-	return db.MasterDataChangeRequest{ID: 10, Status: "pending"}, nil
 }
 
 func mountAdminVendorPackageHandler(svc VendorPackageAdminServicer) (http.Handler, *pkgauth.TokenService) {
@@ -58,7 +59,7 @@ func mountAdminVendorPackageHandler(svc VendorPackageAdminServicer) (http.Handle
 
 func TestAdminVendorPackageHandler_List(t *testing.T) {
 	branchID := int64(9)
-	svc := &fakeVendorPackageAdminServicer{listResult: []service.VendorPackage{{ID: 1, VendorBranchID: &branchID, Code: "PKG1", IsActive: true}}}
+	svc := &fakeVendorPackageAdminServicer{listResult: []service.VendorPackage{{ID: 1, VendorBranchID: &branchID, PackageCode: "PKG1"}}}
 	router, tokenSvc := mountAdminVendorPackageHandler(svc)
 
 	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors/3/packages", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
@@ -66,7 +67,7 @@ func TestAdminVendorPackageHandler_List(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if body := rec.Body.String(); !strings.Contains(body, `"code":"PKG1"`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"package_code":"PKG1"`) {
 		t.Errorf("expected package row, got: %s", body)
 	}
 }
@@ -82,7 +83,7 @@ func TestAdminVendorPackageHandler_Get_NotFound(t *testing.T) {
 func TestAdminVendorPackageHandler_Create_Returns202(t *testing.T) {
 	router, tokenSvc := mountAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{})
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/packages", tokenForRole(t, tokenSvc, 1, "ADMIN"),
-		`{"vendor_branch_id":9,"code":"PKG1","priority_class":"ALL","price":"100.00"}`)
+		`{"vendor_branch_id":9,"package_code":"PKG1","machine_group":"ATM","price_class":"REGULAR","effective_start_date":"2026-01-01","base_price":"100.00"}`)
 	if rec.Code != http.StatusAccepted || !strings.Contains(rec.Body.String(), `"change_request_id":7`) {
 		t.Fatalf("expected 202 with change_request_id, got %d: %s", rec.Code, rec.Body.String())
 	}
@@ -93,16 +94,25 @@ func TestAdminVendorPackageHandler_Create_ErrorMapping(t *testing.T) {
 		err  error
 		want int
 	}{
-		{&service.ValidationError{Field: "price", Message: "tidak valid"}, http.StatusUnprocessableEntity},
-		{service.ErrVendorPackageCodeConflict, http.StatusConflict},
+		{&service.ValidationError{Field: "base_price", Message: "tidak valid"}, http.StatusUnprocessableEntity},
+		{service.ErrVendorPackageOverlap, http.StatusConflict},
 		{service.ErrMasterDataChangePending, http.StatusConflict},
 	}
 	for _, tc := range cases {
 		router, tokenSvc := mountAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{createErr: tc.err})
-		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/packages", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"code":"PKG1"}`)
+		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/packages", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"package_code":"PKG1"}`)
 		if rec.Code != tc.want {
 			t.Errorf("err %v: expected %d, got %d", tc.err, tc.want, rec.Code)
 		}
+	}
+}
+
+func TestAdminVendorPackageHandler_Update_Returns202(t *testing.T) {
+	router, tokenSvc := mountAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{})
+	rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/packages/1", tokenForRole(t, tokenSvc, 1, "ADMIN"),
+		`{"base_price":"150.00","effective_end_date":"2027-12-31"}`)
+	if rec.Code != http.StatusAccepted || !strings.Contains(rec.Body.String(), `"change_request_id":8`) {
+		t.Fatalf("expected 202 with change_request_id, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -114,12 +124,10 @@ func TestAdminVendorPackageHandler_WrongRole_Forbidden(t *testing.T) {
 	}
 }
 
-func TestAdminVendorPackageHandler_Toggle_Returns202(t *testing.T) {
+func TestAdminVendorPackageHandler_Disable_Returns202(t *testing.T) {
 	router, tokenSvc := mountAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{})
-	for _, path := range []string{"/disable", "/enable"} {
-		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/packages/1"+path, tokenForRole(t, tokenSvc, 1, "ADMIN_PARAM"), "")
-		if rec.Code != http.StatusAccepted {
-			t.Errorf("%s: expected 202, got %d", path, rec.Code)
-		}
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/packages/1/disable", tokenForRole(t, tokenSvc, 1, "ADMIN_PARAM"), "")
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("expected 202, got %d", rec.Code)
 	}
 }

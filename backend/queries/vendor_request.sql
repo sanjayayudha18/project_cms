@@ -188,7 +188,7 @@ RETURNING *;
 -- actually receives empty for those two in practice.
 -- replenishment-request-enhancements (Req 5): three additive SELECT columns
 -- -- priority_class (atms.priority_class, migration 030; Req 5.2), paket
--- (vendor_packages_branch.code of the single active package, now deterministic with
+-- (vendor_packages_branch.package_code of the single active package, now deterministic with
 -- the avp.id DESC tie-breaker -- OQ3; Req 5.3, 5.4), and escrow (latest
 -- itm_replenish.escrow per terminal, numeric(20,2) the service carries as a
 -- decimal string, never float -- OQ2; Req 5.5, 5.10). WHERE/ORDER BY/
@@ -207,7 +207,7 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        v.name    AS flm_vendor,
        vb.region AS flm_vendor_region,
        a.priority_class AS priority_class,
-       pkg.code         AS paket,
+       pkg.package_code         AS paket,
        esc.escrow        AS escrow
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id

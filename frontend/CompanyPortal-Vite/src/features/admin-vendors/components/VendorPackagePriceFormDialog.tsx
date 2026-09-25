@@ -29,7 +29,7 @@ interface VendorPackagePriceFormDialogProps {
 function toDefaultValues(price: AdminVendorPackagePrice | null): VendorPackagePriceFormValues {
   if (!price) {
     return {
-      package_code: "",
+      package: "",
       machine_group: "ATM",
       price_class: "REGULAR",
       tier_min: "1",
@@ -44,7 +44,7 @@ function toDefaultValues(price: AdminVendorPackagePrice | null): VendorPackagePr
     };
   }
   return {
-    package_code: price.package_code,
+    package: price.package,
     machine_group: price.machine_group,
     price_class: price.price_class,
     tier_min: String(price.tier_min),
@@ -62,9 +62,10 @@ function toDefaultValues(price: AdminVendorPackagePrice | null): VendorPackagePr
 /**
  * Create/edit form for one vendor's package price row. Grain fields (paket,
  * kelompok mesin, kelas, tingkat, cabang/ATM, mata uang, tanggal mulai) are
- * immutable once created -- disabled in edit mode, same convention as
- * VendorPackageFormDialog's "Kode Paket". Only the content fields (harga,
- * catatan SLA, tanggal berakhir) can be edited afterward.
+ * immutable once created -- disabled in edit mode. Only the content fields
+ * (harga, catatan SLA, tanggal berakhir) can be edited afterward. The form
+ * collects only the `package` label ("PAKET 3") -- the per-row `package_code`
+ * is server-generated at apply-on-approve time and is never entered here.
  */
 export function VendorPackagePriceFormDialog({
   open,
@@ -112,7 +113,7 @@ export function VendorPackagePriceFormDialog({
     try {
       if (mode === "create") {
         const payload: CreateVendorPackagePricePayload = {
-          package_code: values.package_code,
+          package: values.package,
           machine_group: values.machine_group,
           price_class: values.price_class,
           tier_min: Number(values.tier_min),
@@ -155,9 +156,10 @@ export function VendorPackagePriceFormDialog({
     >
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Kode Paket" error={form.formState.errors.package_code?.message}>
+          <Field label="Paket" error={form.formState.errors.package?.message}>
             <input
-              {...form.register("package_code")}
+              {...form.register("package")}
+              placeholder="PAKET 3"
               disabled={mode === "edit"}
               className={inputClass}
             />

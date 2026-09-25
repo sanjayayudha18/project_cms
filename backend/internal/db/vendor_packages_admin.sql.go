@@ -12,10 +12,12 @@ import (
 )
 
 const countActiveVendorPackagesByBranch = `-- name: CountActiveVendorPackagesByBranch :one
-SELECT COUNT(*) FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND deleted_at IS NULL
+SELECT COUNT(*) FROM vendor_packages_branch
+WHERE vendor_branch_id = $1 AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE)
 `
 
-// Backs the branch-disable guard: refuse disabling a branch with active packages.
+// Backs the branch-disable guard: refuse disabling a branch with a current
+// or open-ended special price row.
 func (q *Queries) CountActiveVendorPackagesByBranch(ctx context.Context, vendorBranchID *int64) (int64, error) {
 	row := q.db.QueryRow(ctx, countActiveVendorPackagesByBranch, vendorBranchID)
 	var count int64
@@ -29,11 +31,11 @@ FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE b.vendor_id = $1
   AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
-  AND ($3::text IS NULL OR p.code ILIKE '%' || $3::text || '%')
+  AND ($3::text IS NULL OR p.package_code ILIKE '%' || $3::text || '%')
   AND (
         $4::text = 'all'
-        OR ($4::text = 'active' AND p.deleted_at IS NULL)
-        OR ($4::text = 'disabled' AND p.deleted_at IS NOT NULL)
+        OR ($4::text = 'active' AND (p.effective_end_date IS NULL OR p.effective_end_date >= CURRENT_DATE))
+        OR ($4::text = 'disabled' AND p.effective_end_date < CURRENT_DATE)
       )
 `
 
@@ -57,94 +59,127 @@ func (q *Queries) CountVendorPackagesAdmin(ctx context.Context, arg CountVendorP
 }
 
 const createVendorPackageAdmin = `-- name: CreateVendorPackageAdmin :one
-INSERT INTO vendor_packages_branch (vendor_branch_id, code)
-VALUES ($1, $2)
-RETURNING id, vendor_branch_id, code, is_active, deleted_at
+INSERT INTO vendor_packages_branch
+    (vendor_branch_id, package_code, machine_group, price_class, tier_min, tier_max,
+     base_price, atm_id, sla_note, currency, effective_start_date, effective_end_date)
+VALUES ($1, $2, $3, $4,
+        $5, $6,
+        $7, $8, $9, $10,
+        $11, $12)
+RETURNING id, vendor_branch_id, package_code, machine_group, price_class, tier_min, tier_max,
+          base_price, atm_id, sla_note, currency, effective_start_date, effective_end_date
 `
 
 type CreateVendorPackageAdminParams struct {
-	VendorBranchID *int64 `json:"vendor_branch_id"`
-	Code           string `json:"code"`
+	VendorBranchID     *int64         `json:"vendor_branch_id"`
+	PackageCode        string         `json:"package_code"`
+	MachineGroup       string         `json:"machine_group"`
+	PriceClass         string         `json:"price_class"`
+	TierMin            int32          `json:"tier_min"`
+	TierMax            *int32         `json:"tier_max"`
+	BasePrice          pgtype.Numeric `json:"base_price"`
+	AtmID              *int64         `json:"atm_id"`
+	SlaNote            *string        `json:"sla_note"`
+	Currency           string         `json:"currency"`
+	EffectiveStartDate pgtype.Date    `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date    `json:"effective_end_date"`
 }
 
 type CreateVendorPackageAdminRow struct {
-	ID             int64              `json:"id"`
-	VendorBranchID *int64             `json:"vendor_branch_id"`
-	Code           string             `json:"code"`
-	IsActive       bool               `json:"is_active"`
-	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	ID                 int64          `json:"id"`
+	VendorBranchID     *int64         `json:"vendor_branch_id"`
+	PackageCode        string         `json:"package_code"`
+	MachineGroup       string         `json:"machine_group"`
+	PriceClass         string         `json:"price_class"`
+	TierMin            int32          `json:"tier_min"`
+	TierMax            *int32         `json:"tier_max"`
+	BasePrice          pgtype.Numeric `json:"base_price"`
+	AtmID              *int64         `json:"atm_id"`
+	SlaNote            *string        `json:"sla_note"`
+	Currency           string         `json:"currency"`
+	EffectiveStartDate pgtype.Date    `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date    `json:"effective_end_date"`
 }
 
-// vendor_branch_id and code are the only fields left (migration 010 dropped
-// price/priority_class) -- both immutable after create, so there is no
-// UpdateVendorPackageAdmin anymore; a code/branch change is a new package.
+// Grain (vendor_branch_id, package_code, machine_group, price_class, tier,
+// atm_id, currency, effective_start_date) is immutable after create -- a
+// grain change is a new price period, same convention as
+// CreateVendorPackagePriceAdmin.
 func (q *Queries) CreateVendorPackageAdmin(ctx context.Context, arg CreateVendorPackageAdminParams) (CreateVendorPackageAdminRow, error) {
-	row := q.db.QueryRow(ctx, createVendorPackageAdmin, arg.VendorBranchID, arg.Code)
+	row := q.db.QueryRow(ctx, createVendorPackageAdmin,
+		arg.VendorBranchID,
+		arg.PackageCode,
+		arg.MachineGroup,
+		arg.PriceClass,
+		arg.TierMin,
+		arg.TierMax,
+		arg.BasePrice,
+		arg.AtmID,
+		arg.SlaNote,
+		arg.Currency,
+		arg.EffectiveStartDate,
+		arg.EffectiveEndDate,
+	)
 	var i CreateVendorPackageAdminRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorBranchID,
-		&i.Code,
-		&i.IsActive,
-		&i.DeletedAt,
+		&i.PackageCode,
+		&i.MachineGroup,
+		&i.PriceClass,
+		&i.TierMin,
+		&i.TierMax,
+		&i.BasePrice,
+		&i.AtmID,
+		&i.SlaNote,
+		&i.Currency,
+		&i.EffectiveStartDate,
+		&i.EffectiveEndDate,
 	)
 	return i, err
 }
 
 const disableVendorPackage = `-- name: DisableVendorPackage :exec
-UPDATE vendor_packages_branch SET is_active = false, deleted_at = now() WHERE id = $1
+UPDATE vendor_packages_branch
+SET effective_end_date = CURRENT_DATE - 1, updated_at = now()
+WHERE id = $1
+  AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE)
 `
 
-// Soft-disable only (no_hard_delete_test.go extended in T3.7).
+// Ends the price period as of yesterday. No-op on an already-ended row.
 func (q *Queries) DisableVendorPackage(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, disableVendorPackage, id)
 	return err
 }
 
-const enableVendorPackage = `-- name: EnableVendorPackage :exec
-UPDATE vendor_packages_branch SET is_active = true, deleted_at = NULL WHERE id = $1
-`
-
-func (q *Queries) EnableVendorPackage(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, enableVendorPackage, id)
-	return err
-}
-
-const findVendorPackageAdminByBranchCode = `-- name: FindVendorPackageAdminByBranchCode :one
-SELECT id FROM vendor_packages_branch WHERE vendor_branch_id = $1 AND code = $2
-`
-
-type FindVendorPackageAdminByBranchCodeParams struct {
-	VendorBranchID *int64 `json:"vendor_branch_id"`
-	Code           string `json:"code"`
-}
-
-// Uniqueness pre-check (incl. soft-disabled): (vendor_branch_id, code) is unique.
-func (q *Queries) FindVendorPackageAdminByBranchCode(ctx context.Context, arg FindVendorPackageAdminByBranchCodeParams) (int64, error) {
-	row := q.db.QueryRow(ctx, findVendorPackageAdminByBranchCode, arg.VendorBranchID, arg.Code)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
-}
-
 const getVendorPackageAdminByID = `-- name: GetVendorPackageAdminByID :one
-SELECT p.id, p.vendor_branch_id, b.vendor_id, p.code, p.is_active, p.deleted_at
+SELECT p.id, p.vendor_branch_id, b.vendor_id, p.package_code, p.machine_group, p.price_class,
+       p.tier_min, p.tier_max, p.base_price, p.atm_id, p.sla_note, p.currency,
+       p.effective_start_date, p.effective_end_date
 FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE p.id = $1
 `
 
 type GetVendorPackageAdminByIDRow struct {
-	ID             int64              `json:"id"`
-	VendorBranchID *int64             `json:"vendor_branch_id"`
-	VendorID       int64              `json:"vendor_id"`
-	Code           string             `json:"code"`
-	IsActive       bool               `json:"is_active"`
-	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	ID                 int64          `json:"id"`
+	VendorBranchID     *int64         `json:"vendor_branch_id"`
+	VendorID           int64          `json:"vendor_id"`
+	PackageCode        string         `json:"package_code"`
+	MachineGroup       string         `json:"machine_group"`
+	PriceClass         string         `json:"price_class"`
+	TierMin            int32          `json:"tier_min"`
+	TierMax            *int32         `json:"tier_max"`
+	BasePrice          pgtype.Numeric `json:"base_price"`
+	AtmID              *int64         `json:"atm_id"`
+	SlaNote            *string        `json:"sla_note"`
+	Currency           string         `json:"currency"`
+	EffectiveStartDate pgtype.Date    `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date    `json:"effective_end_date"`
 }
 
-// Includes soft-deleted rows and the owning vendor_id (for URL scoping);
-// doubles as the "before" snapshot / CurrentState (T2.5).
+// Includes expired rows and the owning vendor_id (for URL scoping); doubles
+// as the "before" snapshot / CurrentState.
 func (q *Queries) GetVendorPackageAdminByID(ctx context.Context, id int64) (GetVendorPackageAdminByIDRow, error) {
 	row := q.db.QueryRow(ctx, getVendorPackageAdminByID, id)
 	var i GetVendorPackageAdminByIDRow
@@ -152,27 +187,37 @@ func (q *Queries) GetVendorPackageAdminByID(ctx context.Context, id int64) (GetV
 		&i.ID,
 		&i.VendorBranchID,
 		&i.VendorID,
-		&i.Code,
-		&i.IsActive,
-		&i.DeletedAt,
+		&i.PackageCode,
+		&i.MachineGroup,
+		&i.PriceClass,
+		&i.TierMin,
+		&i.TierMax,
+		&i.BasePrice,
+		&i.AtmID,
+		&i.SlaNote,
+		&i.Currency,
+		&i.EffectiveStartDate,
+		&i.EffectiveEndDate,
 	)
 	return i, err
 }
 
 const listVendorPackagesAdmin = `-- name: ListVendorPackagesAdmin :many
 
-SELECT p.id, p.vendor_branch_id, p.code, p.is_active, p.deleted_at
+SELECT p.id, p.vendor_branch_id, p.package_code, p.machine_group, p.price_class,
+       p.tier_min, p.tier_max, p.base_price, p.atm_id, p.sla_note, p.currency,
+       p.effective_start_date, p.effective_end_date
 FROM vendor_packages_branch p
 JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE b.vendor_id = $1
   AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
-  AND ($3::text IS NULL OR p.code ILIKE '%' || $3::text || '%')
+  AND ($3::text IS NULL OR p.package_code ILIKE '%' || $3::text || '%')
   AND (
         $4::text = 'all'
-        OR ($4::text = 'active' AND p.deleted_at IS NULL)
-        OR ($4::text = 'disabled' AND p.deleted_at IS NOT NULL)
+        OR ($4::text = 'active' AND (p.effective_end_date IS NULL OR p.effective_end_date >= CURRENT_DATE))
+        OR ($4::text = 'disabled' AND p.effective_end_date < CURRENT_DATE)
       )
-ORDER BY p.code ASC, p.id ASC
+ORDER BY p.package_code ASC, p.id ASC
 LIMIT $6::bigint OFFSET $5::bigint
 `
 
@@ -186,22 +231,33 @@ type ListVendorPackagesAdminParams struct {
 }
 
 type ListVendorPackagesAdminRow struct {
-	ID             int64              `json:"id"`
-	VendorBranchID *int64             `json:"vendor_branch_id"`
-	Code           string             `json:"code"`
-	IsActive       bool               `json:"is_active"`
-	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	ID                 int64          `json:"id"`
+	VendorBranchID     *int64         `json:"vendor_branch_id"`
+	PackageCode        string         `json:"package_code"`
+	MachineGroup       string         `json:"machine_group"`
+	PriceClass         string         `json:"price_class"`
+	TierMin            int32          `json:"tier_min"`
+	TierMax            *int32         `json:"tier_max"`
+	BasePrice          pgtype.Numeric `json:"base_price"`
+	AtmID              *int64         `json:"atm_id"`
+	SlaNote            *string        `json:"sla_note"`
+	Currency           string         `json:"currency"`
+	EffectiveStartDate pgtype.Date    `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date    `json:"effective_end_date"`
 }
 
-// Admin vendor package management (plan.md Fase 3, T3.4). Mutations route
-// through the master-data maker-checker engine (Fase 2, D1): the
-// create/update/disable/enable queries below are only run by
-// VendorPackageApplier inside the apply-on-approve transaction.
-// Scoped to one vendor via its branches. Filters: q (code substring),
-// status ('active'|'disabled'|'all', caller resolves absent to 'active'),
-// vendor_branch_id (optional branch drill-down, NULL = all branches).
-// No price/priority_class here since migration 010: this table is now a
-// pure kelolaan/frequency link, prices moved to vendor_package_prices.
+// Admin vendor branch package price ("harga khusus cabang") management
+// (migration 016). Mutations route through the master-data maker-checker
+// engine (Fase 2, D1): the create/update/disable queries below are only run
+// by VendorPackageApplier inside the apply-on-approve transaction. No Enable
+// (effective-dated history, not a togglable entity) -- same convention as
+// vendor_package_prices_admin.sql; "disable" ends validity via
+// effective_end_date, a new period is a new row.
+// Scoped to one vendor via its branches. Filters: q (package_code
+// substring), status ('active'|'disabled'|'all', caller resolves absent to
+// 'active'), vendor_branch_id (optional branch drill-down, NULL = all
+// branches). status 'active' = current or open-ended (effective_end_date
+// IS NULL OR >= today), 'disabled' = effective_end_date in the past.
 func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPackagesAdminParams) ([]ListVendorPackagesAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorPackagesAdmin,
 		arg.VendorID,
@@ -221,9 +277,17 @@ func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPac
 		if err := rows.Scan(
 			&i.ID,
 			&i.VendorBranchID,
-			&i.Code,
-			&i.IsActive,
-			&i.DeletedAt,
+			&i.PackageCode,
+			&i.MachineGroup,
+			&i.PriceClass,
+			&i.TierMin,
+			&i.TierMax,
+			&i.BasePrice,
+			&i.AtmID,
+			&i.SlaNote,
+			&i.Currency,
+			&i.EffectiveStartDate,
+			&i.EffectiveEndDate,
 		); err != nil {
 			return nil, err
 		}
@@ -233,4 +297,67 @@ func (q *Queries) ListVendorPackagesAdmin(ctx context.Context, arg ListVendorPac
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateVendorPackageAdmin = `-- name: UpdateVendorPackageAdmin :one
+UPDATE vendor_packages_branch
+SET base_price = $1, sla_note = $2,
+    effective_end_date = $3, updated_at = now()
+WHERE id = $4
+  AND (effective_end_date IS NULL OR effective_end_date >= CURRENT_DATE)
+RETURNING id, vendor_branch_id, package_code, machine_group, price_class, tier_min, tier_max,
+          base_price, atm_id, sla_note, currency, effective_start_date, effective_end_date
+`
+
+type UpdateVendorPackageAdminParams struct {
+	BasePrice        pgtype.Numeric `json:"base_price"`
+	SlaNote          *string        `json:"sla_note"`
+	EffectiveEndDate pgtype.Date    `json:"effective_end_date"`
+	ID               int64          `json:"id"`
+}
+
+type UpdateVendorPackageAdminRow struct {
+	ID                 int64          `json:"id"`
+	VendorBranchID     *int64         `json:"vendor_branch_id"`
+	PackageCode        string         `json:"package_code"`
+	MachineGroup       string         `json:"machine_group"`
+	PriceClass         string         `json:"price_class"`
+	TierMin            int32          `json:"tier_min"`
+	TierMax            *int32         `json:"tier_max"`
+	BasePrice          pgtype.Numeric `json:"base_price"`
+	AtmID              *int64         `json:"atm_id"`
+	SlaNote            *string        `json:"sla_note"`
+	Currency           string         `json:"currency"`
+	EffectiveStartDate pgtype.Date    `json:"effective_start_date"`
+	EffectiveEndDate   pgtype.Date    `json:"effective_end_date"`
+}
+
+// Only the content fields (base_price, sla_note, effective_end_date) are
+// editable; grain fields stay immutable, same convention as
+// UpdateVendorPackagePriceAdmin. An already-ended row's update is 0 rows
+// (mapped to not-found).
+func (q *Queries) UpdateVendorPackageAdmin(ctx context.Context, arg UpdateVendorPackageAdminParams) (UpdateVendorPackageAdminRow, error) {
+	row := q.db.QueryRow(ctx, updateVendorPackageAdmin,
+		arg.BasePrice,
+		arg.SlaNote,
+		arg.EffectiveEndDate,
+		arg.ID,
+	)
+	var i UpdateVendorPackageAdminRow
+	err := row.Scan(
+		&i.ID,
+		&i.VendorBranchID,
+		&i.PackageCode,
+		&i.MachineGroup,
+		&i.PriceClass,
+		&i.TierMin,
+		&i.TierMax,
+		&i.BasePrice,
+		&i.AtmID,
+		&i.SlaNote,
+		&i.Currency,
+		&i.EffectiveStartDate,
+		&i.EffectiveEndDate,
+	)
+	return i, err
 }

@@ -21,6 +21,8 @@ import type {
   AdminVendorVaultsListResponse,
   AdminVendorsListParams,
   AdminVendorsListResponse,
+  BranchATMsListParams,
+  BranchATMsListResponse,
   CreateVendorBranchPayload,
   CreateVendorPackagePayload,
   CreateVendorPackagePricePayload,
@@ -29,6 +31,7 @@ import type {
   CreateVendorVaultPayload,
   DisableVendorResponse,
   UpdateVendorBranchPayload,
+  UpdateVendorPackagePayload,
   UpdateVendorPackagePricePayload,
   UpdateVendorPayload,
   UpdateVendorPicPayload,
@@ -299,22 +302,24 @@ export async function createVendorPackage(
   return data;
 }
 
+export async function updateVendorPackage(
+  vendorId: number,
+  packageId: number,
+  payload: UpdateVendorPackagePayload,
+): Promise<ChangeRequestAccepted> {
+  const { data } = await api.put<ChangeRequestAccepted>(
+    `${BASE}/${vendorId}/packages/${packageId}`,
+    payload,
+  );
+  return data;
+}
+
 export async function disableVendorPackage(
   vendorId: number,
   packageId: number,
 ): Promise<ChangeRequestAccepted> {
   const { data } = await api.post<ChangeRequestAccepted>(
     `${BASE}/${vendorId}/packages/${packageId}/disable`,
-  );
-  return data;
-}
-
-export async function enableVendorPackage(
-  vendorId: number,
-  packageId: number,
-): Promise<ChangeRequestAccepted> {
-  const { data } = await api.post<ChangeRequestAccepted>(
-    `${BASE}/${vendorId}/packages/${packageId}/enable`,
   );
   return data;
 }
@@ -327,7 +332,7 @@ export async function listVendorPackagePrices(
 ): Promise<AdminVendorPackagePricesListResponse> {
   const q = new URLSearchParams();
   appendCommonParams(q, params);
-  if (params.package_code) q.set("package_code", params.package_code);
+  if (params.package) q.set("package", params.package);
   if (params.machine_group) q.set("machine_group", params.machine_group);
   if (params.price_class) q.set("price_class", params.price_class);
   const { data } = await api.get<AdminVendorPackagePricesListResponse>(
@@ -365,6 +370,20 @@ export async function disableVendorPackagePrice(
 ): Promise<ChangeRequestAccepted> {
   const { data } = await api.post<ChangeRequestAccepted>(
     `${BASE}/${vendorId}/package-prices/${priceId}/disable`,
+  );
+  return data;
+}
+
+export async function listBranchATMs(
+  vendorId: number,
+  branchId: number,
+  params: BranchATMsListParams,
+): Promise<BranchATMsListResponse> {
+  const q = new URLSearchParams();
+  q.set("page", String(params.page));
+  q.set("page_size", String(params.page_size));
+  const { data } = await api.get<BranchATMsListResponse>(
+    `${BASE}/${vendorId}/branches/${branchId}/atms?${q.toString()}`,
   );
   return data;
 }

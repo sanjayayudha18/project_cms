@@ -67,9 +67,11 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 		vendorID, marker).Scan(&branchID); err != nil {
 		t.Fatalf("insert vendor branch: %v", err)
 	}
+	// Migration 016 shape: package_code/machine_group/price_class/tier_min +
+	// effective_start_date replace the old code/priority_class/price columns.
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price)
-		VALUES ($1, 'PAKET TEST', 'ALL', 0) RETURNING id`, branchID).Scan(&packageID); err != nil {
+		INSERT INTO vendor_packages_branch (vendor_branch_id, package_code, machine_group, price_class, tier_min, base_price, currency, effective_start_date)
+		VALUES ($1, 'PAKET TEST', 'ATM', 'REGULAR', 1, 0, 'IDR', CURRENT_DATE - 365) RETURNING id`, branchID).Scan(&packageID); err != nil {
 		t.Fatalf("insert vendor package: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `

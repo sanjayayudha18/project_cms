@@ -73,7 +73,8 @@ func (r *ATMAssignmentAdminRepository) ATMActive(ctx context.Context, atmID int6
 	return err == nil, err
 }
 
-// PackageActive reports whether the vendor package exists and is not soft-disabled.
+// PackageActive reports whether the vendor package price row exists and is
+// current or open-ended (migration 016: effective-dated, no more deleted_at).
 func (r *ATMAssignmentAdminRepository) PackageActive(ctx context.Context, packageID int64) (bool, error) {
 	row, err := r.queries.GetVendorPackageAdminByID(ctx, packageID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -82,5 +83,5 @@ func (r *ATMAssignmentAdminRepository) PackageActive(ctx context.Context, packag
 	if err != nil {
 		return false, err
 	}
-	return !row.DeletedAt.Valid, nil
+	return !row.EffectiveEndDate.Valid || !row.EffectiveEndDate.Time.Before(time.Now()), nil
 }

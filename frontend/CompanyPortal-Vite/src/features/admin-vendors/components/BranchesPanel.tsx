@@ -69,7 +69,15 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
     },
     { accessorKey: "branch_name", header: "Nama" },
     { accessorKey: "region", header: "Wilayah", cell: ({ getValue }) => String(getValue() ?? "—") },
-    { accessorKey: "category", header: "Tipe" },
+    {
+      accessorKey: "category",
+      header: "Tipe",
+      cell: ({ getValue }) => (
+        <span className="inline-flex items-center rounded-full bg-[var(--n-100)] px-2 py-0.5 text-xs font-medium text-[var(--n-600)]">
+          {String(getValue())}
+        </span>
+      ),
+    },
     {
       id: "status",
       header: "Status",
@@ -125,7 +133,7 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-4">
       <div className="flex justify-end">
         <Button onClick={() => setFormOpen(true)}>Tambah Cabang</Button>
       </div>

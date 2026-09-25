@@ -1,13 +1,10 @@
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Link } from "@tanstack/react-router";
-import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useVendor } from "../hooks";
 import { BranchesPanel } from "./BranchesPanel";
+import { InfoTab } from "./InfoTab";
 import { PackagePricesPanel } from "./PackagePricesPanel";
 import { PicsPanel } from "./PicsPanel";
+import { VendorHeader } from "./VendorHeader";
 
 const TOP_TABS = [
   { id: "info", label: "Info" },
@@ -64,14 +61,7 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <PageHeader
-        eyebrow="Manajemen Vendor"
-        title={vendor ? `${vendor.code} · ${vendor.name}` : "Detail Vendor"}
-        description="Data vendor beserta cabang, vault, PIC, dan paketnya."
-      />
-      <Link to="/settings/admin/vendors" search={{}}>
-        <Button variant="ghost">← Kembali ke daftar</Button>
-      </Link>
+      <VendorHeader vendor={vendor} vendorId={vendorId} />
 
       <TabBar label="Detail vendor" tabs={TOP_TABS} active={tab} onChange={setTab} />
 
@@ -81,34 +71,7 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
         </p>
       )}
 
-      {tab === "info" && vendor && (
-        <dl className="grid max-w-2xl grid-cols-[12rem_1fr] gap-x-4 gap-y-3 text-sm">
-          {(
-            [
-              ["Kode", vendor.code],
-              ["Nama", vendor.name],
-              ["Nama badan hukum", vendor.legal_name],
-              ["NPWP", vendor.npwp],
-              ["Email kontak", vendor.contact_email],
-              ["Telepon", vendor.contact_phone],
-              ["Alamat kantor pusat", vendor.hq_address],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="contents">
-              <dt className="font-medium text-[var(--n-600)]">{label}</dt>
-              <dd className="text-[var(--n-900)]">{value || "—"}</dd>
-            </div>
-          ))}
-          <dt className="font-medium text-[var(--n-600)]">Status</dt>
-          <dd>
-            {vendor.is_active ? (
-              <Badge variant="success" icon={CheckCircle} label="Aktif" />
-            ) : (
-              <Badge variant="danger" icon={XCircle} label="Nonaktif" />
-            )}
-          </dd>
-        </dl>
-      )}
+      {tab === "info" && vendor && <InfoTab vendor={vendor} />}
 
       {tab === "branches" && <BranchesPanel vendorId={vendorId} />}
 

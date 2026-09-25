@@ -109,10 +109,14 @@ func seedForecastVendorPackage(t *testing.T, tx pgx.Tx, marker, vendorName strin
 		t.Fatalf("insert vendor branch: %v", err)
 	}
 
+	// Migration 016 shape: package_code/machine_group/price_class/tier_min +
+	// effective_start_date replace the old code/priority_class/price columns.
+	// vpb_no_overlap is scoped per vendor_branch_id, so reusing the same
+	// package_code/grain across different test branches never collides.
 	var packageID int64
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO vendor_packages_branch (vendor_branch_id, code, priority_class, price)
-		VALUES ($1, 'PAKET TEST', 'ALL', 0)
+		INSERT INTO vendor_packages_branch (vendor_branch_id, package_code, machine_group, price_class, tier_min, base_price, currency, effective_start_date)
+		VALUES ($1, 'PAKET TEST', 'ATM', 'REGULAR', 1, 0, 'IDR', CURRENT_DATE - 365)
 		RETURNING id
 	`, branchID).Scan(&packageID); err != nil {
 		t.Fatalf("insert vendor package: %v", err)

@@ -26,20 +26,24 @@ vi.mock("../../master-data/pending", () => ({
 
 const noopMutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
+const useVendorMock = vi.fn(() => ({
+  isError: false,
+  data: {
+    id: 1,
+    code: "V1",
+    name: "Vendor Satu",
+    legal_name: "PT Vendor Satu",
+    npwp: "012345678901000",
+    contact_email: "",
+    contact_phone: "",
+    hq_address: "",
+    is_active: true,
+    deleted_at: null,
+  },
+}));
+
 vi.mock("../hooks", () => ({
-  useVendor: () => ({
-    data: {
-      id: 1,
-      code: "V1",
-      name: "Vendor Satu",
-      legal_name: "PT Vendor Satu",
-      npwp: "012345678901000",
-      contact_email: "",
-      contact_phone: "",
-      hq_address: "",
-      is_active: true,
-    },
-  }),
+  useVendor: (...args: unknown[]) => useVendorMock(...args),
   useVendorBranches: () => ({
     isLoading: false,
     isError: false,
@@ -126,12 +130,20 @@ vi.mock("../hooks", () => ({
   useCreateVendorPackage: () => noopMutation,
   useDisableVendorPackage: () => noopMutation,
   useEnableVendorPackage: () => noopMutation,
+  useVendorPackagePrices: () => ({
+    isLoading: false,
+    isError: false,
+    data: { package_prices: [], page: 1, page_size: 100, total: 0 },
+  }),
+  useCreateVendorPackagePrice: () => noopMutation,
+  useUpdateVendorPackagePrice: () => noopMutation,
+  useDisableVendorPackagePrice: () => noopMutation,
 }));
 
 describe("VendorDetailPage", () => {
   it("shows legal name and NPWP on Info", () => {
     render(<VendorDetailPage vendorId={1} />);
-    expect(screen.getByText("PT Vendor Satu")).toBeTruthy();
+    expect(screen.getAllByText("PT Vendor Satu").length).toBeGreaterThan(0);
     expect(screen.getByText("012345678901000")).toBeTruthy();
   });
 
@@ -149,5 +161,28 @@ describe("VendorDetailPage", () => {
     render(<VendorDetailPage vendorId={1} />);
     await userEvent.click(screen.getByRole("tab", { name: "PIC Vendor-wide" }));
     expect(screen.getByText("Belum ada PIC vendor-wide")).toBeTruthy();
+  });
+
+  it("presents exactly four tabs in order: Info, Cabang, PIC Vendor-wide, Harga Paket", () => {
+    render(<VendorDetailPage vendorId={1} />);
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs).toEqual(["Info", "Cabang", "PIC Vendor-wide", "Harga Paket"]);
+  });
+
+  it("shows only the selected tab's panel when switching tabs", async () => {
+    render(<VendorDetailPage vendorId={1} />);
+
+    // Info panel content is visible by default.
+    expect(screen.getByText("Vendor Satu")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Cabang" }));
+    expect(screen.getByText("Cabang Satu")).toBeTruthy();
+    expect(screen.queryByText("012345678901000")).toBeNull();
+  });
+
+  it("shows the vendor-not-found error when the vendor fails to load", () => {
+    useVendorMock.mockReturnValueOnce({ isError: true, data: undefined });
+    render(<VendorDetailPage vendorId={1} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Vendor tidak ditemukan");
   });
 });

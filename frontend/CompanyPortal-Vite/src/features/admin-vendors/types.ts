@@ -209,23 +209,35 @@ export type CreateVendorPicPayload = VendorPicFormPayload;
 export type UpdateVendorPicPayload = VendorPicFormPayload;
 
 /**
- * Since migration 010 this is a pure kelolaan/frequency link -- no
- * price/priority_class (moved to vendor_package_prices) and no Update (both
- * remaining fields are immutable after create; a code/branch change is a new
- * package). vendor_branch_id NULL = internal package (no vendor, never billed).
+ * A branch's own special/custom package price ("harga khusus cabang",
+ * migration 016) -- same field shape as AdminVendorPackagePrice, but always
+ * branch-scoped (vendor_branch_id required, not optional) and distinct from
+ * it: this is the branch's OWN price, not an override row in the vendor-wide
+ * PT/branch/ATM price tree (that stays in vendor_package_prices, shown on
+ * the vendor page). Money fields are exact decimal strings, never numbers.
+ * No is_active/deleted_at: effective-dated history, not a togglable entity
+ * -- "disable" ends validity (effective_end_date), never soft-deletes.
  */
 export interface AdminVendorPackage {
   id: number;
-  vendor_branch_id: number | null;
-  code: string;
-  is_active: boolean;
-  deleted_at: string | null;
+  vendor_branch_id: number;
+  package_code: string;
+  machine_group: "ATM" | "CDM_CRM";
+  price_class: "REGULAR" | "VIP_INDUSTRI";
+  tier_min: number;
+  tier_max: number | null;
+  base_price: string | null;
+  atm_id: number | null;
+  sla_note: string | null;
+  currency: string;
+  effective_start_date: string;
+  effective_end_date: string | null;
 }
 
 export interface AdminVendorPackagesListParams {
   page: number;
   page_size: number;
-  status?: VendorChildStatus;
+  status?: VendorPackagePriceStatus;
   q?: string;
   /** Branch drill-down: omit for all branches under the vendor. */
   branch_id?: number;
@@ -238,10 +250,27 @@ export interface AdminVendorPackagesListResponse {
   total: number;
 }
 
-export interface CreateVendorPackagePayload {
-  vendor_branch_id: number | null;
-  code: string;
+/** Editable on Update; also embedded in the create payload. */
+export interface VendorPackageContentPayload {
+  base_price: string | null;
+  sla_note: string | null;
+  effective_end_date: string | null;
 }
+
+/** Grain fields are immutable after create -- a grain change is a new price period. */
+export interface CreateVendorPackagePayload extends VendorPackageContentPayload {
+  vendor_branch_id: number;
+  package_code: string;
+  machine_group: "ATM" | "CDM_CRM";
+  price_class: "REGULAR" | "VIP_INDUSTRI";
+  tier_min: number;
+  tier_max: number | null;
+  atm_id: number | null;
+  currency: string;
+  effective_start_date: string;
+}
+
+export type UpdateVendorPackagePayload = VendorPackageContentPayload;
 
 /**
  * Vendor package price (backend/internal/handler/admin_vendor_package_price_handler.go,
@@ -252,11 +281,17 @@ export interface CreateVendorPackagePayload {
  * them in JS, only display. No is_active/deleted_at: a price row is
  * effective-dated history, not a togglable entity -- "disable" ends its
  * validity (effective_end_date), it does not soft-delete the row.
+ *
+ * Migration 017 split the single identifier: `package` is the shared
+ * human-readable label ("PAKET 3") that groups rows; `package_code` is the
+ * per-row unique machine code ("PKG3_ABA_001"), server-generated and never
+ * collected from the operator.
  */
 export interface AdminVendorPackagePrice {
   id: number;
   vendor_id: number;
-  package_code: string;
+  package: string; // label, groups rows ("PAKET 3")
+  package_code: string; // per-row code ("PKG3_ABA_001")
   machine_group: "ATM" | "CDM_CRM";
   price_class: "REGULAR" | "VIP_INDUSTRI";
   tier_min: number;
@@ -277,7 +312,7 @@ export interface AdminVendorPackagePricesListParams {
   page: number;
   page_size: number;
   status?: VendorPackagePriceStatus;
-  package_code?: string;
+  package?: string;
   machine_group?: string;
   price_class?: string;
 }
@@ -296,9 +331,13 @@ export interface VendorPackagePriceContentPayload {
   effective_end_date: string | null;
 }
 
-/** Grain fields are immutable after create -- a grain change is a new price period. */
+/**
+ * Grain fields are immutable after create -- a grain change is a new price
+ * period. `package` is the label the operator picks; `package_code` is NOT
+ * collected here -- it is generated server-side on approval.
+ */
 export interface CreateVendorPackagePricePayload extends VendorPackagePriceContentPayload {
-  package_code: string;
+  package: string;
   machine_group: "ATM" | "CDM_CRM";
   price_class: "REGULAR" | "VIP_INDUSTRI";
   tier_min: number;
@@ -310,3 +349,34 @@ export interface CreateVendorPackagePricePayload extends VendorPackagePriceConte
 }
 
 export type UpdateVendorPackagePricePayload = VendorPackagePriceContentPayload;
+
+/**
+ * Read-only "ATM" sub-tab on the vendor branch detail page
+ * (backend/internal/handler/admin_branch_atm_handler.go, mounted at
+ * /api/v1/admin/vendors/{vendorId}/branches/{branchId}/atms). Display-only:
+ * no create/update/disable, no maker-checker. An ATM is "managed by" a
+ * branch through an active atm_vendor_packages assignment to one of the
+ * branch's packages -- location/priority_class are nullable per the LEFT
+ * JOIN/nullable source columns.
+ */
+export interface ManagedATM {
+  atm_id: number;
+  terminal_id: string;
+  location_name: string | null;
+  location_city_or_regency: string | null;
+  priority_class: string | null;
+  is_active: boolean;
+  package_code: string;
+}
+
+export interface BranchATMsListParams {
+  page: number;
+  page_size: number;
+}
+
+export interface BranchATMsListResponse {
+  atms: ManagedATM[];
+  page: number;
+  page_size: number;
+  total: number;
+}

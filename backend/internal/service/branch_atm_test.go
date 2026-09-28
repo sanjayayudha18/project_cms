@@ -46,7 +46,7 @@ type fakeATM struct {
 // DB, so BranchATMService's dedup/scope/pagination logic can be
 // property-tested per design.md's Testing Strategy.
 type fakeBranchATMRepo struct {
-	today       time.Time // stands in for CURRENT_DATE
+	today       time.Time       // stands in for CURRENT_DATE
 	branches    map[int64]int64 // branchID -> vendorID
 	packages    map[int64]fakePackage
 	assignments []fakeAssignment

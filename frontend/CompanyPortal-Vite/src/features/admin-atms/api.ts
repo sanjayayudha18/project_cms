@@ -84,12 +84,16 @@ export interface ATMAssignment {
   effective_start_date: string;
   effective_end_date: string | null;
   is_active: boolean;
+  /** Owning vendor/cabang of the package; null for internal (ROH) packages. */
+  vendor_id?: number | null;
+  vendor_branch_id?: number | null;
 }
 
+/** Dates omitted = automatic period (starts on the approval date, open-ended). */
 export interface CreateATMAssignmentPayload {
   vendor_package_id: number;
-  effective_start_date: string;
-  effective_end_date: string | null;
+  effective_start_date?: string;
+  effective_end_date?: string | null;
 }
 
 export async function listATMAssignments(atmId: number): Promise<ATMAssignment[]> {

@@ -235,6 +235,7 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
       {!query.isLoading && !query.isError && (
         <DataTable
           data={sorted}
+          pageSize={10}
           columns={columns}
           emptyMessage={
             noMatchesFromNonEmptyList

@@ -1,6 +1,6 @@
 # Plan & Task List: User Session Lifetime (absolut 1 jam, parameterized)
 
-Status: **draft (2026-09-21)** — belum mulai coding. Stage: 3 Build.
+Status: **implemented** (17/17 task, commit `7a86eca`; draft 2026-09-21). Stage: 4 Test. Sisa: tes manual T5.3 di `tests.md` (dijalankan user).
 Catatan SDLC: `intent.md` & `spec.md` belum ada (feature ini masuk lewat permintaan langsung). Isi menyusul kalau perlu jejak audit penuh.
 
 ## Keputusan (2026-09-21)

@@ -160,6 +160,7 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
       {!query.isLoading && !query.isError && (
         <DataTable
           data={pics}
+          pageSize={10}
           columns={columns}
           emptyMessage={
             branchId === null ? "Belum ada PIC vendor-wide" : "Cabang ini belum punya PIC"

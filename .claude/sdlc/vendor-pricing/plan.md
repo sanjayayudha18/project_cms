@@ -1,6 +1,6 @@
 # Plan: Harga Paket per Vendor FLM (desain ulang tabel paket)
 
-Status: **desain disepakati (2026-09-22) — belum ada kode, belum ada migration.**
+Status: **desain disepakati (2026-09-22) — implemented**: migration 009/010 (+017 package_code split), backend (maker-checker + Applier), panel CompanyPortal. Sisa: seed harga khusus per ATM (17 ATM) + biaya tambahan operasional (3 ATM).
 Sumber requirement: `archives/Harga Paket per vendor FLM.docx` (7 screenshot tabel harga, 5 vendor).
 Menggantikan: `vendor_packages.price` + `vendor_packages.priority_class` dari baseline `001_baseline_schema.sql`.
 ERD usulan: `.claude/sdlc/vendor-pricing/schema.dbml` (paste ke dbdiagram.io).

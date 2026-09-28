@@ -130,11 +130,7 @@ export function PackagesPanel({ vendorId, branchId }: PackagesPanelProps) {
               Ubah
             </Button>
             {isOpenEnded && (
-              <Button
-                variant="danger"
-                disabled={isPending}
-                onClick={() => setPendingDisable(pkg)}
-              >
+              <Button variant="danger" disabled={isPending} onClick={() => setPendingDisable(pkg)}>
                 Akhiri
               </Button>
             )}

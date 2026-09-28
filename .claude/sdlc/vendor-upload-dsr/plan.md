@@ -1,6 +1,6 @@
 # Plan: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)
 
-Status: draft — approved in Claude Code plan mode. Stage: 3 Build. Reads: `spec.md`.
+Status: draft — approved in Claude Code plan mode. Stage: 3 Build. Reads: `spec.md`. Code: implemented (commit `4d4e261`).
 Trigger to next stage: engineer accepts this plan -> implementation -> `tests.md`.
 
 > **Post-plan update (2026-09-04):** the single-phase upload design below was

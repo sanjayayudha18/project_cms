@@ -145,7 +145,12 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
         </p>
       )}
       {!query.isLoading && !query.isError && (
-        <DataTable data={branches} columns={columns} emptyMessage="Vendor ini belum punya cabang" />
+        <DataTable
+          pageSize={10}
+          data={branches}
+          columns={columns}
+          emptyMessage="Vendor ini belum punya cabang"
+        />
       )}
 
       <VendorBranchFormDialog

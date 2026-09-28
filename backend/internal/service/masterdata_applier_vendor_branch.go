@@ -10,6 +10,25 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
+func ensureBranchHasNoActiveChildren(ctx context.Context, q *db.Queries, branchID int64) error {
+	vaults, err := q.CountActiveVendorVaultsByBranch(ctx, branchID)
+	if err != nil {
+		return fmt.Errorf("checking active vaults: %w", err)
+	}
+	pics, err := q.CountActiveVendorPicsByBranch(ctx, &branchID)
+	if err != nil {
+		return fmt.Errorf("checking active pics: %w", err)
+	}
+	pkgs, err := q.CountActiveVendorPackagesByBranch(ctx, &branchID)
+	if err != nil {
+		return fmt.Errorf("checking active packages: %w", err)
+	}
+	if vaults+pics+pkgs > 0 {
+		return fmt.Errorf("disable vendor branch: %w", ErrVendorBranchHasActiveChildren)
+	}
+	return nil
+}
+
 // VendorBranchApplier is the Applier for entity_type="vendor_branch" (T3.1).
 type VendorBranchApplier struct{}
 
@@ -59,6 +78,11 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 	case "disable":
 		if change.EntityID == nil {
 			return 0, nil, fmt.Errorf("disable requires entity_id")
+		}
+		// Re-check at apply time: a vault/PIC/package may have been approved
+		// between this disable's submit and its approval (decision 2026-09-25).
+		if err := ensureBranchHasNoActiveChildren(ctx, q, *change.EntityID); err != nil {
+			return 0, nil, err
 		}
 		if err := q.DisableVendorBranch(ctx, *change.EntityID); err != nil {
 			return 0, nil, fmt.Errorf("disable vendor branch: %w", err)

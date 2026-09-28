@@ -34,9 +34,12 @@ export interface AdminATMsUrlParams {
   priority_class: PriorityClass | "";
 }
 
+/** The ATM table shows at most this many rows per page. */
+const MAX_PAGE_SIZE = 10;
+
 const DEFAULTS: AdminATMsUrlParams = {
   page: 1,
-  page_size: 25,
+  page_size: MAX_PAGE_SIZE,
   status: "active",
   q: "",
   brand: "",
@@ -50,7 +53,11 @@ const SEARCH_DEBOUNCE_MS = 300;
 export function parseParams(raw: Record<string, unknown>): AdminATMsUrlParams {
   return {
     page: typeof raw.page === "number" ? raw.page : DEFAULTS.page,
-    page_size: typeof raw.page_size === "number" ? raw.page_size : DEFAULTS.page_size,
+    // Clamped so old/shared links with a larger page_size still show ≤ 10 rows.
+    page_size:
+      typeof raw.page_size === "number"
+        ? Math.min(raw.page_size, MAX_PAGE_SIZE)
+        : DEFAULTS.page_size,
     status: typeof raw.status === "string" ? (raw.status as ATMStatus) : DEFAULTS.status,
     q: typeof raw.q === "string" ? raw.q : DEFAULTS.q,
     brand: typeof raw.brand === "string" ? raw.brand : DEFAULTS.brand,

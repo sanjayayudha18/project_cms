@@ -65,7 +65,11 @@ export function VendorBranchDetailPage({
         </span>
       )}
 
-      <div role="tablist" aria-label="Data cabang" className="flex gap-1 border-b border-[var(--n-200)]">
+      <div
+        role="tablist"
+        aria-label="Data cabang"
+        className="flex gap-1 border-b border-[var(--n-200)]"
+      >
         {BRANCH_SUB_TABS.map((t) => (
           <button
             key={t.id}

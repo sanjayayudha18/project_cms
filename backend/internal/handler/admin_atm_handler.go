@@ -345,6 +345,8 @@ func atmToResponse(a service.ATM) map[string]any {
 		"low_threshold_amount": a.LowThresholdAmount, "critical_threshold_amount": a.CriticalThresholdAmount,
 		"blacklisted": a.Blacklisted, "escrow_account": a.EscrowAccount, "priority_class": a.PriorityClass,
 		"is_active": a.IsActive, "created_at": formatTimePtr(a.CreatedAt), "updated_at": formatTimePtr(a.UpdatedAt),
-		"deleted_at": formatTimePtr(a.DeletedAt),
+		"deleted_at":          formatTimePtr(a.DeletedAt),
+		"current_vendor_code": a.CurrentVendorCode, "current_vendor_name": a.CurrentVendorName, "current_branch_code": a.CurrentBranchCode,
+		"current_package_code": a.CurrentPackageCode,
 	}
 }

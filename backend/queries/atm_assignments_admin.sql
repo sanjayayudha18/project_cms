@@ -12,9 +12,11 @@
 -- is_active=false is what releases the period from the exclusion constraint).
 -- No priority_class here since migration 010 dropped vendor_packages_branch.priority_class.
 SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
-       a.effective_start_date, a.effective_end_date, a.is_active
+       a.effective_start_date, a.effective_end_date, a.is_active,
+       p.vendor_branch_id, vb.vendor_id
 FROM atm_vendor_packages a
 JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
 WHERE a.atm_id = sqlc.arg('atm_id')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -81,3 +83,20 @@ UPDATE atm_vendor_packages SET is_active = false WHERE id = $1;
 -- name: EnableATMAssignment :exec
 -- May raise the exclusion violation if the period was re-assigned meanwhile.
 UPDATE atm_vendor_packages SET is_active = true WHERE id = $1;
+
+-- name: CloseATMAssignmentsBeforeStart :exec
+-- Automatic handover (create with no dates): the running period(s) of this ATM
+-- end the day before the new period starts.
+UPDATE atm_vendor_packages
+SET effective_end_date = sqlc.arg('start_date')::date - 1, updated_at = now()
+WHERE atm_id = sqlc.arg('atm_id') AND is_active
+  AND effective_start_date < sqlc.arg('start_date')::date
+  AND (effective_end_date IS NULL OR effective_end_date >= sqlc.arg('start_date')::date);
+
+-- name: DisableATMAssignmentsStartingOn :exec
+-- Automatic handover: a period that began the same day can't be closed to
+-- start-1 (end < start), so it is soft-disabled instead.
+UPDATE atm_vendor_packages
+SET is_active = false, updated_at = now()
+WHERE atm_id = sqlc.arg('atm_id') AND is_active
+  AND effective_start_date = sqlc.arg('start_date')::date;

@@ -14,9 +14,24 @@ SELECT a.id, a.terminal_id, a.location_id, l.name AS location_name,
        a.machine_type, a.brand, a.model, a.operation_hours, a.deployment_type,
        a.capacity_amount, a.low_threshold_amount, a.critical_threshold_amount,
        a.blacklisted, a.escrow_account, a.priority_class, a.is_active,
-       a.created_at, a.updated_at, a.deleted_at
+       a.created_at, a.updated_at, a.deleted_at,
+       COALESCE(cur.package_code, '') AS current_package_code, COALESCE(cur.branch_code, '') AS current_branch_code,
+       COALESCE(cur.vendor_code, '') AS current_vendor_code, COALESCE(cur.vendor_name, '') AS current_vendor_name
 FROM atms a
 LEFT JOIN locations l ON l.id = a.location_id
+-- Current kelolaan: the active assignment period covering today (latest start wins).
+LEFT JOIN LATERAL (
+    SELECT p.package_code, vb.branch_code, v.code AS vendor_code, v.name AS vendor_name
+    FROM atm_vendor_packages avp
+    JOIN vendor_packages_branch p ON p.id = avp.vendor_package_id
+    LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
+    LEFT JOIN vendors v ON v.id = vb.vendor_id
+    WHERE avp.atm_id = a.id AND avp.is_active
+      AND avp.effective_start_date <= CURRENT_DATE
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= CURRENT_DATE)
+    ORDER BY avp.effective_start_date DESC, avp.id DESC
+    LIMIT 1
+) cur ON true
 WHERE (sqlc.narg('q')::text IS NULL
         OR a.terminal_id ILIKE '%' || sqlc.narg('q')::text || '%')
   AND (sqlc.narg('brand')::text IS NULL OR a.brand = sqlc.narg('brand')::text)

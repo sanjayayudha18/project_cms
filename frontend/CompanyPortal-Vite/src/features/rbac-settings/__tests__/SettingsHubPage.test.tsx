@@ -2,10 +2,14 @@
  * Task 10 (admin-user-vendor-management): Settings hub gains "Manajemen
  * Pengguna"/"Manajemen Vendor" cards linking to the admin-users/
  * admin-vendors routes, distinct from the existing read-only "Hierarki
- * Pengguna" card. Task 9 (admin-atm-management) adds "Manajemen ATM".
+ * Pengguna" card. Task 9 (admin-atm-management) adds "Manajemen ATM";
+ * region-management Task 10.2 adds "Manajemen Region".
+ *
+ * Since the UI revamp, master-data cards live under the "Data master" tab
+ * (the hub opens on "Akses & persetujuan"), so those tests switch tab first.
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { SettingsHubPage } from "../components/SettingsHubPage";
@@ -30,23 +34,25 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
+function renderMasterTab() {
+  render(<SettingsHubPage />);
+  fireEvent.click(screen.getByRole("tab", { name: "Data master" }));
+}
+
 describe("SettingsHubPage — admin cards (Task 10)", () => {
-  it("links Manajemen Pengguna to /settings/admin/users", () => {
-    render(<SettingsHubPage />);
-    const link = screen.getByRole("link", { name: /Manajemen Pengguna/ });
-    expect(link).toHaveAttribute("href", "/settings/admin/users");
+  it.each([
+    ["Manajemen Pengguna", "/settings/admin/users"],
+    ["Manajemen Vendor", "/settings/admin/vendors"],
+    ["Manajemen ATM", "/settings/admin/atms"],
+    ["Manajemen Region", "/settings/admin/regions"],
+  ])("links %s to %s on the Data master tab", (name, href) => {
+    renderMasterTab();
+    expect(screen.getByRole("link", { name: new RegExp(name) })).toHaveAttribute("href", href);
   });
 
-  it("links Manajemen Vendor to /settings/admin/vendors", () => {
+  it("hides master-data cards on the default Akses & persetujuan tab", () => {
     render(<SettingsHubPage />);
-    const link = screen.getByRole("link", { name: /Manajemen Vendor/ });
-    expect(link).toHaveAttribute("href", "/settings/admin/vendors");
-  });
-
-  it("links Manajemen ATM to /settings/admin/atms", () => {
-    render(<SettingsHubPage />);
-    const link = screen.getByRole("link", { name: /Manajemen ATM/ });
-    expect(link).toHaveAttribute("href", "/settings/admin/atms");
+    expect(screen.queryByRole("link", { name: /Manajemen Region/ })).not.toBeInTheDocument();
   });
 
   it("keeps the existing Hierarki Pengguna card distinct (read-only hierarchy vs CRUD)", () => {
@@ -56,6 +62,5 @@ describe("SettingsHubPage — admin cards (Task 10)", () => {
       "href",
       "/settings/rbac/users",
     );
-    expect(screen.getByText(/Kelola akun, peran, dan status aktif pengguna/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 # Plan & Task List: Master Data (vendor, vault, PIC, ATM, kelolaan)
 
-Status: **approved (2026-09-18)** — belum mulai coding. Stage: 3 Build.
+Status: **approved (2026-09-18)** — **implemented** Fase 0–6 (43/43 task; review di `review.md`). Stage: 5 Deploy. Sisa: tombol UI untuk retry-apply.
 Sumber requirement: URS v0.3 Phase 1 §1 · flow: `.claude/feature-flows/01-master-data/feature-flow.md`
 Progress tracker: `.claude/development-progress.md` baris 01.
 

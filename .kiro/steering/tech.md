@@ -6,8 +6,9 @@
 
 | Layer | Choice |
 |-------|--------|
-| Backend | Go + Chi (v5) |
-| DB pool | pgx / pgxpool (`pkg/database`) |
+| Backend (transactional API) | Go + Chi (v5) |
+| Backend (EOD / ETL runtime) | Python + FastAPI (`backend_python/`) — valid third runtime, user decision 2026-09-25 |
+| DB pool | pgx / pgxpool (`pkg/database`, Go) · asyncpg (`backend_python/lib`, Python) |
 | Frontend | React + Vite, served via Nginx |
 | Database | PostgreSQL (external, NON-dockerized) — primary + read replica |
 | Cache | Redis (Memorystore in prod) |
@@ -18,6 +19,8 @@
 | Cloud | GCP |
 
 > Frontend: Dockerized. Backend: Dockerized or local. Database: NOT dockerized.
+
+> **Three runtimes, not two.** The Go+Chi API (`backend/`, `backend-cit/`) is the transactional/office-hours runtime. React+Vite is the frontend. **Python+FastAPI (`backend_python/`) is the EOD / ETL runtime** — DMAA/ITM/DSR ingest + the retry scheduler. It is NOT a Go `cmd/batch` (that entrypoint was deliberately dropped). "Backend is Go + Chi" below describes the transactional API only; EOD is Python. Keep this file, `structure.md`, `project-context.md`, and `.claude/CLAUDE.md` in sync — all four are canonical.
 
 ---
 
@@ -49,7 +52,7 @@
 | Auth | Custom JWT + RBAC middleware (`pkg/auth`, `pkg/middleware`) | — | Multi-role auth, D-3 approval hierarchy |
 | PDF generation | Typst CLI | latest | Template-based PDF (berita acara, surat konfirmasi, memo) |
 | Excel | excelize | latest | DSR import, CIT/CPC recap parsing, schedule export |
-| Queue | asynq | latest | Redis-backed async jobs (projections, PDF gen, reconciliation) |
+| Queue | asynq (candidate) | latest | Redis-backed async jobs. NOT yet adopted — a standalone async worker was dropped (plan 2026-09-25); async is decided per-feature (goroutine + DB job table vs Redis queue) when a feature needs it |
 | Logging | slog (stdlib) | — | Structured logging |
 | Config | envconfig or viper | latest | Environment-based configuration (`pkg/config`) |
 | HTTP client | net/http (stdlib) | — | Future integration calls |
@@ -68,13 +71,40 @@ Two separate Go modules in a workspace (`go.work`), sharing `pkg/`:
 - Both reach the same PostgreSQL primary/replica and the same Redis instance.
 - **Deployment (current):** ONE Compute Engine VM runs both backends as separate containers. Planned split to two VMs in 2028 — the module separation already makes that a zero-code-change deployment change.
 
+## Python EOD / ETL Runtime (`backend_python/`)
+
+The End-of-Day and ingest pipeline runs as Python, not Go. It shares the same PostgreSQL and validates the same JWTs the Go API issues (never issues its own).
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Language | Python 3.11+ | ETL + scheduler runtime |
+| API framework | FastAPI + uvicorn | HTTP services (`service_dsr_etl`, `eod_retry_scheduler`) |
+| DB driver | asyncpg | Async pool (`lib/database.py`) — Python side does NOT use pgx |
+| Models / config | pydantic v2 + pydantic-settings | Request/response models, env config |
+| Scheduling | APScheduler | Retry scheduler, timed EOD triggers |
+| Auth | python-jose[cryptography] | Validates the Go-issued JWT (shared `JWT_SECRET`) |
+
+Layout inside `backend_python/`:
+
+| Path | Role |
+|------|------|
+| `lib/` | Shared: `database.py` (asyncpg pool), `dependencies.py`, `schemas.py`, `services/` (e.g. `SchedulerService`), `utils/` (e.g. `timezone.WIB`) |
+| `service_dsr_etl/` | FastAPI service — vendor DSR upload dry-run/confirm, late/summary/audit/retry routers |
+| `eod_retry_scheduler/` | FastAPI service — EOD retry scheduling |
+| `dmaa/dmaa_etl.py` | DMAA forecast ETL script |
+| `dsr/dsr_etl.py` | DSR ETL script (+ `test_dsr_etl.py`) |
+| `itm/{cashpos,replenish}/` | ITM cash-position + replenishment ETL |
+
+- **Response envelope (Python):** `{status, data, error}` — similar in spirit to Go's `pkg/response` but a separate shape; do not assume they are identical.
+- Each FastAPI service has its own `requirements.txt`, `config.py`, `main.py` (app factory + lifespan), `run.py`, `.env.example`.
+
 ## Infrastructure (Dockerized)
 
 | Service | Image | Purpose |
 |---------|-------|---------|
 | ATM Backend API | Custom (multi-stage Go build, `backend/Dockerfile`) | ~15-25MB final image, port 8080 |
 | CIT Backend API | Custom (multi-stage Go build, `backend-cit/Dockerfile`) | ~15-25MB final image, port 8081 |
-| Worker | Same Go binary, different entrypoint | asynq worker for background jobs |
+| Python ETL / EOD | uvicorn + FastAPI (`backend_python/*`) | DSR ETL + EOD retry scheduler services |
 | Frontend (internal) | nginx:alpine + static build | Serves CompanyPortal-Vite output |
 | Frontend (vendor) | nginx:alpine + static build | Serves VendorPortal-Vite output |
 | Redis | redis:7-alpine | Queue backend (asynq) + JWT blacklist + rate-limit counters |
@@ -136,7 +166,7 @@ task check            # Runs lint + test + build for both frontend and backend
 
 1. **Clean separation:** Frontend knows nothing about DB. Backend exposes REST API only.
 2. **SQL-first:** Use sqlc — write real SQL, get type-safe Go. No ORM magic.
-3. **Async by default:** PDF generation, projection computation, and reconciliation batches go through asynq. API returns immediately with a job ID.
+3. **Async when needed, decided per-feature:** long work (projection, reconciliation, PDF gen) should not block a request, but there is no blanket asynq worker. Choose the mechanism (goroutine + DB job table, Redis queue, or the Python ETL pipeline) when the feature lands. EOD/ingest runs in the Python runtime.
 4. **Feature-based organization:** Both frontend and backend group code by business domain (forecasting, invoice, cit), not by technical layer.
 5. **Single binary deploy:** Go compiles to one binary per entrypoint. No runtime dependencies in container.
 6. **Shared nothing between frontend/backend:** No code sharing. API contract defined via OpenAPI spec, frontend generates typed client from it.

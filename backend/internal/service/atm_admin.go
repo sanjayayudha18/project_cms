@@ -88,6 +88,11 @@ type ATM struct {
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 	DeletedAt               *time.Time
+	// Current kelolaan (list only; "" = no active assignment today).
+	CurrentVendorCode  string
+	CurrentVendorName  string
+	CurrentBranchCode  string
+	CurrentPackageCode string
 }
 
 // LocationOption is one entry of the Location select backing data (Req 6).
@@ -486,6 +491,7 @@ func atmFromListRow(row db.ListATMsAdminRow) (ATM, error) {
 		CriticalThresholdAmount: critical, Blacklisted: row.Blacklisted, EscrowAccount: row.EscrowAccount,
 		PriorityClass: row.PriorityClass, IsActive: row.IsActive,
 		CreatedAt: timestamptzToPtr(row.CreatedAt), UpdatedAt: timestamptzToPtr(row.UpdatedAt), DeletedAt: timestamptzToPtr(row.DeletedAt),
+		CurrentVendorCode: row.CurrentVendorCode, CurrentVendorName: row.CurrentVendorName, CurrentBranchCode: row.CurrentBranchCode, CurrentPackageCode: row.CurrentPackageCode,
 	}, nil
 }
 

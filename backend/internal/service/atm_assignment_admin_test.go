@@ -130,6 +130,32 @@ func TestATMAssignmentAdminService_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("no dates = automatic period: submitted without dates and without an overlap check", func(t *testing.T) {
+		sub := &fakeVendorBranchSubmitter{}
+		repo := &fakeATMAssignmentAdminRepo{overlap: true} // would block a dated create
+		svc := NewATMAssignmentAdminService(repo, sub)
+		if _, err := svc.Create(context.Background(), 7, 3, ATMAssignmentUpdatePayload{VendorPackageID: 5, EffectiveEndDate: sp("2026-12-31")}, "ip"); err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		p := sub.lastRequest.Payload.(ATMAssignmentPayload)
+		if p.EffectiveStartDate != "" || p.EffectiveEndDate != nil || p.VendorPackageID != 5 {
+			t.Errorf("automatic payload must carry no dates: %+v", p)
+		}
+		if !repo.lastStart.IsZero() {
+			t.Errorf("HasOverlap must not be called for an automatic period")
+		}
+	})
+
+	t.Run("automatic period still requires an active package", func(t *testing.T) {
+		sub := &fakeVendorBranchSubmitter{}
+		svc := NewATMAssignmentAdminService(&fakeATMAssignmentAdminRepo{pkgInactive: true}, sub)
+		_, err := svc.Create(context.Background(), 7, 3, ATMAssignmentUpdatePayload{VendorPackageID: 5}, "ip")
+		var ve *ValidationError
+		if !errors.As(err, &ve) || ve.Field != "vendor_package_id" || sub.submitCalled {
+			t.Fatalf("want vendor_package_id ValidationError and no submit, got %v", err)
+		}
+	})
+
 	t.Run("overlap is not submitted", func(t *testing.T) {
 		sub := &fakeVendorBranchSubmitter{}
 		svc := NewATMAssignmentAdminService(&fakeATMAssignmentAdminRepo{overlap: true}, sub)

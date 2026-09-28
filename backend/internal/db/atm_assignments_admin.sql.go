@@ -23,6 +23,26 @@ func (q *Queries) ATMActiveForAssignment(ctx context.Context, id int64) (int64, 
 	return id_2, err
 }
 
+const closeATMAssignmentsBeforeStart = `-- name: CloseATMAssignmentsBeforeStart :exec
+UPDATE atm_vendor_packages
+SET effective_end_date = $1::date - 1, updated_at = now()
+WHERE atm_id = $2 AND is_active
+  AND effective_start_date < $1::date
+  AND (effective_end_date IS NULL OR effective_end_date >= $1::date)
+`
+
+type CloseATMAssignmentsBeforeStartParams struct {
+	StartDate pgtype.Date `json:"start_date"`
+	AtmID     int64       `json:"atm_id"`
+}
+
+// Automatic handover (create with no dates): the running period(s) of this ATM
+// end the day before the new period starts.
+func (q *Queries) CloseATMAssignmentsBeforeStart(ctx context.Context, arg CloseATMAssignmentsBeforeStartParams) error {
+	_, err := q.db.Exec(ctx, closeATMAssignmentsBeforeStart, arg.StartDate, arg.AtmID)
+	return err
+}
+
 const countATMAssignmentsAdmin = `-- name: CountATMAssignmentsAdmin :one
 SELECT COUNT(*)
 FROM atm_vendor_packages a
@@ -94,6 +114,25 @@ UPDATE atm_vendor_packages SET is_active = false WHERE id = $1
 // Soft-disable only; releases the period from the exclusion constraint.
 func (q *Queries) DisableATMAssignment(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, disableATMAssignment, id)
+	return err
+}
+
+const disableATMAssignmentsStartingOn = `-- name: DisableATMAssignmentsStartingOn :exec
+UPDATE atm_vendor_packages
+SET is_active = false, updated_at = now()
+WHERE atm_id = $1 AND is_active
+  AND effective_start_date = $2::date
+`
+
+type DisableATMAssignmentsStartingOnParams struct {
+	AtmID     int64       `json:"atm_id"`
+	StartDate pgtype.Date `json:"start_date"`
+}
+
+// Automatic handover: a period that began the same day can't be closed to
+// start-1 (end < start), so it is soft-disabled instead.
+func (q *Queries) DisableATMAssignmentsStartingOn(ctx context.Context, arg DisableATMAssignmentsStartingOnParams) error {
+	_, err := q.db.Exec(ctx, disableATMAssignmentsStartingOn, arg.AtmID, arg.StartDate)
 	return err
 }
 
@@ -176,9 +215,11 @@ func (q *Queries) GetATMAssignmentAdminByID(ctx context.Context, id int64) (GetA
 const listATMAssignmentsAdmin = `-- name: ListATMAssignmentsAdmin :many
 
 SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
-       a.effective_start_date, a.effective_end_date, a.is_active
+       a.effective_start_date, a.effective_end_date, a.is_active,
+       p.vendor_branch_id, vb.vendor_id
 FROM atm_vendor_packages a
 JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
 WHERE a.atm_id = $1
   AND (
         $2::text = 'all'
@@ -204,6 +245,8 @@ type ListATMAssignmentsAdminRow struct {
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	VendorID           *int64      `json:"vendor_id"`
 }
 
 // Admin ATM assignment (kelolaan ATM) management (plan.md Fase 3, T3.5): an
@@ -239,6 +282,8 @@ func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssign
 			&i.EffectiveStartDate,
 			&i.EffectiveEndDate,
 			&i.IsActive,
+			&i.VendorBranchID,
+			&i.VendorID,
 		); err != nil {
 			return nil, err
 		}

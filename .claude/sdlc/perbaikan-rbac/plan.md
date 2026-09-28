@@ -1,7 +1,7 @@
 # Plan: Kelolaan Cabang â†’ Vault/PIC/Paket per-Cabang (Vendor Detail)
 
 **Route**: `http://localhost:5174/settings/admin/vendors/2`
-**Status**: Draft revisi, belum diimplementasikan; verifikasi kontrak backend diperlukan sebelum implementasi frontend.
+**Status**: Draft revisi, **in progress** (9/23 task selesai, update 2026-09-28); verifikasi kontrak backend diperlukan sebelum implementasi frontend.
 **Terakhir disesuaikan**: 2026-09-22, mengikuti migrasi 007 (`branch_coverage_areas`) dan 008 (`vendor_vaults.category` jadi tiga nilai).
 **Tanggal**: 2026-09-22
 
@@ -52,8 +52,8 @@ Hasil verifikasi 2026-09-22 (diperiksa langsung di source, bukan asumsi):
 
 **Blocker yang tersisa — dua item, belum bisa dicentang:**
 
-- [ ] **Filter `branch_id` belum ada sama sekali.** `ListVendorVaultsAdmin`/`ListVendorPicsAdmin`/`ListVendorPackagesAdmin` beserta `Count`-nya hanya memfilter `vendor_id`, `q`, `status`. Tidak ada parameter cabang, dan tidak ada filter eksplisit untuk PIC vendor-wide (`vendor_branch_id IS NULL`). Kontraknya harus **didefinisikan**, bukan sekadar diverifikasi. Ini pekerjaan §2 dan prasyarat seluruh drill-down cabang.
-- [ ] **Aturan disable cabang dengan child aktif belum ada.** [masterdata_applier_vendor_branch.go](../../../backend/internal/service/masterdata_applier_vendor_branch.go) L57-62 memanggil `DisableVendorBranch` tanpa pemeriksaan child apa pun, sehingga vault/PIC/paket aktif menggantung di cabang nonaktif tanpa peringatan. Plan ini memilih default "tolak sampai child ditangani", tapi **butuh konfirmasi bisnis** sebelum diimplementasikan.
+- [x] ~~**Filter `branch_id` belum ada sama sekali.**~~ **Selesai (verifikasi 2026-09-25):** `branch_id` opsional sudah ada di list+count vault/PIC/paket; PIC vendor-wide via `vendor_wide_only=true`. `ListVendorVaultsAdmin`/`ListVendorPicsAdmin`/`ListVendorPackagesAdmin` beserta `Count`-nya hanya memfilter `vendor_id`, `q`, `status`. Tidak ada parameter cabang, dan tidak ada filter eksplisit untuk PIC vendor-wide (`vendor_branch_id IS NULL`). Kontraknya harus **didefinisikan**, bukan sekadar diverifikasi. Ini pekerjaan §2 dan prasyarat seluruh drill-down cabang.
+- [x] ~~**Aturan disable cabang dengan child aktif belum ada.**~~ **Selesai 2026-09-25:** ditolak 409 saat submit (`VendorBranchAdminService.Disable`) DAN dicek ulang saat apply (`ensureBranchHasNoActiveChildren` di applier; approval handler map ke 409). Tanpa cascade. [masterdata_applier_vendor_branch.go](../../../backend/internal/service/masterdata_applier_vendor_branch.go) L57-62 memanggil `DisableVendorBranch` tanpa pemeriksaan child apa pun, sehingga vault/PIC/paket aktif menggantung di cabang nonaktif tanpa peringatan. Plan ini memilih default "tolak sampai child ditangani", tapi **butuh konfirmasi bisnis** sebelum diimplementasikan.
 
 Status frontend: `types.ts` baru punya `AdminVendor`, `AdminVendorsListParams`, `AdminVendorsListResponse` — belum ada tipe untuk keempat child entity. Di `components/` baru ada `VendorFormDialog.tsx`; keempat dialog child belum dibuat. Jadi §3 dan §4 sepenuhnya pekerjaan baru.
 
@@ -200,7 +200,7 @@ Extend `__tests__/VendorDetailPage.test.tsx` dan pengujian backend terkait:
 - [ ] Manipulasi vendorId/branchId/entityId lintas vendor ditolak pada list/mutation dan divalidasi ulang saat apply.
 - [ ] Vault/package menolak cabang kosong; PIC vendor-wide menerima scope NULL sesuai kontrak.
 - [ ] Form vault menerima ketiga nilai `category` (`ATM`, `CASH`, `ATM_CASH`) dan menolak nilai lain; `type` tidak diekspos sebagai field terpisah.
-- [ ] Disable cabang dengan child aktif mengikuti aturan bisnis terverifikasi, tanpa cascade diam-diam.
+- [x] Disable cabang dengan child aktif mengikuti aturan bisnis terverifikasi, tanpa cascade diam-diam.
 - [ ] Loading, empty, error/retry, pagination, dan pergantian context dialog berfungsi tanpa submit salah cabang.
 - [ ] Alur maker/checker mengikuti aturan otorisasi dan pemisahan kewenangan existing.
 

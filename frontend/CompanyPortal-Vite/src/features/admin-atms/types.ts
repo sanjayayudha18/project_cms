@@ -28,6 +28,11 @@ export interface AdminATM {
   created_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
+  /** Current kelolaan (list endpoint only; "" or absent = no active assignment today). */
+  current_vendor_code?: string;
+  current_vendor_name?: string;
+  current_branch_code?: string;
+  current_package_code?: string;
 }
 
 export interface AdminATMsListParams {

@@ -58,6 +58,29 @@ func mapAssignmentDBError(op string, err error) error {
 	return fmt.Errorf("%s atm assignment: %w", op, err)
 }
 
+// applyAutoAssignment handles a create submitted without dates: the new
+// period starts on the approval date (today, WIB) and is open-ended, and the
+// ATM's running period is handed over in the same transaction -- closed the
+// day before, or disabled if it began today. A future-dated period is left
+// alone and still surfaces as ErrATMAssignmentOverlap.
+func applyAutoAssignment(ctx context.Context, q *db.Queries, p ATMAssignmentPayload, now time.Time) (int64, any, error) {
+	y, m, d := now.In(wibZone).Date()
+	start := pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+	if err := q.CloseATMAssignmentsBeforeStart(ctx, db.CloseATMAssignmentsBeforeStartParams{AtmID: p.ATMID, StartDate: start}); err != nil {
+		return 0, nil, fmt.Errorf("close running atm assignment: %w", err)
+	}
+	if err := q.DisableATMAssignmentsStartingOn(ctx, db.DisableATMAssignmentsStartingOnParams{AtmID: p.ATMID, StartDate: start}); err != nil {
+		return 0, nil, fmt.Errorf("disable same-day atm assignment: %w", err)
+	}
+	created, err := q.CreateATMAssignmentAdmin(ctx, db.CreateATMAssignmentAdminParams{
+		AtmID: p.ATMID, VendorPackageID: p.VendorPackageID, EffectiveStartDate: start,
+	})
+	if err != nil {
+		return 0, nil, mapAssignmentDBError("create", err)
+	}
+	return created.ID, created, nil
+}
+
 // Apply implements Applier for entity_type="atm_assignment".
 func (ATMAssignmentApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDataChangeRequest) (int64, any, error) {
 	q := db.New(tx)
@@ -67,6 +90,9 @@ func (ATMAssignmentApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Mast
 		var p ATMAssignmentPayload
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal atm assignment create payload: %w", err)
+		}
+		if p.EffectiveStartDate == "" {
+			return applyAutoAssignment(ctx, q, p, time.Now())
 		}
 		start, end, err := assignmentDates(p.ATMAssignmentUpdatePayload)
 		if err != nil {

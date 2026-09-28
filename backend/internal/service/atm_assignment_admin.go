@@ -79,6 +79,9 @@ type ATMAssignment struct {
 	EffectiveStartDate string
 	EffectiveEndDate   *string
 	IsActive           bool
+	// Set by List only (nil elsewhere): lets the form preselect vendor/cabang.
+	VendorID       *int64
+	VendorBranchID *int64
 }
 
 func dateToStringPtr(d pgtype.Date) *string {
@@ -107,6 +110,7 @@ func (s *ATMAssignmentAdminService) List(ctx context.Context, arg db.ListATMAssi
 	out := make([]ATMAssignment, len(rows))
 	for i, r := range rows {
 		out[i] = newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+		out[i].VendorID, out[i].VendorBranchID = r.VendorID, r.VendorBranchID
 	}
 	return out, nil
 }
@@ -136,7 +140,14 @@ func (s *ATMAssignmentAdminService) Create(ctx context.Context, makerID, atmID i
 	if !ok {
 		return db.MasterDataChangeRequest{}, ErrAssignmentATMNotFound
 	}
-	if err := s.validate(ctx, atmID, 0, &req); err != nil {
+	if strings.TrimSpace(req.EffectiveStartDate) == "" {
+		// Automatic period: dates are decided at approval (ATMAssignmentApplier),
+		// which also closes the running period -- so no overlap check here.
+		if err := s.validatePackage(ctx, req.VendorPackageID); err != nil {
+			return db.MasterDataChangeRequest{}, err
+		}
+		req.EffectiveStartDate, req.EffectiveEndDate = "", nil
+	} else if err := s.validate(ctx, atmID, 0, &req); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "atm_assignment", Op: "create",
@@ -207,6 +218,21 @@ func (s *ATMAssignmentAdminService) load(ctx context.Context, atmID, id int64) (
 // active; dates YYYY-MM-DD with end >= start (an inverted range would make
 // Postgres raise a raw daterange error); and no overlap with another active
 // assignment of the ATM (excludeID = the row being edited, 0 for create).
+// validatePackage requires a set, currently-effective package.
+func (s *ATMAssignmentAdminService) validatePackage(ctx context.Context, packageID int64) error {
+	if packageID == 0 {
+		return &ValidationError{Field: "vendor_package_id", Message: "wajib diisi"}
+	}
+	ok, err := s.repo.PackageActive(ctx, packageID)
+	if err != nil {
+		return fmt.Errorf("checking package: %w", err)
+	}
+	if !ok {
+		return &ValidationError{Field: "vendor_package_id", Message: "paket tidak ditemukan atau nonaktif"}
+	}
+	return nil
+}
+
 func (s *ATMAssignmentAdminService) validate(ctx context.Context, atmID, excludeID int64, p *ATMAssignmentUpdatePayload) error {
 	if p.VendorPackageID == 0 {
 		return &ValidationError{Field: "vendor_package_id", Message: "wajib diisi"}
@@ -232,12 +258,8 @@ func (s *ATMAssignmentAdminService) validate(ctx context.Context, atmID, exclude
 		}
 	}
 
-	ok, err := s.repo.PackageActive(ctx, p.VendorPackageID)
-	if err != nil {
-		return fmt.Errorf("checking package: %w", err)
-	}
-	if !ok {
-		return &ValidationError{Field: "vendor_package_id", Message: "paket tidak ditemukan atau nonaktif"}
+	if err := s.validatePackage(ctx, p.VendorPackageID); err != nil {
+		return err
 	}
 
 	overlap, err := s.repo.HasOverlap(ctx, atmID, excludeID, start, end)

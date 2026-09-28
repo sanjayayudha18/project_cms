@@ -681,6 +681,46 @@ func TestVendorBranchApplier_Approve_UpdateThenDisable_Integration(t *testing.T)
 	}
 }
 
+// A vault approved after a branch-disable was submitted must block that
+// disable at apply time (decision 2026-09-25: re-check at apply, no cascade).
+func TestVendorBranchApplier_Disable_ActiveChildAtApply_Refused_Integration(t *testing.T) {
+	svc, tag, h := harness(t)
+	ctx := context.Background()
+
+	vendorID := h.seedVendor("ITVB3-"+tag, "Vendor For Branch Test 3 "+tag)
+	branchID := h.seedVendorBranch(vendorID, "ITVBR3-"+tag, "Branch "+tag)
+
+	disableID := h.insertPending("vendor_branch", "disable", &branchID, nil)
+
+	vaultChangeID := h.insertPending("vendor_vault", "create", nil, VendorVaultPayload{
+		VendorBranchID: branchID, VaultCode: "ITVB3-V-" + tag,
+		VendorVaultUpdatePayload: VendorVaultUpdatePayload{Category: "ATM", CurrencyCode: "IDR"},
+	})
+	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: vaultChangeID, Status: "approved"}}
+	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
+		t.Fatalf("Approve(vault create) error = %v", err)
+	}
+	var vaultID int64
+	if err := dbtx(svc).QueryRow(ctx, `SELECT id FROM vendor_vaults WHERE vault_code = $1`, "ITVB3-V-"+tag).Scan(&vaultID); err != nil {
+		t.Fatalf("querying created vault: %v", err)
+	}
+	h.vendorVaultIDs = append(h.vendorVaultIDs, vaultID)
+
+	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: disableID, Status: "approved"}}
+	_, err := svc.Approve(ctx, 999, 1, "127.0.0.1")
+	if !errors.Is(err, ErrVendorBranchHasActiveChildren) {
+		t.Fatalf("Approve(disable) error = %v, want ErrVendorBranchHasActiveChildren", err)
+	}
+
+	var isActive bool
+	if err := dbtx(svc).QueryRow(ctx, `SELECT is_active FROM vendor_branches WHERE id = $1`, branchID).Scan(&isActive); err != nil {
+		t.Fatalf("querying branch: %v", err)
+	}
+	if !isActive {
+		t.Error("branch was disabled despite an active vault")
+	}
+}
+
 func TestVendorVaultApplier_Approve_CreateUpdateDisable_Integration(t *testing.T) {
 	svc, tag, h := harness(t)
 	ctx := context.Background()
@@ -1204,5 +1244,88 @@ func TestMasterDataApprovalService_RetryApply_Integration(t *testing.T) {
 	}
 	if err := svc.RetryApply(ctx, changeID, h.makerID, "127.0.0.1"); !errors.Is(err, ErrMasterDataNotRetryable) {
 		t.Fatalf("second RetryApply = %v, want ErrMasterDataNotRetryable", err)
+	}
+}
+
+// Automatic period (create with no dates): at apply the new period starts
+// today (WIB) and is open-ended; the running period is closed the day before,
+// and one that began today is disabled. Runs in a rolled-back transaction on
+// an ATM with no kelolaan so no real assignment is touched.
+func TestATMAssignmentApplier_AutoPeriod_HandsOverRunningPeriod_Integration(t *testing.T) {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("DATABASE_URL not set — skipping integration test")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		t.Fatalf("connecting to database: %v", err)
+	}
+	defer pool.Close()
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var atmID, pkgID int64
+	err = tx.QueryRow(ctx, `SELECT a.id FROM atms a WHERE a.deleted_at IS NULL
+		AND NOT EXISTS (SELECT 1 FROM atm_vendor_packages p WHERE p.atm_id = a.id) ORDER BY a.id LIMIT 1`).Scan(&atmID)
+	if err != nil {
+		t.Skipf("no ATM without kelolaan available: %v", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch ORDER BY id LIMIT 1`).Scan(&pkgID); err != nil {
+		t.Skipf("no vendor package available: %v", err)
+	}
+
+	now := time.Date(2026, 9, 25, 20, 0, 0, 0, time.UTC) // 2026-09-26 03:00 WIB
+	if _, err := tx.Exec(ctx, `INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, effective_start_date)
+		VALUES ($1, $2, '2026-01-01')`, atmID, pkgID); err != nil {
+		t.Fatal(err)
+	}
+	payload := ATMAssignmentPayload{ATMID: atmID, ATMAssignmentUpdatePayload: ATMAssignmentUpdatePayload{VendorPackageID: pkgID}}
+	if _, _, err := applyAutoAssignment(ctx, db.New(tx), payload, now); err != nil {
+		t.Fatalf("applyAutoAssignment: %v", err)
+	}
+
+	type period struct {
+		start, end string
+		active     bool
+	}
+	read := func() []period {
+		rows, err := tx.Query(ctx, `SELECT effective_start_date::text, COALESCE(effective_end_date::text, ''), is_active
+			FROM atm_vendor_packages WHERE atm_id = $1 ORDER BY id`, atmID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var out []period
+		for rows.Next() {
+			var p period
+			if err := rows.Scan(&p.start, &p.end, &p.active); err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, p)
+		}
+		return out
+	}
+	got := read()
+	want := []period{{"2026-01-01", "2026-09-25", true}, {"2026-09-26", "", true}}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("after first handover got %+v, want %+v", got, want)
+	}
+
+	// Second handover the same day: the period that began today is disabled.
+	var pkg2 int64
+	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch WHERE id <> $1 ORDER BY id LIMIT 1`, pkgID).Scan(&pkg2); err != nil {
+		t.Skipf("need a second vendor package: %v", err)
+	}
+	payload.VendorPackageID = pkg2
+	if _, _, err := applyAutoAssignment(ctx, db.New(tx), payload, now); err != nil {
+		t.Fatalf("second applyAutoAssignment: %v", err)
+	}
+	got = read()
+	if len(got) != 3 || got[1].active || !got[2].active || got[2].start != "2026-09-26" || got[2].end != "" || got[0].end != "2026-09-25" {
+		t.Fatalf("after same-day handover got %+v", got)
 	}
 }

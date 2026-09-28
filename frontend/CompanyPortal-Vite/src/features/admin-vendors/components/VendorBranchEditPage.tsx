@@ -41,7 +41,13 @@ export function VendorBranchEditPage({ vendorId, branchId }: VendorBranchEditPag
 
   const form = useForm<VendorBranchFormValues>({
     resolver: zodResolver(vendorBranchFormSchema),
-    defaultValues: { branch_code: "", branch_name: "", location_id: "", region: "", category: "ATM" },
+    defaultValues: {
+      branch_code: "",
+      branch_name: "",
+      location_id: "",
+      region: "",
+      category: "ATM",
+    },
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset once the branch finishes loading, not on every render

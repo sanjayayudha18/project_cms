@@ -12,7 +12,9 @@ interface ATMsPanelProps {
 
 function locationLabel(atm: ManagedATM): string {
   if (!atm.location_name) return "—";
-  return atm.location_city_or_regency ? `${atm.location_name} · ${atm.location_city_or_regency}` : atm.location_name;
+  return atm.location_city_or_regency
+    ? `${atm.location_name} · ${atm.location_city_or_regency}`
+    : atm.location_name;
 }
 
 /**

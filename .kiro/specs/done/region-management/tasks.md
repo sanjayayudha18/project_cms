@@ -36,7 +36,7 @@ Reference implementations to match for conventions:
     - create→get roundtrip; list filter matrix (`q`, status) + correct `location_count`; pagination count vs per-page; `uq_regions_code` unique-violation surfaces; `SetRegionActive` toggles `is_active`+`deleted_at`; `CountActiveLocationsByRegion` counts only active locations; read-after-write on primary, list on replica. Gate like `audit_log_repository_test.go` (may skip if `DATABASE_URL` unreachable).
     - _Requirements: 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 9.1, 9.2, 9.3_
 
-- [ ] 4. Region admin service (validation, RBAC re-check, audit-in-tx)
+- [x] 4. Region admin service (validation, RBAC re-check, audit-in-tx)
   - [x] 4.1 Implement `backend/internal/service/region_admin.go` — `RegionAdminService`
     - Define sentinel errors (`ErrRegionNotFound`, `ErrRegionCodeConflict`, `ErrRegionCodeImmutable`, `ErrRegionHasActiveLocations`, `ErrRegionStatusUnchanged`, `ErrRegionHardDeleteForbidden`, `ErrNotAuthorized`); reuse existing `ValidationError`. Narrow `RegionAdminRepo` interface + `Pool` (`Begin`). Implement `List`/`Count`/`Get` (reads, no audit); `Create`/`UpdateName`/`Disable`/`Enable` following the audit-in-tx pattern of `rolemgmt.PermissionService`: RBAC re-check → validate → pre-check → open own `pgx.Tx` → mutate via repo `*Tx` method → `audit.NewWriter(tx).Write(...)` in the same tx → commit only if both succeed, rollback on audit failure. `normalizeCode` (trim+uppercase), code regex `^[A-Za-z0-9]+$` (1–20), name required (1–100 after trim). Update rejects a differing `code` (immutable). Disable blocks when `CountActiveLocations>0`; disable/enable reject no-op status changes without writing audit. No delete method.
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 9.1, 9.3, 9.5_
@@ -44,28 +44,28 @@ Reference implementations to match for conventions:
     - Create success (normalized uppercase code + `region_created` audit); duplicate → `ErrRegionCodeConflict`; bad code/name → `ValidationError`; non-admin actor → `ErrNotAuthorized`; audit failure → error and insert NOT committed. UpdateName success (before/after audit); differing code → `ErrRegionCodeImmutable`; missing id → `ErrRegionNotFound`; audit failure → rollback. Disable success at 0 active locations; `CountActiveLocations>0` → `ErrRegionHasActiveLocations` (no audit); already-inactive → `ErrRegionStatusUnchanged` (no audit); audit failure → rollback. Enable success; already-active → `ErrRegionStatusUnchanged`. Authorization matrix: ADMIN ✓, ADMIN_PARAM ✓, APPACCESS/ATM-USER/VENDOR ✗.
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6, 3.2, 3.3, 3.4, 4.2, 4.6, 4.7, 5.2_
     - **Implementation note:** written as `region_admin_integration_test.go` (real Postgres, outer-tx-as-pool harness) instead of a fake-repo/fake-pgx.Tx unit test — this codebase's actual precedent for audit-in-tx services (`internal/rolemgmt/service_integration_test.go`) uses the same real-tx harness rather than hand-rolled `pgx.Tx` fakes (pgx.Tx has 11 methods; no fake-Tx pattern exists anywhere in this codebase). Covers every case listed above, gated on `DATABASE_URL` (not yet run against a live DB — migration 018 isn't applied to dev yet).
-  - [ ]* 4.3 Write property test for code normalization and uniqueness
+  - [x]* 4.3 Write property test for code normalization and uniqueness
     - **Property 1: Code disimpan ternormalisasi dan unik**
     - **Validates: Requirements 2.1, 2.2, 2.7**
-  - [ ]* 4.4 Write property test for validation rejection
+  - [x]* 4.4 Write property test for validation rejection
     - **Property 2: Validasi code dan nama menolak input tak valid tanpa mutasi**
     - **Validates: Requirements 2.3, 2.4, 3.3, 8.2, 8.3**
-  - [ ]* 4.5 Write property test for code immutability on update
+  - [x]* 4.5 Write property test for code immutability on update
     - **Property 3: Code immutable pada update**
     - **Validates: Requirements 3.1, 3.2**
-  - [ ]* 4.6 Write property test for the audit-or-rollback invariant
+  - [x]* 4.6 Write property test for the audit-or-rollback invariant
     - **Property 4: Setiap mutasi punya tepat satu jejak audit, atau tidak terjadi**
     - **Validates: Requirements 2.5, 2.6, 3.5, 3.6, 4.5, 4.6, 6.1, 6.2, 6.3, 6.4, 6.5**
-  - [ ]* 4.7 Write property test for referential-integrity block on disable
+  - [x]* 4.7 Write property test for referential-integrity block on disable
     - **Property 5: Nonaktif diblokir saat ada lokasi aktif dependen**
     - **Validates: Requirements 4.2, 7.2, 7.3**
-  - [ ]* 4.8 Write property test for disable/enable round-trip + idempotency guard
+  - [x]* 4.8 Write property test for disable/enable round-trip + idempotency guard
     - **Property 6: Disable/enable adalah round-trip soft-delete yang idempotent-guarded**
     - **Validates: Requirements 4.1, 4.3, 4.7**
-  - [ ]* 4.9 Write property test for service-layer RBAC enforcement
+  - [x]* 4.9 Write property test for service-layer RBAC enforcement
     - **Property 8: Otorisasi ditegakkan di service, bukan hanya middleware**
     - **Validates: Requirements 5.1, 5.2, 5.4**
-  - [ ]* 4.10 Write property test for case-insensitive search
+  - [x]* 4.10 Write property test for case-insensitive search
     - **Property 9: Pencarian mengembalikan hanya yang cocok, case-insensitive**
     - **Validates: Requirements 1.4, 1.5**
   - _Model: Opus, Effort: High — audit-in-tx transaction control, RBAC re-check, referential-integrity block, and immutability/soft-delete state logic; a wrong transition or a missing rollback corrupts audit integrity and master data._
@@ -106,7 +106,7 @@ Reference implementations to match for conventions:
   - [x] 9.2 Implement `RegionFormDialog.tsx` and `index.ts`
     - RHF + `zodResolver`; create uses `createRegionSchema`, edit uses `updateRegionSchema` with Code field disabled (immutable). Map server 409/422/400 to field errors via `setError` (409/immutable → `code`, validation → related field), dialog stays open. Disable confirmation surfaces the active-location block message from the 409 body. Export `AdminRegionsPage` from `index.ts`.
     - _Requirements: 3.2, 8.1, 8.2, 8.3, 8.7_
-  - [ ]* 9.3 Write component tests in `src/features/admin-regions/__tests__/`
+  - [x]* 9.3 Write component tests in `src/features/admin-regions/__tests__/`
     - Zod schema (code required/format/max20 immutable-in-edit, name required/max100); form maps server 409/422/400 to field errors and keeps dialog open; filter change resets to page 1 and round-trips via URL; table renders Status as icon+label badge; Code & Jumlah Lokasi `tabular-nums`. Mock network.
     - _Requirements: 1.4, 1.8, 3.2, 8.1, 8.2, 8.3, 8.7_
 
@@ -117,7 +117,7 @@ Reference implementations to match for conventions:
   - [x] 10.2 Register "Manajemen Region" card in `SettingsHubPage.tsx`
     - Add master-category card `{ id: "admin-regions", title: "Manajemen Region", description: "Kelola region dan status aktifnya.", href: "/settings/admin/regions", icon: Map, category: "master" }` in the "Data master" tab, shown only when `showMaster` (master-data roles). No top-level `NAV_CONFIG` entry.
     - _Requirements: 5.3, 9.6_
-  - [ ]* 10.3 Extend `SettingsHubPage.test.tsx` and route guard test
+  - [x]* 10.3 Extend `SettingsHubPage.test.tsx` and route guard test
     - Card "Manajemen Region" shown for ADMIN/ADMIN_PARAM and hidden for other roles; `requireRoles` allow/deny/redirect for the region route (pattern of `atms`).
     - _Requirements: 5.3_
 

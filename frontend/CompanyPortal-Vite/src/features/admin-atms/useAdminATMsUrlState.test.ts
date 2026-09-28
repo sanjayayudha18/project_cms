@@ -5,7 +5,7 @@ describe("admin-atms URL state round-trip", () => {
   it("parses raw search params with defaults filled in", () => {
     expect(parseParams({})).toEqual({
       page: 1,
-      page_size: 25,
+      page_size: 10,
       status: "active",
       q: "",
       brand: "",
@@ -18,7 +18,7 @@ describe("admin-atms URL state round-trip", () => {
   it("round-trips a full set of filters through omitDefaults -> parseParams", () => {
     const params = {
       page: 3,
-      page_size: 50,
+      page_size: 5,
       status: "disabled" as const,
       q: "TATM",
       brand: "NCR",
@@ -30,10 +30,14 @@ describe("admin-atms URL state round-trip", () => {
     expect(parseParams(url)).toEqual(params);
   });
 
+  it("caps page_size at 10 rows", () => {
+    expect(parseParams({ page_size: 50 }).page_size).toBe(10);
+  });
+
   it("omits fields that equal their default, keeping shareable URLs clean", () => {
     const url = omitDefaults({
       page: 1,
-      page_size: 25,
+      page_size: 10,
       status: "active",
       q: "",
       brand: "",

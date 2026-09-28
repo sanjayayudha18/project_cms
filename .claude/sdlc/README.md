@@ -75,7 +75,15 @@ feature-specific slice of these in each `intent.md` / `spec.md`:
 
 ## Current features
 
-| Feature | Folder | Status |
-|---------|--------|--------|
-| Vendor upload DSR | `vendor-upload-dsr/` | intent drafted |
-| Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | plan approved, not started |
+Last synced: 2026-09-28. "Stage" = furthest artifact present. "Status" = actual code state (commits / CLAUDE.md Sec 12), which may be ahead of the artifact headers.
+
+| Feature | Folder | Stage | Status |
+|---------|--------|-------|--------|
+| Vendor upload DSR | `vendor-upload-dsr/` | 6 Maintain (all 6 artifacts, headers still `draft`) | implemented (commit `4d4e261`); `intent.md` still awaiting PO sign-off |
+| Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | 5 Deploy (`review.md`) | implemented, Fase 0–6 (plan 43/43); retry-apply has no UI button yet |
+| User session lifetime (1 h, parameterized) | `user-session/` | 4 Test (`tests.md`) | implemented (plan 17/17, commit `7a86eca`); T5.3 manual expiry test outstanding (user) |
+| Vendor package pricing | `vendor-pricing/` | 3 Build (`plan.md`, `schema.dbml`) | schema (mig 009/010/017) + backend + CompanyPortal panel built; per-ATM special price not seeded |
+| Vendor branch tipe / Branch menu | `vendor-branch-tipe/` | 3 Build (`plan.md`) | item 1 implemented 2026-09-23 (plan 18/18) |
+| Kelolaan cabang → vault/PIC/paket (perbaikan RBAC) | `perbaikan-rbac/` | 3 Build (`plan.md`) | draft revision, in progress (9/23 tasks); backend contract check needed before frontend |
+
+None of these went through the full chain in order (legacy, pre-Sec 4a). Only `vendor-upload-dsr/` has `intent.md`/`spec.md`. New features start at `intent.md`.

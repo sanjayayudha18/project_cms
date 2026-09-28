@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageNumbers } from "@/components/ui/PageNumbers";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
@@ -124,6 +125,11 @@ export function AdminATMsPage() {
           >
             Sebelumnya
           </Button>
+          <PageNumbers
+            current={params.page}
+            total={totalPages}
+            onChange={(page) => setParams({ page })}
+          />
           <Button
             variant="secondary"
             disabled={params.page >= totalPages}

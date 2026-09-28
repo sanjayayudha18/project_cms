@@ -51,6 +51,32 @@ export function ATMsTable({
       },
     },
     {
+      id: "current_vendor",
+      header: "Vendor Kelolaan",
+      cell: ({ row }) => {
+        const a = row.original;
+        if (!a.current_vendor_code) return <span className="text-[var(--n-500)]">Belum ada</span>;
+        return (
+          <span className="flex flex-col">
+            <span>
+              {a.current_vendor_code} · {a.current_vendor_name}
+            </span>
+            <span className="text-xs text-[var(--n-500)]">{a.current_branch_code}</span>
+          </span>
+        );
+      },
+    },
+    {
+      id: "current_package",
+      header: "Paket",
+      cell: ({ row }) =>
+        row.original.current_package_code ? (
+          <span className="font-mono tabular-nums">{row.original.current_package_code}</span>
+        ) : (
+          <span className="text-[var(--n-500)]">-</span>
+        ),
+    },
+    {
       id: "status",
       header: "Status",
       cell: ({ row }) => (

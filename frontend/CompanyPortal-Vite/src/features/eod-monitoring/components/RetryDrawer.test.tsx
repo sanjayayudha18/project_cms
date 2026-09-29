@@ -1,4 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { FileStatusRow, ProcessingStatus } from "../types";
 import { RetryDrawer } from "./RetryDrawer";
@@ -53,5 +55,46 @@ describe("RetryDrawer", () => {
     renderDrawer(status);
 
     expect(screen.queryByRole("button", { name: "Retry Manual" })).toBeNull();
+  });
+
+  it("is a labelled modal dialog", () => {
+    renderDrawer("failed");
+
+    const dialog = screen.getByRole("dialog", { name: "Riwayat Retry" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("moves focus to the close button on open and closes on Escape", async () => {
+    const onClose = vi.fn();
+    render(<RetryDrawer file={fileWith("failed")} onClose={onClose} onRetryClick={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tutup" })).toHaveFocus());
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores focus to the trigger when the drawer closes", async () => {
+    function Harness() {
+      const [file, setFile] = useState<FileStatusRow | null>(null);
+      return (
+        <>
+          <button type="button" onClick={() => setFile(fileWith("failed"))}>
+            Open
+          </button>
+          <RetryDrawer file={file} onClose={() => setFile(null)} onRetryClick={vi.fn()} />
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    const trigger = screen.getByRole("button", { name: "Open" });
+    await user.click(trigger);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tutup" })).toHaveFocus());
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 });

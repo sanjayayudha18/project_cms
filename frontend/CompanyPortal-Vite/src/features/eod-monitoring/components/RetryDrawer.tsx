@@ -80,6 +80,7 @@ export function RetryDrawer({ file, onClose, onRetryClick }: RetryDrawerProps) {
 
       <div
         ref={drawerRef}
+        // biome-ignore lint/a11y/useSemanticElements: same reason as ui/Dialog.tsx — native <dialog> top layer would sit above ToastContainer (z-[9999]); the drawer also stacks a ConfirmDialog (Dialog) over itself. Escape and focus restore are handled above.
         role="dialog"
         aria-modal="true"
         aria-labelledby="retry-drawer-title"

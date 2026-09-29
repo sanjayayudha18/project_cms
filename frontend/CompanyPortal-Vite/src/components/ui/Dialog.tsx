@@ -75,6 +75,7 @@ export function Dialog({ open, onClose, title, children, className = "" }: Dialo
       />
       <div
         ref={panelRef}
+        // biome-ignore lint/a11y/useSemanticElements: native <dialog>.showModal() renders in the top layer, which would cover ToastContainer (z-[9999]) and make it inert, so error toasts raised from inside a dialog would be invisible/undismissable. Focus trap, Escape, focus restore and aria-modal are implemented above.
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"

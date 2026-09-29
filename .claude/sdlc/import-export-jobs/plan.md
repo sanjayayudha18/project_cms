@@ -87,7 +87,7 @@ Tidak dikerjakan di fitur ini. Di 2.1: `backend/internal/importjob` (Register/St
 - [x] **T7.4** Syarat deploy R2: VM/container yang menjalankan ETL Python + retry scheduler memakai TZ `Asia/Jakarta` — catat di `.claude/docs/deployment.md` dan `backend_python/*/.env.example` (komentar `TZ=Asia/Jakarta`).
 
 ### Fase 8 — Verifikasi (→ `tests.md`)
-- [ ] **T8.1** `go build ./...` + `go test ./...` (backend, memastikan `models.go` baru aman), `pytest backend_python`, `npm test && npm run typecheck && npm run build` (CompanyPortal) — semua hijau.
+- [x] **T8.1** `go build ./...` + `go test ./...` (backend, memastikan `models.go` baru aman), `pytest backend_python`, `npm test && npm run typecheck && npm run build` (CompanyPortal) — semua hijau. _Selesai — lihat `tests.md` (1 test frontend gagal tidak terkait: `lib/auth/store.test.ts`)._
 - [ ] **T8.2** Review: `code-reviewer` + `database-reviewer` (migrasi/index) + `python-reviewer`; perbaiki CRITICAL/HIGH.
 - [ ] **T8.3** A17 manual browser check halaman EOD monitoring — **outstanding, dikerjakan user**, setelah task routing `/api/eod` (S6) selesai.
 

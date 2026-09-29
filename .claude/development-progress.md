@@ -14,7 +14,7 @@ Branch: `dev1`. No code commits since 2026-09-25 (docs/CLAUDE.md/graphify only).
 | Vendor branch tipe / Branch menu | `vendor-branch-tipe/` | 3 Build | ✅ item 1 implemented 2026-09-23 (18/18) | — |
 | Vendor package pricing | `vendor-pricing/` | 3 Build | 🟡 schema (mig 009/010/017) + backend + CompanyPortal panel built | Per-ATM special price not seeded |
 | Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 in progress (9/23) | Backend contract check before frontend |
-| `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 3 Build (plan draft 2026-09-28) | ✅ built Fases 1–7 (Python + frontend); T8 verification/review pending; Go helper deferred to 2.1 | T8.1–T8.2 tests.md + reviews; A17 manual browser check (user) needs `/api/eod` routing fix |
+| `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 3 Build (plan draft 2026-09-28) | ✅ built Fases 1–7 (Python + frontend); T8 verification/review pending; Go helper deferred to 2.1 | T8.1–T8.2 tests.md + reviews; A17 manual browser check (user) `/api/eod` routing fixed (S6) |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.

@@ -44,7 +44,7 @@ DB integration tests need `DATABASE_URL` (from `backend/.env`, host `host.docker
 | A14 | Migration `019` applied to the **existing** dev DB (T1.2, tables/indexes/FK checked). **Not run on an empty DB** — gap; do this on the first fresh environment. |
 | A15 | `test_eod_api`: file_id as string + field names, own-sources-only, numeric-id-only (422), retry→history→409/404, summary `superseded` bucket — both services |
 | A16 | `test_user_transitions_write_audit_logs_in_same_tx`, `test_system_transitions_write_no_audit_logs`, `test_manual_retry_by_real_user_writes_audit_logs`, `test_manual_retry_without_real_user_writes_no_audit_logs`, `test_eod_api.test_go_issued_jwt_identity_reaches_audit_logs` (Go-side part of A16 deferred with R4) |
-| A17 | **Outstanding — manual browser check by the user** (Golden Rule #10). Blocked on the `/api/eod` routing fix (S6). |
+| A17 | **Outstanding — manual browser check by the user** (Golden Rule #10). Unblocked: `/api/eod` routing fixed (S6, Vite + nginx proxy, verified with curl). |
 
 Frontend (T6.1, FR16 UI): `RetryDrawer.test.tsx` — `superseded` shows "Digantikan" with icon and no retry button; retry offered only for failed/max_retries_exhausted.
 

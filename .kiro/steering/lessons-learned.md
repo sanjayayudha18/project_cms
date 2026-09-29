@@ -58,6 +58,15 @@ The hooks table and Example 5 in README.md document the action type (`runCommand
 
 *Document mistakes that have been made and how to avoid them.*
 
+### Migration numbers cited in docs are stale after the 2026-09-18 baseline squash
+Steering docs (`rbac-design.md`, `project-context.md`, `RBAC-Setup/task.md`) and specs still reference migrations by their **pre-baseline numbers** — e.g. `021`-`025` (approval/hierarchy), `039` (atm search index), `040` (role_permissions). Those files no longer exist under those numbers: the 2026-09-18 squash folded `001`-`040` into `001_baseline_schema.sql` + `002_baseline_seed.sql`, and the originals moved to `backend/migrations/archives/2026-09-18_pre-baseline/`. Live migrations now run `001`-`018` and continue from `019`. When a doc points you at a numbered migration, check whether it predates the baseline before searching the live `migrations/` dir — the schema it describes is almost certainly inside `001_baseline_schema.sql` now.
+
+### RBAC has three parallel authorization axes — never assume editing one changes another
+Authz in CMS is three separate systems: (1) role-string `RequireRoles(...)` guards in `cmd/api/main.go` = the **real backend enforcement**; (2) the `role_permissions` DB catalog = **frontend nav + Role Management UI only**, NOT backend enforcement yet; (3) maker-checker approval keyed on `supervisor_id`/`approval_level`, enforced inside `approval.Orchestrator`, NOT middleware (that's why `/api/v1/approvals` is `RequireAuth`-only). Editing a role's grants in "Manajemen Peran" changes what the user *sees*, not what the backend *allows*. When reasoning about "can role X do Y", identify which axis the question is about first — conflating role (capability) with hierarchy (who-approves-whom) is the most common RBAC mistake here.
+
+### Assessment docs live in `.claude/sdlc/<feature>/assessment.md` with a fixed structure
+Development-readiness assessments follow a consistent 9-11 section shape: Executive Summary (with a readiness verdict emoji ⚠️/✅), Module Scope, Current State (table with ✅/❌ + evidence column), Dependencies, Data/Schema, State Machine, Open Questions, Recommendations & Model-per-stage table, Definition of Done. Match this structure for new assessments. For a **built** module (vs a parked one), frame it as an "as-built source of truth" — verify claims against actual code before writing status, and flag doc-vs-code drift explicitly rather than repeating what the specs claim.
+
 ### fast-check property tests: TypeScript array indexing requires guards
 Vitest runs tests without full `tsc` type-checking, so `NAV_CONFIG[index]` compiles fine at runtime but fails `tsc -b` with "possibly undefined." When writing property tests that index into typed arrays with `fc.integer({ min: 0, max: arr.length - 1 })`, always add a narrowing guard:
 ```typescript

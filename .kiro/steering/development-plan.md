@@ -105,6 +105,7 @@ Binding rules (from `project-context.md`):
 
 ### 0.1 Finish read-replica routing
 - Replace remaining `ponytail:` dbRead TODOs in `cmd/api/main.go` (roles, atm-portal, dsr List/Count). Pool already exists.
+- Python side: add a replica pool (`DATABASE_REPLICA_URL`, fallback to primary) in `backend_python/lib/database.py` and use it for the read-only monitoring APIs (`/status`, `/summary`, `/late`, `/audit`) of `eod_retry_scheduler` + `service_dsr_etl`. Deferred here from `.claude/sdlc/import-export-jobs/spec.md` decision C2 (2026-09-28).
 - **Test:** replica on reads, primary on writes + read-after-write.
 - **Model:** Sonnet, Effort: Low.
 

@@ -1,42 +1,39 @@
 # Development Progress — CMS2 Cash Management System
 
-**Last Updated:** 2026-09-21
+**Last Updated:** 2026-09-29 (synced with `.claude/sdlc/README.md` → "Current features", 2026-09-28)
 
-## Completed Features
+Branch: `dev1`. No code commits since 2026-09-25 (docs/CLAUDE.md/graphify only).
 
-### User Session Lifetime (Absolute 1 Hour, Parameterized)
-- **Status:** ✅ COMPLETE
-- **Branch:** dev1
-- **PR:** Pending
-- **Completed Tasks:**
-  - [x] T1: Configuration layer (SESSION_MAX_LIFETIME env var, 1h default, min 5m guard)
-  - [x] T2: Token service (session deadline inheritance, deadline clamping, access token cap)
-  - [x] T3: Handler integration (rotation → deadline inheritance, cookie MaxAge dynamic, session-end clear)
-  - [x] T4: Frontend (CompanyPortal session notice via query param, VendorPortal error display)
-  - [x] T5: Tests and closure (83.9% coverage, all suites green)
+## Overview
 
-**What Changed:**
-- Sessions are now capped at 1 hour after login, regardless of activity.
-- Refresh token rotation inherits the original deadline instead of extending it.
-- A shortened `SESSION_MAX_LIFETIME` (e.g., 30m) takes effect immediately on next refresh.
-- On session expiry, both portals redirect to login with a specific notice.
-- Test: `.claude/sdlc/user-session/tests.md` (manual 2m real-time validation).
+| Feature | SDLC folder | Stage | Status | Outstanding |
+|---------|-------------|-------|--------|-------------|
+| Vendor upload DSR | `vendor-upload-dsr/` | 6 Maintain | ✅ implemented (`4d4e261`) | `intent.md` PO sign-off (headers still `draft`) |
+| Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | 5 Deploy | ✅ implemented, Fase 0–6 (43/43) | Retry-apply has no UI button |
+| User session lifetime (1 h, parameterized) | `user-session/` | 4 Test | ✅ implemented (17/17, `7a86eca`) | T5.3 manual expiry test (user) |
+| Vendor branch tipe / Branch menu | `vendor-branch-tipe/` | 3 Build | ✅ item 1 implemented 2026-09-23 (18/18) | — |
+| Vendor package pricing | `vendor-pricing/` | 3 Build | 🟡 schema (mig 009/010/017) + backend + CompanyPortal panel built | Per-ATM special price not seeded |
+| Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 in progress (9/23) | Backend contract check before frontend |
+| `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 3 Build (plan draft 2026-09-28) | ⏳ not built (0/26) | Engineer OK on plan; T1.2 migration apply needs explicit user OK; `/api/eod` routing fix for manual check |
+| Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
 
-**Files Modified:**
-- Backend: `pkg/config` (SessionMaxLifetime), `pkg/auth/token_service` (RotateTokenPair + deadline clamping), `backend/internal/handler/auth_handler` (cookie MaxAge + session-end clear)
-- Frontend: CompanyPortal/VendorPortal auth stores/contexts (redirect + notice)
-- Tests: All test fixtures updated, +83.9% coverage on pkg/auth
-- Config: `.env.example`, `.claude/CLAUDE.md` (env list)
-
-**Not Changed:**
-- Authentication mechanisms (LDAP/local) — transparent to this feature.
-- Invoice, reconciliation, DSR, or other business logic modules.
-- Database schema or migrations.
+Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
 
 ---
 
-## Next Phase (Post-Session Cleanup)
+## Feature notes
 
-1. **Idle Timeout** (separate feature): Warn at T-5 minutes, auto-logout if no interaction.
-2. **Session Tracking** (optional): Audit event per session start/end for compliance.
-3. **Force Logout Admin** (optional): In-app button to log out all sessions for a user.
+### User Session Lifetime (Absolute 1 Hour, Parameterized)
+- Sessions capped at `SESSION_MAX_LIFETIME` (default 1h, min 5m) after login, regardless of activity; refresh rotation inherits the original deadline.
+- On expiry both portals redirect to login with a notice.
+- Files: `pkg/config`, `pkg/auth/token_service`, `backend/internal/handler/auth_handler`, CompanyPortal/VendorPortal auth stores. Coverage `pkg/auth` 83.9%.
+- Tests: `.claude/sdlc/user-session/tests.md`.
+
+---
+
+## Next Phase
+
+1. Accept `import-export-jobs/plan.md` → build Phase 0.2.
+2. Finish `perbaikan-rbac` (14 tasks left).
+3. PO acceptance of `dsr-late-report/intent.md` → spec.
+4. Session follow-ups (separate features): idle timeout (warn T-5m), session audit events, admin force-logout.

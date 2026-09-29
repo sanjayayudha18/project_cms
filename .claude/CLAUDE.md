@@ -23,7 +23,7 @@
 ## 1\. Overview
 *   **Name**: CROWN THE Cash Management System
 *   **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
-*   **Stage**: Greenfield, vibe-coded with AI.
+*   **Stage**: Greenfield, built with AI — **not vibe-coded**. All development goes through the AI-Native SDLC (Sec 4a): intent → spec → plan → tests → review → incidents, each stage gated by a human (small fixes per Sec 4a rule 3 excepted).
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
 
 * * *

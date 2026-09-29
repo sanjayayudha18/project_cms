@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ATMsPanel } from "./ATMsPanel";
 import type { ManagedATM } from "../types";
+import { ATMsPanel } from "./ATMsPanel";
 
 const activeATM: ManagedATM = {
   atm_id: 4021,

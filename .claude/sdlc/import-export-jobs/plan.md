@@ -77,7 +77,7 @@ Tidak dikerjakan di fitur ini. Di 2.1: `backend/internal/importjob` (Register/St
 - [x] **T5.6** (2026-09-29, dikerjakan bersama T5.2 karena `mark_stale` di siklus retry membutuhkannya. Disederhanakan: **satu** `stale_after_minutes` per service (default 60, `ge=1`; env `RETRY_STALE_AFTER_MINUTES` / `DSR_ETL_STALE_AFTER_MINUTES`, `.env.example` diperbarui), bukan map per `file_type` — semua sumber kedua service adalah ETL batch dengan batas sama. Tambah map bila suatu saat ada sumber dengan batas berbeda.) Config per service: override stale per `file_type` (C1) di `eod_retry_scheduler/config.py` + `service_dsr_etl/config.py`.
 
 ### Fase 6 — Frontend (`features/eod-monitoring`)
-- [ ] **T6.1** `types.ts`: tambah `superseded` ke `ProcessingStatus`, `STATUS_*` label ("Digantikan") + ikon (bukan warna saja, Sec 13). `RetryDrawer`: `superseded` tidak bisa di-retry.
+- [x] **T6.1** `types.ts`: tambah `superseded` ke `ProcessingStatus`, `STATUS_*` label ("Digantikan") + ikon (bukan warna saja, Sec 13). `RetryDrawer`: `superseded` tidak bisa di-retry. _Selesai: `Layers` icon + "Digantikan"; drawer memakai allowlist (failed/exhausted/processing) sehingga superseded tanpa tombol retry; `RetryDrawer.test.tsx` 5 test; build hijau; `SummaryCounts.superseded` ditambah, kartu ringkasan belum (opsional). Suite penuh: 1 gagal `lib/auth/store.test.ts` (redirect param, tidak terkait, tidak disentuh)._
   - Validate: `npm test` (component test badge `superseded` + tombol retry tersembunyi), `npm run typecheck`, `npm run build` hijau.
 
 ### Fase 7 — Dokumentasi

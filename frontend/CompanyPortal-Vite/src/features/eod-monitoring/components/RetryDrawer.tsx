@@ -61,7 +61,7 @@ export function RetryDrawer({ file, onClose, onRetryClick }: RetryDrawerProps) {
   const showRetryButton =
     file.processing_status === "failed" ||
     file.processing_status === "max_retries_exhausted" ||
-    file.processing_status === "processing";
+    file.processing_status === "processing"; // superseded: replaced by a newer file, nothing to retry
   const retryDisabled = file.processing_status === "processing";
 
   return (

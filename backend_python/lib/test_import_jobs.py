@@ -156,6 +156,24 @@ class ImportJobsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.status(a["id"]), "completed")
         self.assertEqual(await self.status(b["id"]), "processing")
 
+    # review decision A: detected files of one date do not supersede each other
+    async def test_detected_files_of_one_date_all_complete_and_an_upload_supersedes_them(self):
+        ids = []
+        for c in "ab":
+            job = await ij.detect(self.conn, source=self.source, processing_date=DAY, file_hash=h(c),
+                                  original_filename=c, file_path=None, detection_source="not_processed")
+            await ij.start(self.conn, job["id"])
+            await ij.complete(self.conn, job["id"])
+            ids.append(job["id"])
+        self.assertEqual([await self.status(i) for i in ids], ["completed", "completed"])
+        self.assertIsNotNone(await ij.current(self.conn, source=self.source, processing_date=DAY))
+
+        up = await self.done("c")  # a completed upload replaces the whole date
+        self.assertEqual([await self.status(i) for i in ids], ["superseded", "superseded"])
+        self.assertEqual(up["status"], "completed")
+        current = await ij.current(self.conn, source=self.source, processing_date=DAY)
+        self.assertEqual(current["id"], up["id"])
+
     # A7
     async def test_fail_keeps_previous_version_current(self):
         a = await self.done("a")

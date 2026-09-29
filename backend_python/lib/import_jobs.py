@@ -12,7 +12,8 @@ caught 23505 never aborts the caller's outer transaction.
 Concurrency lives in the partial unique indexes of migration 019 (NFR1):
   import_jobs_hash_uq      -> duplicate file (FR2)
   import_jobs_inflight_uq  -> JobInProgressError (FR4)
-  import_jobs_current_uq   -> one completed version per source+date (FR6)
+  import_jobs_current_uq   -> one completed *upload* per source+date (FR6); rows from detect()
+                              are outside it (migration 020), several may complete per date
 
 Audit (FR18): a transition with an actor_id also writes audit_logs in the same
 transaction. System transitions (detect, stale, auto retry) only log here;
@@ -204,23 +205,25 @@ async def complete(
     actor_id: int | None = None,
     ip: str | None = None,
 ) -> asyncpg.Record:
-    """processing -> completed; the previous completed version of source+date becomes
-    superseded in the same transaction (FR6). Pass the caller's connection while it is
-    inside its own transaction to make business writes + completion atomic."""
+    """processing -> completed. A completed upload (register(), detection_source 'upload') supersedes
+    the other completed rows of its source+date in the same transaction (FR6); a detected
+    file never supersedes anything: the ETL drains the whole folder, so several detected files
+    of one date can each complete. Pass the caller's connection while it is inside its own
+    transaction to make business writes + completion atomic."""
     async with conn.transaction():
         job = await _lock(conn, job_id)
         check_transition(job["status"], "completed")
-        if job["processing_date"] is not None:
-            previous = await conn.fetchrow(
+        if job["processing_date"] is not None and job["detection_source"] == "upload":
+            previous = await conn.fetch(
                 """
                 SELECT * FROM import_jobs
                 WHERE source = $1 AND processing_date = $2 AND status = 'completed' AND id <> $3
-                FOR UPDATE
+                ORDER BY id FOR UPDATE
                 """,
                 job["source"], job["processing_date"], job_id,
             )
-            if previous is not None:
-                await _transition(conn, previous, "superseded", action="supersede", actor_id=actor_id, ip=ip)
+            for row in previous:
+                await _transition(conn, row, "superseded", action="supersede", actor_id=actor_id, ip=ip)
         return await _transition(
             conn, job, "completed", action="complete",
             sets="finished_at = now(), error_message = NULL, row_count = $2, error_count = $3",
@@ -257,9 +260,14 @@ async def fail(
 async def current(
     conn: asyncpg.Connection, *, source: str, processing_date: date,
 ) -> asyncpg.Record | None:
-    """Current completed version for source + processing_date (FR9)."""
+    """Current completed version for source + processing_date (FR9): the completed upload,
+    else the latest completed detected file."""
     return await conn.fetchrow(
-        "SELECT * FROM import_jobs WHERE source = $1 AND processing_date = $2 AND status = 'completed'",
+        """
+        SELECT * FROM import_jobs
+        WHERE source = $1 AND processing_date = $2 AND status = 'completed'
+        ORDER BY (detection_source = 'upload') DESC, id DESC LIMIT 1
+        """,
         source, processing_date,
     )
 

@@ -14,12 +14,12 @@ Status: run 2026-09-29 against dev DB (`localhost:5432`). Reads: `spec.md` (A1�
 | Python EOD API (both services) | `python -m unittest lib.test_eod_api` | 6 OK |
 | Python DSR / ITM (existing) | `python -m unittest discover -s dsr` / `-s itm/cashpos` | 7 / 3 OK |
 | Frontend CompanyPortal | `pnpm run build` (includes `tsc -b`) | green |
-| Frontend CompanyPortal | `pnpm run test` | 987 pass, **1 fail** (see below) |
+| Frontend CompanyPortal | `pnpm run test` | 988 pass (the earlier auth-store failure was fixed, see below) |
 | Biome (eod-monitoring) | `biome check src/features/eod-monitoring` | 1 pre-existing a11y warning (`RetryDrawer.tsx:81`), no errors |
 
 DB integration tests need `DATABASE_URL` (from `backend/.env`, host `host.docker.internal` → `localhost`); they skip when empty. After the run: 0 leftover rows in `import_jobs`/`late_detections`/`retry_audit_logs` for 2099 dates.
 
-### Known failure (not caused by this feature)
+### Former failure (fixed, not caused by this feature)
 `src/lib/auth/store.test.ts > refreshToken > redirects with current path as redirect param`: expects `/login?redirect=…` but the code now appends `&reason=session_expired`. File untouched by import-export-jobs; last changed in `7a86eca` ("rbac session … limit login"). Needs its own fix (test or code); not fixed here.
 
 ## Traceability: acceptance criteria → tests
@@ -52,3 +52,5 @@ Frontend (T6.1, FR16 UI): `RetryDrawer.test.tsx` — `superseded` shows "Diganti
 - A14 on a fresh DB; A10 and Go side of A16 (2.1); A17 manual.
 - Coverage % not measured (`coverage` not installed); earlier `trace` run put `lib/import_jobs.py` at ≈98% real.
 - Summary card for `superseded` not added to the UI (type field only).
+
+Fix: `store.ts` deliberately appends `&reason=session_expired` (login page shows the notice, from `7a86eca`); the test was stale. It now expects the `reason` param via the exported `SESSION_EXPIRED_REASON`. Suite: 118 files / 988 tests green. Separate, pre-existing: `biome check src/lib/auth` reports a format error in `store.ts` (not touched here).

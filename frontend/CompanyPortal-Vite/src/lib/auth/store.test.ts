@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AuthUser, type DbRole, useAuthStore } from "./store";
+import { type AuthUser, type DbRole, SESSION_EXPIRED_REASON, useAuthStore } from "./store";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -399,7 +399,7 @@ describe("useAuthStore", () => {
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
 
-    it("redirects with current path as redirect param", async () => {
+    it("redirects with current path as redirect param and the session-expired reason", async () => {
       mockLocation.pathname = "/dashboard";
       mockLocation.search = "?tab=overview";
 
@@ -407,7 +407,9 @@ describe("useAuthStore", () => {
 
       await useAuthStore.getState().refreshToken();
 
-      expect(mockLocation.href).toBe("/login?redirect=%2Fdashboard%3Ftab%3Doverview");
+      expect(mockLocation.href).toBe(
+        `/login?redirect=%2Fdashboard%3Ftab%3Doverview&reason=${SESSION_EXPIRED_REASON}`,
+      );
     });
 
     it("single-flight: concurrent refreshes share the same promise", async () => {

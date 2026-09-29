@@ -1,8 +1,11 @@
-"""GET /status, GET /status/{file_id}/history (task 14.2)."""
+"""GET /status, GET /status/{file_id}/history (task 14.2).
+
+Reads import_jobs (spec FR16). JSON field names are unchanged for
+features/eod-monitoring; file_id is the bigint id serialized as a string.
+"""
 from __future__ import annotations
 
 from datetime import date
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 
@@ -18,21 +21,26 @@ async def get_status(request: Request, processing_date: date):
     pool = request.app.state.db_pool
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM retry_file_tracking WHERE processing_date = $1", processing_date,
+            """
+            SELECT * FROM import_jobs
+            WHERE processing_date = $1 AND source = ANY($2::text[])
+            ORDER BY id
+            """,
+            processing_date, list(FILE_TYPES),
         )
 
     by_file_type: dict[str, list[dict]] = {ft: [] for ft in FILE_TYPES}
     for row in rows:
-        by_file_type.setdefault(row["file_type"], []).append({
-            "file_id": row["id"],
-            "filename": row["filename"],
-            "checksum": row["file_checksum"],
-            "processing_status": row["processing_status"],
+        by_file_type[row["source"]].append({
+            "file_id": str(row["id"]),
+            "filename": row["original_filename"],
+            "checksum": row["file_hash"],
+            "processing_status": row["status"],
             "retry_count": row["auto_retry_count"],
-            "max_retries_exhausted": row["processing_status"] == "max_retries_exhausted",
-            "detected_at": row["detected_at"],
+            "max_retries_exhausted": row["status"] == "max_retries_exhausted",
+            "detected_at": row["created_at"],
             "last_retry_at": row["last_retry_at"],
-            "failure_reason": row["failure_reason"],
+            "failure_reason": row["error_message"],
         })
 
     return {
@@ -42,12 +50,10 @@ async def get_status(request: Request, processing_date: date):
 
 
 @router.get("/status/{file_id}/history")
-async def get_status_history(request: Request, file_id: UUID):
+async def get_status_history(request: Request, file_id: int):
     pool = request.app.state.db_pool
     async with pool.acquire() as conn:
-        file_row = await conn.fetchrow(
-            "SELECT * FROM retry_file_tracking WHERE id = $1", file_id,
-        )
+        file_row = await conn.fetchrow("SELECT * FROM import_jobs WHERE id = $1", file_id)
         audit_rows = await conn.fetch(
             """
             SELECT * FROM retry_audit_logs WHERE file_id = $1
@@ -59,7 +65,7 @@ async def get_status_history(request: Request, file_id: UUID):
     if file_row is None:
         return {
             "status": "success",
-            "data": {"file_id": file_id, "filename": None, "file_type": None, "attempts": []},
+            "data": {"file_id": str(file_id), "filename": None, "file_type": None, "attempts": []},
         }
 
     # Pair up retry_initiated -> retry_completed rows into attempts, in order.
@@ -85,9 +91,9 @@ async def get_status_history(request: Request, file_id: UUID):
     return {
         "status": "success",
         "data": {
-            "file_id": file_id,
-            "filename": file_row["filename"],
-            "file_type": file_row["file_type"],
+            "file_id": str(file_id),
+            "filename": file_row["original_filename"],
+            "file_type": file_row["source"],
             "attempts": attempts,
         },
     }

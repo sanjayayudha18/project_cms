@@ -33,7 +33,17 @@ async def require_auth(request: Request) -> str:
         )
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return payload.get("sub", "unknown")
+    return token_identity(payload)
+
+
+def token_identity(payload: dict) -> str:
+    """`sub` when present; otherwise the numeric `id` claim that Go's
+    pkg/auth AccessTokenClaims issues (it never sets `sub`)."""
+    if payload.get("sub"):
+        return str(payload["sub"])
+    if payload.get("id") is not None:
+        return str(payload["id"])
+    return "unknown"
 
 
 def extract_user_id(auth_result: str) -> str:
@@ -46,5 +56,10 @@ if __name__ == "__main__":
     secret = "test_secret"
     token = jwt.encode({"sub": "user@company.co.id"}, secret, algorithm="HS256")
     payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
-    assert extract_user_id(payload.get("sub", "unknown")) == "user@company.co.id"
+    assert extract_user_id(token_identity(payload)) == "user@company.co.id"
+    # Go-issued access token shape: numeric `id`, no `sub`
+    go_token = jwt.encode({"id": 42, "username": "john.admin", "role": "ADMIN"}, secret, algorithm="HS256")
+    go_payload = jwt.decode(go_token, secret, algorithms=["HS256"], options={"verify_aud": False})
+    assert token_identity(go_payload) == "42"
+    assert token_identity({}) == "unknown"
     print("dependencies.py demo OK")

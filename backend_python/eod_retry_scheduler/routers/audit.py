@@ -42,7 +42,7 @@ async def get_audit(
             "id": row["id"],
             "event_type": row["event_type"],
             "trigger": row["trigger_type"],
-            "file_id": row["file_id"],
+            "file_id": None if row["file_id"] is None else str(row["file_id"]),
             "file_type": row["file_type"],
             "file_checksum": row["file_checksum"],
             "processing_date": row["processing_date"],

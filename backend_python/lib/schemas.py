@@ -21,6 +21,7 @@ class ProcessingStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     MAX_RETRIES_EXHAUSTED = "max_retries_exhausted"
+    SUPERSEDED = "superseded"
 
 
 class TriggerType(str, Enum):
@@ -35,7 +36,7 @@ class APIResponse(BaseModel):
 
 
 class FileStatusItem(BaseModel):
-    file_id: UUID
+    file_id: str  # import_jobs.id (bigint) as a string
     filename: str
     checksum: str
     processing_status: ProcessingStatus
@@ -58,7 +59,7 @@ class RetryAttempt(BaseModel):
 
 class ManualRetryResponse(BaseModel):
     job_id: UUID
-    file_id: UUID
+    file_id: str
     processing_status: ProcessingStatus
     triggered_by: str
 
@@ -79,6 +80,7 @@ class SummaryCount(BaseModel):
     completed: int = 0
     failed: int = 0
     max_retries_exhausted: int = 0
+    superseded: int = 0
     late: int = 0
 
 
@@ -86,7 +88,7 @@ class AuditLogItem(BaseModel):
     id: UUID
     event_type: str
     trigger: TriggerType
-    file_id: UUID | None
+    file_id: str | None
     file_type: str
     file_checksum: str | None
     processing_date: date

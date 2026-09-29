@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
-from uuid import UUID
 
 import asyncpg
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from .. import import_jobs
 from ..database import with_db_retry
 from ..utils.timezone import WIB, current_processing_date
 from .audit_service import AuditService
@@ -24,6 +24,35 @@ from .detector import FileDetector, LateDetector
 from .retry_executor import RetryExecutor, RetryResult
 
 logger = logging.getLogger(__name__)
+
+
+# FR14/C3: the legacy ETLs record success in their own tables and never write
+# import_jobs, so a source+date also counts as done when its table has a
+# successful file for that date. Fixed SQL per source, never built from input.
+# file_date/report_date equal the WIB processing_date: ITM from the filename,
+# DSR = saldo 00:00 of that day, DMAA = file mtime on a host in Asia/Jakarta (R2a).
+LEGACY_DONE_SQL: dict[str, str] = {
+    "dmaa": "SELECT EXISTS(SELECT 1 FROM dmaa_files WHERE status = 'success' AND file_date = $1)",
+    "itm_cashpos": "SELECT EXISTS(SELECT 1 FROM itm_cashpos_files WHERE status = 'completed' AND file_date = $1)",
+    "itm_replenish": "SELECT EXISTS(SELECT 1 FROM itm_replenish_files WHERE status = 'completed' AND file_date = $1)",
+    "dsr": "SELECT EXISTS(SELECT 1 FROM dsr_uploads WHERE daily_status = 'completed' AND report_date = $1)",
+}
+
+
+async def is_source_done(conn: asyncpg.Connection, file_type: str, processing_date) -> bool:
+    """True when import_jobs has a completed row for source+date, or the legacy table has a success."""
+    if await import_jobs.current(conn, source=file_type, processing_date=processing_date) is not None:
+        return True
+    legacy_sql = LEGACY_DONE_SQL.get(file_type)
+    return legacy_sql is not None and bool(await conn.fetchval(legacy_sql, processing_date))
+
+
+async def resolve_actor_id(conn: asyncpg.Connection, user_id: str) -> int | None:
+    """users.id for an auth identity, or None ("api_key_user", unknown/non-numeric ids).
+    audit_logs.actor_id is NOT NULL + FK, so only a real user can be recorded there (P4)."""
+    if not user_id.isdecimal():
+        return None
+    return await conn.fetchval("SELECT id FROM users WHERE id = $1", int(user_id))
 
 
 class RetryConflictError(Exception):
@@ -51,6 +80,8 @@ class SchedulerService:
         self.late_detector = late_detector or LateDetector(settings)
         self.retry_executor = retry_executor or RetryExecutor(settings)
         self.audit = audit_service or AuditService(pool)
+        # C1: every source these services own is a batch ETL, so one limit per service.
+        self.stale_after = timedelta(minutes=settings.stale_after_minutes)
         self._scan_lock = asyncio.Lock()
         self._scheduler = AsyncIOScheduler(timezone=WIB)
         self.last_successful_scan_at: datetime | None = None
@@ -137,11 +168,16 @@ class SchedulerService:
     async def _run_auto_retries(self) -> None:
         """Process automatic retries for eligible failed files, isolating failures per file."""
         async with self.pool.acquire() as conn:
+            # FR8: a run stuck in processing (crashed ETL) is failed first, so it
+            # neither blocks its source+date forever nor waits for a new upload.
+            for file_type in self.file_types:
+                await import_jobs.mark_stale(conn, source=file_type, stale_after=self.stale_after)
             rows = await conn.fetch(
                 """
-                SELECT * FROM retry_file_tracking
-                WHERE processing_status = 'failed' AND auto_retry_count < max_retries
-                  AND file_type = ANY($1::text[])
+                SELECT * FROM import_jobs
+                WHERE status = 'failed' AND auto_retry_count < max_retries
+                  AND source = ANY($1::text[])
+                ORDER BY id
                 """,
                 list(self.file_types),
             )
@@ -150,29 +186,16 @@ class SchedulerService:
                 await self.process_auto_retry(dict(row))
             except Exception as e:
                 logger.exception(
-                    "Failed to auto-retry file %s (type=%s, date=%s): %s",
-                    row["id"], row["file_type"], row["processing_date"], e,
+                    "Failed to auto-retry import_job %s (source=%s, date=%s): %s",
+                    row["id"], row["source"], row["processing_date"], e,
                 )
                 # Continue to next file -- do not break the loop (Property 18).
 
     async def _run_late_check(self, file_type: str) -> None:
         """Check if the SLA deadline passed without completion (Requirement 2)."""
         processing_date = current_processing_date()
-        # ponytail: retry_file_tracking is the only schema this service owns.
-        # A "completed" ETL run that never touched retry_file_tracking is invisible here;
-        # true completion status lives in dmaa_files/itm_cashpos_files/itm_replenish_files/
-        # dsr_uploads, which is out of scope for this migration.
         async with self.pool.acquire() as conn:
-            completed = await conn.fetchval(
-                """
-                SELECT EXISTS(
-                    SELECT 1 FROM retry_file_tracking
-                    WHERE file_type = $1 AND processing_date = $2
-                      AND processing_status = 'completed'
-                )
-                """,
-                file_type, processing_date,
-            )
+            completed = await is_source_done(conn, file_type, processing_date)
         if self.late_detector.check_late(file_type, processing_date, has_completed=completed):
             sla = self.settings.get_sla_time(file_type)
             await self.late_detector.persist_late_detection(
@@ -182,129 +205,85 @@ class SchedulerService:
     # -- retry orchestration (task 9.2) -----------------------------------
 
     async def process_auto_retry(self, file: dict) -> None:
-        """Run one automatic retry attempt for a failed file (state machine transitions)."""
-        file_id: UUID = file["id"]
-        file_type: str = file["file_type"]
+        """Run one automatic retry attempt for a failed import_job (FR13)."""
+        file_id: int = file["id"]
+        file_type: str = file["source"]
         processing_date = file["processing_date"]
-        checksum: str = file["file_checksum"]
+        checksum: str = file["file_hash"]
 
         async with self.pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE retry_file_tracking
-                SET processing_status = 'processing', last_retry_at = now(), updated_at = now()
-                WHERE id = $1
-                """,
-                file_id,
-            )
+            try:
+                await import_jobs.start(conn, file_id)
+            except import_jobs.JobInProgressError:
+                logger.info(
+                    "Skipping auto-retry of import_job %s: another %s run for %s is in progress",
+                    file_id, file_type, processing_date,
+                )
+                return  # retried on the next cycle (FR13)
 
         await self.audit.log_retry_initiated(
             "auto", file_id, file_type, checksum, processing_date, "system",
         )
-
         result = await self.retry_executor.execute_retry(file_type)
-
-        if result.success:
-            new_status = "completed"
-        else:
-            new_auto_count = file["auto_retry_count"] + 1
-            new_status = (
-                "max_retries_exhausted" if new_auto_count >= file["max_retries"] else "failed"
-            )
-
-        async with self.pool.acquire() as conn:
-            if result.success:
-                await conn.execute(
-                    """
-                    UPDATE retry_file_tracking
-                    SET processing_status = 'completed', completed_at = now(), updated_at = now()
-                    WHERE id = $1
-                    """,
-                    file_id,
-                )
-                await self.late_detector.resolve_late_detection(
-                    self.pool, file_type, processing_date,
-                )
-            else:
-                await conn.execute(
-                    """
-                    UPDATE retry_file_tracking
-                    SET processing_status = $2, auto_retry_count = auto_retry_count + 1,
-                        updated_at = now()
-                    WHERE id = $1
-                    """,
-                    file_id, new_status,
-                )
-
+        await self._finish_retry(file_id, file_type, processing_date, result, auto_retry=True)
         await self.audit.log_retry_completed(
             "auto", file_id, file_type, checksum, processing_date, "system",
             "completed" if result.success else "failed",
             result.duration_ms, result.error_detail,
         )
 
-    async def process_manual_retry(self, file_id: UUID, user_id: str) -> dict:
-        """Manual retry: bypasses max_retries, rejects completed files (Properties 10, 11)."""
+    async def process_manual_retry(self, file_id: int, user_id: str, ip: str | None = None) -> dict:
+        """Manual retry: bypasses max_retries, rejects completed files (Properties 10, 11).
+        When user_id is a real users.id, the transitions also go to audit_logs (FR18/P4)."""
         async with self.pool.acquire() as conn:
-            file = await conn.fetchrow(
-                "SELECT * FROM retry_file_tracking WHERE id = $1", file_id,
-            )
-        if file is None:
-            raise FileNotFoundInTrackingError(f"No tracked file with id={file_id}")
-        if file["processing_status"] == "completed":
-            raise RetryConflictError(
-                "File is already in 'completed' status. Retry not allowed."
-            )
+            file = await conn.fetchrow("SELECT * FROM import_jobs WHERE id = $1", file_id)
+            if file is None:
+                raise FileNotFoundInTrackingError(f"No tracked file with id={file_id}")
+            if file["status"] in ("completed", "superseded"):
+                raise RetryConflictError(
+                    f"File is already in '{file['status']}' status. Retry not allowed."
+                )
+            actor_id = await resolve_actor_id(conn, user_id)
+            try:
+                await import_jobs.start(conn, file_id, actor_id=actor_id, ip=ip)
+            except (import_jobs.JobInProgressError, import_jobs.IllegalTransitionError) as e:
+                raise RetryConflictError(str(e)) from e
 
-        file_type = file["file_type"]
+        file_type = file["source"]
         processing_date = file["processing_date"]
-        checksum = file["file_checksum"]
-
-        async with self.pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE retry_file_tracking
-                SET processing_status = 'processing', last_retry_at = now(), updated_at = now()
-                WHERE id = $1
-                """,
-                file_id,
-            )
+        checksum = file["file_hash"]
 
         await self.audit.log_retry_initiated(
             "manual", file_id, file_type, checksum, processing_date, user_id,
         )
-
         result = await self.retry_executor.execute_retry(file_type)
-        new_status = "completed" if result.success else "failed"
-
-        async with self.pool.acquire() as conn:
-            if result.success:
-                await conn.execute(
-                    """
-                    UPDATE retry_file_tracking
-                    SET processing_status = 'completed', completed_at = now(), updated_at = now()
-                    WHERE id = $1
-                    """,
-                    file_id,
-                )
-                await self.late_detector.resolve_late_detection(
-                    self.pool, file_type, processing_date,
-                )
-            else:
-                await conn.execute(
-                    """
-                    UPDATE retry_file_tracking
-                    SET processing_status = 'failed', updated_at = now()
-                    WHERE id = $1
-                    """,
-                    file_id,
-                )
-
+        new_status = await self._finish_retry(
+            file_id, file_type, processing_date, result, auto_retry=False, actor_id=actor_id, ip=ip,
+        )
         await self.audit.log_retry_completed(
             "manual", file_id, file_type, checksum, processing_date, user_id,
             new_status, result.duration_ms, result.error_detail,
         )
 
         return {"file_id": file_id, "processing_status": new_status, "triggered_by": user_id}
+
+    async def _finish_retry(
+        self, file_id: int, file_type: str, processing_date, result: RetryResult, *, auto_retry: bool,
+        actor_id: int | None = None, ip: str | None = None,
+    ) -> str:
+        """completed (+ resolve late detection) or failed/max_retries_exhausted; returns the new status."""
+        async with self.pool.acquire() as conn:
+            if result.success:
+                job = await import_jobs.complete(conn, file_id, actor_id=actor_id, ip=ip)
+            else:
+                job = await import_jobs.fail(
+                    conn, file_id,
+                    result.error_detail or f"ETL exited with code {result.return_code}",
+                    auto_retry=auto_retry, actor_id=actor_id, ip=ip,
+                )
+        if result.success:
+            await self.late_detector.resolve_late_detection(self.pool, file_type, processing_date)
+        return job["status"]
 
     # -- generic manual trigger (POST /process/{file_type}) --------------
 

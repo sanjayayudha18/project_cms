@@ -278,6 +278,36 @@ type DsrUpload struct {
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 }
 
+// One row per ingested file. Idempotent per (source, file_hash); a different hash for a completed (source, processing_date) becomes version+1 and supersedes the old row on completion. Status machine: see .claude/sdlc/import-export-jobs/spec.md FR10.
+type ImportJob struct {
+	ID int64 `json:"id"`
+	// dmaa | itm_cashpos | itm_replenish | dsr | new ingest sources
+	Source string `json:"source"`
+	// NULL = source is not per date; such rows only follow the hash rule (FR4a).
+	ProcessingDate   pgtype.Date `json:"processing_date"`
+	FileHash         string      `json:"file_hash"`
+	OriginalFilename string      `json:"original_filename"`
+	FilePath         *string     `json:"file_path"`
+	Runtime          string      `json:"runtime"`
+	DetectionSource  string      `json:"detection_source"`
+	// pending | processing | completed | failed | max_retries_exhausted | superseded
+	Status          string             `json:"status"`
+	Version         int32              `json:"version"`
+	SupersedesJobID *int64             `json:"supersedes_job_id"`
+	RowCount        *int32             `json:"row_count"`
+	ErrorCount      *int32             `json:"error_count"`
+	ErrorMessage    *string            `json:"error_message"`
+	AutoRetryCount  int32              `json:"auto_retry_count"`
+	MaxRetries      int32              `json:"max_retries"`
+	LastRetryAt     pgtype.Timestamptz `json:"last_retry_at"`
+	CreatedBy       *int64             `json:"created_by"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	// Also the staleness clock: pending/processing older than the per-source limit is marked failed (FR8).
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ItmCashpo struct {
 	ID     int64 `json:"id"`
 	FileID int64 `json:"file_id"`
@@ -370,6 +400,18 @@ type ItmReplenishFile struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LateDetection struct {
+	ID             pgtype.UUID        `json:"id"`
+	FileType       string             `json:"file_type"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	SlaDeadline    pgtype.Time        `json:"sla_deadline"`
+	DetectedAt     pgtype.Timestamptz `json:"detected_at"`
+	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
+	IsResolved     bool               `json:"is_resolved"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Location struct {
 	ID            int64              `json:"id"`
 	RegionID      int64              `json:"region_id"`
@@ -454,6 +496,23 @@ type Region struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type RetryAuditLog struct {
+	ID pgtype.UUID `json:"id"`
+	// retry_initiated | retry_completed
+	EventType string `json:"event_type"`
+	// auto | manual
+	TriggerType    string             `json:"trigger_type"`
+	FileID         *int64             `json:"file_id"`
+	FileType       string             `json:"file_type"`
+	FileChecksum   *string            `json:"file_checksum"`
+	ProcessingDate pgtype.Date        `json:"processing_date"`
+	InitiatedBy    string             `json:"initiated_by"`
+	Outcome        *string            `json:"outcome"`
+	DurationMs     *int32             `json:"duration_ms"`
+	ErrorDetail    *string            `json:"error_detail"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type Role struct {
 	ID int64 `json:"id"`
 	// ADMIN | ADMIN_PARAM | ATM-USER | ATM-SPV | BRANCH-USER | BRANCH-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | VENDOR-USER | APPACCESS
@@ -468,6 +527,19 @@ type RolePermission struct {
 	RoleID        int64              `json:"role_id"`
 	MenuFeatureID int64              `json:"menu_feature_id"`
 	GrantedBy     int64              `json:"granted_by"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type ScanRun struct {
+	ID pgtype.UUID `json:"id"`
+	// failure_detection | late_detection
+	ScanType   string             `json:"scan_type"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	// running | success | failed
+	Status        string             `json:"status"`
+	FilesDetected *int32             `json:"files_detected"`
+	ErrorMessage  *string            `json:"error_message"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 

@@ -1,6 +1,6 @@
 # Spec: `import_jobs` — satu registry file ingest (menyatukan `retry_file_tracking`)
 
-Status: draft (revisi 2, 2026-09-28). Stage: 2 Design. Reads: `intent.md` (Resolved decisions + Amendment).
+Status: draft (revisi 2, 2026-09-28; koreksi review 2026-09-29: FR8, FR10, FR12, NFR6, A11, flagged concerns) — **diterima PO 2026-09-29**. Stage: 2 Design (accepted). Reads: `intent.md` (Resolved decisions + Amendment).
 Trigger ke stage berikut: product owner menerima spec ini → Claude Code plan mode (`plan.md`).
 Sec 4 #7 flag: **migrasi** (tabel baru) + **modul baru** + perubahan perilaku retry scheduler — lihat "Flagged concerns".
 
@@ -53,20 +53,30 @@ Sec 4 #7 flag: **migrasi** (tabel baru) + **modul baru** + perubahan perilaku re
   **per sumber** (default `IMPORT_JOB_STALE_AFTER` = **15 menit** untuk ingest baru; sumber ETL batch
   `dmaa`/`itm_cashpos`/`itm_replenish`/`dsr` mendapat batas sendiri di config Python, usulan 60 menit —
   keputusan C1) → register/retry berikutnya untuk
-  `(source, processing_date)` yang sama menandainya `failed` ("stale") lalu melanjutkan.
+  `(source, processing_date)` yang sama menandainya `failed` ("stale") lalu melanjutkan. Siklus
+  auto-retry juga menjalankan penandaan stale di awal setiap siklus (baris `processing` yang macet
+  tidak menunggu register baru).
 - **FR9 — Current version.** Lookup baris `completed` terkini per `(source, processing_date)`.
 - **FR10 — Status machine** (ditegakkan helper + CHECK):
   `pending → processing → completed → superseded` ·
   `pending|processing → failed` ·
   `failed → processing` (retry) · `failed → max_retries_exhausted` ·
   `max_retries_exhausted → processing` (hanya retry manual).
-- **FR11 — Kontrak Go = Python.** Satu set test kontrak dijalankan di kedua runtime terhadap Postgres nyata.
+  Status awal: `pending` (register, FR1) atau `failed` (deteksi file gagal, FR12 — lewat `detect`, bukan `register`).
+- **FR11 — Kontrak Go = Python. DITUNDA ke forecast 2.1 (R4, 2026-09-29).** Fitur ini hanya membangun
+  helper Python. Helper Go + satu set test kontrak di kedua runtime dibangun di 2.1 (pemakai Go pertama),
+  dengan perilaku helper Python sebagai acuan. Referensi ke Go (`ErrJobInProgress`, dll.) di spec ini
+  berlaku untuk 2.1.
 
 ### Functional — adopsi retry scheduler (Python)
 - **FR12 — Deteksi file gagal.** `FileDetector.persist_detected_files` menulis ke `import_jobs`
   (`source` = `file_type` existing: `dmaa`, `itm_cashpos`, `itm_replenish`, `dsr`; `runtime='python'`;
-  `detection_source` = `not_processed`|`input_remaining`; status `failed`), idempotent lewat FR2
-  (`ON CONFLICT … DO NOTHING` pada index hash). Perilaku scan, jadwal, dan lock tidak berubah.
+  `detection_source` = `not_processed`|`input_remaining`; status awal `failed`) lewat fungsi helper
+  terpisah **`detect`** = insert bila belum ada; bentrok `import_jobs_hash_uq` (23505) → no-op.
+  `detect` **tidak** memakai `register` dan **tidak** menerapkan FR3: baris `failed`/
+  `max_retries_exhausted`/`completed` yang sudah ada tidak di-reset (kalau di-reset, setiap scan 15 menit
+  akan menghidupkan lagi file gagal dan `max_retries` tak pernah berlaku). Perilaku scan, jadwal, dan
+  lock tidak berubah.
 - **FR13 — Auto/manual retry.** `SchedulerService` membaca/menulis `import_jobs` dengan transisi FR10;
   `auto_retry_count`/`max_retries`/`last_retry_at` pindah ke `import_jobs`. Retry manual tetap menolak
   baris `completed` (409) dan tetap melewati `max_retries`. Bila FR4 menolak (ada proses lain untuk
@@ -105,8 +115,8 @@ Sec 4 #7 flag: **migrasi** (tabel baru) + **modul baru** + perubahan perilaku re
 - **NFR3** Tidak ada dependency baru (Go: pgx/sqlc; Python: `asyncpg` yang sudah dipakai `lib/`).
 - **NFR4** Timestamps `timestamptz` UTC; tampilan Asia/Jakarta (Python sudah memakai `lib/utils/timezone.WIB`).
 - **NFR5** Retensi permanen (keputusan #6).
-- **NFR6** Coverage ≥ 80% helper Go; test kontrak hijau di Go & Python; test `lib/services` yang ada
-  disesuaikan dan tetap hijau.
+- **NFR6** Coverage ≥ 80% helper Python (helper Go + kontrak: 2.1). `lib/services` belum punya test
+  sama sekali — A11–A13 butuh harness pytest baru (DB nyata, `retry_executor` di-mock).
 
 ## Data model — migrasi `019_import_jobs.sql` (additive, forward-only)
 
@@ -167,9 +177,10 @@ CREATE INDEX import_jobs_list_idx  ON public.import_jobs (created_at DESC, id DE
 | Komponen | Lokasi | Perubahan |
 |---|---|---|
 | Migrasi | `backend/migrations/019_import_jobs.sql` | Baru: `import_jobs` + 3 tabel pendamping |
-| Queries Go | `backend/queries/import_jobs.sql` → `sqlc generate` (v1.31.1; hand-fix `UserLeafe`) | Baru |
-| Helper Go | `backend/internal/importjob/` (S1) | Baru: `Register`, `Start`, `Complete`/`CompleteTx`, `Fail`, `Current` |
-| Helper Python | `backend_python/lib/import_jobs.py` | Baru: fungsi setara, dipakai ingest baru **dan** oleh `lib/services` |
+| Model sqlc | `sqlc generate` (v1.31.1; hand-fix `UserLeafe`) → struct baru di `models.go`, tanpa queries | Regenerate |
+| Helper Go | `backend/internal/importjob/` (S1) | **Ditunda ke 2.1** (R4) |
+| Helper Python | `backend_python/lib/import_jobs.py` | Baru: `register`, `detect`, `start`, `complete`, `fail`, `current`, `mark_stale`; dipakai `lib/services` dan ingest Python baru |
+| Deploy | `.claude/docs/deployment.md` | Syarat TZ `Asia/Jakarta` untuk host ETL Python (R2a) |
 | Retry scheduler | `backend_python/lib/services/{detector,scheduler_service,audit_service}.py` | `retry_file_tracking` → `import_jobs` lewat helper |
 | API Python | `backend_python/{eod_retry_scheduler,service_dsr_etl}/routers/*.py`, `lib/schemas.py` | Baca `import_jobs`; `file_id` bigint diserialisasi string |
 | UI | `frontend/CompanyPortal-Vite/src/features/eod-monitoring/` | Tidak berubah kecuali label status `max_retries_exhausted`/`superseded` bila belum ada |
@@ -188,7 +199,7 @@ perubahan yang terlihat klien hanya: nilai `file_id` berupa string angka (bukan 
 - Replica pool di sisi Python, worker async, penyimpanan file (0.4), purge/retensi.
 
 ## Resolved spec decisions (tanya-jawab dengan user, 2026-09-28)
-- **S1** Modul Go di `backend/internal/importjob`; ditambahkan ke CLAUDE.md Sec 3 saat build.
+- **S1** Modul Go di `backend/internal/importjob`; ditambahkan ke CLAUDE.md Sec 3 saat dibangun (2.1, R4).
 - **S2** `processing_date` nullable (FR4a).
 - **S3** Revert = versi baru (FR5a).
 - **S4** Audit: user → `audit_logs`; sistem → `retry_audit_logs` + structured log (FR18).
@@ -205,9 +216,14 @@ perubahan yang terlihat klien hanya: nilai `file_id` berupa string angka (bukan 
 - **C4** Kunci idempotensi `(source, file_hash)` disetujui — file identik di tanggal berbeda = duplikat (FR2).
 
 ## Flagged concerns (sisa)
-- [ ] **Verifikasi saat plan:** FR14 mengasumsikan `file_date`/`report_date` di tabel lama sama dengan
-  `processing_date` yang dipakai scheduler (`current_processing_date()`). Cek definisinya sebelum build;
-  bila berbeda (mis. H-1), pemetaan FR14 menyertakan offset-nya.
+- [x] **Verifikasi saat plan (FR14 tanggal):** ITM = tanggal di nama file = tanggal tiba (P1); DSR
+  `report_date` = saldo 00:00 hari itu (`dsr-late-report/intent.md` #1) → cocok tanpa offset.
+- [x] **R2 DMAA timezone (review 2026-09-29) — diputuskan (a):** `dmaa_etl.py:139` mengisi `file_date`
+  dari `datetime.fromtimestamp(st_mtime).date()` = TZ **host**; `processing_date` = WIB. Host yang
+  menjalankan ETL Python + retry scheduler **wajib** TZ `Asia/Jakarta` (syarat deploy). FR14 `dmaa` tetap
+  tanpa offset. ETL tidak diubah (keputusan #1).
+- [x] **R4 Helper Go (review 2026-09-29) — diputuskan: ditunda ke forecast 2.1.** FR11, A10, dan sisi Go
+  A16 pindah ke spec 2.1.
 - [ ] Nilai 60 menit untuk sumber ETL batch adalah usulan; ukur durasi ETL nyata di dev.
 
 ## Acceptance (tiap baris → test di `tests.md`)
@@ -224,8 +240,8 @@ perubahan yang terlihat klien hanya: nilai `file_id` berupa string angka (bukan 
 | A7 | Fail v2 → v1 tetap `completed` | FR7 |
 | A8 | Baris `processing` lebih tua dari batas sumbernya → ditandai `failed` lalu lanjut; sumber ETL batch memakai batasnya sendiri, bukan 15 menit | FR8 |
 | A9 | Transisi ilegal ditolak (mis. `completed → processing`) | FR10 |
-| A10 | Suite kontrak hijau di Go & Python, baris identik | FR11 |
-| A11 | Scan detector dua kali atas file gagal yang sama → satu baris | FR12 |
+| A10 | Suite kontrak hijau di Go & Python, baris identik — **ditunda ke 2.1** | FR11 |
+| A11 | Scan detector dua kali atas file gagal yang sama → satu baris; baris `failed`/`max_retries_exhausted` yang sudah ada **tidak** berubah status/`auto_retry_count` | FR12 |
 | A12 | Auto-retry: gagal ×3 → `max_retries_exhausted`; retry manual tetap jalan; baris `completed` → 409 | FR13 |
 | A13 | Late check: tidak `late` bila `import_jobs` `completed` **atau** tabel lama sukses untuk tanggal itu (4 sumber, masing-masing diuji); `late` bila keduanya kosong; sukses retry me-resolve `late_detections` | FR14 |
 | A14 | `019` diterapkan di DB kosong: 4 tabel + index + FK `retry_audit_logs.file_id` ada | FR15 |

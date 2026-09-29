@@ -18,7 +18,7 @@ class AuditService:
         self.pool = pool
 
     async def log_retry_initiated(
-        self, trigger: str, file_id: UUID | None, file_type: str, file_checksum: str | None,
+        self, trigger: str, file_id: int | None, file_type: str, file_checksum: str | None,
         processing_date: date, initiated_by: str,
     ) -> UUID:
         async with self.pool.acquire() as conn:
@@ -35,7 +35,7 @@ class AuditService:
         return row["id"]
 
     async def log_retry_completed(
-        self, trigger: str, file_id: UUID | None, file_type: str, file_checksum: str | None,
+        self, trigger: str, file_id: int | None, file_type: str, file_checksum: str | None,
         processing_date: date, initiated_by: str, outcome: str,
         duration_ms: int, error_detail: str | None,
     ) -> UUID:

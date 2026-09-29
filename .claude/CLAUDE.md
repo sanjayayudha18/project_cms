@@ -76,7 +76,8 @@ pnpm --dir frontend/VendorPortal-Vite  run dev|build|test|lint     # dev :5174
 # Python EOD (run from backend_python/ so `lib` imports resolve)
 cd backend_python && python -m eod_retry_scheduler.run   # :8091
 cd backend_python && python -m service_dsr_etl.run       # :8090
-cd backend_python && pytest dsr itm/cashpos
+cd backend_python && python -m unittest discover -s dsr && python -m unittest discover -s itm/cashpos   # stdlib unittest; pytest is not installed
+cd backend_python && python -m unittest lib.test_import_jobs -v   # integration; skips when DATABASE_URL is empty (use localhost, not host.docker.internal)
 
 # Migrations: plain numbered SQL in backend/migrations/ (no migrate tool), applied by hand to dev
 psql "postgres://…@localhost:5432/cms" -f backend/migrations/0NN_<name>.sql
@@ -302,7 +303,7 @@ LOG_LEVEL=info
 *   **`admin/users`** apply immediately (not maker-checker), guarded `APPACCESS`. Local-user create issues a temp password + `must_change_password=true`.
 *   **Role Management (and planned Region Management) — documented deviation from Golden Rule #3**: apply immediately, but the `audit_logs` write is in the **same transaction** (audit failure rolls back) and `APPACCESS`/`ADMIN` is re-checked at route + service layer.
 *   **Soft-delete only** for `users`, `vendors`, `atms` (and other master data) — `is_active=false` + `deleted_at`, never `DELETE FROM`; enforced by `internal/repository/no_hard_delete_test.go`. `atms.terminal_id` is immutable after create.
-*   **Migration baseline (2026-09-18)**: `001_baseline_schema.sql` + `002_baseline_seed.sql` (dev password hash `password123`); old 001–040 live in `backend/migrations/archives/2026-09-18_pre-baseline/`. New migrations continue the sequence (currently up to `018_`).
+*   **Migration baseline (2026-09-18)**: `001_baseline_schema.sql` + `002_baseline_seed.sql` (dev password hash `password123`); old 001–040 live in `backend/migrations/archives/2026-09-18_pre-baseline/`. New migrations continue the sequence (currently up to `019_`; `019_import_jobs.sql` applied to dev 2026-09-29).
 *   `vendor_packages_branch` and `atm_vendor_packages` were truncated by migration 011 — **need re-seeding on dev** before those screens show data.
 *   Full rationale, affected files, and per-migration history: [docs/decisions.md](./docs/decisions.md).
 

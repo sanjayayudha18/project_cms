@@ -11,7 +11,8 @@ from ..config import FILE_TYPES
 
 router = APIRouter(dependencies=[Depends(require_auth)])
 
-_STATUSES = ("pending", "processing", "completed", "failed", "max_retries_exhausted")
+# superseded is its own bucket: an older version replaced by a newer file, not a failure.
+_STATUSES = ("pending", "processing", "completed", "failed", "max_retries_exhausted", "superseded")
 
 
 @router.get("/summary")
@@ -20,12 +21,12 @@ async def get_summary(request: Request, processing_date: date):
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT file_type, processing_status, COUNT(*) AS cnt
-            FROM retry_file_tracking
-            WHERE processing_date = $1
-            GROUP BY file_type, processing_status
+            SELECT source, status, COUNT(*) AS cnt
+            FROM import_jobs
+            WHERE processing_date = $1 AND source = ANY($2::text[])
+            GROUP BY source, status
             """,
-            processing_date,
+            processing_date, list(FILE_TYPES),
         )
         late_count = await conn.fetchval(
             """
@@ -40,11 +41,8 @@ async def get_summary(request: Request, processing_date: date):
     by_file_type = {ft: {status: 0 for status in _STATUSES} for ft in FILE_TYPES}
 
     for row in rows:
-        status = row["processing_status"]
-        if status in counts:
-            counts[status] += row["cnt"]
-        if row["file_type"] in by_file_type and status in by_file_type[row["file_type"]]:
-            by_file_type[row["file_type"]][status] += row["cnt"]
+        counts[row["status"]] += row["cnt"]
+        by_file_type[row["source"]][row["status"]] += row["cnt"]
 
     return {
         "status": "success",

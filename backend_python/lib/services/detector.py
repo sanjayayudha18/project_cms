@@ -15,6 +15,7 @@ from uuid import UUID
 
 import asyncpg
 
+from .. import import_jobs
 from ..utils.timezone import WIB
 
 logger = logging.getLogger(__name__)
@@ -81,21 +82,16 @@ class FileDetector:
     async def persist_detected_files(
         self, pool: asyncpg.Pool, files: list[DetectedFile], processing_date: date,
     ) -> int:
-        """Insert newly detected files into retry_file_tracking. Idempotent per (checksum, date)."""
+        """Record newly detected files in import_jobs as `failed` (FR12). Idempotent per
+        (file_type, checksum) via import_jobs.detect, which never resets an existing row."""
         inserted = 0
         async with pool.acquire() as conn:
             for f in files:
-                row = await conn.fetchrow(
-                    """
-                    INSERT INTO retry_file_tracking
-                        (file_type, filename, file_path, file_checksum, processing_date,
-                         detection_source, failure_reason, processing_status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, 'failed')
-                    ON CONFLICT (file_checksum, processing_date) DO NOTHING
-                    RETURNING id
-                    """,
-                    f.file_type, f.filename, str(f.file_path), f.checksum,
-                    processing_date, f.detection_source, f.failure_reason,
+                row = await import_jobs.detect(
+                    conn, source=f.file_type, processing_date=processing_date,
+                    file_hash=f.checksum, original_filename=f.filename,
+                    file_path=str(f.file_path), detection_source=f.detection_source,
+                    error_message=f.failure_reason,
                 )
                 if row is not None:
                     inserted += 1

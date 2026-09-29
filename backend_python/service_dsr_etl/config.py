@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import time
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Retry settings
     retry_interval_minutes: int = 30
     max_auto_retries: int = 3
+    # import_jobs pending/processing older than this is marked failed (FR8/C1; batch ETL, not 15m)
+    stale_after_minutes: int = Field(default=60, ge=1)
     db_retry_max_attempts: int = 3
     db_retry_base_delay_seconds: float = 1.0
 

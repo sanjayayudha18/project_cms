@@ -27,7 +27,7 @@
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
 
 * * *
-## graphify
+## 1a. graphify (codebase navigation)
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
@@ -153,31 +153,14 @@ Layered, not one package per domain: `handler/` (HTTP) → `service/` (business 
 *   **Integration**: `escrow_batch_files`, `escrow_batch_rows`, `escrow_reconciliation_results`
 > Need a new table/column? Propose here FIRST, get approval, then migrate.
 * * *
-## 3a. Business Rules & Requirements (from URS v0.3 Phase 1 — `UR New Template v0.3 - E2E Cash Management System v.4 - Phase 1.docx-20260918115415.md` at repo root; older Rev1 .docx in `archives/`)
-> Source-of-truth requirements doc. Anything below not yet reflected in code/schema is a **spec**, not an implemented behavior — check code before assuming it's live.
-> Per-feature flow diagrams (Mermaid, editable): `.claude/feature-flows/<feature>/feature-flow.md`.
+## 3a. Business Rules & Requirements
+> Full URS summary (FNC 001–003, forecast uploads, pemenuhan/pengambilan dana, reports, dashboard, cash count, invoice recon, NFR, DGCC): [docs/requirements.md](./docs/requirements.md). Anything there not in code/schema is a **spec**, not live behaviour — check code first. Flow diagrams: `.claude/feature-flows/<feature>/feature-flow.md`.
 
-*   **Functional requirements (all High)**: FNC 001 ATM Cash Forecasting (DSR intake, replenishment instruction, projection) · FNC 002 Cash Count (scheduling, reconciliation, progress + result report; vault ATM/Cash + selektif mesin) · FNC 003 Dashboard (daily instruction amount + term ID, DSR lateness recap, cash count daily progress + monthly report).
-*   **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
-    `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
-    *   Fallback: DMAA recommendation exists but DSR missing → compute from DMAA recommendation alone. URS open question ("apakah rumus ini masih valid?") **resolved 2026-09-25: formula + fallback confirmed valid as written.**
-    *   `Rencana Isi Hari-H` = previous day's order to be filled on H; it reduces the vendor's physical balance.
-    *   `Proyeksi Refund` per ATM = opening balance (H) − predicted transactions (H and H+1), from DMAA/Data Science horizon.
-    *   Results groupable by vendor · vault · denomination (cash need per vendor).
-*   **Forecast input uploads** (review of DMAA H0 recommendation): complaint-handling/recon list (skip if DMAA already recommended emergency/planned yesterday, else add as emergency order) · ATM project list from business units (replace/new/relocation → add as emergency/planned) · problem-ATM list (exclude) · adjustment order (replaces DMAA nominal for listed IDs). Merged into a **draft order** → tiered approval (maker-checker) → publish replenishment instruction + notification.
-*   DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis (columns: report date [not send date], vendor + vault area, received-at, status OK/TELAT). Email/in-app notification on late DSR.
-*   Duplicate-order prevention: an ATM with an emergency/adhoc order issued up to H-1, or active on H0, gets no additional order (excluded from the Data Science forecast file).
-*   ATM in "problem" status (pending part, vandalism, etc.) is excluded from replenishment recommendations.
-*   **Pemenuhan dana (fund fulfillment)**: branch/Cash Management sets source location, nominal per denomination, pickup date + time, providing vault; vendor FLM sees it in-app. **Pengambilan dana**: FLM inputs officer + vehicle (nama, KTP, NIP, perusahaan, keperluan, nominal + per denom, jumlah lembar, no. kendaraan, tanggal) → maker-checker approval → system issues downloadable surat tugas → verification + handover (serah terima) between Cash Management and FLM.
-*   Replenishment result is classified (holiday-adjusted): on-schedule · early (1–2 days) · late (1–2 days) · not done (>2 days off or skipped) · **replenished without an order** (realisasi vs order).
-*   **Required reports**: refund per ID (filter vendor/denom) · fill amount ≠ order (with ID detail) · transactions (tarik/setor) · ATM profile · order vs transaction · user report · user log (last login) · trip/realisasi per vendor per ATM ID (incl. highest).
-*   **Dashboard**: status, aging, SLA, historical trend, exception indicators; filter + drill-down; export CSV/XLSX/PDF.
-*   **Master data (vendor)**: vendor legal identity, active/inactive, NPWP, notification PIC; vault address, coordinates (optional), operating hours, capacity, category ATM/Cash; PIC jabatan/phone/email; kelolaan vendor → ATM and/or branch/customer. Changes via maker-checker + audit trail; bulk import/export CSV/XLSX with structure + content validation.
-*   **Cash count (vault, monthly)**: risk category from escrow (SIBS/MIS) balance analysis drives a random/non-patterned visit schedule (ignores holidays/non-working days; considers regional PIC availability). Assigned PIC gets email notification, can accept/reject (reject → history kept, then reschedule or reassign). On accept, a surat tugas is issued. Berita Acara (BA) is filled digitally on-site, DSR column auto-fills from vendor's uploaded DSR, photo evidence attached, dual e-sign (vendor + bank PIC). BA templates: vault ATM, vault Cash, valas; plus checklist parameters. Final docs (BA, checklist, photos) downloadable/printable. Monthly recap = 3-way reconciliation: cash count vs. escrow (H-1, auto from MIS/SIBS) vs. proofing (manual input), diffs flagged for follow-up; per-escrow status Complete / On-progress / Not Complete + findings; vendor performance evaluation.
-*   **Cash count selektif (machine-level)**: same flow as vault cash count, scoped to specific ATMs per supervision instruction.
-*   **Invoice reconciliation**: vendor uploads invoice + supporting docs; CIMB Niaga internal team uploads ATM master data (active/terminated ATM, price, trip package, category VIP/Industri/Regular); system auto-reconciles; internal team can manually adjust against vendor disputes (sanggahan).
-*   **NFR targets**: 24×7 availability outside planned maintenance · dashboard load ≤3s (p95) · DSR upload ≤30s/doc · journal-post initial response ≤5s with async status confirm ≤2min · 300 concurrent active users · horizontal scalability for vendor portal · Data Centers: Bintaro & NTT · operating hours 07:00–20:00 (uptime 24×7) · responsive/mobile-usable UI + basic accessibility · structured logging, telemetry, metrics, operational alerts · certified e-sign optional.
-*   **DGCC / data privacy**: this system is internal + vendor-operational, not customer-facing, so UU PDP/POJK 22/2023 items on customer personal-data collection are likely N/A — but vendor (FLM) data exchange involves a third party, so a Third-Party Risk Assessment (TPRA) and Data Processing Agreement should be tracked as a compliance item, not assumed done.
+Always-on rules (money/recon — never re-derive):
+*   **Order ATM** = `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`; DSR missing → from DMAA recommendation alone (confirmed 2026-09-25). Distinct from the EOD `Final Realisasi` formula (Sec 14).
+*   DSR upload deadline **09:00**; late/missing DSR feeds the FLM penalty report.
+*   No extra order for an ATM with an emergency/adhoc order issued up to H-1 or active on H0; ATMs in "problem" status are excluded from recommendations.
+*   Key NFRs: dashboard ≤3s p95 · DSR upload ≤30s/doc · 300 concurrent users · office hours 07:00–20:00, uptime 24×7.
 * * *
 ## 4\. AI Collaboration Rules (the leash)
 1. Plan first for non-trivial work: list files + steps, wait for OK.
@@ -288,33 +271,11 @@ LOG_LEVEL=info
 *   .dockerignore: node\_modules, dist, .env, .git.
 
 * * *
-## 10\. GCP Deployment (0 -> Deployed)
-
-| # | Product | Role |
-| ---| ---| --- |
-| 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend, currently ONE VM running both `backend/` (ATM, port 8080) and `backend-cit/` (CIT, port 8081) as separate containers — see split-VM plan below |
-| 3 | CloudSQL Postgres | Primary (write) |
-| 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
-| 5 | Cloud Storage | Uploads/exports/escrow batch files |
-| 6 | Memorystore Redis | Cache/sessions |
-| 7 | Artifact Registry | Docker images |
-| 8 | Cloud Build | CI: build -> test -> scan -> push |
-| 9 | Secret Manager | Secrets (JWT, LDAP, SMTP, DB) |
-| 10 | Cloud DNS | Domains (internal + vendor) |
-| 11 | Cloud Armor | WAF (esp. vendor portal) |
-| 12 | Cloud Logging | Structured logs |
-| 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
-
-**Current state (now): ONE Compute Engine VM runs both backends** as separate Docker containers (`backend` on 8080, `backend-cit` on 8081) — see root `docker-compose.yml` (Sec 9). Fine for now: CIT is still a skeleton with no real endpoints, low load.
-
-**Planned (2028): split into two separate Compute Engine VMs**, one per backend. This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so moving CIT to its own VM later requires **no code change** — just deploy the existing `cms-backend-cit` image to a new VM and repoint its `.env`. When that split happens:
-*   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
-*   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
-*   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
-
-**Pipeline**: Cloud Build -> lint + go test + vite build (x2) -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
-**Rollback**: keep previous image SHA deployable, per service.
+## 10\. GCP Deployment
+> Product map (Compute Engine, CloudSQL primary + replica, GCS, Memorystore, Artifact Registry, Cloud Build, Secret Manager, DNS, Armor, Logging, Monitoring), split-VM plan, pipeline: [docs/deployment.md](./docs/deployment.md).
+*   Today: ONE VM runs `backend` (8080) + `backend-cit` (8081) as separate containers. 2028: one VM per backend — zero code change.
+*   Both backends must share the **same** CloudSQL, **same** Redis (JWT blacklist + rate limits) and **same** `JWT_SECRET`; only ATM issues tokens, CIT only validates.
+*   Images tagged by git SHA (never `latest`); keep the previous SHA deployable per service for rollback.
 
 * * *
 ## 11\. Definition of Done
@@ -347,20 +308,7 @@ LOG_LEVEL=info
 
 * * *
 ## 13\. UI/UX & Brand
-**Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue.
-
-**Two themes, one per frontend:**
-*   **Internal app** (`frontend/CompanyPortal-Vite`) → **Option A "Merah Sirih"**. Warm off-white neutrals, red as a ≤10% accent (primary buttons, active states, key figures). Optimized for data-dense screens operators stare at all day.
-    *   Primary `oklch(56% 0.223 27)` · Primary Deep `oklch(47% 0.185 27)` · Red Tint `oklch(94% 0.03 25)` · Surface `oklch(98.6% 0.006 40)` · Text `oklch(26% 0.02 30)`
-*   **Vendor portal** (`frontend/VendorPortal-Vite`) → **Option B "Merah Menyala"**. Bold, brand-forward: maroon-red top bar, full-red active sidebar. Strong CIMB identity from first load, especially on login.
-    *   Primary `oklch(54% 0.233 27)` · Maroon Bar `oklch(40% 0.155 26)` · Maroon Deep `oklch(30% 0.11 25)` · Surface `oklch(99.5% 0.003 40)` · Text `oklch(25% 0.02 28)`
-
-**Rules:**
-*   Font: one family in multiple weights (hierarchy via scale + weight, not two competing fonts). Use `tabular-nums` for all money/metrics tables.
-*   **Accessibility**: never encode status with color alone — always pair red/green with a label or icon (color-blind users). Deep red on white is safe for bold text/buttons only; do NOT use it for small thin text (insufficient contrast).
-*   Red is an accent, not wallpaper (internal). Don't scatter it everywhere — it works because it's rare.
-*   Money as `tabular-nums`, currency shown explicitly (IDR), amounts right-aligned in tables.
-*   Palette reference / live mockups: see the CMS palette showcase artifact.
+> Full palette + rules live in [rules/frontend-ui.md](./rules/frontend-ui.md), auto-loaded for `frontend/**`. Internal app = "Merah Sirih" (red ≤10% accent); vendor portal = "Merah Menyala" (brand-forward). Everywhere, including exports: money in `tabular-nums`, currency (IDR) explicit, right-aligned; never encode status by colour alone.
 
 * * *
 ## 14\. Backend Split: Transactional vs Batch (EOD)
@@ -416,3 +364,5 @@ Both run on the **same VM**. Their windows **partly overlap**: the Python schedu
 ## 15\. Where docs live
 *   Legacy feature specs + steering docs: `.kiro/` (`.kiro/specs/<feature>/`, `.kiro/steering/`) — still valid for features started there (Sec 4a rule 7).
 *   New feature artifacts: `.claude/sdlc/<feature>/` (Sec 4a).
+*   Detail moved out of this file (read on demand): `.claude/docs/` — `requirements.md` (URS), `data-map.md` (table/column notes), `decisions.md` (decision log), `deployment.md` (GCP). Keep this file to always-on rules; put long history there.
+*   Path-scoped rules (auto-loaded by path): `.claude/rules/` — `frontend-ui.md` for `frontend/**`.

@@ -88,7 +88,7 @@ Tidak dikerjakan di fitur ini. Di 2.1: `backend/internal/importjob` (Register/St
 
 ### Fase 8 — Verifikasi (→ `tests.md`)
 - [x] **T8.1** `go build ./...` + `go test ./...` (backend, memastikan `models.go` baru aman), `pytest backend_python`, `npm test && npm run typecheck && npm run build` (CompanyPortal) — semua hijau. _Selesai — lihat `tests.md` (1 test frontend gagal tidak terkait: `lib/auth/store.test.ts`)._
-- [~] **T8.2** Review: `code-reviewer` + `database-reviewer` (migrasi/index) + `python-reviewer`; perbaiki CRITICAL/HIGH. _Review selesai, temuan diperbaiki — lihat `review.md`; menunggu keputusan A (supersede multi-file) dan task C (path traversal DSR)._
+- [x] **T8.2** Review: `code-reviewer` + `database-reviewer` (migrasi/index) + `python-reviewer`; perbaiki CRITICAL/HIGH. _Review selesai, temuan diperbaiki — lihat `review.md`; menunggu keputusan A (supersede multi-file) dan task C (path traversal DSR)._ _A diselesaikan lewat migrasi 020; sisa: task C (path traversal DSR, terpisah)._
 - [ ] **T8.3** A17 manual browser check halaman EOD monitoring — **outstanding, dikerjakan user**, setelah task routing `/api/eod` (S6) selesai.
 
 ## Urutan & ketergantungan

@@ -15,8 +15,10 @@ Reviewed 2026-09-29 by code-reviewer, database-reviewer, python-reviewer (report
 
 Tests added: executor error/other-service/pending/late-finish (scheduler), stale counting (import_jobs), `test_retry_executor.py` (timeout, bounded detail), role gate + token hardening + id bounds (API). 55 lib tests + DSR 7 + ITM 3 green.
 
-## Open — needs a decision
-- **A. Several files per source+date supersede each other** (DB H1, code M3, python M7). `current_uq` allows one completed row per source+date and the ETL drains the whole folder, so completing file B marks file A "Digantikan". Options: (1) narrow `current_uq` to uploaded rows (`detection_source IS NULL`) via migration 020, detected rows then never supersede; (2) `part_key` column. Not done: even the light option needs an index change.
+## Fixed after decision A (2026-09-29)
+- **A. Several files per source+date superseded each other** (DB H1, code M3, python M7): migration `020` narrows `import_jobs_current_uq` to `detection_source = 'upload'`; `complete()` only supersedes for uploads (and then all other completed rows of the date); detected files never supersede. Test: `test_detected_files_of_one_date_all_complete_and_an_upload_supersedes_them`; index probed on dev (detected rows allowed, second completed upload rejected with 23505).
+
+## Open
 - **C. Path traversal** in `service_dsr_etl` `/process/dsr/{dry-run,commit}` (`filename` unvalidated, pre-existing code) — separate task.
 
 ## Deferred (D, decided 2026-09-29)

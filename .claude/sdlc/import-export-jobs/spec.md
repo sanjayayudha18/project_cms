@@ -160,9 +160,10 @@ CREATE UNIQUE INDEX import_jobs_hash_uq ON public.import_jobs (source, file_hash
 -- FR4: satu proses berjalan per sumber+tanggal.
 CREATE UNIQUE INDEX import_jobs_inflight_uq ON public.import_jobs (source, processing_date)
     WHERE status IN ('pending','processing');
--- FR5/FR6/FR9: satu versi terkini per sumber+tanggal.
+-- FR5/FR6/FR9: satu versi terkini per sumber+tanggal — hanya file upload; file hasil detect()
+-- tidak ikut (beberapa bisa completed per tanggal; migrasi 020, review.md keputusan A).
 CREATE UNIQUE INDEX import_jobs_current_uq ON public.import_jobs (source, processing_date)
-    WHERE status = 'completed';
+    WHERE status = 'completed' AND detection_source = 'upload';
 -- Retry scheduler + monitoring.
 CREATE INDEX import_jobs_retry_idx ON public.import_jobs (status, source) WHERE status = 'failed';
 CREATE INDEX import_jobs_date_idx  ON public.import_jobs (processing_date, source);

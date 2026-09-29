@@ -53,7 +53,7 @@ Migrations were squashed on 2026-09-18 into `001_baseline_schema.sql` + `002_bas
 - **Integration:** `internal/corebanking` (escrow ingest)
 - **CIT backend (`backend-cit/`):** `/health` + auth-protected empty group only; every `internal/*` package is a stub file
 - **EOD Final Realisasi** calc + run table + late-completion alert (Python pipeline has ETL + retry only)
-- **Unmigrated tables:** `documents`, `notifications`, `import_jobs`, `export_jobs`, `forecast_runs/results`, `replenishment_instructions`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated)
+- **Unmigrated tables:** `documents`, `notifications`, `export_jobs`, `forecast_runs/results`, `replenishment_instructions`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated)
 
 ### Mock frontends (hardcoded data, not API-backed)
 `features/dashboard` (MetricStrip, AttentionPanel, ReplenishmentSummary) · `features/cit` · `features/cash-flow` · `features/forecast` · `features/invoice` · `features/reconciliation` · `features/replenishment`. Each is wired only by its owning phase item.
@@ -109,7 +109,7 @@ Binding rules (from `project-context.md`):
 - **Test:** replica on reads, primary on writes + read-after-write.
 - **Model:** Sonnet, Effort: Low.
 
-### 0.2 `import_jobs` / `export_jobs` + idempotency helper
+### 0.2 `import_jobs` / `export_jobs` + idempotency helper — ✅ done (Python helper + EOD; Go helper deferred to 2.1; T8 review pending)
 - Migration `019`+: status, `file_hash` unique, processing_date, counts, error. Shared helper enforcing idempotency per file hash. Reconcile with existing `master_data_import_batches` (SHA-256) and `dsr_uploads` rather than duplicating.
 - **Unblocks:** every file ingest (invoice, escrow, forecast inputs).
 - **Model:** Opus, Effort: High.

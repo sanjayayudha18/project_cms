@@ -28,3 +28,5 @@
 
 **Pipeline**: Cloud Build -> lint + go test + vite build (x2) -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
+
+**Python EOD host prerequisite (import_jobs, R2a)**: the VM/container running `backend_python` (ETL scripts + `eod_retry_scheduler` + `service_dsr_etl`) MUST run with `TZ=Asia/Jakarta`. DMAA `file_date` is derived from file mtime in the host timezone; a different TZ makes the DMAA late check misfire. Verify at VM/container setup.

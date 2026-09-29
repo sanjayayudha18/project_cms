@@ -19,7 +19,7 @@ Tests added: executor error/other-service/pending/late-finish (scheduler), stale
 - **A. Several files per source+date superseded each other** (DB H1, code M3, python M7): migration `020` narrows `import_jobs_current_uq` to `detection_source = 'upload'`; `complete()` only supersedes for uploads (and then all other completed rows of the date); detected files never supersede. Test: `test_detected_files_of_one_date_all_complete_and_an_upload_supersedes_them`; index probed on dev (detected rows allowed, second completed upload rejected with 23505).
 
 ## Open
-- **C. Path traversal** in `service_dsr_etl` `/process/dsr/{dry-run,commit}` (`filename` unvalidated, pre-existing code) — separate task.
+- **C. Path traversal** in `service_dsr_etl` `/process/dsr/{dry-run,commit}`: fixed (pre-existing code, outside import_jobs). `DsrFileRequest.filename` must be a bare file name (no separators, drive colon, control chars, leading `.`/`-`; 422 otherwise) and `dsr_etl.safe_child()` re-checks it for `--mode dry_run|commit`. Tests: `SafeChildTests`, `DsrProcessFilenameTest`.
 
 ## Deferred (D, decided 2026-09-29)
 DB-enforced status machine trigger; `version`/`supersedes_job_id` for `detect` rows; `file_type` varchar(20) → text; index tuning (`retry_idx`, `list_idx`, unused indexes); preflight `to_regclass('retry_file_tracking')` in deploy runbook.

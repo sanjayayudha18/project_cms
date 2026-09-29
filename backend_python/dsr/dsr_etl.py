@@ -98,6 +98,17 @@ def connect():
     )
 
 
+def safe_child(base: Path, name: str) -> Path:
+    """`base / name` only when `name` is a bare file name; anything that could leave `base`
+    (separators, "..", absolute paths, drive letters) aborts. --file comes from an HTTP body."""
+    if not name or name != Path(name).name or name in (".", "..") or ":" in name or "\x00" in name:
+        raise SystemExit(f"Invalid file name: {name!r}")
+    path = (base / name).resolve()
+    if path.parent != base.resolve():
+        raise SystemExit(f"Invalid file name: {name!r}")
+    return base / name
+
+
 def archive(path: Path) -> Path:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     target = BACKUP_DIR / path.name
@@ -697,7 +708,7 @@ def main() -> None:
     if args.mode == "dry_run":
         if not args.file:
             raise SystemExit("--file is required with --mode dry_run")
-        path = INPUT_DIR / args.file
+        path = safe_child(INPUT_DIR, args.file)
         if not path.exists():
             raise SystemExit(f"File not found: {path}")
         with connect() as conn:
@@ -708,7 +719,7 @@ def main() -> None:
     if args.mode == "commit":
         if not args.file:
             raise SystemExit("--file is required with --mode commit")
-        path = PENDING_DIR / args.file
+        path = safe_child(PENDING_DIR, args.file)
         if not path.exists():
             raise SystemExit(f"Staged file not found: {path}")
         with connect() as conn:

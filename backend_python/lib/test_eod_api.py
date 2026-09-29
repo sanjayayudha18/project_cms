@@ -237,5 +237,38 @@ class EodApiTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await call(app, "POST", f"/retry/{bad}"))[0], 422, bad)
 
 
+class DsrProcessFilenameTest(unittest.IsolatedAsyncioTestCase):
+    """Task C: /process/dsr/{dry-run,commit} take a bare file name only (no DB needed:
+    rejection happens in request validation, before any ETL runs)."""
+
+    BAD = ("../x.xlsx", "..\\x.xlsx", "..", "sub/x.xlsx", "C:\\x.xlsx", "/etc/passwd", "-rf", "", ".hidden")
+
+    async def post(self, path: str, filename: str) -> int:
+        app = create_dsr_app(dsr_config.Settings(_env_file=None, auth_secret=SECRET, auth_mode="api_key"))
+        body = json.dumps({"filename": filename}).encode()
+        scope = {
+            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST", "scheme": "http",
+            "path": path, "raw_path": path.encode(), "root_path": "", "query_string": b"",
+            "headers": [(b"authorization", f"Bearer {SECRET}".encode()), (b"content-type", b"application/json")],
+            "client": (CLIENT_IP, 5555), "server": ("test", 80),
+        }
+        sent: list[dict] = []
+
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        async def send(message):
+            sent.append(message)
+
+        await app(scope, receive, send)
+        return next(m["status"] for m in sent if m["type"] == "http.response.start")
+
+    async def test_traversal_and_option_like_names_are_rejected_before_any_etl_runs(self):
+        for path in ("/process/dsr/dry-run", "/process/dsr/commit"):
+            for name in self.BAD:
+                with self.subTest(path=path, filename=name):
+                    self.assertEqual(await self.post(path, name), 422)  # would be 500 (no scheduler) if it got through
+
+
 if __name__ == "__main__":
     unittest.main()

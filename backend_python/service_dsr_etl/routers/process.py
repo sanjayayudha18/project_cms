@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lib.dependencies import require_auth
 
@@ -50,7 +50,9 @@ async def trigger_process(file_type: str, request: Request):
 
 
 class DsrFileRequest(BaseModel):
-    filename: str
+    # A bare file name inside FTP_DATA/DSR: no path separators, drive colon, control chars,
+    # leading dot ("..") or leading dash (would read as a CLI option). Also enforced in dsr_etl.py.
+    filename: str = Field(min_length=1, max_length=255, pattern=r"^[^/\\:\x00-\x1f.\-][^/\\:\x00-\x1f]*$")
 
 
 def _last_json_line(stdout: str) -> dict | None:

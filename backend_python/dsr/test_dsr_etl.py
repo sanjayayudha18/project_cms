@@ -12,6 +12,7 @@ from dsr_etl import (
     parse_upload_filename,
     read_daily_rows,
     read_rencana_isi_rows,
+    safe_child,
 )
 
 
@@ -88,6 +89,21 @@ def _build_synthetic_workbook(path: Path) -> None:
     rencana["D5"] = 400000
 
     wb.save(path)
+
+
+class SafeChildTests(unittest.TestCase):
+    def test_bare_file_names_are_accepted(self) -> None:
+        base = Path(tempfile.gettempdir())
+        for name in ("V1__42__DSR 2099-01-01 (x 1.000).xlsx", "a.xlsx"):
+            self.assertEqual(safe_child(base, name), base / name)
+
+    def test_names_that_could_leave_the_folder_are_rejected(self) -> None:
+        base = Path(tempfile.gettempdir()) / "dsr_in"
+        outside = str(Path(tempfile.gettempdir()) / "x.xlsx")
+        for name in ("", ".", "..", "../x.xlsx", "..\\x.xlsx", "sub/x.xlsx", "sub\\x.xlsx",
+                     outside, "C:x.xlsx", "a\x00.xlsx"):
+            with self.subTest(name=name), self.assertRaises(SystemExit):
+                safe_child(base, name)
 
 
 class DsrEtlParserTests(unittest.TestCase):

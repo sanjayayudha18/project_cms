@@ -82,6 +82,8 @@ class SchedulerService:
         self.audit = audit_service or AuditService(pool)
         # C1: every source these services own is a batch ETL, so one limit per service.
         self.stale_after = timedelta(minutes=settings.stale_after_minutes)
+        # kill a hung ETL before its row would be swept as stale while it is still running
+        self.etl_timeout = self.stale_after.total_seconds() * 0.9
         self._scan_lock = asyncio.Lock()
         self._scheduler = AsyncIOScheduler(timezone=WIB)
         self.last_successful_scan_at: datetime | None = None
@@ -137,9 +139,11 @@ class SchedulerService:
             logger.info("Starting failure detection scan")
             try:
                 for file_type in self.file_types:
-                    files = (
-                        self.detector.scan_not_processed(file_type)
-                        + self.detector.scan_input_remaining(file_type)
+                    # sync filesystem walk + SHA-256: keep it off the event loop
+                    files = await asyncio.to_thread(
+                        lambda ft=file_type: (
+                            self.detector.scan_not_processed(ft) + self.detector.scan_input_remaining(ft)
+                        ),
                     )
                     if not files:
                         continue
@@ -221,10 +225,9 @@ class SchedulerService:
                 )
                 return  # retried on the next cycle (FR13)
 
-        await self.audit.log_retry_initiated(
-            "auto", file_id, file_type, checksum, processing_date, "system",
+        result = await self._run_attempt(
+            "auto", file_id, file_type, checksum, processing_date, "system", auto_retry=True,
         )
-        result = await self.retry_executor.execute_retry(file_type)
         await self._finish_retry(file_id, file_type, processing_date, result, auto_retry=True)
         await self.audit.log_retry_completed(
             "auto", file_id, file_type, checksum, processing_date, "system",
@@ -237,9 +240,10 @@ class SchedulerService:
         When user_id is a real users.id, the transitions also go to audit_logs (FR18/P4)."""
         async with self.pool.acquire() as conn:
             file = await conn.fetchrow("SELECT * FROM import_jobs WHERE id = $1", file_id)
-            if file is None:
+            # a job of the other service (or a source this one cannot run) is unknown here
+            if file is None or file["source"] not in self.file_types:
                 raise FileNotFoundInTrackingError(f"No tracked file with id={file_id}")
-            if file["status"] in ("completed", "superseded"):
+            if file["status"] in ("completed", "superseded", "pending"):
                 raise RetryConflictError(
                     f"File is already in '{file['status']}' status. Retry not allowed."
                 )
@@ -253,10 +257,10 @@ class SchedulerService:
         processing_date = file["processing_date"]
         checksum = file["file_hash"]
 
-        await self.audit.log_retry_initiated(
+        result = await self._run_attempt(
             "manual", file_id, file_type, checksum, processing_date, user_id,
+            auto_retry=False, actor_id=actor_id, ip=ip,
         )
-        result = await self.retry_executor.execute_retry(file_type)
         new_status = await self._finish_retry(
             file_id, file_type, processing_date, result, auto_retry=False, actor_id=actor_id, ip=ip,
         )
@@ -267,21 +271,58 @@ class SchedulerService:
 
         return {"file_id": file_id, "processing_status": new_status, "triggered_by": user_id}
 
+    async def _run_attempt(
+        self, trigger: str, file_id: int, file_type: str, checksum: str, processing_date, initiator: str,
+        *, auto_retry: bool, actor_id: int | None = None, ip: str | None = None,
+    ) -> RetryResult:
+        """Audit + run the ETL for a job already in `processing`. If anything raises (missing
+        script, DB blip, cancellation), the job is failed before re-raising so it never
+        stays stranded in `processing` until the stale sweep."""
+        try:
+            await self.audit.log_retry_initiated(trigger, file_id, file_type, checksum, processing_date, initiator)
+            return await self.retry_executor.execute_retry(file_type, timeout=self.etl_timeout)
+        except BaseException as e:
+            await asyncio.shield(self._fail_after_error(file_id, e, auto_retry, actor_id, ip))
+            raise
+
+    async def _fail_after_error(
+        self, file_id: int, error: BaseException, auto_retry: bool, actor_id: int | None, ip: str | None,
+    ) -> None:
+        try:
+            async with self.pool.acquire() as conn:
+                await import_jobs.fail(
+                    conn, file_id, f"ETL did not run: {type(error).__name__}: {error}",
+                    auto_retry=auto_retry, actor_id=actor_id, ip=ip,
+                )
+        except Exception:
+            logger.exception("Could not fail import_job %s after an ETL error", file_id)
+
     async def _finish_retry(
         self, file_id: int, file_type: str, processing_date, result: RetryResult, *, auto_retry: bool,
         actor_id: int | None = None, ip: str | None = None,
     ) -> str:
         """completed (+ resolve late detection) or failed/max_retries_exhausted; returns the new status."""
         async with self.pool.acquire() as conn:
-            if result.success:
-                job = await import_jobs.complete(conn, file_id, actor_id=actor_id, ip=ip)
-            else:
-                job = await import_jobs.fail(
-                    conn, file_id,
-                    result.error_detail or f"ETL exited with code {result.return_code}",
-                    auto_retry=auto_retry, actor_id=actor_id, ip=ip,
-                )
-        if result.success:
+            try:
+                if result.success:
+                    job = await import_jobs.complete(conn, file_id, actor_id=actor_id, ip=ip)
+                else:
+                    job = await import_jobs.fail(
+                        conn, file_id,
+                        result.error_detail or f"ETL exited with code {result.return_code}",
+                        auto_retry=auto_retry, actor_id=actor_id, ip=ip,
+                    )
+            except import_jobs.IllegalTransitionError:
+                # the stale sweep failed this row while its ETL was still running (FR8)
+                job = await conn.fetchrow("SELECT * FROM import_jobs WHERE id = $1", file_id)
+                logger.warning("import_job %s left processing before its ETL finished (now %s)", file_id, job["status"])
+                if result.success and job["status"] in ("failed", "max_retries_exhausted"):
+                    try:  # the data did load: put the row back through processing to completed
+                        await import_jobs.start(conn, file_id, actor_id=actor_id, ip=ip)
+                        job = await import_jobs.complete(conn, file_id, actor_id=actor_id, ip=ip)
+                    except import_jobs.JobInProgressError:
+                        logger.warning("import_job %s stays %s: another run is in flight", file_id, job["status"])
+        if job["status"] == "completed":
             await self.late_detector.resolve_late_detection(self.pool, file_type, processing_date)
         return job["status"]
 
@@ -313,24 +354,25 @@ if __name__ == "__main__":
         retry_interval_minutes = 30
         db_retry_max_attempts = 3
         db_retry_base_delay_seconds = 1.0
+        stale_after_minutes = 60
 
         def get_sla_time(self, file_type: str) -> _time:
             return _time(6, 0)
 
     file_types = ("dmaa", "itm_cashpos", "itm_replenish")
-    svc = SchedulerService(_FakeSettings(), _FakePool(), file_types)  # type: ignore[arg-type]
-    svc.start()
-    job_ids = {job.id for job in svc._scheduler.get_jobs()}
-    assert "failure_detection_scan" in job_ids
-    assert "auto_retry_cycle" in job_ids
-    for ft in file_types:
-        assert f"late_check_{ft}" in job_ids
-    svc.stop()
 
-    async def _lock_demo():
+    async def _demo():  # APScheduler's asyncio scheduler needs a running loop
+        svc = SchedulerService(_FakeSettings(), _FakePool(), file_types)  # type: ignore[arg-type]
+        svc.start()
+        job_ids = {job.id for job in svc._scheduler.get_jobs()}
+        assert "failure_detection_scan" in job_ids
+        assert "auto_retry_cycle" in job_ids
+        for ft in file_types:
+            assert f"late_check_{ft}" in job_ids
+        svc.stop()
         async with svc._scan_lock:
             assert svc._scan_lock.locked()
         assert not svc._scan_lock.locked()
 
-    _asyncio.run(_lock_demo())
+    _asyncio.run(_demo())
     print("scheduler_service.py demo OK")

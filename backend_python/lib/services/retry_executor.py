@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
+MAX_ERROR_DETAIL = 1000
+
+
 class RetryResult:
     def __init__(
         self, success: bool, duration_ms: int, stdout: str, stderr: str, return_code: int,
@@ -17,7 +20,8 @@ class RetryResult:
         self.stdout = stdout
         self.stderr = stderr
         self.return_code = return_code
-        self.error_detail = stderr if not success else None
+        # FR7: keep the tail (the traceback's last lines), bounded before it reaches the DB/API.
+        self.error_detail = stderr[-MAX_ERROR_DETAIL:] if not success else None
 
 
 class RetryExecutor:
@@ -30,7 +34,9 @@ class RetryExecutor:
         """Return the ETL script path for a given file type."""
         return self.settings.etl_script(file_type)
 
-    async def execute_retry(self, file_type: str, extra_args: list[str] | None = None) -> RetryResult:
+    async def execute_retry(
+        self, file_type: str, extra_args: list[str] | None = None, timeout: float | None = None,
+    ) -> RetryResult:
         """Run the ETL script for the given file type and capture the result.
 
         extra_args is only used by the DSR single-file dry-run/commit flow
@@ -53,7 +59,16 @@ class RetryExecutor:
             stderr=asyncio.subprocess.PIPE,
             cwd=str(script_path.parent),
         )
-        stdout_bytes, stderr_bytes = await proc.communicate()
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout)
+        except asyncio.TimeoutError:
+            # a hung ETL must not hold its import_job in `processing` (and the scan lock) forever
+            proc.kill()
+            await proc.wait()
+            return RetryResult(
+                success=False, duration_ms=int((time_module.monotonic() - start) * 1000),
+                stdout="", stderr=f"ETL timed out after {timeout:.0f}s", return_code=-1,
+            )
 
         duration_ms = int((time_module.monotonic() - start) * 1000)
         stdout = stdout_bytes.decode("utf-8", errors="replace")

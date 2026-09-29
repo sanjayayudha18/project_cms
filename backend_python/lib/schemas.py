@@ -58,7 +58,6 @@ class RetryAttempt(BaseModel):
 
 
 class ManualRetryResponse(BaseModel):
-    job_id: UUID
     file_id: str
     processing_status: ProcessingStatus
     triggered_by: str

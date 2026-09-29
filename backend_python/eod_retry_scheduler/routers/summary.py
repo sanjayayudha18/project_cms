@@ -5,11 +5,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Request
 
-from lib.dependencies import require_auth
+from lib.dependencies import require_eod_role
 
 from ..config import FILE_TYPES
 
-router = APIRouter(dependencies=[Depends(require_auth)])
+router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 # superseded is its own bucket: an older version replaced by a newer file, not a failure.
 _STATUSES = ("pending", "processing", "completed", "failed", "max_retries_exhausted", "superseded")
@@ -31,9 +31,9 @@ async def get_summary(request: Request, processing_date: date):
         late_count = await conn.fetchval(
             """
             SELECT COUNT(*) FROM late_detections
-            WHERE processing_date = $1 AND is_resolved = false
+            WHERE processing_date = $1 AND is_resolved = false AND file_type = ANY($2::text[])
             """,
-            processing_date,
+            processing_date, list(FILE_TYPES),
         )
 
     counts = {status: 0 for status in _STATUSES}

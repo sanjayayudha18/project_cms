@@ -5,9 +5,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Request
 
-from lib.dependencies import require_auth
+from lib.dependencies import require_eod_role
 
-router = APIRouter(dependencies=[Depends(require_auth)])
+from ..config import FILE_TYPES
+
+router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 
 @router.get("/late")
@@ -15,7 +17,8 @@ async def get_late(request: Request, processing_date: date):
     pool = request.app.state.db_pool
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM late_detections WHERE processing_date = $1", processing_date,
+            "SELECT * FROM late_detections WHERE processing_date = $1 AND file_type = ANY($2::text[])",
+            processing_date, list(FILE_TYPES),
         )
 
     data = [

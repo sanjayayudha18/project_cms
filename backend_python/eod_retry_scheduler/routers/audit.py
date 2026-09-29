@@ -5,9 +5,11 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Request
 
-from lib.dependencies import require_auth
+from lib.dependencies import require_eod_role
 
-router = APIRouter(dependencies=[Depends(require_auth)])
+from ..config import FILE_TYPES
+
+router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 
 @router.get("/audit")
@@ -19,8 +21,8 @@ async def get_audit(
 ):
     pool = request.app.state.db_pool
 
-    clauses = []
-    params: list = []
+    params: list = [list(FILE_TYPES)]
+    clauses = ["file_type = ANY($1::text[])"]
     if processing_date is not None:
         params.append(processing_date)
         clauses.append(f"processing_date = ${len(params)}")

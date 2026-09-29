@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from lib.database import create_db_pool
+from lib.dependencies import assert_auth_configured
 from lib.services.scheduler_service import SchedulerService
 from lib.utils.timezone import WIB
 
@@ -25,6 +26,7 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings: Settings = app.state.settings
+    assert_auth_configured(settings)
     app.state.start_time = datetime.now(WIB)
 
     pool = await create_db_pool(settings)

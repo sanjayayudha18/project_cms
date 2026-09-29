@@ -272,20 +272,32 @@ async def mark_stale(
     processing_date: date | None = None,
 ) -> list[int]:
     """pending/processing rows untouched for longer than stale_after -> failed (FR8).
+    A stale `processing` row consumed an attempt (its ETL ran and died), so it counts toward
+    auto_retry_count and can reach max_retries_exhausted; a stale `pending` row never ran.
     processing_date=None sweeps every date of the source (auto-retry cycle, T5.2)."""
-    rows = await conn.fetch(
-        """
-        UPDATE import_jobs
-        SET status = 'failed', finished_at = now(),
-            error_message = 'stale: no progress for ' || $2::interval::text
-        WHERE source = $1 AND status IN ('pending', 'processing')
-          AND updated_at < now() - $2::interval
-          AND ($3::date IS NULL OR processing_date = $3)
-        RETURNING id
-        """,
-        source, stale_after, processing_date,
-    )
-    ids = [r["id"] for r in rows]
+    async with conn.transaction():
+        rows = await conn.fetch(
+            """
+            UPDATE import_jobs
+            SET status = 'failed', finished_at = now(),
+                auto_retry_count = auto_retry_count + (status = 'processing')::int,
+                error_message = 'stale: no progress for ' || $2::interval::text
+            WHERE source = $1 AND status IN ('pending', 'processing')
+              AND updated_at < now() - $2::interval
+              AND ($3::date IS NULL OR processing_date = $3)
+            RETURNING id
+            """,
+            source, stale_after, processing_date,
+        )
+        ids = [r["id"] for r in rows]
+        if ids:
+            await conn.execute(
+                """
+                UPDATE import_jobs SET status = 'max_retries_exhausted'
+                WHERE id = ANY($1::bigint[]) AND auto_retry_count >= max_retries
+                """,
+                ids,
+            )
     if ids:
         logger.warning("import_jobs marked stale (source=%s date=%s): %s", source, processing_date, ids)
     return ids

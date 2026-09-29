@@ -58,10 +58,11 @@ export function RetryDrawer({ file, onClose, onRetryClick }: RetryDrawerProps) {
       ? `${file.checksum.slice(0, CHECKSUM_TRUNCATE_LENGTH)}…`
       : file.checksum;
 
+  // superseded is deliberately absent: it was replaced by a newer file, nothing to retry
   const showRetryButton =
     file.processing_status === "failed" ||
     file.processing_status === "max_retries_exhausted" ||
-    file.processing_status === "processing"; // superseded: replaced by a newer file, nothing to retry
+    file.processing_status === "processing";
   const retryDisabled = file.processing_status === "processing";
 
   return (

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import unittest
 from datetime import date
 
@@ -33,6 +34,16 @@ DAY = date(2099, 1, 1)
 SECRET = "test-secret"
 CLIENT_IP = "10.9.8.7"
 
+
+def access_token(role: str | None = "ADMIN", uid: int = 1, exp: bool = True, secret: str = SECRET) -> str:
+    """Shape of pkg/auth AccessTokenClaims (numeric `id`, no `sub`); role=None mimics a refresh token."""
+    claims: dict = {"id": uid, "username": "t"}
+    if role is not None:
+        claims["role"] = role
+    if exp:
+        claims["exp"] = int(time.time()) + 300
+    return jwt.encode(claims, secret, algorithm="HS256")
+
 # (name, app factory, config module, a source owned by that service, hash char)
 SERVICES = (
     ("eod_retry_scheduler", create_retry_app, retry_config, "dmaa", "a"),
@@ -41,7 +52,7 @@ SERVICES = (
 
 
 class _AlwaysOkExecutor:
-    async def execute_retry(self, file_type: str, extra_args=None) -> RetryResult:
+    async def execute_retry(self, file_type: str, extra_args=None, timeout=None) -> RetryResult:
         return RetryResult(success=True, duration_ms=1, stdout="", stderr="", return_code=0)
 
 
@@ -184,8 +195,7 @@ class EodApiTest(unittest.IsolatedAsyncioTestCase):
             self.skipTest("no users row")
         app = self.app(create_retry_app, retry_config, auth_mode="jwt")
         job_id = await self.detected("dmaa", "9")
-        # shape of pkg/auth AccessTokenClaims: numeric `id`, no `sub`
-        token = jwt.encode({"id": uid, "username": "t", "role": "ADMIN"}, SECRET, algorithm="HS256")
+        token = access_token("ADMIN", uid)
         status, body = await call(app, "POST", f"/retry/{job_id}", token=token)
         self.assertEqual(status, 200)
         self.assertEqual(body["data"]["triggered_by"], str(uid))
@@ -195,6 +205,36 @@ class EodApiTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual([r["action"] for r in rows], ["import_job_retry", "import_job_complete"])
         self.assertEqual({(r["actor_id"], r["ip"]) for r in rows}, {(uid, CLIENT_IP)})
+
+    # review: RBAC on monitoring + retry (Sec 5), JWT hardening
+    async def test_jwt_role_gate_and_token_hardening(self):
+        for name, create_app, config, source, c in SERVICES:
+            with self.subTest(service=name):
+                app = self.app(create_app, config, auth_mode="jwt")
+                job_id = await self.detected(source, c)
+                q = f"processing_date={DAY}"
+                for path, query, method in (("/status", q, "GET"), ("/summary", q, "GET"), ("/late", q, "GET"),
+                                            ("/audit", q, "GET"), (f"/retry/{job_id}", "", "POST")):
+                    self.assertEqual((await call(app, method, path, query, token=access_token("VENDOR")))[0], 403, path)
+                    self.assertEqual((await call(app, method, path, query, token=access_token(None)))[0], 401, path)
+                    self.assertEqual((await call(app, method, path, query, token=access_token(exp=False)))[0], 401, path)
+                    self.assertEqual((await call(app, method, path, query, token=access_token(secret="wrong")))[0], 401, path)
+                self.assertEqual((await call(app, "GET", "/summary", q, token=access_token("ADMIN")))[0], 200)
+                self.assertEqual((await call(app, "GET", "/summary", q, token=access_token("APPACCESS")))[0], 200)
+                # the VENDOR attempts above must not have touched the job
+                self.assertEqual(
+                    await self.pool.fetchval("SELECT status FROM import_jobs WHERE id = $1", job_id), "failed")
+
+    async def test_other_services_job_is_unknown_and_id_bounds(self):
+        dsr_job = await self.detected("dsr", "c")
+        app = self.app(create_retry_app, retry_config)
+        self.assertEqual((await call(app, "POST", f"/retry/{dsr_job}"))[0], 404)
+        _, body = await call(app, "GET", f"/status/{dsr_job}/history")
+        self.assertEqual((body["data"]["filename"], body["data"]["attempts"]), (None, []))
+        self.assertEqual(
+            await self.pool.fetchval("SELECT status FROM import_jobs WHERE id = $1", dsr_job), "failed")
+        for bad in ("0", "-1", "9223372036854775808"):
+            self.assertEqual((await call(app, "POST", f"/retry/{bad}"))[0], 422, bad)
 
 
 if __name__ == "__main__":

@@ -7,13 +7,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Request
 
-from lib.dependencies import require_auth
+from lib.dependencies import require_eod_role
 
 from ..config import FILE_TYPES
 
-router = APIRouter(dependencies=[Depends(require_auth)])
+router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 
 @router.get("/status")
@@ -50,10 +50,13 @@ async def get_status(request: Request, processing_date: date):
 
 
 @router.get("/status/{file_id}/history")
-async def get_status_history(request: Request, file_id: int):
+async def get_status_history(request: Request, file_id: int = Path(ge=1, le=9223372036854775807)):
     pool = request.app.state.db_pool
     async with pool.acquire() as conn:
-        file_row = await conn.fetchrow("SELECT * FROM import_jobs WHERE id = $1", file_id)
+        # only this service's own sources: a job of the other service looks unknown
+        file_row = await conn.fetchrow(
+            "SELECT * FROM import_jobs WHERE id = $1 AND source = ANY($2::text[])", file_id, list(FILE_TYPES),
+        )
         audit_rows = await conn.fetch(
             """
             SELECT * FROM retry_audit_logs WHERE file_id = $1

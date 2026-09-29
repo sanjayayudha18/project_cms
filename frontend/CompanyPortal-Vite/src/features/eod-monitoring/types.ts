@@ -94,7 +94,6 @@ export interface FileHistoryResponse {
 // ─── Manual Retry ─────────────────────────────────────────────────────────────
 
 export interface ManualRetryResponse {
-  job_id: string;
   file_id: string;
   processing_status: ProcessingStatus;
   triggered_by: string;

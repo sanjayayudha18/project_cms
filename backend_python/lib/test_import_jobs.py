@@ -317,6 +317,24 @@ class ImportJobsCommittedTest(unittest.IsolatedAsyncioTestCase):
         swept = await ij.mark_stale(conn, source=self.source, stale_after=timedelta(milliseconds=100))
         self.assertEqual(sorted(swept), sorted(ids))
 
+    # review: a stale `processing` row consumed an attempt; a stale `pending` row never ran
+    async def test_stale_processing_counts_an_attempt_and_can_exhaust(self):
+        conn = self.conns[0]
+        running, _ = await ij.register(conn, source=self.source, processing_date=DAY,
+                                       file_hash=h("a"), original_filename="a")
+        never_ran, _ = await ij.register(conn, source=self.source, processing_date=DAY + timedelta(days=1),
+                                         file_hash=h("b"), original_filename="b")
+        await ij.start(conn, running["id"])
+        await conn.execute("UPDATE import_jobs SET max_retries = 1 WHERE id = $1", running["id"])
+        await asyncio.sleep(0.3)
+        await ij.mark_stale(conn, source=self.source, stale_after=timedelta(milliseconds=100))
+        rows = {r["id"]: r for r in await conn.fetch(
+            "SELECT id, status, auto_retry_count FROM import_jobs WHERE source = $1", self.source)}
+        self.assertEqual((rows[running["id"]]["status"], rows[running["id"]]["auto_retry_count"]),
+                         ("max_retries_exhausted", 1))
+        self.assertEqual((rows[never_ran["id"]]["status"], rows[never_ran["id"]]["auto_retry_count"]),
+                         ("failed", 0))
+
 
 if __name__ == "__main__":
     unittest.main()

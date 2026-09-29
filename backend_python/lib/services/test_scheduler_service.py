@@ -45,7 +45,7 @@ class _FakeExecutor:
         self.outcomes = list(outcomes)
         self.calls: list[str] = []
 
-    async def execute_retry(self, file_type: str, extra_args=None) -> RetryResult:
+    async def execute_retry(self, file_type: str, extra_args=None, timeout=None) -> RetryResult:
         self.calls.append(file_type)
         ok = self.outcomes.pop(0)
         return RetryResult(success=ok, duration_ms=5, stdout="", stderr="" if ok else "etl boom",
@@ -217,6 +217,60 @@ class SchedulerRetryTest(unittest.IsolatedAsyncioTestCase):
         await svc._run_auto_retries()
         self.assertEqual(executor.calls, [self.source])
         self.assertEqual((await self.job(job_id))["status"], "completed")
+
+
+    # review: anything raised after start() must not strand the job in `processing`
+    async def test_executor_error_fails_the_job_instead_of_stranding_it(self):
+        class _Raises:
+            async def execute_retry(self, file_type, extra_args=None, timeout=None):
+                raise FileNotFoundError("etl script missing")
+
+        job_id = await self.detected("a")
+        svc, _ = self.service()
+        svc.retry_executor = _Raises()
+        await svc._run_auto_retries()  # the cycle logs the error and carries on
+        job = await self.job(job_id)
+        self.assertEqual((job["status"], job["auto_retry_count"]), ("failed", 1))
+        self.assertIn("etl script missing", job["error_message"])
+
+        with self.assertRaises(FileNotFoundError):
+            await svc.process_manual_retry(job_id, "42")
+        job = await self.job(job_id)
+        self.assertEqual((job["status"], job["auto_retry_count"]), ("failed", 1))  # manual never counts
+
+    async def test_manual_retry_of_other_services_job_is_unknown(self):
+        job_id = await self.detected()
+        svc, executor = self.service(True)
+        svc.file_types = ("some_other_source",)
+        with self.assertRaises(FileNotFoundInTrackingError):
+            await svc.process_manual_retry(job_id, "42")
+        self.assertEqual((executor.calls, (await self.job(job_id))["status"]), ([], "failed"))
+
+    async def test_manual_retry_of_pending_job_is_conflict(self):
+        async with self.pool.acquire() as conn:
+            job, _ = await ij.register(conn, source=self.source, processing_date=DAY,
+                                       file_hash="a" * 64, original_filename="a.xlsx")
+        svc, executor = self.service(True)
+        with self.assertRaises(RetryConflictError):
+            await svc.process_manual_retry(job["id"], "42")
+        self.assertEqual(executor.calls, [])
+
+    # review: the ETL finished after the stale sweep already failed its row
+    async def test_etl_finishing_after_stale_sweep_still_completes_the_job(self):
+        job_id = await self.detected()
+        async with self.pool.acquire() as conn:
+            await ij.start(conn, job_id)
+        await self.pool.execute("UPDATE import_jobs SET status = 'failed' WHERE id = $1", job_id)  # swept
+        svc, _ = self.service()
+        ok = RetryResult(success=True, duration_ms=1, stdout="", stderr="", return_code=0)
+        status = await svc._finish_retry(job_id, self.source, DAY, ok, auto_retry=True)
+        self.assertEqual(status, "completed")
+        failed = RetryResult(success=False, duration_ms=1, stdout="", stderr="x", return_code=1)
+        other = await self.detected("b")
+        async with self.pool.acquire() as conn:
+            await ij.start(conn, other)
+        await self.pool.execute("UPDATE import_jobs SET status = 'failed' WHERE id = $1", other)
+        self.assertEqual(await svc._finish_retry(other, self.source, DAY, failed, auto_retry=False), "failed")
 
 
 class _NoClockLateDetector(LateDetector):

@@ -68,3 +68,7 @@ desktop.ini
 FTP_DATA/
 DSR_DATA/
 
+
+# ---------- Python ----------
+__pycache__/
+*.pyc

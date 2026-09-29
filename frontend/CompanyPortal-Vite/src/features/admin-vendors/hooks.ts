@@ -370,11 +370,7 @@ export function useDisableVendorPackagePrice(vendorId: number) {
 // Read-only "ATM" sub-tab (.kiro/specs/vendor-branch-atms) -- no mutations,
 // no maker-checker; the "children" prefix keeps it covered by
 // useInvalidateList's ["admin-vendors"] key prefix like the siblings above.
-export function useBranchATMs(
-  vendorId: number,
-  branchId: number,
-  params: BranchATMsListParams,
-) {
+export function useBranchATMs(vendorId: number, branchId: number, params: BranchATMsListParams) {
   return useQuery<BranchATMsListResponse, ApiError>({
     queryKey: ["admin-vendors", "children", vendorId, "branches", branchId, "atms", params],
     queryFn: () => listBranchATMs(vendorId, branchId, params),

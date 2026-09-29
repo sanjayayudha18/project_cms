@@ -36,7 +36,8 @@ const DOMAIN_OPTIONS = Object.entries(DOMAIN_LABEL)
 
 function matchesQuery(user: RbacUser, supervisorName: string | undefined, query: string): boolean {
   if (!query) return true;
-  const haystack = `${user.full_name} ${user.username} ${user.role} ${supervisorName ?? ""}`.toLowerCase();
+  const haystack =
+    `${user.full_name} ${user.username} ${user.role} ${supervisorName ?? ""}`.toLowerCase();
   return haystack.includes(query.toLowerCase());
 }
 
@@ -146,7 +147,11 @@ export function RbacUsersPage() {
                 <tbody>
                   {checkers.map((user) =>
                     editingId === user.id ? (
-                      <ApprovalLevelEditRow key={user.id} user={user} onDone={() => setEditingId(null)} />
+                      <ApprovalLevelEditRow
+                        key={user.id}
+                        user={user}
+                        onDone={() => setEditingId(null)}
+                      />
                     ) : (
                       <tr key={user.id} className={rbacRowClass}>
                         <td className={rbacTdClass}>
@@ -158,7 +163,9 @@ export function RbacUsersPage() {
                         <td className={`${rbacTdClass} text-right tabular-nums`}>
                           {user.approval_level ?? "—"}
                         </td>
-                        <td className={`${rbacTdClass} text-right tabular-nums`}>{teamSize(user.id)}</td>
+                        <td className={`${rbacTdClass} text-right tabular-nums`}>
+                          {teamSize(user.id)}
+                        </td>
                         <td className={rbacTdClass}>
                           <EditButton user={user} onClick={() => setEditingId(user.id)} />
                         </td>
@@ -168,7 +175,9 @@ export function RbacUsersPage() {
                 </tbody>
               </table>
             ) : (
-              <p className="p-4 text-sm text-[var(--n-500)]">Tidak ada supervisor pada filter ini.</p>
+              <p className="p-4 text-sm text-[var(--n-500)]">
+                Tidak ada supervisor pada filter ini.
+              </p>
             )}
           </UserSection>
 
@@ -228,7 +237,9 @@ export function RbacUsersPage() {
                 </tbody>
               </table>
             ) : (
-              <p className="p-4 text-sm text-[var(--n-500)]">Tidak ada pengguna biasa pada filter ini.</p>
+              <p className="p-4 text-sm text-[var(--n-500)]">
+                Tidak ada pengguna biasa pada filter ini.
+              </p>
             )}
           </UserSection>
 
@@ -261,7 +272,9 @@ export function RbacUsersPage() {
                       <td className={rbacTdClass}>
                         <RoleBadge role={user.role} />
                       </td>
-                      <td className={`${rbacTdClass} text-[var(--n-500)]`}>Tidak ikut maker-checker</td>
+                      <td className={`${rbacTdClass} text-[var(--n-500)]`}>
+                        Tidak ikut maker-checker
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -296,7 +309,9 @@ function UserSection({
           <p className="text-xs text-[var(--n-500)]">{description}</p>
         </div>
       </div>
-      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">{children}</div>
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
+        {children}
+      </div>
     </section>
   );
 }
@@ -410,7 +425,11 @@ function SupervisorEditRow({
   return (
     <EditRow user={user} colSpan={3} mutation={mutation} onSubmit={onSubmit} onCancel={onDone}>
       <div className="w-52">
-        <FormField label="Supervisor ID" htmlFor={`supervisor_id-${user.id}`} error={errors.supervisor_id?.message}>
+        <FormField
+          label="Supervisor ID"
+          htmlFor={`supervisor_id-${user.id}`}
+          error={errors.supervisor_id?.message}
+        >
           <select
             id={`supervisor_id-${user.id}`}
             defaultValue={user.supervisor_id ?? ""}
@@ -457,7 +476,11 @@ function EditRow({
         <UserCell user={user} />
       </td>
       <td colSpan={colSpan - 1} className="px-3 py-3 align-top">
-        <form id={`hierarchy-form-${user.id}`} onSubmit={onSubmit} className="flex flex-wrap items-start gap-3">
+        <form
+          id={`hierarchy-form-${user.id}`}
+          onSubmit={onSubmit}
+          className="flex flex-wrap items-start gap-3"
+        >
           {children}
           {mutation.isError && (
             <p className="flex items-center gap-1 text-xs text-[var(--danger-fg)] self-center">

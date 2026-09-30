@@ -1,8 +1,8 @@
 # Development Progress — CMS2 Cash Management System
 
-**Last Updated:** 2026-09-29 (synced with `.claude/sdlc/README.md` → "Current features", 2026-09-28)
+**Last Updated:** 2026-09-30
 
-Branch: `dev1`. No code commits since 2026-09-25 (docs/CLAUDE.md/graphify only).
+Branch: `dev1` (latest: `531d9ef` perbaikan RBAC G2, `332b340` child-panel paging). PR dev1 → main not opened yet.
 
 ## Overview
 
@@ -13,8 +13,8 @@ Branch: `dev1`. No code commits since 2026-09-25 (docs/CLAUDE.md/graphify only).
 | User session lifetime (1 h, parameterized) | `user-session/` | 4 Test | ✅ implemented (17/17, `7a86eca`) | T5.3 manual expiry test (user) |
 | Vendor branch tipe / Branch menu | `vendor-branch-tipe/` | 3 Build | ✅ item 1 implemented 2026-09-23 (18/18) | — |
 | Vendor package pricing | `vendor-pricing/` | 3 Build | 🟡 schema (mig 009/010/017) + backend + CompanyPortal panel built | Per-ATM special price not seeded |
-| Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 in progress (9/23) | Backend contract check before frontend |
-| `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 3 Build (plan draft 2026-09-28) | ✅ built Fases 1–7 (Python + frontend); T8 verification/review pending; Go helper deferred to 2.1 | T8.1–T8.2 tests.md + reviews; A17 manual browser check (user) `/api/eod` routing fixed (S6) |
+| Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 mostly built — backend contract, 4 dialogs, branch drill-down, vendor-wide PIC, pending badges; 2026-09-30 server-side paging + branch search (G1), pending creates visible (G2), tests (G3) | Automated tests for approve/reject/apply-failure, double-submit/cross-tab conflict, per-entity CRUD payloads; manual browser check (user) |
+| `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 4 Test | ✅ built Fases 1–7 (Python + frontend); T8.1 tests green, T8.2 reviews fixed (migration 020, DSR path traversal); Go helper deferred to 2.1 | A17 manual browser check of EOD monitoring (user) — `/api/eod` routing ready (S6) |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
@@ -33,7 +33,8 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ## Next Phase
 
-1. Accept `import-export-jobs/plan.md` → build Phase 0.2.
-2. Finish `perbaikan-rbac` (14 tasks left).
-3. PO acceptance of `dsr-late-report/intent.md` → spec.
-4. Session follow-ups (separate features): idle timeout (warn T-5m), session audit events, admin force-logout.
+1. User: A17 manual check of EOD monitoring (closes Phase 0.2) + manual check of perbaikan-rbac (ROH paging, pending creates).
+2. Finish `perbaikan-rbac` acceptance: approve/reject/apply-failure states, double-submit + cross-tab conflict (check backend rejects duplicates first), per-entity CRUD tests.
+3. PR dev1 → main.
+4. PO acceptance of `dsr-late-report/intent.md` → spec.
+5. Session follow-ups (separate features): idle timeout (warn T-5m), session audit events, admin force-logout.

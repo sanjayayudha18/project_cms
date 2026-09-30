@@ -46,12 +46,17 @@ const INPUT_CLASS =
   "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
 const LABEL_CLASS = "text-xs font-medium uppercase tracking-wider text-[var(--n-600)]";
 
-/** "" = Semua for the three selects; unassigned excludes vendor/region. */
+/**
+ * "" = Semua for the three selects. unassigned (no active vendor) and
+ * noRegion (vendor branch without region, review R1) are set only from a recap
+ * row and dropped as soon as the vendor or region select changes.
+ */
 interface DetailFilters {
   brand: string;
   flmVendor: string;
   flmVendorRegion: string;
   unassigned: boolean;
+  noRegion: boolean;
 }
 
 const EMPTY_FILTERS: DetailFilters = {
@@ -59,6 +64,7 @@ const EMPTY_FILTERS: DetailFilters = {
   flmVendor: "",
   flmVendorRegion: "",
   unassigned: false,
+  noRegion: false,
 };
 
 const toOption = (value: string) => ({ value, label: value });
@@ -115,7 +121,7 @@ export function ForecastBrowser() {
   let activeGroupKey: string | null = null;
   if (filters.unassigned) {
     activeGroupKey = "";
-  } else if (filters.flmVendor && filters.flmVendorRegion) {
+  } else if (filters.flmVendor && (filters.flmVendorRegion || filters.noRegion)) {
     activeGroupKey = summaryGroupKey({
       flm_vendor: filters.flmVendor,
       flm_vendor_region: filters.flmVendorRegion,
@@ -160,19 +166,27 @@ export function ForecastBrowser() {
   }
 
   // Discrete selects refetch immediately on change (Req 1.11) — no debounce
-  // needed, unlike the free-text ATM ID filter above. Any vendor/region pick
-  // leaves the no-vendor view, since the two are mutually exclusive.
+  // needed, unlike the free-text ATM ID filter above. A vendor/region pick
+  // drops the recap-only flags, which can't be combined with it.
   function handleFilterChange(patch: Partial<DetailFilters>): void {
-    setFilters((prev) => ({ ...prev, unassigned: false, ...patch }));
+    const touchesVendor = "flmVendor" in patch || "flmVendorRegion" in patch;
+    setFilters((prev) => ({
+      ...prev,
+      ...(touchesVendor ? { unassigned: false, noRegion: false } : {}),
+      ...patch,
+    }));
     resetPageAndSelection();
   }
 
   function handleSelectGroup(group: ForecastSummaryGroup): void {
-    handleFilterChange(
-      group.flm_vendor === ""
-        ? { flmVendor: "", flmVendorRegion: "", unassigned: true }
-        : { flmVendor: group.flm_vendor, flmVendorRegion: group.flm_vendor_region },
-    );
+    const base = { flmVendor: group.flm_vendor, flmVendorRegion: group.flm_vendor_region };
+    if (group.flm_vendor === "") {
+      handleFilterChange({ ...base, unassigned: true });
+    } else if (group.flm_vendor_region === "") {
+      handleFilterChange({ ...base, noRegion: true });
+    } else {
+      handleFilterChange(base);
+    }
     detailRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
@@ -303,15 +317,16 @@ export function ForecastBrowser() {
             onChange={(v) => handleFilterChange({ brand: v ?? "" })}
           />
           {filters.unassigned && (
-            <button
-              type="button"
-              onClick={() => handleFilterChange({ unassigned: false })}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[var(--n-300)] bg-[var(--n-50)] px-4 text-sm text-[var(--n-800)] outline-none hover:bg-[var(--n-100)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-            >
-              Hanya ATM tanpa vendor aktif
-              <X className="h-4 w-4" aria-hidden="true" />
-              <span className="sr-only">(hapus filter)</span>
-            </button>
+            <FilterChip
+              label="Hanya ATM tanpa vendor aktif"
+              onRemove={() => handleFilterChange({ unassigned: false })}
+            />
+          )}
+          {filters.noRegion && (
+            <FilterChip
+              label="Tanpa region"
+              onRemove={() => handleFilterChange({ noRegion: false })}
+            />
           )}
         </div>
 
@@ -378,5 +393,20 @@ export function ForecastBrowser() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Removable pill for a recap-only filter (no input control of its own). */
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[var(--n-300)] bg-[var(--n-50)] px-4 text-sm text-[var(--n-800)] outline-none hover:bg-[var(--n-100)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+    >
+      {label}
+      <X className="h-4 w-4" aria-hidden="true" />
+      <span className="sr-only">(hapus filter)</span>
+    </button>
   );
 }

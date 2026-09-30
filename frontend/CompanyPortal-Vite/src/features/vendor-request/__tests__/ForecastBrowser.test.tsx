@@ -104,6 +104,15 @@ const SUMMARY_RESPONSE: ForecastSummaryResponse = {
       amount_replenish: 1000,
       unrequested_amount_replenish: 1000,
     },
+    {
+      flm_vendor: "ROH",
+      flm_vendor_region: "",
+      atm_count: 1,
+      requested_atm_count: 0,
+      unrequested_atm_count: 1,
+      amount_replenish: 1000,
+      unrequested_amount_replenish: 1000,
+    },
   ],
 };
 
@@ -406,6 +415,31 @@ describe("ForecastBrowser — vendor × region recap (forecast-browser-summary F
         screen.queryByRole("button", { name: /Hanya ATM tanpa vendor aktif/ }),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("clicking a vendor row without region requests no_region=true for that vendor (review R1)", async () => {
+    mockRows([makeRow("ATM-R", 1000, { flm_vendor: "ROH", flm_vendor_region: "" })]);
+    const user = userEvent.setup();
+    renderUnfiltered();
+
+    await user.click(await screen.findByRole("button", { name: "Lihat ATM ROH tanpa region" }));
+    await waitFor(() => {
+      const last = forecastCalls().at(-1) ?? "";
+      expect(last).toContain("flm_vendor=ROH");
+      expect(last).toContain("no_region=true");
+      expect(last).not.toContain("flm_vendor_region");
+    });
+    const row = screen.getByRole("button", { name: "Lihat ATM ROH tanpa region" }).closest("tr");
+    expect(row).toHaveAttribute("aria-current", "true");
+
+    // Picking a region drops the recap-only flag (they can't be combined).
+    await user.selectOptions(screen.getByLabelText("FLM Vendor Region"), "Jawa Barat");
+    await waitFor(() => {
+      const last = forecastCalls().at(-1) ?? "";
+      expect(last).toContain("flm_vendor_region=Jawa+Barat");
+      expect(last).not.toContain("no_region");
+    });
+    expect(screen.queryByRole("button", { name: /Tanpa region/ })).not.toBeInTheDocument();
   });
 
   it("disables Buat Vendor Request with a hint when the selection spans two vendors", async () => {

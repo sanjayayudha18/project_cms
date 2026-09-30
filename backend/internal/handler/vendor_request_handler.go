@@ -81,13 +81,14 @@ func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var unassigned bool
-	switch q.Get("unassigned") {
-	case "", "false":
-	case "true":
-		unassigned = true
-	default:
+	unassigned, ok := parseBoolFlag(q.Get("unassigned"))
+	if !ok {
 		writeError(w, http.StatusBadRequest, "bad_request", "unassigned harus true atau false")
+		return
+	}
+	noRegion, ok := parseBoolFlag(q.Get("no_region"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "bad_request", "no_region harus true atau false")
 		return
 	}
 
@@ -98,6 +99,7 @@ func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Req
 		FLMVendor:       q.Get("flm_vendor"),
 		FLMVendorRegion: q.Get("flm_vendor_region"),
 		Unassigned:      unassigned,
+		NoRegion:        noRegion,
 		Page:            page,
 		PageSize:        pageSize,
 	})
@@ -106,6 +108,18 @@ func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, toForecastResponse(result))
+}
+
+// parseBoolFlag accepts only "" / "false" (false) and "true" (true), so a
+// typo'd flag is a 400 instead of silently meaning "no filter".
+func parseBoolFlag(v string) (value, ok bool) {
+	switch v {
+	case "", "false":
+		return false, true
+	case "true":
+		return true, true
+	}
+	return false, false
 }
 
 // ForecastSummary handles GET /forecast/summary (forecast-browser-summary

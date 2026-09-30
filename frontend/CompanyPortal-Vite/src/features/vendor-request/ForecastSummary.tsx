@@ -140,14 +140,16 @@ function GroupRow({
 }) {
   const isUnassigned = group.flm_vendor === "";
   const vendorLabel = isUnassigned ? "Tanpa vendor aktif" : group.flm_vendor;
-  const regionSuffix = group.flm_vendor_region ? ` ${group.flm_vendor_region}` : "";
+  // review R1: a vendor branch without a region is its own row (V, "").
+  const regionLabel = isUnassigned ? "-" : group.flm_vendor_region || "(tanpa region)";
+  const regionSuffix = isUnassigned ? "" : ` ${group.flm_vendor_region || "tanpa region"}`;
   return (
     <tr
       aria-current={isActive ? "true" : undefined}
       className={`border-b border-[var(--n-100)] last:border-0 ${isActive ? "bg-[var(--red-50)]" : ""}`}
     >
       <td className="px-3 py-2 font-medium text-[var(--n-900)]">{vendorLabel}</td>
-      <td className="px-3 py-2">{group.flm_vendor_region || "-"}</td>
+      <td className="px-3 py-2">{regionLabel}</td>
       <td className="px-3 py-2 text-right tabular-nums">{group.atm_count}</td>
       <td className="px-3 py-2 text-right tabular-nums">Rp {formatIDR(group.amount_replenish)}</td>
       <td className="px-3 py-2 text-right tabular-nums">

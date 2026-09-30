@@ -200,6 +200,15 @@ func TestBrowseForecast_ValidatesCIT2Filters(t *testing.T) {
 			p.FLMVendor = ""
 			return p
 		}, "unassigned"},
+		{"no_region with flm_vendor_region rejected", func(p BrowseForecastParams) BrowseForecastParams {
+			p.NoRegion = true
+			return p
+		}, "no_region"},
+		{"unassigned with no_region rejected", func(p BrowseForecastParams) BrowseForecastParams {
+			p.Unassigned, p.NoRegion = true, true
+			p.FLMVendor, p.FLMVendorRegion = "", ""
+			return p
+		}, "unassigned"},
 		{"brand over 255 chars rejected", func(p BrowseForecastParams) BrowseForecastParams {
 			p.Brand = longValue
 			return p
@@ -244,6 +253,12 @@ func TestBrowseForecast_ValidatesCIT2Filters(t *testing.T) {
 	all.Unassigned = true
 	if _, err := svc.BrowseForecast(context.Background(), all); err != nil {
 		t.Errorf("BrowseForecast() unassigned only = %v, want nil", err)
+	}
+	// review R1: vendor + no_region (region left empty) is valid.
+	noRegion := base
+	noRegion.FLMVendorRegion, noRegion.NoRegion = "", true
+	if _, err := svc.BrowseForecast(context.Background(), noRegion); err != nil {
+		t.Errorf("BrowseForecast() vendor + no_region = %v, want nil", err)
 	}
 }
 

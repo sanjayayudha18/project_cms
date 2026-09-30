@@ -769,11 +769,14 @@ func TestVendorRequestHandler_BrowseForecast_UnassignedParam(t *testing.T) {
 		query          string
 		wantStatus     int
 		wantUnassigned bool
+		wantNoRegion   bool
 	}{
-		{"", http.StatusOK, false},
-		{"&unassigned=false", http.StatusOK, false},
-		{"&unassigned=true", http.StatusOK, true},
-		{"&unassigned=abc", http.StatusBadRequest, false},
+		{"", http.StatusOK, false, false},
+		{"&unassigned=false", http.StatusOK, false, false},
+		{"&unassigned=true", http.StatusOK, true, false},
+		{"&unassigned=abc", http.StatusBadRequest, false, false},
+		{"&no_region=true&flm_vendor=TAG", http.StatusOK, false, true},
+		{"&no_region=1", http.StatusBadRequest, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
@@ -786,6 +789,9 @@ func TestVendorRequestHandler_BrowseForecast_UnassignedParam(t *testing.T) {
 			}
 			if svc.lastBrowseParams.Unassigned != tt.wantUnassigned {
 				t.Errorf("Unassigned = %v, want %v", svc.lastBrowseParams.Unassigned, tt.wantUnassigned)
+			}
+			if svc.lastBrowseParams.NoRegion != tt.wantNoRegion {
+				t.Errorf("NoRegion = %v, want %v", svc.lastBrowseParams.NoRegion, tt.wantNoRegion)
 			}
 		})
 	}

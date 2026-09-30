@@ -129,6 +129,16 @@ describe("ForecastSummary", () => {
   });
 });
 
+describe("ForecastSummary — vendor branch without region (review R1)", () => {
+  it('labels the region "(tanpa region)" and names the action accordingly', () => {
+    const group = { ...DATA.groups[0], flm_vendor_region: "" };
+    renderSummary({ data: { ...DATA, groups: [group] } });
+
+    const row = rowOf("Lihat ATM TAG tanpa region");
+    expect(within(row).getByText("(tanpa region)")).toBeInTheDocument();
+  });
+});
+
 describe("summaryGroupKey", () => {
   it('maps the no-vendor group to "" and others to vendor|region', () => {
     expect(summaryGroupKey({ flm_vendor: "", flm_vendor_region: "" })).toBe("");

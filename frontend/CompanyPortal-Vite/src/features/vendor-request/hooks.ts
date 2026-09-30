@@ -99,7 +99,7 @@ export function useForecastSummary(forecastDate: string) {
 export function useForecastSelectAll(
   params: Pick<
     BrowseForecastParams,
-    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned"
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned" | "noRegion"
   >,
   cap: number,
 ) {

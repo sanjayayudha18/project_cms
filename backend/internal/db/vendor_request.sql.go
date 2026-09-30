@@ -34,6 +34,7 @@ WHERE f.periode_pred = $1::date
   AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
   AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
   AND (NOT $6::bool OR v.id IS NULL)
+  AND (NOT $7::bool OR (v.id IS NOT NULL AND vb.region IS NULL))
 `
 
 type CountForecastForDateParams struct {
@@ -43,6 +44,7 @@ type CountForecastForDateParams struct {
 	FlmVendor       string      `json:"flm_vendor"`
 	FlmVendorRegion string      `json:"flm_vendor_region"`
 	Unassigned      bool        `json:"unassigned"`
+	NoRegion        bool        `json:"no_region"`
 }
 
 // forecast-browser-summary: same unassigned filter as ListForecastForDate, and
@@ -63,6 +65,7 @@ func (q *Queries) CountForecastForDate(ctx context.Context, arg CountForecastFor
 		arg.FlmVendor,
 		arg.FlmVendorRegion,
 		arg.Unassigned,
+		arg.NoRegion,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -607,8 +610,9 @@ WHERE f.periode_pred = $1::date
   AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
   AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
   AND (NOT $6::bool OR v.id IS NULL)
+  AND (NOT $7::bool OR (v.id IS NOT NULL AND vb.region IS NULL))
 ORDER BY f.terminal_id ASC
-LIMIT $8::int OFFSET ($7::int - 1) * $8::int
+LIMIT $9::int OFFSET ($8::int - 1) * $9::int
 `
 
 type ListForecastForDateParams struct {
@@ -618,6 +622,7 @@ type ListForecastForDateParams struct {
 	FlmVendor       string      `json:"flm_vendor"`
 	FlmVendorRegion string      `json:"flm_vendor_region"`
 	Unassigned      bool        `json:"unassigned"`
+	NoRegion        bool        `json:"no_region"`
 	Page            int32       `json:"page"`
 	PageSize        int32       `json:"page_size"`
 }
@@ -644,6 +649,8 @@ type ListForecastForDateRow struct {
 // unassigned=true keeps only rows with no active vendor package (v.id IS NULL);
 // is_requested = the (terminal_id, periode_pred, denom) row is already an item
 // of a vendor_request that is not cancelled/rejected/is_canceled.
+// no_region=true (review R1) keeps rows whose vendor branch has region NULL,
+// so the recap's "(V, tanpa region)" row drills down exactly.
 // Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
 // periode_pred, optional terminal_id partial match, default sort terminal_id
 // ascending (Req 3.2). Extended with ATM/vendor context (Req 3.1): Lokasi ATM,
@@ -684,6 +691,7 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 		arg.FlmVendor,
 		arg.FlmVendorRegion,
 		arg.Unassigned,
+		arg.NoRegion,
 		arg.Page,
 		arg.PageSize,
 	)
@@ -996,23 +1004,24 @@ WITH r AS (
 ), atm AS (
     SELECT r.terminal_id,
            r.flm_vendor,
-           r.flm_vendor_region,
+           LOWER(r.flm_vendor_region) AS region_key,
+           MIN(r.flm_vendor_region)   AS flm_vendor_region,
            bool_and(r.is_requested) AS all_requested,
            SUM(r.amount_replenish) AS amount,
            COALESCE(SUM(r.amount_replenish) FILTER (WHERE NOT r.is_requested), 0) AS unrequested_amount
     FROM r
-    GROUP BY r.terminal_id, r.flm_vendor, r.flm_vendor_region
+    GROUP BY r.terminal_id, r.flm_vendor, LOWER(r.flm_vendor_region)
 )
-SELECT COALESCE(atm.flm_vendor, '')::text        AS flm_vendor,
-       COALESCE(atm.flm_vendor_region, '')::text AS flm_vendor_region,
+SELECT COALESCE(atm.flm_vendor, '')::text             AS flm_vendor,
+       COALESCE(MIN(atm.flm_vendor_region), '')::text AS flm_vendor_region,
        COUNT(*)::bigint                                        AS atm_count,
        (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
        SUM(atm.amount)::bigint                                 AS amount_replenish,
        SUM(atm.unrequested_amount)::bigint                     AS unrequested_amount_replenish
 FROM atm
-GROUP BY atm.flm_vendor, atm.flm_vendor_region
+GROUP BY atm.flm_vendor, atm.region_key
 ORDER BY (COUNT(*) - COUNT(*) FILTER (WHERE atm.all_requested)) DESC,
-         COALESCE(atm.flm_vendor, ''), COALESCE(atm.flm_vendor_region, '')
+         COALESCE(atm.flm_vendor, ''), COALESCE(atm.region_key, '')
 `
 
 type SummarizeForecastForDateRow struct {
@@ -1030,8 +1039,11 @@ type SummarizeForecastForDateRow struct {
 // terminals the detail table shows for that filter. An ATM counts as requested
 // only when ALL its denoms are requested (bool_and) — one missing denom keeps
 // it "belum", so nothing is silently skipped. The no-active-vendor group comes
-// back as flm_vendor = ” / flm_vendor_region = ”. Amounts are bigint sums of
-// full-IDR amount_replenish, never float.
+// back as flm_vendor = ” / flm_vendor_region = ”; a vendor branch with region
+// NULL comes back as (V, ”) — drilled into with no_region=true (review R1).
+// Regions are grouped case-insensitively (LOWER), matching the LOWER(...)
+// filter, and shown as MIN(region) — so two spellings never split one row.
+// Amounts are bigint sums of full-IDR amount_replenish, never float.
 func (q *Queries) SummarizeForecastForDate(ctx context.Context, forecastDate pgtype.Date) ([]SummarizeForecastForDateRow, error) {
 	rows, err := q.db.Query(ctx, summarizeForecastForDate, forecastDate)
 	if err != nil {

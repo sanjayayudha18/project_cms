@@ -127,6 +127,110 @@ func TestIntegration_SummarizeForecastForDate(t *testing.T) {
 	})
 }
 
+// TestIntegration_SummarizeForecastForDate_RegionEdges covers review R1: a
+// vendor branch with region NULL forms its own (V, "") recap row that
+// no_region=true drills into exactly, and two spellings of one region (case
+// only) form ONE row matching the case-insensitive region filter.
+func TestIntegration_SummarizeForecastForDate_RegionEdges(t *testing.T) {
+	q, tx := setupForecastQueryHarness(t)
+	ctx := context.Background()
+	marker := uuid.NewString()[:8]
+	forecastDate := time.Date(2031, 3, 18, 0, 0, 0, 0, time.UTC)
+	start := forecastDate.AddDate(0, 0, -10)
+	locationID := seedForecastRegionAndLocation(t, tx, marker)
+	vendor := "SUMR Vendor " + marker
+
+	// Branch 1: region "Integration Test Region" (from the seed helper).
+	pkgUpper := seedForecastVendorPackage(t, tx, marker+"-r", vendor)
+	var vendorID int64
+	if err := tx.QueryRow(ctx, `
+		SELECT vb.vendor_id FROM vendor_packages_branch vp
+		JOIN vendor_branches vb ON vb.id = vp.vendor_branch_id
+		WHERE vp.id = $1`, pkgUpper).Scan(&vendorID); err != nil {
+		t.Fatalf("lookup vendor: %v", err)
+	}
+	// Branch 2: same region, lower-case spelling. Branch 3: region NULL.
+	lower := "integration test region"
+	pkgLower := seedBranchPackage(t, tx, vendorID, marker+"-l", &lower)
+	pkgNull := seedBranchPackage(t, tx, vendorID, marker+"-n", nil)
+
+	for i, pkg := range []int64{pkgUpper, pkgLower, pkgNull, pkgNull} {
+		terminal := "ISUMR-" + strconv.Itoa(i) + "-" + marker
+		atmID := seedForecastATM(t, tx, terminal, locationID)
+		linkAtmVendorPackage(t, tx, atmID, pkg, &start, nil, true)
+		seedForecastRow(t, tx, terminal, forecastDate, 50000)
+	}
+
+	groups, err := q.SummarizeForecastForDate(ctx, toPgDate(forecastDate))
+	if err != nil {
+		t.Fatalf("SummarizeForecastForDate: %v", err)
+	}
+	var withRegion, noRegion *db.SummarizeForecastForDateRow
+	for i := range groups {
+		if groups[i].FlmVendor != vendor {
+			continue
+		}
+		if groups[i].FlmVendorRegion == "" {
+			noRegion = &groups[i]
+		} else {
+			withRegion = &groups[i]
+		}
+	}
+	if withRegion == nil || withRegion.AtmCount != 2 {
+		t.Fatalf("case-variant regions must form one row of 2 ATMs, got %+v (groups %+v)", withRegion, groups)
+	}
+	if noRegion == nil || noRegion.AtmCount != 2 {
+		t.Fatalf("NULL-region branch must form its own row of 2 ATMs, got %+v", noRegion)
+	}
+
+	byRegion := listForecastParams(t, q, db.ListForecastForDateParams{
+		ForecastDate: toPgDate(forecastDate), FlmVendor: vendor,
+		FlmVendorRegion: withRegion.FlmVendorRegion, Page: 1, PageSize: 100,
+	})
+	if len(byRegion) != 2 {
+		t.Errorf("region filter rows = %d, want 2 (both spellings)", len(byRegion))
+	}
+	byNoRegion := listForecastParams(t, q, db.ListForecastForDateParams{
+		ForecastDate: toPgDate(forecastDate), FlmVendor: vendor, NoRegion: true, Page: 1, PageSize: 100,
+	})
+	count, err := q.CountForecastForDate(ctx, db.CountForecastForDateParams{
+		ForecastDate: toPgDate(forecastDate), FlmVendor: vendor, NoRegion: true,
+	})
+	if err != nil {
+		t.Fatalf("CountForecastForDate: %v", err)
+	}
+	if len(byNoRegion) != 2 || count != 2 {
+		t.Errorf("no_region rows/count = %d/%d, want 2/2", len(byNoRegion), count)
+	}
+}
+
+func seedBranchPackage(t *testing.T, tx pgx.Tx, vendorID int64, marker string, region *string) int64 {
+	t.Helper()
+	ctx := context.Background()
+	var branchID, packageID int64
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region)
+		VALUES ($1, $2, $2, $3) RETURNING id`, vendorID, "ITEST-"+marker, region).Scan(&branchID); err != nil {
+		t.Fatalf("insert vendor branch: %v", err)
+	}
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO vendor_packages_branch (vendor_branch_id, package_code, machine_group, price_class, tier_min, base_price, currency, effective_start_date)
+		VALUES ($1, 'PAKET TEST', 'ATM', 'REGULAR', 1, 0, 'IDR', CURRENT_DATE - 365)
+		RETURNING id`, branchID).Scan(&packageID); err != nil {
+		t.Fatalf("insert vendor package: %v", err)
+	}
+	return packageID
+}
+
+func listForecastParams(t *testing.T, q *db.Queries, p db.ListForecastForDateParams) []db.ListForecastForDateRow {
+	t.Helper()
+	rows, err := q.ListForecastForDate(context.Background(), p)
+	if err != nil {
+		t.Fatalf("ListForecastForDate: %v", err)
+	}
+	return rows
+}
+
 type item struct {
 	terminal string
 	denom    int32

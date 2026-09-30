@@ -2,12 +2,12 @@
 
 Reviewed 2026-09-30 by Claude (inline review of the full diff: bugs, security, CLAUDE.md compliance, data checked on dev DB).
 Separate reviewer agents (code-reviewer / database-reviewer) not run — available on request.
-Status: **R1 decided = option A (2026-09-30), implementation ON HOLD by user**; no CRITICAL. Code owner merges; AI never self-approves.
+Status: **R1 fixed (option A, 2026-09-30)**; R2 fixed; no open Important; no CRITICAL. Code owner merges; AI never self-approves.
 
 ## Important
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| R1 | **Vendor branch without region → recap row can't be drilled into exactly.** A group `(V, region NULL)` is shown with region "-"; clicking it sets `flm_vendor=V` and region = Semua, so the detail table shows **all** of V's regions (superset — nothing is hidden, but AC3 "ATM count in detail = recap" fails for that row). The region dropdown also has no way to pick "no region". | Dev DB: **51 of 422** `vendor_branches.region` IS NULL (Abacus, Advantage, Brinks, Kejar, Prosegur, …). | **Decided A 2026-09-30 — implementation on hold** (user: "pakai opsi A tapi tahan dulu untuk implementasi") |
+| R1 | **Vendor branch without region → recap row can't be drilled into exactly.** A group `(V, region NULL)` is shown with region "-"; clicking it sets `flm_vendor=V` and region = Semua, so the detail table shows **all** of V's regions (superset — nothing is hidden, but AC3 "ATM count in detail = recap" fails for that row). The region dropdown also has no way to pick "no region". | Dev DB: **51 of 422** `vendor_branches.region` IS NULL (Abacus, Advantage, Brinks, Kejar, Prosegur, …). | **Fixed 2026-09-30 (option A, released by user "lanjut R1")** — `no_region=true` on `GET /forecast` (List + Count: `v.id IS NOT NULL AND vb.region IS NULL`; 400 with `flm_vendor_region`/`unassigned`); recap groups region by `LOWER` (shown `MIN`); UI row "(tanpa region)" sends `vendor + no_region`, chip "Tanpa region ✕", flag dropped when vendor/region select changes. Tests: service validation, handler flag parse, integration `TestIntegration_SummarizeForecastForDate_RegionEdges`, frontend recap/browser tests. |
 | R2 | Recap showed the previous date's counts while the new date loaded (`keepPreviousData`) — an operator could read old numbers as the new date's. | `hooks.ts` `useForecastSummary` | **Fixed** — placeholder removed; skeleton shows while loading. Tests/lint green. |
 
 **R1 options**
@@ -16,7 +16,7 @@ Status: **R1 decided = option A (2026-09-30), implementation ON HOLD by user**; 
 - **C:** accept the superset and label the row "(tanpa region — detail menampilkan semua region vendor ini)". Frontend only; AC3 relaxed for these rows.
 
 ## Nit / minor (not fixed, noted)
-- **Region case variants** split into separate recap rows (grouping is exact, filter is `LOWER(...)`): 1 vendor on dev has two spellings of one region; clicking either row shows both. Fixed for free if R1-A also groups by `LOWER(region)` (display `MIN(region)`).
+- ~~Region case variants split into separate recap rows~~ — **fixed with R1** (grouping by `LOWER(region)`, integration-tested).
 - Recap groups by vendor **name** — same key the existing `flm_vendor` filter uses; two vendors with an identical name would merge. No known duplicates.
 - Select-all 1000-item cap counts already-requested rows too — conservative, never exceeds the server cap.
 - Create still accepts an item already in another open request (out of scope per spec; UI badge only).
@@ -25,7 +25,7 @@ Status: **R1 decided = option A (2026-09-30), implementation ON HOLD by user**; 
 
 ## Security pass
 - New `GET /forecast/summary`: same `vendorRequestViewerRoles` as `/forecast` (401/403 tested). Returns aggregates of data those roles can already browse row by row — no access widened (intent OQ3: no branch scoping today).
-- Input: `forecast_date` format + `validateDateBound`; `unassigned` strict (`""|false|true`, else 400); filters length-bound 255. All SQL via sqlc parameters.
+- Input: `forecast_date` format + `validateDateBound`; `unassigned` / `no_region` strict (`""|false|true`, else 400, shared `parseBoolFlag`); filters length-bound 255. All SQL via sqlc parameters.
 - No secrets, no request-data logging, no new env vars. Frontend renders text only.
 
 ## Bugs / correctness pass
@@ -50,6 +50,6 @@ New code: service `ForecastSummary` 91.3%, handler `ForecastSummary` + response 
 - [ ] Manual browser check — **outstanding (user)**, checklist in `tests.md`.
 
 ## Gates
-1. R1: option A chosen 2026-09-30, **on hold** — implement (`no_region=true` + group by `LOWER(region)`) only when the user releases it, then rerun tests. Until then AC3 fails for the no-region rows (superset shown).
+1. R1: done 2026-09-30 (option A) — all tests green (`tests.md`).
 2. User manual browser check (`tests.md` AC1–AC6).
 3. Commit (one conventional feature commit) → code owner merge.

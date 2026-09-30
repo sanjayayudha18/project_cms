@@ -37,6 +37,7 @@ function buildForecastQuery(params: BrowseForecastParams): string {
   if (params.flmVendor) search.set("flm_vendor", params.flmVendor);
   if (params.flmVendorRegion) search.set("flm_vendor_region", params.flmVendorRegion);
   if (params.unassigned) search.set("unassigned", "true");
+  if (params.noRegion) search.set("no_region", "true");
   search.set("page", String(params.page ?? 1));
   search.set("page_size", String(params.pageSize ?? 20));
   return search.toString();
@@ -75,7 +76,7 @@ export async function fetchForecastSummary(forecastDate: string): Promise<Foreca
 export async function fetchAllForecastForSelection(
   params: Pick<
     BrowseForecastParams,
-    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned"
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned" | "noRegion"
   >,
   cap: number,
 ): Promise<FetchAllForecastResult> {

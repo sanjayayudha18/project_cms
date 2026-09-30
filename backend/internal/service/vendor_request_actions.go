@@ -31,7 +31,8 @@ var validVendorRequestStatuses = []string{
 // CIT-2 Req 1.4 "vendor + region required" rule so the page can show every
 // ATM; the one-vendor-per-request rule is still enforced at Create
 // (GetActiveVendorForTerminal). Unassigned is mutually exclusive with a
-// vendor/region filter (it selects rows whose vendor is NULL).
+// vendor/region filter (it selects rows whose vendor is NULL); NoRegion (review
+// R1) selects vendor rows whose branch region is NULL, so it excludes a region.
 func (s *VendorRequestService) BrowseForecast(ctx context.Context, params BrowseForecastParams) (*BrowseForecastResult, error) {
 	if params.ForecastDate == "" {
 		return nil, &ValidationError{Field: "forecast_date", Message: "wajib diisi"}
@@ -45,8 +46,11 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 	if params.PageSize < 1 || params.PageSize > 100 {
 		return nil, &ValidationError{Field: "page_size", Message: "harus antara 1 dan 100"}
 	}
-	if params.Unassigned && (params.FLMVendor != "" || params.FLMVendorRegion != "") {
+	if params.Unassigned && (params.FLMVendor != "" || params.FLMVendorRegion != "" || params.NoRegion) {
 		return nil, &ValidationError{Field: "unassigned", Message: "tidak bisa digabung dengan filter vendor/region"}
+	}
+	if params.NoRegion && params.FLMVendorRegion != "" {
+		return nil, &ValidationError{Field: "no_region", Message: "tidak bisa digabung dengan filter region"}
 	}
 	if len(params.Brand) > 255 {
 		return nil, &ValidationError{Field: "brand", Message: "maksimal 255 karakter"}
@@ -70,6 +74,7 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		FlmVendor:       params.FLMVendor,
 		FlmVendorRegion: params.FLMVendorRegion,
 		Unassigned:      params.Unassigned,
+		NoRegion:        params.NoRegion,
 		Page:            int32(params.Page),
 		PageSize:        int32(params.PageSize),
 	})
@@ -83,6 +88,7 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		FlmVendor:       params.FLMVendor,
 		FlmVendorRegion: params.FLMVendorRegion,
 		Unassigned:      params.Unassigned,
+		NoRegion:        params.NoRegion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("counting forecast for %s: %w", params.ForecastDate, err)

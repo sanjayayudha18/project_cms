@@ -284,6 +284,8 @@ export interface BrowseForecastParams {
   flmVendorRegion?: string;
   /** Only rows with no active vendor package; never combined with flmVendor/flmVendorRegion. */
   unassigned?: boolean;
+  /** review R1: only rows whose vendor branch has no region; never combined with flmVendorRegion. */
+  noRegion?: boolean;
   page?: number;
   pageSize?: number;
 }

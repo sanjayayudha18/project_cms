@@ -212,6 +212,8 @@ type ListVendorRequestResult struct {
 // no filter); forecast-browser-summary relaxed CIT-2 Req 1.4, which made the
 // vendor/region pair required. Unassigned keeps only rows with no active
 // vendor package and cannot be combined with a vendor/region filter.
+// NoRegion (review R1) keeps only rows whose vendor branch has no region; it
+// cannot be combined with FLMVendorRegion or Unassigned.
 type BrowseForecastParams struct {
 	ForecastDate    string // YYYY-MM-DD, required
 	TerminalID      string
@@ -219,6 +221,7 @@ type BrowseForecastParams struct {
 	FLMVendor       string
 	FLMVendorRegion string
 	Unassigned      bool
+	NoRegion        bool
 	Page            int
 	PageSize        int
 }
@@ -259,7 +262,8 @@ type BrowseForecastResult struct {
 
 // ForecastSummaryGroup is one (FLM vendor, region) recap row of GET
 // /forecast/summary (forecast-browser-summary FR1). The no-active-vendor group
-// has FLMVendor == "" and FLMVendorRegion == "". An ATM counts as requested
+// has FLMVendor == "" and FLMVendorRegion == ""; a vendor branch without a
+// region has FLMVendor set and FLMVendorRegion == "" (review R1). An ATM counts as requested
 // only when every one of its denoms is. Amounts are full IDR.
 type ForecastSummaryGroup struct {
 	FLMVendor                  string

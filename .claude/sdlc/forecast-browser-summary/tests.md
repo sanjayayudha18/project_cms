@@ -12,7 +12,7 @@ Input: `plan.md` (accepted 2026-09-30). Trigger ke stage berikut: review (`revie
 | `cd backend && go test ./...` | OK (semua paket) |
 | `cd backend && DATABASE_URL=<dev, localhost> go test -tags integration ./internal/service ./internal/handler ./internal/repository -count=1` | OK |
 | `gofmt` pada file yang diubah (setelah strip CRLF) | bersih |
-| `pnpm --dir frontend/CompanyPortal-Vite run test` | 121 file, 1020 test lulus |
+| `pnpm --dir frontend/CompanyPortal-Vite run test` | 121 file, 1022 test lulus (rerun setelah review R1/R2) |
 | `pnpm --dir frontend/CompanyPortal-Vite run lint` (biome) | bersih, 0 warning |
 | `pnpm --dir frontend/CompanyPortal-Vite run build` | OK (warning chunk >500 kB sudah ada sebelumnya) |
 | `EXPLAIN ANALYZE SummarizeForecastForDate` di dev, tanggal tersibuk (2026-07-20, 513 rekomendasi, 1.919 ATM) | **13 ms** (target ≤ 3 s p95) |
@@ -29,6 +29,8 @@ Input: `plan.md` (accepted 2026-09-30). Trigger ke stage berikut: review (`revie
 | FR2 vendor/region opsional; `unassigned` + vendor/region → error | `TestBrowseForecast_ValidatesCIT2Filters` (kasus "wajib dipilih" lama diganti) |
 | FR2 parse `unassigned` (""/false/true/abc→400) | `TestVendorRequestHandler_BrowseForecast_UnassignedParam` |
 | FR2 `unassigned=true` hanya ATM tanpa paket | integration subtest (e) |
+| Review R1: `no_region` validasi + parse; cabang tanpa region = grup sendiri, drill-down tepat; ejaan region beda huruf = satu grup | `TestBrowseForecast_ValidatesCIT2Filters`, `TestVendorRequestHandler_BrowseForecast_UnassignedParam`, `TestIntegration_SummarizeForecastForDate_RegionEdges`, `ForecastBrowser.test.tsx` "clicking a vendor row without region…", `ForecastSummary.test.tsx` "(tanpa region)" |
+| Review R2: ringkasan tidak menampilkan angka tanggal lama saat ganti tanggal | `hooks.ts` tanpa `keepPreviousData` (dicek lewat review; tidak ada test khusus) |
 | FR3 `is_requested` map + wire + nilai per baris dari DB | `TestBrowseForecast_MapsIsRequested`, `TestVendorRequestHandler_BrowseForecast_IsRequestedOnWire`, integration "is_requested on list rows" |
 | FR4 KPI, status berlabel (bukan warna saja), Rp tabular-nums, `aria-current`, callback, empty, error | `ForecastSummary.test.tsx` |
 | FR4 badge "Sudah di-request"/"Tanpa vendor"/"Belum", checkbox disabled | `ForecastTable.test.tsx` "request status" |
@@ -42,7 +44,7 @@ Input: `plan.md` (accepted 2026-09-30). Trigger ke stage berikut: review (`revie
 Jalankan backend :8080 + `pnpm --dir frontend/CompanyPortal-Vite run dev`, login ATM-USER, buka `/replenishment/forecast-browser`:
 - [ ] AC1 ringkasan + detail tampil tanpa memilih filter.
 - [ ] AC2 grup "Tanpa vendor aktif" muncul (bila ada) → klik → detail hanya ATM itu; chip bisa dihapus.
-- [ ] AC3 klik grup (V,R) → jumlah ATM distinct di detail = kolom ATM ringkasan.
+- [ ] AC3 klik grup (V,R) → jumlah ATM distinct di detail = kolom ATM ringkasan (termasuk baris "(tanpa region)" → chip "Tanpa region").
 - [ ] AC4 buat Vendor Request sebagian ATM → kembali → "Sudah" naik, "Belum" turun, badge "Sudah di-request", checkbox disabled.
 - [ ] AC5 batalkan/tolak request itu → ATM kembali "Belum".
 - [ ] AC6 pilih ATM dua vendor → tombol Buat disabled + teks bantu.

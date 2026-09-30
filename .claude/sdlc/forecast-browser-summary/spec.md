@@ -39,6 +39,8 @@ Mengubah spec lama: `.kiro/specs/done/cit-vendor-request-enhancements` **Req 1.4
 }
 ```
 - `groups` satu baris per (vendor, region); grup tanpa vendor aktif = `flm_vendor: ""`, `flm_vendor_region: ""`.
+  Cabang vendor **tanpa region** (`vendor_branches.region` NULL) = grup `(V, "")` (review R1, 2026-09-30).
+  Region dikelompokkan case-insensitive (`LOWER`), ditampilkan `MIN(region)` — sama dengan filter `LOWER(...)`.
   Urutan server: `unrequested_atm_count DESC, flm_vendor ASC, flm_vendor_region ASC`.
 - Amount = `SUM(amount_replenish)` (bigint, IDR penuh) → `int64` di Go, tidak pernah float.
 - `unrequested_amount_replenish` = jumlah amount rekomendasi yang **belum** di-request.
@@ -50,6 +52,9 @@ Mengubah spec lama: `.kiro/specs/done/cit-vendor-request-enhancements` **Req 1.4
 - `flm_vendor`, `flm_vendor_region` **opsional** (kosong = Semua). Batas 255 karakter tetap.
 - Parameter baru `unassigned=true` → hanya rekomendasi tanpa vendor aktif. Bila dikombinasikan dengan `flm_vendor` atau
   `flm_vendor_region` non-kosong → 400 `unassigned tidak bisa digabung dengan filter vendor/region`.
+  Nilai selain `true`/`false`/kosong → 400.
+- Parameter baru `no_region=true` (review R1) → hanya rekomendasi ber-vendor yang cabangnya tanpa region
+  (`v.id IS NOT NULL AND vb.region IS NULL`). Tidak bisa digabung dengan `flm_vendor_region` atau `unassigned` → 400.
   Nilai selain `true`/`false`/kosong → 400.
 - `CountForecastForDate` ikut filter yang sama, dan LATERAL-nya disamakan dengan `ListForecastForDate`
   (tambah tie-breaker `avp.id DESC`) supaya hitungan & baris tidak pernah beda vendor.

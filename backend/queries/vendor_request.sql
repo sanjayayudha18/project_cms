@@ -174,6 +174,8 @@ RETURNING *;
 -- unassigned=true keeps only rows with no active vendor package (v.id IS NULL);
 -- is_requested = the (terminal_id, periode_pred, denom) row is already an item
 -- of a vendor_request that is not cancelled/rejected/is_canceled.
+-- no_region=true (review R1) keeps rows whose vendor branch has region NULL,
+-- so the recap's "(V, tanpa region)" row drills down exactly.
 -- Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
 -- periode_pred, optional terminal_id partial match, default sort terminal_id
 -- ascending (Req 3.2). Extended with ATM/vendor context (Req 3.1): Lokasi ATM,
@@ -254,6 +256,7 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
   AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
   AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL)
+  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region IS NULL))
 ORDER BY f.terminal_id ASC
 LIMIT sqlc.arg('page_size')::int OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
 
@@ -289,7 +292,8 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('brand')::text = '' OR LOWER(a.brand) = LOWER(sqlc.arg('brand')::text))
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
   AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
-  AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL);
+  AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL)
+  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region IS NULL));
 
 -- name: SummarizeForecastForDate :many
 -- forecast-browser-summary (FR1): per (FLM vendor, region) recap for one
@@ -298,8 +302,11 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
 -- terminals the detail table shows for that filter. An ATM counts as requested
 -- only when ALL its denoms are requested (bool_and) — one missing denom keeps
 -- it "belum", so nothing is silently skipped. The no-active-vendor group comes
--- back as flm_vendor = '' / flm_vendor_region = ''. Amounts are bigint sums of
--- full-IDR amount_replenish, never float.
+-- back as flm_vendor = '' / flm_vendor_region = ''; a vendor branch with region
+-- NULL comes back as (V, '') — drilled into with no_region=true (review R1).
+-- Regions are grouped case-insensitively (LOWER), matching the LOWER(...)
+-- filter, and shown as MIN(region) — so two spellings never split one row.
+-- Amounts are bigint sums of full-IDR amount_replenish, never float.
 WITH r AS (
     SELECT f.terminal_id,
            f.amount_replenish,
@@ -334,23 +341,24 @@ WITH r AS (
 ), atm AS (
     SELECT r.terminal_id,
            r.flm_vendor,
-           r.flm_vendor_region,
+           LOWER(r.flm_vendor_region) AS region_key,
+           MIN(r.flm_vendor_region)   AS flm_vendor_region,
            bool_and(r.is_requested) AS all_requested,
            SUM(r.amount_replenish) AS amount,
            COALESCE(SUM(r.amount_replenish) FILTER (WHERE NOT r.is_requested), 0) AS unrequested_amount
     FROM r
-    GROUP BY r.terminal_id, r.flm_vendor, r.flm_vendor_region
+    GROUP BY r.terminal_id, r.flm_vendor, LOWER(r.flm_vendor_region)
 )
-SELECT COALESCE(atm.flm_vendor, '')::text        AS flm_vendor,
-       COALESCE(atm.flm_vendor_region, '')::text AS flm_vendor_region,
+SELECT COALESCE(atm.flm_vendor, '')::text             AS flm_vendor,
+       COALESCE(MIN(atm.flm_vendor_region), '')::text AS flm_vendor_region,
        COUNT(*)::bigint                                        AS atm_count,
        (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
        SUM(atm.amount)::bigint                                 AS amount_replenish,
        SUM(atm.unrequested_amount)::bigint                     AS unrequested_amount_replenish
 FROM atm
-GROUP BY atm.flm_vendor, atm.flm_vendor_region
+GROUP BY atm.flm_vendor, atm.region_key
 ORDER BY (COUNT(*) - COUNT(*) FILTER (WHERE atm.all_requested)) DESC,
-         COALESCE(atm.flm_vendor, ''), COALESCE(atm.flm_vendor_region, '');
+         COALESCE(atm.flm_vendor, ''), COALESCE(atm.region_key, '');
 
 -- name: NextRequestNumberSeq :one
 -- Atomic per-(vendor, replenish_date) increment backing the new

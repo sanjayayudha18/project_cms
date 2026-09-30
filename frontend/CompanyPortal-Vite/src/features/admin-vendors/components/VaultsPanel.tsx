@@ -11,6 +11,7 @@ import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorVault, useEnableVendorVault, useVendorVaults } from "../hooks";
 import type { AdminVendorVault } from "../types";
+import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorVaultFormDialog } from "./VendorVaultFormDialog";
 
 interface VaultsPanelProps {
@@ -21,9 +22,10 @@ interface VaultsPanelProps {
 /** Vault list scoped to one branch: create/edit/disable/enable. */
 export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
   const { toast } = useToast();
+  const [page, setPage] = useState(1);
   const query = useVendorVaults(vendorId, {
-    page: 1,
-    page_size: 100,
+    page,
+    page_size: CHILD_PAGE_SIZE,
     status: "all",
     branch_id: branchId,
   });
@@ -145,7 +147,15 @@ export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
         </p>
       )}
       {!query.isLoading && !query.isError && (
-        <DataTable data={vaults} columns={columns} emptyMessage="Cabang ini belum punya vault" />
+        <>
+          <DataTable data={vaults} columns={columns} emptyMessage="Cabang ini belum punya vault" />
+          <ServerPager
+            page={page}
+            total={query.data?.total ?? 0}
+            unit="vault"
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <VendorVaultFormDialog

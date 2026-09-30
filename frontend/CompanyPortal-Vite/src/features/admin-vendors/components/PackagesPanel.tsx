@@ -11,6 +11,7 @@ import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPackage, useVendorPackages } from "../hooks";
 import type { AdminVendorPackage } from "../types";
+import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorPackageFormDialog } from "./VendorPackageFormDialog";
 
 interface PackagesPanelProps {
@@ -34,9 +35,10 @@ function money(value: string | null): string {
  */
 export function PackagesPanel({ vendorId, branchId }: PackagesPanelProps) {
   const { toast } = useToast();
+  const [page, setPage] = useState(1);
   const query = useVendorPackages(vendorId, {
-    page: 1,
-    page_size: 100,
+    page,
+    page_size: CHILD_PAGE_SIZE,
     status: "all",
     branch_id: branchId,
   });
@@ -160,11 +162,19 @@ export function PackagesPanel({ vendorId, branchId }: PackagesPanelProps) {
         </p>
       )}
       {!query.isLoading && !query.isError && (
-        <DataTable
-          data={packages}
-          columns={columns}
-          emptyMessage="Cabang ini belum punya harga khusus"
-        />
+        <>
+          <DataTable
+            data={packages}
+            columns={columns}
+            emptyMessage="Cabang ini belum punya harga khusus"
+          />
+          <ServerPager
+            page={page}
+            total={query.data?.total ?? 0}
+            unit="harga khusus"
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <VendorPackageFormDialog

@@ -1,7 +1,7 @@
 # Plan: Kelolaan Cabang â†’ Vault/PIC/Paket per-Cabang (Vendor Detail)
 
-**Route**: `http://localhost:5174/settings/admin/vendors/2`
-**Status**: Draft revisi, **in progress** (9/23 task selesai, update 2026-09-28); verifikasi kontrak backend diperlukan sebelum implementasi frontend.
+**Route**: CompanyPortal (`:5173`) `/settings/admin/vendors/{id}` dan `/settings/admin/vendors/{id}/branches/{branchId}`.
+**Status**: **in progress** (audit ulang 2026-09-30). Kontrak backend (§1–§2), keempat dialog, drill-down cabang (`VendorBranchDetailPage`), tab PIC Vendor-wide, dan badge pending sudah terbangun (`f11bc40`, `90aa526`). 2026-09-30: **G1** keempat panel child pakai paging server (`ServerPager`, 20/halaman) + cari cabang (`q`) — sebelumnya terpotong di 100 baris (ROH 308 cabang); **G3** test `__tests__/ChildPanelsPaging.test.tsx`. Sisa: **G2** pending *create* belum terlihat (create belum punya `entity_id`), acceptance yang belum dicentang di bawah, dan manual browser check (user).
 **Terakhir disesuaikan**: 2026-09-22, mengikuti migrasi 007 (`branch_coverage_areas`) dan 008 (`vendor_vaults.category` jadi tiga nilai).
 **Tanggal**: 2026-09-22
 
@@ -189,9 +189,9 @@ Ketentuan:
 
 Extend `__tests__/VendorDetailPage.test.tsx` dan pengujian backend terkait:
 - [ ] Klik cabang A/B menampilkan data scope yang benar; perpindahan cepat tidak membocorkan hasil cabang sebelumnya.
-- [ ] Dataset vendor lebih dari 100 baris, termasuk child cabang yang hanya muncul setelah halaman pertama, tetap dapat ditemukan melalui pagination/filter. Vendor ROH (308 cabang) adalah kasus uji nyata untuk ini.
-- [ ] Total/count konsisten dengan filter vendor/cabang/scope PIC; urutan halaman deterministik.
-- [ ] PIC vendor-wide dapat dibaca dan dikelola tanpa memilih cabang serta tidak tercampur dengan PIC cabang.
+- [x] Dataset vendor lebih dari 100 baris, termasuk child cabang yang hanya muncul setelah halaman pertama, tetap dapat ditemukan melalui pagination/filter. Vendor ROH (308 cabang) adalah kasus uji nyata untuk ini. _(2026-09-30: paging server + cari `q`; `ChildPanelsPaging.test.tsx`. Manual check ROH: outstanding, user.)_
+- [x] Total/count konsisten dengan filter vendor/cabang/scope PIC; urutan halaman deterministik. _(List/Count sqlc berfilter identik + `ORDER BY <natural key>, id`; pager memakai `total` server.)_
+- [x] PIC vendor-wide dapat dibaca dan dikelola tanpa memilih cabang serta tidak tercampur dengan PIC cabang. _(`vendor_wide_only` vs `branch_id` saling eksklusif; diuji.)_
 - [ ] Create/edit/disable/enable diuji untuk branch, vault, PIC, dan package, termasuk payload dan permission.
 - [ ] Respons 202 menghasilkan feedback pending, bukan perubahan efektif pada master data.
 - [ ] Pending create terlihat tanpa ID master; pending request tetap terlihat setelah reload melalui sumber authoritative.

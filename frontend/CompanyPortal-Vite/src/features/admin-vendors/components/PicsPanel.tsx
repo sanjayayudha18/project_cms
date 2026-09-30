@@ -11,6 +11,7 @@ import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPic, useEnableVendorPic, useVendorPics } from "../hooks";
 import type { AdminVendorPic } from "../types";
+import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorPicFormDialog } from "./VendorPicFormDialog";
 
 interface PicsPanelProps {
@@ -22,9 +23,10 @@ interface PicsPanelProps {
 /** PIC list scoped to one branch (branchId set) or vendor-wide (branchId null). */
 export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
   const { toast } = useToast();
+  const [page, setPage] = useState(1);
   const query = useVendorPics(vendorId, {
-    page: 1,
-    page_size: 100,
+    page,
+    page_size: CHILD_PAGE_SIZE,
     status: "all",
     ...(branchId === null ? { vendor_wide_only: true } : { branch_id: branchId }),
   });
@@ -158,14 +160,21 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
         </p>
       )}
       {!query.isLoading && !query.isError && (
-        <DataTable
-          data={pics}
-          pageSize={10}
-          columns={columns}
-          emptyMessage={
-            branchId === null ? "Belum ada PIC vendor-wide" : "Cabang ini belum punya PIC"
-          }
-        />
+        <>
+          <DataTable
+            data={pics}
+            columns={columns}
+            emptyMessage={
+              branchId === null ? "Belum ada PIC vendor-wide" : "Cabang ini belum punya PIC"
+            }
+          />
+          <ServerPager
+            page={page}
+            total={query.data?.total ?? 0}
+            unit="PIC"
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <VendorPicFormDialog

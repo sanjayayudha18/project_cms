@@ -12,7 +12,11 @@ import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorBranch, useEnableVendorBranch, useVendorBranches } from "../hooks";
 import type { AdminVendorBranch } from "../types";
+import { useDebouncedValue } from "../useAdminVendorsUrlState";
+import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorBranchFormDialog } from "./VendorBranchFormDialog";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface BranchesPanelProps {
   vendorId: number;
@@ -25,7 +29,15 @@ interface BranchesPanelProps {
  */
 export function BranchesPanel({ vendorId }: BranchesPanelProps) {
   const { toast } = useToast();
-  const query = useVendorBranches(vendorId, { page: 1, page_size: 100, status: "all" });
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const q = useDebouncedValue(searchInput.trim(), SEARCH_DEBOUNCE_MS);
+  const query = useVendorBranches(vendorId, {
+    page,
+    page_size: CHILD_PAGE_SIZE,
+    status: "all",
+    ...(q ? { q } : {}),
+  });
   const pendingIds = usePendingEntityIds("vendor_branch");
   const disableMutation = useDisableVendorBranch(vendorId);
   const enableMutation = useEnableVendorBranch(vendorId);
@@ -134,7 +146,27 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <label
+            htmlFor={`vendor-${vendorId}-branch-search`}
+            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
+          >
+            Cari cabang
+          </label>
+          <input
+            id={`vendor-${vendorId}-branch-search`}
+            type="text"
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value.slice(0, 100));
+              setPage(1);
+            }}
+            maxLength={100}
+            placeholder="Kode atau nama cabang"
+            className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+          />
+        </div>
         <Button onClick={() => setFormOpen(true)}>Tambah Cabang</Button>
       </div>
 
@@ -145,12 +177,19 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
         </p>
       )}
       {!query.isLoading && !query.isError && (
-        <DataTable
-          pageSize={10}
-          data={branches}
-          columns={columns}
-          emptyMessage="Vendor ini belum punya cabang"
-        />
+        <>
+          <DataTable
+            data={branches}
+            columns={columns}
+            emptyMessage={q ? "Tidak ada cabang yang cocok" : "Vendor ini belum punya cabang"}
+          />
+          <ServerPager
+            page={page}
+            total={query.data?.total ?? 0}
+            unit="cabang"
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <VendorBranchFormDialog

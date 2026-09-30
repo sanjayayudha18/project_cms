@@ -54,7 +54,7 @@ export function omitDefaults(params: AdminVendorsUrlParams): AdminVendorsSearchP
   return out;
 }
 
-function useDebouncedValue<T>(value: T, delayMs: number): T {
+export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delayMs);

@@ -88,9 +88,14 @@ export function VendorBranchDetailPage({
         ))}
       </div>
 
-      {subTab === "vaults" && <VaultsPanel vendorId={vendorId} branchId={branchId} />}
-      {subTab === "pics" && <PicsPanel vendorId={vendorId} branchId={branchId} />}
-      {subTab === "packages" && <PackagesPanel vendorId={vendorId} branchId={branchId} />}
+      {/* key={branchId}: a new branch starts each panel back on page 1. */}
+      {subTab === "vaults" && (
+        <VaultsPanel key={branchId} vendorId={vendorId} branchId={branchId} />
+      )}
+      {subTab === "pics" && <PicsPanel key={branchId} vendorId={vendorId} branchId={branchId} />}
+      {subTab === "packages" && (
+        <PackagesPanel key={branchId} vendorId={vendorId} branchId={branchId} />
+      )}
       {subTab === "atms" && <ATMsPanel vendorId={vendorId} branchId={branchId} />}
     </div>
   );

@@ -26,9 +26,12 @@ var validVendorRequestStatuses = []string{
 // --- Reads (no transaction needed) --------------------------------------
 
 // BrowseForecast lists dmaa_atm_forecast rows for one forecast_date (Req 3).
-// CIT-2 (Req 1): FLMVendor/FLMVendorRegion are required (server-side backstop
-// for the frontend's block-fetch behavior, Req 1.4); Brand stays optional.
-// All three are length-bound to <=255 chars (Req 1.14).
+// Brand/FLMVendor/FLMVendorRegion are optional filters, each length-bound to
+// <=255 chars (CIT-2 Req 1.14). forecast-browser-summary (FR2) dropped the
+// CIT-2 Req 1.4 "vendor + region required" rule so the page can show every
+// ATM; the one-vendor-per-request rule is still enforced at Create
+// (GetActiveVendorForTerminal). Unassigned is mutually exclusive with a
+// vendor/region filter (it selects rows whose vendor is NULL).
 func (s *VendorRequestService) BrowseForecast(ctx context.Context, params BrowseForecastParams) (*BrowseForecastResult, error) {
 	if params.ForecastDate == "" {
 		return nil, &ValidationError{Field: "forecast_date", Message: "wajib diisi"}
@@ -42,11 +45,8 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 	if params.PageSize < 1 || params.PageSize > 100 {
 		return nil, &ValidationError{Field: "page_size", Message: "harus antara 1 dan 100"}
 	}
-	if params.FLMVendor == "" {
-		return nil, &ValidationError{Field: "flm_vendor", Message: "wajib dipilih"}
-	}
-	if params.FLMVendorRegion == "" {
-		return nil, &ValidationError{Field: "flm_vendor_region", Message: "wajib dipilih"}
+	if params.Unassigned && (params.FLMVendor != "" || params.FLMVendorRegion != "") {
+		return nil, &ValidationError{Field: "unassigned", Message: "tidak bisa digabung dengan filter vendor/region"}
 	}
 	if len(params.Brand) > 255 {
 		return nil, &ValidationError{Field: "brand", Message: "maksimal 255 karakter"}
@@ -69,6 +69,7 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		Brand:           params.Brand,
 		FlmVendor:       params.FLMVendor,
 		FlmVendorRegion: params.FLMVendorRegion,
+		Unassigned:      params.Unassigned,
 		Page:            int32(params.Page),
 		PageSize:        int32(params.PageSize),
 	})
@@ -81,6 +82,7 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		Brand:           params.Brand,
 		FlmVendor:       params.FLMVendor,
 		FlmVendorRegion: params.FLMVendorRegion,
+		Unassigned:      params.Unassigned,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("counting forecast for %s: %w", params.ForecastDate, err)
@@ -109,6 +111,7 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 			PriorityClass:   notesOrEmpty(r.PriorityClass),
 			Paket:           notesOrEmpty(r.Paket),
 			Escrow:          escrow,
+			IsRequested:     r.IsRequested,
 		}
 	}
 
@@ -119,6 +122,54 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		PageSize:   params.PageSize,
 		TotalPages: totalPages(total, params.PageSize),
 	}, nil
+}
+
+// ForecastSummary recaps one forecast_date per (FLM vendor, region)
+// (forecast-browser-summary FR1): ATM counts requested vs not, and amounts.
+// Totals are summed here from the groups rather than by a second query, so
+// they can never disagree with the rows shown. Reads the primary pool (plan
+// D1): the page is reopened right after a Create, so replica lag would hide
+// the drop in "belum".
+func (s *VendorRequestService) ForecastSummary(ctx context.Context, forecastDate string) (*ForecastSummaryResult, error) {
+	if forecastDate == "" {
+		return nil, &ValidationError{Field: "forecast_date", Message: "wajib diisi"}
+	}
+	if err := validateDateBound("forecast_date", forecastDate); err != nil {
+		return nil, err
+	}
+	date, err := time.Parse("2006-01-02", forecastDate)
+	if err != nil {
+		return nil, &ValidationError{Field: "forecast_date", Message: "harus berformat YYYY-MM-DD"}
+	}
+
+	rows, err := s.read.SummarizeForecastForDate(ctx, toPgDate(date))
+	if err != nil {
+		return nil, fmt.Errorf("summarizing forecast for %s: %w", forecastDate, err)
+	}
+
+	result := &ForecastSummaryResult{ForecastDate: date, Groups: make([]ForecastSummaryGroup, len(rows))}
+	for i, r := range rows {
+		g := ForecastSummaryGroup{
+			FLMVendor:                  r.FlmVendor,
+			FLMVendorRegion:            r.FlmVendorRegion,
+			ATMCount:                   r.AtmCount,
+			RequestedATMCount:          r.RequestedAtmCount,
+			UnrequestedATMCount:        r.AtmCount - r.RequestedAtmCount,
+			AmountReplenish:            r.AmountReplenish,
+			UnrequestedAmountReplenish: r.UnrequestedAmountReplenish,
+		}
+		result.Groups[i] = g
+		t := &result.Totals
+		t.ATMCount += g.ATMCount
+		t.RequestedATMCount += g.RequestedATMCount
+		t.UnrequestedATMCount += g.UnrequestedATMCount
+		t.AmountReplenish += g.AmountReplenish
+		t.UnrequestedAmountReplenish += g.UnrequestedAmountReplenish
+		if g.FLMVendor == "" {
+			t.UnassignedATMCount += g.ATMCount
+		}
+	}
+	return result, nil
 }
 
 // ListVendorOptions returns the active-vendor and distinct-region option

@@ -14,6 +14,7 @@ import {
   createVendorRequest,
   fetchAllForecastForSelection,
   fetchForecast,
+  fetchForecastSummary,
   fetchVendorOptions,
   fetchVendorRequest,
   fetchVendorRequestAuditLog,
@@ -29,6 +30,7 @@ import type {
   CreateVendorRequestPayload,
   FetchAllForecastResult,
   ForecastResponse,
+  ForecastSummaryResponse,
   ListVendorRequestParams,
   VendorOptionsResponse,
   VendorRequestDetail,
@@ -72,6 +74,22 @@ export function useForecastBrowse(params: BrowseForecastParams, enabled = true) 
 }
 
 /**
+ * Vendor × region recap (forecast-browser-summary FR1). Keyed under the
+ * ["vendor-requests"] prefix so creating a Vendor Request (which invalidates
+ * that prefix) refetches it and the "belum" counts drop. No keepPreviousData
+ * (unlike the browse hooks): after a date change the recap must not show the
+ * previous date's counts as if they were the new date's — skeleton instead.
+ */
+export function useForecastSummary(forecastDate: string) {
+  return useQuery<ForecastSummaryResponse, ApiError>({
+    queryKey: ["vendor-requests", "forecast-summary", forecastDate],
+    queryFn: () => fetchForecastSummary(forecastDate),
+    enabled: forecastDate !== "",
+    staleTime: VENDOR_REQUEST_STALE_TIME,
+  });
+}
+
+/**
  * Cross-page select-all fetch (Req 2.2, 2.8). Disabled by default — call
  * `.refetch()` imperatively on button click, not on every render, since it
  * can issue multiple requests (fetchAllForecastForSelection pages through
@@ -81,7 +99,7 @@ export function useForecastBrowse(params: BrowseForecastParams, enabled = true) 
 export function useForecastSelectAll(
   params: Pick<
     BrowseForecastParams,
-    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion"
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned"
   >,
   cap: number,
 ) {

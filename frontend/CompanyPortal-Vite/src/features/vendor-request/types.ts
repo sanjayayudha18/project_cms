@@ -63,6 +63,11 @@ export interface ForecastRow {
    * itm_replenish row (Req 5.11 — render "-", not "0").
    */
   escrow: string | null;
+  /**
+   * forecast-browser-summary (FR3): this (terminal, periode, denom) is already
+   * an item of a Vendor Request that is not cancelled/rejected.
+   */
+  is_requested: boolean;
 }
 
 export interface ForecastResponse {
@@ -76,6 +81,30 @@ export interface FetchAllForecastResult {
   totalCount: number;
   /** True when totalCount exceeds the Vendor Request item cap; rows is empty in that case. */
   exceededCap: boolean;
+}
+
+// -- Forecast summary (GET /forecast/summary) -----------------------------
+// forecast-browser-summary (FR1): per FLM vendor × region recap. An ATM counts
+// as requested only when all its denoms are. Amounts are full IDR integers.
+
+export interface ForecastSummaryCounts {
+  atm_count: number;
+  requested_atm_count: number;
+  unrequested_atm_count: number;
+  amount_replenish: number;
+  unrequested_amount_replenish: number;
+}
+
+/** flm_vendor === "" (and flm_vendor_region === "") = ATMs with no active vendor package. */
+export interface ForecastSummaryGroup extends ForecastSummaryCounts {
+  flm_vendor: string;
+  flm_vendor_region: string;
+}
+
+export interface ForecastSummaryResponse {
+  forecast_date: string;
+  totals: ForecastSummaryCounts & { unassigned_atm_count: number };
+  groups: ForecastSummaryGroup[];
 }
 
 // -- Vendor options (GET /vendors) ------------------------------------------
@@ -249,10 +278,12 @@ export interface BrowseForecastParams {
   atmId?: string;
   /** Optional (CIT-2 Req 1.9): "" / omitted = no filter (the "Semua" option). */
   brand?: string;
-  /** Required, no ALL option (CIT-2 Req 1.2, 1.4) — the page blocks the fetch until this is set. */
-  flmVendor: string;
-  /** Required, no ALL option (CIT-2 Req 1.3, 1.4) — the page blocks the fetch until this is set. */
-  flmVendorRegion: string;
+  /** Optional: "" / omitted = Semua (forecast-browser-summary FR2 relaxed CIT-2 Req 1.4). */
+  flmVendor?: string;
+  /** Optional: "" / omitted = Semua. */
+  flmVendorRegion?: string;
+  /** Only rows with no active vendor package; never combined with flmVendor/flmVendorRegion. */
+  unassigned?: boolean;
   page?: number;
   pageSize?: number;
 }

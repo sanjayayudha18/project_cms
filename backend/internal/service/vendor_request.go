@@ -208,15 +208,17 @@ type ListVendorRequestResult struct {
 }
 
 // BrowseForecastParams holds validated forecast-browse filters (Req 3.1-3.3,
-// CIT-2 Req 1). Brand is optional (""= no filter, Req 1.9); FLMVendor and
-// FLMVendorRegion are required with no empty-sentinel (Req 1.2-1.5) --
-// BrowseForecast rejects a browse missing either before calling the repo.
+// CIT-2 Req 1). Brand, FLMVendor and FLMVendorRegion are all optional (""=
+// no filter); forecast-browser-summary relaxed CIT-2 Req 1.4, which made the
+// vendor/region pair required. Unassigned keeps only rows with no active
+// vendor package and cannot be combined with a vendor/region filter.
 type BrowseForecastParams struct {
 	ForecastDate    string // YYYY-MM-DD, required
 	TerminalID      string
 	Brand           string
 	FLMVendor       string
 	FLMVendorRegion string
+	Unassigned      bool
 	Page            int
 	PageSize        int
 }
@@ -241,6 +243,9 @@ type ForecastRow struct {
 	PriorityClass   string
 	Paket           string
 	Escrow          *string
+	// IsRequested: this (terminal, periode, denom) is already an item of a
+	// vendor request that is not cancelled/rejected (forecast-browser-summary FR3).
+	IsRequested bool
 }
 
 // BrowseForecastResult is the paginated forecast-browse response.
@@ -250,6 +255,38 @@ type BrowseForecastResult struct {
 	Page       int
 	PageSize   int
 	TotalPages int
+}
+
+// ForecastSummaryGroup is one (FLM vendor, region) recap row of GET
+// /forecast/summary (forecast-browser-summary FR1). The no-active-vendor group
+// has FLMVendor == "" and FLMVendorRegion == "". An ATM counts as requested
+// only when every one of its denoms is. Amounts are full IDR.
+type ForecastSummaryGroup struct {
+	FLMVendor                  string
+	FLMVendorRegion            string
+	ATMCount                   int64
+	RequestedATMCount          int64
+	UnrequestedATMCount        int64
+	AmountReplenish            int64
+	UnrequestedAmountReplenish int64
+}
+
+// ForecastSummaryTotals is the sum of every ForecastSummaryGroup, plus the
+// ATM count of the no-active-vendor group.
+type ForecastSummaryTotals struct {
+	ATMCount                   int64
+	RequestedATMCount          int64
+	UnrequestedATMCount        int64
+	UnassignedATMCount         int64
+	AmountReplenish            int64
+	UnrequestedAmountReplenish int64
+}
+
+// ForecastSummaryResult backs GET /vendor-requests/forecast/summary.
+type ForecastSummaryResult struct {
+	ForecastDate time.Time
+	Totals       ForecastSummaryTotals
+	Groups       []ForecastSummaryGroup
 }
 
 // VendorOption is one selectable CIT vendor (CIT-2 Req 1.2, 3 Q2): the id is
@@ -300,6 +337,7 @@ type VendorRequestRepository interface {
 	CountVendorRequests(ctx context.Context, arg db.CountVendorRequestsParams) (int64, error)
 	ListForecastForDate(ctx context.Context, arg db.ListForecastForDateParams) ([]db.ListForecastForDateRow, error)
 	CountForecastForDate(ctx context.Context, arg db.CountForecastForDateParams) (int64, error)
+	SummarizeForecastForDate(ctx context.Context, forecastDate pgtype.Date) ([]db.SummarizeForecastForDateRow, error)
 	ForecastRowExists(ctx context.Context, arg db.ForecastRowExistsParams) (db.ForecastRowExistsRow, error)
 	UpdateVendorRequestStatus(ctx context.Context, arg db.UpdateVendorRequestStatusParams) (db.VendorRequest, error)
 	ListAuditLogsByEntity(ctx context.Context, arg db.ListAuditLogsByEntityParams) ([]db.AuditLog, error)
@@ -329,6 +367,7 @@ type VendorRequestPool interface {
 // VendorRequestServicer is the interface the HTTP handler (task 4) depends on.
 type VendorRequestServicer interface {
 	BrowseForecast(ctx context.Context, params BrowseForecastParams) (*BrowseForecastResult, error)
+	ForecastSummary(ctx context.Context, forecastDate string) (*ForecastSummaryResult, error)
 	ListVendorOptions(ctx context.Context) (*VendorOptionsResult, error)
 	Create(ctx context.Context, actor Actor, in CreateVendorRequestInput) (*VendorRequestDetail, error)
 	UpdateItems(ctx context.Context, actor Actor, id int64, items []ItemInput) (*VendorRequestDetail, error)

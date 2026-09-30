@@ -50,6 +50,7 @@ func NewVendorRequestHandler(svc service.VendorRequestServicer) *VendorRequestHa
 func (h *VendorRequestHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/forecast", h.BrowseForecast)
+	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/forecast/summary", h.ForecastSummary)
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/vendors", h.ListVendorOptions)
 	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/", h.Create)
 	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Put("/{id}/items", h.UpdateItems)
@@ -80,12 +81,23 @@ func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	var unassigned bool
+	switch q.Get("unassigned") {
+	case "", "false":
+	case "true":
+		unassigned = true
+	default:
+		writeError(w, http.StatusBadRequest, "bad_request", "unassigned harus true atau false")
+		return
+	}
+
 	result, err := h.service.BrowseForecast(r.Context(), service.BrowseForecastParams{
 		ForecastDate:    q.Get("forecast_date"),
 		TerminalID:      q.Get("atm_id"),
 		Brand:           q.Get("brand"),
 		FLMVendor:       q.Get("flm_vendor"),
 		FLMVendorRegion: q.Get("flm_vendor_region"),
+		Unassigned:      unassigned,
 		Page:            page,
 		PageSize:        pageSize,
 	})
@@ -94,6 +106,17 @@ func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, toForecastResponse(result))
+}
+
+// ForecastSummary handles GET /forecast/summary (forecast-browser-summary
+// FR1): per vendor × region recap of one forecast_date.
+func (h *VendorRequestHandler) ForecastSummary(w http.ResponseWriter, r *http.Request) {
+	result, err := h.service.ForecastSummary(r.Context(), r.URL.Query().Get("forecast_date"))
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toForecastSummaryResponse(result))
 }
 
 // ListVendorOptions handles GET /vendors (CIT-2 Req 1.2, 1.3, 3 Q2): the

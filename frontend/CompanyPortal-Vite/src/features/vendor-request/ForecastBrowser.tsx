@@ -3,50 +3,76 @@
  * dmaa_atm_forecast rows, select some, and jump into vendor-request
  * creation with the selection carried via selectionStore (route state has
  * no generic-object option in TanStack Router v1).
+ *
+ * forecast-browser-summary (.claude/sdlc/forecast-browser-summary): the page
+ * opens on a vendor × region recap plus the unfiltered detail table — FLM
+ * Vendor/Region are optional ("Semua"), so no ATM hides behind an unpicked
+ * filter. A recap row sets the detail filters. Create still needs every
+ * selected row to share one vendor (CIT-2 Req 4).
  */
 
 import { Button } from "@/components/ui/Button";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import type { OnChangeFn, RowSelectionState, SortingState } from "@tanstack/react-table";
-import { useEffect, useState } from "react";
-import { ForecastTable, forecastRowId } from "./ForecastTable";
+import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ForecastSummary, summaryGroupKey } from "./ForecastSummary";
+import { ForecastTable, forecastRowId, isForecastRowSelectable } from "./ForecastTable";
 import {
   getVendorRequestErrorMessage,
   useForecastBrowse,
   useForecastSelectAll,
+  useForecastSummary,
   useVendorOptions,
 } from "./hooks";
 import { nextBusinessDayISO } from "./lib/nextBusinessDay";
 import { usePendingVendorRequestSelection } from "./selectionStore";
-import type { ForecastRow } from "./types";
+import type { ForecastRow, ForecastSummaryGroup } from "./types";
 
 const DEFAULT_PAGE_SIZE = 25;
 const ATM_FILTER_DEBOUNCE_MS = 300;
 // Same static ATM brand list as atm-portal/components/FilterBar.tsx — no
 // dedicated "distinct brands" endpoint exists, and 3 known values don't
 // warrant one.
-const BRAND_OPTIONS = ["Hyosung", "Wincor", "Diebold"];
+const BRAND_OPTIONS = ["Hyosung", "Wincor", "Diebold"].map((b) => ({ value: b, label: b }));
 // Vendor Request payloads are capped at 1000 items server-side
 // (request-replenish-to-vendor spec) — select-all must respect the same cap.
 const SELECT_ALL_ITEM_CAP = 1000;
+const INPUT_CLASS =
+  "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
+const LABEL_CLASS = "text-xs font-medium uppercase tracking-wider text-[var(--n-600)]";
+
+/** "" = Semua for the three selects; unassigned excludes vendor/region. */
+interface DetailFilters {
+  brand: string;
+  flmVendor: string;
+  flmVendorRegion: string;
+  unassigned: boolean;
+}
+
+const EMPTY_FILTERS: DetailFilters = {
+  brand: "",
+  flmVendor: "",
+  flmVendorRegion: "",
+  unassigned: false,
+};
+
+const toOption = (value: string) => ({ value, label: value });
 
 export function ForecastBrowser() {
   const navigate = useNavigate();
   const setPending = usePendingVendorRequestSelection((s) => s.setPending);
   const { toast } = useToast();
+  const detailRef = useRef<HTMLDivElement>(null);
 
   const [forecastDate, setForecastDate] = useState(() => nextBusinessDayISO());
   const [atmIdInput, setAtmIdInput] = useState("");
   const [debouncedAtmId, setDebouncedAtmId] = useState("");
-  // CIT-2 (Req 1): Brand stays optional (empty = no filter, "Semua"); FLM
-  // Vendor and FLM Vendor Region are required with no ALL option and block
-  // the forecast fetch until both are chosen.
-  const [brand, setBrand] = useState("");
-  const [flmVendor, setFlmVendor] = useState("");
-  const [flmVendorRegion, setFlmVendorRegion] = useState("");
+  const [filters, setFilters] = useState<DetailFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sorting, setSorting] = useState<SortingState>([{ id: "terminal_id", desc: false }]);
@@ -62,18 +88,15 @@ export function ForecastBrowser() {
   const vendorOptions = vendorOptionsQuery.data?.vendors ?? [];
   const regionOptions = vendorOptionsQuery.data?.regions ?? [];
 
-  // Req 1.4, 1.5: no forecast fetch until both required filters are set.
-  const filtersReady = flmVendor !== "" && flmVendorRegion !== "";
+  const summaryQuery = useForecastSummary(forecastDate);
 
-  const { data, isLoading, isError, refetch } = useForecastBrowse(
-    { forecastDate, atmId: debouncedAtmId, brand, flmVendor, flmVendorRegion, page, pageSize },
-    filtersReady,
-  );
-
-  const selectAllQuery = useForecastSelectAll(
-    { forecastDate, atmId: debouncedAtmId, brand, flmVendor, flmVendorRegion },
-    SELECT_ALL_ITEM_CAP,
-  );
+  const filterParams = { forecastDate, atmId: debouncedAtmId, ...filters };
+  const { data, isLoading, isError, refetch } = useForecastBrowse({
+    ...filterParams,
+    page,
+    pageSize,
+  });
+  const selectAllQuery = useForecastSelectAll(filterParams, SELECT_ALL_ITEM_CAP);
 
   // Sorting applies to the currently fetched page only — the backend
   // guarantees atm_id ascending as the base order (Req 3.2); ForecastTable's
@@ -81,11 +104,23 @@ export function ForecastBrowser() {
   // sortable columns (denom, amount_replenish).
   const rows = data?.data ?? [];
 
-  const rowSelectionEntries = Object.keys(selectedRowsMap).length;
-  const selectedTotal = Object.values(selectedRowsMap).reduce(
-    (sum, row) => sum + row.amount_replenish,
-    0,
-  );
+  const selectedRows = Object.values(selectedRowsMap);
+  const selectedTotal = selectedRows.reduce((sum, row) => sum + row.amount_replenish, 0);
+  // Every Vendor Request is for exactly one vendor (CIT-2 Req 4): with the
+  // vendor filter now optional, the vendor comes from the selected rows.
+  const selectedVendors = [...new Set(selectedRows.map((row) => row.flm_vendor))];
+  const isMixedVendor = selectedVendors.length > 1;
+
+  // Which recap row the detail table currently mirrors (highlighted there).
+  let activeGroupKey: string | null = null;
+  if (filters.unassigned) {
+    activeGroupKey = "";
+  } else if (filters.flmVendor && filters.flmVendorRegion) {
+    activeGroupKey = summaryGroupKey({
+      flm_vendor: filters.flmVendor,
+      flm_vendor_region: filters.flmVendorRegion,
+    });
+  }
 
   const handleRowSelectionChange: OnChangeFn<RowSelectionState> = (updater) => {
     setRowSelectionState((old) => {
@@ -106,43 +141,39 @@ export function ForecastBrowser() {
     });
   };
 
-  function handleDateChange(nextDate: string): void {
-    setForecastDate(nextDate);
+  // Req 2.6: any date/filter change may leave selected rows outside the new
+  // result — clearing is simpler than reconciling and never misrepresents it.
+  function resetPageAndSelection(): void {
     setPage(1);
     setRowSelectionState({});
     setSelectedRowsMap({});
+  }
+
+  function handleDateChange(nextDate: string): void {
+    setForecastDate(nextDate);
+    resetPageAndSelection();
   }
 
   function handleAtmIdChange(value: string): void {
     setAtmIdInput(value);
-    setPage(1);
-    // Req 2.6: the selection may include rows outside the new filter —
-    // clearing is simpler than reconciling and never misrepresents it.
-    setRowSelectionState({});
-    setSelectedRowsMap({});
+    resetPageAndSelection();
   }
 
   // Discrete selects refetch immediately on change (Req 1.11) — no debounce
-  // needed, unlike the free-text ATM ID filter above.
-  function handleBrandChange(value: string): void {
-    setBrand(value);
-    setPage(1);
-    setRowSelectionState({});
-    setSelectedRowsMap({});
+  // needed, unlike the free-text ATM ID filter above. Any vendor/region pick
+  // leaves the no-vendor view, since the two are mutually exclusive.
+  function handleFilterChange(patch: Partial<DetailFilters>): void {
+    setFilters((prev) => ({ ...prev, unassigned: false, ...patch }));
+    resetPageAndSelection();
   }
 
-  function handleFlmVendorChange(value: string): void {
-    setFlmVendor(value);
-    setPage(1);
-    setRowSelectionState({});
-    setSelectedRowsMap({});
-  }
-
-  function handleFlmVendorRegionChange(value: string): void {
-    setFlmVendorRegion(value);
-    setPage(1);
-    setRowSelectionState({});
-    setSelectedRowsMap({});
+  function handleSelectGroup(group: ForecastSummaryGroup): void {
+    handleFilterChange(
+      group.flm_vendor === ""
+        ? { flmVendor: "", flmVendorRegion: "", unassigned: true }
+        : { flmVendor: group.flm_vendor, flmVendorRegion: group.flm_vendor_region },
+    );
+    detailRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }
 
   function handlePageSizeChange(nextPageSize: number): void {
@@ -151,10 +182,11 @@ export function ForecastBrowser() {
   }
 
   function handleCreateClick(): void {
-    // filtersReady gates the Create button being enabled at all, so
-    // flmVendor is always a real, already-resolved option here (Req 4, Q2).
-    const vendorId = vendorOptions.find((v) => v.name === flmVendor)?.id ?? 0;
-    setPending({ forecastDate, items: Object.values(selectedRowsMap), vendorId });
+    // Enabled only for a single-vendor selection, and rows without a vendor
+    // can't be selected, so selectedVendors[0] is a real vendor name (Req 4,
+    // Q2). Create re-checks every terminal's active vendor server-side.
+    const vendorId = vendorOptions.find((v) => v.name === selectedVendors[0])?.id ?? 0;
+    setPending({ forecastDate, items: selectedRows, vendorId });
     navigate({ to: "/replenishment/vendor-requests/new" });
   }
 
@@ -176,17 +208,19 @@ export function ForecastBrowser() {
     }
 
     // Merge onto the existing map/selection (Req 2.8: preserve any manual
-    // ticks already made) rather than replacing it.
+    // ticks already made) rather than replacing it. Already-requested rows
+    // are skipped (forecast-browser-summary FR4.5) — they'd be requested twice.
+    const selectable = payload.rows.filter(isForecastRowSelectable);
     setSelectedRowsMap((prev) => {
       const next = { ...prev };
-      for (const row of payload.rows) {
+      for (const row of selectable) {
         next[forecastRowId(row)] = row;
       }
       return next;
     });
     setRowSelectionState((prev) => {
       const next = { ...prev };
-      for (const row of payload.rows) {
+      for (const row of selectable) {
         next[forecastRowId(row)] = true;
       }
       return next;
@@ -198,6 +232,12 @@ export function ForecastBrowser() {
     setSelectedRowsMap({});
   }
 
+  const isSelectAllDisabled =
+    filters.flmVendor === "" ||
+    !data ||
+    data.pagination.total_count === 0 ||
+    selectAllQuery.isFetching;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -206,146 +246,96 @@ export function ForecastBrowser() {
         description="Pilih data forecast DMAA untuk disusun menjadi Vendor Request ke vendor CIT"
       />
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forecast-date"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            Tanggal Forecast
-          </label>
-          <input
-            id="forecast-date"
-            type="date"
-            value={forecastDate}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forecast-atm-filter"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            Cari ATM ID
-          </label>
-          <input
-            id="forecast-atm-filter"
-            type="text"
-            value={atmIdInput}
-            onChange={(e) => handleAtmIdChange(e.target.value)}
-            placeholder="Cari ATM ID..."
-            className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forecast-flm-vendor"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            FLM Vendor <span className="text-[var(--red-600)]">*</span>
-          </label>
-          <select
-            id="forecast-flm-vendor"
-            value={flmVendor}
-            onChange={(e) => handleFlmVendorChange(e.target.value)}
-            className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          >
-            <option value="" disabled>
-              Pilih FLM Vendor
-            </option>
-            {vendorOptions.map((v) => (
-              <option key={v.id} value={v.name}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forecast-flm-vendor-region"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            FLM Vendor Region <span className="text-[var(--red-600)]">*</span>
-          </label>
-          <select
-            id="forecast-flm-vendor-region"
-            value={flmVendorRegion}
-            onChange={(e) => handleFlmVendorRegionChange(e.target.value)}
-            className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          >
-            <option value="" disabled>
-              Pilih FLM Vendor Region
-            </option>
-            {regionOptions.map((region) => (
-              <option key={region} value={region}>
-                {region}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="forecast-brand"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            Brand
-          </label>
-          <select
-            id="forecast-brand"
-            value={brand}
-            onChange={(e) => handleBrandChange(e.target.value)}
-            className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          >
-            <option value="">Semua</option>
-            {BRAND_OPTIONS.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="forecast-date" className={LABEL_CLASS}>
+          Tanggal Forecast
+        </label>
+        <input
+          id="forecast-date"
+          type="date"
+          value={forecastDate}
+          onChange={(e) => handleDateChange(e.target.value)}
+          className={`${INPUT_CLASS} w-fit`}
+        />
       </div>
 
-      {!filtersReady ? (
-        <div className="flex flex-col items-start gap-2 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] px-4 py-6 text-sm text-[var(--n-700)]">
-          <p>Pilih FLM Vendor dan FLM Vendor Region untuk menampilkan rekomendasi.</p>
-          <p>
-            Ingin melihat seluruh data DMAA tanpa filter vendor?{" "}
-            <Link
-              to="/forecasting/dmaa-forecast"
-              className="font-medium text-[var(--red-600)] hover:underline"
-            >
-              Buka DMAA Forecast →
-            </Link>
-          </p>
-        </div>
-      ) : (
-        <>
-          <ForecastTable
-            data={rows}
-            isLoading={isLoading}
-            isError={isError}
-            onRetry={() => refetch()}
-            sorting={sorting}
-            onSortingChange={setSorting}
-            rowSelection={rowSelection}
-            onRowSelectionChange={handleRowSelectionChange}
-            pagination={data?.pagination}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={handlePageSizeChange}
-          />
+      <ForecastSummary
+        data={summaryQuery.data}
+        isLoading={summaryQuery.isLoading}
+        isError={summaryQuery.isError}
+        onRetry={() => summaryQuery.refetch()}
+        activeKey={activeGroupKey}
+        onSelectGroup={handleSelectGroup}
+      />
 
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] px-4 py-3">
-            <div className="flex items-center gap-6 text-sm text-[var(--n-700)]">
+      <div ref={detailRef} className="flex scroll-mt-4 flex-col gap-4">
+        <h2 className="text-base font-semibold text-[var(--n-900)]">Detail Rekomendasi ATM</h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="forecast-atm-filter" className={LABEL_CLASS}>
+              Cari ATM ID
+            </label>
+            <input
+              id="forecast-atm-filter"
+              type="text"
+              value={atmIdInput}
+              onChange={(e) => handleAtmIdChange(e.target.value)}
+              placeholder="Cari ATM ID..."
+              className={INPUT_CLASS}
+            />
+          </div>
+          <FilterSelect
+            label="FLM Vendor"
+            value={filters.flmVendor}
+            options={vendorOptions.map((v) => toOption(v.name))}
+            onChange={(v) => handleFilterChange({ flmVendor: v ?? "" })}
+          />
+          <FilterSelect
+            label="FLM Vendor Region"
+            value={filters.flmVendorRegion}
+            options={regionOptions.map(toOption)}
+            onChange={(v) => handleFilterChange({ flmVendorRegion: v ?? "" })}
+          />
+          <FilterSelect
+            label="Brand"
+            value={filters.brand}
+            options={BRAND_OPTIONS}
+            onChange={(v) => handleFilterChange({ brand: v ?? "" })}
+          />
+          {filters.unassigned && (
+            <button
+              type="button"
+              onClick={() => handleFilterChange({ unassigned: false })}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[var(--n-300)] bg-[var(--n-50)] px-4 text-sm text-[var(--n-800)] outline-none hover:bg-[var(--n-100)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+            >
+              Hanya ATM tanpa vendor aktif
+              <X className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">(hapus filter)</span>
+            </button>
+          )}
+        </div>
+
+        <ForecastTable
+          data={rows}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          rowSelection={rowSelection}
+          onRowSelectionChange={handleRowSelectionChange}
+          pagination={data?.pagination}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={handlePageSizeChange}
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] px-4 py-3">
+          <div className="flex flex-col gap-1 text-sm text-[var(--n-700)]">
+            <div className="flex items-center gap-6">
               <span>
-                <span className="font-semibold text-[var(--n-900)]">{rowSelectionEntries}</span>{" "}
+                <span className="font-semibold text-[var(--n-900)]">{selectedRows.length}</span>{" "}
                 item terpilih
               </span>
               <span>
@@ -355,28 +345,38 @@ export function ForecastBrowser() {
                 </span>
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                onClick={handleSelectAll}
-                disabled={!data || data.pagination.total_count === 0 || selectAllQuery.isFetching}
-              >
-                {selectAllQuery.isFetching ? "Memilih…" : "Pilih Semua Rekomendasi"}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={handleClearSelection}
-                disabled={rowSelectionEntries === 0}
-              >
-                Bersihkan Pilihan
-              </Button>
-              <Button onClick={handleCreateClick} disabled={rowSelectionEntries === 0}>
-                Buat Vendor Request
-              </Button>
-            </div>
+            {isMixedVendor && (
+              <output className="block font-medium text-[var(--warning-fg)]">
+                Pilihan berisi {selectedVendors.length} vendor. Satu Vendor Request hanya untuk satu
+                vendor.
+              </output>
+            )}
+            {filters.flmVendor === "" && (
+              <p className="text-xs text-[var(--n-600)]">
+                Pilih FLM Vendor untuk memakai "Pilih Semua Rekomendasi".
+              </p>
+            )}
           </div>
-        </>
-      )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={handleSelectAll} disabled={isSelectAllDisabled}>
+              {selectAllQuery.isFetching ? "Memilih…" : "Pilih Semua Rekomendasi"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleClearSelection}
+              disabled={selectedRows.length === 0}
+            >
+              Bersihkan Pilihan
+            </Button>
+            <Button
+              onClick={handleCreateClick}
+              disabled={selectedRows.length === 0 || isMixedVendor}
+            >
+              Buat Vendor Request
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

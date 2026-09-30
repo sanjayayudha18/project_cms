@@ -12,6 +12,7 @@ import type {
   FetchAllForecastResult,
   ForecastResponse,
   ForecastRow,
+  ForecastSummaryResponse,
   ListVendorRequestParams,
   VendorOptionsResponse,
   VendorRequestDetail,
@@ -33,8 +34,9 @@ function buildForecastQuery(params: BrowseForecastParams): string {
   // Brand is optional (CIT-2 Req 1.9): omit entirely rather than sending "",
   // matching the backend's empty-sentinel = no-filter convention.
   if (params.brand) search.set("brand", params.brand);
-  search.set("flm_vendor", params.flmVendor);
-  search.set("flm_vendor_region", params.flmVendorRegion);
+  if (params.flmVendor) search.set("flm_vendor", params.flmVendor);
+  if (params.flmVendorRegion) search.set("flm_vendor_region", params.flmVendorRegion);
+  if (params.unassigned) search.set("unassigned", "true");
   search.set("page", String(params.page ?? 1));
   search.set("page_size", String(params.pageSize ?? 20));
   return search.toString();
@@ -54,6 +56,13 @@ export async function fetchForecast(params: BrowseForecastParams): Promise<Forec
   return data;
 }
 
+/** Per vendor × region recap of one forecast date (forecast-browser-summary FR1). */
+export async function fetchForecastSummary(forecastDate: string): Promise<ForecastSummaryResponse> {
+  const search = new URLSearchParams({ forecast_date: forecastDate });
+  const { data } = await api.get<ForecastSummaryResponse>(`${BASE}/forecast/summary?${search}`);
+  return data;
+}
+
 /**
  * Fetches every forecast row matching the date + ATM filter, across all
  * pages, for the cross-page "Pilih Semua Rekomendasi" select-all (Req 2.2).
@@ -66,7 +75,7 @@ export async function fetchForecast(params: BrowseForecastParams): Promise<Forec
 export async function fetchAllForecastForSelection(
   params: Pick<
     BrowseForecastParams,
-    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion"
+    "forecastDate" | "atmId" | "brand" | "flmVendor" | "flmVendorRegion" | "unassigned"
   >,
   cap: number,
 ): Promise<FetchAllForecastResult> {

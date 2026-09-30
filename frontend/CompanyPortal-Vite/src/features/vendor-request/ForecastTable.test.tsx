@@ -17,6 +17,7 @@ const rowWithContext: ForecastRow = {
   escrow: "1000000.00",
   flm_vendor: "TAG",
   flm_vendor_region: "TAG Jawa Barat",
+  is_requested: false,
 };
 
 const rowWithoutContext: ForecastRow = {
@@ -81,25 +82,25 @@ describe("ForecastTable — four new context columns (Task 4)", () => {
   });
 
   // Task 17: 9 -> 11 (drops Amount Refund, adds Priority Class/Paket/Escrow).
-  it("spans all 11 columns on the empty-result row", () => {
+  it("spans all 12 columns on the empty-result row", () => {
     renderTable({ data: [] });
 
     const emptyCell = screen.getByText("Tidak ada data forecast untuk tanggal yang dipilih");
-    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "11");
+    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "12");
   });
 
-  it("spans all 11 columns on the error row", () => {
+  it("spans all 12 columns on the error row", () => {
     renderTable({ data: [], isError: true });
 
     const errorCell = screen.getByText("Gagal memuat data forecast");
-    expect(errorCell.closest("td")).toHaveAttribute("colspan", "11");
+    expect(errorCell.closest("td")).toHaveAttribute("colspan", "12");
   });
 
-  it("spans all 11 columns on skeleton rows while loading", () => {
+  it("spans all 12 columns on skeleton rows while loading", () => {
     const { container } = renderTable({ data: [], isLoading: true });
 
     const skeletonRow = container.querySelector("tbody tr");
-    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(11);
+    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(12);
   });
 });
 
@@ -144,5 +145,28 @@ describe("ForecastTable — PriorityClass/Paket/Escrow, Amount Refund dropped (T
     for (const el of dashCells) {
       expect(el.textContent).not.toBe("—");
     }
+  });
+});
+
+describe("ForecastTable — request status (forecast-browser-summary FR4.4)", () => {
+  it("marks an already-requested row with a labelled badge and disables its checkbox", () => {
+    renderTable({ data: [{ ...rowWithContext, is_requested: true }] });
+
+    expect(screen.getByText("Sudah di-request")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pilih baris 1234")).toBeDisabled();
+  });
+
+  it("disables the checkbox of a row with no active vendor and labels it", () => {
+    renderTable({ data: [rowWithoutContext] });
+
+    expect(screen.getByText("Tanpa vendor")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pilih baris 5678")).toBeDisabled();
+  });
+
+  it("leaves a not-yet-requested row with a vendor selectable", () => {
+    renderTable({ data: [rowWithContext] });
+
+    expect(screen.getByText("Belum")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pilih baris 1234")).not.toBeDisabled();
   });
 });

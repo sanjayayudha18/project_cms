@@ -17,8 +17,9 @@ import (
 // test — BrowseForecast never calls the other methods, so they return zero
 // values and exist only to satisfy the interface.
 type fakeForecastRepo struct {
-	listRows []db.ListForecastForDateRow
-	total    int64
+	listRows    []db.ListForecastForDateRow
+	total       int64
+	summaryRows []db.SummarizeForecastForDateRow
 }
 
 func (f *fakeForecastRepo) CreateVendorRequest(context.Context, db.CreateVendorRequestParams) (db.VendorRequest, error) {
@@ -63,6 +64,9 @@ func (f *fakeForecastRepo) ListForecastForDate(context.Context, db.ListForecastF
 }
 func (f *fakeForecastRepo) CountForecastForDate(context.Context, db.CountForecastForDateParams) (int64, error) {
 	return f.total, nil
+}
+func (f *fakeForecastRepo) SummarizeForecastForDate(context.Context, pgtype.Date) ([]db.SummarizeForecastForDateRow, error) {
+	return f.summaryRows, nil
 }
 func (f *fakeForecastRepo) ForecastRowExists(context.Context, db.ForecastRowExistsParams) (db.ForecastRowExistsRow, error) {
 	return db.ForecastRowExistsRow{}, nil
@@ -167,10 +171,10 @@ func TestBrowseForecast_MapsNewContextFields(t *testing.T) {
 	}
 }
 
-// TestBrowseForecast_ValidatesCIT2Filters covers Task 4.1 (Req 1.4, 1.14):
-// FLMVendor/FLMVendorRegion are required with no empty-sentinel (server-side
-// backstop for the frontend's block-fetch behavior), and all three filters
-// are length-bound to <=255 chars.
+// TestBrowseForecast_ValidatesCIT2Filters covers Task 4.1 (Req 1.14): all
+// three filters are length-bound to <=255 chars. forecast-browser-summary FR2
+// relaxed Req 1.4: empty vendor/region is now valid ("Semua"), and
+// unassigned cannot be combined with a vendor/region filter.
 func TestBrowseForecast_ValidatesCIT2Filters(t *testing.T) {
 	base := BrowseForecastParams{
 		ForecastDate:    "2027-01-15",
@@ -186,14 +190,16 @@ func TestBrowseForecast_ValidatesCIT2Filters(t *testing.T) {
 		mutate    func(p BrowseForecastParams) BrowseForecastParams
 		wantField string
 	}{
-		{"missing flm_vendor rejected", func(p BrowseForecastParams) BrowseForecastParams {
-			p.FLMVendor = ""
-			return p
-		}, "flm_vendor"},
-		{"missing flm_vendor_region rejected", func(p BrowseForecastParams) BrowseForecastParams {
+		{"unassigned with flm_vendor rejected", func(p BrowseForecastParams) BrowseForecastParams {
+			p.Unassigned = true
 			p.FLMVendorRegion = ""
 			return p
-		}, "flm_vendor_region"},
+		}, "unassigned"},
+		{"unassigned with flm_vendor_region rejected", func(p BrowseForecastParams) BrowseForecastParams {
+			p.Unassigned = true
+			p.FLMVendor = ""
+			return p
+		}, "unassigned"},
 		{"brand over 255 chars rejected", func(p BrowseForecastParams) BrowseForecastParams {
 			p.Brand = longValue
 			return p
@@ -226,5 +232,87 @@ func TestBrowseForecast_ValidatesCIT2Filters(t *testing.T) {
 	// (Req 1.9: empty Brand = no filter).
 	if _, err := svc.BrowseForecast(context.Background(), base); err != nil {
 		t.Errorf("BrowseForecast() with valid required filters = %v, want nil", err)
+	}
+
+	// forecast-browser-summary FR2: no vendor/region ("Semua") and
+	// unassigned alone are both valid.
+	all := base
+	all.FLMVendor, all.FLMVendorRegion = "", ""
+	if _, err := svc.BrowseForecast(context.Background(), all); err != nil {
+		t.Errorf("BrowseForecast() without vendor/region = %v, want nil", err)
+	}
+	all.Unassigned = true
+	if _, err := svc.BrowseForecast(context.Background(), all); err != nil {
+		t.Errorf("BrowseForecast() unassigned only = %v, want nil", err)
+	}
+}
+
+func TestBrowseForecast_MapsIsRequested(t *testing.T) {
+	fake := &fakeForecastRepo{
+		listRows: []db.ListForecastForDateRow{{TerminalID: "1", IsRequested: true}, {TerminalID: "2"}},
+		total:    2,
+	}
+	svc := &VendorRequestService{read: fake}
+	result, err := svc.BrowseForecast(context.Background(), BrowseForecastParams{ForecastDate: "2027-01-15", Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("BrowseForecast: %v", err)
+	}
+	if !result.Data[0].IsRequested || result.Data[1].IsRequested {
+		t.Errorf("IsRequested = %v/%v, want true/false", result.Data[0].IsRequested, result.Data[1].IsRequested)
+	}
+}
+
+// TestForecastSummary_TotalsAreSumOfGroups covers forecast-browser-summary
+// FR1: unrequested = atm - requested per group, totals = Σ groups, and the
+// "" vendor group feeds unassigned_atm_count.
+func TestForecastSummary_TotalsAreSumOfGroups(t *testing.T) {
+	fake := &fakeForecastRepo{summaryRows: []db.SummarizeForecastForDateRow{
+		{FlmVendor: "PT ABC", FlmVendorRegion: "Jabodetabek", AtmCount: 84, RequestedAtmCount: 40,
+			AmountReplenish: 12_400_000_000, UnrequestedAmountReplenish: 6_100_000_000},
+		{FlmVendor: "PT XYZ", FlmVendorRegion: "Jawa Barat", AtmCount: 51, RequestedAtmCount: 51,
+			AmountReplenish: 7_100_000_000},
+		{FlmVendor: "", FlmVendorRegion: "", AtmCount: 6,
+			AmountReplenish: 810_000_000, UnrequestedAmountReplenish: 810_000_000},
+	}}
+	svc := &VendorRequestService{read: fake}
+
+	got, err := svc.ForecastSummary(context.Background(), "2027-01-15")
+	if err != nil {
+		t.Fatalf("ForecastSummary: %v", err)
+	}
+	want := ForecastSummaryTotals{
+		ATMCount: 141, RequestedATMCount: 91, UnrequestedATMCount: 50, UnassignedATMCount: 6,
+		AmountReplenish: 20_310_000_000, UnrequestedAmountReplenish: 6_910_000_000,
+	}
+	if got.Totals != want {
+		t.Errorf("Totals = %+v, want %+v", got.Totals, want)
+	}
+	if got.Groups[0].UnrequestedATMCount != 44 || got.Groups[1].UnrequestedATMCount != 0 {
+		t.Errorf("UnrequestedATMCount = %d/%d, want 44/0", got.Groups[0].UnrequestedATMCount, got.Groups[1].UnrequestedATMCount)
+	}
+	if got.ForecastDate.Format("2006-01-02") != "2027-01-15" {
+		t.Errorf("ForecastDate = %v", got.ForecastDate)
+	}
+}
+
+func TestForecastSummary_EmptyDateReturnsEmptyGroups(t *testing.T) {
+	svc := &VendorRequestService{read: &fakeForecastRepo{}}
+	got, err := svc.ForecastSummary(context.Background(), "2027-01-15")
+	if err != nil {
+		t.Fatalf("ForecastSummary: %v", err)
+	}
+	if got.Groups == nil || len(got.Groups) != 0 || got.Totals != (ForecastSummaryTotals{}) {
+		t.Errorf("want non-nil empty groups and zero totals, got %+v", got)
+	}
+}
+
+func TestForecastSummary_ValidatesDate(t *testing.T) {
+	svc := &VendorRequestService{read: &fakeForecastRepo{}}
+	for _, date := range []string{"", "15-01-2027", "2027-13-40"} {
+		_, err := svc.ForecastSummary(context.Background(), date)
+		var ve *ValidationError
+		if !errors.As(err, &ve) || ve.Field != "forecast_date" {
+			t.Errorf("ForecastSummary(%q) error = %v, want forecast_date ValidationError", date, err)
+		}
 	}
 }

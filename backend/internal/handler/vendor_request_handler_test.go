@@ -47,6 +47,10 @@ type fakeVendorRequestServicer struct {
 	auditErr            error
 	vendorOptionsResult *service.VendorOptionsResult
 	vendorOptionsErr    error
+	summaryResult       *service.ForecastSummaryResult
+	summaryErr          error
+	lastSummaryDate     string
+	lastBrowseParams    service.BrowseForecastParams
 
 	// CIT-2 (Task 8.3): capture the last received input to verify the
 	// handler's request-body/query-param parsing, not just the response shape.
@@ -54,8 +58,13 @@ type fakeVendorRequestServicer struct {
 	lastListParams  service.ListVendorRequestParams
 }
 
-func (f *fakeVendorRequestServicer) BrowseForecast(context.Context, service.BrowseForecastParams) (*service.BrowseForecastResult, error) {
+func (f *fakeVendorRequestServicer) BrowseForecast(_ context.Context, p service.BrowseForecastParams) (*service.BrowseForecastResult, error) {
+	f.lastBrowseParams = p
 	return f.browseResult, f.browseErr
+}
+func (f *fakeVendorRequestServicer) ForecastSummary(_ context.Context, date string) (*service.ForecastSummaryResult, error) {
+	f.lastSummaryDate = date
+	return f.summaryResult, f.summaryErr
 }
 func (f *fakeVendorRequestServicer) ListVendorOptions(context.Context) (*service.VendorOptionsResult, error) {
 	return f.vendorOptionsResult, f.vendorOptionsErr
@@ -694,5 +703,105 @@ func TestVendorRequestHandler_Create_NonManualRequiresPeriodePred(t *testing.T) 
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (missing periode_pred), body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+// -- forecast-browser-summary ---------------------------------------------
+
+func TestVendorRequestHandler_ForecastSummary(t *testing.T) {
+	svc := &fakeVendorRequestServicer{summaryResult: &service.ForecastSummaryResult{
+		ForecastDate: time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC),
+		Totals:       service.ForecastSummaryTotals{ATMCount: 3, RequestedATMCount: 1, UnrequestedATMCount: 2, UnassignedATMCount: 1, AmountReplenish: 300, UnrequestedAmountReplenish: 200},
+		Groups: []service.ForecastSummaryGroup{
+			{FLMVendor: "TAG", FLMVendorRegion: "Jawa Barat", ATMCount: 2, RequestedATMCount: 1, UnrequestedATMCount: 1, AmountReplenish: 200, UnrequestedAmountReplenish: 100},
+			{ATMCount: 1, UnrequestedATMCount: 1, AmountReplenish: 100, UnrequestedAmountReplenish: 100},
+		},
+	}}
+	router, ts := mountVendorRequestHandler(t, svc)
+	path := "/api/v1/vendor-requests/forecast/summary?forecast_date=2027-01-15"
+
+	if rec := vendorRequestDoRequest(router, http.MethodGet, path, "", ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no token: status = %d, want 401", rec.Code)
+	}
+	if rec := vendorRequestDoRequest(router, http.MethodGet, path, vendorRequestTokenFor(t, ts, 5, "VENDOR"), ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("wrong role: status = %d, want 403", rec.Code)
+	}
+
+	rec := vendorRequestDoRequest(router, http.MethodGet, path, vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if svc.lastSummaryDate != "2027-01-15" {
+		t.Errorf("forecast_date passed = %q", svc.lastSummaryDate)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["forecast_date"] != "2027-01-15" {
+		t.Errorf("forecast_date = %v", body["forecast_date"])
+	}
+	totals := body["totals"].(map[string]any)
+	for _, key := range []string{"atm_count", "requested_atm_count", "unrequested_atm_count", "unassigned_atm_count", "amount_replenish", "unrequested_amount_replenish"} {
+		if _, ok := totals[key]; !ok {
+			t.Errorf("totals missing %q", key)
+		}
+	}
+	groups := body["groups"].([]any)
+	unassigned := groups[1].(map[string]any)
+	if len(groups) != 2 || unassigned["flm_vendor"] != "" || unassigned["flm_vendor_region"] != "" {
+		t.Errorf("groups = %v", groups)
+	}
+}
+
+func TestVendorRequestHandler_ForecastSummary_ValidationError(t *testing.T) {
+	svc := &fakeVendorRequestServicer{summaryErr: &service.ValidationError{Field: "forecast_date", Message: "wajib diisi"}}
+	router, ts := mountVendorRequestHandler(t, svc)
+	rec := vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast/summary",
+		vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400, body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVendorRequestHandler_BrowseForecast_UnassignedParam(t *testing.T) {
+	tests := []struct {
+		query          string
+		wantStatus     int
+		wantUnassigned bool
+	}{
+		{"", http.StatusOK, false},
+		{"&unassigned=false", http.StatusOK, false},
+		{"&unassigned=true", http.StatusOK, true},
+		{"&unassigned=abc", http.StatusBadRequest, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			svc := &fakeVendorRequestServicer{browseResult: &service.BrowseForecastResult{Data: []service.ForecastRow{}}}
+			router, ts := mountVendorRequestHandler(t, svc)
+			rec := vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast?forecast_date=2027-01-15"+tt.query,
+				vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if svc.lastBrowseParams.Unassigned != tt.wantUnassigned {
+				t.Errorf("Unassigned = %v, want %v", svc.lastBrowseParams.Unassigned, tt.wantUnassigned)
+			}
+		})
+	}
+}
+
+func TestVendorRequestHandler_BrowseForecast_IsRequestedOnWire(t *testing.T) {
+	svc := &fakeVendorRequestServicer{browseResult: &service.BrowseForecastResult{
+		Data: []service.ForecastRow{{TerminalID: "1", IsRequested: true}}, Total: 1, Page: 1, PageSize: 10, TotalPages: 1,
+	}}
+	router, ts := mountVendorRequestHandler(t, svc)
+	rec := vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/forecast?forecast_date=2027-01-15",
+		vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"is_requested":true`) {
+		t.Errorf("is_requested missing from body: %s", rec.Body.String())
 	}
 }

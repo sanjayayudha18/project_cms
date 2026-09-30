@@ -190,6 +190,7 @@ Every non-trivial feature lives in `.claude/sdlc/<feature>/` and moves through 6
 | 6 Maintain | `incidents.md` | On-call | Log incidents, add a regression test/eval per incident; a breach → new `intent.md` (loop closes) |
 
 **Rules for the AI:**
+0. **Ask first, every time.** For any feature addition or fix, before writing code ask the user: *"Perlu dibuat AI-DLC baru (`.claude/sdlc/<feature>/`) atau cukup dokumentasi bug fix?"* Wait for the answer. Bug-fix documentation goes in [bugfixes.md](./bugfixes.md) (newest first, use its template). Don't decide it yourself. Rule 3 below is only the default you suggest; the user makes the call. Anything touching Sec 4 #7 or the schema always gets the full chain.
 1. Before coding a feature, check `.claude/sdlc/<feature>/`. Missing → start at `intent.md`. Never skip a stage or start the next one before the previous artifact is accepted by a human.
 2. Work only from the latest accepted artifact. If code and artifact disagree, STOP and ask. Don't silently fix either one.
 3. Small fixes/typos/single-file bugs are exempt, so there's no artifact chain for them. Anything touching Sec 4 #7 or the schema is never exempt.

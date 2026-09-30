@@ -16,6 +16,7 @@ Branch: `dev1` (latest: `531d9ef` perbaikan RBAC G2, `332b340` child-panel pagin
 | Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 mostly built — backend contract, 4 dialogs, branch drill-down, vendor-wide PIC, pending badges; 2026-09-30 server-side paging + branch search (G1), pending creates visible (G2), tests (G3) | Automated tests for approve/reject/apply-failure, double-submit/cross-tab conflict, per-entity CRUD payloads; manual browser check (user) |
 | `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 4 Test | ✅ built Fases 1–7 (Python + frontend); T8.1 tests green, T8.2 reviews fixed (migration 020, DSR path traversal); Go helper deferred to 2.1 | A17 manual browser check of EOD monitoring (user) — `/api/eod` routing ready (S6) |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
+| Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (review 2026-09-30) | ✅ built (uncommitted) | R1 opsi A ditahan; manual browser check (user) → commit |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
 

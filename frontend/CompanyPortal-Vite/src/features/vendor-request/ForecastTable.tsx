@@ -9,6 +9,7 @@
  */
 
 import { Skeleton } from "@/components/feedback/Skeleton";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import {
@@ -21,7 +22,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { AlertCircle, ArrowDown, ArrowUp } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, CheckCircle2 } from "lucide-react";
 import type { ForecastRow, PaginationMeta } from "./types";
 
 const SKELETON_ROW_COUNT = 5;
@@ -29,6 +30,25 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
 export function forecastRowId(row: ForecastRow): string {
   return `${row.terminal_id}|${row.periode_pred}|${row.denom}`;
+}
+
+/**
+ * forecast-browser-summary (FR4.4): an already-requested row can't be picked
+ * again (no double request from the UI), and a row with no active vendor can't
+ * go into a Vendor Request at all (every request is for exactly one vendor).
+ */
+export function isForecastRowSelectable(row: ForecastRow): boolean {
+  return !row.is_requested && row.flm_vendor !== "";
+}
+
+function RequestStatus({ row }: { row: ForecastRow }) {
+  if (row.is_requested) {
+    return <Badge variant="success" icon={CheckCircle2} label="Sudah di-request" />;
+  }
+  if (row.flm_vendor === "") {
+    return <Badge variant="warning" icon={AlertTriangle} label="Tanpa vendor" />;
+  }
+  return <Badge variant="neutral" label="Belum" />;
 }
 
 const columns: ColumnDef<ForecastRow>[] = [
@@ -51,8 +71,9 @@ const columns: ColumnDef<ForecastRow>[] = [
         type="checkbox"
         aria-label={`Pilih baris ${row.original.terminal_id}`}
         checked={row.getIsSelected()}
+        disabled={!row.getCanSelect()}
         onChange={row.getToggleSelectedHandler()}
-        className="h-4 w-4 cursor-pointer accent-[var(--red-500)]"
+        className="h-4 w-4 cursor-pointer accent-[var(--red-500)] disabled:cursor-not-allowed disabled:opacity-40"
       />
     ),
     enableSorting: false,
@@ -60,6 +81,12 @@ const columns: ColumnDef<ForecastRow>[] = [
   {
     accessorKey: "terminal_id",
     header: "ATM ID",
+  },
+  {
+    id: "request_status",
+    header: "Status",
+    cell: ({ row }) => <RequestStatus row={row.original} />,
+    enableSorting: false,
   },
   {
     accessorKey: "lokasi_atm",
@@ -170,7 +197,7 @@ export function ForecastTable({
     onRowSelectionChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableRowSelection: true,
+    enableRowSelection: (row) => isForecastRowSelectable(row.original),
   });
 
   const totalPages = Math.max(1, pagination?.total_pages ?? 1);

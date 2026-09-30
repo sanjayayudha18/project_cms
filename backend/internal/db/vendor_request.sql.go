@@ -23,7 +23,7 @@ LEFT JOIN LATERAL (
       AND avp.is_active = true
       AND avp.effective_start_date <= $1::date
       AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
-    ORDER BY avp.effective_start_date DESC
+    ORDER BY avp.effective_start_date DESC, avp.id DESC
     LIMIT 1
 ) active_pkg ON true
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
@@ -33,6 +33,7 @@ WHERE f.periode_pred = $1::date
   AND ($3::text = '' OR LOWER(a.brand) = LOWER($3::text))
   AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
   AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
+  AND (NOT $6::bool OR v.id IS NULL)
 `
 
 type CountForecastForDateParams struct {
@@ -41,8 +42,12 @@ type CountForecastForDateParams struct {
 	Brand           string      `json:"brand"`
 	FlmVendor       string      `json:"flm_vendor"`
 	FlmVendorRegion string      `json:"flm_vendor_region"`
+	Unassigned      bool        `json:"unassigned"`
 }
 
+// forecast-browser-summary: same unassigned filter as ListForecastForDate, and
+// the LATERAL now carries the same avp.id DESC tie-breaker so count and rows
+// always resolve an ATM to the same vendor.
 // Mirrors ListForecastForDate's WHERE for pagination total. CIT-2 (Req 1):
 // unlike the pre-CIT-2 version, this now NEEDS the same
 // atms -> atm_vendor_packages (active) -> vendor_packages_branch -> vendor_branches
@@ -57,6 +62,7 @@ func (q *Queries) CountForecastForDate(ctx context.Context, arg CountForecastFor
 		arg.Brand,
 		arg.FlmVendor,
 		arg.FlmVendorRegion,
+		arg.Unassigned,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -560,7 +566,17 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        vb.region AS flm_vendor_region,
        a.priority_class AS priority_class,
        pkg.package_code         AS paket,
-       esc.escrow        AS escrow
+       esc.escrow        AS escrow,
+       EXISTS (
+           SELECT 1
+           FROM vendor_request_items vri
+           JOIN vendor_requests vr ON vr.id = vri.vendor_request_id
+           WHERE vri.terminal_id = f.terminal_id
+             AND vri.periode_pred = f.periode_pred
+             AND vri.denom = f.denom
+             AND vr.status NOT IN ('cancelled', 'rejected')
+             AND vr.is_canceled = false
+       ) AS is_requested
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN locations l ON l.id = a.location_id
@@ -590,8 +606,9 @@ WHERE f.periode_pred = $1::date
   AND ($3::text = '' OR LOWER(a.brand) = LOWER($3::text))
   AND ($4::text = '' OR LOWER(v.name) = LOWER($4::text))
   AND ($5::text = '' OR LOWER(vb.region) = LOWER($5::text))
+  AND (NOT $6::bool OR v.id IS NULL)
 ORDER BY f.terminal_id ASC
-LIMIT $7::int OFFSET ($6::int - 1) * $7::int
+LIMIT $8::int OFFSET ($7::int - 1) * $8::int
 `
 
 type ListForecastForDateParams struct {
@@ -600,6 +617,7 @@ type ListForecastForDateParams struct {
 	Brand           string      `json:"brand"`
 	FlmVendor       string      `json:"flm_vendor"`
 	FlmVendorRegion string      `json:"flm_vendor_region"`
+	Unassigned      bool        `json:"unassigned"`
 	Page            int32       `json:"page"`
 	PageSize        int32       `json:"page_size"`
 }
@@ -618,8 +636,14 @@ type ListForecastForDateRow struct {
 	PriorityClass   *string        `json:"priority_class"`
 	Paket           *string        `json:"paket"`
 	Escrow          pgtype.Numeric `json:"escrow"`
+	IsRequested     bool           `json:"is_requested"`
 }
 
+// forecast-browser-summary (.claude/sdlc/forecast-browser-summary): flm_vendor/
+// flm_vendor_region are now optional (empty = Semua, relaxing CIT-2 Req 1.4);
+// unassigned=true keeps only rows with no active vendor package (v.id IS NULL);
+// is_requested = the (terminal_id, periode_pred, denom) row is already an item
+// of a vendor_request that is not cancelled/rejected/is_canceled.
 // Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
 // periode_pred, optional terminal_id partial match, default sort terminal_id
 // ascending (Req 3.2). Extended with ATM/vendor context (Req 3.1): Lokasi ATM,
@@ -659,6 +683,7 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 		arg.Brand,
 		arg.FlmVendor,
 		arg.FlmVendorRegion,
+		arg.Unassigned,
 		arg.Page,
 		arg.PageSize,
 	)
@@ -683,6 +708,7 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 			&i.PriorityClass,
 			&i.Paket,
 			&i.Escrow,
+			&i.IsRequested,
 		); err != nil {
 			return nil, err
 		}
@@ -933,6 +959,104 @@ func (q *Queries) SoftCancelVendorRequest(ctx context.Context, arg SoftCancelVen
 		&i.CancellationReason,
 	)
 	return i, err
+}
+
+const summarizeForecastForDate = `-- name: SummarizeForecastForDate :many
+WITH r AS (
+    SELECT f.terminal_id,
+           f.amount_replenish,
+           v.name    AS flm_vendor,
+           vb.region AS flm_vendor_region,
+           EXISTS (
+               SELECT 1
+               FROM vendor_request_items vri
+               JOIN vendor_requests vr ON vr.id = vri.vendor_request_id
+               WHERE vri.terminal_id = f.terminal_id
+                 AND vri.periode_pred = f.periode_pred
+                 AND vri.denom = f.denom
+                 AND vr.status NOT IN ('cancelled', 'rejected')
+                 AND vr.is_canceled = false
+           ) AS is_requested
+    FROM dmaa_atm_forecast f
+    LEFT JOIN atms a ON a.terminal_id = f.terminal_id
+    LEFT JOIN LATERAL (
+        SELECT vp.vendor_branch_id
+        FROM atm_vendor_packages avp
+        JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+        WHERE avp.atm_id = a.id
+          AND avp.is_active = true
+          AND avp.effective_start_date <= $1::date
+          AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= $1::date)
+        ORDER BY avp.effective_start_date DESC, avp.id DESC
+        LIMIT 1
+    ) active_pkg ON true
+    LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+    LEFT JOIN vendors v ON v.id = vb.vendor_id
+    WHERE f.periode_pred = $1::date
+), atm AS (
+    SELECT r.terminal_id,
+           r.flm_vendor,
+           r.flm_vendor_region,
+           bool_and(r.is_requested) AS all_requested,
+           SUM(r.amount_replenish) AS amount,
+           COALESCE(SUM(r.amount_replenish) FILTER (WHERE NOT r.is_requested), 0) AS unrequested_amount
+    FROM r
+    GROUP BY r.terminal_id, r.flm_vendor, r.flm_vendor_region
+)
+SELECT COALESCE(atm.flm_vendor, '')::text        AS flm_vendor,
+       COALESCE(atm.flm_vendor_region, '')::text AS flm_vendor_region,
+       COUNT(*)::bigint                                        AS atm_count,
+       (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
+       SUM(atm.amount)::bigint                                 AS amount_replenish,
+       SUM(atm.unrequested_amount)::bigint                     AS unrequested_amount_replenish
+FROM atm
+GROUP BY atm.flm_vendor, atm.flm_vendor_region
+ORDER BY (COUNT(*) - COUNT(*) FILTER (WHERE atm.all_requested)) DESC,
+         COALESCE(atm.flm_vendor, ''), COALESCE(atm.flm_vendor_region, '')
+`
+
+type SummarizeForecastForDateRow struct {
+	FlmVendor                  string `json:"flm_vendor"`
+	FlmVendorRegion            string `json:"flm_vendor_region"`
+	AtmCount                   int64  `json:"atm_count"`
+	RequestedAtmCount          int64  `json:"requested_atm_count"`
+	AmountReplenish            int64  `json:"amount_replenish"`
+	UnrequestedAmountReplenish int64  `json:"unrequested_amount_replenish"`
+}
+
+// forecast-browser-summary (FR1): per (FLM vendor, region) recap for one
+// forecast_date. Vendor resolution is identical to ListForecastForDate (same
+// LATERAL + tie-breaker) so each group's atm_count equals the distinct
+// terminals the detail table shows for that filter. An ATM counts as requested
+// only when ALL its denoms are requested (bool_and) — one missing denom keeps
+// it "belum", so nothing is silently skipped. The no-active-vendor group comes
+// back as flm_vendor = ” / flm_vendor_region = ”. Amounts are bigint sums of
+// full-IDR amount_replenish, never float.
+func (q *Queries) SummarizeForecastForDate(ctx context.Context, forecastDate pgtype.Date) ([]SummarizeForecastForDateRow, error) {
+	rows, err := q.db.Query(ctx, summarizeForecastForDate, forecastDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SummarizeForecastForDateRow{}
+	for rows.Next() {
+		var i SummarizeForecastForDateRow
+		if err := rows.Scan(
+			&i.FlmVendor,
+			&i.FlmVendorRegion,
+			&i.AtmCount,
+			&i.RequestedAtmCount,
+			&i.AmountReplenish,
+			&i.UnrequestedAmountReplenish,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateVendorRequestStatus = `-- name: UpdateVendorRequestStatus :one

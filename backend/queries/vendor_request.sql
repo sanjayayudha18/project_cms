@@ -169,6 +169,11 @@ WHERE id = sqlc.arg('id')::bigint
 RETURNING *;
 
 -- name: ListForecastForDate :many
+-- forecast-browser-summary (.claude/sdlc/forecast-browser-summary): flm_vendor/
+-- flm_vendor_region are now optional (empty = Semua, relaxing CIT-2 Req 1.4);
+-- unassigned=true keeps only rows with no active vendor package (v.id IS NULL);
+-- is_requested = the (terminal_id, periode_pred, denom) row is already an item
+-- of a vendor_request that is not cancelled/rejected/is_canceled.
 -- Forecast Browser source (Req 3): dmaa_atm_forecast rows for one
 -- periode_pred, optional terminal_id partial match, default sort terminal_id
 -- ascending (Req 3.2). Extended with ATM/vendor context (Req 3.1): Lokasi ATM,
@@ -208,7 +213,17 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        vb.region AS flm_vendor_region,
        a.priority_class AS priority_class,
        pkg.package_code         AS paket,
-       esc.escrow        AS escrow
+       esc.escrow        AS escrow,
+       EXISTS (
+           SELECT 1
+           FROM vendor_request_items vri
+           JOIN vendor_requests vr ON vr.id = vri.vendor_request_id
+           WHERE vri.terminal_id = f.terminal_id
+             AND vri.periode_pred = f.periode_pred
+             AND vri.denom = f.denom
+             AND vr.status NOT IN ('cancelled', 'rejected')
+             AND vr.is_canceled = false
+       ) AS is_requested
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN locations l ON l.id = a.location_id
@@ -238,10 +253,14 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('brand')::text = '' OR LOWER(a.brand) = LOWER(sqlc.arg('brand')::text))
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
   AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
+  AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL)
 ORDER BY f.terminal_id ASC
 LIMIT sqlc.arg('page_size')::int OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
 
 -- name: CountForecastForDate :one
+-- forecast-browser-summary: same unassigned filter as ListForecastForDate, and
+-- the LATERAL now carries the same avp.id DESC tie-breaker so count and rows
+-- always resolve an ATM to the same vendor.
 -- Mirrors ListForecastForDate's WHERE for pagination total. CIT-2 (Req 1):
 -- unlike the pre-CIT-2 version, this now NEEDS the same
 -- atms -> atm_vendor_packages (active) -> vendor_packages_branch -> vendor_branches
@@ -260,7 +279,7 @@ LEFT JOIN LATERAL (
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
       AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= sqlc.arg('forecast_date')::date)
-    ORDER BY avp.effective_start_date DESC
+    ORDER BY avp.effective_start_date DESC, avp.id DESC
     LIMIT 1
 ) active_pkg ON true
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
@@ -269,7 +288,69 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('terminal_id')::text = '' OR f.terminal_id ILIKE '%' || sqlc.arg('terminal_id')::text || '%')
   AND (sqlc.arg('brand')::text = '' OR LOWER(a.brand) = LOWER(sqlc.arg('brand')::text))
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
-  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text));
+  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
+  AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL);
+
+-- name: SummarizeForecastForDate :many
+-- forecast-browser-summary (FR1): per (FLM vendor, region) recap for one
+-- forecast_date. Vendor resolution is identical to ListForecastForDate (same
+-- LATERAL + tie-breaker) so each group's atm_count equals the distinct
+-- terminals the detail table shows for that filter. An ATM counts as requested
+-- only when ALL its denoms are requested (bool_and) — one missing denom keeps
+-- it "belum", so nothing is silently skipped. The no-active-vendor group comes
+-- back as flm_vendor = '' / flm_vendor_region = ''. Amounts are bigint sums of
+-- full-IDR amount_replenish, never float.
+WITH r AS (
+    SELECT f.terminal_id,
+           f.amount_replenish,
+           v.name    AS flm_vendor,
+           vb.region AS flm_vendor_region,
+           EXISTS (
+               SELECT 1
+               FROM vendor_request_items vri
+               JOIN vendor_requests vr ON vr.id = vri.vendor_request_id
+               WHERE vri.terminal_id = f.terminal_id
+                 AND vri.periode_pred = f.periode_pred
+                 AND vri.denom = f.denom
+                 AND vr.status NOT IN ('cancelled', 'rejected')
+                 AND vr.is_canceled = false
+           ) AS is_requested
+    FROM dmaa_atm_forecast f
+    LEFT JOIN atms a ON a.terminal_id = f.terminal_id
+    LEFT JOIN LATERAL (
+        SELECT vp.vendor_branch_id
+        FROM atm_vendor_packages avp
+        JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+        WHERE avp.atm_id = a.id
+          AND avp.is_active = true
+          AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
+          AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= sqlc.arg('forecast_date')::date)
+        ORDER BY avp.effective_start_date DESC, avp.id DESC
+        LIMIT 1
+    ) active_pkg ON true
+    LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+    LEFT JOIN vendors v ON v.id = vb.vendor_id
+    WHERE f.periode_pred = sqlc.arg('forecast_date')::date
+), atm AS (
+    SELECT r.terminal_id,
+           r.flm_vendor,
+           r.flm_vendor_region,
+           bool_and(r.is_requested) AS all_requested,
+           SUM(r.amount_replenish) AS amount,
+           COALESCE(SUM(r.amount_replenish) FILTER (WHERE NOT r.is_requested), 0) AS unrequested_amount
+    FROM r
+    GROUP BY r.terminal_id, r.flm_vendor, r.flm_vendor_region
+)
+SELECT COALESCE(atm.flm_vendor, '')::text        AS flm_vendor,
+       COALESCE(atm.flm_vendor_region, '')::text AS flm_vendor_region,
+       COUNT(*)::bigint                                        AS atm_count,
+       (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
+       SUM(atm.amount)::bigint                                 AS amount_replenish,
+       SUM(atm.unrequested_amount)::bigint                     AS unrequested_amount_replenish
+FROM atm
+GROUP BY atm.flm_vendor, atm.flm_vendor_region
+ORDER BY (COUNT(*) - COUNT(*) FILTER (WHERE atm.all_requested)) DESC,
+         COALESCE(atm.flm_vendor, ''), COALESCE(atm.flm_vendor_region, '');
 
 -- name: NextRequestNumberSeq :one
 -- Atomic per-(vendor, replenish_date) increment backing the new

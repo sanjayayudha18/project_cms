@@ -60,6 +60,8 @@ type forecastRowResponse struct {
 	PriorityClass string  `json:"priority_class"`
 	Paket         string  `json:"paket"`
 	Escrow        *string `json:"escrow"`
+	// forecast-browser-summary (FR3): additive.
+	IsRequested bool `json:"is_requested"`
 }
 
 type forecastResponse struct {
@@ -84,6 +86,7 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			PriorityClass:   row.PriorityClass,
 			Paket:           row.Paket,
 			Escrow:          row.Escrow,
+			IsRequested:     row.IsRequested,
 		}
 	}
 	return forecastResponse{
@@ -92,6 +95,45 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			Page: result.Page, PageSize: result.PageSize,
 			TotalCount: result.Total, TotalPages: result.TotalPages,
 		},
+	}
+}
+
+// -- GET /forecast/summary -------------------------------------------------
+
+type forecastSummaryTotalsResponse struct {
+	ATMCount                   int64 `json:"atm_count"`
+	RequestedATMCount          int64 `json:"requested_atm_count"`
+	UnrequestedATMCount        int64 `json:"unrequested_atm_count"`
+	UnassignedATMCount         int64 `json:"unassigned_atm_count"`
+	AmountReplenish            int64 `json:"amount_replenish"`
+	UnrequestedAmountReplenish int64 `json:"unrequested_amount_replenish"`
+}
+
+type forecastSummaryGroupResponse struct {
+	FLMVendor                  string `json:"flm_vendor"`
+	FLMVendorRegion            string `json:"flm_vendor_region"`
+	ATMCount                   int64  `json:"atm_count"`
+	RequestedATMCount          int64  `json:"requested_atm_count"`
+	UnrequestedATMCount        int64  `json:"unrequested_atm_count"`
+	AmountReplenish            int64  `json:"amount_replenish"`
+	UnrequestedAmountReplenish int64  `json:"unrequested_amount_replenish"`
+}
+
+type forecastSummaryResponse struct {
+	ForecastDate string                         `json:"forecast_date"`
+	Totals       forecastSummaryTotalsResponse  `json:"totals"`
+	Groups       []forecastSummaryGroupResponse `json:"groups"`
+}
+
+func toForecastSummaryResponse(result *service.ForecastSummaryResult) forecastSummaryResponse {
+	groups := make([]forecastSummaryGroupResponse, len(result.Groups))
+	for i, g := range result.Groups {
+		groups[i] = forecastSummaryGroupResponse(g)
+	}
+	return forecastSummaryResponse{
+		ForecastDate: formatDate(result.ForecastDate),
+		Totals:       forecastSummaryTotalsResponse(result.Totals),
+		Groups:       groups,
 	}
 }
 

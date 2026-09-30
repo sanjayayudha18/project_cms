@@ -12,8 +12,11 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/">{children}</a>,
 }));
 
+const usePendingCreatesMock = vi.fn();
+
 vi.mock("../../master-data/pending", () => ({
   usePendingEntityIds: () => new Set<number>(),
+  usePendingCreates: (...args: unknown[]) => usePendingCreatesMock(...args),
 }));
 
 const noopMutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
@@ -48,6 +51,7 @@ function lastParams(mock: ReturnType<typeof vi.fn>): Record<string, unknown> {
 }
 
 beforeEach(() => {
+  usePendingCreatesMock.mockReset().mockReturnValue([]);
   useVendorBranchesMock.mockReset().mockReturnValue(listResult("branches", 308));
   useVendorVaultsMock.mockReset().mockReturnValue(listResult("vaults", 45));
   useVendorPicsMock.mockReset().mockReturnValue({
@@ -122,5 +126,70 @@ describe("PicsPanel scope", () => {
 
     expect(screen.getByRole("button", { name: "Sebelumnya" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Berikutnya" })).toBeDisabled();
+  });
+});
+
+// G2: staged creates have no master row yet; each panel lists the ones in
+// its own scope so the maker does not submit them twice.
+describe("pending creates", () => {
+  function pendingList() {
+    return screen.queryByRole("region", { name: "Pengajuan baru menunggu approval" });
+  }
+
+  it("BranchesPanel lists this vendor's staged branch creates only", () => {
+    usePendingCreatesMock.mockReturnValue([
+      { id: 11, payload: { vendor_id: 1, branch_code: "BR9", branch_name: "Cabang Baru" } },
+      { id: 12, payload: { vendor_id: 2, branch_code: "XX1", branch_name: "Vendor Lain" } },
+    ]);
+    render(<BranchesPanel vendorId={1} />);
+
+    expect(usePendingCreatesMock).toHaveBeenCalledWith("vendor_branch");
+    expect(pendingList()).toHaveTextContent("BR9 · Cabang Baru");
+    expect(pendingList()).toHaveTextContent("(1)");
+    expect(pendingList()).not.toHaveTextContent("Vendor Lain");
+  });
+
+  it("VaultsPanel lists staged vaults of the selected branch only", () => {
+    usePendingCreatesMock.mockReturnValue([
+      { id: 21, payload: { vendor_branch_id: 7, vault_code: "VLT-NEW" } },
+      { id: 22, payload: { vendor_branch_id: 8, vault_code: "VLT-OTHER" } },
+    ]);
+    render(<VaultsPanel vendorId={1} branchId={7} />);
+
+    expect(pendingList()).toHaveTextContent("VLT-NEW");
+    expect(pendingList()).not.toHaveTextContent("VLT-OTHER");
+  });
+
+  it("vendor-wide PICs show only staged PICs without a branch", () => {
+    usePendingCreatesMock.mockReturnValue([
+      { id: 31, payload: { vendor_id: 1, vendor_branch_id: null, name: "Wide Baru" } },
+      { id: 32, payload: { vendor_id: 1, vendor_branch_id: 7, name: "Cabang Baru" } },
+      { id: 33, payload: { vendor_id: 2, vendor_branch_id: null, name: "Vendor Lain" } },
+    ]);
+    render(<PicsPanel vendorId={1} branchId={null} />);
+
+    expect(pendingList()).toHaveTextContent("Wide Baru");
+    expect(pendingList()).not.toHaveTextContent("Cabang Baru");
+    expect(pendingList()).not.toHaveTextContent("Vendor Lain");
+  });
+
+  it("branch PICs show only staged PICs for that branch", () => {
+    usePendingCreatesMock.mockReturnValue([
+      { id: 31, payload: { vendor_id: 1, vendor_branch_id: null, name: "Wide Baru" } },
+      { id: 32, payload: { vendor_id: 1, vendor_branch_id: 7, name: "Cabang Baru" } },
+    ]);
+    render(<PicsPanel vendorId={1} branchId={7} />);
+
+    expect(pendingList()).toHaveTextContent("Cabang Baru");
+    expect(pendingList()).not.toHaveTextContent("Wide Baru");
+  });
+
+  it("renders nothing when no staged create is in scope", () => {
+    usePendingCreatesMock.mockReturnValue([
+      { id: 22, payload: { vendor_branch_id: 8, vault_code: "VLT-OTHER" } },
+    ]);
+    render(<VaultsPanel vendorId={1} branchId={7} />);
+
+    expect(pendingList()).toBeNull();
   });
 });

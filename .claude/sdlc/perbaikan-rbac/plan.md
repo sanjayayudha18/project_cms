@@ -1,7 +1,7 @@
 # Plan: Kelolaan Cabang â†’ Vault/PIC/Paket per-Cabang (Vendor Detail)
 
 **Route**: CompanyPortal (`:5173`) `/settings/admin/vendors/{id}` dan `/settings/admin/vendors/{id}/branches/{branchId}`.
-**Status**: **in progress** (audit ulang 2026-09-30). Kontrak backend (§1–§2), keempat dialog, drill-down cabang (`VendorBranchDetailPage`), tab PIC Vendor-wide, dan badge pending sudah terbangun (`f11bc40`, `90aa526`). 2026-09-30: **G1** keempat panel child pakai paging server (`ServerPager`, 20/halaman) + cari cabang (`q`) — sebelumnya terpotong di 100 baris (ROH 308 cabang); **G3** test `__tests__/ChildPanelsPaging.test.tsx`. Sisa: **G2** pending *create* belum terlihat (create belum punya `entity_id`), acceptance yang belum dicentang di bawah, dan manual browser check (user).
+**Status**: **in progress** (audit ulang 2026-09-30). Kontrak backend (§1–§2), keempat dialog, drill-down cabang (`VendorBranchDetailPage`), tab PIC Vendor-wide, dan badge pending sudah terbangun (`f11bc40`, `90aa526`). 2026-09-30: **G1** keempat panel child pakai paging server (`ServerPager`, 20/halaman) + cari cabang (`q`) — sebelumnya terpotong di 100 baris (ROH 308 cabang); **G3** test `__tests__/ChildPanelsPaging.test.tsx`. **G2** (2026-09-30) pengajuan *create* yang pending tampil di atas tabel panel masing-masing (`PendingCreatesList`, difilter per vendor/cabang/scope PIC dari `payload`). Sisa: acceptance yang belum dicentang di bawah dan manual browser check (user).
 **Terakhir disesuaikan**: 2026-09-22, mengikuti migrasi 007 (`branch_coverage_areas`) dan 008 (`vendor_vaults.category` jadi tiga nilai).
 **Tanggal**: 2026-09-22
 
@@ -194,7 +194,7 @@ Extend `__tests__/VendorDetailPage.test.tsx` dan pengujian backend terkait:
 - [x] PIC vendor-wide dapat dibaca dan dikelola tanpa memilih cabang serta tidak tercampur dengan PIC cabang. _(`vendor_wide_only` vs `branch_id` saling eksklusif; diuji.)_
 - [ ] Create/edit/disable/enable diuji untuk branch, vault, PIC, dan package, termasuk payload dan permission.
 - [ ] Respons 202 menghasilkan feedback pending, bukan perubahan efektif pada master data.
-- [ ] Pending create terlihat tanpa ID master; pending request tetap terlihat setelah reload melalui sumber authoritative.
+- [x] Pending create terlihat tanpa ID master; pending request tetap terlihat setelah reload melalui sumber authoritative. _(2026-09-30: dari `GET /admin/master-data/changes?status=pending` — sumber authoritative, bukan state lokal; `ChildPanelsPaging.test.tsx`, `master-data/pending.test.tsx`.)_
 - [ ] Approval/apply memperbarui data efektif; rejection mempertahankan data lama dan menampilkan status yang benar; kegagalan apply tidak dilaporkan sukses.
 - [ ] Double-click, pengajuan berulang, dan konflik lintas tab/user ditangani; server menolak konflik sesuai kebijakan.
 - [ ] Manipulasi vendorId/branchId/entityId lintas vendor ditolak pada list/mutation dan divalidasi ulang saat apply.

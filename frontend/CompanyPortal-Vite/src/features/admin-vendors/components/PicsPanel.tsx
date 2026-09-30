@@ -8,9 +8,10 @@ import { BellRing, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
-import { usePendingEntityIds } from "../../master-data/pending";
+import { usePendingCreates, usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPic, useEnableVendorPic, useVendorPics } from "../hooks";
 import type { AdminVendorPic } from "../types";
+import { PendingCreatesList } from "./PendingCreatesList";
 import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorPicFormDialog } from "./VendorPicFormDialog";
 
@@ -31,6 +32,13 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
     ...(branchId === null ? { vendor_wide_only: true } : { branch_id: branchId }),
   });
   const pendingIds = usePendingEntityIds("vendor_pic");
+  const pendingCreates = usePendingCreates("vendor_pic")
+    .filter((c) =>
+      branchId === null
+        ? c.payload.vendor_id === vendorId && c.payload.vendor_branch_id == null
+        : c.payload.vendor_branch_id === branchId,
+    )
+    .map((c) => ({ id: c.id, label: String(c.payload.name) }));
   const disableMutation = useDisableVendorPic(vendorId);
   const enableMutation = useEnableVendorPic(vendorId);
 
@@ -152,6 +160,8 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
           {warning}
         </output>
       ))}
+
+      <PendingCreatesList items={pendingCreates} />
 
       {query.isLoading && <p className="text-sm text-[var(--n-500)]">Memuat…</p>}
       {query.isError && (

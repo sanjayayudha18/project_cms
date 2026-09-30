@@ -8,9 +8,10 @@ import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
-import { usePendingEntityIds } from "../../master-data/pending";
+import { usePendingCreates, usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPackage, useVendorPackages } from "../hooks";
 import type { AdminVendorPackage } from "../types";
+import { PendingCreatesList } from "./PendingCreatesList";
 import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorPackageFormDialog } from "./VendorPackageFormDialog";
 
@@ -43,6 +44,12 @@ export function PackagesPanel({ vendorId, branchId }: PackagesPanelProps) {
     branch_id: branchId,
   });
   const pendingIds = usePendingEntityIds("vendor_package");
+  const pendingCreates = usePendingCreates("vendor_package")
+    .filter((c) => c.payload.vendor_branch_id === branchId)
+    .map((c) => ({
+      id: c.id,
+      label: `${c.payload.package_code} · ${c.payload.machine_group}/${c.payload.price_class}`,
+    }));
   const disableMutation = useDisableVendorPackage(vendorId);
 
   const [formPackage, setFormPackage] = useState<AdminVendorPackage | null>(null);
@@ -154,6 +161,8 @@ export function PackagesPanel({ vendorId, branchId }: PackagesPanelProps) {
           Tambah Harga Khusus
         </Button>
       </div>
+
+      <PendingCreatesList items={pendingCreates} />
 
       {query.isLoading && <p className="text-sm text-[var(--n-500)]">Memuat…</p>}
       {query.isError && (

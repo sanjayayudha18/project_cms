@@ -9,10 +9,11 @@ import { CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
-import { usePendingEntityIds } from "../../master-data/pending";
+import { usePendingCreates, usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorBranch, useEnableVendorBranch, useVendorBranches } from "../hooks";
 import type { AdminVendorBranch } from "../types";
 import { useDebouncedValue } from "../useAdminVendorsUrlState";
+import { PendingCreatesList } from "./PendingCreatesList";
 import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorBranchFormDialog } from "./VendorBranchFormDialog";
 
@@ -39,6 +40,9 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
     ...(q ? { q } : {}),
   });
   const pendingIds = usePendingEntityIds("vendor_branch");
+  const pendingCreates = usePendingCreates("vendor_branch")
+    .filter((c) => c.payload.vendor_id === vendorId)
+    .map((c) => ({ id: c.id, label: `${c.payload.branch_code} · ${c.payload.branch_name}` }));
   const disableMutation = useDisableVendorBranch(vendorId);
   const enableMutation = useEnableVendorBranch(vendorId);
 
@@ -169,6 +173,8 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
         </div>
         <Button onClick={() => setFormOpen(true)}>Tambah Cabang</Button>
       </div>
+
+      <PendingCreatesList items={pendingCreates} />
 
       {query.isLoading && <p className="text-sm text-[var(--n-500)]">Memuat…</p>}
       {query.isError && (

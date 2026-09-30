@@ -10,6 +10,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("../../master-data/pending", () => ({
   usePendingEntityIds: () => new Set<number>(),
+  usePendingCreates: () => [],
 }));
 
 const noopMutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };

@@ -24,7 +24,7 @@ type ATMAssignmentAdminServicer interface {
 	Update(ctx context.Context, makerID, atmID, id int64, req service.ATMAssignmentUpdatePayload, actorIP string) (db.MasterDataChangeRequest, error)
 	Disable(ctx context.Context, makerID, atmID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 	Enable(ctx context.Context, makerID, atmID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
-	PackageOptions(ctx context.Context, atmID, vendorID int64) ([]string, error)
+	PackageOptions(ctx context.Context, atmID, vendorID int64) ([]db.ListATMPackageOptionsRow, error)
 }
 
 // AdminATMAssignmentHandler handles ADMIN/ADMIN_PARAM-only ATM assignment
@@ -215,7 +215,7 @@ func (h *AdminATMAssignmentHandler) toggle(w http.ResponseWriter, r *http.Reques
 }
 
 // PackageOptions handles GET /api/v1/admin/atms/{atmID}/assignment-package-options?vendor_id=
-// (FR11): vendor-wide package labels with a tariff matching the ATM, for the
+// (FR11): vendor-wide tariff rows matching the ATM, for the
 // "Seluruh vendor" dropdown. Read-only. Mounted beside (not under) /assignments.
 func (h *AdminATMAssignmentHandler) PackageOptions(w http.ResponseWriter, r *http.Request) {
 	atmID, err := parsePathID(r, "atmID")
@@ -228,12 +228,12 @@ func (h *AdminATMAssignmentHandler) PackageOptions(w http.ResponseWriter, r *htt
 		writeError(w, http.StatusBadRequest, "bad_request", "vendor_id wajib diisi")
 		return
 	}
-	labels, err := h.svc.PackageOptions(r.Context(), atmID, vendorID)
+	options, err := h.svc.PackageOptions(r.Context(), atmID, vendorID)
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"packages": labels})
+	writeJSON(w, http.StatusOK, map[string]any{"packages": options})
 }
 
 func (h *AdminATMAssignmentHandler) handleError(w http.ResponseWriter, err error) {

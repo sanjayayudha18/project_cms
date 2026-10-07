@@ -21,7 +21,32 @@ vi.mock("../api", () => ({
     },
   ],
   createATMAssignment: vi.fn(async () => ({ change_request_id: 1, status: "pending" })),
-  listATMPackageOptions: vi.fn(async () => ["PAKET 3", "PAKET 4"]),
+  listATMPackageOptions: vi.fn(async () => [
+    {
+      package: "PAKET 3",
+      package_code: "PKG3_ABA_001",
+      tier_min: 1,
+      tier_max: 50,
+      base_price: "2003100.00",
+      currency: "IDR",
+    },
+    {
+      package: "PAKET 4",
+      package_code: "PKG4_ABA_002",
+      tier_min: 1,
+      tier_max: 50,
+      base_price: "2500000.00",
+      currency: "IDR",
+    },
+    {
+      package: "PAKET 4",
+      package_code: "PKG4_ABA_005",
+      tier_min: 51,
+      tier_max: null,
+      base_price: "",
+      currency: "IDR",
+    },
+  ]),
 }));
 vi.mock("../../admin-vendors/api", () => ({
   listVendors: async () => ({
@@ -118,14 +143,20 @@ describe("ATMAssignmentsDialog", () => {
     await waitFor(() => expect(cabang.value).toBe("5"));
     fireEvent.change(cabang, { target: { value: "" } });
     fireEvent.click(screen.getByLabelText(/Paket seluruh vendor/));
-    await waitFor(() => expect(screen.getByRole("option", { name: "PAKET 4" })).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Paket"), { target: { value: "PAKET 4" } });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", {
+          name: "PKG4_ABA_005 · PAKET 4 · tingkat 51+ · —",
+        }),
+      ).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByLabelText("Paket"), { target: { value: "PKG4_ABA_005" } });
     expect((screen.getByRole("button", { name: "Ajukan" }) as HTMLButtonElement).disabled).toBe(
       true,
     );
   });
 
-  it("vendor-wide: picks a label from the ATM's options and submits vendor, cabang and label", async () => {
+  it("vendor-wide: picks a tariff row (code · tier · price) and submits vendor, cabang and its label", async () => {
     vi.mocked(createATMAssignment).mockClear();
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -146,8 +177,14 @@ describe("ATMAssignmentsDialog", () => {
     expect(paket.value).toBe("");
     const ajukan = screen.getByRole("button", { name: "Ajukan" }) as HTMLButtonElement;
     expect(ajukan.disabled).toBe(true);
-    await waitFor(() => expect(screen.getByRole("option", { name: "PAKET 4" })).toBeTruthy());
-    fireEvent.change(paket, { target: { value: "PAKET 4" } });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", {
+          name: "PKG4_ABA_005 · PAKET 4 · tingkat 51+ · —",
+        }),
+      ).toBeTruthy(),
+    );
+    fireEvent.change(paket, { target: { value: "PKG4_ABA_005" } });
     expect(ajukan.disabled).toBe(false);
     fireEvent.click(ajukan);
     await waitFor(() =>

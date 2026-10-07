@@ -104,7 +104,7 @@ func (r *ATMAssignmentAdminRepository) VendorTariffExistsForATM(ctx context.Cont
 	return r.queries.VendorTariffExistsForATM(ctx, arg)
 }
 
-// ListATMPackageOptions lists the vendor-wide package labels with a matching tariff for the ATM.
-func (r *ATMAssignmentAdminRepository) ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]string, error) {
+// ListATMPackageOptions lists the vendor-wide tariff rows matching the ATM.
+func (r *ATMAssignmentAdminRepository) ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]db.ListATMPackageOptionsRow, error) {
 	return r.queries.ListATMPackageOptions(ctx, arg)
 }

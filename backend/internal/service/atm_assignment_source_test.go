@@ -138,8 +138,8 @@ func TestATMAssignmentAdminService_Update_VendorLabelWithinMode(t *testing.T) {
 }
 
 func TestATMAssignmentAdminService_PackageOptions(t *testing.T) {
-	t.Run("returns labels", func(t *testing.T) {
-		svc := NewATMAssignmentAdminService(&fakeATMAssignmentAdminRepo{options: []string{"PAKET 3", "PAKET 4"}}, nil)
+	t.Run("returns tariff rows", func(t *testing.T) {
+		svc := NewATMAssignmentAdminService(&fakeATMAssignmentAdminRepo{options: []db.ListATMPackageOptionsRow{{Package: "PAKET 3"}, {Package: "PAKET 4"}}}, nil)
 		got, err := svc.PackageOptions(context.Background(), 3, 2)
 		if err != nil || len(got) != 2 {
 			t.Fatalf("got %v err=%v", got, err)

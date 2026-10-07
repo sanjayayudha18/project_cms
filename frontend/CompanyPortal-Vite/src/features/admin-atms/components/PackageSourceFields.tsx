@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { listVendorPackages } from "../../admin-vendors/api";
-import { type ATMAssignmentSource, listATMPackageOptions } from "../api";
+import { formatIDR } from "../../admin-vendors/lib/packagePrice";
+import { type ATMAssignmentSource, type ATMPackageOption, listATMPackageOptions } from "../api";
 
 const inputClass =
   "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)]";
@@ -28,9 +30,16 @@ interface Props {
 /**
  * "Jenis paket" choice + the Paket dropdown it drives. The cabang stays chosen
  * outside (it is the managing branch in both modes); only where the package list
- * comes from differs: the branch's own packages, or the vendor-wide package
- * labels that have a tariff matching this ATM.
+ * comes from differs: the branch's own packages, or the vendor-wide tariff rows
+ * matching this ATM. Vendor-wide shows one option per tariff (code · tier ·
+ * price) but reports only its label upward -- the assignment stores the label.
  */
+function vendorOptionLabel(o: ATMPackageOption): string {
+  const tier = o.tier_max === null ? `${o.tier_min}+` : `${o.tier_min}-${o.tier_max}`;
+  const price = o.base_price === "" ? "—" : formatIDR(o.base_price);
+  return `${o.package_code} · ${o.package} · tingkat ${tier} · ${price}`;
+}
+
 export function PackageSourceFields({
   atmId,
   vendorId,
@@ -58,6 +67,11 @@ export function PackageSourceFields({
     queryFn: () => listATMPackageOptions(atmId, Number(vendorId)),
     enabled: source === "vendor" && vendorId !== "",
   });
+
+  // Several tariff rows share one label, so the select tracks the chosen code;
+  // the parent clearing `value` clears the selection.
+  const [vendorCode, setVendorCode] = useState("");
+  const selectValue = source === "vendor" ? (value === "" ? "" : vendorCode) : value;
 
   const needsBranch = source === "branch" && branchId === "";
   const loadError = source === "branch" ? branchPackages.isError : vendorPackages.isError;
@@ -97,9 +111,14 @@ export function PackageSourceFields({
         Paket
         <select
           className={inputClass}
-          value={value}
+          value={selectValue}
           disabled={vendorId === "" || needsBranch}
-          onChange={(e) => onValueChange(e.target.value)}
+          onChange={(e) => {
+            if (source === "branch") return onValueChange(e.target.value);
+            const code = e.target.value;
+            setVendorCode(code);
+            onValueChange(vendorPackages.data?.find((o) => o.package_code === code)?.package ?? "");
+          }}
         >
           <option value="">Pilih paket</option>
           {source === "branch"
@@ -109,9 +128,9 @@ export function PackageSourceFields({
                   {p.atm_id !== null ? ` · ATM #${p.atm_id}` : ""}
                 </option>
               ))
-            : (vendorPackages.data ?? []).map((label) => (
-                <option key={label} value={label}>
-                  {label}
+            : (vendorPackages.data ?? []).map((o) => (
+                <option key={o.package_code} value={o.package_code}>
+                  {vendorOptionLabel(o)}
                 </option>
               ))}
         </select>

@@ -21,7 +21,7 @@ type fakeATMAssignmentAdminRepo struct {
 	noPriceGroup  bool
 	branchInvalid bool
 	tariffMissing bool
-	options       []string
+	options       []db.ListATMPackageOptionsRow
 	// lastOverlap records the period HasOverlap was asked about.
 	lastExclude int64
 	lastStart   time.Time
@@ -48,7 +48,7 @@ func (f *fakeATMAssignmentAdminRepo) PackageActive(context.Context, int64) (bool
 	return !f.pkgInactive, nil
 }
 
-func (f *fakeATMAssignmentAdminRepo) ListATMPackageOptions(context.Context, db.ListATMPackageOptionsParams) ([]string, error) {
+func (f *fakeATMAssignmentAdminRepo) ListATMPackageOptions(context.Context, db.ListATMPackageOptionsParams) ([]db.ListATMPackageOptionsRow, error) {
 	return f.options, nil
 }
 func (f *fakeATMAssignmentAdminRepo) GetATMPriceGroup(context.Context, int64) (db.GetATMPriceGroupRow, error) {

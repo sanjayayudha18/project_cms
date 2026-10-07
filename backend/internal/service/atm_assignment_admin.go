@@ -37,7 +37,7 @@ type ATMAssignmentAdminRepo interface {
 	HasOverlap(ctx context.Context, atmID, excludeID int64, start time.Time, end *time.Time) (bool, error)
 	ATMActive(ctx context.Context, atmID int64) (bool, error)
 	PackageActive(ctx context.Context, packageID int64) (bool, error)
-	ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]string, error)
+	ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]db.ListATMPackageOptionsRow, error)
 	vendorSourceQueries
 }
 
@@ -264,9 +264,9 @@ func (s *ATMAssignmentAdminService) validateSource(ctx context.Context, atmID in
 	return s.validatePackage(ctx, p.VendorPackageID)
 }
 
-// PackageOptions lists the vendor-wide package labels that have a tariff for
+// PackageOptions lists the vendor-wide tariff rows (label, code, tier, price) for
 // the ATM's machine group/price class today (FR11).
-func (s *ATMAssignmentAdminService) PackageOptions(ctx context.Context, atmID, vendorID int64) ([]string, error) {
+func (s *ATMAssignmentAdminService) PackageOptions(ctx context.Context, atmID, vendorID int64) ([]db.ListATMPackageOptionsRow, error) {
 	ok, err := s.repo.ATMActive(ctx, atmID)
 	if err != nil {
 		return nil, fmt.Errorf("checking atm: %w", err)

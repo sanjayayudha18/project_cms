@@ -48,7 +48,7 @@ func TestIntegration_VendorWideAssignment(t *testing.T) {
 	if exists, _ = q.VendorTariffExistsForATM(ctx, db.VendorTariffExistsForATMParams{VendorID: vendorID, Package: "PAKET 9", AtmID: atmID, AsOf: asOf}); exists {
 		t.Error("PAKET 9 has no tariff, must not exist")
 	}
-	if opts, err := q.ListATMPackageOptions(ctx, db.ListATMPackageOptionsParams{VendorID: vendorID, AtmID: atmID, AsOf: asOf}); err != nil || len(opts) != 1 || opts[0] != "PAKET 4" {
+	if opts, err := q.ListATMPackageOptions(ctx, db.ListATMPackageOptionsParams{VendorID: vendorID, AtmID: atmID, AsOf: asOf}); err != nil || len(opts) != 1 || opts[0].Package != "PAKET 4" || opts[0].PackageCode == "" {
 		t.Fatalf("package options = %v err=%v, want [PAKET 4]", opts, err)
 	}
 	if _, err := q.CheckAssignmentVendorBranch(ctx, db.CheckAssignmentVendorBranchParams{VendorID: vendorID, VendorBranchID: branchID}); err != nil {

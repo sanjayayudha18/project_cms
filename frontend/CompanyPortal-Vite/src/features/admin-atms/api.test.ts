@@ -90,11 +90,21 @@ describe("admin-atms api client", () => {
     expect(result).toEqual({ locations: [] });
   });
 
-  it("listATMPackageOptions asks the ATM's package-options endpoint for the vendor and returns the labels", async () => {
-    getMock.mockResolvedValue({ data: { packages: ["PAKET 3", "PAKET 4"] } });
+  it("listATMPackageOptions asks the ATM's package-options endpoint for the vendor and returns the tariff rows", async () => {
+    const rows = [
+      {
+        package: "PAKET 3",
+        package_code: "PKG3_ABA_001",
+        tier_min: 1,
+        tier_max: 50,
+        base_price: "2003100.00",
+        currency: "IDR",
+      },
+    ];
+    getMock.mockResolvedValue({ data: { packages: rows } });
     const result = await listATMPackageOptions(3, 2);
     expect(getMock).toHaveBeenCalledWith("/admin/atms/3/assignment-package-options?vendor_id=2");
-    expect(result).toEqual(["PAKET 3", "PAKET 4"]);
+    expect(result).toEqual(rows);
   });
 
   it("listATMPackageOptions treats a null list as empty", async () => {

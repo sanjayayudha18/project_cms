@@ -185,7 +185,12 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
   }
 
   return (
-    <Dialog open={atm !== null} onClose={onClose} title={`Kelolaan ATM ${atm?.terminal_id ?? ""}`}>
+    <Dialog
+      open={atm !== null}
+      onClose={onClose}
+      title={`Kelolaan ATM ${atm?.terminal_id ?? ""}`}
+      className="max-w-4xl"
+    >
       <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
         <div className="flex items-end gap-3">
           <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-[var(--n-600)]">
@@ -214,34 +219,36 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
           <p className="text-sm text-[var(--n-500)]">Belum ada periode kelolaan.</p>
         )}
         {list.data && list.data.length > 0 && (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="text-left text-[var(--n-500)]">
-                <th className="py-2 pr-4 font-medium">Paket</th>
-                <th className="py-2 pr-4 font-medium">Jenis</th>
-                <th className="py-2 pr-4 font-medium">Mulai</th>
-                <th className="py-2 pr-4 font-medium">Selesai</th>
-                <th className="py-2 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.data.map((a) => (
-                <tr key={a.id} className="border-t border-[var(--n-200)]">
-                  <td className="py-2 pr-4">{a.package_code}</td>
-                  <td className="py-2 pr-4">{SOURCE_LABEL[a.source] ?? a.source}</td>
-                  <td className="py-2 pr-4 tabular-nums">{a.effective_start_date}</td>
-                  <td className="py-2 pr-4 tabular-nums">{a.effective_end_date ?? "Terbuka"}</td>
-                  <td className="py-2">
-                    {a.is_active ? (
-                      <Badge variant="success" icon={CheckCircle} label="Aktif" />
-                    ) : (
-                      <Badge variant="danger" icon={XCircle} label="Nonaktif" />
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="text-left text-[var(--n-500)]">
+                  <th className="py-2 pr-4 font-medium">Paket</th>
+                  <th className="py-2 pr-4 font-medium">Jenis</th>
+                  <th className="py-2 pr-4 font-medium">Mulai</th>
+                  <th className="py-2 pr-4 font-medium">Selesai</th>
+                  <th className="py-2 font-medium">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.data.map((a) => (
+                  <tr key={a.id} className="border-t border-[var(--n-200)]">
+                    <td className="py-2 pr-4">{a.package_code}</td>
+                    <td className="py-2 pr-4">{SOURCE_LABEL[a.source] ?? a.source}</td>
+                    <td className="py-2 pr-4 tabular-nums">{a.effective_start_date}</td>
+                    <td className="py-2 pr-4 tabular-nums">{a.effective_end_date ?? "Terbuka"}</td>
+                    <td className="py-2">
+                      {a.is_active ? (
+                        <Badge variant="success" icon={CheckCircle} label="Aktif" />
+                      ) : (
+                        <Badge variant="danger" icon={XCircle} label="Nonaktif" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         <form

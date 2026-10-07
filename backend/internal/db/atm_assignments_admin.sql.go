@@ -369,7 +369,12 @@ func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssign
 }
 
 const listATMPackageOptions = `-- name: ListATMPackageOptions :many
-SELECT DISTINCT vpp.package::text AS package
+SELECT vpp.package::text AS package,
+       vpp.package_code,
+       vpp.tier_min,
+       vpp.tier_max,
+       COALESCE(vpp.base_price::text, '')::text AS base_price,
+       vpp.currency::text AS currency
 FROM atms a
 JOIN vendor_package_prices vpp
   ON vpp.vendor_id = $1
@@ -379,7 +384,7 @@ JOIN vendor_package_prices vpp
  AND vpp.effective_start_date <= $2::date
  AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= $2::date)
 WHERE a.id = $3 AND a.deleted_at IS NULL
-ORDER BY 1
+ORDER BY vpp.package, vpp.tier_min, vpp.package_code
 `
 
 type ListATMPackageOptionsParams struct {
@@ -388,21 +393,39 @@ type ListATMPackageOptionsParams struct {
 	AtmID    int64       `json:"atm_id"`
 }
 
-// FR11: distinct package labels of a vendor that pass the same tariff check as
+type ListATMPackageOptionsRow struct {
+	Package     string `json:"package"`
+	PackageCode string `json:"package_code"`
+	TierMin     int32  `json:"tier_min"`
+	TierMax     *int32 `json:"tier_max"`
+	BasePrice   string `json:"base_price"`
+	Currency    string `json:"currency"`
+}
+
+// FR11: the vendor's tariff rows that pass the same check as
 // VendorTariffExistsForATM, for the assignment dialog's vendor-wide dropdown.
-func (q *Queries) ListATMPackageOptions(ctx context.Context, arg ListATMPackageOptionsParams) ([]string, error) {
+// One row per tariff (code + tier + price) so the dropdown shows what the label
+// means; the assignment still stores only the label (avp.package).
+func (q *Queries) ListATMPackageOptions(ctx context.Context, arg ListATMPackageOptionsParams) ([]ListATMPackageOptionsRow, error) {
 	rows, err := q.db.Query(ctx, listATMPackageOptions, arg.VendorID, arg.AsOf, arg.AtmID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []ListATMPackageOptionsRow{}
 	for rows.Next() {
-		var package_ string
-		if err := rows.Scan(&package_); err != nil {
+		var i ListATMPackageOptionsRow
+		if err := rows.Scan(
+			&i.Package,
+			&i.PackageCode,
+			&i.TierMin,
+			&i.TierMax,
+			&i.BasePrice,
+			&i.Currency,
+		); err != nil {
 			return nil, err
 		}
-		items = append(items, package_)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

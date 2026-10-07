@@ -108,9 +108,22 @@ export type CreateATMAssignmentPayload = {
   | { source: "vendor"; vendor_id: number; vendor_branch_id: number; package: string }
 );
 
-/** Vendor-wide package labels that have a tariff matching this ATM's machine group/class today. */
-export async function listATMPackageOptions(atmId: number, vendorId: number): Promise<string[]> {
-  const { data } = await api.get<{ packages: string[] | null }>(
+/** A vendor-wide tariff row matching the ATM. base_price is a decimal string ("" = inherited). */
+export interface ATMPackageOption {
+  package: string;
+  package_code: string;
+  tier_min: number;
+  tier_max: number | null;
+  base_price: string;
+  currency: string;
+}
+
+/** Vendor-wide tariff rows matching this ATM's machine group/class today. */
+export async function listATMPackageOptions(
+  atmId: number,
+  vendorId: number,
+): Promise<ATMPackageOption[]> {
+  const { data } = await api.get<{ packages: ATMPackageOption[] | null }>(
     `${BASE}/${atmId}/assignment-package-options?vendor_id=${vendorId}`,
   );
   return data.packages ?? [];

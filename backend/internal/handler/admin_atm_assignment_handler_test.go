@@ -24,7 +24,7 @@ type fakeATMAssignmentAdminServicer struct {
 	listResult []service.ATMAssignment
 	getResult  *service.ATMAssignment
 	createErr  error
-	options    []string
+	options    []db.ListATMPackageOptionsRow
 	optionsErr error
 	lastVendor int64
 }
@@ -47,7 +47,7 @@ func (f *fakeATMAssignmentAdminServicer) Update(context.Context, int64, int64, i
 func (f *fakeATMAssignmentAdminServicer) Disable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 9, Status: "pending"}, nil
 }
-func (f *fakeATMAssignmentAdminServicer) PackageOptions(_ context.Context, _, vendorID int64) ([]string, error) {
+func (f *fakeATMAssignmentAdminServicer) PackageOptions(_ context.Context, _, vendorID int64) ([]db.ListATMPackageOptionsRow, error) {
 	f.lastVendor = vendorID
 	return f.options, f.optionsErr
 }
@@ -307,11 +307,14 @@ func TestAdminATMAssignmentHandler_List_ExposesSource(t *testing.T) {
 }
 
 func TestAdminATMAssignmentHandler_PackageOptions(t *testing.T) {
-	t.Run("returns labels for vendor", func(t *testing.T) {
-		svc := &fakeATMAssignmentAdminServicer{options: []string{"PAKET 3", "PAKET 4"}}
+	t.Run("returns tariff rows for vendor", func(t *testing.T) {
+		tierMax := int32(50)
+		svc := &fakeATMAssignmentAdminServicer{options: []db.ListATMPackageOptionsRow{
+			{Package: "PAKET 3", PackageCode: "PKG3_ABA_001", TierMin: 1, TierMax: &tierMax, BasePrice: "2003100.00", Currency: "IDR"},
+		}}
 		router, tokenSvc := mountPackageOptions(svc)
 		rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignment-package-options?vendor_id=2", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"packages":["PAKET 3","PAKET 4"]`) || svc.lastVendor != 2 {
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"packages":[{"package":"PAKET 3","package_code":"PKG3_ABA_001","tier_min":1,"tier_max":50,"base_price":"2003100.00","currency":"IDR"}]`) || svc.lastVendor != 2 {
 			t.Fatalf("got %d: %s (vendor %d)", rec.Code, rec.Body.String(), svc.lastVendor)
 		}
 	})

@@ -149,9 +149,16 @@ SELECT EXISTS (
 ) AS exists;
 
 -- name: ListATMPackageOptions :many
--- FR11: distinct package labels of a vendor that pass the same tariff check as
+-- FR11: the vendor's tariff rows that pass the same check as
 -- VendorTariffExistsForATM, for the assignment dialog's vendor-wide dropdown.
-SELECT DISTINCT vpp.package::text AS package
+-- One row per tariff (code + tier + price) so the dropdown shows what the label
+-- means; the assignment still stores only the label (avp.package).
+SELECT vpp.package::text AS package,
+       vpp.package_code,
+       vpp.tier_min,
+       vpp.tier_max,
+       COALESCE(vpp.base_price::text, '')::text AS base_price,
+       vpp.currency::text AS currency
 FROM atms a
 JOIN vendor_package_prices vpp
   ON vpp.vendor_id = sqlc.arg('vendor_id')
@@ -161,4 +168,4 @@ JOIN vendor_package_prices vpp
  AND vpp.effective_start_date <= sqlc.arg('as_of')::date
  AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= sqlc.arg('as_of')::date)
 WHERE a.id = sqlc.arg('atm_id') AND a.deleted_at IS NULL
-ORDER BY 1;
+ORDER BY vpp.package, vpp.tier_min, vpp.package_code;

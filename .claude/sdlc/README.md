@@ -75,11 +75,11 @@ feature-specific slice of these in each `intent.md` / `spec.md`:
 
 ## Current features
 
-Last synced: 2026-09-30. "Stage" = furthest artifact present. "Status" = actual code state (commits / CLAUDE.md Sec 12), which may be ahead of the artifact headers.
+Last synced: 2026-10-07 (`dev1` = `main`, PR #1 merged `38eb0a1`). "Stage" = furthest artifact present. "Status" = actual code state (commits / CLAUDE.md Sec 12), which may be ahead of the artifact headers.
 
 | Feature | Folder | Stage | Status |
 |---------|--------|-------|--------|
-| Vendor upload DSR | `vendor-upload-dsr/` | 6 Maintain (all 6 artifacts, headers still `draft`) | implemented (commit `4d4e261`); `intent.md` still awaiting PO sign-off |
+| Vendor upload DSR | `vendor-upload-dsr/` | 6 Maintain (all 6 artifacts, headers still `draft`) | implemented (commit `4d4e261`); `tests.md` re-verified 2026-10-07 (T1/T3/T5/T7 pass, T4 removed, T6 obsolete; T2 live-DB test outstanding); `intent.md` still awaiting PO sign-off |
 | Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | 5 Deploy (`review.md`) | implemented, Fase 0–6 (plan 43/43); retry-apply has no UI button yet |
 | User session lifetime (1 h, parameterized) | `user-session/` | 4 Test (`tests.md`) | implemented (plan 17/17, commit `7a86eca`); T5.3 manual expiry test outstanding (user) |
 | Vendor package pricing | `vendor-pricing/` | 3 Build (`plan.md`, `schema.dbml`) | schema (mig 009/010/017) + backend + CompanyPortal panel built; per-ATM special price not seeded |
@@ -87,9 +87,9 @@ Last synced: 2026-09-30. "Stage" = furthest artifact present. "Status" = actual 
 | Kelolaan cabang → vault/PIC/paket (perbaikan RBAC) | `perbaikan-rbac/` | 3 Build (`plan.md`) | mostly built (backend contract, dialogs, branch drill-down, vendor-wide PIC, pending badges); 2026-09-30 G1 server-side paging + branch search, G2 pending creates visible, G3 tests; next: approve/reject/apply-failure + conflict tests, manual browser check (user) |
 | `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 4 Test (`tests.md`, `review.md`) | built Fases 1–7; T8.1 tests green, T8.2 reviews fixed (migration 020, DSR path traversal); Go helper deferred to forecast 2.1; TZ Asia/Jakarta deploy prereq; remaining: A17 manual browser check (user), `/api/eod` routing ready (S6) |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (`intent.md`, draft 2026-09-28) | not built; depends on 0.3 notification + DSR schema change (per-cabang); open questions resolved 2026-09-28, awaiting PO acceptance |
-| Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (`review.md`, 2026-09-30) | committed `7f6d16b` + review R1/R2 fix `a9873d2`; tests/lint/build green; no open review findings; manual browser check outstanding (user) → merge |
-| Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (`review.md`, 2026-10-01) | built (not committed): migrasi 021 applied to dev; tests/lint/build green; review R1 fixed, no open Important (6 nits noted); next: manual browser check (user, needs kelolaan seed) → commit split from old Forecast Browser changes (D3) → merge |
-| Kelolaan ATM: paket khusus cabang atau vendor-wide | `atm-package-source/` | 5 Deploy (`review.md`, 2026-10-07) | built, committed `ff005fa` (satu commit bersama fitur lain, tidak dipisah per fitur; mig 023 applied to dev); backend unit+integration, frontend tests/lint/build green; review R1 (I1 cakupan, I2 mode-check Applier) fixed, no open Important | manual browser check (user) → merge |
+| Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (`review.md`, 2026-09-30) | committed `7f6d16b` + review R1/R2 fix `a9873d2`; tests/lint/build green; no open review findings; merged to main; manual browser check outstanding (user) |
+| Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (`review.md`, 2026-10-01) | built, committed in `ff005fa`, merged to main; migrasi 021 applied to dev; tests/lint/build green; review R1 fixed, no open Important (6 nits noted); next: manual browser check (user, needs kelolaan seed) |
+| Kelolaan ATM: paket khusus cabang atau vendor-wide | `atm-package-source/` | 5 Deploy (`review.md`, 2026-10-07) | built, committed `ff005fa` (satu commit bersama fitur lain, tidak dipisah per fitur; mig 023 applied to dev); backend unit+integration, frontend tests/lint/build green; review R1 (I1 cakupan, I2 mode-check Applier) fixed, no open Important; fixes `321a10b`, `00b05a1`; merged to main; next: manual browser check (user) |
 | PKS vendor + Limit CIS per area vault (FSD v1.0) | `vendor-pks-cis-limit/` | 1 Plan (`intent.md`, draft 2026-10-05) | not built; schema A1–A6 + Q1–Q8 resolved 2026-10-05 (migrasi 022); no open questions; awaiting PO accept → spec |
 
 None of these went through the full chain in order (legacy, pre-Sec 4a). Only `vendor-upload-dsr/` has `intent.md`/`spec.md`. New features start at `intent.md`.

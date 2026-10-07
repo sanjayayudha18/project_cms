@@ -60,7 +60,7 @@ Migrations were squashed on 2026-09-18 into `001_baseline_schema.sql` + `002_bas
 
 ### Accepted known gaps (do NOT fix unless asked)
 - `atm_vendor_packages.vendor_package_id` isn't validated against the ATM's `price_machine_group`/`price_class` (user decision 2026-09-23).
-- `vendor_packages_branch` and `atm_vendor_packages` are **empty on dev** (truncated by mig `011`) — need re-seed before those screens show data (Phase 1.4).
+- `vendor_packages_branch` and `atm_vendor_packages` were truncated by mig `011`; dev was re-seeded 2026-09-24 (Phase 1.4 ✅). A fresh DB built from migrations alone still has them empty.
 - `vendor_package_prices` seed is partial (no SSI Paket 3/6, no per-ATM Harga Khusus / Biaya Tambahan).
 - `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`018` aren't exercised by it.
 
@@ -76,28 +76,7 @@ Binding rules (from `project-context.md`):
 - Money = numeric/integer minor units. Writes → primary, reports/dashboards → replica.
 - Every state change writes `audit_logs`. File ingests idempotent per file hash.
 
----
-
-## Phase 1 — Close in-flight work ← **CURRENT**
-
-### 1.1 Region management wrap-up — ✅ DONE 2026-09-25
-- Mig `018` confirmed applied on dev. Integration tests (14) green against real Postgres; added rapid property tests (4.3/4.4/4.9), component tests (9.3), hub + route-guard tests (10.3). Fixed `SettingsHubPage.test.tsx`, which had been broken since the UI revamp (master cards moved behind the "Data master" tab). Spec moved to `.kiro/specs/done/`.
-
-### 1.2 Vendor branch drill-down verification (`.claude/sdlc/perbaikan-rbac/plan.md`)
-- CRUD shipped in `f11bc40`; 17 checklist items still unverified. Decided 2026-09-25:
-  - **Filter contract — ✅ already built:** optional `branch_id` on vault/PIC/package list + count. PIC vendor-wide scope uses the existing `vendor_wide_only=true` (same semantics as the agreed `scope=vendor`; kept as-is to avoid API churn — `scope=all` = no param, `scope=branch` = `branch_id`).
-  - **Disable branch with active children — ✅ done 2026-09-25:** 409 at submit (existing) + re-check at apply (`ensureBranchHasNoActiveChildren`, new) mapped to 409 in the approval handler; integration test added. No cascade.
-  - **Remaining:** the other checklist items in that plan are UI/flow checks → **manual browser verification by the user** (Golden Rule #10).
-- Only verify + fix gaps listed there. No new UI.
-- **Model:** Sonnet, Effort: Medium.
-
-### 1.3 DSR upload re-verification (`.claude/sdlc/vendor-upload-dsr/`)
-- `tests.md` predates the two-phase dry-run/confirm flow; re-verify test cases against current behavior, mark each pass/fail.
-- **Model:** Sonnet, Effort: Medium.
-
-### 1.4 Dev data re-seed
-- Re-seed `vendor_packages_branch` + `atm_vendor_packages` so branch/assignment screens are testable. Data source must be confirmed by the user — do not invent rows.
-- **Model:** Sonnet, Effort: Medium — data migration, STOP & flag rule applies.
+> **Numbering ≠ execution order.** Phases are listed by number; Phase 1 (close in-flight) runs *before* Phase 0 (infra) — see the dependency graph below. Numbers are kept stable because other docs reference them (e.g. "0.3", "2.1").
 
 ---
 
@@ -127,6 +106,28 @@ Binding rules (from `project-context.md`):
 - **Model:** Sonnet, Effort: Medium.
 
 > Async worker: dropped as a standalone item. Decide per-feature (goroutine + DB job table vs Redis queue) when 2.1 needs it — no new dependency until then.
+
+---
+
+## Phase 1 — Close in-flight work ← **CURRENT**
+
+### 1.1 Region management wrap-up — ✅ DONE 2026-09-25
+- Mig `018` confirmed applied on dev. Integration tests (14) green against real Postgres; added rapid property tests (4.3/4.4/4.9), component tests (9.3), hub + route-guard tests (10.3). Fixed `SettingsHubPage.test.tsx`, which had been broken since the UI revamp (master cards moved behind the "Data master" tab). Spec moved to `.kiro/specs/done/`.
+
+### 1.2 Vendor branch drill-down verification (`.claude/sdlc/perbaikan-rbac/plan.md`)
+- CRUD shipped in `f11bc40`; 17 checklist items still unverified. Decided 2026-09-25:
+  - **Filter contract — ✅ already built:** optional `branch_id` on vault/PIC/package list + count. PIC vendor-wide scope uses the existing `vendor_wide_only=true` (same semantics as the agreed `scope=vendor`; kept as-is to avoid API churn — `scope=all` = no param, `scope=branch` = `branch_id`).
+  - **Disable branch with active children — ✅ done 2026-09-25:** 409 at submit (existing) + re-check at apply (`ensureBranchHasNoActiveChildren`, new) mapped to 409 in the approval handler; integration test added. No cascade.
+  - **Remaining:** the other checklist items in that plan are UI/flow checks → **manual browser verification by the user** (Golden Rule #10).
+- Only verify + fix gaps listed there. No new UI.
+- **Model:** Sonnet, Effort: Medium.
+
+### 1.3 DSR upload re-verification (`.claude/sdlc/vendor-upload-dsr/`) — ✅ DONE 2026-10-07 (automated part)
+- Every `tests.md` case re-checked against the two-phase flow: T1/T3/T5/T7 pass, T4 removed (out of scope), T6 obsolete. New tests: Go vendor-scoping (T5) + Python negative-amount (T7).
+- **Remaining:** T2 live-DB integration test (same/changed checksum) and the manual browser check (user, Golden Rule #10).
+
+### 1.4 Dev data re-seed — ✅ DONE 2026-10-07
+- Checked dev DB 2026-10-07: both tables were already re-seeded on 2026-09-24 (`vendor_packages_branch` 93 rows, `atm_vendor_packages` 1,163 active rows, all branch mode). No seed migration needed; the drafted `024_seed_dev_vendor_packages_branch.sql` was dropped (it would have tripped `atm_vendor_packages_no_overlap` against the existing rows).
 
 ---
 

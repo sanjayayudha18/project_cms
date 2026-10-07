@@ -137,6 +137,14 @@ class DsrEtlParserTests(unittest.TestCase):
         self.assertIsNone(amount)
         self.assertTrue(is_error)
 
+    def test_cell_number_keeps_negative_sign_exactly(self) -> None:
+        # T7: pengeluaran arrives negative; the sign and value must survive as
+        # Decimal (never float-rounded), whether the cell is numeric or text.
+        for raw, want in [(-1500000, "-1500000"), ("-1,500,000", "-1500000"), (-1500000.5, "-1500000.5")]:
+            amount, is_error = cell_number(raw)
+            self.assertFalse(is_error, raw)
+            self.assertEqual(Decimal(want), amount, raw)
+
     def test_read_daily_rows_header_and_leaf_lines(self) -> None:
         fields, rows, error_count = read_daily_rows(self.path)
 

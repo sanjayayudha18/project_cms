@@ -90,11 +90,17 @@ SELECT
     vr.*,
     cu.full_name AS created_by_name,
     au.full_name AS approved_by_name,
-    ru.full_name AS rejected_by_name
+    ru.full_name AS rejected_by_name,
+    csu.full_name AS completion_submitted_by_name,
+    cau.full_name AS completion_approved_by_name,
+    cru.full_name AS completion_rejected_by_name
 FROM vendor_requests vr
 JOIN users cu ON cu.id = vr.created_by
 LEFT JOIN users au ON au.id = vr.approved_by
 LEFT JOIN users ru ON ru.id = vr.rejected_by
+LEFT JOIN users csu ON csu.id = vr.completion_submitted_by
+LEFT JOIN users cau ON cau.id = vr.completion_approved_by
+LEFT JOIN users cru ON cru.id = vr.completion_rejected_by
 WHERE vr.id = sqlc.arg('id')::bigint;
 
 -- name: ListVendorRequests :many
@@ -215,6 +221,7 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        vb.region AS flm_vendor_region,
        a.priority_class AS priority_class,
        pkg.package_code         AS paket,
+       active_pkg.package       AS paket_vendor, -- vendor-wide label (migration 023); NULL for a branch package
        esc.escrow        AS escrow,
        EXISTS (
            SELECT 1
@@ -225,14 +232,20 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
              AND vri.denom = f.denom
              AND vr.status NOT IN ('cancelled', 'rejected')
              AND vr.is_canceled = false
-       ) AS is_requested
+       ) AS is_requested,
+       vq.remaining   AS visit_remaining,
+       vq.quota_total AS visit_quota_total
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN locations l ON l.id = a.location_id
+-- atm-visit-quota (FR5): sisa kunjungan; LEFT JOIN tabel nyata -> nullable
+-- *int32 (alasan sqlc sama dengan kolom paket di atas).
+LEFT JOIN atm_visit_quotas vq ON vq.atm_id = a.id
 LEFT JOIN LATERAL (
-    SELECT vp.vendor_branch_id, vp.id AS vendor_package_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id,
+           avp.vendor_package_id AS vendor_package_id, avp.package AS package
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
@@ -275,9 +288,9 @@ SELECT COUNT(*)
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN LATERAL (
-    SELECT vp.vendor_branch_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
@@ -310,6 +323,7 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
 WITH r AS (
     SELECT f.terminal_id,
            f.amount_replenish,
+           v.id      AS vendor_id,
            v.name    AS flm_vendor,
            vb.region AS flm_vendor_region,
            EXISTS (
@@ -325,9 +339,9 @@ WITH r AS (
     FROM dmaa_atm_forecast f
     LEFT JOIN atms a ON a.terminal_id = f.terminal_id
     LEFT JOIN LATERAL (
-        SELECT vp.vendor_branch_id
+        SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
         FROM atm_vendor_packages avp
-        JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+        LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
         WHERE avp.atm_id = a.id
           AND avp.is_active = true
           AND avp.effective_start_date <= sqlc.arg('forecast_date')::date
@@ -341,6 +355,7 @@ WITH r AS (
 ), atm AS (
     SELECT r.terminal_id,
            r.flm_vendor,
+           MIN(r.vendor_id)           AS vendor_id,
            LOWER(r.flm_vendor_region) AS region_key,
            MIN(r.flm_vendor_region)   AS flm_vendor_region,
            bool_and(r.is_requested) AS all_requested,
@@ -350,6 +365,8 @@ WITH r AS (
     GROUP BY r.terminal_id, r.flm_vendor, LOWER(r.flm_vendor_region)
 )
 SELECT COALESCE(atm.flm_vendor, '')::text             AS flm_vendor,
+       -- atm-visit-quota (FR6.6): target reset kuota massal; 0 = tanpa vendor.
+       COALESCE(MIN(atm.vendor_id), 0)::bigint        AS vendor_id,
        COALESCE(MIN(atm.flm_vendor_region), '')::text AS flm_vendor_region,
        COUNT(*)::bigint                                        AS atm_count,
        (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
@@ -420,9 +437,9 @@ WHERE id = sqlc.arg('id')::bigint;
 SELECT v.id AS vendor_id
 FROM atms a
 JOIN LATERAL (
-    SELECT vp.vendor_branch_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= sqlc.arg('as_of_date')::date
@@ -450,3 +467,58 @@ FROM dmaa_atm_forecast
 WHERE terminal_id = sqlc.arg('terminal_id')::text
   AND periode_pred = sqlc.arg('periode_pred')::date
   AND denom = sqlc.arg('denom')::int;
+
+-- ---------------------------------------------------------------------------
+-- atm-visit-quota: laporan selesai replenish (spec FR1)
+-- ---------------------------------------------------------------------------
+
+-- name: UpdateVendorRequestCompletion :one
+-- One query for the three completion transitions, same CASE-guard idea as
+-- UpdateVendorRequestStatus: completion_pending stamps the maker (and clears a
+-- previous rejection), completed stamps the approver, approved (= laporan
+-- ditolak, back to the maker) stamps the rejecter + reason.
+UPDATE vendor_requests
+SET
+    status = sqlc.arg('status')::text,
+    completion_submitted_by = CASE WHEN sqlc.arg('status')::text = 'completion_pending' THEN sqlc.arg('actor_id')::bigint ELSE completion_submitted_by END,
+    completion_submitted_at = CASE WHEN sqlc.arg('status')::text = 'completion_pending' THEN now() ELSE completion_submitted_at END,
+    completion_approved_by  = CASE WHEN sqlc.arg('status')::text = 'completed' THEN sqlc.arg('actor_id')::bigint ELSE completion_approved_by END,
+    completion_approved_at  = CASE WHEN sqlc.arg('status')::text = 'completed' THEN now() ELSE completion_approved_at END,
+    completion_rejected_by  = CASE WHEN sqlc.arg('status')::text = 'approved' THEN sqlc.arg('actor_id')::bigint
+                                   WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejected_by END,
+    completion_rejected_at  = CASE WHEN sqlc.arg('status')::text = 'approved' THEN now()
+                                   WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejected_at END,
+    completion_rejection_reason = CASE WHEN sqlc.arg('status')::text = 'approved' THEN sqlc.narg('reason')::text
+                                   WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejection_reason END
+WHERE id = sqlc.arg('id')::bigint
+RETURNING *;
+
+-- name: ListDistinctRequestTerminals :many
+SELECT DISTINCT terminal_id FROM vendor_request_items
+WHERE vendor_request_id = $1
+ORDER BY terminal_id;
+
+-- name: UpsertVendorRequestAtmResult :exec
+INSERT INTO vendor_request_atm_results (vendor_request_id, terminal_id, result)
+VALUES (sqlc.arg('vendor_request_id')::bigint, sqlc.arg('terminal_id')::text, sqlc.arg('result')::text)
+ON CONFLICT (vendor_request_id, terminal_id)
+DO UPDATE SET result = EXCLUDED.result, updated_at = now();
+
+-- name: ListVendorRequestAtmResults :many
+SELECT * FROM vendor_request_atm_results
+WHERE vendor_request_id = $1
+ORDER BY terminal_id;
+
+-- name: ListRequestVisitInfo :many
+-- Per distinct terminal of one request: current sisa kunjungan (if the ATM
+-- has a quota row) and whether this request's visit was over quota. Feeds
+-- the detail screen badges and the approve-dialog warning (FR6.2/6.3).
+SELECT t.terminal_id,
+       vq.remaining   AS visit_remaining,
+       vq.quota_total AS visit_quota_total,
+       COALESCE(av.is_over_quota AND av.cancelled_at IS NULL, false)::boolean AS is_over_quota
+FROM (SELECT DISTINCT vri.terminal_id FROM vendor_request_items vri WHERE vri.vendor_request_id = sqlc.arg('id')::bigint) t
+LEFT JOIN atms a ON a.terminal_id = t.terminal_id
+LEFT JOIN atm_visit_quotas vq ON vq.atm_id = a.id
+LEFT JOIN atm_visits av ON av.atm_id = a.id AND av.vendor_request_id = sqlc.arg('id')::bigint
+ORDER BY t.terminal_id;

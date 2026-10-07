@@ -9,8 +9,12 @@
 import { Skeleton } from "@/components/feedback/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { VISIT_QUOTA_CHECKER_ROLES, useResetVendorQuota } from "@/features/atm-portal/visitQuota";
+import { useAuthStore } from "@/lib/auth/store";
+import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
-import { AlertCircle, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Clock, RotateCcw } from "lucide-react";
+import { useState } from "react";
 import type { ForecastSummaryGroup, ForecastSummaryResponse } from "./types";
 
 /** Stable key of a group; "" identifies the no-active-vendor group. */
@@ -53,7 +57,46 @@ export function ForecastSummary({
     return <Skeleton height={160} className="w-full" />;
   }
 
+  return <SummaryContent data={data} activeKey={activeKey} onSelectGroup={onSelectGroup} />;
+}
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+const SELECT_CLASS =
+  "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
+const LABEL_CLASS = "text-xs font-medium uppercase tracking-wider text-[var(--n-600)]";
+
+function SummaryContent({
+  data,
+  activeKey,
+  onSelectGroup,
+}: {
+  data: ForecastSummaryResponse;
+  activeKey: string | null;
+  onSelectGroup: (group: ForecastSummaryGroup) => void;
+}) {
   const { totals, groups } = data;
+  const [vendorPick, setVendorPick] = useState("");
+  const [regionPick, setRegionPick] = useState("");
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
+  const [pageRaw, setPageRaw] = useState(1);
+
+  const vendors = [...new Set(groups.map((g) => g.flm_vendor).filter(Boolean))].sort();
+  const regions = [...new Set(groups.map((g) => g.flm_vendor_region).filter(Boolean))].sort();
+  // A pick that no longer exists (e.g. after a date change) falls back to "Semua".
+  const vendor = vendors.includes(vendorPick) ? vendorPick : "";
+  const region = regions.includes(regionPick) ? regionPick : "";
+
+  // atm-visit-quota (FR6.6): reset kuota is per vendor (all its regions), so it
+  // is offered once a single vendor is picked, not per vendor × region row.
+  const vendorId = vendor ? (groups.find((g) => g.flm_vendor === vendor)?.vendor_id ?? 0) : 0;
+
+  const filtered = groups.filter(
+    (g) => (!vendor || g.flm_vendor === vendor) && (!region || g.flm_vendor_region === region),
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(pageRaw, totalPages);
+  const pageGroups = filtered.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <section aria-label="Ringkasan forecast" className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -69,6 +112,53 @@ export function ForecastSummary({
           value={totals.unassigned_atm_count}
           warn={totals.unassigned_atm_count > 0}
         />
+      </div>
+
+      <h2 className="text-base font-semibold text-[var(--n-900)]">Summary Rekomendasi ATM</h2>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="summary-vendor-filter" className={LABEL_CLASS}>
+            Vendor
+          </label>
+          <select
+            id="summary-vendor-filter"
+            value={vendor}
+            onChange={(e) => {
+              setVendorPick(e.target.value);
+              setPageRaw(1);
+            }}
+            className={SELECT_CLASS}
+          >
+            <option value="">Semua</option>
+            {vendors.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="summary-region-filter" className={LABEL_CLASS}>
+            Region
+          </label>
+          <select
+            id="summary-region-filter"
+            value={region}
+            onChange={(e) => {
+              setRegionPick(e.target.value);
+              setPageRaw(1);
+            }}
+            className={SELECT_CLASS}
+          >
+            <option value="">Semua</option>
+            {regions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+        {vendorId > 0 && <VendorQuotaReset vendorId={vendorId} vendorName={vendor} />}
       </div>
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--n-200)]">
@@ -106,14 +196,16 @@ export function ForecastSummary({
               </tr>
             </thead>
             <tbody>
-              {groups.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-[var(--n-700)]">
-                    Tidak ada rekomendasi forecast untuk tanggal ini
+                    {groups.length === 0
+                      ? "Tidak ada rekomendasi forecast untuk tanggal ini"
+                      : "Tidak ada data yang cocok dengan filter"}
                   </td>
                 </tr>
               )}
-              {groups.map((group) => (
+              {pageGroups.map((group) => (
                 <GroupRow
                   key={summaryGroupKey(group)}
                   group={group}
@@ -124,8 +216,100 @@ export function ForecastSummary({
             </tbody>
           </table>
         </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--n-200)] px-4 py-3 text-sm text-[var(--n-600)]">
+          <div className="flex items-center gap-2">
+            <label htmlFor="summary-page-size">Baris per halaman ringkasan</label>
+            <select
+              id="summary-page-size"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPageRaw(1);
+              }}
+              className={SELECT_CLASS}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+          <span>
+            Menampilkan {pageGroups.length} dari {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <span>
+              Halaman {page} dari {totalPages}
+            </span>
+            <Button variant="secondary" disabled={page <= 1} onClick={() => setPageRaw(page - 1)}>
+              Sebelumnya<span className="sr-only"> ringkasan</span>
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={page >= totalPages}
+              onClick={() => setPageRaw(page + 1)}
+            >
+              Berikutnya<span className="sr-only"> ringkasan</span>
+            </Button>
+          </div>
+        </div>
       </div>
     </section>
+  );
+}
+
+const RESET_TOAST_MS = 6000;
+
+/** Checker-only, two-step "Reset kuota vendor" (resets every ATM of the vendor). */
+function VendorQuotaReset({ vendorId, vendorName }: { vendorId: number; vendorName: string }) {
+  const role = useAuthStore((s) => s.user?.role);
+  const { toast, dismiss } = useToast();
+  const resetMutation = useResetVendorQuota();
+  const [confirming, setConfirming] = useState(false);
+
+  if (!role || !VISIT_QUOTA_CHECKER_ROLES.includes(role)) return null;
+
+  async function handleReset(): Promise<void> {
+    try {
+      const res = await resetMutation.mutateAsync(vendorId);
+      const skipped =
+        res.skipped_count > 0 ? `, ${res.skipped_count} dilewati (paket tidak dikenali)` : "";
+      const id = toast({
+        type: "success",
+        message: `Kuota ${vendorName} di-reset: ${res.reset_count} ATM${skipped}`,
+      });
+      setTimeout(() => dismiss(id), RESET_TOAST_MS);
+    } catch (err) {
+      const id = toast({
+        type: "error",
+        message: err instanceof Error ? err.message : "Gagal me-reset kuota vendor",
+      });
+      setTimeout(() => dismiss(id), RESET_TOAST_MS);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <Button variant="secondary" onClick={() => setConfirming(true)}>
+        <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+        Reset Kuota Vendor
+      </Button>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span>Reset sisa kunjungan semua ATM {vendorName} ke kuota paketnya?</span>
+      <Button variant="secondary" onClick={() => setConfirming(false)}>
+        Batal
+      </Button>
+      <Button disabled={resetMutation.isPending} onClick={handleReset}>
+        {resetMutation.isPending ? "Me-reset..." : "Ya, Reset"}
+      </Button>
+    </div>
   );
 }
 

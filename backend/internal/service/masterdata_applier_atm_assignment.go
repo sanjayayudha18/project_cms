@@ -53,6 +53,8 @@ func mapAssignmentDBError(op string, err error) error {
 			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentOverlap)
 		case pgUniqueViolation:
 			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentDuplicate)
+		case pgCheckViolation:
+			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentSourceInvalid)
 		}
 	}
 	return fmt.Errorf("%s atm assignment: %w", op, err)
@@ -72,8 +74,9 @@ func applyAutoAssignment(ctx context.Context, q *db.Queries, p ATMAssignmentPayl
 	if err := q.DisableATMAssignmentsStartingOn(ctx, db.DisableATMAssignmentsStartingOnParams{AtmID: p.ATMID, StartDate: start}); err != nil {
 		return 0, nil, fmt.Errorf("disable same-day atm assignment: %w", err)
 	}
+	pkgID, vendorID, branchID, label := p.dbColumns()
 	created, err := q.CreateATMAssignmentAdmin(ctx, db.CreateATMAssignmentAdminParams{
-		AtmID: p.ATMID, VendorPackageID: p.VendorPackageID, EffectiveStartDate: start,
+		AtmID: p.ATMID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label, EffectiveStartDate: start,
 	})
 	if err != nil {
 		return 0, nil, mapAssignmentDBError("create", err)
@@ -91,15 +94,21 @@ func (ATMAssignmentApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Mast
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal atm assignment create payload: %w", err)
 		}
+		now := time.Now()
+		if err := validateSourceAtApply(ctx, q, p.ATMID, p.ATMAssignmentUpdatePayload, now); err != nil {
+			return 0, nil, err
+		}
 		if p.EffectiveStartDate == "" {
-			return applyAutoAssignment(ctx, q, p, time.Now())
+			return applyAutoAssignment(ctx, q, p, now)
 		}
 		start, end, err := assignmentDates(p.ATMAssignmentUpdatePayload)
 		if err != nil {
 			return 0, nil, err
 		}
+		pkgID, vendorID, branchID, label := p.dbColumns()
 		created, err := q.CreateATMAssignmentAdmin(ctx, db.CreateATMAssignmentAdminParams{
-			AtmID: p.ATMID, VendorPackageID: p.VendorPackageID, EffectiveStartDate: start, EffectiveEndDate: end,
+			AtmID: p.ATMID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label,
+			EffectiveStartDate: start, EffectiveEndDate: end,
 		})
 		if err != nil {
 			return 0, nil, mapAssignmentDBError("create", err)
@@ -118,8 +127,22 @@ func (ATMAssignmentApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Mast
 		if err != nil {
 			return 0, nil, err
 		}
+		cur, err := q.GetATMAssignmentAdminByID(ctx, *change.EntityID)
+		if err != nil {
+			return 0, nil, fmt.Errorf("load atm assignment for update: %w", err)
+		}
+		// The service refuses a mode switch at submit; re-check here so a stale or
+		// hand-crafted payload can never turn a branch row into a vendor-wide one (or back).
+		if cur.Source != p.source() {
+			return 0, nil, fmt.Errorf("%w: sumber paket tidak dapat diubah", ErrATMAssignmentSourceInvalid)
+		}
+		if err := validateSourceAtApply(ctx, q, cur.AtmID, p, time.Now()); err != nil {
+			return 0, nil, err
+		}
+		pkgID, vendorID, branchID, label := p.dbColumns()
 		updated, err := q.UpdateATMAssignmentAdmin(ctx, db.UpdateATMAssignmentAdminParams{
-			ID: *change.EntityID, VendorPackageID: p.VendorPackageID, EffectiveStartDate: start, EffectiveEndDate: end,
+			ID: *change.EntityID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label,
+			EffectiveStartDate: start, EffectiveEndDate: end,
 		})
 		if err != nil {
 			return 0, nil, mapAssignmentDBError("update", err)

@@ -7,7 +7,7 @@
 
 import { useAuthStore } from "@/lib/auth/store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,8 @@ import type { VendorRequestDetail as VendorRequestDetailType } from "../types";
 const mutateAsyncOk = () => vi.fn().mockResolvedValue(undefined);
 
 const useVendorRequestMock = vi.fn();
+const submitCompletionSpy = vi.fn();
+const approveCompletionSpy = vi.fn();
 
 vi.mock("../hooks", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../hooks")>();
@@ -29,6 +31,15 @@ vi.mock("../hooks", async (importOriginal) => {
     useRejectVendorRequest: () => ({ mutateAsync: mutateAsyncOk(), isPending: false }),
     useReviseVendorRequest: () => ({ mutateAsync: mutateAsyncOk(), isPending: false }),
     useCancelVendorRequest: () => ({ mutateAsync: mutateAsyncOk(), isPending: false }),
+    useSubmitVendorRequestCompletion: () => ({
+      mutateAsync: submitCompletionSpy,
+      isPending: false,
+    }),
+    useApproveVendorRequestCompletion: () => ({
+      mutateAsync: approveCompletionSpy,
+      isPending: false,
+    }),
+    useRejectVendorRequestCompletion: () => ({ mutateAsync: mutateAsyncOk(), isPending: false }),
   };
 });
 
@@ -85,6 +96,14 @@ const BASE_DETAIL: VendorRequestDetailType = {
   is_canceled: false,
   is_manual: false,
   cancellation_reason: null,
+  completion_submitted_by: null,
+  completion_submitted_at: null,
+  completion_approved_by: null,
+  completion_approved_at: null,
+  completion_rejected_by: null,
+  completion_rejected_at: null,
+  completion_rejection_reason: null,
+  atms: [],
 };
 
 function mockDetail(overrides: Partial<VendorRequestDetailType>) {
@@ -287,5 +306,117 @@ describe("VendorRequestDetail — approved-cancel (Task 16, Req 3.1, 3.7)", () =
 
     expect(screen.getByText("Alasan Pembatalan")).toBeInTheDocument();
     expect(screen.getByText("Vendor batal")).toBeInTheDocument();
+  });
+});
+
+describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-quota FR6)", () => {
+  const ATMS = [
+    {
+      terminal_id: "ATM001",
+      completion_result: null,
+      visit_remaining: 3,
+      visit_quota_total: 5,
+      is_over_quota: false,
+    },
+    {
+      terminal_id: "ATM002",
+      completion_result: null,
+      visit_remaining: 0,
+      visit_quota_total: 4,
+      is_over_quota: false,
+    },
+  ];
+
+  beforeEach(() => {
+    submitCompletionSpy.mockReset().mockResolvedValue(undefined);
+    approveCompletionSpy.mockReset().mockResolvedValue({ over_quota_terminals: ["ATM002"] });
+  });
+
+  it("approved + maker sees Laporkan Selesai; checker does not", () => {
+    mockDetail({ status: "approved", atms: ATMS });
+    setUser(1, "ATM-USER");
+    const { unmount } = renderWithProviders();
+    expect(screen.getByRole("button", { name: /Laporkan Selesai/ })).toBeInTheDocument();
+    unmount();
+
+    setUser(2, "ATM-SPV");
+    renderWithProviders();
+    expect(screen.queryByRole("button", { name: /Laporkan Selesai/ })).not.toBeInTheDocument();
+  });
+
+  it("report dialog defaults every ATM to Berhasil and sends the toggled Gagal", async () => {
+    mockDetail({ status: "approved", atms: ATMS });
+    setUser(1, "ATM-USER");
+    renderWithProviders();
+
+    await userEvent.click(screen.getByRole("button", { name: /Laporkan Selesai/ }));
+    const atm2 = screen.getByRole("group", { name: "Hasil replenish ATM002" });
+    await userEvent.click(within(atm2).getByLabelText("Gagal"));
+    await userEvent.click(screen.getByRole("button", { name: "Kirim Laporan" }));
+
+    expect(submitCompletionSpy).toHaveBeenCalledWith({
+      id: 42,
+      results: [
+        { terminal_id: "ATM001", result: "success" },
+        { terminal_id: "ATM002", result: "failed" },
+      ],
+    });
+  });
+
+  it("completion_pending: the reporter cannot review own report, another checker can", () => {
+    const pending = {
+      status: "completion_pending" as const,
+      completion_submitted_by: { id: 2, full_name: "SPV Pelapor" },
+      atms: ATMS,
+    };
+    mockDetail(pending);
+    setUser(2, "ADMIN");
+    const { unmount } = renderWithProviders();
+    expect(screen.queryByRole("button", { name: "Setujui Laporan" })).not.toBeInTheDocument();
+    unmount();
+
+    setUser(3, "ATM-SPV");
+    renderWithProviders();
+    expect(screen.getByRole("button", { name: "Setujui Laporan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Tolak Laporan/ })).toBeInTheDocument();
+  });
+
+  it("approve dialog warns which successful ATMs will exceed their kuota", async () => {
+    mockDetail({
+      status: "completion_pending",
+      completion_submitted_by: { id: 1, full_name: "Maker" },
+      atms: [
+        { ...ATMS[0], completion_result: "success" },
+        { ...ATMS[1], completion_result: "success" },
+      ],
+    });
+    setUser(3, "ATM-SPV");
+    renderWithProviders();
+
+    await userEvent.click(screen.getByRole("button", { name: "Setujui Laporan" }));
+    const dialog = screen.getByRole("dialog", { name: "Setujui Laporan Selesai" });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("1 ATM akan melebihi kuota");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("ATM002");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Setujui Laporan" }));
+    expect(approveCompletionSpy).toHaveBeenCalledWith(42);
+  });
+
+  it("completed: per-ATM table shows result, sisa/kuota and the Kelebihan kuota badge (text, not colour only)", () => {
+    mockDetail({
+      status: "completed",
+      atms: [
+        { ...ATMS[0], completion_result: "success", visit_remaining: 2 },
+        { ...ATMS[1], completion_result: "success", visit_remaining: -1, is_over_quota: true },
+      ],
+    });
+    setUser(1, "ATM-USER");
+    renderWithProviders();
+
+    expect(screen.getAllByText("Berhasil")).toHaveLength(2);
+    expect(screen.getByText("2/5")).toBeInTheDocument();
+    expect(screen.getByText("0/4")).toBeInTheDocument();
+    expect(screen.getByText("(+1)")).toBeInTheDocument();
+    expect(screen.getByText("Kelebihan kuota")).toBeInTheDocument();
   });
 });

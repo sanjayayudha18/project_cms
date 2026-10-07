@@ -47,6 +47,10 @@ type MasterDataExportRepo interface {
 // exportSpec is one entity's stable CSV header and its page -> cells mapping.
 type exportSpec struct {
 	header []string
+	// legacyHeader, when set, is an older header the importer still accepts: the
+	// same columns minus one (the missing column is filled with legacyFill).
+	legacyHeader []string
+	legacyFill   string
 	page   func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) (rows [][]string, lastID int64, err error)
 }
 
@@ -120,11 +124,13 @@ var exportSpecs = map[string]exportSpec{
 		},
 	},
 	ExportATMAssignments: {
-		header: []string{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"},
+		header:       []string{"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
+		legacyHeader: []string{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"},
+		legacyFill:   AssignmentSourceBranch,
 		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 			rows, err := r.ATMAssignments(ctx, after, status, limit)
 			return exportPage(rows, err, func(x db.ExportATMAssignmentsBatchRow) int64 { return x.ID }, func(x db.ExportATMAssignmentsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.TerminalID, x.VendorCode, x.BranchCode, x.PackageCode, x.EffectiveStartDate, x.EffectiveEndDate, boolCell(x.IsActive)}
+				return []string{strconv.FormatInt(x.ID, 10), x.TerminalID, x.VendorCode, x.BranchCode, x.PackageSource, x.PackageCode, x.EffectiveStartDate, x.EffectiveEndDate, boolCell(x.IsActive)}
 			})
 		},
 	},

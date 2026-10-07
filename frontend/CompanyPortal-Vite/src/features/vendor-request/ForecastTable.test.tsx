@@ -18,6 +18,8 @@ const rowWithContext: ForecastRow = {
   flm_vendor: "TAG",
   flm_vendor_region: "TAG Jawa Barat",
   is_requested: false,
+  visit_remaining: null,
+  visit_quota_total: null,
 };
 
 const rowWithoutContext: ForecastRow = {
@@ -74,7 +76,8 @@ describe("ForecastTable — four new context columns (Task 4)", () => {
     renderTable({ data: [rowWithoutContext] });
 
     const placeholders = screen.getAllByText("-");
-    expect(placeholders).toHaveLength(4);
+    // 4 context columns + Sisa Kunjungan (atm-visit-quota: no kuota row yet).
+    expect(placeholders).toHaveLength(5);
     for (const el of placeholders) {
       expect(el.textContent).toBe("-");
       expect(el.textContent).not.toBe("—");
@@ -82,25 +85,25 @@ describe("ForecastTable — four new context columns (Task 4)", () => {
   });
 
   // Task 17: 9 -> 11 (drops Amount Refund, adds Priority Class/Paket/Escrow).
-  it("spans all 12 columns on the empty-result row", () => {
+  it("spans all 13 columns on the empty-result row", () => {
     renderTable({ data: [] });
 
     const emptyCell = screen.getByText("Tidak ada data forecast untuk tanggal yang dipilih");
-    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "12");
+    expect(emptyCell.closest("td")).toHaveAttribute("colspan", "13");
   });
 
-  it("spans all 12 columns on the error row", () => {
+  it("spans all 13 columns on the error row", () => {
     renderTable({ data: [], isError: true });
 
     const errorCell = screen.getByText("Gagal memuat data forecast");
-    expect(errorCell.closest("td")).toHaveAttribute("colspan", "12");
+    expect(errorCell.closest("td")).toHaveAttribute("colspan", "13");
   });
 
-  it("spans all 12 columns on skeleton rows while loading", () => {
+  it("spans all 13 columns on skeleton rows while loading", () => {
     const { container } = renderTable({ data: [], isLoading: true });
 
     const skeletonRow = container.querySelector("tbody tr");
-    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(12);
+    expect(skeletonRow?.querySelectorAll("td")).toHaveLength(13);
   });
 });
 
@@ -168,5 +171,19 @@ describe("ForecastTable — request status (forecast-browser-summary FR4.4)", ()
 
     expect(screen.getByText("Belum")).toBeInTheDocument();
     expect(screen.getByLabelText("Pilih baris 1234")).not.toBeDisabled();
+  });
+});
+
+describe("ForecastTable — Sisa Kunjungan (atm-visit-quota FR6.6)", () => {
+  it("renders sisa/kuota right-aligned in tabular-nums", () => {
+    renderTable({ data: [{ ...rowWithContext, visit_remaining: 3, visit_quota_total: 5 }] });
+    expect(screen.getByRole("columnheader", { name: "Sisa Kunjungan" })).toBeInTheDocument();
+    expect(screen.getByText("3/5")).toBeInTheDocument();
+  });
+
+  it("flags an exhausted / over-quota ATM with text, not colour alone", () => {
+    renderTable({ data: [{ ...rowWithContext, visit_remaining: -2, visit_quota_total: 4 }] });
+    expect(screen.getByText("(+2)")).toBeInTheDocument();
+    expect(screen.getByText("kuota habis", { exact: false })).toBeInTheDocument();
   });
 });

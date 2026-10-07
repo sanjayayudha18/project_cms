@@ -17,6 +17,7 @@ import {
   disableATM,
   enableATM,
   getATM,
+  listATMPackageOptions,
   listATMs,
   listLocationOptions,
   updateATM,
@@ -87,5 +88,17 @@ describe("admin-atms api client", () => {
     const result = await listLocationOptions();
     expect(getMock).toHaveBeenCalledWith("/admin/atms/locations");
     expect(result).toEqual({ locations: [] });
+  });
+
+  it("listATMPackageOptions asks the ATM's package-options endpoint for the vendor and returns the labels", async () => {
+    getMock.mockResolvedValue({ data: { packages: ["PAKET 3", "PAKET 4"] } });
+    const result = await listATMPackageOptions(3, 2);
+    expect(getMock).toHaveBeenCalledWith("/admin/atms/3/assignment-package-options?vendor_id=2");
+    expect(result).toEqual(["PAKET 3", "PAKET 4"]);
+  });
+
+  it("listATMPackageOptions treats a null list as empty", async () => {
+    getMock.mockResolvedValue({ data: { packages: null } });
+    expect(await listATMPackageOptions(3, 2)).toEqual([]);
   });
 });

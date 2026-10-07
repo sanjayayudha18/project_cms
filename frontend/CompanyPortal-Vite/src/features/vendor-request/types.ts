@@ -13,7 +13,9 @@ export type VendorRequestStatus =
   | "processing"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  /** atm-visit-quota: laporan selesai replenish menunggu persetujuan SPV. */
+  | "completion_pending";
 
 /**
  * CIT-2 (cit-vendor-request-enhancements spec): a Manual_Request's
@@ -68,6 +70,12 @@ export interface ForecastRow {
    * an item of a Vendor Request that is not cancelled/rejected.
    */
   is_requested: boolean;
+  /**
+   * atm-visit-quota (FR5): sisa kunjungan (atm_visit_quotas.remaining, may be
+   * negative = kelebihan kuota); null = the ATM has no quota row yet.
+   */
+  visit_remaining: number | null;
+  visit_quota_total: number | null;
 }
 
 export interface ForecastResponse {
@@ -97,6 +105,8 @@ export interface ForecastSummaryCounts {
 
 /** flm_vendor === "" (and flm_vendor_region === "") = ATMs with no active vendor package. */
 export interface ForecastSummaryGroup extends ForecastSummaryCounts {
+  /** atm-visit-quota (FR6.6): target of "Reset kuota vendor"; 0 = no active vendor. */
+  vendor_id: number;
   flm_vendor: string;
   flm_vendor_region: string;
 }
@@ -173,6 +183,36 @@ export interface VendorRequestDetail {
    * before this column existed (their reason lives only in the audit log).
    */
   cancellation_reason: string | null;
+  // atm-visit-quota (FR5): laporan selesai replenish.
+  completion_submitted_by: UserRef | null;
+  completion_submitted_at: string | null;
+  completion_approved_by: UserRef | null;
+  completion_approved_at: string | null;
+  completion_rejected_by: UserRef | null;
+  completion_rejected_at: string | null;
+  completion_rejection_reason: string | null;
+  /** One row per distinct ATM of the request. */
+  atms: RequestAtmStatus[];
+  /** Only on the approve-completion response: ATMs that went over quota. */
+  over_quota_terminals?: string[];
+}
+
+export type CompletionResult = "success" | "failed";
+
+export interface RequestAtmStatus {
+  terminal_id: string;
+  /** null until a laporan selesai has been submitted. */
+  completion_result: CompletionResult | null;
+  /** Current sisa (may be negative); null = kuota tidak diketahui / belum ada. */
+  visit_remaining: number | null;
+  visit_quota_total: number | null;
+  /** This request's visit for the ATM went over quota. */
+  is_over_quota: boolean;
+}
+
+export interface CompletionResultInput {
+  terminal_id: string;
+  result: CompletionResult;
 }
 
 export interface VendorRequestSummary {
@@ -310,4 +350,5 @@ export const VENDOR_REQUEST_STATUSES: VendorRequestStatus[] = [
   "completed",
   "failed",
   "cancelled",
+  "completion_pending",
 ];

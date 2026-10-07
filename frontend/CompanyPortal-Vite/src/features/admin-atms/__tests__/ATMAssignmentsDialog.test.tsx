@@ -12,6 +12,7 @@ vi.mock("../api", () => ({
       atm_id: 3,
       vendor_package_id: 8,
       package_code: "PKG-A",
+      source: "branch",
       effective_start_date: "2026-01-01",
       effective_end_date: null,
       is_active: true,
@@ -20,6 +21,7 @@ vi.mock("../api", () => ({
     },
   ],
   createATMAssignment: vi.fn(async () => ({ change_request_id: 1, status: "pending" })),
+  listATMPackageOptions: vi.fn(async () => ["PAKET 3", "PAKET 4"]),
 }));
 vi.mock("../../admin-vendors/api", () => ({
   listVendors: async () => ({
@@ -95,7 +97,66 @@ describe("ATMAssignmentsDialog", () => {
     expect(ajukan.disabled).toBe(false);
     fireEvent.click(ajukan);
     await waitFor(() =>
-      expect(createATMAssignment).toHaveBeenCalledWith(3, { vendor_package_id: 9 }),
+      expect(createATMAssignment).toHaveBeenCalledWith(3, {
+        source: "branch",
+        vendor_package_id: 9,
+      }),
+    );
+  });
+
+  it("requires a cabang in both modes: no 'Semua cabang' option, submit stays disabled until one is chosen", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ATMAssignmentsDialog
+          atm={{ id: 3, terminal_id: "T-003" } as AdminATM}
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    const cabang = (await screen.findByLabelText("Cabang")) as HTMLSelectElement;
+    expect(screen.queryByText("Semua cabang")).toBeNull();
+    await waitFor(() => expect(cabang.value).toBe("5"));
+    fireEvent.change(cabang, { target: { value: "" } });
+    fireEvent.click(screen.getByLabelText(/Paket seluruh vendor/));
+    await waitFor(() => expect(screen.getByRole("option", { name: "PAKET 4" })).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Paket"), { target: { value: "PAKET 4" } });
+    expect((screen.getByRole("button", { name: "Ajukan" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+
+  it("vendor-wide: picks a label from the ATM's options and submits vendor, cabang and label", async () => {
+    vi.mocked(createATMAssignment).mockClear();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ATMAssignmentsDialog
+          atm={{ id: 3, terminal_id: "T-003" } as AdminATM}
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    const vendor = (await screen.findByLabelText("Vendor")) as HTMLSelectElement;
+    await waitFor(() => expect(vendor.value).toBe("2"));
+    const cabang = screen.getByLabelText("Cabang") as HTMLSelectElement;
+    await waitFor(() => expect(cabang.value).toBe("5"));
+
+    fireEvent.click(screen.getByLabelText(/Paket seluruh vendor/));
+    // Switching the source clears the package until a new one is picked.
+    const paket = screen.getByLabelText("Paket") as HTMLSelectElement;
+    expect(paket.value).toBe("");
+    const ajukan = screen.getByRole("button", { name: "Ajukan" }) as HTMLButtonElement;
+    expect(ajukan.disabled).toBe(true);
+    await waitFor(() => expect(screen.getByRole("option", { name: "PAKET 4" })).toBeTruthy());
+    fireEvent.change(paket, { target: { value: "PAKET 4" } });
+    expect(ajukan.disabled).toBe(false);
+    fireEvent.click(ajukan);
+    await waitFor(() =>
+      expect(createATMAssignment).toHaveBeenCalledWith(3, {
+        source: "vendor",
+        vendor_id: 2,
+        vendor_branch_id: 5,
+        package: "PAKET 4",
+      }),
     );
   });
 });

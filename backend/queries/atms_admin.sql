@@ -21,10 +21,10 @@ FROM atms a
 LEFT JOIN locations l ON l.id = a.location_id
 -- Current kelolaan: the active assignment period covering today (latest start wins).
 LEFT JOIN LATERAL (
-    SELECT p.package_code, vb.branch_code, v.code AS vendor_code, v.name AS vendor_name
+    SELECT COALESCE(p.package_code, avp.package) AS package_code, vb.branch_code, v.code AS vendor_code, v.name AS vendor_name
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch p ON p.id = avp.vendor_package_id
-    LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
+    LEFT JOIN vendor_packages_branch p ON p.id = avp.vendor_package_id
+    LEFT JOIN vendor_branches vb ON vb.id = COALESCE(p.vendor_branch_id, avp.vendor_branch_id) -- NULL for internal (ROH) packages
     LEFT JOIN vendors v ON v.id = vb.vendor_id
     WHERE avp.atm_id = a.id AND avp.is_active
       AND avp.effective_start_date <= CURRENT_DATE

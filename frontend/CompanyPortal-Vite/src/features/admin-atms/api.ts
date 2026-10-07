@@ -76,24 +76,44 @@ export async function listLocationOptions(): Promise<LocationOptionsResponse> {
 // No priority_class -- vendor_packages lost it in migration 010 (price/class
 // now live in vendor_package_prices, keyed off the ATM's own machine_type/
 // priority_class instead of the package).
+/** Where the assigned package comes from (migration 023). */
+export type ATMAssignmentSource = "branch" | "vendor";
+
 export interface ATMAssignment {
   id: number;
   atm_id: number;
-  vendor_package_id: number;
+  /** Null for a vendor-wide assignment (package_code is then the vendor-wide label). */
+  vendor_package_id: number | null;
   package_code: string;
+  /** "branch" = a package special to a vendor branch; "vendor" = a vendor-wide package label. */
+  source: ATMAssignmentSource;
   effective_start_date: string;
   effective_end_date: string | null;
   is_active: boolean;
-  /** Owning vendor/cabang of the package; null for internal (ROH) packages. */
+  /** Managing vendor/cabang; null for internal (ROH) packages. */
   vendor_id?: number | null;
   vendor_branch_id?: number | null;
 }
 
-/** Dates omitted = automatic period (starts on the approval date, open-ended). */
-export interface CreateATMAssignmentPayload {
-  vendor_package_id: number;
+/**
+ * Dates omitted = automatic period (starts on the approval date, open-ended).
+ * "branch": the package is a vendor_packages_branch row. "vendor": a vendor-wide
+ * package label, managed by the chosen cabang of the vendor.
+ */
+export type CreateATMAssignmentPayload = {
   effective_start_date?: string;
   effective_end_date?: string | null;
+} & (
+  | { source: "branch"; vendor_package_id: number }
+  | { source: "vendor"; vendor_id: number; vendor_branch_id: number; package: string }
+);
+
+/** Vendor-wide package labels that have a tariff matching this ATM's machine group/class today. */
+export async function listATMPackageOptions(atmId: number, vendorId: number): Promise<string[]> {
+  const { data } = await api.get<{ packages: string[] | null }>(
+    `${BASE}/${atmId}/assignment-package-options?vendor_id=${vendorId}`,
+  );
+  return data.packages ?? [];
 }
 
 export async function listATMAssignments(atmId: number): Promise<ATMAssignment[]> {

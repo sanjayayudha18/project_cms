@@ -16,9 +16,9 @@ SELECT COUNT(*)
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN LATERAL (
-    SELECT vp.vendor_branch_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= $1::date
@@ -121,7 +121,7 @@ VALUES (
     $7::text,
     $8::bigint
 )
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason
 `
 
 type CreateVendorRequestParams struct {
@@ -181,6 +181,13 @@ func (q *Queries) CreateVendorRequest(ctx context.Context, arg CreateVendorReque
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 	)
 	return i, err
 }
@@ -236,9 +243,9 @@ const getActiveVendorForTerminal = `-- name: GetActiveVendorForTerminal :one
 SELECT v.id AS vendor_id
 FROM atms a
 JOIN LATERAL (
-    SELECT vp.vendor_branch_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= $1::date
@@ -297,7 +304,7 @@ func (q *Queries) GetVendorForRequestNumber(ctx context.Context, id int64) (GetV
 }
 
 const getVendorRequest = `-- name: GetVendorRequest :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason FROM vendor_requests WHERE id = $1
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason FROM vendor_requests WHERE id = $1
 `
 
 // Plain read, no joins -- used where only the request's own columns are
@@ -327,47 +334,70 @@ func (q *Queries) GetVendorRequest(ctx context.Context, id int64) (VendorRequest
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 	)
 	return i, err
 }
 
 const getVendorRequestDetail = `-- name: GetVendorRequestDetail :one
 SELECT
-    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at, vr.is_canceled, vr.request_category, vr.replenish_date, vr.is_manual, vr.vendor_id, vr.cancellation_reason,
+    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at, vr.is_canceled, vr.request_category, vr.replenish_date, vr.is_manual, vr.vendor_id, vr.cancellation_reason, vr.completion_submitted_by, vr.completion_submitted_at, vr.completion_approved_by, vr.completion_approved_at, vr.completion_rejected_by, vr.completion_rejected_at, vr.completion_rejection_reason,
     cu.full_name AS created_by_name,
     au.full_name AS approved_by_name,
-    ru.full_name AS rejected_by_name
+    ru.full_name AS rejected_by_name,
+    csu.full_name AS completion_submitted_by_name,
+    cau.full_name AS completion_approved_by_name,
+    cru.full_name AS completion_rejected_by_name
 FROM vendor_requests vr
 JOIN users cu ON cu.id = vr.created_by
 LEFT JOIN users au ON au.id = vr.approved_by
 LEFT JOIN users ru ON ru.id = vr.rejected_by
+LEFT JOIN users csu ON csu.id = vr.completion_submitted_by
+LEFT JOIN users cau ON cau.id = vr.completion_approved_by
+LEFT JOIN users cru ON cru.id = vr.completion_rejected_by
 WHERE vr.id = $1::bigint
 `
 
 type GetVendorRequestDetailRow struct {
-	ID                 int64              `json:"id"`
-	RequestNumber      string             `json:"request_number"`
-	ForecastDate       pgtype.Date        `json:"forecast_date"`
-	Status             string             `json:"status"`
-	Notes              *string            `json:"notes"`
-	CreatedBy          int64              `json:"created_by"`
-	ApprovedBy         *int64             `json:"approved_by"`
-	RejectedBy         *int64             `json:"rejected_by"`
-	RejectionReason    *string            `json:"rejection_reason"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	SubmittedAt        pgtype.Timestamptz `json:"submitted_at"`
-	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
-	RejectedAt         pgtype.Timestamptz `json:"rejected_at"`
-	IsCanceled         bool               `json:"is_canceled"`
-	RequestCategory    *string            `json:"request_category"`
-	ReplenishDate      pgtype.Date        `json:"replenish_date"`
-	IsManual           bool               `json:"is_manual"`
-	VendorID           *int64             `json:"vendor_id"`
-	CancellationReason *string            `json:"cancellation_reason"`
-	CreatedByName      string             `json:"created_by_name"`
-	ApprovedByName     *string            `json:"approved_by_name"`
-	RejectedByName     *string            `json:"rejected_by_name"`
+	ID                        int64              `json:"id"`
+	RequestNumber             string             `json:"request_number"`
+	ForecastDate              pgtype.Date        `json:"forecast_date"`
+	Status                    string             `json:"status"`
+	Notes                     *string            `json:"notes"`
+	CreatedBy                 int64              `json:"created_by"`
+	ApprovedBy                *int64             `json:"approved_by"`
+	RejectedBy                *int64             `json:"rejected_by"`
+	RejectionReason           *string            `json:"rejection_reason"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	SubmittedAt               pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedAt                pgtype.Timestamptz `json:"approved_at"`
+	RejectedAt                pgtype.Timestamptz `json:"rejected_at"`
+	IsCanceled                bool               `json:"is_canceled"`
+	RequestCategory           *string            `json:"request_category"`
+	ReplenishDate             pgtype.Date        `json:"replenish_date"`
+	IsManual                  bool               `json:"is_manual"`
+	VendorID                  *int64             `json:"vendor_id"`
+	CancellationReason        *string            `json:"cancellation_reason"`
+	CompletionSubmittedBy     *int64             `json:"completion_submitted_by"`
+	CompletionSubmittedAt     pgtype.Timestamptz `json:"completion_submitted_at"`
+	CompletionApprovedBy      *int64             `json:"completion_approved_by"`
+	CompletionApprovedAt      pgtype.Timestamptz `json:"completion_approved_at"`
+	CompletionRejectedBy      *int64             `json:"completion_rejected_by"`
+	CompletionRejectedAt      pgtype.Timestamptz `json:"completion_rejected_at"`
+	CompletionRejectionReason *string            `json:"completion_rejection_reason"`
+	CreatedByName             string             `json:"created_by_name"`
+	ApprovedByName            *string            `json:"approved_by_name"`
+	RejectedByName            *string            `json:"rejected_by_name"`
+	CompletionSubmittedByName *string            `json:"completion_submitted_by_name"`
+	CompletionApprovedByName  *string            `json:"completion_approved_by_name"`
+	CompletionRejectedByName  *string            `json:"completion_rejected_by_name"`
 }
 
 // Detail response shape (Req 9.6): header plus created_by/approved_by/
@@ -398,15 +428,25 @@ func (q *Queries) GetVendorRequestDetail(ctx context.Context, id int64) (GetVend
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 		&i.CreatedByName,
 		&i.ApprovedByName,
 		&i.RejectedByName,
+		&i.CompletionSubmittedByName,
+		&i.CompletionApprovedByName,
+		&i.CompletionRejectedByName,
 	)
 	return i, err
 }
 
 const getVendorRequestForUpdate = `-- name: GetVendorRequestForUpdate :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason FROM vendor_requests WHERE id = $1 FOR UPDATE
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason FROM vendor_requests WHERE id = $1 FOR UPDATE
 `
 
 // Row-locking read for every state transition (submit/approve/reject/revise/
@@ -438,6 +478,13 @@ func (q *Queries) GetVendorRequestForUpdate(ctx context.Context, id int64) (Vend
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 	)
 	return i, err
 }
@@ -530,6 +577,32 @@ func (q *Queries) ListActiveVendors(ctx context.Context) ([]ListActiveVendorsRow
 	return items, nil
 }
 
+const listDistinctRequestTerminals = `-- name: ListDistinctRequestTerminals :many
+SELECT DISTINCT terminal_id FROM vendor_request_items
+WHERE vendor_request_id = $1
+ORDER BY terminal_id
+`
+
+func (q *Queries) ListDistinctRequestTerminals(ctx context.Context, vendorRequestID int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, listDistinctRequestTerminals, vendorRequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var terminal_id string
+		if err := rows.Scan(&terminal_id); err != nil {
+			return nil, err
+		}
+		items = append(items, terminal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDistinctVendorBranchRegions = `-- name: ListDistinctVendorBranchRegions :many
 SELECT DISTINCT region
 FROM vendor_branches
@@ -569,6 +642,7 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        vb.region AS flm_vendor_region,
        a.priority_class AS priority_class,
        pkg.package_code         AS paket,
+       active_pkg.package       AS paket_vendor, -- vendor-wide label (migration 023); NULL for a branch package
        esc.escrow        AS escrow,
        EXISTS (
            SELECT 1
@@ -579,14 +653,18 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
              AND vri.denom = f.denom
              AND vr.status NOT IN ('cancelled', 'rejected')
              AND vr.is_canceled = false
-       ) AS is_requested
+       ) AS is_requested,
+       vq.remaining   AS visit_remaining,
+       vq.quota_total AS visit_quota_total
 FROM dmaa_atm_forecast f
 LEFT JOIN atms a ON a.terminal_id = f.terminal_id
 LEFT JOIN locations l ON l.id = a.location_id
+LEFT JOIN atm_visit_quotas vq ON vq.atm_id = a.id
 LEFT JOIN LATERAL (
-    SELECT vp.vendor_branch_id, vp.id AS vendor_package_id
+    SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id,
+           avp.vendor_package_id AS vendor_package_id, avp.package AS package
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     WHERE avp.atm_id = a.id
       AND avp.is_active = true
       AND avp.effective_start_date <= $1::date
@@ -640,8 +718,11 @@ type ListForecastForDateRow struct {
 	FlmVendorRegion *string        `json:"flm_vendor_region"`
 	PriorityClass   *string        `json:"priority_class"`
 	Paket           *string        `json:"paket"`
+	PaketVendor     *string        `json:"paket_vendor"`
 	Escrow          pgtype.Numeric `json:"escrow"`
 	IsRequested     bool           `json:"is_requested"`
+	VisitRemaining  *int32         `json:"visit_remaining"`
+	VisitQuotaTotal *int32         `json:"visit_quota_total"`
 }
 
 // forecast-browser-summary (.claude/sdlc/forecast-browser-summary): flm_vendor/
@@ -683,6 +764,8 @@ type ListForecastForDateRow struct {
 // emit a non-nullable string that crashes pgx scan on the no-active-package
 // NULL -- Req 5.4/5.8 requires that case to render "-"), while a real-table
 // LEFT JOIN yields the nullable *string the service maps via notesOrEmpty.
+// atm-visit-quota (FR5): sisa kunjungan; LEFT JOIN tabel nyata -> nullable
+// *int32 (alasan sqlc sama dengan kolom paket di atas).
 func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDateParams) ([]ListForecastForDateRow, error) {
 	rows, err := q.db.Query(ctx, listForecastForDate,
 		arg.ForecastDate,
@@ -715,8 +798,89 @@ func (q *Queries) ListForecastForDate(ctx context.Context, arg ListForecastForDa
 			&i.FlmVendorRegion,
 			&i.PriorityClass,
 			&i.Paket,
+			&i.PaketVendor,
 			&i.Escrow,
 			&i.IsRequested,
+			&i.VisitRemaining,
+			&i.VisitQuotaTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRequestVisitInfo = `-- name: ListRequestVisitInfo :many
+SELECT t.terminal_id,
+       vq.remaining   AS visit_remaining,
+       vq.quota_total AS visit_quota_total,
+       COALESCE(av.is_over_quota AND av.cancelled_at IS NULL, false)::boolean AS is_over_quota
+FROM (SELECT DISTINCT vri.terminal_id FROM vendor_request_items vri WHERE vri.vendor_request_id = $1::bigint) t
+LEFT JOIN atms a ON a.terminal_id = t.terminal_id
+LEFT JOIN atm_visit_quotas vq ON vq.atm_id = a.id
+LEFT JOIN atm_visits av ON av.atm_id = a.id AND av.vendor_request_id = $1::bigint
+ORDER BY t.terminal_id
+`
+
+type ListRequestVisitInfoRow struct {
+	TerminalID      string `json:"terminal_id"`
+	VisitRemaining  *int32 `json:"visit_remaining"`
+	VisitQuotaTotal *int32 `json:"visit_quota_total"`
+	IsOverQuota     bool   `json:"is_over_quota"`
+}
+
+// Per distinct terminal of one request: current sisa kunjungan (if the ATM
+// has a quota row) and whether this request's visit was over quota. Feeds
+// the detail screen badges and the approve-dialog warning (FR6.2/6.3).
+func (q *Queries) ListRequestVisitInfo(ctx context.Context, id int64) ([]ListRequestVisitInfoRow, error) {
+	rows, err := q.db.Query(ctx, listRequestVisitInfo, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRequestVisitInfoRow{}
+	for rows.Next() {
+		var i ListRequestVisitInfoRow
+		if err := rows.Scan(
+			&i.TerminalID,
+			&i.VisitRemaining,
+			&i.VisitQuotaTotal,
+			&i.IsOverQuota,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVendorRequestAtmResults = `-- name: ListVendorRequestAtmResults :many
+SELECT vendor_request_id, terminal_id, result, updated_at FROM vendor_request_atm_results
+WHERE vendor_request_id = $1
+ORDER BY terminal_id
+`
+
+func (q *Queries) ListVendorRequestAtmResults(ctx context.Context, vendorRequestID int64) ([]VendorRequestAtmResult, error) {
+	rows, err := q.db.Query(ctx, listVendorRequestAtmResults, vendorRequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VendorRequestAtmResult{}
+	for rows.Next() {
+		var i VendorRequestAtmResult
+		if err := rows.Scan(
+			&i.VendorRequestID,
+			&i.TerminalID,
+			&i.Result,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -926,7 +1090,7 @@ const softCancelVendorRequest = `-- name: SoftCancelVendorRequest :one
 UPDATE vendor_requests
 SET status = 'cancelled', is_canceled = true, cancellation_reason = $1::text
 WHERE id = $2::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason
 `
 
 type SoftCancelVendorRequestParams struct {
@@ -965,6 +1129,13 @@ func (q *Queries) SoftCancelVendorRequest(ctx context.Context, arg SoftCancelVen
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 	)
 	return i, err
 }
@@ -973,6 +1144,7 @@ const summarizeForecastForDate = `-- name: SummarizeForecastForDate :many
 WITH r AS (
     SELECT f.terminal_id,
            f.amount_replenish,
+           v.id      AS vendor_id,
            v.name    AS flm_vendor,
            vb.region AS flm_vendor_region,
            EXISTS (
@@ -988,9 +1160,9 @@ WITH r AS (
     FROM dmaa_atm_forecast f
     LEFT JOIN atms a ON a.terminal_id = f.terminal_id
     LEFT JOIN LATERAL (
-        SELECT vp.vendor_branch_id
+        SELECT COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
         FROM atm_vendor_packages avp
-        JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+        LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
         WHERE avp.atm_id = a.id
           AND avp.is_active = true
           AND avp.effective_start_date <= $1::date
@@ -1004,6 +1176,7 @@ WITH r AS (
 ), atm AS (
     SELECT r.terminal_id,
            r.flm_vendor,
+           MIN(r.vendor_id)           AS vendor_id,
            LOWER(r.flm_vendor_region) AS region_key,
            MIN(r.flm_vendor_region)   AS flm_vendor_region,
            bool_and(r.is_requested) AS all_requested,
@@ -1013,6 +1186,8 @@ WITH r AS (
     GROUP BY r.terminal_id, r.flm_vendor, LOWER(r.flm_vendor_region)
 )
 SELECT COALESCE(atm.flm_vendor, '')::text             AS flm_vendor,
+       -- atm-visit-quota (FR6.6): target reset kuota massal; 0 = tanpa vendor.
+       COALESCE(MIN(atm.vendor_id), 0)::bigint        AS vendor_id,
        COALESCE(MIN(atm.flm_vendor_region), '')::text AS flm_vendor_region,
        COUNT(*)::bigint                                        AS atm_count,
        (COUNT(*) FILTER (WHERE atm.all_requested))::bigint     AS requested_atm_count,
@@ -1026,6 +1201,7 @@ ORDER BY (COUNT(*) - COUNT(*) FILTER (WHERE atm.all_requested)) DESC,
 
 type SummarizeForecastForDateRow struct {
 	FlmVendor                  string `json:"flm_vendor"`
+	VendorID                   int64  `json:"vendor_id"`
 	FlmVendorRegion            string `json:"flm_vendor_region"`
 	AtmCount                   int64  `json:"atm_count"`
 	RequestedAtmCount          int64  `json:"requested_atm_count"`
@@ -1055,6 +1231,7 @@ func (q *Queries) SummarizeForecastForDate(ctx context.Context, forecastDate pgt
 		var i SummarizeForecastForDateRow
 		if err := rows.Scan(
 			&i.FlmVendor,
+			&i.VendorID,
 			&i.FlmVendorRegion,
 			&i.AtmCount,
 			&i.RequestedAtmCount,
@@ -1071,6 +1248,79 @@ func (q *Queries) SummarizeForecastForDate(ctx context.Context, forecastDate pgt
 	return items, nil
 }
 
+const updateVendorRequestCompletion = `-- name: UpdateVendorRequestCompletion :one
+
+UPDATE vendor_requests
+SET
+    status = $1::text,
+    completion_submitted_by = CASE WHEN $1::text = 'completion_pending' THEN $2::bigint ELSE completion_submitted_by END,
+    completion_submitted_at = CASE WHEN $1::text = 'completion_pending' THEN now() ELSE completion_submitted_at END,
+    completion_approved_by  = CASE WHEN $1::text = 'completed' THEN $2::bigint ELSE completion_approved_by END,
+    completion_approved_at  = CASE WHEN $1::text = 'completed' THEN now() ELSE completion_approved_at END,
+    completion_rejected_by  = CASE WHEN $1::text = 'approved' THEN $2::bigint
+                                   WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejected_by END,
+    completion_rejected_at  = CASE WHEN $1::text = 'approved' THEN now()
+                                   WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejected_at END,
+    completion_rejection_reason = CASE WHEN $1::text = 'approved' THEN $3::text
+                                   WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejection_reason END
+WHERE id = $4::bigint
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason
+`
+
+type UpdateVendorRequestCompletionParams struct {
+	Status  string  `json:"status"`
+	ActorID int64   `json:"actor_id"`
+	Reason  *string `json:"reason"`
+	ID      int64   `json:"id"`
+}
+
+// ---------------------------------------------------------------------------
+// atm-visit-quota: laporan selesai replenish (spec FR1)
+// ---------------------------------------------------------------------------
+// One query for the three completion transitions, same CASE-guard idea as
+// UpdateVendorRequestStatus: completion_pending stamps the maker (and clears a
+// previous rejection), completed stamps the approver, approved (= laporan
+// ditolak, back to the maker) stamps the rejecter + reason.
+func (q *Queries) UpdateVendorRequestCompletion(ctx context.Context, arg UpdateVendorRequestCompletionParams) (VendorRequest, error) {
+	row := q.db.QueryRow(ctx, updateVendorRequestCompletion,
+		arg.Status,
+		arg.ActorID,
+		arg.Reason,
+		arg.ID,
+	)
+	var i VendorRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequestNumber,
+		&i.ForecastDate,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.ApprovedBy,
+		&i.RejectedBy,
+		&i.RejectionReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SubmittedAt,
+		&i.ApprovedAt,
+		&i.RejectedAt,
+		&i.IsCanceled,
+		&i.RequestCategory,
+		&i.ReplenishDate,
+		&i.IsManual,
+		&i.VendorID,
+		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
+	)
+	return i, err
+}
+
 const updateVendorRequestStatus = `-- name: UpdateVendorRequestStatus :one
 UPDATE vendor_requests
 SET
@@ -1082,7 +1332,7 @@ SET
     rejected_by = CASE WHEN $1::text = 'rejected' THEN $2::bigint ELSE rejected_by END,
     rejection_reason = CASE WHEN $1::text = 'rejected' THEN $3::text ELSE rejection_reason END
 WHERE id = $4::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason
 `
 
 type UpdateVendorRequestStatusParams struct {
@@ -1126,6 +1376,31 @@ func (q *Queries) UpdateVendorRequestStatus(ctx context.Context, arg UpdateVendo
 		&i.IsManual,
 		&i.VendorID,
 		&i.CancellationReason,
+		&i.CompletionSubmittedBy,
+		&i.CompletionSubmittedAt,
+		&i.CompletionApprovedBy,
+		&i.CompletionApprovedAt,
+		&i.CompletionRejectedBy,
+		&i.CompletionRejectedAt,
+		&i.CompletionRejectionReason,
 	)
 	return i, err
+}
+
+const upsertVendorRequestAtmResult = `-- name: UpsertVendorRequestAtmResult :exec
+INSERT INTO vendor_request_atm_results (vendor_request_id, terminal_id, result)
+VALUES ($1::bigint, $2::text, $3::text)
+ON CONFLICT (vendor_request_id, terminal_id)
+DO UPDATE SET result = EXCLUDED.result, updated_at = now()
+`
+
+type UpsertVendorRequestAtmResultParams struct {
+	VendorRequestID int64  `json:"vendor_request_id"`
+	TerminalID      string `json:"terminal_id"`
+	Result          string `json:"result"`
+}
+
+func (q *Queries) UpsertVendorRequestAtmResult(ctx context.Context, arg UpsertVendorRequestAtmResultParams) error {
+	_, err := q.db.Exec(ctx, upsertVendorRequestAtmResult, arg.VendorRequestID, arg.TerminalID, arg.Result)
+	return err
 }

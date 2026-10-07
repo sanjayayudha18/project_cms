@@ -21,6 +21,7 @@ const pgCheckViolation = "23514"
 
 var validVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected", "processing", "completed", "cancelled",
+	"completion_pending", // atm-visit-quota (migration 021)
 }
 
 // --- Reads (no transaction needed) --------------------------------------
@@ -115,9 +116,11 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 			FLMVendor:       notesOrEmpty(r.FlmVendor),
 			FLMVendorRegion: notesOrEmpty(r.FlmVendorRegion),
 			PriorityClass:   notesOrEmpty(r.PriorityClass),
-			Paket:           notesOrEmpty(r.Paket),
+			Paket:           notesOrEmpty(packageLabel(r.Paket, r.PaketVendor)),
 			Escrow:          escrow,
 			IsRequested:     r.IsRequested,
+			VisitRemaining:  r.VisitRemaining,
+			VisitQuotaTotal: r.VisitQuotaTotal,
 		}
 	}
 
@@ -156,6 +159,7 @@ func (s *VendorRequestService) ForecastSummary(ctx context.Context, forecastDate
 	result := &ForecastSummaryResult{ForecastDate: date, Groups: make([]ForecastSummaryGroup, len(rows))}
 	for i, r := range rows {
 		g := ForecastSummaryGroup{
+			VendorID:                   r.VendorID,
 			FLMVendor:                  r.FlmVendor,
 			FLMVendorRegion:            r.FlmVendorRegion,
 			ATMCount:                   r.AtmCount,
@@ -304,7 +308,11 @@ func (s *VendorRequestService) Get(ctx context.Context, id int64) (*VendorReques
 		return nil, fmt.Errorf("list items for vendor request %d: %w", id, err)
 	}
 
-	return mapDetail(header, items), nil
+	detail := mapDetail(header, items)
+	if detail.Atms, err = s.requestAtmStatuses(ctx, id); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 // AuditLog returns the append-only audit trail for one vendor request,
@@ -1028,6 +1036,13 @@ func mapDetail(h db.GetVendorRequestDetailRow, itemRows []db.VendorRequestItem) 
 	if h.RejectedBy != nil {
 		detail.RejectedBy = &UserRef{ID: *h.RejectedBy, FullName: notesOrEmpty(h.RejectedByName)}
 	}
+	detail.CompletionSubmittedBy = userRefOrNil(h.CompletionSubmittedBy, h.CompletionSubmittedByName)
+	detail.CompletionSubmittedAt = timestamptzToPtr(h.CompletionSubmittedAt)
+	detail.CompletionApprovedBy = userRefOrNil(h.CompletionApprovedBy, h.CompletionApprovedByName)
+	detail.CompletionApprovedAt = timestamptzToPtr(h.CompletionApprovedAt)
+	detail.CompletionRejectedBy = userRefOrNil(h.CompletionRejectedBy, h.CompletionRejectedByName)
+	detail.CompletionRejectedAt = timestamptzToPtr(h.CompletionRejectedAt)
+	detail.CompletionRejectionReason = h.CompletionRejectionReason
 
 	items := make([]VendorRequestItemOut, len(itemRows))
 	var total int64

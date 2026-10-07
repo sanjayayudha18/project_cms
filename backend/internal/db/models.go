@@ -100,12 +100,41 @@ type AtmDenom struct {
 type AtmVendorPackage struct {
 	ID                 int64              `json:"id"`
 	AtmID              int64              `json:"atm_id"`
-	VendorPackageID    int64              `json:"vendor_package_id"`
+	VendorPackageID    *int64             `json:"vendor_package_id"`
 	EffectiveStartDate pgtype.Date        `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date        `json:"effective_end_date"`
 	IsActive           bool               `json:"is_active"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	VendorID           *int64             `json:"vendor_id"`
+	VendorBranchID     *int64             `json:"vendor_branch_id"`
+	// Mode vendor-wide: label paket persis seperti vendor_package_prices.package (mis. PAKET 4). NULL pada mode paket cabang.
+	Package *string `json:"package"`
+}
+
+// Satu kunjungan replenish berhasil per (vendor_request, ATM), dibuat saat SPV approve laporan selesai. UNIQUE mencegah pengurangan ganda. Soft-cancel saja, tidak pernah dihapus. Migrasi 021.
+type AtmVisit struct {
+	ID              int64              `json:"id"`
+	AtmID           int64              `json:"atm_id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	QuotaKnown      bool               `json:"quota_known"`
+	IsOverQuota     bool               `json:"is_over_quota"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	CancelledAt     pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledBy     *int64             `json:"cancelled_by"`
+	CancelReason    *string            `json:"cancel_reason"`
+}
+
+// Sisa kunjungan replenish per ATM. quota_total = snapshot package_frequencies.cr_frequency saat reset/pembuatan; remaining dikurangi 1 per kunjungan, boleh negatif (= kelebihan kuota). Tidak ada reset otomatis. Migrasi 021.
+type AtmVisitQuota struct {
+	AtmID       int64              `json:"atm_id"`
+	PackageCode string             `json:"package_code"`
+	QuotaTotal  int32              `json:"quota_total"`
+	Remaining   int32              `json:"remaining"`
+	ResetAt     pgtype.Timestamptz `json:"reset_at"`
+	// NULL = baris dibuat otomatis oleh kunjungan pertama, bukan reset manual.
+	ResetBy   *int64             `json:"reset_by"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Append-only audit trail: who (actor_id) did what (action) to which entity, before/after state, from where (ip). No update/delete query exists in code.
@@ -723,6 +752,22 @@ type VendorRequest struct {
 	VendorID *int64 `json:"vendor_id"`
 	// Reason captured on cancel (Req 3.2/3.3). NULL for non-canceled rows and for rows canceled before this column existed (their reason lives only in audit_logs.after).
 	CancellationReason *string `json:"cancellation_reason"`
+	// Maker laporan selesai replenish (ATM-USER). Checker laporan harus berbeda. Migrasi 021.
+	CompletionSubmittedBy     *int64             `json:"completion_submitted_by"`
+	CompletionSubmittedAt     pgtype.Timestamptz `json:"completion_submitted_at"`
+	CompletionApprovedBy      *int64             `json:"completion_approved_by"`
+	CompletionApprovedAt      pgtype.Timestamptz `json:"completion_approved_at"`
+	CompletionRejectedBy      *int64             `json:"completion_rejected_by"`
+	CompletionRejectedAt      pgtype.Timestamptz `json:"completion_rejected_at"`
+	CompletionRejectionReason *string            `json:"completion_rejection_reason"`
+}
+
+// Hasil laporan selesai per ATM (terminal distinct dari vendor_request_items). Ditimpa saat laporan diajukan ulang setelah ditolak. Migrasi 021.
+type VendorRequestAtmResult struct {
+	VendorRequestID int64              `json:"vendor_request_id"`
+	TerminalID      string             `json:"terminal_id"`
+	Result          string             `json:"result"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.

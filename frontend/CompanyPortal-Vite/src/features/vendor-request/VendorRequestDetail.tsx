@@ -12,24 +12,41 @@ import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import { Link, useParams } from "@tanstack/react-router";
-import { AlertCircle, Ban, XCircle } from "lucide-react";
+import { AlertCircle, Ban, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
+import {
+  ApproveCompletionModal,
+  CompletionAtmTable,
+  ReportCompletionModal,
+  toCompletionPayload,
+} from "./CompletionPanels";
 import { StatusBadge } from "./StatusBadge";
 import {
   getVendorRequestErrorMessage,
   useApproveVendorRequest,
+  useApproveVendorRequestCompletion,
   useCancelVendorRequest,
   useRejectVendorRequest,
+  useRejectVendorRequestCompletion,
   useReviseVendorRequest,
   useSubmitVendorRequest,
+  useSubmitVendorRequestCompletion,
   useUpdateVendorRequestItems,
   useVendorRequest,
 } from "./hooks";
-import type { VendorRequestDetail as VendorRequestDetailType, VendorRequestItem } from "./types";
+import type {
+  CompletionResult,
+  VendorRequestDetail as VendorRequestDetailType,
+  VendorRequestItem,
+} from "./types";
 
 const MAKER_ROLES = ["ADMIN", "ATM-USER", "BRANCH-ATM-USER"];
 const CHECKER_ROLES = ["ADMIN", "ATM-SPV", "BRANCH-ATM-SPV"];
 const ERROR_TOAST_MS = 5000;
+const OVER_QUOTA_TOAST_MS = 8000;
+// atm-visit-quota: the per-ATM completion/kuota table is shown once a request
+// can be (or has been) reported as replenished.
+const COMPLETION_STATUSES = ["approved", "completion_pending", "completed"];
 const REJECTION_REASON_MAX = 500;
 const AMOUNT_MIN = 1;
 
@@ -45,6 +62,12 @@ export function VendorRequestDetail() {
   const [rejectReason, setRejectReason] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  // atm-visit-quota: laporan selesai dialogs.
+  const [completeOpen, setCompleteOpen] = useState(false);
+  const [completeResults, setCompleteResults] = useState<Record<string, CompletionResult>>({});
+  const [approveCompletionOpen, setApproveCompletionOpen] = useState(false);
+  const [rejectCompletionOpen, setRejectCompletionOpen] = useState(false);
+  const [rejectCompletionReason, setRejectCompletionReason] = useState("");
 
   const updateItemsMutation = useUpdateVendorRequestItems();
   const submitMutation = useSubmitVendorRequest();
@@ -52,6 +75,9 @@ export function VendorRequestDetail() {
   const rejectMutation = useRejectVendorRequest();
   const reviseMutation = useReviseVendorRequest();
   const cancelMutation = useCancelVendorRequest();
+  const submitCompletionMutation = useSubmitVendorRequestCompletion();
+  const approveCompletionMutation = useApproveVendorRequestCompletion();
+  const rejectCompletionMutation = useRejectVendorRequestCompletion();
 
   const isBusy =
     updateItemsMutation.isPending ||
@@ -59,7 +85,10 @@ export function VendorRequestDetail() {
     approveMutation.isPending ||
     rejectMutation.isPending ||
     reviseMutation.isPending ||
-    cancelMutation.isPending;
+    cancelMutation.isPending ||
+    submitCompletionMutation.isPending ||
+    approveCompletionMutation.isPending ||
+    rejectCompletionMutation.isPending;
 
   function showErrorToast(message: string): void {
     const toastId = toast({ type: "error", message });
@@ -121,6 +150,13 @@ export function VendorRequestDetail() {
     ((isCreator || (isChecker && !isCreator)) &&
       (data.status === "draft" || data.status === "pending_approval")) ||
     (isChecker && data.status === "approved");
+  // atm-visit-quota FR1: maker reports an approved request as replenished;
+  // a checker other than the reporter approves/rejects that report.
+  const canReportCompletion = data.status === "approved" && isMaker && !data.is_canceled;
+  const isReporter =
+    user !== null && user !== undefined && data.completion_submitted_by?.id === user.id;
+  const canReviewCompletion = data.status === "completion_pending" && isChecker && !isReporter;
+  const showCompletionTable = COMPLETION_STATUSES.includes(data.status) && data.atms.length > 0;
 
   function startEditItems(): void {
     if (!data) return;
@@ -173,6 +209,45 @@ export function VendorRequestDetail() {
     });
   }
 
+  async function handleSubmitCompletion(): Promise<void> {
+    if (!data) return;
+    await runAction(async () => {
+      await submitCompletionMutation.mutateAsync({
+        id: data.id,
+        results: toCompletionPayload(data.atms, completeResults),
+      });
+      setCompleteOpen(false);
+      setCompleteResults({});
+    });
+  }
+
+  async function handleApproveCompletion(): Promise<void> {
+    if (!data) return;
+    await runAction(async () => {
+      const result = await approveCompletionMutation.mutateAsync(data.id);
+      setApproveCompletionOpen(false);
+      const over = result.over_quota_terminals ?? [];
+      if (over.length > 0) {
+        const toastId = toast({
+          type: "warning",
+          message: `Laporan disetujui. ${over.length} ATM melebihi kuota kunjungan: ${over.join(", ")}`,
+        });
+        setTimeout(() => dismiss(toastId), OVER_QUOTA_TOAST_MS);
+      }
+    });
+  }
+
+  async function handleRejectCompletion(): Promise<void> {
+    if (!data) return;
+    const reason = rejectCompletionReason.trim();
+    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
+    await runAction(async () => {
+      await rejectCompletionMutation.mutateAsync({ id: data.id, reason });
+      setRejectCompletionOpen(false);
+      setRejectCompletionReason("");
+    });
+  }
+
   const editValid =
     editingItems?.every(
       (it) => Number.isInteger(it.amount_replenish) && it.amount_replenish >= AMOUNT_MIN,
@@ -181,6 +256,9 @@ export function VendorRequestDetail() {
     rejectReason.trim().length >= 1 && rejectReason.trim().length <= REJECTION_REASON_MAX;
   const cancelValid =
     cancelReason.trim().length >= 1 && cancelReason.trim().length <= REJECTION_REASON_MAX;
+  const rejectCompletionValid =
+    rejectCompletionReason.trim().length >= 1 &&
+    rejectCompletionReason.trim().length <= REJECTION_REASON_MAX;
 
   const items = editingItems ?? data.items;
 
@@ -303,10 +381,76 @@ export function VendorRequestDetail() {
                   Batalkan
                 </Button>
               )}
+              {canReportCompletion && (
+                <Button disabled={isBusy} onClick={() => setCompleteOpen(true)}>
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                  Laporkan Selesai
+                </Button>
+              )}
+              {canReviewCompletion && (
+                <>
+                  <Button
+                    variant="danger"
+                    disabled={isBusy}
+                    onClick={() => setRejectCompletionOpen(true)}
+                  >
+                    <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                    Tolak Laporan
+                  </Button>
+                  <Button disabled={isBusy} onClick={() => setApproveCompletionOpen(true)}>
+                    Setujui Laporan
+                  </Button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {showCompletionTable && <CompletionAtmTable atms={data.atms} />}
+
+      {completeOpen && (
+        <ReportCompletionModal
+          atms={data.atms}
+          results={completeResults}
+          onResultChange={(terminalId, result) =>
+            setCompleteResults((cur) => ({ ...cur, [terminalId]: result }))
+          }
+          busy={submitCompletionMutation.isPending}
+          onConfirm={handleSubmitCompletion}
+          onDismiss={() => {
+            setCompleteOpen(false);
+            setCompleteResults({});
+          }}
+        />
+      )}
+
+      {approveCompletionOpen && (
+        <ApproveCompletionModal
+          atms={data.atms}
+          busy={approveCompletionMutation.isPending}
+          onConfirm={handleApproveCompletion}
+          onDismiss={() => setApproveCompletionOpen(false)}
+        />
+      )}
+
+      {rejectCompletionOpen && (
+        <ReasonModal
+          title="Tolak Laporan Selesai"
+          reasonLabel="Alasan Penolakan Laporan"
+          confirmLabel="Tolak Laporan"
+          busyLabel="Menolak..."
+          reason={rejectCompletionReason}
+          onReasonChange={setRejectCompletionReason}
+          valid={rejectCompletionValid}
+          busy={rejectCompletionMutation.isPending}
+          onConfirm={handleRejectCompletion}
+          onDismiss={() => {
+            setRejectCompletionOpen(false);
+            setRejectCompletionReason("");
+          }}
+        />
+      )}
 
       {rejectOpen && (
         <ReasonModal
@@ -371,6 +515,19 @@ function DetailFields({ detail }: { detail: VendorRequestDetailType }) {
     // replenishment-request-enhancements (Req 3.11 Opsi B): populated from
     // the response now that migration 038 persists it on vendor_requests.
     detail.cancellation_reason ? ["Alasan Pembatalan", detail.cancellation_reason] : null,
+    // atm-visit-quota: laporan selesai replenish.
+    detail.completion_submitted_by
+      ? ["Dilaporkan Selesai Oleh", detail.completion_submitted_by.full_name]
+      : null,
+    detail.completion_submitted_at
+      ? ["Dilaporkan Pada", formatAtmDateTime(new Date(detail.completion_submitted_at))]
+      : null,
+    detail.completion_approved_by
+      ? ["Laporan Disetujui Oleh", detail.completion_approved_by.full_name]
+      : null,
+    detail.completion_rejection_reason
+      ? ["Alasan Penolakan Laporan", detail.completion_rejection_reason]
+      : null,
     detail.notes ? ["Catatan", detail.notes] : null,
   ].filter((f): f is [string, string] => f !== null);
   const allFields = [...alwaysShown, ...fields];
@@ -407,7 +564,7 @@ interface ReasonModalProps {
  * 2.4) and Cancel (Req 3.2, 3.3) — same shape, different copy, so one
  * component instead of two near-identical ones (was RejectModal).
  */
-function ReasonModal({
+export function ReasonModal({
   title,
   reasonLabel,
   confirmLabel,

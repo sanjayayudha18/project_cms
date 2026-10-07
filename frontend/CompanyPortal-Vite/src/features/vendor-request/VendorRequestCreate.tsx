@@ -40,7 +40,7 @@ const ERROR_TOAST_MS = 5000;
 const CATEGORY_OPTIONS: { value: VendorRequestCategory; label: string }[] = [
   { value: "planned", label: "Planned — replenish H+1" },
   { value: "emergency", label: "Emergency — replenish H+0" },
-  { value: "additional", label: "Additional — pilih H+0/H+1/H+2" },
+  { value: "additional", label: "Additional — pilih tanggal sendiri" },
 ];
 
 /** Plain hyphen, never an em-dash, for an empty/null context column (Req 2.2). */
@@ -182,22 +182,20 @@ export function VendorRequestCreate() {
     : replenishDate < jakartaCalendarDateISO(0)
       ? "Tidak boleh sebelum hari ini"
       : null;
-  const additionalDateOptions = [0, 1, 2].map((offset) => jakartaCalendarDateISO(offset));
+  const todayISO = jakartaCalendarDateISO(0);
 
   // Req 1.3-1.5: drives Replenish_Date on BOTH paths now, not just manual —
-  // Planned -> H+1, Emergency -> H+0, Additional -> a dropdown restricted to
-  // exactly {H+0, H+1, H+2} (rendered below), never a freely-typed date.
+  // Planned -> H+1, Emergency -> H+0, Additional -> operator-picked date
+  // (today or later; replenishDateError blocks past dates).
   function handleCategoryChange(next: VendorRequestCategory | ""): void {
     setCategory(next);
     if (next === "") {
       setReplenishDate("");
       return;
     }
-    const additionalDefault = additionalDateOptions[0] ?? jakartaCalendarDateISO(0);
     if (next === "planned") setReplenishDate(jakartaCalendarDateISO(1));
-    else if (next === "emergency") setReplenishDate(jakartaCalendarDateISO(0));
-    else
-      setReplenishDate((prev) => (additionalDateOptions.includes(prev) ? prev : additionalDefault));
+    else if (next === "emergency") setReplenishDate(todayISO);
+    else setReplenishDate((prev) => (prev >= todayISO ? prev : todayISO));
   }
 
   function showErrorToast(message: string): void {
@@ -361,20 +359,17 @@ export function VendorRequestCreate() {
             Tanggal Replenish <span className="text-[var(--red-600)]">*</span>
           </label>
           {category === "additional" ? (
-            <select
+            <input
               id="replenish-date"
+              type="date"
               value={replenishDate}
+              min={todayISO}
               onChange={(e) => setReplenishDate(e.target.value)}
               className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-            >
-              {additionalDateOptions.map((d, i) => (
-                <option key={d} value={d}>{`H+${i} (${d})`}</option>
-              ))}
-            </select>
+            />
           ) : (
             // Planned/Emergency (both paths, Req 1.3/1.4) and the
-            // not-yet-chosen "" state (Req 1.2) are all auto-set/locked —
-            // never freely typed, so this is always a disabled display input.
+            // not-yet-chosen "" state (Req 1.2) are auto-set/locked.
             <input
               id="replenish-date"
               type="date"

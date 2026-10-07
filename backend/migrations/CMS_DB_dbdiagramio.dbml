@@ -585,7 +585,7 @@ Table vendor_requests {
   id bigint [pk, increment]
   request_number text [not null]
   forecast_date date [not null]
-  status text [not null, default: 'draft', note: 'draft | pending_approval | approved | rejected | processing | completed | failed | cancelled']
+  status text [not null, default: 'draft', note: 'draft | pending_approval | approved | rejected | processing | completed | failed | cancelled | completion_pending (021)']
   notes text
   created_by bigint [not null]
   approved_by bigint
@@ -602,6 +602,54 @@ Table vendor_requests {
   is_manual boolean [not null, default: false]
   vendor_id bigint
   cancellation_reason text
+  completion_submitted_by bigint [note: 'migration 021: maker of laporan selesai']
+  completion_submitted_at timestamptz
+  completion_approved_by bigint
+  completion_approved_at timestamptz
+  completion_rejected_by bigint
+  completion_rejected_at timestamptz
+  completion_rejection_reason text
+}
+
+Table vendor_request_atm_results {
+  vendor_request_id bigint [not null]
+  terminal_id text [not null]
+  result text [not null, note: 'success | failed']
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (vendor_request_id, terminal_id) [pk]
+  }
+  Note: 'migration 021: laporan selesai per ATM'
+}
+
+Table atm_visit_quotas {
+  atm_id bigint [pk]
+  package_code text [not null, note: 'snapshot at reset / first visit']
+  quota_total integer [not null, note: 'cr_frequency snapshot, CHECK > 0']
+  remaining integer [not null, note: 'may be negative = kelebihan kuota']
+  reset_at timestamptz [not null, default: `now()`]
+  reset_by bigint [note: 'NULL = auto-created by first visit']
+  updated_at timestamptz [not null, default: `now()`]
+  Note: 'migration 021: sisa kunjungan replenish per ATM'
+}
+
+Table atm_visits {
+  id bigint [pk, increment]
+  atm_id bigint [not null]
+  vendor_request_id bigint [not null]
+  quota_known boolean [not null]
+  is_over_quota boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  cancelled_at timestamptz
+  cancelled_by bigint
+  cancel_reason text
+
+  indexes {
+    (vendor_request_id, atm_id) [unique]
+    (atm_id, created_at)
+  }
+  Note: 'migration 021: one counted visit per (request, ATM); soft-cancel only'
 }
 
 Table vendor_request_items {
@@ -698,3 +746,14 @@ Ref: vendor_requests.rejected_by > users.id
 Ref: vendor_requests.vendor_id > vendors.id
 Ref: vendor_request_items.vendor_request_id > vendor_requests.id
 Ref: vendor_request_number_seq.vendor_id > vendors.id
+Ref: vendor_requests.completion_submitted_by > users.id
+Ref: vendor_requests.completion_approved_by > users.id
+Ref: vendor_requests.completion_rejected_by > users.id
+Ref: vendor_request_atm_results.vendor_request_id > vendor_requests.id
+
+// ATM visit quota (migration 021)
+Ref: atm_visit_quotas.atm_id - atms.id
+Ref: atm_visit_quotas.reset_by > users.id
+Ref: atm_visits.atm_id > atms.id
+Ref: atm_visits.vendor_request_id > vendor_requests.id
+Ref: atm_visits.cancelled_by > users.id

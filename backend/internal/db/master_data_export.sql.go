@@ -14,14 +14,15 @@ SELECT av.id,
        a.terminal_id,
        v.code                                  AS vendor_code,
        b.branch_code,
-       p.package_code,
+       CASE WHEN av.vendor_package_id IS NULL THEN 'vendor' ELSE 'branch' END::text AS package_source,
+       COALESCE(p.package_code, av.package)::text AS package_code,
        av.effective_start_date::text           AS effective_start_date,
        COALESCE(av.effective_end_date::text, '')::text AS effective_end_date,
        av.is_active
 FROM atm_vendor_packages av
 JOIN atms a ON a.id = av.atm_id
-JOIN vendor_packages_branch p ON p.id = av.vendor_package_id
-JOIN vendor_branches b ON b.id = p.vendor_branch_id
+LEFT JOIN vendor_packages_branch p ON p.id = av.vendor_package_id
+JOIN vendor_branches b ON b.id = COALESCE(p.vendor_branch_id, av.vendor_branch_id)
 JOIN vendors v ON v.id = b.vendor_id
 WHERE av.id > $1::bigint
   AND ($2::text = 'all'
@@ -42,15 +43,18 @@ type ExportATMAssignmentsBatchRow struct {
 	TerminalID         string `json:"terminal_id"`
 	VendorCode         string `json:"vendor_code"`
 	BranchCode         string `json:"branch_code"`
+	PackageSource      string `json:"package_source"`
 	PackageCode        string `json:"package_code"`
 	EffectiveStartDate string `json:"effective_start_date"`
 	EffectiveEndDate   string `json:"effective_end_date"`
 	IsActive           bool   `json:"is_active"`
 }
 
-// Kelolaan ATM: atm_vendor_packages rows keyed by terminal_id + package
-// (branch_code, package_code). This table has no deleted_at; is_active is the
-// disable flag, so status filters on it.
+// Kelolaan ATM: atm_vendor_packages rows keyed by terminal_id + package. Two
+// sources (migration 023): package_source 'branch' = a vendor_packages_branch
+// row (package_code = its code), 'vendor' = a vendor-wide label (package_code =
+// the label). vendor_code/branch_code are always the managing branch. This table
+// has no deleted_at; is_active is the disable flag, so status filters on it.
 func (q *Queries) ExportATMAssignmentsBatch(ctx context.Context, arg ExportATMAssignmentsBatchParams) ([]ExportATMAssignmentsBatchRow, error) {
 	rows, err := q.db.Query(ctx, exportATMAssignmentsBatch, arg.AfterID, arg.Status, arg.BatchSize)
 	if err != nil {
@@ -65,6 +69,7 @@ func (q *Queries) ExportATMAssignmentsBatch(ctx context.Context, arg ExportATMAs
 			&i.TerminalID,
 			&i.VendorCode,
 			&i.BranchCode,
+			&i.PackageSource,
 			&i.PackageCode,
 			&i.EffectiveStartDate,
 			&i.EffectiveEndDate,
@@ -515,6 +520,43 @@ func (q *Queries) ImportPackageKeys(ctx context.Context) ([]ImportPackageKeysRow
 			&i.BranchCode,
 			&i.PackageCode,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const importVendorPackageLabels = `-- name: ImportVendorPackageLabels :many
+SELECT DISTINCT v.code AS vendor_code, vpp.package::text AS package
+FROM vendor_package_prices vpp
+JOIN vendors v ON v.id = vpp.vendor_id
+WHERE v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR'
+  AND vpp.atm_id IS NULL
+  AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= CURRENT_DATE)
+`
+
+type ImportVendorPackageLabelsRow struct {
+	VendorCode string `json:"vendor_code"`
+	Package    string `json:"package"`
+}
+
+// Vendor-wide package labels per FLM vendor (atm-assignments import, package_source
+// 'vendor'): the vendor has a PT-/branch-level tariff that is still open or not yet
+// ended. Whether the tariff fits a given ATM is checked at confirm (FR9).
+func (q *Queries) ImportVendorPackageLabels(ctx context.Context) ([]ImportVendorPackageLabelsRow, error) {
+	rows, err := q.db.Query(ctx, importVendorPackageLabels)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ImportVendorPackageLabelsRow{}
+	for rows.Next() {
+		var i ImportVendorPackageLabelsRow
+		if err := rows.Scan(&i.VendorCode, &i.Package); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -10,6 +10,7 @@ import type { ApiError } from "@/lib/api/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   approveVendorRequest,
+  approveVendorRequestCompletion,
   cancelVendorRequest,
   createVendorRequest,
   fetchAllForecastForSelection,
@@ -20,13 +21,16 @@ import {
   fetchVendorRequestAuditLog,
   fetchVendorRequests,
   rejectVendorRequest,
+  rejectVendorRequestCompletion,
   reviseVendorRequest,
   submitVendorRequest,
+  submitVendorRequestCompletion,
   updateVendorRequestItems,
 } from "./api";
 import type {
   AuditLogResponse,
   BrowseForecastParams,
+  CompletionResultInput,
   CreateVendorRequestPayload,
   FetchAllForecastResult,
   ForecastResponse,
@@ -142,6 +146,45 @@ export function useVendorRequestAuditLog(id: number | null) {
 function useInvalidateOnSuccess() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: vendorRequestKeys.all });
+}
+
+/** atm-visit-quota: a completion approve also changes kuota shown on ATM profiles. */
+function useInvalidateWithQuota() {
+  const queryClient = useQueryClient();
+  return async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: vendorRequestKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ["atm-visit-quota"] }),
+    ]);
+  };
+}
+
+export function useSubmitVendorRequestCompletion() {
+  const invalidate = useInvalidateOnSuccess();
+  return useMutation<
+    VendorRequestDetail,
+    ApiError,
+    { id: number; results: CompletionResultInput[] }
+  >({
+    mutationFn: ({ id, results }) => submitVendorRequestCompletion(id, results),
+    onSuccess: invalidate,
+  });
+}
+
+export function useApproveVendorRequestCompletion() {
+  const invalidate = useInvalidateWithQuota();
+  return useMutation<VendorRequestDetail, ApiError, number>({
+    mutationFn: approveVendorRequestCompletion,
+    onSuccess: invalidate,
+  });
+}
+
+export function useRejectVendorRequestCompletion() {
+  const invalidate = useInvalidateOnSuccess();
+  return useMutation<VendorRequestDetail, ApiError, { id: number; reason: string }>({
+    mutationFn: ({ id, reason }) => rejectVendorRequestCompletion(id, reason),
+    onSuccess: invalidate,
+  });
 }
 
 export function useCreateVendorRequest() {

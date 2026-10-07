@@ -23,6 +23,29 @@ func (q *Queries) ATMActiveForAssignment(ctx context.Context, id int64) (int64, 
 	return id_2, err
 }
 
+const checkAssignmentVendorBranch = `-- name: CheckAssignmentVendorBranch :one
+SELECT vb.id
+FROM vendor_branches vb
+JOIN vendors v ON v.id = vb.vendor_id
+WHERE vb.id = $1 AND vb.vendor_id = $2
+  AND vb.is_active AND vb.deleted_at IS NULL
+  AND v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR'
+`
+
+type CheckAssignmentVendorBranchParams struct {
+	VendorBranchID int64 `json:"vendor_branch_id"`
+	VendorID       int64 `json:"vendor_id"`
+}
+
+// Vendor-wide assignment (FR9.2-3): the vendor is an active FLM vendor (not
+// INTERNAL/ROH, which never has tariffs) and the branch belongs to it and is active.
+func (q *Queries) CheckAssignmentVendorBranch(ctx context.Context, arg CheckAssignmentVendorBranchParams) (int64, error) {
+	row := q.db.QueryRow(ctx, checkAssignmentVendorBranch, arg.VendorBranchID, arg.VendorID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const closeATMAssignmentsBeforeStart = `-- name: CloseATMAssignmentsBeforeStart :exec
 UPDATE atm_vendor_packages
 SET effective_end_date = $1::date - 1, updated_at = now()
@@ -67,14 +90,18 @@ func (q *Queries) CountATMAssignmentsAdmin(ctx context.Context, arg CountATMAssi
 }
 
 const createATMAssignmentAdmin = `-- name: CreateATMAssignmentAdmin :one
-INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, effective_start_date, effective_end_date)
-VALUES ($1, $2, $3, $4)
-RETURNING id, atm_id, vendor_package_id, effective_start_date, effective_end_date, is_active
+INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date)
+VALUES ($1, $2, $3, $4, $5,
+        $6, $7)
+RETURNING id, atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date, is_active
 `
 
 type CreateATMAssignmentAdminParams struct {
 	AtmID              int64       `json:"atm_id"`
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
+	VendorID           *int64      `json:"vendor_id"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	Package            *string     `json:"package"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 }
@@ -82,7 +109,10 @@ type CreateATMAssignmentAdminParams struct {
 type CreateATMAssignmentAdminRow struct {
 	ID                 int64       `json:"id"`
 	AtmID              int64       `json:"atm_id"`
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
+	VendorID           *int64      `json:"vendor_id"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	Package            *string     `json:"package"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
@@ -92,6 +122,9 @@ func (q *Queries) CreateATMAssignmentAdmin(ctx context.Context, arg CreateATMAss
 	row := q.db.QueryRow(ctx, createATMAssignmentAdmin,
 		arg.AtmID,
 		arg.VendorPackageID,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.Package,
 		arg.EffectiveStartDate,
 		arg.EffectiveEndDate,
 	)
@@ -100,6 +133,9 @@ func (q *Queries) CreateATMAssignmentAdmin(ctx context.Context, arg CreateATMAss
 		&i.ID,
 		&i.AtmID,
 		&i.VendorPackageID,
+		&i.VendorID,
+		&i.VendorBranchID,
+		&i.Package,
 		&i.EffectiveStartDate,
 		&i.EffectiveEndDate,
 		&i.IsActive,
@@ -179,21 +215,28 @@ func (q *Queries) FindOverlappingATMAssignment(ctx context.Context, arg FindOver
 }
 
 const getATMAssignmentAdminByID = `-- name: GetATMAssignmentAdminByID :one
-SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
-       a.effective_start_date, a.effective_end_date, a.is_active
+SELECT a.id, a.atm_id, a.vendor_package_id,
+       COALESCE(p.package_code, a.package)::text AS package_code,
+       a.effective_start_date, a.effective_end_date, a.is_active,
+       a.vendor_id, a.vendor_branch_id, a.package,
+       CASE WHEN a.vendor_package_id IS NULL THEN 'vendor' ELSE 'branch' END::text AS source
 FROM atm_vendor_packages a
-JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.id = $1
 `
 
 type GetATMAssignmentAdminByIDRow struct {
 	ID                 int64       `json:"id"`
 	AtmID              int64       `json:"atm_id"`
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
 	PackageCode        string      `json:"package_code"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
+	VendorID           *int64      `json:"vendor_id"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	Package            *string     `json:"package"`
+	Source             string      `json:"source"`
 }
 
 // Doubles as the "before" snapshot / CurrentState (T2.5).
@@ -208,18 +251,43 @@ func (q *Queries) GetATMAssignmentAdminByID(ctx context.Context, id int64) (GetA
 		&i.EffectiveStartDate,
 		&i.EffectiveEndDate,
 		&i.IsActive,
+		&i.VendorID,
+		&i.VendorBranchID,
+		&i.Package,
+		&i.Source,
 	)
+	return i, err
+}
+
+const getATMPriceGroup = `-- name: GetATMPriceGroup :one
+SELECT price_machine_group, price_class FROM atms WHERE id = $1 AND deleted_at IS NULL
+`
+
+type GetATMPriceGroupRow struct {
+	PriceMachineGroup *string `json:"price_machine_group"`
+	PriceClass        *string `json:"price_class"`
+}
+
+// price_machine_group / price_class are generated columns; NULL when the ATM's
+// machine_type/priority_class is unmapped (vendor-wide assignment then fails hard).
+func (q *Queries) GetATMPriceGroup(ctx context.Context, id int64) (GetATMPriceGroupRow, error) {
+	row := q.db.QueryRow(ctx, getATMPriceGroup, id)
+	var i GetATMPriceGroupRow
+	err := row.Scan(&i.PriceMachineGroup, &i.PriceClass)
 	return i, err
 }
 
 const listATMAssignmentsAdmin = `-- name: ListATMAssignmentsAdmin :many
 
-SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
+SELECT a.id, a.atm_id, a.vendor_package_id,
+       COALESCE(p.package_code, a.package)::text AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active,
-       p.vendor_branch_id, vb.vendor_id
+       vb.id AS vendor_branch_id,
+       vb.vendor_id,
+       CASE WHEN a.vendor_package_id IS NULL THEN 'vendor' ELSE 'branch' END::text AS source
 FROM atm_vendor_packages a
-JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
-LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
+LEFT JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_branches vb ON vb.id = COALESCE(p.vendor_branch_id, a.vendor_branch_id) -- NULL for internal (ROH) packages
 WHERE a.atm_id = $1
   AND (
         $2::text = 'all'
@@ -240,13 +308,14 @@ type ListATMAssignmentsAdminParams struct {
 type ListATMAssignmentsAdminRow struct {
 	ID                 int64       `json:"id"`
 	AtmID              int64       `json:"atm_id"`
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
 	PackageCode        string      `json:"package_code"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
 	VendorBranchID     *int64      `json:"vendor_branch_id"`
 	VendorID           *int64      `json:"vendor_id"`
+	Source             string      `json:"source"`
 }
 
 // Admin ATM assignment (kelolaan ATM) management (plan.md Fase 3, T3.5): an
@@ -260,6 +329,9 @@ type ListATMAssignmentsAdminRow struct {
 // status: 'active'|'disabled'|'all' on is_active (the table has no deleted_at;
 // is_active=false is what releases the period from the exclusion constraint).
 // No priority_class here since migration 010 dropped vendor_packages_branch.priority_class.
+// Two sources (migration 023): 'branch' = vendor_package_id -> vendor_packages_branch;
+// 'vendor' = vendor_id + vendor_branch_id + package (label). package_code and the
+// managing branch/vendor resolve through COALESCE so callers see one shape.
 func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssignmentsAdminParams) ([]ListATMAssignmentsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listATMAssignmentsAdmin,
 		arg.AtmID,
@@ -284,6 +356,7 @@ func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssign
 			&i.IsActive,
 			&i.VendorBranchID,
 			&i.VendorID,
+			&i.Source,
 		); err != nil {
 			return nil, err
 		}
@@ -295,18 +368,66 @@ func (q *Queries) ListATMAssignmentsAdmin(ctx context.Context, arg ListATMAssign
 	return items, nil
 }
 
+const listATMPackageOptions = `-- name: ListATMPackageOptions :many
+SELECT DISTINCT vpp.package::text AS package
+FROM atms a
+JOIN vendor_package_prices vpp
+  ON vpp.vendor_id = $1
+ AND vpp.machine_group = a.price_machine_group
+ AND vpp.price_class = a.price_class
+ AND (vpp.atm_id IS NULL OR vpp.atm_id = a.id)
+ AND vpp.effective_start_date <= $2::date
+ AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= $2::date)
+WHERE a.id = $3 AND a.deleted_at IS NULL
+ORDER BY 1
+`
+
+type ListATMPackageOptionsParams struct {
+	VendorID int64       `json:"vendor_id"`
+	AsOf     pgtype.Date `json:"as_of"`
+	AtmID    int64       `json:"atm_id"`
+}
+
+// FR11: distinct package labels of a vendor that pass the same tariff check as
+// VendorTariffExistsForATM, for the assignment dialog's vendor-wide dropdown.
+func (q *Queries) ListATMPackageOptions(ctx context.Context, arg ListATMPackageOptionsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listATMPackageOptions, arg.VendorID, arg.AsOf, arg.AtmID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var package_ string
+		if err := rows.Scan(&package_); err != nil {
+			return nil, err
+		}
+		items = append(items, package_)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateATMAssignmentAdmin = `-- name: UpdateATMAssignmentAdmin :one
 UPDATE atm_vendor_packages
 SET vendor_package_id = $1,
-    effective_start_date = $2,
-    effective_end_date = $3,
+    vendor_id = $2,
+    vendor_branch_id = $3,
+    package = $4,
+    effective_start_date = $5,
+    effective_end_date = $6,
     updated_at = now()
-WHERE id = $4 AND is_active
-RETURNING id, atm_id, vendor_package_id, effective_start_date, effective_end_date, is_active
+WHERE id = $7 AND is_active
+RETURNING id, atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date, is_active
 `
 
 type UpdateATMAssignmentAdminParams struct {
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
+	VendorID           *int64      `json:"vendor_id"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	Package            *string     `json:"package"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	ID                 int64       `json:"id"`
@@ -315,17 +436,24 @@ type UpdateATMAssignmentAdminParams struct {
 type UpdateATMAssignmentAdminRow struct {
 	ID                 int64       `json:"id"`
 	AtmID              int64       `json:"atm_id"`
-	VendorPackageID    int64       `json:"vendor_package_id"`
+	VendorPackageID    *int64      `json:"vendor_package_id"`
+	VendorID           *int64      `json:"vendor_id"`
+	VendorBranchID     *int64      `json:"vendor_branch_id"`
+	Package            *string     `json:"package"`
 	EffectiveStartDate pgtype.Date `json:"effective_start_date"`
 	EffectiveEndDate   pgtype.Date `json:"effective_end_date"`
 	IsActive           bool        `json:"is_active"`
 }
 
 // atm_id is immutable. Only an active row can be edited (a disabled one is
-// re-enabled first, which re-runs the overlap guard).
+// re-enabled first, which re-runs the overlap guard). The source mode never
+// changes (the service rejects it; avp_source_chk is the backstop).
 func (q *Queries) UpdateATMAssignmentAdmin(ctx context.Context, arg UpdateATMAssignmentAdminParams) (UpdateATMAssignmentAdminRow, error) {
 	row := q.db.QueryRow(ctx, updateATMAssignmentAdmin,
 		arg.VendorPackageID,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.Package,
 		arg.EffectiveStartDate,
 		arg.EffectiveEndDate,
 		arg.ID,
@@ -335,9 +463,50 @@ func (q *Queries) UpdateATMAssignmentAdmin(ctx context.Context, arg UpdateATMAss
 		&i.ID,
 		&i.AtmID,
 		&i.VendorPackageID,
+		&i.VendorID,
+		&i.VendorBranchID,
+		&i.Package,
 		&i.EffectiveStartDate,
 		&i.EffectiveEndDate,
 		&i.IsActive,
 	)
 	return i, err
+}
+
+const vendorTariffExistsForATM = `-- name: VendorTariffExistsForATM :one
+SELECT EXISTS (
+    SELECT 1
+    FROM atms a
+    JOIN vendor_package_prices vpp
+      ON vpp.vendor_id = $1
+     AND vpp.package = $2
+     AND vpp.machine_group = a.price_machine_group
+     AND vpp.price_class = a.price_class
+     AND (vpp.atm_id IS NULL OR vpp.atm_id = a.id)
+     AND vpp.effective_start_date <= $3::date
+     AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= $3::date)
+    WHERE a.id = $4 AND a.deleted_at IS NULL
+) AS exists
+`
+
+type VendorTariffExistsForATMParams struct {
+	VendorID int64       `json:"vendor_id"`
+	Package  string      `json:"package"`
+	AsOf     pgtype.Date `json:"as_of"`
+	AtmID    int64       `json:"atm_id"`
+}
+
+// FR9.4: some tariff row of this vendor/label matches the ATM's machine group and
+// price class and is effective on as_of. A row scoped to another ATM (atm_id set)
+// does not count; PT-wide and branch rows do.
+func (q *Queries) VendorTariffExistsForATM(ctx context.Context, arg VendorTariffExistsForATMParams) (bool, error) {
+	row := q.db.QueryRow(ctx, vendorTariffExistsForATM,
+		arg.VendorID,
+		arg.Package,
+		arg.AsOf,
+		arg.AtmID,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

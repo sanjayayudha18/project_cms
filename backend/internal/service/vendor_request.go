@@ -160,6 +160,28 @@ type VendorRequestDetail struct {
 	IsCanceled         bool
 	IsManual           bool
 	CancellationReason *string // nil unless canceled after migration 038 (Req 3.11 Opsi B)
+
+	// atm-visit-quota (spec FR5): laporan selesai + per-ATM kuota info.
+	CompletionSubmittedBy     *UserRef
+	CompletionSubmittedAt     *time.Time
+	CompletionApprovedBy      *UserRef
+	CompletionApprovedAt      *time.Time
+	CompletionRejectedBy      *UserRef
+	CompletionRejectedAt      *time.Time
+	CompletionRejectionReason *string
+	Atms                      []RequestAtmStatus
+}
+
+// RequestAtmStatus is one distinct ATM of a request: its laporan-selesai
+// result (nil before a report) and current sisa kunjungan (nil = kuota
+// tidak diketahui / belum ada baris kuota). IsOverQuota is true once this
+// request's (uncancelled) visit for the ATM went over quota.
+type RequestAtmStatus struct {
+	TerminalID       string
+	CompletionResult *string
+	VisitRemaining   *int32
+	VisitQuotaTotal  *int32
+	IsOverQuota      bool
 }
 
 // VendorRequestSummary is one row of the list response (Req 9.4). CIT-2
@@ -249,6 +271,9 @@ type ForecastRow struct {
 	// IsRequested: this (terminal, periode, denom) is already an item of a
 	// vendor request that is not cancelled/rejected (forecast-browser-summary FR3).
 	IsRequested bool
+	// atm-visit-quota FR5: sisa kunjungan; nil = ATM has no quota row yet.
+	VisitRemaining  *int32
+	VisitQuotaTotal *int32
 }
 
 // BrowseForecastResult is the paginated forecast-browse response.
@@ -266,6 +291,7 @@ type BrowseForecastResult struct {
 // region has FLMVendor set and FLMVendorRegion == "" (review R1). An ATM counts as requested
 // only when every one of its denoms is. Amounts are full IDR.
 type ForecastSummaryGroup struct {
+	VendorID                   int64 // 0 for the no-active-vendor group (atm-visit-quota FR6.6)
 	FLMVendor                  string
 	FLMVendorRegion            string
 	ATMCount                   int64
@@ -354,6 +380,9 @@ type VendorRequestRepository interface {
 	// ListVendorOptions support (Req 1.2, 1.3, 3 Q2).
 	ListActiveVendors(ctx context.Context) ([]db.ListActiveVendorsRow, error)
 	ListDistinctVendorBranchRegions(ctx context.Context) ([]*string, error)
+	// atm-visit-quota: detail per-ATM status.
+	ListVendorRequestAtmResults(ctx context.Context, vendorRequestID int64) ([]db.VendorRequestAtmResult, error)
+	ListRequestVisitInfo(ctx context.Context, id int64) ([]db.ListRequestVisitInfoRow, error)
 }
 
 // VendorRequestPool is the *pgxpool.Pool surface the service needs: db.DBTX
@@ -383,6 +412,10 @@ type VendorRequestServicer interface {
 	List(ctx context.Context, params ListVendorRequestParams) (*ListVendorRequestResult, error)
 	Get(ctx context.Context, id int64) (*VendorRequestDetail, error)
 	AuditLog(ctx context.Context, id int64) ([]AuditEntry, error)
+	// atm-visit-quota (spec FR1): laporan selesai replenish.
+	SubmitCompletion(ctx context.Context, actor Actor, id int64, results []CompletionResultInput) (*VendorRequestDetail, error)
+	ApproveCompletion(ctx context.Context, actor Actor, id int64) (*VendorRequestDetail, []string, error)
+	RejectCompletion(ctx context.Context, actor Actor, id int64, reason string) (*VendorRequestDetail, error)
 }
 
 // VendorRequestService implements VendorRequestServicer.
@@ -414,6 +447,11 @@ const (
 	actionReject  action = "reject"
 	actionRevise  action = "revise"
 	actionCancel  action = "cancel"
+
+	// atm-visit-quota (spec FR1): laporan selesai replenish.
+	actionSubmitCompletion  action = "submit_completion"
+	actionApproveCompletion action = "approve_completion"
+	actionRejectCompletion  action = "reject_completion"
 )
 
 // transitions is the valid-transition table (Req 2.1). approved->processing,
@@ -425,7 +463,10 @@ var transitions = map[string]map[action]string{
 	"draft":            {actionSubmit: "pending_approval", actionCancel: "cancelled"},
 	"pending_approval": {actionApprove: "approved", actionReject: "rejected", actionCancel: "cancelled"},
 	"rejected":         {actionRevise: "draft"},
-	"approved":         {actionCancel: "cancelled"},
+	"approved":         {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// atm-visit-quota FR1: a rejected report goes back to approved so the
+	// maker can resubmit; no cancel from completion_pending (FR1.4).
+	"completion_pending": {actionApproveCompletion: "completed", actionRejectCompletion: "approved"},
 }
 
 // nextState returns the target status for (cur, a), or ok=false if the

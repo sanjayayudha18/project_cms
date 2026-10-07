@@ -11,12 +11,18 @@
 -- status: 'active'|'disabled'|'all' on is_active (the table has no deleted_at;
 -- is_active=false is what releases the period from the exclusion constraint).
 -- No priority_class here since migration 010 dropped vendor_packages_branch.priority_class.
-SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
+-- Two sources (migration 023): 'branch' = vendor_package_id -> vendor_packages_branch;
+-- 'vendor' = vendor_id + vendor_branch_id + package (label). package_code and the
+-- managing branch/vendor resolve through COALESCE so callers see one shape.
+SELECT a.id, a.atm_id, a.vendor_package_id,
+       COALESCE(p.package_code, a.package)::text AS package_code,
        a.effective_start_date, a.effective_end_date, a.is_active,
-       p.vendor_branch_id, vb.vendor_id
+       vb.id AS vendor_branch_id,
+       vb.vendor_id,
+       CASE WHEN a.vendor_package_id IS NULL THEN 'vendor' ELSE 'branch' END::text AS source
 FROM atm_vendor_packages a
-JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
-LEFT JOIN vendor_branches vb ON vb.id = p.vendor_branch_id -- NULL for internal (ROH) packages
+LEFT JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_branches vb ON vb.id = COALESCE(p.vendor_branch_id, a.vendor_branch_id) -- NULL for internal (ROH) packages
 WHERE a.atm_id = sqlc.arg('atm_id')
   AND (
         sqlc.arg('status')::text = 'all'
@@ -38,10 +44,13 @@ WHERE a.atm_id = sqlc.arg('atm_id')
 
 -- name: GetATMAssignmentAdminByID :one
 -- Doubles as the "before" snapshot / CurrentState (T2.5).
-SELECT a.id, a.atm_id, a.vendor_package_id, p.package_code,
-       a.effective_start_date, a.effective_end_date, a.is_active
+SELECT a.id, a.atm_id, a.vendor_package_id,
+       COALESCE(p.package_code, a.package)::text AS package_code,
+       a.effective_start_date, a.effective_end_date, a.is_active,
+       a.vendor_id, a.vendor_branch_id, a.package,
+       CASE WHEN a.vendor_package_id IS NULL THEN 'vendor' ELSE 'branch' END::text AS source
 FROM atm_vendor_packages a
-JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
+LEFT JOIN vendor_packages_branch p ON p.id = a.vendor_package_id
 WHERE a.id = $1;
 
 -- name: FindOverlappingATMAssignment :one
@@ -61,20 +70,25 @@ LIMIT 1;
 SELECT id FROM atms WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: CreateATMAssignmentAdmin :one
-INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, effective_start_date, effective_end_date)
-VALUES (sqlc.arg('atm_id'), sqlc.arg('vendor_package_id'), sqlc.arg('effective_start_date'), sqlc.narg('effective_end_date'))
-RETURNING id, atm_id, vendor_package_id, effective_start_date, effective_end_date, is_active;
+INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date)
+VALUES (sqlc.arg('atm_id'), sqlc.narg('vendor_package_id'), sqlc.narg('vendor_id'), sqlc.narg('vendor_branch_id'), sqlc.narg('package'),
+        sqlc.arg('effective_start_date'), sqlc.narg('effective_end_date'))
+RETURNING id, atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date, is_active;
 
 -- name: UpdateATMAssignmentAdmin :one
 -- atm_id is immutable. Only an active row can be edited (a disabled one is
--- re-enabled first, which re-runs the overlap guard).
+-- re-enabled first, which re-runs the overlap guard). The source mode never
+-- changes (the service rejects it; avp_source_chk is the backstop).
 UPDATE atm_vendor_packages
-SET vendor_package_id = sqlc.arg('vendor_package_id'),
+SET vendor_package_id = sqlc.narg('vendor_package_id'),
+    vendor_id = sqlc.narg('vendor_id'),
+    vendor_branch_id = sqlc.narg('vendor_branch_id'),
+    package = sqlc.narg('package'),
     effective_start_date = sqlc.arg('effective_start_date'),
     effective_end_date = sqlc.narg('effective_end_date'),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND is_active
-RETURNING id, atm_id, vendor_package_id, effective_start_date, effective_end_date, is_active;
+RETURNING id, atm_id, vendor_package_id, vendor_id, vendor_branch_id, package, effective_start_date, effective_end_date, is_active;
 
 -- name: DisableATMAssignment :exec
 -- Soft-disable only; releases the period from the exclusion constraint.
@@ -100,3 +114,51 @@ UPDATE atm_vendor_packages
 SET is_active = false, updated_at = now()
 WHERE atm_id = sqlc.arg('atm_id') AND is_active
   AND effective_start_date = sqlc.arg('start_date')::date;
+
+-- name: GetATMPriceGroup :one
+-- price_machine_group / price_class are generated columns; NULL when the ATM's
+-- machine_type/priority_class is unmapped (vendor-wide assignment then fails hard).
+SELECT price_machine_group, price_class FROM atms WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: CheckAssignmentVendorBranch :one
+-- Vendor-wide assignment (FR9.2-3): the vendor is an active FLM vendor (not
+-- INTERNAL/ROH, which never has tariffs) and the branch belongs to it and is active.
+SELECT vb.id
+FROM vendor_branches vb
+JOIN vendors v ON v.id = vb.vendor_id
+WHERE vb.id = sqlc.arg('vendor_branch_id') AND vb.vendor_id = sqlc.arg('vendor_id')
+  AND vb.is_active AND vb.deleted_at IS NULL
+  AND v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR';
+
+-- name: VendorTariffExistsForATM :one
+-- FR9.4: some tariff row of this vendor/label matches the ATM's machine group and
+-- price class and is effective on as_of. A row scoped to another ATM (atm_id set)
+-- does not count; PT-wide and branch rows do.
+SELECT EXISTS (
+    SELECT 1
+    FROM atms a
+    JOIN vendor_package_prices vpp
+      ON vpp.vendor_id = sqlc.arg('vendor_id')
+     AND vpp.package = sqlc.arg('package')
+     AND vpp.machine_group = a.price_machine_group
+     AND vpp.price_class = a.price_class
+     AND (vpp.atm_id IS NULL OR vpp.atm_id = a.id)
+     AND vpp.effective_start_date <= sqlc.arg('as_of')::date
+     AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= sqlc.arg('as_of')::date)
+    WHERE a.id = sqlc.arg('atm_id') AND a.deleted_at IS NULL
+) AS exists;
+
+-- name: ListATMPackageOptions :many
+-- FR11: distinct package labels of a vendor that pass the same tariff check as
+-- VendorTariffExistsForATM, for the assignment dialog's vendor-wide dropdown.
+SELECT DISTINCT vpp.package::text AS package
+FROM atms a
+JOIN vendor_package_prices vpp
+  ON vpp.vendor_id = sqlc.arg('vendor_id')
+ AND vpp.machine_group = a.price_machine_group
+ AND vpp.price_class = a.price_class
+ AND (vpp.atm_id IS NULL OR vpp.atm_id = a.id)
+ AND vpp.effective_start_date <= sqlc.arg('as_of')::date
+ AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= sqlc.arg('as_of')::date)
+WHERE a.id = sqlc.arg('atm_id') AND a.deleted_at IS NULL
+ORDER BY 1;

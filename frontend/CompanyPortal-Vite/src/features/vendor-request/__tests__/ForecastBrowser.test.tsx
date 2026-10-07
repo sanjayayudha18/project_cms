@@ -10,7 +10,7 @@
  */
 import { api } from "@/lib/api/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ForecastBrowser } from "../ForecastBrowser";
@@ -87,6 +87,7 @@ const SUMMARY_RESPONSE: ForecastSummaryResponse = {
   },
   groups: [
     {
+      vendor_id: 1,
       flm_vendor: "TAG",
       flm_vendor_region: "Jawa Barat",
       atm_count: 2,
@@ -96,6 +97,7 @@ const SUMMARY_RESPONSE: ForecastSummaryResponse = {
       unrequested_amount_replenish: 1000,
     },
     {
+      vendor_id: 0,
       flm_vendor: "",
       flm_vendor_region: "",
       atm_count: 1,
@@ -105,6 +107,7 @@ const SUMMARY_RESPONSE: ForecastSummaryResponse = {
       unrequested_amount_replenish: 1000,
     },
     {
+      vendor_id: 2,
       flm_vendor: "ROH",
       flm_vendor_region: "",
       atm_count: 1,
@@ -147,6 +150,8 @@ function makeRow(
     amount_replenish: amountReplenish,
     amount_refund: 0,
     dmaa_file_id: 1,
+    visit_remaining: null,
+    visit_quota_total: null,
     lokasi_atm: "",
     brand: "",
     priority_class: "",
@@ -222,7 +227,7 @@ async function renderPage() {
   const flmVendorSelect = await screen.findByLabelText("FLM Vendor");
   // Wait for useVendorOptions to resolve and populate the option, not just
   // for the (already-present, options-less) <select> element itself.
-  await screen.findByRole("option", { name: "TAG" });
+  await within(flmVendorSelect).findByRole("option", { name: "TAG" });
   await user.selectOptions(flmVendorSelect, "TAG");
   await user.selectOptions(screen.getByLabelText("FLM Vendor Region"), "Jawa Barat");
   return utils;
@@ -464,7 +469,7 @@ describe("ForecastBrowser — vendor × region recap (forecast-browser-summary F
     const selectAll = await screen.findByRole("button", { name: "Pilih Semua Rekomendasi" });
     expect(selectAll).toBeDisabled();
 
-    await screen.findByRole("option", { name: "TAG" });
+    await within(screen.getByLabelText("FLM Vendor")).findByRole("option", { name: "TAG" });
     await user.selectOptions(screen.getByLabelText("FLM Vendor"), "TAG");
     await waitFor(() => expect(selectAll).not.toBeDisabled());
     await user.click(selectAll);

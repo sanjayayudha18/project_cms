@@ -62,6 +62,9 @@ type forecastRowResponse struct {
 	Escrow        *string `json:"escrow"`
 	// forecast-browser-summary (FR3): additive.
 	IsRequested bool `json:"is_requested"`
+	// atm-visit-quota (FR5): sisa kunjungan, null = belum ada baris kuota.
+	VisitRemaining  *int32 `json:"visit_remaining"`
+	VisitQuotaTotal *int32 `json:"visit_quota_total"`
 }
 
 type forecastResponse struct {
@@ -87,6 +90,8 @@ func toForecastResponse(result *service.BrowseForecastResult) forecastResponse {
 			Paket:           row.Paket,
 			Escrow:          row.Escrow,
 			IsRequested:     row.IsRequested,
+			VisitRemaining:  row.VisitRemaining,
+			VisitQuotaTotal: row.VisitQuotaTotal,
 		}
 	}
 	return forecastResponse{
@@ -110,6 +115,7 @@ type forecastSummaryTotalsResponse struct {
 }
 
 type forecastSummaryGroupResponse struct {
+	VendorID                   int64  `json:"vendor_id"` // 0 = tanpa vendor aktif (atm-visit-quota FR6.6)
 	FLMVendor                  string `json:"flm_vendor"`
 	FLMVendorRegion            string `json:"flm_vendor_region"`
 	ATMCount                   int64  `json:"atm_count"`
@@ -190,6 +196,25 @@ type vendorRequestDetailResponse struct {
 	IsCanceled         bool                        `json:"is_canceled"`
 	IsManual           bool                        `json:"is_manual"`
 	CancellationReason *string                     `json:"cancellation_reason"`
+	// atm-visit-quota (FR5): laporan selesai + kuota per ATM.
+	CompletionSubmittedBy     *vendorRequestUserRef  `json:"completion_submitted_by"`
+	CompletionSubmittedAt     *string                `json:"completion_submitted_at"`
+	CompletionApprovedBy      *vendorRequestUserRef  `json:"completion_approved_by"`
+	CompletionApprovedAt      *string                `json:"completion_approved_at"`
+	CompletionRejectedBy      *vendorRequestUserRef  `json:"completion_rejected_by"`
+	CompletionRejectedAt      *string                `json:"completion_rejected_at"`
+	CompletionRejectionReason *string                `json:"completion_rejection_reason"`
+	Atms                      []requestAtmStatusResp `json:"atms"`
+	// Only on POST /{id}/complete/approve: ATMs that went over quota.
+	OverQuotaTerminals []string `json:"over_quota_terminals,omitempty"`
+}
+
+type requestAtmStatusResp struct {
+	TerminalID       string  `json:"terminal_id"`
+	CompletionResult *string `json:"completion_result"`
+	VisitRemaining   *int32  `json:"visit_remaining"`
+	VisitQuotaTotal  *int32  `json:"visit_quota_total"`
+	IsOverQuota      bool    `json:"is_over_quota"`
 }
 
 func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailResponse {
@@ -219,7 +244,24 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 		IsCanceled:         d.IsCanceled,
 		IsManual:           d.IsManual,
 		CancellationReason: d.CancellationReason,
+
+		CompletionSubmittedBy:     toUserRefResponse(d.CompletionSubmittedBy),
+		CompletionSubmittedAt:     formatTimestampPtr(d.CompletionSubmittedAt),
+		CompletionApprovedBy:      toUserRefResponse(d.CompletionApprovedBy),
+		CompletionApprovedAt:      formatTimestampPtr(d.CompletionApprovedAt),
+		CompletionRejectedBy:      toUserRefResponse(d.CompletionRejectedBy),
+		CompletionRejectedAt:      formatTimestampPtr(d.CompletionRejectedAt),
+		CompletionRejectionReason: d.CompletionRejectionReason,
+		Atms:                      toRequestAtmStatusResp(d.Atms),
 	}
+}
+
+func toRequestAtmStatusResp(in []service.RequestAtmStatus) []requestAtmStatusResp {
+	out := make([]requestAtmStatusResp, len(in))
+	for i, a := range in {
+		out[i] = requestAtmStatusResp(a)
+	}
+	return out
 }
 
 // -- GET / (list) ---------------------------------------------------------

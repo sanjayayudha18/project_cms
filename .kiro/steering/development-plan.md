@@ -133,7 +133,7 @@ Binding rules (from `project-context.md`):
 ## Phase 2 — ATM operations (daily transactional core)
 
 ### 2.1 `internal/forecast` (Order ATM engine)
-- `forecast_runs` / `forecast_results`. `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` (Sec 3a). Formula + fallback (DSR missing → DMAA recommendation alone) **confirmed valid 2026-09-25**. Exclude problem ATMs; duplicate-order prevention. Forecast input uploads (complaint/project/problem/adjustment lists) → draft order → maker-checker.
+- `forecast_runs` / `forecast_results`. `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` (Sec 3a; FSD v1.0 formula, replaced the URS formula 2026-10-01). DSR-missing fallback is an open question. Exclude problem ATMs; duplicate-order prevention. Forecast input uploads (complaint/project/problem/adjustment lists) → draft order → maker-checker.
 - **Depends on:** 0.2, DSR + DMAA data.
 - **Model:** Opus, Effort: High.
 
@@ -164,7 +164,7 @@ Binding rules (from `project-context.md`):
 ## Resolved decisions (2026-09-25)
 
 1. **EOD runtime:** stays Python (`backend_python/`). No Go `cmd/batch`. CLAUDE.md Sec 14 updated.
-2. **Order ATM formula:** valid as written (CLAUDE.md Sec 3a).
+2. **Order ATM formula:** valid as written (CLAUDE.md Sec 3a). *Superseded 2026-10-01 by the FSD v1.0 formula — see Sec 3a.*
 3. **Branch `branch_id` filter + disable-with-children:** see Phase 1.2.
 4. **Cash count tables:** `cash_count_schedules` + `cash_count_evidences` names approved into CLAUDE.md Sec 3; columns + any extra tables decided in the Phase 5 spec. Phase stays parked.
 

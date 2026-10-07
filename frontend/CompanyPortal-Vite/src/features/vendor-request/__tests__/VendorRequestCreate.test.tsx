@@ -10,7 +10,7 @@
 
 import { api } from "@/lib/api/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -216,19 +216,23 @@ describe("VendorRequestCreate — CIT-2 manual mode (Task 12.3)", () => {
     expect(replenishInput).toBeDisabled();
   });
 
-  it("Additional offers a H+0/H+1/H+2 select instead of a locked input", async () => {
+  it("Additional offers an editable date input with today as the minimum", async () => {
     const user = await enterManualMode();
 
     await user.selectOptions(screen.getByLabelText(/kategori request/i), "additional");
 
-    const replenishSelect = screen.getByLabelText(/tanggal replenish/i) as HTMLSelectElement;
-    expect(replenishSelect.tagName).toBe("SELECT");
-    const optionValues = Array.from(replenishSelect.options).map((o) => o.value);
-    expect(optionValues).toEqual([
-      jakartaCalendarDateISO(0),
-      jakartaCalendarDateISO(1),
-      jakartaCalendarDateISO(2),
-    ]);
+    const replenishInput = screen.getByLabelText(/tanggal replenish/i) as HTMLInputElement;
+    expect(replenishInput.type).toBe("date");
+    expect(replenishInput).toBeEnabled();
+    expect(replenishInput.min).toBe(jakartaCalendarDateISO(0));
+    expect(replenishInput.value).toBe(jakartaCalendarDateISO(0));
+
+    const future = jakartaCalendarDateISO(10);
+    fireEvent.change(replenishInput, { target: { value: future } });
+    expect(replenishInput.value).toBe(future);
+
+    fireEvent.change(replenishInput, { target: { value: jakartaCalendarDateISO(-1) } });
+    expect(await screen.findByText("Tidak boleh sebelum hari ini")).toBeInTheDocument();
   });
 
   it("accepts a manually added row's terminal_id/denom/amount_replenish", async () => {

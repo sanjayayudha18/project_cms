@@ -33,7 +33,7 @@ import { nextBusinessDayISO } from "./lib/nextBusinessDay";
 import { usePendingVendorRequestSelection } from "./selectionStore";
 import type { ForecastRow, ForecastSummaryGroup } from "./types";
 
-const DEFAULT_PAGE_SIZE = 25;
+const DEFAULT_PAGE_SIZE = 10;
 const ATM_FILTER_DEBOUNCE_MS = 300;
 // Same static ATM brand list as atm-portal/components/FilterBar.tsx — no
 // dedicated "distinct brands" endpoint exists, and 3 known values don't

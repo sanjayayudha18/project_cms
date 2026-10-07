@@ -367,6 +367,7 @@ func main() {
 	atmAssignmentAdminService := service.NewATMAssignmentAdminService(atmAssignmentAdminRepo, masterDataChangeService)
 	adminATMAssignmentHandler := handler.NewAdminATMAssignmentHandler(atmAssignmentAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/atms/{atmID}/assignments", adminATMAssignmentHandler.Routes())
+	masterDataAdmin.Get("/api/v1/admin/atms/{atmID}/assignment-package-options", adminATMAssignmentHandler.PackageOptions)
 
 	// CSV import of master data (plan.md T5.3 dry-run, T5.4 confirm). It validates
 	// and stages a write flow, so it reads the PRIMARY (dbPool), never the
@@ -433,6 +434,12 @@ func main() {
 	vendorRequestService := service.NewVendorRequestService(dbPool)
 	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
+
+	// Kuota kunjungan replenish per ATM (.claude/sdlc/atm-visit-quota): read
+	// for viewers, reset/cancel-visit for checkers (re-checked in service).
+	// Primary pool (plan D1: read right after approve/reset/cancel).
+	atmVisitQuotaHandler := handler.NewAtmVisitQuotaHandler(service.NewAtmVisitQuotaService(dbPool))
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-visit-quotas", atmVisitQuotaHandler.Routes())
 
 	// Create and mount the Audit Log Viewer handler (read-only, admin-only).
 	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL wiring lands

@@ -5,12 +5,13 @@ Modul: `internal/forecast`, `internal/replenishment`, `internal/dsr`, `internal/
 
 ## Formula
 ```
-Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)
+Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund
 ```
-- Proyeksi Refund per ID = opening balance H − transaksi prediksi H & H+1
-- Rencana Isi Hari-H = order hari sebelumnya yang diisi pada hari H (pengurang saldo fisik FLM)
-- DSR tidak ada tapi ada rekomendasi DMAA → hitung dari rekomendasi DMAA saja
-- ⚠️ URS masih bertanya: "apakah rumus ini masih valid?" — perlu konfirmasi bisnis
+- Sumber: FSD "DSR End To End Cash Management" v1.0 — menggantikan rumus URS (diputuskan 2026-10-01)
+- Forecast Amount = hasil forecast EDP/DMAA (siap 06:00); Saldo DSR = upload vendor 06:30–09:00; hitung 09:30–10:00
+- Forecast Refund per ID = opening balance H − transaksi prediksi H & H+1
+- Rencana Isi Hari-H tidak lagi dipakai di rumus
+- ⚠️ Open question: fallback jika DSR tidak ada/telat belum didefinisikan FSD
 
 ## Flow: end-to-end
 
@@ -44,10 +45,9 @@ flowchart TD
     subgraph CALC[3. Perhitungan Kebutuhan]
         E --> F[Ambil Saldo DSR vendor]
         F --> G[Ambil Proyeksi Refund]
-        G --> H[Ambil Rencana Isi Hari-H]
-        H --> I{DSR tersedia?}
-        I -->|Ya| J[Hitung formula Order ATM]
-        I -->|Tidak| K[Pakai rekomendasi DMAA]
+        G --> I{DSR tersedia?}
+        I -->|Ya| J[Hitung Forecast Replenish]
+        I -->|Tidak| K[Fallback: open question]
         J --> L[Kelompokkan per vendor · vault · denom]
         K --> L
     end

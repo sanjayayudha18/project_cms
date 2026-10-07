@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -16,6 +17,11 @@ type fakeATMAssignmentAdminRepo struct {
 	overlap     bool
 	atmMissing  bool
 	pkgInactive bool
+	// vendor-wide (migration 023) lookups
+	noPriceGroup  bool
+	branchInvalid bool
+	tariffMissing bool
+	options       []string
 	// lastOverlap records the period HasOverlap was asked about.
 	lastExclude int64
 	lastStart   time.Time
@@ -40,6 +46,26 @@ func (f *fakeATMAssignmentAdminRepo) ATMActive(context.Context, int64) (bool, er
 }
 func (f *fakeATMAssignmentAdminRepo) PackageActive(context.Context, int64) (bool, error) {
 	return !f.pkgInactive, nil
+}
+
+func (f *fakeATMAssignmentAdminRepo) ListATMPackageOptions(context.Context, db.ListATMPackageOptionsParams) ([]string, error) {
+	return f.options, nil
+}
+func (f *fakeATMAssignmentAdminRepo) GetATMPriceGroup(context.Context, int64) (db.GetATMPriceGroupRow, error) {
+	if f.noPriceGroup {
+		return db.GetATMPriceGroupRow{}, nil
+	}
+	m, c := "ATM", "REGULAR"
+	return db.GetATMPriceGroupRow{PriceMachineGroup: &m, PriceClass: &c}, nil
+}
+func (f *fakeATMAssignmentAdminRepo) CheckAssignmentVendorBranch(context.Context, db.CheckAssignmentVendorBranchParams) (int64, error) {
+	if f.branchInvalid {
+		return 0, pgx.ErrNoRows
+	}
+	return 1, nil
+}
+func (f *fakeATMAssignmentAdminRepo) VendorTariffExistsForATM(context.Context, db.VendorTariffExistsForATMParams) (bool, error) {
+	return !f.tariffMissing, nil
 }
 
 func date(s string) pgtype.Date {
@@ -167,7 +193,7 @@ func TestATMAssignmentAdminService_Create(t *testing.T) {
 
 func TestATMAssignmentAdminService_UpdateAndToggle(t *testing.T) {
 	ctx := context.Background()
-	active := &db.GetATMAssignmentAdminByIDRow{ID: 1, AtmID: 3, IsActive: true, EffectiveStartDate: date("2026-03-01")}
+	active := &db.GetATMAssignmentAdminByIDRow{ID: 1, AtmID: 3, IsActive: true, Source: AssignmentSourceBranch, EffectiveStartDate: date("2026-03-01")}
 	disabled := &db.GetATMAssignmentAdminByIDRow{ID: 1, AtmID: 3, IsActive: false, EffectiveStartDate: date("2026-03-01"), EffectiveEndDate: date("2026-03-31")}
 	foreign := &db.GetATMAssignmentAdminByIDRow{ID: 1, AtmID: 4, IsActive: true}
 
@@ -206,7 +232,7 @@ func TestATMAssignmentAdminService_UpdateAndToggle(t *testing.T) {
 }
 
 func TestATMAssignmentAdminService_Update_ExcludesOwnRowFromOverlap(t *testing.T) {
-	repo := &fakeATMAssignmentAdminRepo{getByID: &db.GetATMAssignmentAdminByIDRow{ID: 9, AtmID: 3, IsActive: true}}
+	repo := &fakeATMAssignmentAdminRepo{getByID: &db.GetATMAssignmentAdminByIDRow{ID: 9, AtmID: 3, IsActive: true, Source: AssignmentSourceBranch}}
 	if _, err := NewATMAssignmentAdminService(repo, &fakeVendorBranchSubmitter{}).Update(context.Background(), 7, 3, 9, validAssignment(), "ip"); err != nil {
 		t.Fatal(err)
 	}

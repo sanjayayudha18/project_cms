@@ -20,6 +20,7 @@ const STATUS_CONFIG: Record<VendorRequestStatus, { variant: BadgeVariant; label:
   completed: { variant: "success", label: "Selesai" },
   failed: { variant: "danger", label: "Gagal" },
   cancelled: { variant: "neutral", label: "Dibatalkan" },
+  completion_pending: { variant: "warning", label: "Menunggu Persetujuan Laporan" },
 };
 
 interface StatusBadgeProps {

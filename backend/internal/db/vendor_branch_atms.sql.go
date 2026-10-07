@@ -12,9 +12,9 @@ import (
 const countBranchATMs = `-- name: CountBranchATMs :one
 SELECT COUNT(DISTINCT a.id)
 FROM atm_vendor_packages avp
-JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
 JOIN atms a                    ON a.id = avp.atm_id
-WHERE vp.vendor_branch_id = $1
+WHERE COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) = $1
   AND avp.is_active = true
   AND avp.effective_start_date <= CURRENT_DATE
   AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= CURRENT_DATE)
@@ -42,12 +42,12 @@ FROM (
         a.is_active AS is_active,
         l.name AS location_name,
         l.city_or_regency AS location_city_or_regency,
-        vp.package_code AS package_code
+        COALESCE(vp.package_code, avp.package) AS package_code
     FROM atm_vendor_packages avp
-    JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
+    LEFT JOIN vendor_packages_branch vp ON vp.id = avp.vendor_package_id
     JOIN atms a                   ON a.id = avp.atm_id
     LEFT JOIN locations l         ON l.id = a.location_id
-    WHERE vp.vendor_branch_id = $1
+    WHERE COALESCE(vp.vendor_branch_id, avp.vendor_branch_id) = $1
       AND avp.is_active = true
       AND avp.effective_start_date <= CURRENT_DATE
       AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= CURRENT_DATE)
@@ -76,7 +76,8 @@ type ListBranchATMsRow struct {
 // Read-only "ATM" sub-tab on the vendor branch detail page (.kiro/specs/
 // vendor-branch-atms). An ATM is "managed by" a branch when it has an
 // active atm_vendor_packages assignment to a vendor_packages_branch row
-// owned by that branch. No mutations here -- display-only, no
+// owned by that branch, or a vendor-wide assignment (migration 023) that
+// names that branch as its managing branch. No mutations here -- display-only, no
 // maker-checker. GetVendorBranchVendorID already exists in
 // vendor_vaults_admin.sql and is reused for the vendor-scope check.
 // One row per ATM managed by branch $1 (active assignments only, i.e. the

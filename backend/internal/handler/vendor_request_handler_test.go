@@ -55,7 +55,24 @@ type fakeVendorRequestServicer struct {
 	// CIT-2 (Task 8.3): capture the last received input to verify the
 	// handler's request-body/query-param parsing, not just the response shape.
 	lastCreateInput service.CreateVendorRequestInput
-	lastListParams  service.ListVendorRequestParams
+
+	// atm-visit-quota: laporan selesai.
+	completionResult    *service.VendorRequestDetail
+	completionErr       error
+	overQuota           []string
+	lastCompletionInput []service.CompletionResultInput
+	lastListParams      service.ListVendorRequestParams
+}
+
+func (f *fakeVendorRequestServicer) SubmitCompletion(_ context.Context, _ service.Actor, _ int64, in []service.CompletionResultInput) (*service.VendorRequestDetail, error) {
+	f.lastCompletionInput = in
+	return f.completionResult, f.completionErr
+}
+func (f *fakeVendorRequestServicer) ApproveCompletion(context.Context, service.Actor, int64) (*service.VendorRequestDetail, []string, error) {
+	return f.completionResult, f.overQuota, f.completionErr
+}
+func (f *fakeVendorRequestServicer) RejectCompletion(context.Context, service.Actor, int64, string) (*service.VendorRequestDetail, error) {
+	return f.completionResult, f.completionErr
 }
 
 func (f *fakeVendorRequestServicer) BrowseForecast(_ context.Context, p service.BrowseForecastParams) (*service.BrowseForecastResult, error) {

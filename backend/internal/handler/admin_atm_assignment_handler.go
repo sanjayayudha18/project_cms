@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -23,6 +24,7 @@ type ATMAssignmentAdminServicer interface {
 	Update(ctx context.Context, makerID, atmID, id int64, req service.ATMAssignmentUpdatePayload, actorIP string) (db.MasterDataChangeRequest, error)
 	Disable(ctx context.Context, makerID, atmID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 	Enable(ctx context.Context, makerID, atmID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
+	PackageOptions(ctx context.Context, atmID, vendorID int64) ([]string, error)
 }
 
 // AdminATMAssignmentHandler handles ADMIN/ADMIN_PARAM-only ATM assignment
@@ -51,7 +53,7 @@ func (h *AdminATMAssignmentHandler) Routes() chi.Router {
 
 func assignmentToResponse(a service.ATMAssignment) map[string]any {
 	return map[string]any{
-		"id": a.ID, "atm_id": a.ATMID, "vendor_package_id": a.VendorPackageID, "package_code": a.PackageCode,
+		"id": a.ID, "atm_id": a.ATMID, "vendor_package_id": a.VendorPackageID, "package_code": a.PackageCode, "source": a.Source,
 		"effective_start_date": a.EffectiveStartDate,
 		"effective_end_date":   a.EffectiveEndDate, "is_active": a.IsActive,
 		"vendor_id": a.VendorID, "vendor_branch_id": a.VendorBranchID,
@@ -210,6 +212,28 @@ func (h *AdminATMAssignmentHandler) toggle(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
+}
+
+// PackageOptions handles GET /api/v1/admin/atms/{atmID}/assignment-package-options?vendor_id=
+// (FR11): vendor-wide package labels with a tariff matching the ATM, for the
+// "Seluruh vendor" dropdown. Read-only. Mounted beside (not under) /assignments.
+func (h *AdminATMAssignmentHandler) PackageOptions(w http.ResponseWriter, r *http.Request) {
+	atmID, err := parsePathID(r, "atmID")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	vendorID, err := strconv.ParseInt(r.URL.Query().Get("vendor_id"), 10, 64)
+	if err != nil || vendorID <= 0 {
+		writeError(w, http.StatusBadRequest, "bad_request", "vendor_id wajib diisi")
+		return
+	}
+	labels, err := h.svc.PackageOptions(r.Context(), atmID, vendorID)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"packages": labels})
 }
 
 func (h *AdminATMAssignmentHandler) handleError(w http.ResponseWriter, err error) {

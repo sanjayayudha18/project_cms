@@ -129,6 +129,23 @@ describe("AuditFilterBar", () => {
     expect(navigateMock).toHaveBeenLastCalledWith({ to: ".", search: { action: "reject" } });
   });
 
+  it("offers the atm-visit-quota actions and entity types (review N3)", async () => {
+    const user = userEvent.setup();
+    searchState = {};
+    render(<AuditLogPage />);
+
+    await user.selectOptions(screen.getByLabelText("Aksi"), "approve_completion");
+    expect(navigateMock).toHaveBeenLastCalledWith({
+      to: ".",
+      search: { action: "approve_completion" },
+    });
+    for (const action of ["submit_completion", "reject_completion", "reset"]) {
+      expect(screen.getByRole("option", { name: action })).toBeInTheDocument();
+    }
+    await user.selectOptions(screen.getByLabelText("Tipe Entitas"), "atm_visit_quota");
+    expect(screen.getByRole("option", { name: "atm_visit" })).toBeInTheDocument();
+  });
+
   it("blocks a from-date after the to-date and explains why", async () => {
     const user = userEvent.setup();
     searchState = { date_to: "2026-09-10" };

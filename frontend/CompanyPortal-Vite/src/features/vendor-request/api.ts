@@ -8,6 +8,7 @@ import { api } from "@/lib/api/client";
 import type {
   AuditLogResponse,
   BrowseForecastParams,
+  CompletionResultInput,
   CreateVendorRequestPayload,
   FetchAllForecastResult,
   ForecastResponse,
@@ -171,5 +172,29 @@ export async function cancelVendorRequest(
   const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/cancel`, {
     cancellation_reason: reason,
   });
+  return data;
+}
+
+// -- atm-visit-quota: laporan selesai replenish (spec FR5) ------------------
+
+export async function submitVendorRequestCompletion(
+  id: number,
+  results: CompletionResultInput[],
+): Promise<VendorRequestDetail> {
+  const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/complete`, { results });
+  return data;
+}
+
+/** Response adds over_quota_terminals (ATMs that went over their kuota). */
+export async function approveVendorRequestCompletion(id: number): Promise<VendorRequestDetail> {
+  const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/complete/approve`);
+  return data;
+}
+
+export async function rejectVendorRequestCompletion(
+  id: number,
+  reason: string,
+): Promise<VendorRequestDetail> {
+  const { data } = await api.post<VendorRequestDetail>(`${BASE}/${id}/complete/reject`, { reason });
   return data;
 }

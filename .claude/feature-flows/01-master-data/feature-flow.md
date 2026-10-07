@@ -31,6 +31,27 @@ flowchart TD
     N --> O([Selesai])
 ```
 
+## Flow: upload master (FSD v1.0 — target, belum diimplementasi)
+
+Sumber: FSD "DSR End To End Cash Management" v1.0 — Upload Master Vendor & Master Kelolaan ATM (diputuskan 2026-10-01). Upload **mengganti** seluruh data master lama (bukan upsert). Kode saat ini masih upsert + all-or-nothing (CLAUDE.md Sec 12 D1/D2).
+
+```mermaid
+flowchart TD
+    A([Maker upload file master]) --> B[Review master data]
+    B --> C{Ada record ditolak?}
+    C -->|Ya| D{Kelolaan ATM: nama perusahaan<br/>belum terdaftar di Master Vendor?}
+    D -->|Ya| D1[Daftarkan via upload Master Vendor] --> E
+    D -->|Tidak| E[Perbaiki record yang ditolak]
+    E --> F[Upload ulang record yang diperbaiki] --> B
+    C -->|Tidak| G{Checker review & approve<br/>Checker ≠ Maker}
+    G -->|Reject| H[Kembalikan ke Maker] --> E
+    G -->|Approve| I[Replace data master di CROWN]
+    I --> J[(audit_logs: maker, checker, field before/after)]
+    J --> K([Selesai])
+```
+
+Open questions: nasib baris yang tidak ada di file (soft-disable? bagaimana jika masih direferensikan assignment aktif); record perbaikan digabung ke batch pending atau batch baru.
+
 ## Flow: pencarian & export
 
 ```mermaid

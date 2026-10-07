@@ -37,6 +37,8 @@ type ATMAssignmentAdminRepo interface {
 	HasOverlap(ctx context.Context, atmID, excludeID int64, start time.Time, end *time.Time) (bool, error)
 	ATMActive(ctx context.Context, atmID int64) (bool, error)
 	PackageActive(ctx context.Context, packageID int64) (bool, error)
+	ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]string, error)
+	vendorSourceQueries
 }
 
 // ATMAssignmentAdminService validates ATM assignment (kelolaan) changes and
@@ -58,8 +60,16 @@ func NewATMAssignmentAdminService(repo ATMAssignmentAdminRepo, changes ATMAssign
 // ATMAssignmentUpdatePayload is the editable field set; also the embedded tail
 // of ATMAssignmentPayload. atm_id is immutable. Dates are YYYY-MM-DD, both
 // inclusive; a nil end date means open-ended.
+//
+// Source selects where the package comes from (migration 023): "branch" (or
+// empty, for requests staged before then) uses VendorPackageID; "vendor" uses
+// VendorID + VendorBranchID + Package (the vendor-wide package label).
 type ATMAssignmentUpdatePayload struct {
-	VendorPackageID    int64   `json:"vendor_package_id"`
+	Source             string  `json:"source,omitempty"`
+	VendorPackageID    int64   `json:"vendor_package_id,omitempty"`
+	VendorID           int64   `json:"vendor_id,omitempty"`
+	VendorBranchID     int64   `json:"vendor_branch_id,omitempty"`
+	Package            string  `json:"package,omitempty"`
 	EffectiveStartDate string  `json:"effective_start_date"`
 	EffectiveEndDate   *string `json:"effective_end_date"`
 }
@@ -74,12 +84,13 @@ type ATMAssignmentPayload struct {
 type ATMAssignment struct {
 	ID                 int64
 	ATMID              int64
-	VendorPackageID    int64
-	PackageCode        string
+	VendorPackageID    *int64 // nil for a vendor-wide assignment
+	PackageCode        string // branch package code, or the vendor-wide label
+	Source             string // AssignmentSourceBranch | AssignmentSourceVendor
 	EffectiveStartDate string
 	EffectiveEndDate   *string
 	IsActive           bool
-	// Set by List only (nil elsewhere): lets the form preselect vendor/cabang.
+	// Managing vendor/cabang: lets the form preselect them.
 	VendorID       *int64
 	VendorBranchID *int64
 }
@@ -92,8 +103,8 @@ func dateToStringPtr(d pgtype.Date) *string {
 	return &s
 }
 
-func newATMAssignment(id, atmID, pkgID int64, code string, start, end pgtype.Date, active bool) ATMAssignment {
-	a := ATMAssignment{ID: id, ATMID: atmID, VendorPackageID: pkgID, PackageCode: code,
+func newATMAssignment(id, atmID int64, pkgID *int64, code, source string, start, end pgtype.Date, active bool) ATMAssignment {
+	a := ATMAssignment{ID: id, ATMID: atmID, VendorPackageID: pkgID, PackageCode: code, Source: source,
 		EffectiveEndDate: dateToStringPtr(end), IsActive: active}
 	if s := dateToStringPtr(start); s != nil {
 		a.EffectiveStartDate = *s
@@ -109,7 +120,7 @@ func (s *ATMAssignmentAdminService) List(ctx context.Context, arg db.ListATMAssi
 	}
 	out := make([]ATMAssignment, len(rows))
 	for i, r := range rows {
-		out[i] = newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+		out[i] = newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.Source, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
 		out[i].VendorID, out[i].VendorBranchID = r.VendorID, r.VendorBranchID
 	}
 	return out, nil
@@ -127,7 +138,8 @@ func (s *ATMAssignmentAdminService) Get(ctx context.Context, atmID, id int64) (*
 	if err != nil || r == nil || r.AtmID != atmID {
 		return nil, err
 	}
-	a := newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+	a := newATMAssignment(r.ID, r.AtmID, r.VendorPackageID, r.PackageCode, r.Source, r.EffectiveStartDate, r.EffectiveEndDate, r.IsActive)
+	a.VendorID, a.VendorBranchID = r.VendorID, r.VendorBranchID
 	return &a, nil
 }
 
@@ -143,7 +155,7 @@ func (s *ATMAssignmentAdminService) Create(ctx context.Context, makerID, atmID i
 	if strings.TrimSpace(req.EffectiveStartDate) == "" {
 		// Automatic period: dates are decided at approval (ATMAssignmentApplier),
 		// which also closes the running period -- so no overlap check here.
-		if err := s.validatePackage(ctx, req.VendorPackageID); err != nil {
+		if err := s.validateSource(ctx, atmID, &req, time.Now()); err != nil {
 			return db.MasterDataChangeRequest{}, err
 		}
 		req.EffectiveStartDate, req.EffectiveEndDate = "", nil
@@ -163,6 +175,12 @@ func (s *ATMAssignmentAdminService) Update(ctx context.Context, makerID, atmID, 
 	}
 	if !before.IsActive {
 		return db.MasterDataChangeRequest{}, ErrATMAssignmentNotFound
+	}
+	if err := normalizeSource(&req); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	if req.Source != before.Source {
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "source", Message: "sumber paket tidak dapat diubah; buat periode kelolaan baru"}
 	}
 	if err := s.validate(ctx, atmID, id, &req); err != nil {
 		return db.MasterDataChangeRequest{}, err
@@ -233,9 +251,40 @@ func (s *ATMAssignmentAdminService) validatePackage(ctx context.Context, package
 	return nil
 }
 
+// validateSource checks the package source of a payload: shape (FR3) then, per
+// mode, an active branch package or the vendor-wide tariff rules (FR9) as of
+// asOf (the period's start date).
+func (s *ATMAssignmentAdminService) validateSource(ctx context.Context, atmID int64, p *ATMAssignmentUpdatePayload, asOf time.Time) error {
+	if err := normalizeSource(p); err != nil {
+		return err
+	}
+	if p.Source == AssignmentSourceVendor {
+		return checkVendorSource(ctx, s.repo, atmID, *p, assignmentAsOf(*p, asOf))
+	}
+	return s.validatePackage(ctx, p.VendorPackageID)
+}
+
+// PackageOptions lists the vendor-wide package labels that have a tariff for
+// the ATM's machine group/price class today (FR11).
+func (s *ATMAssignmentAdminService) PackageOptions(ctx context.Context, atmID, vendorID int64) ([]string, error) {
+	ok, err := s.repo.ATMActive(ctx, atmID)
+	if err != nil {
+		return nil, fmt.Errorf("checking atm: %w", err)
+	}
+	if !ok {
+		return nil, ErrAssignmentATMNotFound
+	}
+	if vendorID == 0 {
+		return nil, &ValidationError{Field: "vendor_id", Message: "wajib diisi"}
+	}
+	return s.repo.ListATMPackageOptions(ctx, db.ListATMPackageOptionsParams{
+		AtmID: atmID, VendorID: vendorID, AsOf: pgtype.Date{Time: assignmentAsOf(ATMAssignmentUpdatePayload{}, time.Now()), Valid: true},
+	})
+}
+
 func (s *ATMAssignmentAdminService) validate(ctx context.Context, atmID, excludeID int64, p *ATMAssignmentUpdatePayload) error {
-	if p.VendorPackageID == 0 {
-		return &ValidationError{Field: "vendor_package_id", Message: "wajib diisi"}
+	if err := normalizeSource(p); err != nil {
+		return err
 	}
 	p.EffectiveStartDate = strings.TrimSpace(p.EffectiveStartDate)
 	start, err := time.Parse(assignmentDateLayout, p.EffectiveStartDate)
@@ -258,7 +307,7 @@ func (s *ATMAssignmentAdminService) validate(ctx context.Context, atmID, exclude
 		}
 	}
 
-	if err := s.validatePackage(ctx, p.VendorPackageID); err != nil {
+	if err := s.validateSource(ctx, atmID, p, start); err != nil {
 		return err
 	}
 

@@ -1,8 +1,32 @@
+import { useAuthStore } from "@/lib/auth/store";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ForecastSummary, summaryGroupKey } from "./ForecastSummary";
 import type { ForecastSummaryResponse } from "./types";
+
+const resetVendorSpy = vi.fn();
+vi.mock("@/features/atm-portal/visitQuota", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/atm-portal/visitQuota")>();
+  return {
+    ...actual,
+    useResetVendorQuota: () => ({ mutateAsync: resetVendorSpy, isPending: false }),
+  };
+});
+
+function setRole(role: string) {
+  useAuthStore.setState({
+    user: {
+      id: 9,
+      username: "u",
+      fullName: "U",
+      email: "u@x.com",
+      role: role as never,
+      isKaryawan: true,
+      vendorId: null,
+    },
+  });
+}
 
 const DATA: ForecastSummaryResponse = {
   forecast_date: "2027-01-15",
@@ -16,6 +40,7 @@ const DATA: ForecastSummaryResponse = {
   },
   groups: [
     {
+      vendor_id: 1,
       flm_vendor: "TAG",
       flm_vendor_region: "Jawa Barat",
       atm_count: 3,
@@ -25,6 +50,7 @@ const DATA: ForecastSummaryResponse = {
       unrequested_amount_replenish: 3_000_000,
     },
     {
+      vendor_id: 2,
       flm_vendor: "ROH",
       flm_vendor_region: "Jawa Timur",
       atm_count: 3,
@@ -34,6 +60,7 @@ const DATA: ForecastSummaryResponse = {
       unrequested_amount_replenish: 0,
     },
     {
+      vendor_id: 0,
       flm_vendor: "",
       flm_vendor_region: "",
       atm_count: 1,
@@ -145,5 +172,27 @@ describe("summaryGroupKey", () => {
     expect(summaryGroupKey({ flm_vendor: "TAG", flm_vendor_region: "Jawa Barat" })).toBe(
       "TAG|Jawa Barat",
     );
+  });
+});
+
+describe("ForecastSummary — Reset Kuota Vendor (atm-visit-quota FR6.6)", () => {
+  it("is offered only after picking one vendor, only to a checker, in two steps", async () => {
+    resetVendorSpy.mockReset().mockResolvedValue({ reset_count: 3, skipped_count: 1 });
+    setRole("ATM-SPV");
+    renderSummary();
+
+    expect(screen.queryByRole("button", { name: /Reset Kuota Vendor/ })).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Vendor"), "TAG");
+    await userEvent.click(screen.getByRole("button", { name: /Reset Kuota Vendor/ }));
+    expect(resetVendorSpy).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Ya, Reset" }));
+    expect(resetVendorSpy).toHaveBeenCalledWith(1); // TAG's vendor_id in DATA
+  });
+
+  it("is hidden from a non-checker", async () => {
+    setRole("ATM-USER");
+    renderSummary();
+    await userEvent.selectOptions(screen.getByLabelText("Vendor"), "TAG");
+    expect(screen.queryByRole("button", { name: /Reset Kuota Vendor/ })).not.toBeInTheDocument();
   });
 });

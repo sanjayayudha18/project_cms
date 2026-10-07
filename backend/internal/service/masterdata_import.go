@@ -73,6 +73,7 @@ type ImportResult struct {
 type MasterDataImportRepo interface {
 	MasterDataExportRepo
 	PackageKeys(ctx context.Context) ([]db.ImportPackageKeysRow, error)
+	PackageLabels(ctx context.Context) ([]db.ImportVendorPackageLabelsRow, error)
 	LocationIDs(ctx context.Context) ([]int64, error)
 }
 
@@ -122,7 +123,7 @@ func cleanCell(s string) string {
 // (whichever the header line uses -- Excel in an Indonesian locale writes `;`),
 // header validation, empty-row skipping. A non-empty errs means the file is
 // unusable as a whole (bad CSV / wrong header) and no row was processed.
-func readImportCSV(r io.Reader, header []string) (recs []importRecord, errs []ImportRowError, err error) {
+func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (recs []importRecord, errs []ImportRowError, err error) {
 	data, err := io.ReadAll(io.LimitReader(r, MasterDataImportMaxBytes+1))
 	if err != nil {
 		return nil, nil, err
@@ -145,6 +146,7 @@ func readImportCSV(r io.Reader, header []string) (recs []importRecord, errs []Im
 	cr.FieldsPerRecord = -1
 
 	gotHeader := false
+	padAt := -1 // column index to insert legacyFill at when the file uses the legacy header
 	for {
 		rec, rerr := cr.Read()
 		if errors.Is(rerr, io.EOF) {
@@ -161,7 +163,11 @@ func readImportCSV(r io.Reader, header []string) (recs []importRecord, errs []Im
 		line, _ := cr.FieldPos(0)
 		if !gotHeader {
 			gotHeader = true
-			if !headerMatches(rec, header) {
+			switch {
+			case headerMatches(rec, header):
+			case legacy != nil && headerMatches(rec, legacy):
+				padAt = missingColumn(header, legacy)
+			default:
 				return nil, []ImportRowError{{Row: 1, Field: "header", Message: "kolom header tidak sesuai; diharapkan persis: " + strings.Join(header, ",")}}, nil
 			}
 			continue
@@ -177,6 +183,9 @@ func readImportCSV(r io.Reader, header []string) (recs []importRecord, errs []Im
 		if empty {
 			continue
 		}
+		if padAt >= 0 && len(cells) == len(header)-1 {
+			cells = append(cells[:padAt], append([]string{legacyFill}, cells[padAt:]...)...)
+		}
 		if len(recs) >= MasterDataImportMaxRows {
 			return nil, nil, &ValidationError{Field: "file", Message: fmt.Sprintf("jumlah baris melebihi %d", MasterDataImportMaxRows)}
 		}
@@ -186,6 +195,16 @@ func readImportCSV(r io.Reader, header []string) (recs []importRecord, errs []Im
 		return nil, []ImportRowError{{Row: 1, Field: "header", Message: "file kosong"}}, nil
 	}
 	return recs, nil, nil
+}
+
+// missingColumn is the index in full of the one column legacy lacks.
+func missingColumn(full, legacy []string) int {
+	for i := range legacy {
+		if full[i] != legacy[i] {
+			return i
+		}
+	}
+	return len(legacy)
 }
 
 func headerMatches(got, want []string) bool {
@@ -220,6 +239,7 @@ type importEnv struct {
 	branches  map[string]int64            // active "vendor|branch" -> id
 	atms      map[string]int64            // active terminal id -> id
 	packages  map[string]int64            // active "vendor|branch|package" -> id
+	labels    map[string]bool             // vendor-wide package labels with an open tariff, "vendor|label"
 	locations map[int64]bool
 	spans     map[string][]importSpan // terminal -> active periods (db rows not in the file + accepted file rows)
 	seenKey   map[string]int
@@ -238,7 +258,7 @@ func importNatKey(entity string, v map[string]string) string {
 	case ExportATMs:
 		return v["terminal_id"]
 	case ExportATMAssignments:
-		return strings.Join([]string{v["terminal_id"], v["vendor_code"], v["branch_code"], v["package_code"], v["effective_start_date"]}, "|")
+		return strings.Join([]string{v["terminal_id"], v["vendor_code"], v["branch_code"], assignmentSourceCell(v), v["package_code"], v["effective_start_date"]}, "|")
 	}
 	return ""
 }
@@ -250,7 +270,16 @@ var importImmutable = map[string][]string{
 	ExportVendorVaults:   {"vendor_code", "branch_code", "vault_code"},
 	ExportVendorPICs:     {"vendor_code"},
 	ExportATMs:           {"terminal_id"},
-	ExportATMAssignments: {"terminal_id"},
+	ExportATMAssignments: {"terminal_id", "package_source"},
+}
+
+// assignmentSourceCell is the package_source of a kelolaan row; blank (a file
+// that predates the column) means the branch package.
+func assignmentSourceCell(v map[string]string) string {
+	if v["package_source"] == "" {
+		return AssignmentSourceBranch
+	}
+	return v["package_source"]
 }
 
 func (i *MasterDataImporter) loadAll(ctx context.Context, entity string) ([]map[string]string, error) {
@@ -338,6 +367,20 @@ func (i *MasterDataImporter) buildEnv(ctx context.Context, entity string) (*impo
 		if env.atms, err = i.activeSet(ctx, ExportATMs, func(r map[string]string) string { return r["terminal_id"] }); err != nil {
 			return nil, err
 		}
+		if env.vendors, err = i.activeSet(ctx, ExportVendors, vendorKey); err != nil {
+			return nil, err
+		}
+		if env.branches, err = i.activeSet(ctx, ExportVendorBranches, branchKey); err != nil {
+			return nil, err
+		}
+		labels, err := i.repo.PackageLabels(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading package labels for import: %w", err)
+		}
+		env.labels = make(map[string]bool, len(labels))
+		for _, l := range labels {
+			env.labels[l.VendorCode+"|"+l.Package] = true
+		}
 		keys, err := i.repo.PackageKeys(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("loading packages for import: %w", err)
@@ -363,7 +406,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	}
 	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}}}
 
-	recs, fileErrs, err := readImportCSV(r, spec.header)
+	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeader, spec.legacyFill)
 	if err != nil {
 		return nil, err
 	}
@@ -450,6 +493,9 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 	v := make(map[string]string, len(header))
 	for c, h := range header {
 		v[h] = rec.cells[c]
+	}
+	if e.entity == ExportATMAssignments {
+		v["package_source"] = assignmentSourceCell(v)
 	}
 
 	var id int64
@@ -665,8 +711,22 @@ func (e *importEnv) validateFields(v map[string]string, creating bool, add func(
 		if v["terminal_id"] != "" && e.atms[v["terminal_id"]] == 0 {
 			add("terminal_id", "ATM tidak ditemukan atau nonaktif")
 		}
-		if v["package_code"] != "" && e.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]] == 0 {
-			add("package_code", "paket tidak ditemukan atau nonaktif")
+		switch v["package_source"] {
+		case AssignmentSourceBranch:
+			if v["package_code"] != "" && e.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]] == 0 {
+				add("package_code", "paket tidak ditemukan atau nonaktif")
+			}
+		case AssignmentSourceVendor:
+			if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
+				add("vendor_code", "vendor tidak ditemukan atau nonaktif")
+			} else if v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
+				add("branch_code", "cabang tidak ditemukan atau nonaktif")
+			}
+			if v["package_code"] != "" && !e.labels[v["vendor_code"]+"|"+v["package_code"]] {
+				add("package_code", "vendor tidak punya tarif aktif untuk paket ini")
+			}
+		default:
+			add("package_source", "harus branch atau vendor")
 		}
 		start, serr := time.Parse(assignmentDateLayout, v["effective_start_date"])
 		if serr != nil {

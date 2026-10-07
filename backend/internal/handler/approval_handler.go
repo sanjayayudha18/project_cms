@@ -196,6 +196,8 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 	// approval decision is already recorded; the change itself could not land.
 	case errors.Is(err, service.ErrATMAssignmentOverlap):
 		writeError(w, http.StatusConflict, "conflict", service.ErrATMAssignmentOverlap.Error())
+	case errors.Is(err, service.ErrATMAssignmentSourceInvalid):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, service.ErrVendorCodeConflict):
 		writeError(w, http.StatusConflict, "conflict", service.ErrVendorCodeConflict.Error())
 	case errors.Is(err, service.ErrATMTerminalIDConflict):

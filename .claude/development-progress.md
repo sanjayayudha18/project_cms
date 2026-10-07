@@ -17,6 +17,8 @@ Branch: `dev1` (latest: `531d9ef` perbaikan RBAC G2, `332b340` child-panel pagin
 | `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 4 Test | ✅ built Fases 1–7 (Python + frontend); T8.1 tests green, T8.2 reviews fixed (migration 020, DSR path traversal); Go helper deferred to 2.1 | A17 manual browser check of EOD monitoring (user) — `/api/eod` routing ready (S6) |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
 | Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (review 2026-09-30) | ✅ built, committed (`7f6d16b`, R1 `a9873d2`) | manual browser check (user) → merge ke main |
+| Kelolaan ATM: paket khusus cabang / vendor-wide | `atm-package-source/` | 5 Deploy (review 2026-10-07) | ✅ built, not committed (mig 023 applied to dev); tests green; review R1 fixed | manual browser check (user) → commit (pisahkan per fitur) → merge |
+| Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (review 2026-10-01) | ✅ built, not committed (mig 021 applied to dev); review R1 fixed | manual browser check (user, seed kelolaan dulu) → commit (pisahkan dari perubahan Forecast Browser lama) → merge |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
 

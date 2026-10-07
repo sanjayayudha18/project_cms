@@ -85,3 +85,26 @@ func (r *ATMAssignmentAdminRepository) PackageActive(ctx context.Context, packag
 	}
 	return !row.EffectiveEndDate.Valid || !row.EffectiveEndDate.Time.Before(time.Now()), nil
 }
+
+// The next four are the vendor-wide (migration 023) read lookups; the method
+// names mirror db.Queries so the same checks can also run inside the apply tx.
+
+// GetATMPriceGroup returns the ATM's generated price_machine_group/price_class.
+func (r *ATMAssignmentAdminRepository) GetATMPriceGroup(ctx context.Context, id int64) (db.GetATMPriceGroupRow, error) {
+	return r.queries.GetATMPriceGroup(ctx, id)
+}
+
+// CheckAssignmentVendorBranch returns the branch id when it belongs to an active FLM vendor.
+func (r *ATMAssignmentAdminRepository) CheckAssignmentVendorBranch(ctx context.Context, arg db.CheckAssignmentVendorBranchParams) (int64, error) {
+	return r.queries.CheckAssignmentVendorBranch(ctx, arg)
+}
+
+// VendorTariffExistsForATM reports whether the vendor has a matching tariff for the label on arg.AsOf.
+func (r *ATMAssignmentAdminRepository) VendorTariffExistsForATM(ctx context.Context, arg db.VendorTariffExistsForATMParams) (bool, error) {
+	return r.queries.VendorTariffExistsForATM(ctx, arg)
+}
+
+// ListATMPackageOptions lists the vendor-wide package labels with a matching tariff for the ATM.
+func (r *ATMAssignmentAdminRepository) ListATMPackageOptions(ctx context.Context, arg db.ListATMPackageOptionsParams) ([]string, error) {
+	return r.queries.ListATMPackageOptions(ctx, arg)
+}

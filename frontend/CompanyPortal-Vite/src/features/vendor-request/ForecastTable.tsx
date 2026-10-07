@@ -11,6 +11,7 @@
 import { Skeleton } from "@/components/feedback/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { visitSisa } from "@/features/atm-portal/visitQuota";
 import { formatIDR } from "@/lib/utils/formatCurrency";
 import {
   type ColumnDef,
@@ -26,7 +27,7 @@ import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, CheckCircle2 } from "lu
 import type { ForecastRow, PaginationMeta } from "./types";
 
 const SKELETON_ROW_COUNT = 5;
-const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 export function forecastRowId(row: ForecastRow): string {
   return `${row.terminal_id}|${row.periode_pred}|${row.denom}`;
@@ -49,6 +50,27 @@ function RequestStatus({ row }: { row: ForecastRow }) {
     return <Badge variant="warning" icon={AlertTriangle} label="Tanpa vendor" />;
   }
   return <Badge variant="neutral" label="Belum" />;
+}
+
+/**
+ * atm-visit-quota (FR6.6): sisa/kuota kunjungan; "-" when the ATM has no
+ * kuota row yet. Exhausted / over quota is flagged with an icon + text, not
+ * colour alone.
+ */
+function VisitSisa({ row }: { row: ForecastRow }) {
+  if (row.visit_remaining === null || row.visit_quota_total === null) {
+    return "-";
+  }
+  const { sisa, kelebihan } = visitSisa(row.visit_remaining);
+  const exhausted = row.visit_remaining <= 0;
+  return (
+    <span className="inline-flex items-center justify-end gap-1 tabular-nums">
+      {exhausted && <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />}
+      {sisa}/{row.visit_quota_total}
+      {kelebihan > 0 && <span className="text-[var(--n-600)]">(+{kelebihan})</span>}
+      {exhausted && <span className="sr-only"> kuota habis</span>}
+    </span>
+  );
 }
 
 const columns: ColumnDef<ForecastRow>[] = [
@@ -138,6 +160,13 @@ const columns: ColumnDef<ForecastRow>[] = [
     accessorKey: "paket",
     header: "Paket",
     cell: ({ getValue }) => getValue<string>() || "-",
+    enableSorting: false,
+  },
+  {
+    id: "visit_remaining",
+    header: "Sisa Kunjungan",
+    cell: ({ row }) => <VisitSisa row={row.original} />,
+    meta: { align: "right" },
     enableSorting: false,
   },
   {

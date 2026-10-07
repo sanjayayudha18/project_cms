@@ -53,13 +53,17 @@ func (fakeImportRepo) ATMs(_ context.Context, after int64, _ string, limit int32
 }
 
 func (fakeImportRepo) ATMAssignments(_ context.Context, after int64, _ string, limit int32) ([]db.ExportATMAssignmentsBatchRow, error) {
-	all := []db.ExportATMAssignmentsBatchRow{{ID: 1, TerminalID: "T1", VendorCode: "V1", BranchCode: "B1", PackageCode: "P1",
+	all := []db.ExportATMAssignmentsBatchRow{{ID: 1, TerminalID: "T1", VendorCode: "V1", BranchCode: "B1", PackageSource: "branch", PackageCode: "P1",
 		EffectiveStartDate: "2026-01-01", EffectiveEndDate: "2026-06-30", IsActive: true}}
 	return page(all, after, limit, func(r db.ExportATMAssignmentsBatchRow) int64 { return r.ID }), nil
 }
 
 func (fakeImportRepo) PackageKeys(context.Context) ([]db.ImportPackageKeysRow, error) {
 	return []db.ImportPackageKeysRow{{ID: 11, VendorCode: "V1", BranchCode: "B1", PackageCode: "P1"}}, nil
+}
+
+func (fakeImportRepo) PackageLabels(context.Context) ([]db.ImportVendorPackageLabelsRow, error) {
+	return []db.ImportVendorPackageLabelsRow{{VendorCode: "V1", Package: "PAKET 4"}}, nil
 }
 
 func (fakeImportRepo) LocationIDs(context.Context) ([]int64, error) { return []int64{5, 6}, nil }
@@ -323,5 +327,68 @@ func TestImport_ErrorListIsCappedButCounted(t *testing.T) {
 
 	if p := res.Preview; len(p.Errors) != masterDataImportMaxErrs || !p.ErrorsTruncated || p.ValidRows != 0 {
 		t.Errorf("want %d errors listed + truncated flag, got %d truncated=%v valid=%d", masterDataImportMaxErrs, len(p.Errors), p.ErrorsTruncated, p.ValidRows)
+	}
+}
+
+const assignmentHeaderV2 = "id,terminal_id,vendor_code,branch_code,package_source,package_code,effective_start_date,effective_end_date,is_active\n"
+
+func TestImport_AssignmentTwoModes(t *testing.T) {
+	csvText := assignmentHeaderV2 +
+		",T2,V1,B1,branch,P1,2026-01-01,,\n" + // row 2: branch package
+		",T2,V1,B1,,P1,2025-01-01,2025-12-31,\n" + // row 3: blank source = branch
+		",T1,V1,B1,vendor,PAKET 4,2026-07-01,,\n" + // row 4: vendor-wide label, after the existing T1 period
+		",T2,V1,B1,vendor,PAKET 4,2026-03-01,,\n" + // row 5: overlaps row 2 across modes
+		",T1,V9,B1,vendor,PAKET 4,2027-01-01,,\n" + // row 6: unknown vendor
+		",T1,V1,B9,vendor,PAKET 4,2027-01-01,,\n" + // row 7: unknown branch
+		",T1,V1,B1,vendor,PAKET 9,2027-01-01,,\n" + // row 8: no tariff for the label
+		",T1,V1,B1,other,P1,2027-01-01,,\n" // row 9: bad source
+
+	res := dryRun(t, ExportATMAssignments, csvText)
+
+	for _, want := range []struct {
+		row   int
+		field string
+	}{{5, "effective_start_date"}, {6, "vendor_code"}, {7, "branch_code"}, {8, "package_code"}, {9, "package_source"}} {
+		if !hasErr(res, want.row, want.field) {
+			t.Errorf("missing error row %d field %s in %+v", want.row, want.field, res.Preview.Errors)
+		}
+	}
+	for _, row := range []int{2, 3, 4} {
+		for _, e := range res.Preview.Errors {
+			if e.Row == row {
+				t.Errorf("row %d must be valid, got %+v", row, e)
+			}
+		}
+	}
+	if res.Preview.Creates != 3 {
+		t.Errorf("want rows 2, 3, 4 valid, got %+v", res.Preview)
+	}
+}
+
+func TestImport_AssignmentSourceIsImmutable(t *testing.T) {
+	// db assignment 1 is a branch package; a file row cannot turn it into a vendor-wide one.
+	res := dryRun(t, ExportATMAssignments, assignmentHeaderV2+"1,T1,V1,B1,vendor,PAKET 4,2026-01-01,2026-06-30,true\n")
+	if !hasErr(res, 2, "package_source") {
+		t.Errorf("want package_source immutable error, got %+v", res.Preview.Errors)
+	}
+}
+
+func TestImport_AssignmentLegacyHeaderStillAccepted(t *testing.T) {
+	h := "id,terminal_id,vendor_code,branch_code,package_code,effective_start_date,effective_end_date,is_active\n"
+	res := dryRun(t, ExportATMAssignments, h+"1,T1,V1,B1,P1,2026-01-01,2026-06-30,true\n")
+	if len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+		t.Errorf("legacy file re-importing an unchanged branch row must be a no-op, got %+v", res.Preview)
+	}
+}
+
+func TestAssignmentFields_BySource(t *testing.T) {
+	env := &importEnv{packages: map[string]int64{"V1|B1|P1": 11}, vendors: map[string]int64{"V1": 3}, branches: map[string]int64{"V1|B1": 9}}
+	b := assignmentFields(map[string]string{"vendor_code": "V1", "branch_code": "B1", "package_code": "P1", "effective_start_date": "2026-01-01"}, env)
+	if b.Source != AssignmentSourceBranch || b.VendorPackageID != 11 || b.VendorID != 0 || b.Package != "" {
+		t.Errorf("branch payload wrong: %+v", b)
+	}
+	v := assignmentFields(map[string]string{"package_source": "vendor", "vendor_code": "V1", "branch_code": "B1", "package_code": "PAKET 4", "effective_start_date": "2026-01-01"}, env)
+	if v.Source != AssignmentSourceVendor || v.VendorPackageID != 0 || v.VendorID != 3 || v.VendorBranchID != 9 || v.Package != "PAKET 4" {
+		t.Errorf("vendor payload wrong: %+v", v)
 	}
 }

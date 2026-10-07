@@ -5,11 +5,18 @@ import { useToast } from "@/lib/hooks/useToast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { listVendorChildren, listVendorPackages, listVendors } from "../../admin-vendors/api";
+import { listVendorChildren, listVendors } from "../../admin-vendors/api";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
-import { type ATMAssignment, createATMAssignment, listATMAssignments } from "../api";
+import {
+  type ATMAssignment,
+  type ATMAssignmentSource,
+  type CreateATMAssignmentPayload,
+  createATMAssignment,
+  listATMAssignments,
+} from "../api";
 import { useUpdateATM } from "../hooks";
 import type { AdminATM, UpdateATMPayload } from "../types";
+import { PackageSourceFields } from "./PackageSourceFields";
 
 const inputClass =
   "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)]";
@@ -31,6 +38,31 @@ export function currentAssignment(list: ATMAssignment[], today: string): ATMAssi
 
 const idStr = (n: number | null | undefined) => (n ? String(n) : "");
 
+const SOURCE_LABEL: Record<ATMAssignmentSource, string> = {
+  branch: "Khusus cabang",
+  vendor: "Seluruh vendor",
+};
+
+/** The Paket field value an assignment corresponds to: branch package id, or vendor-wide label. */
+function packageValueOf(a: ATMAssignment | undefined): string {
+  if (!a) return "";
+  return a.source === "vendor" ? a.package_code : idStr(a.vendor_package_id);
+}
+
+/**
+ * Whether submitting would change nothing: the same source and package (and,
+ * for a vendor-wide package, the same managing cabang) as the running period.
+ */
+export function isSameAsCurrent(
+  cur: ATMAssignment | undefined,
+  source: ATMAssignmentSource,
+  value: string,
+  branchId: string,
+): boolean {
+  if (!cur || cur.source !== source || packageValueOf(cur) !== value) return false;
+  return source === "branch" || idStr(cur.vendor_branch_id) === branchId;
+}
+
 interface Props {
   atm: AdminATM | null;
   onClose: () => void;
@@ -48,7 +80,8 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
   const atmId = atm?.id ?? 0;
   const [vendorId, setVendorId] = useState("");
   const [branchId, setBranchId] = useState("");
-  const [packageId, setPackageId] = useState("");
+  const [source, setSource] = useState<ATMAssignmentSource>("branch");
+  const [packageValue, setPackageValue] = useState("");
   const [escrowAccount, setEscrowAccount] = useState(atm?.escrow_account ?? "");
   // Which ATM the form was last prefilled for; null = prefill on next data.
   const [prefilledFor, setPrefilledFor] = useState<number | null>(null);
@@ -72,7 +105,8 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
     const cur = currentAssignment(list.data, new Date().toLocaleDateString("en-CA"));
     setVendorId(idStr(cur?.vendor_id));
     setBranchId(idStr(cur?.vendor_branch_id));
-    setPackageId(idStr(cur?.vendor_package_id));
+    setSource(cur?.source ?? "branch");
+    setPackageValue(packageValueOf(cur));
     setPrefilledFor(atmId);
   }, [list.data, atmId, prefilledFor]);
   const vendors = useQuery({
@@ -85,39 +119,42 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
     queryFn: () => listVendorChildren(Number(vendorId), "branches"),
     enabled: vendorId !== "",
   });
-  // Only currently-effective branch packages (vendor_packages_branch has no
-  // is_active since migration 016 -- "active" = effective_end_date open/future).
-  const packages = useQuery({
-    queryKey: ["admin-vendors", "packages-options", Number(vendorId), branchId],
-    queryFn: () =>
-      listVendorPackages(Number(vendorId), {
-        page: 1,
-        page_size: 100,
-        status: "active",
-        branch_id: branchId === "" ? undefined : Number(branchId),
-      }),
-    enabled: vendorId !== "",
-  });
   const create = useMutation({
     mutationFn: () =>
       // No dates: the system starts the period on the approval date (open-ended)
       // and closes the running one (ATMAssignmentApplier).
-      createATMAssignment(atmId, { vendor_package_id: Number(packageId) }),
+      createATMAssignment(atmId, buildPayload()),
     onSuccess: (res) => {
       toast({ type: "success", message: pendingApprovalMessage(res) });
-      setPackageId("");
+      setPackageValue("");
       qc.invalidateQueries({ queryKey: ["admin-atms", "assignments", atmId] });
     },
     onError: (err: Error) => toast({ type: "error", message: err.message }),
   });
 
   const activeBranches = (branches.data ?? []).filter((b) => b.is_active);
-  const activePackages = packages.data?.packages ?? [];
+
+  function buildPayload(): CreateATMAssignmentPayload {
+    if (source === "vendor") {
+      return {
+        source,
+        vendor_id: Number(vendorId),
+        vendor_branch_id: Number(branchId),
+        package: packageValue,
+      };
+    }
+    return { source, vendor_package_id: Number(packageValue) };
+  }
+
   // Re-assigning the package already running would change nothing.
   const cur = list.data
     ? currentAssignment(list.data, new Date().toLocaleDateString("en-CA"))
     : undefined;
-  const canSubmit = packageId !== "" && packageId !== idStr(cur?.vendor_package_id);
+  const canSubmit =
+    vendorId !== "" &&
+    branchId !== "" &&
+    packageValue !== "" &&
+    !isSameAsCurrent(cur, source, packageValue, branchId);
   const escrowChanged = atm !== null && escrowAccount !== (atm.escrow_account ?? "");
 
   // UpdateATMPayload has no partial-patch form (Sec: ATM Update requires the
@@ -181,6 +218,7 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
             <thead>
               <tr className="text-left text-[var(--n-500)]">
                 <th className="py-2 pr-4 font-medium">Paket</th>
+                <th className="py-2 pr-4 font-medium">Jenis</th>
                 <th className="py-2 pr-4 font-medium">Mulai</th>
                 <th className="py-2 pr-4 font-medium">Selesai</th>
                 <th className="py-2 font-medium">Status</th>
@@ -190,6 +228,7 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
               {list.data.map((a) => (
                 <tr key={a.id} className="border-t border-[var(--n-200)]">
                   <td className="py-2 pr-4">{a.package_code}</td>
+                  <td className="py-2 pr-4">{SOURCE_LABEL[a.source] ?? a.source}</td>
                   <td className="py-2 pr-4 tabular-nums">{a.effective_start_date}</td>
                   <td className="py-2 pr-4 tabular-nums">{a.effective_end_date ?? "Terbuka"}</td>
                   <td className="py-2">
@@ -221,7 +260,7 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
               onChange={(e) => {
                 setVendorId(e.target.value);
                 setBranchId("");
-                setPackageId("");
+                setPackageValue("");
               }}
             >
               <option value="">Pilih vendor</option>
@@ -240,10 +279,11 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
               disabled={vendorId === ""}
               onChange={(e) => {
                 setBranchId(e.target.value);
-                setPackageId("");
+                // A branch package belongs to one cabang; a vendor-wide label does not.
+                if (source === "branch") setPackageValue("");
               }}
             >
-              <option value="">Semua cabang</option>
+              <option value="">Pilih cabang</option>
               {activeBranches.map((b) => (
                 <option key={String(b.id)} value={String(b.id)}>
                   {String(b.branch_code)} · {String(b.branch_name)}
@@ -251,23 +291,18 @@ export function ATMAssignmentsDialog({ atm, onClose }: Props) {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-[var(--n-600)]">
-            Paket
-            <select
-              className={inputClass}
-              value={packageId}
-              disabled={vendorId === ""}
-              onChange={(e) => setPackageId(e.target.value)}
-            >
-              <option value="">Pilih paket</option>
-              {activePackages.map((p) => (
-                <option key={p.id} value={String(p.id)}>
-                  {p.package_code} · {p.machine_group} · {p.price_class}
-                  {p.atm_id !== null ? ` · ATM #${p.atm_id}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <PackageSourceFields
+            atmId={atmId}
+            vendorId={vendorId}
+            branchId={branchId}
+            source={source}
+            value={packageValue}
+            onSourceChange={(next) => {
+              setSource(next);
+              setPackageValue("");
+            }}
+            onValueChange={setPackageValue}
+          />
           <p className="text-xs text-[var(--n-500)]">
             Periode diatur otomatis: mulai berlaku pada tanggal disetujui dan berakhir terbuka;
             periode yang sedang berjalan ditutup sehari sebelumnya.

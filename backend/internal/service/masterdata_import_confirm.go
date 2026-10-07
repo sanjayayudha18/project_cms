@@ -209,7 +209,7 @@ func rowRejection(row int, err error) error {
 	if errors.As(err, &ve) {
 		return &ImportInvalidError{Errors: []ImportRowError{{Row: row, Field: ve.Field, Message: ve.Message}}}
 	}
-	for _, known := range []error{ErrVendorCodeConflict, ErrATMTerminalIDConflict, ErrATMAssignmentOverlap, ErrATMAssignmentDuplicate,
+	for _, known := range []error{ErrVendorCodeConflict, ErrATMTerminalIDConflict, ErrATMAssignmentOverlap, ErrATMAssignmentDuplicate, ErrATMAssignmentSourceInvalid,
 		ErrVendorVaultCodeConflict, ErrATMNotFound, ErrATMInvalidReference} {
 		if errors.Is(err, known) {
 			return &ImportInvalidError{Errors: []ImportRowError{{Row: row, Field: "row", Message: err.Error()}}}
@@ -364,6 +364,14 @@ func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
 }
 
 func assignmentFields(v map[string]string, env *importEnv) ATMAssignmentUpdatePayload {
-	return ATMAssignmentUpdatePayload{VendorPackageID: env.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]],
+	p := ATMAssignmentUpdatePayload{Source: assignmentSourceCell(v),
 		EffectiveStartDate: v["effective_start_date"], EffectiveEndDate: optStr(v["effective_end_date"])}
+	if p.Source == AssignmentSourceVendor {
+		p.VendorID = env.vendors[v["vendor_code"]]
+		p.VendorBranchID = env.branches[v["vendor_code"]+"|"+v["branch_code"]]
+		p.Package = v["package_code"]
+		return p
+	}
+	p.VendorPackageID = env.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]]
+	return p
 }

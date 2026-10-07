@@ -14,6 +14,11 @@ const ACTION_OPTIONS = [
   "revise",
   "cancel",
   "admin_set_hierarchy",
+  // atm-visit-quota: laporan selesai replenish + kuota kunjungan.
+  "submit_completion",
+  "approve_completion",
+  "reject_completion",
+  "reset",
 ].map((v) => ({ value: v, label: v }));
 
 const ENTITY_TYPE_OPTIONS = [
@@ -21,6 +26,8 @@ const ENTITY_TYPE_OPTIONS = [
   "approval_request",
   "master_data_change_request",
   "user",
+  "atm_visit_quota",
+  "atm_visit",
 ].map((v) => ({ value: v, label: v }));
 
 const INPUT_CLASS =

@@ -59,6 +59,10 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/reject", h.Reject)
 	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/{id}/revise", h.Revise)
 	r.With(middleware.RequireRoles(vendorRequestCancelRoles...)).Post("/{id}/cancel", h.Cancel)
+	// atm-visit-quota (spec FR5): laporan selesai replenish.
+	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/{id}/complete", h.SubmitCompletion)
+	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/complete/approve", h.ApproveCompletion)
+	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/complete/reject", h.RejectCompletion)
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/", h.List)
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}", h.Get)
 	r.With(middleware.RequireRoles(vendorRequestAuditRoles...)).Get("/{id}/audit-log", h.AuditLog)
@@ -348,6 +352,68 @@ func (h *VendorRequestHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toDetailResponse(result))
 }
 
+type completionBody struct {
+	Results []struct {
+		TerminalID string `json:"terminal_id"`
+		Result     string `json:"result"`
+	} `json:"results"`
+}
+
+// SubmitCompletion handles POST /{id}/complete (atm-visit-quota FR1.1).
+func (h *VendorRequestHandler) SubmitCompletion(w http.ResponseWriter, r *http.Request) {
+	var body completionBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "body tidak valid")
+		return
+	}
+	results := make([]service.CompletionResultInput, len(body.Results))
+	for i, res := range body.Results {
+		results[i] = service.CompletionResultInput{TerminalID: res.TerminalID, Result: res.Result}
+	}
+	h.doTransition(w, r, func(actor service.Actor, id int64) (*service.VendorRequestDetail, error) {
+		return h.service.SubmitCompletion(r.Context(), actor, id, results)
+	})
+}
+
+// ApproveCompletion handles POST /{id}/complete/approve (FR1.2): the
+// response adds over_quota_terminals so the checker sees the warning.
+func (h *VendorRequestHandler) ApproveCompletion(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFromRequest(r)
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+	id, err := parseVendorRequestID(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	result, overQuota, err := h.service.ApproveCompletion(r.Context(), actor, id)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	resp := toDetailResponse(result)
+	resp.OverQuotaTerminals = overQuota
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type reasonBody struct {
+	Reason string `json:"reason"`
+}
+
+// RejectCompletion handles POST /{id}/complete/reject (FR1.3).
+func (h *VendorRequestHandler) RejectCompletion(w http.ResponseWriter, r *http.Request) {
+	var body reasonBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "body tidak valid")
+		return
+	}
+	h.doTransition(w, r, func(actor service.Actor, id int64) (*service.VendorRequestDetail, error) {
+		return h.service.RejectCompletion(r.Context(), actor, id, body.Reason)
+	})
+}
+
 // doTransition is the shared parse-actor/parse-id/call/respond flow for the
 // three no-body transition endpoints (submit, approve, revise). Cancel used
 // to share this too, but now has its own body (cancellation_reason, Req 3.2).
@@ -519,7 +585,7 @@ func (h *VendorRequestHandler) handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrNotChecker):
 		writeForbidden(w, "Hanya checker yang dapat melakukan aksi ini")
 	case errors.Is(err, service.ErrSelfApproval):
-		writeForbidden(w, "Checker tidak boleh sama dengan pembuat request (four-eyes)")
+		writeForbidden(w, "Checker tidak boleh sama dengan pembuat request / pelapor (four-eyes)")
 	case errors.Is(err, service.ErrNotAuthorized):
 		writeForbidden(w, "Anda tidak berhak melakukan aksi ini")
 	case errors.As(err, &invalidItemsErr):
@@ -528,6 +594,8 @@ func (h *VendorRequestHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "bad_request", "Terdapat item duplikat dalam request")
 	case errors.Is(err, service.ErrRejectReasonEmpty):
 		writeValidationError(w, "rejection_reason", "wajib diisi")
+	case errors.Is(err, service.ErrCompletionReasonEmpty):
+		writeValidationError(w, "reason", "wajib diisi")
 	case errors.Is(err, service.ErrCancelReasonEmpty):
 		writeValidationError(w, "cancellation_reason", "wajib diisi")
 	case errors.Is(err, service.ErrNumberGeneration):

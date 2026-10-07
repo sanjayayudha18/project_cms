@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<VendorRequestStatus, string> = {
   completed: "Selesai",
   failed: "Gagal",
   cancelled: "Dibatalkan",
+  completion_pending: "Menunggu Persetujuan Laporan",
 };
 
 export function VendorRequestList() {

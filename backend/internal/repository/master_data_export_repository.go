@@ -53,6 +53,11 @@ func (r *MasterDataExportRepository) ATMAssignments(ctx context.Context, afterID
 // (T5.3) validates foreign keys against. Construct the repository for the
 // importer on the PRIMARY pool: validating a write flow must not be fooled by
 // replica lag.
+func (r *MasterDataExportRepository) PackageLabels(ctx context.Context) ([]db.ImportVendorPackageLabelsRow, error) {
+	return r.queries.ImportVendorPackageLabels(ctx)
+}
+
+// PackageKeys lists active branch packages by natural key (see PackageLabels for vendor-wide labels).
 func (r *MasterDataExportRepository) PackageKeys(ctx context.Context) ([]db.ImportPackageKeysRow, error) {
 	return r.queries.ImportPackageKeys(ctx)
 }

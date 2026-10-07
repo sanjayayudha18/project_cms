@@ -24,6 +24,9 @@ type fakeATMAssignmentAdminServicer struct {
 	listResult []service.ATMAssignment
 	getResult  *service.ATMAssignment
 	createErr  error
+	options    []string
+	optionsErr error
+	lastVendor int64
 }
 
 func (f *fakeATMAssignmentAdminServicer) List(context.Context, db.ListATMAssignmentsAdminParams) ([]service.ATMAssignment, error) {
@@ -43,6 +46,10 @@ func (f *fakeATMAssignmentAdminServicer) Update(context.Context, int64, int64, i
 }
 func (f *fakeATMAssignmentAdminServicer) Disable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 9, Status: "pending"}, nil
+}
+func (f *fakeATMAssignmentAdminServicer) PackageOptions(_ context.Context, _, vendorID int64) ([]string, error) {
+	f.lastVendor = vendorID
+	return f.options, f.optionsErr
 }
 func (f *fakeATMAssignmentAdminServicer) Enable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 10, Status: "pending"}, nil
@@ -67,10 +74,11 @@ func mountAdminATMAssignmentHandler(svc ATMAssignmentAdminServicer) (http.Handle
 }
 
 func TestAdminATMAssignmentHandler_List_DatesAndOpenEnd(t *testing.T) {
+	pkg5 := int64(5)
 	end := "2026-12-31"
 	svc := &fakeATMAssignmentAdminServicer{listResult: []service.ATMAssignment{
-		{ID: 1, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", EffectiveStartDate: "2026-01-01", IsActive: true},
-		{ID: 2, ATMID: 3, VendorPackageID: 5, PackageCode: "PKG1", EffectiveStartDate: "2025-01-01", EffectiveEndDate: &end},
+		{ID: 1, ATMID: 3, VendorPackageID: &pkg5, PackageCode: "PKG1", EffectiveStartDate: "2026-01-01", IsActive: true},
+		{ID: 2, ATMID: 3, VendorPackageID: &pkg5, PackageCode: "PKG1", EffectiveStartDate: "2025-01-01", EffectiveEndDate: &end},
 	}}
 	router, tokenSvc := mountAdminATMAssignmentHandler(svc)
 
@@ -112,6 +120,7 @@ func TestAdminATMAssignmentHandler_Create_ErrorMapping(t *testing.T) {
 		{service.ErrMasterDataChangePending, http.StatusConflict},
 		{service.ErrAssignmentATMNotFound, http.StatusNotFound},
 		{service.ErrATMAssignmentNotFound, http.StatusNotFound},
+		{&service.ValidationError{Field: "package", Message: "vendor tidak punya tarif aktif"}, http.StatusUnprocessableEntity},
 	}
 	for _, tc := range cases {
 		router, tokenSvc := mountAdminATMAssignmentHandler(&fakeATMAssignmentAdminServicer{createErr: tc.err})
@@ -254,6 +263,7 @@ func TestApprovalHandler_HandleError_MasterDataApplyConflicts(t *testing.T) {
 		{fmt.Errorf("approved but apply failed (change request 4): %w", fmt.Errorf("apply change: %w", fmt.Errorf("create atm: %w", service.ErrATMTerminalIDConflict))), http.StatusConflict},
 		{fmt.Errorf("approved but apply failed (change request 3): %w", fmt.Errorf("apply change: %w", fmt.Errorf("create vendor: %w", service.ErrVendorCodeConflict))), http.StatusConflict},
 		{fmt.Errorf("approved but apply failed (change request 2): %w", service.ErrMasterDataChangeStale), http.StatusConflict},
+		{fmt.Errorf("approved but apply failed (change request 5): %w", fmt.Errorf("apply change: %w", fmt.Errorf("%w: tarif hilang", service.ErrATMAssignmentSourceInvalid))), http.StatusConflict},
 		{errors.New("boom"), http.StatusInternalServerError},
 	}
 	for _, tc := range cases {
@@ -263,4 +273,67 @@ func TestApprovalHandler_HandleError_MasterDataApplyConflicts(t *testing.T) {
 			t.Errorf("err %v: expected %d, got %d", tc.err, tc.want, rec.Code)
 		}
 	}
+}
+
+func mountPackageOptions(svc ATMAssignmentAdminServicer) (http.Handler, *pkgauth.TokenService) {
+	tokenSvc := assignmentTokenSvc()
+	r := chi.NewRouter()
+	r.With(
+		custommw.RequireAuth(tokenSvc),
+		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+	).Get("/api/v1/admin/atms/{atmID}/assignment-package-options", NewAdminATMAssignmentHandler(svc).PackageOptions)
+	return r, tokenSvc
+}
+
+func TestAdminATMAssignmentHandler_Create_VendorSourcePayloadReachesService(t *testing.T) {
+	router, tokenSvc := mountAdminATMAssignmentHandler(&fakeATMAssignmentAdminServicer{})
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/atms/3/assignments", tokenForRole(t, tokenSvc, 1, "ADMIN"),
+		`{"source":"vendor","vendor_id":2,"vendor_branch_id":9,"package":"PAKET 4"}`)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminATMAssignmentHandler_List_ExposesSource(t *testing.T) {
+	svc := &fakeATMAssignmentAdminServicer{listResult: []service.ATMAssignment{
+		{ID: 1, ATMID: 3, PackageCode: "PAKET 4", Source: service.AssignmentSourceVendor, EffectiveStartDate: "2026-01-01", IsActive: true},
+	}}
+	router, tokenSvc := mountAdminATMAssignmentHandler(svc)
+	rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignments", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `"source":"vendor"`) || !strings.Contains(body, `"vendor_package_id":null`) {
+		t.Fatalf("want source vendor and null vendor_package_id, got %d: %s", rec.Code, body)
+	}
+}
+
+func TestAdminATMAssignmentHandler_PackageOptions(t *testing.T) {
+	t.Run("returns labels for vendor", func(t *testing.T) {
+		svc := &fakeATMAssignmentAdminServicer{options: []string{"PAKET 3", "PAKET 4"}}
+		router, tokenSvc := mountPackageOptions(svc)
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignment-package-options?vendor_id=2", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"packages":["PAKET 3","PAKET 4"]`) || svc.lastVendor != 2 {
+			t.Fatalf("got %d: %s (vendor %d)", rec.Code, rec.Body.String(), svc.lastVendor)
+		}
+	})
+	t.Run("vendor_id required", func(t *testing.T) {
+		router, tokenSvc := mountPackageOptions(&fakeATMAssignmentAdminServicer{})
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignment-package-options", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", rec.Code)
+		}
+	})
+	t.Run("unknown ATM is 404", func(t *testing.T) {
+		router, tokenSvc := mountPackageOptions(&fakeATMAssignmentAdminServicer{optionsErr: service.ErrAssignmentATMNotFound})
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignment-package-options?vendor_id=2", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", rec.Code)
+		}
+	})
+	t.Run("non-admin is forbidden", func(t *testing.T) {
+		router, tokenSvc := mountPackageOptions(&fakeATMAssignmentAdminServicer{})
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/atms/3/assignment-package-options?vendor_id=2", tokenForRole(t, tokenSvc, 1, "ATM-USER"), "")
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403, got %d", rec.Code)
+		}
+	})
 }

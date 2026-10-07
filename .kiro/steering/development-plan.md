@@ -82,7 +82,7 @@ Binding rules (from `project-context.md`):
 
 ## Phase 0 — Infrastructure foundations
 
-### 0.1 Finish read-replica routing
+### 0.1 Finish read-replica routing — ✅ DONE 2026-10-07 (see `.claude/bugfixes.md`)
 - Replace remaining `ponytail:` dbRead TODOs in `cmd/api/main.go` (roles, atm-portal, dsr List/Count). Pool already exists.
 - Python side: add a replica pool (`DATABASE_REPLICA_URL`, fallback to primary) in `backend_python/lib/database.py` and use it for the read-only monitoring APIs (`/status`, `/summary`, `/late`, `/audit`) of `eod_retry_scheduler` + `service_dsr_etl`. Deferred here from `.claude/sdlc/import-export-jobs/spec.md` decision C2 (2026-09-28).
 - **Test:** replica on reads, primary on writes + read-after-write.
@@ -93,15 +93,15 @@ Binding rules (from `project-context.md`):
 - **Unblocks:** every file ingest (invoice, escrow, forecast inputs).
 - **Model:** Opus, Effort: High.
 
-### 0.3 `internal/notification` (in-app + SMTP)
+### 0.3 `internal/notification` (in-app + SMTP) — 🟡 intent draft 2026-10-07 (`.claude/sdlc/notification/`)
 - `notifications` table. In-app write + company SMTP relay. Needed by DSR-late alert, replenishment publish, cash count.
 - **Model:** Sonnet, Effort: Medium.
 
-### 0.4 `internal/document` (storage)
+### 0.4 `internal/document` (storage) — 🟡 intent draft 2026-10-07 (`.claude/sdlc/document/`)
 - `documents` table. Upload → GCS (local dir in dev); metadata in DB. Reused by invoice, cash count, escrow.
 - **Model:** Sonnet, Effort: Medium.
 
-### 0.5 `internal/export` (XLSX/PDF)
+### 0.5 `internal/export` (XLSX/PDF) — ⏸ deferred 2026-10-07 (user): no XLSX/PDF consumer yet; decide deps when a Phase 2 report needs it
 - Extend beyond master-data CSV. **New deps (excelize, PDF tool) need approval first** (Golden Rule #1).
 - **Model:** Sonnet, Effort: Medium.
 

@@ -20,7 +20,7 @@ Template:
 - **Root cause**: pool replica baru dipakai export master-data, region, dan branch-ATM; repo lain belum dipisah.
 - **Fix**: Go — `main.go` memakai `dbReadPool` untuk ATM Portal, DMAA Forecast viewer, Role Management (list/catalog/permission, sesuai spec Req 8), RBAC list views, Audit Log viewer. `VendorAdminRepository`/`ATMAdminRepository` jadi `(primary, replica)`: List/Count (+ ATM ListLocations) ke replica; GetByID/pre-check tetap primary (snapshot "before" saat Submit). Sengaja **tetap primary**: DSR upload (read-after-write hasil commit Python), `MasterDataChangeRepository` List/Count (badge pending dibaca tepat setelah Submit). Python — `lib/database.create_read_pool` (`*_DATABASE_REPLICA_URL`, kosong = primary) → `app.state.db_read_pool` dipakai `/status`, `/status/{id}/history`, `/summary`, `/late`, `/audit` di `eod_retry_scheduler` + `service_dsr_etl`; `/health` + proses/retry tetap primary. `.env.example` keduanya ditambah.
 - **Tests**: `go test ./...` + `go test -tags integration ./internal/...` (dev DB) lulus; `rolemgmt` `TestRepository_WriteReadTopology` lulus; Python `lib.test_eod_api` + `lib.test_import_jobs` (34, dev DB), `dsr`, `itm/cashpos`, `python -m lib.database` (fallback check) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list pages + EOD monitoring).
-- **Commit**: _(belum)_
+- **Commit**: `d7ede9e`
 
 ---
 

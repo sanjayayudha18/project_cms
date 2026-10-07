@@ -96,9 +96,8 @@ func (r *MasterDataChangeRepository) ListByBatch(ctx context.Context, batchID in
 }
 
 // List returns a page of change requests, filtered by entity_type/status
-// (T2.7). ponytail: uses the same connection as everything else here for
-// now; swap to the dbRead pool when DATABASE_REPLICA_URL wiring lands (same
-// TODO convention as VendorAdminRepository/ATMAdminRepository).
+// (T2.7). Primary on purpose: the pending-change list/badges are read right
+// after a Submit (read-after-write), so replica lag would hide them.
 func (r *MasterDataChangeRepository) List(ctx context.Context, arg db.ListMasterDataChangeRequestsParams) ([]db.MasterDataChangeRequest, error) {
 	return r.queries.ListMasterDataChangeRequests(ctx, arg)
 }

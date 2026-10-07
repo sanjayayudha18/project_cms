@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from lib.database import create_db_pool
+from lib.database import create_db_pool, create_read_pool
 from lib.dependencies import assert_auth_configured
 from lib.services.scheduler_service import SchedulerService
 from lib.utils.timezone import WIB
@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
 
     pool = await create_db_pool(settings)
     app.state.db_pool = pool
+    read_pool = await create_read_pool(settings, pool)
+    app.state.db_read_pool = read_pool
 
     scheduler_service = SchedulerService(settings, pool, FILE_TYPES)
     scheduler_service.start()
@@ -40,6 +42,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         scheduler_service.stop()
+        if read_pool is not pool:
+            await read_pool.close()
         await pool.close()
 
 

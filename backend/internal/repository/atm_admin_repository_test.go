@@ -71,7 +71,7 @@ func TestATMAdminRepository(t *testing.T) {
 		t.Fatalf("seed disabled atm: %v", err)
 	}
 
-	repo := NewATMAdminRepository(tx)
+	repo := NewATMAdminRepository(tx, tx)
 
 	t.Run("List q filter matches terminal_id, default active status excludes disabled", func(t *testing.T) {
 		q := tag

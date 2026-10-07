@@ -55,7 +55,7 @@ func TestVendorAdminRepository(t *testing.T) {
 		t.Fatalf("seed disabled vendor: %v", err)
 	}
 
-	repo := NewVendorAdminRepository(tx)
+	repo := NewVendorAdminRepository(tx, tx)
 
 	t.Run("List q filter matches code and name, default active status excludes disabled", func(t *testing.T) {
 		q := tag

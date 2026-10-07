@@ -18,7 +18,7 @@ router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 @router.get("/status")
 async def get_status(request: Request, processing_date: date):
-    pool = request.app.state.db_pool
+    pool = request.app.state.db_read_pool
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
@@ -51,7 +51,7 @@ async def get_status(request: Request, processing_date: date):
 
 @router.get("/status/{file_id}/history")
 async def get_status_history(request: Request, file_id: int = Path(ge=1, le=9223372036854775807)):
-    pool = request.app.state.db_pool
+    pool = request.app.state.db_read_pool
     async with pool.acquire() as conn:
         # only this service's own sources: a job of the other service looks unknown
         file_row = await conn.fetchrow(

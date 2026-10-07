@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql://postgres:postgres@localhost:5432/cms"
+    # Read replica for /status, /summary, /late, /audit; empty = use primary.
+    database_replica_url: str = ""
 
     # Auth
     auth_secret: str = "change_me"

@@ -56,10 +56,9 @@ func main() {
 	}
 	slog.Info("connected to PostgreSQL")
 
-	// Read-replica pool, used only by the master-data CSV export for now (plan
-	// T5.1; the other "swap dbPool for the dbRead pool" notes below are still
-	// pending). Heavy reads belong on the replica (CLAUDE.md Sec 6). When
-	// DATABASE_REPLICA_URL is unset (local/dev) the export reads the primary.
+	// Read-replica pool for list/report/viewer reads (CLAUDE.md Sec 6). Writes,
+	// read-after-write and authorization checks stay on dbPool. When
+	// DATABASE_REPLICA_URL is unset (local/dev) dbReadPool is the primary.
 	// A configured-but-unreachable replica is a startup failure, like the primary.
 	dbReadPool := dbPool
 	if cfg.DatabaseReplicaURL != "" {
@@ -168,9 +167,9 @@ func main() {
 	// manage permissions") — see design.md "Middleware". Immediate-apply,
 	// audit-only (documented deviation from Golden Rule #3, recorded in
 	// project-context.md Sec 12).
-	// ponytail: swap dbPool for the dbRead pool on ListRoles/ListCatalog when
-	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
-	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbPool)
+	// List/catalog/permission reads hit the replica (spec Req 8); writes +
+	// read-after-write use the primary.
+	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbReadPool)
 	roleMgmtService := rolemgmt.NewPermissionService(roleMgmtRepo, dbPool)
 	roleMgmtHandler := handler.NewRoleMgmtHandler(roleMgmtService)
 	r.With(
@@ -179,14 +178,13 @@ func main() {
 	).Mount("/api/v1/admin/roles", roleMgmtHandler.Routes())
 
 	// Create and mount ATM Portal handler, protected by RequireAuth
-	atmPortalService := service.NewAtmPortalService(db.New(dbPool))
+	// (read-only monitoring -> replica).
+	atmPortalService := service.NewAtmPortalService(db.New(dbReadPool))
 	atmPortalHandler := handler.NewAtmPortalHandler(atmPortalService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-portal", atmPortalHandler.Routes())
 
-	// Create and mount DMAA Forecast handler (read-only viewer, read-replica
-	// bound; currently the shared pool until the replica pool is wired).
-	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL wiring lands
-	dmaaForecastService := service.NewDmaaForecastService(db.New(dbPool))
+	// Create and mount DMAA Forecast handler (read-only viewer -> replica).
+	dmaaForecastService := service.NewDmaaForecastService(db.New(dbReadPool))
 	dmaaForecastHandler := handler.NewDmaaForecastHandler(dmaaForecastService)
 	r.With(
 		custommw.RequireAuth(tokenService),
@@ -200,6 +198,8 @@ func main() {
 	dsrRetryBaseURL := getenvDefault("DSR_RETRY_SCHEDULER_BASE_URL", "http://localhost:8090")
 	dsrProcessAuth := os.Getenv("DSR_RETRY_SCHEDULER_AUTH")
 	dsrHTTPClient := &http.Client{Timeout: 30 * time.Second}
+	// Primary on purpose: BuildUploadResult/List read rows the Python commit
+	// just wrote (read-after-write across services).
 	dsrService := service.NewDsrService(db.New(dbPool), redisClient, dsrHTTPClient, dsrUploadDir, dsrRetryBaseURL, dsrProcessAuth)
 	dsrHandler := handler.NewDsrUploadHandler(dsrService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr", dsrHandler.Routes())
@@ -212,8 +212,6 @@ func main() {
 	// ApplierRegistry: each entity_type registers its applier as its own
 	// CRUD support lands (Fase 3/4) -- "vendor" (T2.3) + "vendor_branch"
 	// (T3.1) so far.
-	// ponytail: swap dbPool for the dbRead pool on List/Count when
-	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
 	masterDataApplierRegistry := service.ApplierRegistry{
 		"vendor":               service.VendorApplier{},
 		"vendor_branch":        service.VendorBranchApplier{},
@@ -265,9 +263,7 @@ func main() {
 	// create/update/disable/enable stage a change via masterDataChangeService and
 	// return 202; VendorApplier applies it once approved. Mounted before the
 	// /vendors/{vendorID}/... sub-resources below, as before.
-	// ponytail: swap dbPool for the dbRead pool on List/Count when
-	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
-	vendorAdminRepo := repository.NewVendorAdminRepository(dbPool)
+	vendorAdminRepo := repository.NewVendorAdminRepository(dbPool, dbReadPool)
 	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, masterDataChangeService)
 	adminVendorHandler := handler.NewAdminVendorHandler(vendorAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
@@ -278,9 +274,7 @@ func main() {
 	// return 202; ATMApplier applies it once approved. The existing
 	// /api/v1/atm-portal mount stays untouched (read-only monitoring). Mounted
 	// before /atms/{atmID}/assignments below, as before.
-	// ponytail: swap dbPool for the dbRead pool on List/Get/ListLocations when
-	// DATABASE_REPLICA_URL wiring lands (same TODO convention as above).
-	atmAdminRepo := repository.NewATMAdminRepository(dbPool)
+	atmAdminRepo := repository.NewATMAdminRepository(dbPool, dbReadPool)
 	atmAdminService := service.NewATMAdminService(atmAdminRepo, masterDataChangeService)
 	adminATMHandler := handler.NewAdminATMHandler(atmAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/atms", adminATMHandler.Routes())
@@ -396,10 +390,9 @@ func main() {
 	// (RBAC Settings Menu spec). Widened to include APPACCESS alongside
 	// ADMIN/ADMIN_PARAM (Requirement 3).
 	//
-	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL
-	// wiring lands (same TODO convention as the audit-log repository above).
+	// List views read the replica; policy writes stay on the primary.
 	adminApprovalHandler := handler.NewAdminApprovalHandler(approvalRepo, auditWriter)
-	rbacReadRepo := repository.NewRbacReadRepository(dbPool)
+	rbacReadRepo := repository.NewRbacReadRepository(dbReadPool)
 	rbacPolicyStore := repository.NewApprovalPolicyStore(dbPool)
 	rbacListHandler := handler.NewRbacListHandler(rbacReadRepo, rbacPolicyStore, auditWriter)
 	// AdminApprovalHandler.Routes() and RbacListHandler.Routes() cannot both be
@@ -442,8 +435,7 @@ func main() {
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-visit-quotas", atmVisitQuotaHandler.Routes())
 
 	// Create and mount the Audit Log Viewer handler (read-only, admin-only).
-	// ponytail: swap dbPool for the dbRead pool when DATABASE_REPLICA_URL wiring lands
-	auditLogRepo := repository.NewAuditLogRepository(dbPool)
+	auditLogRepo := repository.NewAuditLogRepository(dbReadPool)
 	auditLogService := service.NewAuditLogReadService(auditLogRepo)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
 	r.With(

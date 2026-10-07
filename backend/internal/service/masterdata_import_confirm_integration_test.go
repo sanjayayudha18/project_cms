@@ -62,7 +62,7 @@ func newImportFixture(t *testing.T) *importFixture {
 		Orchestrator: f.orch,
 		Audit:        audit.NewWriter(h.pool),
 		Services: func(sub ImportSubmitter) ImportServices {
-			return ImportServices{Vendors: NewVendorAdminService(repository.NewVendorAdminRepository(h.pool), sub)}
+			return ImportServices{Vendors: NewVendorAdminService(repository.NewVendorAdminRepository(h.pool, h.pool), sub)}
 		},
 	})
 	// Registered after harness's cleanup, so it runs BEFORE it: batches and their

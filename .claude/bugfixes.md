@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-07 — Phase 0.1: read-replica routing selesai (Go + Python)
+- **Symptom**: read untuk list/viewer/laporan masih ke primary (TODO `ponytail: swap dbPool for the dbRead pool` di `cmd/api/main.go`); service EOD Python tidak punya pool replica (deferred dari import-export-jobs C2).
+- **Root cause**: pool replica baru dipakai export master-data, region, dan branch-ATM; repo lain belum dipisah.
+- **Fix**: Go — `main.go` memakai `dbReadPool` untuk ATM Portal, DMAA Forecast viewer, Role Management (list/catalog/permission, sesuai spec Req 8), RBAC list views, Audit Log viewer. `VendorAdminRepository`/`ATMAdminRepository` jadi `(primary, replica)`: List/Count (+ ATM ListLocations) ke replica; GetByID/pre-check tetap primary (snapshot "before" saat Submit). Sengaja **tetap primary**: DSR upload (read-after-write hasil commit Python), `MasterDataChangeRepository` List/Count (badge pending dibaca tepat setelah Submit). Python — `lib/database.create_read_pool` (`*_DATABASE_REPLICA_URL`, kosong = primary) → `app.state.db_read_pool` dipakai `/status`, `/status/{id}/history`, `/summary`, `/late`, `/audit` di `eod_retry_scheduler` + `service_dsr_etl`; `/health` + proses/retry tetap primary. `.env.example` keduanya ditambah.
+- **Tests**: `go test ./...` + `go test -tags integration ./internal/...` (dev DB) lulus; `rolemgmt` `TestRepository_WriteReadTopology` lulus; Python `lib.test_eod_api` + `lib.test_import_jobs` (34, dev DB), `dsr`, `itm/cashpos`, `python -m lib.database` (fallback check) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list pages + EOD monitoring).
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-07 — Kelolaan ATM: dropdown "Paket seluruh vendor" hanya label + tabel terpotong
 - **Symptom**: di `/settings/admin/atms` → Kelolaan ATM, mode "Paket seluruh vendor" hanya menampilkan label (PAKET 3/4/5) tanpa kode paket; modal terlalu sempit sehingga kolom tabel riwayat kelolaan terpotong.
 - **Root cause**: `ListATMPackageOptions` mengembalikan `DISTINCT package` saja; `ATMAssignmentsDialog` memakai lebar default `Dialog` (`max-w-lg`).

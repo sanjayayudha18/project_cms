@@ -9,8 +9,7 @@ import (
 // RbacReadRepository is the read-only repository backing the RBAC settings
 // menu's list views (user hierarchy, delegations, leaves, policies).
 //
-// ponytail: uses dbPool; swap for the dbRead pool when DATABASE_REPLICA_URL
-// wiring lands (same TODO convention as AuditLogRepository / cmd/api/main.go).
+// Wired to the read-replica pool in cmd/api/main.go (CLAUDE.md Sec 6).
 type RbacReadRepository struct {
 	queries *db.Queries
 }

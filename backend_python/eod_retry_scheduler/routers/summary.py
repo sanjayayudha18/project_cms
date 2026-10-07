@@ -17,7 +17,7 @@ _STATUSES = ("pending", "processing", "completed", "failed", "max_retries_exhaus
 
 @router.get("/summary")
 async def get_summary(request: Request, processing_date: date):
-    pool = request.app.state.db_pool
+    pool = request.app.state.db_read_pool
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """

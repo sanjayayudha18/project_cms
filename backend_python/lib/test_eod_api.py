@@ -100,6 +100,7 @@ class EodApiTest(unittest.IsolatedAsyncioTestCase):
                                    auth_secret=SECRET, auth_mode=auth_mode)
         app = create_app(settings)
         app.state.db_pool = self.pool
+        app.state.db_read_pool = self.pool
         app.state.scheduler_service = SchedulerService(
             settings, self.pool, config.FILE_TYPES, retry_executor=_AlwaysOkExecutor(),
         )

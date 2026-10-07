@@ -24,27 +24,29 @@ import (
 // atm_portal_cashpos.go/atm_portal_profile.go), so ATMAdminService reuses
 // those directly instead of duplicating the algorithm here.
 //
-// ponytail: uses dbPool for both reads and writes; swap List/Get/
-// ListLocations to the dbRead pool when DATABASE_REPLICA_URL wiring lands
-// (same TODO convention as AuditLogRepository / VendorAdminRepository).
+// List/Count/ListLocations read the replica (CLAUDE.md Sec 6); GetByID and
+// the submit-time pre-checks stay on the primary since Submit uses GetByID
+// as the "before" snapshot.
 type ATMAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count/ListLocations
 }
 
-// NewATMAdminRepository creates an ATMAdminRepository wrapping the given database connection.
-func NewATMAdminRepository(dbConn db.DBTX) *ATMAdminRepository {
-	return &ATMAdminRepository{queries: db.New(dbConn)}
+// NewATMAdminRepository creates an ATMAdminRepository. Pass the primary pool
+// for both arguments when no replica is configured.
+func NewATMAdminRepository(primary, replica db.DBTX) *ATMAdminRepository {
+	return &ATMAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of ATMs matching the given filters.
 func (r *ATMAdminRepository) List(ctx context.Context, arg db.ListATMsAdminParams) ([]db.ListATMsAdminRow, error) {
-	return r.queries.ListATMsAdmin(ctx, arg)
+	return r.dbRead.ListATMsAdmin(ctx, arg)
 }
 
 // Count returns the total number of ATMs matching the given filters (same
 // filter fields as List, without pagination).
 func (r *ATMAdminRepository) Count(ctx context.Context, arg db.CountATMsAdminParams) (int64, error) {
-	return r.queries.CountATMsAdmin(ctx, arg)
+	return r.dbRead.CountATMsAdmin(ctx, arg)
 }
 
 // GetByID returns an ATM by id, including soft-deleted rows. Returns nil,
@@ -77,7 +79,7 @@ func (r *ATMAdminRepository) FindByTerminalID(ctx context.Context, terminalID st
 // ListLocations returns every location for the ATM form's Location select,
 // ordered by name.
 func (r *ATMAdminRepository) ListLocations(ctx context.Context) ([]db.ListLocationsForSelectRow, error) {
-	return r.queries.ListLocationsForSelect(ctx)
+	return r.dbRead.ListLocationsForSelect(ctx)
 }
 
 // LocationExists reports whether the given location_id references an

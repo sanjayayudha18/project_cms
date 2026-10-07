@@ -209,6 +209,10 @@ func validate(msg Message) error {
 		return fmt.Errorf("%w: title longer than %d", ErrInvalidMessage, maxTitleLen)
 	case utf8.RuneCountInString(msg.Body) > maxBodyLen:
 		return fmt.Errorf("%w: body longer than %d", ErrInvalidMessage, maxBodyLen)
+	case msg.Link != "" && (!strings.HasPrefix(msg.Link, "/") || strings.HasPrefix(msg.Link, "//")):
+		// Both portals navigate to Link as-is: only an in-app path is allowed,
+		// never an absolute or protocol-relative URL (review R3).
+		return fmt.Errorf("%w: link must be an in-app path", ErrInvalidMessage)
 	}
 	return nil
 }

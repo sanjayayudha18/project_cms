@@ -144,3 +144,50 @@ func TestWorker_TickWithoutMailerSendsNothing(t *testing.T) {
 		t.Fatal("SMTP disabled must not touch the outbox")
 	}
 }
+
+func TestWorker_RunStopsOnCancel(t *testing.T) {
+	store := &fakeStore{}
+	w := newTestWorker(store, nil)
+	w.interval = 10 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { w.Run(ctx); close(done) }()
+	time.Sleep(30 * time.Millisecond)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+	if len(store.purged) != 2 {
+		t.Fatalf("purge ran %d times in one day, want once (2 deletes)", len(store.purged)/2)
+	}
+}
+
+func TestWorker_TickKeepsRetryingPurgeAfterError(t *testing.T) {
+	calls := 0
+	w := &Worker{
+		inTx: func(_ context.Context, _ func(emailStore) error) error {
+			calls++
+			return errors.New("db down")
+		},
+		mailer:   &fakeMailer{},
+		interval: time.Minute,
+		now:      func() time.Time { return fixedNow },
+	}
+	w.tick(context.Background()) // send batch + purge both fail, logged
+	w.tick(context.Background()) // failed purge is not recorded: tried again
+	if calls != 4 {
+		t.Fatalf("inTx calls = %d, want 4 (batch + purge, twice)", calls)
+	}
+	if !w.lastPurge.IsZero() {
+		t.Fatal("a failed purge must not count as done")
+	}
+}
+
+func TestNewWorker_Defaults(t *testing.T) {
+	w := NewWorker(nil, nil, time.Minute)
+	if w.mailer != nil || w.interval != time.Minute || w.now == nil || w.inTx == nil {
+		t.Fatalf("worker = %+v", w)
+	}
+}

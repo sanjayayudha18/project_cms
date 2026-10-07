@@ -70,6 +70,9 @@ func TestSend_ValidatesMessage(t *testing.T) {
 		{"empty title", Message{Type: "x"}},
 		{"title too long", Message{Type: "x", Title: strings.Repeat("a", 121)}},
 		{"body too long", Message{Type: "x", Title: "t", Body: strings.Repeat("é", 1001)}},
+		{"absolute link", Message{Type: "x", Title: "t", Link: "https://evil.example/x"}},
+		{"protocol-relative link", Message{Type: "x", Title: "t", Link: "//evil.example/x"}},
+		{"javascript link", Message{Type: "x", Title: "t", Link: "javascript:alert(1)"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

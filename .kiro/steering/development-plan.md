@@ -93,7 +93,7 @@ Binding rules (from `project-context.md`):
 - **Unblocks:** every file ingest (invoice, escrow, forecast inputs).
 - **Model:** Opus, Effort: High.
 
-### 0.3 `internal/notification` (in-app + SMTP) — ✅ built 2026-10-07 (stage 4 Test; review + manual browser check outstanding) (`.claude/sdlc/notification/`)
+### 0.3 `internal/notification` (in-app + SMTP) — ✅ built 2026-10-07 (stage 5 review done, R1–R3 fixed; merge + manual browser check outstanding) (`.claude/sdlc/notification/`)
 - `notifications` table. In-app write + company SMTP relay. Needed by DSR-late alert, replenishment publish, cash count.
 - **Model:** Sonnet, Effort: Medium.
 

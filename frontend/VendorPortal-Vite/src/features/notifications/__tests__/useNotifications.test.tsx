@@ -95,4 +95,22 @@ describe("VendorPortal notifications hooks", () => {
     await waitFor(() => expect(result.current.unread.data).toBe(0));
     expect(result.current.list.data?.every((n) => n.is_read)).toBe(true);
   });
+
+  it("refetches the list when the page mounts again", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } }, // app default
+    });
+    const shared = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const listCalls = () =>
+      getMock.mock.calls.filter(([p]) => !String(p).endsWith("/unread-count")).length;
+
+    const first = renderHook(() => useNotifications(), { wrapper: shared });
+    await waitFor(() => expect(first.result.current.data).toHaveLength(2));
+    first.unmount();
+    const second = renderHook(() => useNotifications(), { wrapper: shared });
+    await waitFor(() => expect(listCalls()).toBe(2));
+    second.unmount();
+  });
 });

@@ -20,6 +20,9 @@ export function useNotifications() {
   return useQuery({
     queryKey: listKey,
     queryFn: async () => (await fetchNotifications(1, PAGE_SIZE)).items,
+    // Refetch whenever the page mounts: the global 5-min staleTime would show
+    // an old list while the polled badge already counts new items (review R1).
+    staleTime: 0,
   });
 }
 

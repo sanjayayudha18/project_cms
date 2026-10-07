@@ -36,6 +36,9 @@ export function useRecentNotifications(enabled: boolean) {
     queryKey: notificationKeys.recent,
     queryFn: () => fetchNotifications(1, RECENT_PAGE_SIZE),
     enabled,
+    // Refetch on every open: the global 5-min staleTime would show an old
+    // list while the polled badge already counts new items (review R1).
+    staleTime: 0,
   });
 }
 

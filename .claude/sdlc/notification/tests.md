@@ -15,7 +15,7 @@ Input: `plan.md` (accepted 2026-10-07). Stage berikut: review (`review.md`) → 
 | `cd backend && DATABASE_URL=<dev, localhost> go test -tags integration -count=1 ./internal/...` | OK (semua paket, termasuk 4 `TestIntegration_*` notification + 2 over-quota) |
 | `gofmt -l` pada file Go yang dibuat/diubah | bersih (`cmd/hashpw` memang sudah tidak rapi sebelumnya) |
 | `go test -race` | tidak bisa di mesin ini (Windows tanpa cgo) |
-| `pnpm --dir frontend/CompanyPortal-Vite run test` | 123 file, 1050 test lulus |
+| `pnpm --dir frontend/CompanyPortal-Vite run test` | 123 file, 1050 test lulus (1051 setelah review R1) |
 | `pnpm --dir frontend/CompanyPortal-Vite run lint` | bersih |
 | `pnpm --dir frontend/CompanyPortal-Vite run build` | OK (warning chunk >500 kB sudah ada) |
 | `pnpm --dir frontend/VendorPortal-Vite run test` | 104 test; 103 lulus + `routeGuard.property.test.tsx` flaky **sudah ada sebelumnya** (gagal 2 dari 3 run pada kode tanpa perubahan ini) |

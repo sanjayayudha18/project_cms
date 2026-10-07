@@ -20,7 +20,10 @@ vi.mock("@tanstack/react-router", () => ({ useRouter: () => ({ history: { push }
 import { NotificationBell } from "./NotificationBell";
 
 function renderBell() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // staleTime mirrors the app default (routes/__root.tsx) so R1 is exercised.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } },
+  });
   return render(
     <QueryClientProvider client={client}>
       <NotificationBell />
@@ -112,5 +115,16 @@ describe("NotificationBell", () => {
     expect(await screen.findByRole("dialog", { name: "Notifikasi" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("refetches the list every time the panel is opened", async () => {
+    fetchUnreadCount.mockResolvedValue(0);
+    renderBell();
+    const bell = screen.getByRole("button", { name: "Notifikasi" });
+    fireEvent.click(bell);
+    await screen.findByText("Kelebihan kuota kunjungan");
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(bell);
+    await waitFor(() => expect(fetchNotifications).toHaveBeenCalledTimes(2));
   });
 });

@@ -140,3 +140,23 @@ func TestSMTPMailer_TimesOutOnSilentServer(t *testing.T) {
 		t.Fatalf("Send hung for %v", elapsed)
 	}
 }
+
+func TestSMTPMailer_DialFailure(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	ln.Close() // nothing listens any more
+	host, port, _ := net.SplitHostPort(addr)
+	m := &SMTPMailer{Host: host, Port: port, From: "a@b.co", DialTimeout: time.Second}
+	if err := m.Send(context.Background(), "x@b.co", "s", "b"); err == nil || !strings.Contains(err.Error(), "smtp dial") {
+		t.Fatalf("err = %v, want smtp dial error", err)
+	}
+}
+
+func TestSMTPMailer_DefaultTimeouts(t *testing.T) {
+	if orDefault(0, time.Second) != time.Second || orDefault(2*time.Second, time.Second) != 2*time.Second {
+		t.Fatal("orDefault")
+	}
+}

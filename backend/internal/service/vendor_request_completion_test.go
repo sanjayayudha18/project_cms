@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -97,5 +98,36 @@ func TestRejectCompletion_EmptyReason(t *testing.T) {
 	svc := &VendorRequestService{} // validation runs before any DB access
 	if _, err := svc.RejectCompletion(context.Background(), Actor{UserID: 2, Role: "ATM-SPV"}, 1, "   "); !errors.Is(err, ErrCompletionReasonEmpty) {
 		t.Fatalf("err = %v, want ErrCompletionReasonEmpty", err)
+	}
+}
+
+func TestOverQuotaNotification(t *testing.T) {
+	maker := int64(10)
+	req := db.VendorRequest{ID: 9, RequestNumber: "REPABC20261007001", CompletionSubmittedBy: &maker}
+
+	msg, to := overQuotaNotification(req, []string{"T001", "T002"})
+	if msg.Type != "visit_quota.over_quota" || !msg.Email || msg.Link != "/replenishment/vendor-requests/9" {
+		t.Fatalf("msg = %+v", msg)
+	}
+	if msg.EntityType != "vendor_request" || msg.EntityID == nil || *msg.EntityID != 9 {
+		t.Fatalf("entity = %s/%v", msg.EntityType, msg.EntityID)
+	}
+	if want := "Vendor request REPABC20261007001: ATM T001, T002 melebihi kuota kunjungan replenish."; msg.Body != want {
+		t.Fatalf("body = %q, want %q", msg.Body, want)
+	}
+	if len(to.UserIDs) != 1 || to.UserIDs[0] != 10 || len(to.Roles) != 1 || to.Roles[0] != "ATM-SPV" || len(to.VendorIDs) != 0 {
+		t.Fatalf("recipients = %+v, want maker 10 + ATM-SPV only (spec S1)", to)
+	}
+
+	many := make([]string, 300)
+	for i := range many {
+		many[i] = "TERMINAL-LONG-ID-0000"
+	}
+	msg, _ = overQuotaNotification(db.VendorRequest{ID: 1, RequestNumber: "R"}, many)
+	if len([]rune(msg.Body)) > 1000 || !strings.Contains(msg.Body, "dan 280 ATM lainnya") {
+		t.Fatalf("body (%d runes) = %q", len([]rune(msg.Body)), msg.Body)
+	}
+	if _, to := overQuotaNotification(db.VendorRequest{ID: 1}, []string{"T"}); len(to.UserIDs) != 0 {
+		t.Fatalf("no maker on the request must not add a user: %+v", to)
 	}
 }

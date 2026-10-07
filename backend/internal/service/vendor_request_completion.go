@@ -10,6 +10,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
 
 // Laporan selesai replenish (.claude/sdlc/atm-visit-quota/spec.md FR1):
@@ -166,9 +167,11 @@ func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor
 // records one visit (recordVisit: idempotent per request+ATM, atomic quota
 // decrement) in the same tx. Returns the terminals that went over quota so
 // the checker sees the warning (FR6.2); over quota never blocks (intent #10).
+// Over quota also notifies the report's maker + every active ATM-SPV
+// (notification spec FR6), in the same tx: a failed Send rolls back the approve.
 func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Actor, id int64) (*VendorRequestDetail, []string, error) {
 	overQuota := []string{}
-	err := s.completionTx(ctx, actor, id, actionApproveCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
+	err := s.completionTx(ctx, actor, id, actionApproveCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		results, err := q.ListVendorRequestAtmResults(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("list results of %d: %w", id, err)
@@ -187,6 +190,12 @@ func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Acto
 				overQuota = append(overQuota, out.TerminalID)
 			}
 			visits = append(visits, out)
+		}
+		if len(overQuota) > 0 && s.notifier != nil {
+			msg, to := overQuotaNotification(req, overQuota)
+			if err := s.notifier.Send(ctx, q, msg, to); err != nil {
+				return nil, fmt.Errorf("notify over quota for %d: %w", id, err)
+			}
 		}
 		if _, err := q.UpdateVendorRequestCompletion(ctx, db.UpdateVendorRequestCompletionParams{
 			Status: newStatus, ActorID: actor.UserID, ID: id,
@@ -264,4 +273,34 @@ func userRefOrNil(id *int64, name *string) *UserRef {
 		return nil
 	}
 	return &UserRef{ID: *id, FullName: notesOrEmpty(name)}
+}
+
+// overQuotaListMax caps the terminals named in the notification body so it
+// stays under the 1000-character limit however many ATMs went over quota.
+const overQuotaListMax = 20
+
+// overQuotaNotification builds the "kelebihan kuota" notification (spec
+// FR6.1, S1/S2): maker of the report + all active ATM-SPV, in-app + email.
+func overQuotaNotification(req db.VendorRequest, terminals []string) (notification.Message, notification.Recipients) {
+	listed := terminals
+	suffix := ""
+	if len(terminals) > overQuotaListMax {
+		listed = terminals[:overQuotaListMax]
+		suffix = fmt.Sprintf(" dan %d ATM lainnya", len(terminals)-overQuotaListMax)
+	}
+	id := req.ID
+	msg := notification.Message{
+		Type:       "visit_quota.over_quota",
+		Title:      "Kelebihan kuota kunjungan",
+		Body:       fmt.Sprintf("Vendor request %s: ATM %s%s melebihi kuota kunjungan replenish.", req.RequestNumber, strings.Join(listed, ", "), suffix),
+		Link:       fmt.Sprintf("/replenishment/vendor-requests/%d", req.ID),
+		EntityType: "vendor_request",
+		EntityID:   &id,
+		Email:      true,
+	}
+	to := notification.Recipients{Roles: []string{"ATM-SPV"}}
+	if req.CompletionSubmittedBy != nil {
+		to.UserIDs = []int64{*req.CompletionSubmittedBy}
+	}
+	return msg, to
 }

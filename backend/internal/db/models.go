@@ -504,6 +504,36 @@ type MenuFeature struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Notifikasi in-app, satu baris per user penerima. Dibaca hanya oleh penerimanya. Dihapus setelah 90 hari (retensi). Migrasi 025.
+type Notification struct {
+	ID              int64              `json:"id"`
+	RecipientUserID int64              `json:"recipient_user_id"`
+	Type            string             `json:"type"`
+	Title           string             `json:"title"`
+	Body            string             `json:"body"`
+	Link            *string            `json:"link"`
+	EntityType      *string            `json:"entity_type"`
+	EntityID        *int64             `json:"entity_id"`
+	IsRead          bool               `json:"is_read"`
+	ReadAt          pgtype.Timestamptz `json:"read_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+// Outbox email notifikasi, satu baris per alamat. notification_id NULL untuk PIC vendor (bukan user). status: pending|sent|failed|skipped (skipped = SMTP tidak dikonfigurasi). Migrasi 025.
+type NotificationEmail struct {
+	ID             int64              `json:"id"`
+	NotificationID *int64             `json:"notification_id"`
+	ToAddress      string             `json:"to_address"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	Status         string             `json:"status"`
+	Attempts       int32              `json:"attempts"`
+	LastError      *string            `json:"last_error"`
+	NextAttemptAt  pgtype.Timestamptz `json:"next_attempt_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 // Frekuensi CR & FLM per bulan untuk tiap (kode paket, kelompok mesin). Grainnya (kode, kelompok mesin) - bukan kolom di vendor_packages - karena FLM berbeda menurut tipe mesin: PAKET 3 ATM = FLM 4, PAKET 3 CDM/CRM = FLM 6. Nilai dari archives/Harga Paket per vendor FLM.docx. Migrasi 009.
 type PackageFrequency struct {
 	PackageCode  string             `json:"package_code"`

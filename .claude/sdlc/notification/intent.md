@@ -1,6 +1,6 @@
 # Intent: Modul notifikasi (in-app + email SMTP) — Phase 0.3
 
-Author: user (product owner), ditulis bersama Claude. Status: **draft 2026-10-07 — menunggu PO accept**.
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-07 (PO, via chat)**.
 Stage: 1 Plan. Stage berikut: `spec.md` (setelah intent diterima).
 Menyentuh Sec 4 #7: **skema (tabel baru `notifications`, migrasi baru)** → wajib AI-DLC penuh.
 
@@ -49,6 +49,17 @@ Kondisi sekarang (dicek di kode 2026-10-07):
 7. **Template email**: bahasa (ID/EN), format (plain text vs HTML), siapa yang menyetujui isi?
 8. **Preferensi user**: user boleh mematikan email per jenis notifikasi, atau semua wajib?
 9. **Fitur pemakai pertama** untuk membuktikan modul ini (lihat outcome 5).
+
+## Resolved decisions (PO, 2026-10-07)
+1. **Penerima**: user tertentu, semua user aktif suatu role (di-expand saat event), atau vendor (user vendor aktif → in-app + email; `vendor_pics.is_notification_recipient = true` → email). Alamat user = `users.email`.
+2. **Email**: outbox di tx yang sama dengan event bisnis + goroutine pengirim di `cmd/api`; retry 3x lalu `failed`. Email gagal tidak membatalkan transaksi.
+3. **Real-time**: polling unread tiap 60 detik, tanpa SSE/WebSocket.
+4. **Audit**: tidak ada `audit_logs` per notifikasi; status di tabel cukup. "Tandai dibaca" tidak diaudit.
+5. **Retensi**: 90 hari, lalu dihapus otomatis (notifikasi bukan master data).
+6. **Alert EOD** dari Python ditunda ke Phase 7.
+7. **Template**: Bahasa Indonesia, plain text.
+8. **Preferensi user**: tidak ada (semua jenis aktif).
+9. **Pemakai pertama**: kelebihan kuota kunjungan (`atm-visit-quota`, saat approve laporan selesai).
 
 ## Out of scope
 - Push notification mobile, SMS, WhatsApp.

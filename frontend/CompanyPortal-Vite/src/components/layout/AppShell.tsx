@@ -7,6 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AppShellProps {
   children: React.ReactNode;
+  /** Rendered in the header (the notification bell). */
+  notifications?: React.ReactNode;
 }
 
 const SIDEBAR_EXPANDED_WIDTH = "256px";
@@ -21,7 +23,7 @@ const BREAKPOINT_LG = 1024;
  * Manages sidebar expanded/collapsed state via local state.
  * Responsive: sidebar collapses to icon-only at < 1024px.
  */
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, notifications }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const router = useRouter();
@@ -161,6 +163,7 @@ export function AppShell({ children }: AppShellProps) {
             onLogout={logout}
             onSidebarToggle={handleSidebarToggle}
             sidebarCollapsed={sidebarCollapsed}
+            notifications={notifications}
           />
         )}
       </header>

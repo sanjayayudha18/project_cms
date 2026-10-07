@@ -12,6 +12,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
 
 // Actor carries who is acting, resolved from the JWT by the handler.
@@ -420,8 +421,9 @@ type VendorRequestServicer interface {
 
 // VendorRequestService implements VendorRequestServicer.
 type VendorRequestService struct {
-	pool VendorRequestPool
-	read VendorRequestRepository // db.New(pool): read-only queries, no tx needed
+	pool     VendorRequestPool
+	read     VendorRequestRepository // db.New(pool): read-only queries, no tx needed
+	notifier Notifier                // nil = no notifications (tests, or not wired)
 }
 
 // NewVendorRequestService creates a VendorRequestService wrapping the given
@@ -435,6 +437,19 @@ type VendorRequestService struct {
 // vendor_request_actions.go.
 func NewVendorRequestService(pool VendorRequestPool) *VendorRequestService {
 	return &VendorRequestService{pool: pool, read: db.New(pool)}
+}
+
+// Notifier sends notifications inside the caller's tx (implemented by
+// notification.Service; notification plan D1).
+type Notifier interface {
+	Send(ctx context.Context, q notification.Querier, msg notification.Message, to notification.Recipients) error
+}
+
+// WithNotifier enables notifications (cmd/api/main.go). Kept as a setter so
+// the many NewVendorRequestService call sites (mostly tests) stay unchanged.
+func (s *VendorRequestService) WithNotifier(n Notifier) *VendorRequestService {
+	s.notifier = n
+	return s
 }
 
 // --- State machine -----------------------------------------------------

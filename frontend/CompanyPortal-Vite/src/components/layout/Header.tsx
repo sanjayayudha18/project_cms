@@ -1,19 +1,28 @@
 import type { AuthUser } from "@/lib/auth";
-import { Bell, ChevronDown, LogOut, Menu, Search, User } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, LogOut, Menu, Search, User } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 export interface HeaderProps {
   user: AuthUser;
   onLogout: () => void;
   onSidebarToggle: () => void;
   sidebarCollapsed: boolean;
+  /** Notification bell slot (features/notifications), passed in by the
+   * protected layout so Header itself needs no data providers. */
+  notifications?: ReactNode;
 }
 
 /**
  * Header — top bar with search, notifications, and user dropdown.
  * Clean, functional design. No unnecessary decoration.
  */
-export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: HeaderProps) {
+export function Header({
+  user,
+  onLogout,
+  onSidebarToggle,
+  sidebarCollapsed,
+  notifications,
+}: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
@@ -60,27 +69,7 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
 
       {/* Right section: notifications + user */}
       <div className="flex items-center gap-[var(--space-2)]">
-        {/* Notification bell */}
-        <button
-          type="button"
-          className="relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)]"
-          style={{ color: "var(--n-600)" }}
-          aria-label="Notifikasi"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "var(--n-100)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-          }}
-        >
-          <Bell size={18} aria-hidden="true" />
-          {/* Notification dot */}
-          <span
-            className="absolute right-[6px] top-[6px] h-2 w-2 rounded-full"
-            style={{ backgroundColor: "var(--red-500)" }}
-            aria-label="Ada notifikasi baru"
-          />
-        </button>
+        {notifications}
 
         {/* Divider */}
         <div

@@ -35,6 +35,14 @@ Plan/spec: `.claude/sdlc/atm-package-source/`. Migration `023_atm_assignment_ven
 *   Vendor-wide validation (service, not DB): vendor active + `kind='FLM_VENDOR'`, branch of that vendor and active, ATM has `price_machine_group`/`price_class`, and a `vendor_package_prices` row for `(vendor, package, machine_group, price_class)` effective on the start date whose `atm_id` is NULL or this ATM. Repeated at apply.
 *   Readers resolve label `COALESCE(vendor_packages_branch.package_code, avp.package)` and cabang `COALESCE(vendor_packages_branch.vendor_branch_id, avp.vendor_branch_id)`.
 
+## Notifications (migration 025)
+
+Plan/spec: `.claude/sdlc/notification/`. Migration `025_notifications.sql`, applied to dev DB 2026-10-07.
+
+*   `notifications` — one row per recipient **user** (fan-out at send time; role/vendor recipients are expanded to active users then). `type` (stable code, e.g. `visit_quota.over_quota`), `title` (1–120), `body` (≤ 1000), `link` (path in the recipient's portal), `entity_type`/`entity_id` (optional source), `is_read`, `read_at`, `created_at`. Indexes: `(recipient_user_id, created_at DESC, id DESC)`, partial `(recipient_user_id) WHERE is_read = false` (unread polling), `(created_at)` (retention). Only the recipient reads/updates it.
+*   `notification_emails` — outbox, one row per unique (lowercased) address; `notification_id` NULL for `vendor_pics` recipients (email only, `is_notification_recipient = true`). `status` `pending|sent|failed|skipped` (`skipped` = `SMTP_HOST` empty), `attempts`, `last_error` (≤ 500 chars, no credentials), `next_attempt_at`, `sent_at`. Partial index on `next_attempt_at WHERE status = 'pending'`; claimed `FOR UPDATE SKIP LOCKED`.
+*   Retention: worker hard-deletes `notifications` older than 90 days and final-status `notification_emails` older than 90 days, once per 24 h (pending rows are never purged).
+
 ## Proposed — FSD v1.0 (2026-10-01) — NOT approved, NOT migrated
 
 Source: FSD "DSR End To End Cash Management" v1.0 field tables (Master Vendor, Master Kelolaan ATM, Monitoring Limit CIS, Parameter Cash Count, Cash Count Planning). Status: proposal awaiting user approval → then migration `021+` via an AI-DLC chain. Reuse existing tables first; new tables only where nothing fits.

@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { NotificationBell } from "@/features/notifications";
 import { useAuthStore } from "@/lib/auth/store";
 import type { DbRole } from "@/lib/auth/store";
 import { Navigate, Outlet, createRoute, redirect } from "@tanstack/react-router";
@@ -47,7 +48,7 @@ function ProtectedLayout() {
 
   // Auth is resolved and user is authenticated → render AppShell within 1 cycle
   return (
-    <AppShell>
+    <AppShell notifications={<NotificationBell />}>
       <Outlet />
     </AppShell>
   );

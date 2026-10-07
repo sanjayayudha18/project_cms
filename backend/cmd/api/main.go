@@ -19,6 +19,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/handler"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
 	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
@@ -424,7 +425,11 @@ func main() {
 	// endpoint role subset (maker/checker/viewer) is applied inside
 	// Routes() itself since it differs per route, and actor-level
 	// authorization (creator/checker/four-eyes) is enforced in the service.
-	vendorRequestService := service.NewVendorRequestService(dbPool)
+	// Notifications (.claude/sdlc/notification): Send runs inside the business
+	// tx; the worker below sends the email outbox and purges after 90 days.
+	smtpMailer, notifyInterval := loadNotificationConfig()
+	notificationService := notification.NewService(smtpMailer != nil)
+	vendorRequestService := service.NewVendorRequestService(dbPool).WithNotifier(notificationService)
 	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
 
@@ -433,6 +438,11 @@ func main() {
 	// Primary pool (plan D1: read right after approve/reset/cancel).
 	atmVisitQuotaHandler := handler.NewAtmVisitQuotaHandler(service.NewAtmVisitQuotaService(dbPool))
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-visit-quotas", atmVisitQuotaHandler.Routes())
+
+	// Every authenticated role (VENDOR-USER too) reads only its own
+	// notifications; list/unread-count on the replica, mark-read on primary.
+	notificationHandler := handler.NewNotificationHandler(notification.NewRepository(dbPool, dbReadPool))
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/notifications", notificationHandler.Routes())
 
 	// Create and mount the Audit Log Viewer handler (read-only, admin-only).
 	auditLogRepo := repository.NewAuditLogRepository(dbReadPool)
@@ -465,8 +475,16 @@ func main() {
 		}
 	}()
 
+	workerCtx, stopWorker := context.WithCancel(ctx)
+	var mailer notification.Mailer // stays a nil interface when SMTP is off
+	if smtpMailer != nil {
+		mailer = smtpMailer
+	}
+	go notification.NewWorker(dbPool, mailer, notifyInterval).Run(workerCtx)
+
 	<-done
 	slog.Info("shutting down server...")
+	stopWorker()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -508,4 +526,32 @@ func getenvDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// loadNotificationConfig reads the ATM-only SMTP settings (like DSR_*, not in
+// the shared pkg/config). SMTP_HOST empty = email disabled (outbox rows are
+// written as "skipped"); SMTP_HOST set without SMTP_FROM is a startup error.
+func loadNotificationConfig() (*notification.SMTPMailer, time.Duration) {
+	interval, err := time.ParseDuration(getenvDefault("NOTIFICATION_EMAIL_POLL_INTERVAL", "60s"))
+	if err != nil || interval <= 0 {
+		slog.Error("invalid NOTIFICATION_EMAIL_POLL_INTERVAL", "error", err)
+		os.Exit(1)
+	}
+	host := os.Getenv("SMTP_HOST")
+	if host == "" {
+		slog.Warn("SMTP_HOST not set: notification emails are disabled (stored as skipped)")
+		return nil, interval
+	}
+	from := os.Getenv("SMTP_FROM")
+	if from == "" {
+		slog.Error("SMTP_FROM is required when SMTP_HOST is set")
+		os.Exit(1)
+	}
+	return &notification.SMTPMailer{
+		Host:     host,
+		Port:     getenvDefault("SMTP_PORT", "587"),
+		User:     os.Getenv("SMTP_USER"),
+		Password: os.Getenv("SMTP_PASSWORD"),
+		From:     from,
+	}, interval
 }

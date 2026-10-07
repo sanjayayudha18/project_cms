@@ -1,6 +1,6 @@
 # Intent: Penyimpanan dokumen (`documents`) — Phase 0.4
 
-Author: user (product owner), ditulis bersama Claude. Status: **draft 2026-10-07 — menunggu PO accept**.
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-07, DEFERRED ke Phase 3/5 (PO)** — spec ditulis saat fitur pemakai pertama (invoice / cash count) dimulai.
 Stage: 1 Plan. Stage berikut: `spec.md` (setelah intent diterima).
 Menyentuh Sec 4 #7: **skema (tabel baru `documents`, migrasi baru)** + **file upload (trust boundary)** → wajib AI-DLC penuh.
 
@@ -45,6 +45,15 @@ Kondisi sekarang (dicek di kode 2026-10-07):
 6. **Scan antivirus**: perlu dipindai sebelum disimpan/diunduh? Ada layanan perusahaan yang harus dipakai?
 7. **Fitur pemakai pertama**: modul ini belum punya pemakai di Phase 0–2 — dibangun sekarang, atau ditunda sampai Phase 3/5 yang membutuhkannya (YAGNI)?
 8. **Migrasi DSR**: upload DSR yang ada pindah ke `documents`, atau tetap di `FTP_DATA/DSR/` (kontrak nama file dipakai ETL Python)?
+
+## Resolved decisions (PO, 2026-10-07)
+- **Q7**: **tunda** — belum ada pemakai di Phase 0–2 (YAGNI). Phase 0 dianggap selesai tanpa 0.4.
+- **Q1**: maks **10 MB**; PDF, JPG, PNG, XLSX, CSV; tipe dicek lewat magic bytes.
+- **Q2/Q3**: backend **lokal dulu** (satu implementasi); dependency GCS diajukan saat deploy. Unduh di-stream lewat backend dengan cek akses.
+- **Q4**: kepemilikan generik `owner_type` + `owner_id`.
+- **Q5**: disimpan tanpa batas sampai kebijakan retensi bank ditentukan; hanya soft-disable.
+- **Q6**: tanpa antivirus dulu — dicatat sebagai risiko di spec.
+- **Q8**: DSR tetap di `FTP_DATA/DSR/` (kontrak nama file ETL Python tidak diubah).
 
 ## Out of scope
 - E-sign (Phase 5), pembuatan PDF Berita Acara / export XLSX/PDF (0.5, ditunda).

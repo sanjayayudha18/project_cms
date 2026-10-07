@@ -1,60 +1,68 @@
-import notificationsData from "@/data/notifications.json";
-import { useAuth } from "@/features/auth/useAuth";
-import type { Notification } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type VendorNotification,
+  fetchNotifications,
+  fetchUnreadCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "./api";
 
+// ponytail: the page shows the newest 100 only, no pagination UI; add paging
+// when vendors actually accumulate more than that within the 90-day retention.
+const PAGE_SIZE = 100;
+const UNREAD_POLL_MS = 60_000;
+
+const listKey = ["notifications", "list"] as const;
+const unreadKey = ["notifications", "unread-count"] as const;
+
+/** The newest notifications of the logged-in vendor user (server-scoped). */
 export function useNotifications() {
-  const { state } = useAuth();
-  const vendorId = state.user?.vendorId;
-
-  const query = useQuery({
-    queryKey: ["notifications", vendorId],
-    queryFn: () => {
-      const allNotifications = notificationsData as Notification[];
-      return allNotifications.filter((n) => n.vendorId === String(vendorId));
-    },
-    enabled: !!vendorId,
+  return useQuery({
+    queryKey: listKey,
+    queryFn: async () => (await fetchNotifications(1, PAGE_SIZE)).items,
   });
-
-  const unreadCount = query.data?.filter((n) => !n.isRead).length ?? 0;
-
-  return { ...query, unreadCount };
 }
+
+/** Unread count for the sidebar badge, polled every 60 s (spec decision 3). */
+export function useUnreadCount() {
+  return useQuery({
+    queryKey: unreadKey,
+    queryFn: fetchUnreadCount,
+    refetchInterval: UNREAD_POLL_MS,
+  });
+}
+
+// After a write the cache is updated in place, not refetched: list and count
+// come from the read replica, which may lag the primary (spec FR4.5).
 
 export function useMarkAsRead() {
   const queryClient = useQueryClient();
-  const { state } = useAuth();
-  const vendorId = state.user?.vendorId;
-
   return useMutation({
-    mutationFn: async (notificationId: string) => {
-      // Simulate marking as read
-      await Promise.resolve();
-      return { notificationId, success: true };
-    },
-    onSuccess: ({ notificationId }) => {
-      queryClient.setQueryData<Notification[]>(["notifications", vendorId], (old) =>
-        old?.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
+    mutationFn: markNotificationRead,
+    onSuccess: (_data, id) => {
+      const wasUnread =
+        queryClient
+          .getQueryData<VendorNotification[]>(listKey)
+          ?.some((n) => n.id === id && !n.is_read) ?? false;
+      queryClient.setQueryData<VendorNotification[]>(listKey, (old) =>
+        old?.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
       );
+      if (wasUnread) {
+        queryClient.setQueryData<number>(unreadKey, (old) => Math.max((old ?? 1) - 1, 0));
+      }
     },
   });
 }
 
 export function useMarkAllAsRead() {
   const queryClient = useQueryClient();
-  const { state } = useAuth();
-  const vendorId = state.user?.vendorId;
-
   return useMutation({
-    mutationFn: async () => {
-      // Simulate marking all as read
-      await Promise.resolve();
-      return { success: true };
-    },
+    mutationFn: markAllNotificationsRead,
     onSuccess: () => {
-      queryClient.setQueryData<Notification[]>(["notifications", vendorId], (old) =>
-        old?.map((n) => ({ ...n, isRead: true })),
+      queryClient.setQueryData<VendorNotification[]>(listKey, (old) =>
+        old?.map((n) => ({ ...n, is_read: true })),
       );
+      queryClient.setQueryData<number>(unreadKey, 0);
     },
   });
 }

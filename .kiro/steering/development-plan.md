@@ -93,11 +93,11 @@ Binding rules (from `project-context.md`):
 - **Unblocks:** every file ingest (invoice, escrow, forecast inputs).
 - **Model:** Opus, Effort: High.
 
-### 0.3 `internal/notification` (in-app + SMTP) — 🟡 intent draft 2026-10-07 (`.claude/sdlc/notification/`)
+### 0.3 `internal/notification` (in-app + SMTP) — ✅ built 2026-10-07 (stage 4 Test; review + manual browser check outstanding) (`.claude/sdlc/notification/`)
 - `notifications` table. In-app write + company SMTP relay. Needed by DSR-late alert, replenishment publish, cash count.
 - **Model:** Sonnet, Effort: Medium.
 
-### 0.4 `internal/document` (storage) — 🟡 intent draft 2026-10-07 (`.claude/sdlc/document/`)
+### 0.4 `internal/document` (storage) — ⏸ deferred to Phase 3/5 2026-10-07 (intent accepted, `.claude/sdlc/document/`)
 - `documents` table. Upload → GCS (local dir in dev); metadata in DB. Reused by invoice, cash count, escrow.
 - **Model:** Sonnet, Effort: Medium.
 

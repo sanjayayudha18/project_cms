@@ -1,6 +1,6 @@
 import { NotificationBadge } from "@/components/layout/NotificationBadge";
 import { useAuth } from "@/features/auth/useAuth";
-import { useNotifications } from "@/features/notifications/useNotifications";
+import { useUnreadCount } from "@/features/notifications/useNotifications";
 import { NAV_ITEMS, ROUTES } from "@/lib/constants";
 import { truncate } from "@/lib/formatters";
 import { Link } from "@tanstack/react-router";
@@ -65,7 +65,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
   const { state, logout } = useAuth();
   const user = state.user;
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { unreadCount } = useNotifications();
+  const { data: unreadCount = 0 } = useUnreadCount();
 
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.hiddenFromNav);
 

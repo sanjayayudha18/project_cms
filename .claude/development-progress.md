@@ -21,8 +21,8 @@ Branch: `dev1` = `main` (PR #1 dev1 → main merged, `38eb0a1`; latest `87b2d78`
 | Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (review 2026-10-01) | ✅ built, merged to main (committed in `ff005fa`; mig 021 applied to dev); review R1 fixed | manual browser check (user, seed kelolaan dulu) |
 | Vendor PKS / CIS limit | `vendor-pks-cis-limit/` | 1 Plan (intent draft 2026-10-05) | ⏳ not built; columns approved 2026-10-05 (CLAUDE.md Sec 3), migration `022` not created | PO accept intent → spec → migration 022 |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
-| Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 1 Plan (intent draft 2026-10-07) | ⏳ not built | PO answers 9 open questions + accept |
-| Penyimpanan dokumen (Phase 0.4) | `document/` | 1 Plan (intent draft 2026-10-07) | ⏳ not built | PO answers 8 open questions + accept |
+| Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 4 Test (2026-10-07) | ✅ built: `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |
+| Penyimpanan dokumen (Phase 0.4) | `document/` | 1 Plan (intent accepted) | ⏸ deferred to Phase 3/5 (PO 2026-10-07) | spec when first consumer starts |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
 
@@ -42,7 +42,7 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 1. User: manual browser checks — A17 EOD monitoring (closes Phase 0.2), perbaikan-rbac (ROH paging, pending creates), Forecast Browser, kelolaan ATM paket source, kuota kunjungan.
 2. Finish `perbaikan-rbac` acceptance: approve/reject/apply-failure states, double-submit + cross-tab conflict (check backend rejects duplicates first), per-entity CRUD tests.
-3. PO acceptance of `notification/intent.md` (0.3) and `document/intent.md` (0.4) → spec. 0.5 export deferred (no XLSX/PDF consumer yet).
+3. `notification/` (0.3): review.md → merge; user: browser check of bell + VendorPortal page; real SMTP send once relay creds exist. 0.4 + 0.5 deferred.
 4. PO acceptance of `dsr-late-report/intent.md` → spec.
 5. `vendor-pks-cis-limit`: spec → migration 022.
 6. Session follow-ups (separate features): idle timeout (warn T-5m), session audit events, admin force-logout.

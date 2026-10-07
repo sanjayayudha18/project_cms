@@ -21,9 +21,16 @@ const arbRetryAfterSeconds: fc.Arbitrary<number> = fc.integer({
   max: 900,
 });
 
+const EMAIL_DOMAIN = "@example.com";
+
 const arbNonEmptyCredential: fc.Arbitrary<string> = fc
   .string({ minLength: 1, maxLength: 64 })
   .filter((s) => s.trim().length > 0);
+
+/** Builds a syntactically valid email of exactly `length` characters. */
+function emailOfLength(length: number): string {
+  return "a".repeat(length - EMAIL_DOMAIN.length) + EMAIL_DOMAIN;
+}
 
 // ─── Property 18: Whitespace-Only Input Rejection ─────────────────────────────
 
@@ -32,18 +39,18 @@ const arbNonEmptyCredential: fc.Arbitrary<string> = fc
  * loginSchema SHALL reject submission with a field error (no pre-trim in the test).
  */
 describe("Property 18: Whitespace-Only Input Rejection", () => {
-  it("whitespace-only username is rejected by exported loginSchema", () => {
+  it("whitespace-only email is rejected by exported loginSchema", () => {
     fc.assert(
       fc.property(arbWhitespaceOnly, (whitespace) => {
         const result = loginSchema.safeParse({
-          username: whitespace,
+          email: whitespace,
           password: "validpass",
         });
         expect(result.success).toBe(false);
         if (!result.success) {
-          const usernameError = result.error.issues.find((i) => i.path[0] === "username");
-          expect(usernameError).toBeDefined();
-          expect(usernameError?.message).toBe("Wajib diisi");
+          const emailError = result.error.issues.find((i) => i.path[0] === "email");
+          expect(emailError).toBeDefined();
+          expect(emailError?.message).toBe("Wajib diisi");
         }
       }),
       { numRuns: 100 },
@@ -54,7 +61,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
     fc.assert(
       fc.property(arbWhitespaceOnly, (whitespace) => {
         const result = loginSchema.safeParse({
-          username: "validuser",
+          email: "validuser@example.com",
           password: whitespace,
         });
         expect(result.success).toBe(false);
@@ -70,9 +77,9 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
 
   it("whitespace-only in both fields is rejected", () => {
     fc.assert(
-      fc.property(arbWhitespaceOnly, arbWhitespaceOnly, (wsUser, wsPass) => {
+      fc.property(arbWhitespaceOnly, arbWhitespaceOnly, (wsEmail, wsPass) => {
         const result = loginSchema.safeParse({
-          username: wsUser,
+          email: wsEmail,
           password: wsPass,
         });
         expect(result.success).toBe(false);
@@ -85,7 +92,7 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
     // Password with leading/trailing space but non-empty core must still be accepted
     // (schema rejects only pure whitespace; it must not strip password content).
     const result = loginSchema.safeParse({
-      username: "validuser",
+      email: "validuser@example.com",
       password: " pass ",
     });
     expect(result.success).toBe(true);
@@ -95,15 +102,15 @@ describe("Property 18: Whitespace-Only Input Rejection", () => {
 // ─── Max length boundaries ────────────────────────────────────────────────────
 
 describe("Login schema max-length boundaries", () => {
-  it("accepts username at 128 and rejects 129", () => {
+  it("accepts email at 128 and rejects 129", () => {
     const ok = loginSchema.safeParse({
-      username: "a".repeat(128),
+      email: emailOfLength(128),
       password: "validpass",
     });
     expect(ok.success).toBe(true);
 
     const over = loginSchema.safeParse({
-      username: "a".repeat(129),
+      email: emailOfLength(129),
       password: "validpass",
     });
     expect(over.success).toBe(false);
@@ -111,13 +118,13 @@ describe("Login schema max-length boundaries", () => {
 
   it("accepts password at 72 and rejects 73", () => {
     const ok = loginSchema.safeParse({
-      username: "validuser",
+      email: "validuser@example.com",
       password: "p".repeat(72),
     });
     expect(ok.success).toBe(true);
 
     const over = loginSchema.safeParse({
-      username: "validuser",
+      email: "validuser@example.com",
       password: "p".repeat(73),
     });
     expect(over.success).toBe(false);
@@ -125,9 +132,10 @@ describe("Login schema max-length boundaries", () => {
 
   it("accepts arbitrary valid credential pairs within limits", () => {
     fc.assert(
-      fc.property(arbNonEmptyCredential, arbNonEmptyCredential, (username, password) => {
-        fc.pre(username.length <= 128 && password.length <= 72);
-        const result = loginSchema.safeParse({ username, password });
+      fc.property(arbNonEmptyCredential, arbNonEmptyCredential, (emailLocal, password) => {
+        const email = emailLocal.trim() + EMAIL_DOMAIN;
+        fc.pre(email.length <= 128 && password.length <= 72);
+        const result = loginSchema.safeParse({ email, password });
         expect(result.success).toBe(true);
       }),
       { numRuns: 100 },

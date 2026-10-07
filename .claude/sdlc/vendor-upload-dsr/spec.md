@@ -5,6 +5,17 @@ Trigger to next stage: product owner accepts this spec -> Claude Code plan mode.
 Skills applied: security (upload validation, rate limiting), api-design. Flag
 contradictions below.
 
+> **Post-spec update (2026-09-04):** the single-phase FR5/FR11 flow below
+> (Go blocks on `retry_scheduler`, returns `pending` on timeout) was
+> superseded during implementation by a two-phase dry-run/confirm flow — see
+> `plan.md`'s post-plan update and `testing.md` for the current behavior.
+> `retry_scheduler` itself was later split into
+> `backend_python/service_dsr_etl/` (owns `dsr` only, port 8090 -- what every
+> FR below actually means when it says `retry_scheduler`) and
+> `backend_python/eod_retry_scheduler/` (owns
+> `dmaa`/`itm_cashpos`/`itm_replenish`, port 8091). The whole tree also moved
+> from `scheduler/` to `backend_python/` at the repo root (2026-09-04).
+
 > Regenerated from `intent.md` (2026-09-03, 8-round grilling session).
 > Replaces the previous draft, which assumed single-location, sync-in-handler
 > parsing with no `retry_scheduler`/Python involvement.

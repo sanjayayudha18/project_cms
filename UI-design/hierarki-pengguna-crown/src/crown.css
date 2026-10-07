@@ -1,0 +1,193 @@
+/* CROWN design tokens — per 05-UI-BRAND.md (LAW). Light mode only. */
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  :root {
+    /* --- CROWN palette, hex first --- */
+    --bg: #fbfaf9;
+    --surface: #fefdfd;
+    --surface-raised: #fffefe;
+    --surface-sunken: #f4f1f0;
+    --border-c: #e7e3e1;
+    --border-strong: #cfc9c6;
+    --ink: #2b2523;
+    --ink-secondary: #6e6461;
+    --ink-muted: #9c9491;
+    --brand: #e4142a;
+    --brand-hover: #c40f23;
+    --brand-fg: #fffcfb;
+    --brand-text: #b00e1f;
+    --brand-tint: #fce9ea;
+    --success: #1b7a4a;
+    --success-tint: #e6f4ec;
+    --warning: #a66a00;
+    --warning-text: #7c5000;
+    --warning-tint: #fbf0de;
+    --info: #2a5faf;
+    --info-tint: #e7eef9;
+    --danger: #a00d22;
+    --danger-tint: #fbe8ea;
+
+    /* --- shadcn bindings --- */
+    --background: var(--bg);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface-raised);
+    --popover-foreground: var(--ink);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-fg);
+    --secondary: var(--surface-sunken);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-sunken);
+    --muted-foreground: var(--ink-secondary);
+    --accent: var(--brand-tint);
+    --accent-foreground: var(--brand-text);
+    --destructive: var(--danger);
+    --destructive-foreground: var(--brand-fg);
+    --border: var(--border-c);
+    --input: var(--border-strong);
+    --ring: var(--brand);
+    /* lg 6px panels, md 4px controls, per §5 */
+    --radius: 6px;
+  }
+
+  @supports (color: oklch(0% 0 0)) {
+    :root {
+      --bg: oklch(98.6% 0.006 40);
+      --surface: oklch(99.6% 0.003 40);
+      --surface-raised: oklch(99.8% 0.002 40);
+      --surface-sunken: oklch(96.4% 0.008 38);
+      --border-c: oklch(91% 0.008 35);
+      --border-strong: oklch(83% 0.012 34);
+      --ink: oklch(26% 0.02 30);
+      --ink-secondary: oklch(48% 0.016 30);
+      --ink-muted: oklch(64% 0.012 32);
+      --brand: oklch(56% 0.223 27);
+      --brand-hover: oklch(50% 0.2 27);
+      --brand-fg: oklch(99% 0.004 40);
+      --brand-text: oklch(47% 0.185 27);
+      --brand-tint: oklch(95% 0.028 25);
+      --success: oklch(49% 0.13 151);
+      --success-tint: oklch(95% 0.03 151);
+      --warning: oklch(58% 0.13 70);
+      --warning-text: oklch(45% 0.115 70);
+      --warning-tint: oklch(95.5% 0.035 78);
+      --info: oklch(52% 0.11 250);
+      --info-tint: oklch(94.5% 0.025 250);
+      --danger: oklch(45% 0.19 22);
+      --danger-tint: oklch(94% 0.03 22);
+    }
+  }
+
+  body {
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-optical-sizing: auto;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* §2 label token, floored at 12px per §1 ("never below 12px") */
+.label-xs {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* §7 + §12.2 — sticky headers need separate borders */
+table.crown {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+table.crown thead th:first-child,
+table.crown tbody td:first-child {
+  padding-left: 24px;
+}
+
+table.crown thead th:last-child,
+table.crown tbody td:last-child {
+  padding-right: 24px;
+}
+
+table.crown thead th {
+  position: sticky;
+  top: 0;
+  /* Only has to beat its own table body. A sticky header on the app's
+     z-index scale (200) paints straight through modal overlays. */
+  z-index: 20;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 -1px 0 var(--border-c);
+  padding: 10px 16px;
+  text-align: left;
+  color: var(--ink-secondary);
+}
+
+table.crown tbody td {
+  height: 44px;
+  padding: 8px 16px;
+  box-shadow: inset 0 -1px 0 var(--border-c);
+  font-size: 0.875rem;
+}
+
+table.crown tbody tr:hover td {
+  background: var(--surface-sunken);
+}
+
+table.crown tbody tr[data-selected="true"] td {
+  background: var(--brand-tint);
+}
+
+*, ::before, ::after {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

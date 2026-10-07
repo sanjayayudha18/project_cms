@@ -30,12 +30,22 @@ This project has a knowledge graph at `graphify-out/` with god nodes, community 
 
 ---
 
+## 0a. Development Stage & DB Schema Policy
+
+**Current phase**: Early development (MVP/greenfield). Schema is **MUTABLE** — database changes (new tables, columns, migrations) are expected and encouraged as requirements evolve. No need to wait for formal approval on schema changes during this stage, though structural decisions that affect the module/table map (Sec 2) should still be flagged here after they are applied.
+
+> This relaxes Golden Rule #2's "propose table/column FIRST" gate for the current stage: apply the change, then record it in Sec 2. The gate returns once the schema stabilizes post-MVP.
+
+---
+
 ## 1. Overview
 
 - **Name**: CROWN THE Cash Management System
 - **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
 - **Stage**: Greenfield, vibe-coded with AI.
 - **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
+  - **Implemented** (migration `027_seed_appaccess_role.sql`, 2026-09-09): `APPACCESS` — sole authority for account provisioning (set initial passwords, force first-login change) + configuring CRUD mapping & RBAC delegation (maker-checker), distinct from `ADMIN`/`ADMIN_PARAM`. 10th role. See `.kiro/specs/Auth-Local-Lifecycle/task.md` Tasks 1 & 6. Not yet verified against a live DB (external Postgres unreachable this session) — run the migration and confirm `SELECT * FROM roles WHERE role='APPACCESS'` before relying on it in production.
+  - **Vendor sub-roles (CIT)**: `Vendor CIT` (uploads CIT DSR) and `Vendor CIT Supervisor` (supervises/approves CIT DSR uploads for the vendor). Both are vendor-portal (local auth) roles scoped to their own vendor's assignments only.
 
 ---
 
@@ -73,7 +83,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ### Modules (create ONLY these unless told)
 
-**Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
+**Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` (**implemented**: append-only `audit.Writer`, RBAC-Setup Task 3) · `internal/approval` (**implemented**: maker-checker hierarchy + orchestrator, RBAC-Setup Tasks 1-9 — see "Approval integration pattern" below) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
 
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
 
@@ -87,8 +97,11 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ### DB logical groups (canonical table names)
 
-- **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local)
-- **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`
+- **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local), `users.supervisor_id` (self-FK, reporting line, migration 021) + `users.approval_level` (int, independent of role, migration 021) — **implemented**, RBAC-Setup Tasks 1-9 done, see `.kiro/specs/RBAC-Setup/task.md`; **implemented** (migration `026_users_password_policy.sql`, 2026-09-09): revived `auth_source='local_dev'` + `users.password_changed_at`, `users.must_change_password`, `users.failed_login_attempts`, `users.locked_until` (local-password policy: 90d expiry / 7d warning / 3x-fail lock / 30m auto-unlock, `pkg/auth.MaxFailedLogins`/`LockoutDuration`/`PasswordMaxAgeDays`/`PasswordWarnDays` — hardcoded constants, no env override) — see `.kiro/specs/Auth-Local-Lifecycle/task.md` Tasks 1-7. Not yet verified against a live DB this session (external Postgres unreachable) — run migrations `026`-`027` and confirm `\d users` before relying on it in production.
+- **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`, `approval_policies` (document_type + amount range → required_level, migration 022), `approval_steps` (per-level trail on an `approval_requests` row, migration 024), `approval_delegations` (leave fallback, migrations 024+025) + `user_leaves` (migration 024) — **implemented**, RBAC-Setup Tasks 1-9 done, see `.kiro/specs/RBAC-Setup/task.md`. `documents`/`notifications`/`import_jobs`/`export_jobs` remain unimplemented (not part of RBAC-Setup).
+- **Auth/Core — Role Management** (approved, `.kiro/specs/role-management`; originally migration `040_role_permissions.sql`, now folded into the 2026-09-18 baseline — see Sec 12):
+  - `menu_features` — Menu_Feature_Catalog. `id` bigint identity PK · `parent_id` bigint self-FK → `menu_features(id)` ON DELETE RESTRICT, nullable (NULL = top-level menu, non-NULL = feature under a menu) · `key` text UNIQUE (stable machine key, e.g. `settings.roles`) · `label` text · `kind` text CHECK IN ('menu','feature') + CHECK hierarchy (`menu`⇔`parent_id IS NULL`) · `sort_order` integer default 0 · `is_active` boolean default true · `created_at`/`updated_at` timestamptz default now(). Index on `parent_id`.
+  - `role_permissions` — Role_Permission_Mapping (many-to-many `roles`↔`menu_features`; row presence = grant). `id` bigint identity PK · `role_id` bigint FK → `roles(id)` ON DELETE CASCADE · `menu_feature_id` bigint FK → `menu_features(id)` ON DELETE CASCADE · `granted_by` bigint FK → `users(id)` · `created_at` timestamptz default now(). UNIQUE `(role_id, menu_feature_id)`; indexes on `role_id` and `menu_feature_id`.
 - **Master**: `vendors`, `vendor_pics`, `vendor_vaults`, `locations`, `atms`, `vendor_assignments`
 - **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
 - **Finance**: `invoice_uploads`, `invoice_items`, `invoice_reconciliation_results`
@@ -97,22 +110,47 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 > Need a new table/column? Propose here FIRST, get approval, then migrate.
 
+### Approval integration pattern (how other modules use `internal/approval`)
+
+Any module that needs maker-checker (invoice approval, DSR exception override, etc.) calls the existing `approval.Orchestrator` — do not build a second approval state machine.
+
+1. Construct once at startup, alongside your other `internal/<module>` wiring in `cmd/api/main.go`:
+   `repo := approval.NewRepository(dbPool)` (implements all three resolver/store interfaces), then
+   `orch := approval.NewOrchestrator(repo, repo, repo, audit.NewWriter(dbPool), nil)`.
+2. **Submit**: when your module's create/update flow needs sign-off, call
+   `orch.SubmitForApproval(ctx, makerID, "<your_document_type>", documentID, amount, ip)`. It returns `(request, created bool, err)` — `created=false` means a request for that `(document_type, document_id)` already exists (idempotent; map to `409` at your HTTP layer if you want to signal "already submitted", same as `internal/handler/approval_handler.go`'s `Submit`).
+3. **Add a threshold row** in `approval_policies` for your `document_type` (min/max amount → required_level) — see `022_approval_policies.sql`'s seed for the `invoice` example. Without a matching policy, `SubmitForApproval` returns `approval.ErrPolicyNotFound`.
+4. **Approve/Reject**: `orch.Approve(ctx, requestID, actorID, ip)` / `orch.Reject(...)`. Map `approval.ErrNotAuthorized` → `403`, `approval.ErrRequestNotPending` → `409` (see `approval_handler.go`'s `handleError` for the exact pattern).
+5. **Apply your module's effect only after `request.Status == "approved"`** — never apply it optimistically at submit time. Poll via `orch`'s underlying store or listen for the `final_approve` audit entry; there is no event bus yet (YAGNI until a second consumer needs one).
+6. You get the reporting-line hierarchy, leave/delegation fallback, and audit trail for free — do not duplicate `approval_delegations`/`user_leaves` lookups in your module.
+
 ---
 
-## 2a. Business Rules & Requirements (from URS v0.3 Rev1, `archives/UR New Template v0.3...docx`)
+## 2a. Business Rules & Requirements (from URS v0.3 Phase 1 — `UR New Template v0.3 - E2E Cash Management System v.4 - Phase 1.docx-*.md` at repo root; older Rev1 .docx in `archives/`)
 
 > Source-of-truth requirements doc. Anything below not yet reflected in code/schema is a **spec**, not an implemented behavior — check code before assuming it's live.
+> **Per-feature flow diagrams (Mermaid, editable) live in `.claude/feature-flows/<feature>/feature-flow.md`** — read the matching flow before implementing a feature. The nine flows: `01-master-data`, `02-dsr-upload`, `03-atm-cash-forecasting`, `04-pemenuhan-pengambilan-dana`, `05-invoice-reconciliation`, `06-replenishment-validation-reports`, `07-dashboard`, `08-cash-count-vault`, `09-cash-count-selektif-mesin`.
 
+- **Functional requirements (all High)**: FNC 001 ATM Cash Forecasting (DSR intake, replenishment instruction, projection) · FNC 002 Cash Count (scheduling, reconciliation, progress + result report; vault ATM/Cash + selektif mesin) · FNC 003 Dashboard (daily instruction amount + term ID, DSR lateness recap, cash count daily progress + monthly report).
 - **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 10, which is a different calc for a different job):
   `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
-- DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis.
-- Duplicate-order prevention: an ATM with an active order is not reissued a new one for the same period.
+  - Fallback: DMAA recommendation exists but DSR missing → compute from DMAA recommendation alone. **Open question in URS** ("apakah rumus ini masih valid?") — confirm with business before treating as final.
+  - `Rencana Isi Hari-H` = previous day's order to be filled on H; it reduces the vendor's physical balance.
+  - `Proyeksi Refund` per ATM = opening balance (H) − predicted transactions (H and H+1), from DMAA/Data Science horizon.
+  - Results groupable by vendor · vault · denomination (cash need per vendor).
+- **Forecast input uploads** (review of DMAA H0 recommendation): complaint-handling/recon list (skip if DMAA already recommended emergency/planned yesterday, else add as emergency order) · ATM project list from business units (replace/new/relocation → add as emergency/planned) · problem-ATM list (exclude) · adjustment order (replaces DMAA nominal for listed IDs). Merged into a **draft order** → tiered approval (maker-checker) → publish replenishment instruction + notification.
+- DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis (columns: report date [not send date], vendor + vault area, received-at, status OK/TELAT). Email/in-app notification on late DSR.
+- Duplicate-order prevention: an ATM with an emergency/adhoc order issued up to H-1, or active on H0, gets no additional order (excluded from the Data Science forecast file).
 - ATM in "problem" status (pending part, vandalism, etc.) is excluded from replenishment recommendations.
-- Replenishment result is classified into 4 categories (holiday-adjusted): on-schedule · early (1–2 days) · late (1–2 days) · not done (>2 days off or skipped).
-- **Cash count (vault, monthly)**: risk category from escrow (SIBS/MIS) balance analysis drives a random/non-patterned visit schedule. Assigned PIC gets email notification, can accept/reject (reject → reschedule or reassign). On accept, a surat tugas is issued. Berita Acara (BA) is filled digitally on-site, DSR column auto-fills from vendor's uploaded DSR, photo evidence attached, dual e-sign (vendor + bank PIC). Monthly recap = 3-way reconciliation: cash count vs. escrow (H-1, auto from MIS/SIBS) vs. proofing (manual input).
+- **Pemenuhan dana (fund fulfillment)**: branch/Cash Management sets source location, nominal per denomination, pickup date + time, providing vault; vendor FLM sees it in-app. **Pengambilan dana**: FLM inputs officer + vehicle (nama, KTP, NIP, perusahaan, keperluan, nominal + per denom, jumlah lembar, no. kendaraan, tanggal) → maker-checker approval → system issues downloadable surat tugas → verification + handover (serah terima) between Cash Management and FLM.
+- Replenishment result is classified (holiday-adjusted): on-schedule · early (1–2 days) · late (1–2 days) · not done (>2 days off or skipped) · **replenished without an order** (realisasi vs order).
+- **Required reports**: refund per ID (filter vendor/denom) · fill amount ≠ order (with ID detail) · transactions (tarik/setor) · ATM profile · order vs transaction · user report · user log (last login) · trip/realisasi per vendor per ATM ID (incl. highest).
+- **Dashboard**: status, aging, SLA, historical trend, exception indicators; filter + drill-down; export CSV/XLSX/PDF.
+- **Master data (vendor)**: vendor legal identity, active/inactive, NPWP, notification PIC; vault address, coordinates (optional), operating hours, capacity, category ATM/Cash; PIC jabatan/phone/email; kelolaan vendor → ATM and/or branch/customer. Changes via maker-checker + audit trail; bulk import/export CSV/XLSX with structure + content validation.
+- **Cash count (vault, monthly)**: risk category from escrow (SIBS/MIS) balance analysis drives a random/non-patterned visit schedule (ignores holidays/non-working days; considers regional PIC availability). Assigned PIC gets email notification, can accept/reject (reject → history kept, then reschedule or reassign). On accept, a surat tugas is issued. Berita Acara (BA) is filled digitally on-site, DSR column auto-fills from vendor's uploaded DSR, photo evidence attached, dual e-sign (vendor + bank PIC). BA templates: vault ATM, vault Cash, valas; plus checklist parameters. Final docs (BA, checklist, photos) downloadable/printable. Monthly recap = 3-way reconciliation: cash count vs. escrow (H-1, auto from MIS/SIBS) vs. proofing (manual input), diffs flagged for follow-up; per-escrow status Complete / On-progress / Not Complete + findings; vendor performance evaluation.
 - **Cash count selektif (machine-level)**: same flow as vault cash count, scoped to specific ATMs per supervision instruction.
 - **Invoice reconciliation**: vendor uploads invoice + supporting docs; CIMB Niaga internal team uploads ATM master data (active/terminated ATM, price, trip package, category VIP/Industri/Regular); system auto-reconciles; internal team can manually adjust against vendor disputes (sanggahan).
-- **NFR targets**: 24×7 availability outside planned maintenance · dashboard load ≤3s (p95) · DSR upload ≤30s/doc · journal-post initial response ≤5s with async status confirm ≤2min · 300 concurrent active users · horizontal scalability for vendor portal · Data Centers: Bintaro & NTT.
+- **NFR targets**: 24×7 availability outside planned maintenance · dashboard load ≤3s (p95) · DSR upload ≤30s/doc · journal-post initial response ≤5s with async status confirm ≤2min · 300 concurrent active users · horizontal scalability for vendor portal · Data Centers: Bintaro & NTT · operating hours 07:00–20:00 (uptime 24×7) · responsive/mobile-usable UI + basic accessibility · structured logging, telemetry, metrics, operational alerts · certified e-sign optional.
 - **DGCC / data privacy**: this system is internal + vendor-operational, not customer-facing, so UU PDP/POJK 22/2023 items on customer personal-data collection are likely N/A — but vendor (FLM) data exchange involves a third party, so a Third-Party Risk Assessment (TPRA) and Data Processing Agreement should be tracked as a compliance item, not assumed done.
 
 ---
@@ -133,7 +171,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 ## 4. Cross-Cutting Domain Rules (NON-NEGOTIABLE)
 
-- **Auth split**: Internal → LDAP bind (no local password). Vendor → local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth_source in claims. Vendors scoped to own assignments only.
+- **Auth split**: Internal → LDAP bind (no local password). Vendor → local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth_source in claims. Vendors scoped to own assignments only. Vendor roles include `Vendor CIT` (upload CIT DSR) and `Vendor CIT Supervisor` (supervise/approve CIT DSR uploads for the same vendor) — supervisor != uploader on the maker-checker gate.
 - **Maker-checker**: any create/update/delete on financial or master data → `approval_requests` (pending → approved/rejected). Effect applies only after approval. Maker != checker.
 - **Invoice**: CMS validates & approves only. Does NOT trigger/execute payment. Terminal = approved (handed off downstream).
 - **Escrow reconciliation**: source = batch file from Corebanking. Ingest → parse into `escrow_batch_rows` → reconcile vs CMS cash position → store deltas. Idempotent per file hash.
@@ -294,3 +332,8 @@ Both run on the **same VM**. Because their active windows don't overlap, each ge
 - DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
 - Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 2). Deployed together on ONE Compute Engine VM today (two containers); planned to split into two separate VMs in 2028 (Sec 9) — the module split already makes that a zero-code-change deployment change when it happens.
 - Cash count (vault + selective machine) is confirmed in-scope per URS v0.3 Rev1, but its module/tables are a **proposal pending approval** (Sec 2a) — not yet part of the approved module/table map in Sec 2 until confirmed.
+- RBAC hierarchy + multi-layer maker-checker approval (`.kiro/specs/RBAC-Setup/task.md`, Tasks 1-9) is **implemented**: `internal/approval` (chain resolver, effective-approver/delegation resolver, orchestrator), `internal/audit` (append-only writer), migrations 021-025, admin endpoints (`/api/v1/admin/approval/*`, ADMIN/ADMIN_PARAM only) and `/api/v1/approvals/*` mounted behind `RequireAuth` only (submit must reach any maker; per-request authorization happens inside the orchestrator, not via `RequireRoles` — role and approval hierarchy are deliberately separate concepts). Other modules integrate via the pattern documented under Sec 2 "Approval integration pattern" — do not build a second approval state machine. Known gap: `sqlc generate` is currently blocked by an unrelated pre-existing bug in migration 017 (missing table name); `internal/db/{audit,approval}.sql.go` were hand-written to match sqlc's exact output convention and should be regenerated once 017 is fixed.
+- **Admin CRUD for `users`/`vendors`** (`.kiro/specs/admin-user-vendor-management`): `backend/internal/handler/admin_user_handler.go` mounts `/api/v1/admin/users` (list/get/create/update/disable/enable), guarded `APPACCESS`; `admin_vendor_handler.go` mounts `/api/v1/admin/vendors` (same verbs), guarded `ADMIN`/`ADMIN_PARAM`. Disable is **soft-delete only** — `is_active=false` + `deleted_at`, never a hard `DELETE FROM`; `internal/repository/no_hard_delete_test.go` enforces this for both tables. A local (`auth_source=local`) user create issues a system-generated **temporary password** with `must_change_password=true` in the same insert, forcing a change on next login — no separate provisioning call. A search-index migration originally scoped for these screens was **deferred** (not applied); see the spec's Task 0/1 notes and follow-ups.md.
+- **Role Management** (`.kiro/specs/role-management`, in progress): data-driven menu/feature permission layer for the ATM backend + a "Manajemen Peran" screen under Pengaturan in `CompanyPortal-Vite`, scoped to `APPACCESS`/`ADMIN`. **Deliberate, documented deviation from Golden Rule #3**: create/update on `menu_features`/`role_permissions` apply **immediately** (no `approval_requests`, no maker-checker) — the substitute control is (a) a mandatory `audit_logs` write in the **same DB transaction** as the mutation (audit-write failure rolls back the change, so no permission/role change can exist without an audit trail), and (b) re-checked `APPACCESS`/`ADMIN` authorization at both the route-guard and service layers. New roles are born with zero access until explicitly granted. This does not alter any existing `RequireRoles(...)` guard on other routes.
+- **Admin CRUD for `atms`** (`.kiro/specs/admin-atm-management`): `backend/internal/handler/admin_atm_handler.go` mounts `/api/v1/admin/atms` (list/get/create/update/disable/enable, plus a read-only `/locations` lookup for the form's Location select), guarded `ADMIN`/`ADMIN_PARAM`. Disable is **soft-delete only** (`is_active=false` + `deleted_at`); `no_hard_delete_test.go` extended to cover `atms`. `terminal_id` is immutable after create (400 on change). The read-only `/api/v1/atm-portal` monitoring viewer is unchanged. Unlike the users/vendors spec, this one **approved and applied** an additive trigram search index (`pg_trgm` + GIN on `atms.terminal_id`, originally `039_admin_atm_search_index.sql`, now in the baseline) since `atms` held ~1900 rows. Frontend at `/settings/admin/atms` (`frontend/CompanyPortal-Vite/src/features/admin-atms/`), surfaced as a "Manajemen ATM" card in `SettingsHubPage.tsx` — no top-level `NAV_CONFIG` entry.
+- **Migration baseline (2026-09-18)**: `backend/migrations/` was squashed into `001_baseline_schema.sql` (pg_dump schema-only of the fully migrated DB, incl. `btree_gist` + `pg_trgm`) + `002_baseline_seed.sql` (reference/master data: roles, users [dev hash `password123`], menu_features, role_permissions, regions, locations, vendors, vendor_*, atms, atm_vendor_packages, approval_policies). Old 001–040 moved to `backend/migrations/archives/2026-09-18_pre-baseline/` — file names cited elsewhere in this doc (e.g. 021-027, 039, 040) now live there. New migrations continue from `003_`. Old `012_retry_scheduler.sql` tables were never applied, so they are NOT in the baseline.

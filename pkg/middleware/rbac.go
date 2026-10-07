@@ -15,11 +15,13 @@ const authContextKey contextKey = "auth_context"
 
 // AuthContext is injected into request context after token validation.
 type AuthContext struct {
-	UserID     int64
-	Username   string
-	Role       string
-	IsKaryawan bool
-	VendorID   *int64
+	UserID        int64
+	Username      string
+	Role          string
+	IsKaryawan    bool
+	VendorID      *int64
+	SupervisorID  *int64 // nullable — reporting line (RBAC-Setup)
+	ApprovalLevel *int32 // nullable — maker-checker level, independent of Role
 }
 
 // RequireAuth validates the Bearer token and injects AuthContext.
@@ -48,11 +50,13 @@ func RequireAuth(tokenService *auth.TokenService) func(http.Handler) http.Handle
 			}
 
 			authCtx := &AuthContext{
-				UserID:     claims.UserID,
-				Username:   claims.Username,
-				Role:       claims.Role,
-				IsKaryawan: claims.IsKaryawan,
-				VendorID:   claims.VendorID,
+				UserID:        claims.UserID,
+				Username:      claims.Username,
+				Role:          claims.Role,
+				IsKaryawan:    claims.IsKaryawan,
+				VendorID:      claims.VendorID,
+				SupervisorID:  claims.SupervisorID,
+				ApprovalLevel: claims.ApprovalLevel,
 			}
 
 			ctx := context.WithValue(r.Context(), authContextKey, authCtx)
@@ -87,6 +91,13 @@ func RequireRoles(allowedRoles ...string) func(http.Handler) http.Handler {
 			writeJSONError(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses ke resource ini")
 		})
 	}
+}
+
+// WithAuthContext returns ctx carrying authCtx, as RequireAuth does after
+// validating a token. Lets service-layer RBAC re-checks (which read the
+// caller from ctx) be exercised without an HTTP round trip.
+func WithAuthContext(ctx context.Context, authCtx *AuthContext) context.Context {
+	return context.WithValue(ctx, authContextKey, authCtx)
 }
 
 // GetAuthContext extracts AuthContext from the request context.

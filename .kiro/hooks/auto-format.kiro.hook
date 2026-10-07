@@ -1,7 +1,7 @@
 {
   "name": "auto-format",
   "version": "1.0.0",
-  "enabled": true,
+  "enabled": false,
   "description": "Automatically format TypeScript and JavaScript files on save",
   "when": {
     "type": "fileEdited",

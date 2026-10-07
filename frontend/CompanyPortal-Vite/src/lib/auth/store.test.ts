@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AuthUser, type DbRole, useAuthStore } from "./store";
+import { type AuthUser, type DbRole, SESSION_EXPIRED_REASON, useAuthStore } from "./store";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -123,13 +123,13 @@ describe("useAuthStore", () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        json: async () => ({ error: "auth_failed", message: "Username atau password salah" }),
+        json: async () => ({ error: "auth_failed", message: "Email atau password salah" }),
       });
 
       await useAuthStore.getState().login("wrong", "wrong");
 
       const state = useAuthStore.getState();
-      expect(state.error).toBe("Username atau password salah");
+      expect(state.error).toBe("Email atau password salah");
       expect(state.user).toBeNull();
       expect(state.isAuthenticated).toBe(false);
     });
@@ -169,7 +169,7 @@ describe("useAuthStore", () => {
           error: "validation_error",
           message: "Validasi gagal",
           details: [
-            { field: "username", message: "wajib diisi" },
+            { field: "email", message: "wajib diisi" },
             { field: "password", message: "wajib diisi" },
           ],
         }),
@@ -178,7 +178,7 @@ describe("useAuthStore", () => {
       await useAuthStore.getState().login("", "");
 
       const state = useAuthStore.getState();
-      expect(state.error).toContain("username");
+      expect(state.error).toContain("email");
       expect(state.error).toContain("password");
     });
 
@@ -268,7 +268,7 @@ describe("useAuthStore", () => {
       );
     });
 
-    it("sends username and password in body", async () => {
+    it("sends email and password in body", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -290,7 +290,7 @@ describe("useAuthStore", () => {
 
       const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(options.body as string);
-      expect(body).toEqual({ username: "john.admin", password: "Password123!" });
+      expect(body).toEqual({ email: "john.admin", password: "Password123!" });
     });
   });
 
@@ -399,7 +399,7 @@ describe("useAuthStore", () => {
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
 
-    it("redirects with current path as redirect param", async () => {
+    it("redirects with current path as redirect param and the session-expired reason", async () => {
       mockLocation.pathname = "/dashboard";
       mockLocation.search = "?tab=overview";
 
@@ -407,7 +407,9 @@ describe("useAuthStore", () => {
 
       await useAuthStore.getState().refreshToken();
 
-      expect(mockLocation.href).toBe("/login?redirect=%2Fdashboard%3Ftab%3Doverview");
+      expect(mockLocation.href).toBe(
+        `/login?redirect=%2Fdashboard%3Ftab%3Doverview&reason=${SESSION_EXPIRED_REASON}`,
+      );
     });
 
     it("single-flight: concurrent refreshes share the same promise", async () => {
@@ -493,6 +495,42 @@ describe("useAuthStore", () => {
       await useAuthStore.getState().initialize();
 
       expect(loadingDuringFetch).toBe(true);
+    });
+
+    it("is single-flight: a concurrent second initialize() must not re-hit /refresh and clobber the session", async () => {
+      // Refresh tokens rotate: the first call succeeds, any further call would get a 401.
+      // React StrictMode fires the root effect twice, so this is a real hard-load scenario.
+      mockFetch.mockReset();
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token: "restored-token",
+            user: {
+              id: 1,
+              username: "john.admin",
+              full_name: "John Admin",
+              email: "john.admin@cimb.local",
+              role: "ADMIN",
+              is_karyawan: true,
+              vendor_id: null,
+            },
+          }),
+        })
+        .mockResolvedValue({ ok: false, status: 401 });
+
+      await Promise.all([
+        useAuthStore.getState().initialize(),
+        useAuthStore.getState().initialize(),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+
+      // The in-flight marker is cleared afterwards, so a later initialize() runs again.
+      await useAuthStore.getState().initialize();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it("handles network error gracefully during init", async () => {

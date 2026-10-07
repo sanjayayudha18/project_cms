@@ -36,16 +36,23 @@ Here's the sequence to update your running containers after code changes:
 
 Backend:
 
+cd backend-cit 
+docker compose down
+docker compose up -d --build
+
+----------------------------
+
 cd backend
 docker compose down
 docker compose up -d --build
 
 `````````
-cd backend-cit 
-docker compose down
-docker compose up -d --build
 
 Frontend:
+
+cd frontend
+powershell -ExecutionPolicy Bypass -File "C:\Users\RB Yudha Rangga\OneDrive\Documents\Development\CMS2\frontend\dev.ps1"
+
 
 cd frontend
 docker compose down

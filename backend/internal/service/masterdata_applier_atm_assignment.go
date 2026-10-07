@@ -1,0 +1,183 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/cimb-niaga/cms/backend/internal/db"
+)
+
+// pgExclusionViolation is atm_vendor_packages_no_overlap; the unique case
+// ((atm_id, vendor_package_id, effective_start_date)) reuses pgUniqueViolation
+// from vendor_request_actions.go.
+const pgExclusionViolation = "23P01"
+
+// ATMAssignmentApplier is the Applier for entity_type="atm_assignment" (T3.5).
+// It is where the authoritative overlap guard bites: the exclusion constraint
+// is re-checked inside the apply transaction, so two overlapping requests that
+// were both pending cannot both land. A violation is returned as
+// ErrATMAssignmentOverlap (never the raw DB error); the approval handler maps
+// it to a 409.
+type ATMAssignmentApplier struct{}
+
+func assignmentDates(p ATMAssignmentUpdatePayload) (start, end pgtype.Date, err error) {
+	s, err := time.Parse(assignmentDateLayout, p.EffectiveStartDate)
+	if err != nil {
+		return start, end, fmt.Errorf("parse effective_start_date %q: %w", p.EffectiveStartDate, err)
+	}
+	start = pgtype.Date{Time: s, Valid: true}
+	if p.EffectiveEndDate != nil {
+		e, err := time.Parse(assignmentDateLayout, *p.EffectiveEndDate)
+		if err != nil {
+			return start, end, fmt.Errorf("parse effective_end_date %q: %w", *p.EffectiveEndDate, err)
+		}
+		end = pgtype.Date{Time: e, Valid: true}
+	}
+	return start, end, nil
+}
+
+// mapAssignmentDBError translates the overlap/duplicate SQLSTATEs; other
+// errors pass through wrapped with the operation name.
+func mapAssignmentDBError(op string, err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case pgExclusionViolation:
+			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentOverlap)
+		case pgUniqueViolation:
+			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentDuplicate)
+		case pgCheckViolation:
+			return fmt.Errorf("%s atm assignment: %w", op, ErrATMAssignmentSourceInvalid)
+		}
+	}
+	return fmt.Errorf("%s atm assignment: %w", op, err)
+}
+
+// applyAutoAssignment handles a create submitted without dates: the new
+// period starts on the approval date (today, WIB) and is open-ended, and the
+// ATM's running period is handed over in the same transaction -- closed the
+// day before, or disabled if it began today. A future-dated period is left
+// alone and still surfaces as ErrATMAssignmentOverlap.
+func applyAutoAssignment(ctx context.Context, q *db.Queries, p ATMAssignmentPayload, now time.Time) (int64, any, error) {
+	y, m, d := now.In(wibZone).Date()
+	start := pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+	if err := q.CloseATMAssignmentsBeforeStart(ctx, db.CloseATMAssignmentsBeforeStartParams{AtmID: p.ATMID, StartDate: start}); err != nil {
+		return 0, nil, fmt.Errorf("close running atm assignment: %w", err)
+	}
+	if err := q.DisableATMAssignmentsStartingOn(ctx, db.DisableATMAssignmentsStartingOnParams{AtmID: p.ATMID, StartDate: start}); err != nil {
+		return 0, nil, fmt.Errorf("disable same-day atm assignment: %w", err)
+	}
+	pkgID, vendorID, branchID, label := p.dbColumns()
+	created, err := q.CreateATMAssignmentAdmin(ctx, db.CreateATMAssignmentAdminParams{
+		AtmID: p.ATMID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label, EffectiveStartDate: start,
+	})
+	if err != nil {
+		return 0, nil, mapAssignmentDBError("create", err)
+	}
+	return created.ID, created, nil
+}
+
+// Apply implements Applier for entity_type="atm_assignment".
+func (ATMAssignmentApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDataChangeRequest) (int64, any, error) {
+	q := db.New(tx)
+
+	switch change.Op {
+	case "create":
+		var p ATMAssignmentPayload
+		if err := json.Unmarshal(change.Payload, &p); err != nil {
+			return 0, nil, fmt.Errorf("unmarshal atm assignment create payload: %w", err)
+		}
+		now := time.Now()
+		if err := validateSourceAtApply(ctx, q, p.ATMID, p.ATMAssignmentUpdatePayload, now); err != nil {
+			return 0, nil, err
+		}
+		if p.EffectiveStartDate == "" {
+			return applyAutoAssignment(ctx, q, p, now)
+		}
+		start, end, err := assignmentDates(p.ATMAssignmentUpdatePayload)
+		if err != nil {
+			return 0, nil, err
+		}
+		pkgID, vendorID, branchID, label := p.dbColumns()
+		created, err := q.CreateATMAssignmentAdmin(ctx, db.CreateATMAssignmentAdminParams{
+			AtmID: p.ATMID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label,
+			EffectiveStartDate: start, EffectiveEndDate: end,
+		})
+		if err != nil {
+			return 0, nil, mapAssignmentDBError("create", err)
+		}
+		return created.ID, created, nil
+
+	case "update":
+		if change.EntityID == nil {
+			return 0, nil, fmt.Errorf("update requires entity_id")
+		}
+		var p ATMAssignmentUpdatePayload
+		if err := json.Unmarshal(change.Payload, &p); err != nil {
+			return 0, nil, fmt.Errorf("unmarshal atm assignment update payload: %w", err)
+		}
+		start, end, err := assignmentDates(p)
+		if err != nil {
+			return 0, nil, err
+		}
+		cur, err := q.GetATMAssignmentAdminByID(ctx, *change.EntityID)
+		if err != nil {
+			return 0, nil, fmt.Errorf("load atm assignment for update: %w", err)
+		}
+		// The service refuses a mode switch at submit; re-check here so a stale or
+		// hand-crafted payload can never turn a branch row into a vendor-wide one (or back).
+		if cur.Source != p.source() {
+			return 0, nil, fmt.Errorf("%w: sumber paket tidak dapat diubah", ErrATMAssignmentSourceInvalid)
+		}
+		if err := validateSourceAtApply(ctx, q, cur.AtmID, p, time.Now()); err != nil {
+			return 0, nil, err
+		}
+		pkgID, vendorID, branchID, label := p.dbColumns()
+		updated, err := q.UpdateATMAssignmentAdmin(ctx, db.UpdateATMAssignmentAdminParams{
+			ID: *change.EntityID, VendorPackageID: pkgID, VendorID: vendorID, VendorBranchID: branchID, Package: label,
+			EffectiveStartDate: start, EffectiveEndDate: end,
+		})
+		if err != nil {
+			return 0, nil, mapAssignmentDBError("update", err)
+		}
+		return *change.EntityID, updated, nil
+
+	case "disable":
+		if change.EntityID == nil {
+			return 0, nil, fmt.Errorf("disable requires entity_id")
+		}
+		if err := q.DisableATMAssignment(ctx, *change.EntityID); err != nil {
+			return 0, nil, fmt.Errorf("disable atm assignment: %w", err)
+		}
+		return *change.EntityID, map[string]bool{"is_active": false}, nil
+
+	case "enable":
+		if change.EntityID == nil {
+			return 0, nil, fmt.Errorf("enable requires entity_id")
+		}
+		if err := q.EnableATMAssignment(ctx, *change.EntityID); err != nil {
+			return 0, nil, mapAssignmentDBError("enable", err)
+		}
+		return *change.EntityID, map[string]bool{"is_active": true}, nil
+
+	default:
+		return 0, nil, fmt.Errorf("unsupported op=%s for entity_type=atm_assignment", change.Op)
+	}
+}
+
+// CurrentState implements Applier: same db.GetATMAssignmentAdminByIDRow shape
+// ATMAssignmentAdminService uses for SubmitRequest.Before.
+func (ATMAssignmentApplier) CurrentState(ctx context.Context, tx pgx.Tx, entityID int64) (any, error) {
+	row, err := db.New(tx).GetATMAssignmentAdminByID(ctx, entityID)
+	if err != nil {
+		return nil, fmt.Errorf("load current atm assignment state: %w", err)
+	}
+	return row, nil
+}

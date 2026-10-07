@@ -106,9 +106,8 @@ describe("handleStubRequest", () => {
     expect(data.user).toHaveProperty("id");
     expect(data.user).toHaveProperty("fullName");
     expect(data.user).toHaveProperty("email");
-    expect(data.user).toHaveProperty("roles");
-    expect(data.user.roles).toContain("Admin");
-    expect(data.user.primaryRole).toBe("Admin");
+    expect(data.user).toHaveProperty("role");
+    expect(data.user.role).toBe("ADMIN");
   });
 
   it("returns auth refresh response for POST /auth/refresh", async () => {

@@ -1,6 +1,15 @@
+import { configureApiAuth } from "@/lib/api/client";
 import { queryClient } from "@/lib/queryClient";
 import type { AuthState, AuthUser } from "@/lib/types";
-import { type ReactNode, createContext, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 // ─── API Config ───────────────────────────────────────────────────────────────
 
@@ -31,7 +40,7 @@ interface ApiErrorResponse {
 
 export interface AuthContextValue {
   readonly state: AuthState;
-  login(username: string, password: string): Promise<void>;
+  login(email: string, password: string): Promise<void>;
   logout(): Promise<void>;
   refreshToken(): Promise<boolean>;
 }
@@ -68,6 +77,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState<number | null>(null);
+
+  // Kept in sync with accessToken below so the api client's getter (wired
+  // once, see the configureApiAuth effect) always reads the current token
+  // instead of closing over the value from whichever render wired it.
+  const accessTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // ─── Initialize: attempt token refresh on mount ─────────────────────────────
 
@@ -114,7 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // ─── Login ──────────────────────────────────────────────────────────────────
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setError(null);
     setRateLimitRetryAfter(null);
 
@@ -125,7 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           "Content-Type": "application/json",
           "X-Portal-Type": "vendor",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
         credentials: "include",
       });
 
@@ -141,8 +158,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Handle error responses
       switch (response.status) {
         case 401: {
-          setError("Username atau password salah");
-          throw new Error("Username atau password salah");
+          setError("Email atau password salah");
+          throw new Error("Email atau password salah");
         }
         case 403: {
           const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
@@ -231,6 +248,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!response.ok) {
           setAccessToken(null);
           setUser(null);
+          setError("Sesi berakhir, silakan login kembali");
           return false;
         }
 
@@ -257,6 +275,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return refreshPromise;
   }, []);
+
+  // ─── Wire the api client's auth hooks ───────────────────────────────────────
+  // Without this, api.* calls (e.g. dsrUploadApi) never get an Authorization
+  // header and always 401, regardless of login state.
+
+  useEffect(() => {
+    configureApiAuth({
+      getToken: () => accessTokenRef.current,
+      refresh: refreshToken,
+      onFailure: () => {
+        setAccessToken(null);
+        setUser(null);
+      },
+    });
+  }, [refreshToken]);
 
   // ─── State ──────────────────────────────────────────────────────────────────
 

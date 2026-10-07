@@ -355,39 +355,50 @@ LOG_LEVEL=info
 
 **Brand anchor**: CIMB Niaga Red — `#E4142A` → `oklch(56% 0.223 27)`. Use OKLCH for all colors; build shade scales by holding chroma+hue constant and varying lightness. Never `#000`/`#fff`; tint neutrals slightly toward the brand hue. **Light mode only** (no dark mode, no toggle).
 
-**Two themes, one per frontend:**
-*   **Internal app** (`frontend/CompanyPortal-Vite`) -> "Merah Sirih". Warm off-white neutrals, red as a ≤10% accent. Optimized for data-dense screens.
-*   **Vendor portal** (`frontend/VendorPortal-Vite`) -> "Merah Menyala". Bold: maroon-red top bar, full-red active sidebar.
+**Two themes, one per frontend** (both share the same semantic tokens + component patterns; only brand intensity and navigation chrome differ):
+*   **Internal app** (`frontend/CompanyPortal-Vite`) -> **"Merah Sirih"**. Warm off-white neutrals, red as a ≤10% accent (primary buttons, active states, key figures). Optimized for data-dense screens operators stare at all day.
+    *   Primary `oklch(56% 0.223 27)` · Primary Deep `oklch(47% 0.185 27)` · Red Tint `oklch(94% 0.03 25)` · Surface `oklch(98.6% 0.006 40)` · Text `oklch(26% 0.02 30)`
+*   **Vendor portal** (`frontend/VendorPortal-Vite`) -> **"Merah Menyala"**. Bold, brand-forward: maroon-red top bar, full-red active sidebar. Strong CIMB identity from first load, especially on login.
+    *   Primary `oklch(54% 0.233 27)` · Maroon Bar `oklch(40% 0.155 26)` · Maroon Deep `oklch(30% 0.11 25)` · Surface `oklch(99.5% 0.003 40)` · Text `oklch(25% 0.02 28)`
 
 **Design tokens (canonical, from `ui_design.md`):**
 *   Brand Red scale (hue 29): `--red-50` `oklch(0.965 0.018 29)` … `--red-500` `oklch(0.552 0.205 29)` (Primary/CIMB Red/CTA) … `--red-900` `oklch(0.250 0.082 29)`.
 *   Neutrals (tinted hue 29): `--n-0` `oklch(0.992 0.003 29)` (cards/inputs) … `--n-900` `oklch(0.178 0.005 29)` (headings).
 *   Semantic (far from brand hue): Success (155), Warning (78), Danger (12, rose — NOT brand red), Info (245).
-*   **Hard rule**: Brand red = hue 29 (action/identity). Error red = hue 12 rose (destructive only). Never same red for both. Error NEVER signalled by color alone — always icon + text.
+*   **Hard rule**: Brand red = hue 29 (action/identity). Error red = hue 12 rose (destructive only). Never same red for both. Error NEVER signalled by color alone — always icon + text. Deep red on white is safe for bold text/buttons only; do NOT use it for small thin text (insufficient contrast).
 *   Typography: system font stack, one family, hierarchy via scale+weight. `tabular-nums` on EVERY amount/metric/table; money monospace, right-aligned.
 *   Spacing: 4pt scale (`--space-1` 4px … `--space-18` 72px). NO `--space-5/7/9` (resolves to 0). Radius sm 4 / md 6 / lg 10. Subtle brand-tinted shadows.
 *   Components: one primary per view; tables are primary interface (uppercase headers, amounts right/tabular/mono, status via badges not row color); focus ring = soft red halo.
 *   **Bans**: no side-stripe accent borders >1px, no gradient text, no glassmorphism default, no hero-metric template, no identical repeated card grids, no em dashes in UI copy, no pure black/white, no color-only status.
+*   Palette reference / live mockups: see the CMS palette showcase artifact.
 
 * * *
 
 ## 14\. Backend Split: Transactional vs Batch (EOD)
-**One codebase, two entrypoints.** Domain logic stays shared in `internal/*`.
-*   `cmd/api` — transactional server. Always on, serves the frontends. Office hours active.
-*   `cmd/batch` — End-of-Day runner. Cron at midnight, processes, then exits/idles.
-Both run on the **same VM**; active windows don't overlap (no contention).
+**One codebase, two entrypoints.** Domain logic stays shared in `internal/*`. Two ways to run it:
+*   `cmd/api` — transactional server. Always on, serves the frontends. Active during office hours, idle at night.
+*   `cmd/batch` — End-of-Day runner. Triggered by cron/scheduler at midnight (date rollover), processes, then exits/idles. Idle during office hours.
 
-**What EOD does**: ingest from DSR (saldo akhir 00:00 per vault), Opti Cash forecast (Order H-1 & H), horizon H-2 (refund validation); compute Final Realisasi = rekomendasi DMAA − (saldo DSR + refund horizon H-2) per vendor; produce daily summaries read next working day.
+Both run on the **same VM**. Because their active windows don't overlap, each gets the full machine when it runs — no resource contention, no "borrowing" mechanism needed. This is intentional: never run heavy batch work concurrently with live transactional traffic.
 
 > This EOD `Final Realisasi` formula is separate from the daily `Order ATM` formula (Sec 3a) — don't conflate the two, they answer different questions (backdated realisasi summary vs. same-day/H-2 order calc).
 
+**What the batch/EOD does** (backdated summary work, mirrors corebanking EOD):
+*   Ingest & compute from DSR (saldo akhir 00:00 per vault), Opti Cash forecast (Order H-1 & H), horizon H-2 (refund validation).
+*   Compute Final Realisasi = rekomendasi DMAA − (saldo DSR + refund horizon H-2), per vendor.
+*   Produce the daily summaries the transactional module reads the next working day.
+
 **Handoff rules (NON-NEGOTIABLE):**
-*   EOD output written to **DB = source of truth**. Redis only cache, never store of record.
-*   Every EOD run tracked in a run table (`forecast_runs` / an `eod_runs` table): `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
-*   Transactional reads a `processing_date` only after run marked **success**. Never partial/in-progress.
-*   On completion emit domain event (`EODCompleted` / `SummaryReady`).
-*   Batch ingests idempotent per file/`processing_date` (re-run safe).
-*   **EOD Monitoring** (admin/app-support only): dashboard per-run status + email alert on failure OR not-complete before office hours.
+*   EOD output is written to **DB = source of truth** (durable, queryable, auditable). Redis only as a cache layer on top, never the store of record for EOD results.
+*   Every EOD run is tracked in a run table (`forecast_runs` / an `eod_runs` table): `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
+*   Transactional module reads a `processing_date` only after its run is marked **success**. Never read partial/in-progress data.
+*   On completion, emit a domain event (`EODCompleted` / `SummaryReady`) — fits the in-process event-driven model.
+*   Batch ingests are idempotent per file/`processing_date` (re-run safe).
+
+**EOD Monitoring (admin / app-support only):**
+*   Dedicated dashboard page: per-run status, `processing_date`, duration, records processed, last success, failures with error detail.
+*   **Email alert** to admin/app-support on: EOD failure, AND EOD not completed before office-hours start (the critical case — stops operators working on stale data). Sent via company SMTP.
+*   Scope this page + alerts to admin/app-support roles only.
 
 * * *
 

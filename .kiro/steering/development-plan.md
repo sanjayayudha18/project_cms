@@ -1,0 +1,189 @@
+# CMS Development Plan (Kiro Steering Doc)
+
+> Roadmap for the remaining CMS work, sequenced against the module & table map in `project-context.md` / `.claude/CLAUDE.md` Sec 3. This is a **living plan** — update it when a module lands, a table is approved, or a dependency shifts.
+> **Companion docs:** `project-context.md` (source of truth for modules/tables/rules), `tech.md` (fixed stack), `structure.md` (layout), `model-recommendation.md` (per-task Model/Effort convention), `.claude/development-progress.md` (feature-level changelog).
+
+---
+
+## ⛔ Scope guard — read before starting ANY task
+
+**Current focus (in order):** Phase 1 (close in-flight work; next: 1.2 manual check → 1.3) → Phase 0 (infra) → Phase 2 (ATM ops).
+Anything not listed under those three phases is **out of scope right now**. If a request touches it, STOP and ask.
+
+Rules:
+1. **One task = one item in this file.** If the work isn't an item here, add it here first (with user OK), then build it.
+2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes + items in Phase 1 are allowed.
+3. **Do not touch Phases 3–7** (finance, escrow, cash count, CIT, EOD) until Phase 2 lands, unless the user explicitly re-prioritizes.
+4. **Do not wire mock screens** (see "Mock frontends") ad hoc — each gets wired only as part of its owning phase item.
+5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential — **next free: `019`**.
+6. Accepted known gaps (listed below) are **not** to be "fixed along the way".
+
+---
+
+## Status snapshot (as of 2026-09-25)
+
+Overall completion: **~40-45%**. "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
+
+Migrations were squashed on 2026-09-18 into `001_baseline_schema.sql` + `002_baseline_seed.sql` (old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range: `001`–`018`.
+
+### Built and wired (verified in code)
+
+| Area | Endpoint / location | Notes |
+| --- | --- | --- |
+| Auth | `/api/v1/auth` | LDAP + local, JWT, password lifecycle, absolute 1h session (`SESSION_MAX_LIFETIME`) |
+| Approval | `/api/v1/approvals`, `/api/v1/admin/approval` | Maker-checker orchestrator, chain resolver, delegation/leave |
+| Audit | `/api/v1/audit-logs` + viewer frontend (`features/audit-log`) | Append-only writer + viewer, read indexes (mig `006`) |
+| Role management | `/api/v1/admin/roles` | Immediate-apply + audit-in-tx (documented deviation, CLAUDE.md Sec 12) |
+| Admin users | `/api/v1/admin/users` | APPACCESS, immediate apply |
+| Master data (maker-checker) | `/api/v1/admin/vendors` (+ `/branches`, `/branches/{id}/atms`, `/vaults`, `/pics`, `/packages`, `/package-prices`), `/api/v1/admin/atms` (+ `/assignments`), `/api/v1/admin/master-data/{changes,export,import}` | All writes stage → 202 → apply-on-approve via `Applier`. CSV import/export. Migrations `003`–`017` |
+| Regions | `/api/v1/admin/regions` + `features/admin-regions` | Immediate-apply + audit. Mig `018` applied; spec in `specs/done/` |
+| ATM portal | `/api/v1/atm-portal` | Read-only monitoring |
+| DMAA forecast | `/api/v1/dmaa-forecast` | Read-only **viewer** — not the forecast engine |
+| DSR (ATM) | `/api/v1/dsr` | Vendor DSR upload, two-phase dry-run/confirm; Python ETL in `backend_python/service_dsr_etl` |
+| Vendor request | `/api/v1/vendor-requests` | DMAA → vendor replenishment request, maker-checker state machine |
+| EOD ETL (Python) | `backend_python/{dmaa,itm,eod_retry_scheduler}` + `features/eod-monitoring` | Python ETL + FastAPI retry scheduler + monitoring page — this **is** the EOD runtime (decision 2026-09-25, CLAUDE.md Sec 14) |
+
+### Partial
+- **Read replica** — `dbReadPool` exists in `cmd/api/main.go` (falls back to primary if `DATABASE_REPLICA_URL` unset) and is used by master-data export + regions. Remaining `ponytail:` TODOs (roles, atm-portal, dsr List/Count) still read primary.
+
+### Not built
+- **ATM ops engines:** `internal/replenishment`, `internal/forecast` (H+2 engine / Order ATM formula), `internal/cashcount`
+- **Finance:** `internal/invoice`, `internal/reconciliation`
+- **Platform:** `internal/document`, `internal/notification`, `internal/export` (XLSX/PDF — CSV exists for master data only)
+- **Integration:** `internal/corebanking` (escrow ingest)
+- **CIT backend (`backend-cit/`):** `/health` + auth-protected empty group only; every `internal/*` package is a stub file
+- **EOD Final Realisasi** calc + run table + late-completion alert (Python pipeline has ETL + retry only)
+- **Unmigrated tables:** `documents`, `notifications`, `export_jobs`, `forecast_runs/results`, `replenishment_instructions`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated)
+
+### Mock frontends (hardcoded data, not API-backed)
+`features/dashboard` (MetricStrip, AttentionPanel, ReplenishmentSummary) · `features/cit` · `features/cash-flow` · `features/forecast` · `features/invoice` · `features/reconciliation` · `features/replenishment`. Each is wired only by its owning phase item.
+
+### Accepted known gaps (do NOT fix unless asked)
+- `atm_vendor_packages.vendor_package_id` isn't validated against the ATM's `price_machine_group`/`price_class` (user decision 2026-09-23).
+- `vendor_packages_branch` and `atm_vendor_packages` are **empty on dev** (truncated by mig `011`) — need re-seed before those screens show data (Phase 1.4).
+- `vendor_package_prices` seed is partial (no SSI Paket 3/6, no per-ATM Harga Khusus / Biaya Tambahan).
+- `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`018` aren't exercised by it.
+
+---
+
+## Sequencing strategy
+
+**Close in-flight → infra → ATM ops.** Shared infrastructure first so business modules don't each re-invent async jobs, notifications, document storage, and replica reads. CIT stays in its own late phase (low load, CLAUDE.md Sec 10).
+
+Binding rules (from `project-context.md`):
+- State-machine + DB-backed orchestration for long flows (`how_to_handle_flowprocess.md`), never one long sync endpoint.
+- Maker-checker via the existing `approval.Orchestrator` — never a second state machine.
+- Money = numeric/integer minor units. Writes → primary, reports/dashboards → replica.
+- Every state change writes `audit_logs`. File ingests idempotent per file hash.
+
+---
+
+## Phase 1 — Close in-flight work ← **CURRENT**
+
+### 1.1 Region management wrap-up — ✅ DONE 2026-09-25
+- Mig `018` confirmed applied on dev. Integration tests (14) green against real Postgres; added rapid property tests (4.3/4.4/4.9), component tests (9.3), hub + route-guard tests (10.3). Fixed `SettingsHubPage.test.tsx`, which had been broken since the UI revamp (master cards moved behind the "Data master" tab). Spec moved to `.kiro/specs/done/`.
+
+### 1.2 Vendor branch drill-down verification (`.claude/sdlc/perbaikan-rbac/plan.md`)
+- CRUD shipped in `f11bc40`; 17 checklist items still unverified. Decided 2026-09-25:
+  - **Filter contract — ✅ already built:** optional `branch_id` on vault/PIC/package list + count. PIC vendor-wide scope uses the existing `vendor_wide_only=true` (same semantics as the agreed `scope=vendor`; kept as-is to avoid API churn — `scope=all` = no param, `scope=branch` = `branch_id`).
+  - **Disable branch with active children — ✅ done 2026-09-25:** 409 at submit (existing) + re-check at apply (`ensureBranchHasNoActiveChildren`, new) mapped to 409 in the approval handler; integration test added. No cascade.
+  - **Remaining:** the other checklist items in that plan are UI/flow checks → **manual browser verification by the user** (Golden Rule #10).
+- Only verify + fix gaps listed there. No new UI.
+- **Model:** Sonnet, Effort: Medium.
+
+### 1.3 DSR upload re-verification (`.claude/sdlc/vendor-upload-dsr/`)
+- `tests.md` predates the two-phase dry-run/confirm flow; re-verify test cases against current behavior, mark each pass/fail.
+- **Model:** Sonnet, Effort: Medium.
+
+### 1.4 Dev data re-seed
+- Re-seed `vendor_packages_branch` + `atm_vendor_packages` so branch/assignment screens are testable. Data source must be confirmed by the user — do not invent rows.
+- **Model:** Sonnet, Effort: Medium — data migration, STOP & flag rule applies.
+
+---
+
+## Phase 0 — Infrastructure foundations
+
+### 0.1 Finish read-replica routing
+- Replace remaining `ponytail:` dbRead TODOs in `cmd/api/main.go` (roles, atm-portal, dsr List/Count). Pool already exists.
+- Python side: add a replica pool (`DATABASE_REPLICA_URL`, fallback to primary) in `backend_python/lib/database.py` and use it for the read-only monitoring APIs (`/status`, `/summary`, `/late`, `/audit`) of `eod_retry_scheduler` + `service_dsr_etl`. Deferred here from `.claude/sdlc/import-export-jobs/spec.md` decision C2 (2026-09-28).
+- **Test:** replica on reads, primary on writes + read-after-write.
+- **Model:** Sonnet, Effort: Low.
+
+### 0.2 `import_jobs` / `export_jobs` + idempotency helper — ✅ done (Python helper + EOD; Go helper deferred to 2.1; T8 review pending)
+- Migration `019`+: status, `file_hash` unique, processing_date, counts, error. Shared helper enforcing idempotency per file hash. Reconcile with existing `master_data_import_batches` (SHA-256) and `dsr_uploads` rather than duplicating.
+- **Unblocks:** every file ingest (invoice, escrow, forecast inputs).
+- **Model:** Opus, Effort: High.
+
+### 0.3 `internal/notification` (in-app + SMTP)
+- `notifications` table. In-app write + company SMTP relay. Needed by DSR-late alert, replenishment publish, cash count.
+- **Model:** Sonnet, Effort: Medium.
+
+### 0.4 `internal/document` (storage)
+- `documents` table. Upload → GCS (local dir in dev); metadata in DB. Reused by invoice, cash count, escrow.
+- **Model:** Sonnet, Effort: Medium.
+
+### 0.5 `internal/export` (XLSX/PDF)
+- Extend beyond master-data CSV. **New deps (excelize, PDF tool) need approval first** (Golden Rule #1).
+- **Model:** Sonnet, Effort: Medium.
+
+> Async worker: dropped as a standalone item. Decide per-feature (goroutine + DB job table vs Redis queue) when 2.1 needs it — no new dependency until then.
+
+---
+
+## Phase 2 — ATM operations (daily transactional core)
+
+### 2.1 `internal/forecast` (Order ATM engine)
+- `forecast_runs` / `forecast_results`. `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` (Sec 3a; FSD v1.0 formula, replaced the URS formula 2026-10-01). DSR-missing fallback is an open question. Exclude problem ATMs; duplicate-order prevention. Forecast input uploads (complaint/project/problem/adjustment lists) → draft order → maker-checker.
+- **Depends on:** 0.2, DSR + DMAA data.
+- **Model:** Opus, Effort: High.
+
+### 2.2 `internal/replenishment`
+- `replenishment_instructions`. Lifecycle state machine; holiday-adjusted classification (on-schedule/early/late/not-done/no-order). Maker-checker. Wire mock `ReplenishmentScreen.tsx` + dashboard `ReplenishmentSummary`.
+- **Depends on:** 2.1, 0.3.
+- **Model:** Opus, Effort: High.
+
+### 2.3 DSR late/missing report
+- Monthly late/missing-DSR-per-vendor report (09:00 deadline, FLM penalty basis) + late notification.
+- **Depends on:** 0.3 (0.5 for XLSX).
+- **Model:** Sonnet, Effort: Medium.
+
+---
+
+## Later phases — parked (do not start without explicit re-prioritization)
+
+| Phase | Item | Gate |
+| --- | --- | --- |
+| 3 Finance | `internal/invoice` (validate + approve only, NO payment), `internal/reconciliation` | Phase 2 data, 0.4 |
+| 4 Integration | `internal/corebanking` escrow batch ingest | 0.2, 3 |
+| 5 Cash count | `internal/cashcount` (vault + selective machine) | Table names approved; column design in Phase 5 spec. 0.3, 0.4, 4 |
+| 6 CIT | `backend-cit`: orders, journal, CIT DSR, CIT reconciliation | ATM ops solid |
+| 7 EOD | Extend Python pipeline: Final Realisasi calc, run table (`eod_runs`), `success`-only reads, not-done-before-office-hours email | Phase 2, 0.3 |
+
+---
+
+## Resolved decisions (2026-09-25)
+
+1. **EOD runtime:** stays Python (`backend_python/`). No Go `cmd/batch`. CLAUDE.md Sec 14 updated.
+2. **Order ATM formula:** valid as written (CLAUDE.md Sec 3a). *Superseded 2026-10-01 by the FSD v1.0 formula — see Sec 3a.*
+3. **Branch `branch_id` filter + disable-with-children:** see Phase 1.2.
+4. **Cash count tables:** `cash_count_schedules` + `cash_count_evidences` names approved into CLAUDE.md Sec 3; columns + any extra tables decided in the Phase 5 spec. Phase stays parked.
+
+---
+
+## Dependency graph
+
+```
+Phase 1 (close in-flight) ─> Phase 0 (infra) ─> Phase 2 (ATM ops) ─┬─> 3 Finance ─> 4 Escrow ─> 5 Cash count
+                                                                    ├─> 7 EOD
+                                                                    └─> 6 CIT
+```
+
+---
+
+## Working conventions
+
+1. Spec first for non-trivial work: `.kiro/specs/<feature>/` (requirements → design → tasks) or `.claude/sdlc/<feature>/plan.md`. Finished specs move to `.kiro/specs/done/`.
+2. Every task carries **`Model:` + `Effort:`** (`model-recommendation.md`).
+3. Tests ship with every feature; coverage ≥80% on `internal/*`. Manual browser verification is done by the user (Golden Rule #10).
+4. When an item lands: update the **Status snapshot** here, `.claude/development-progress.md`, and CLAUDE.md Sec 3/12 if schema changed.
+5. Keep "done" honest: wired + DB-backed + tested.

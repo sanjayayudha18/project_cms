@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { AlertTriangle, CheckCircle, Clock, Loader, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Layers, Loader, XCircle } from "lucide-react";
 
 // ─── API Response Envelope ────────────────────────────────────────────────────
 
@@ -17,6 +17,7 @@ export interface SummaryCounts {
   completed: number;
   failed: number;
   max_retries_exhausted: number;
+  superseded: number;
   late: number;
 }
 
@@ -35,7 +36,8 @@ export type ProcessingStatus =
   | "processing"
   | "completed"
   | "failed"
-  | "max_retries_exhausted";
+  | "max_retries_exhausted"
+  | "superseded";
 
 export interface FileStatusItem {
   file_id: string;
@@ -92,7 +94,6 @@ export interface FileHistoryResponse {
 // ─── Manual Retry ─────────────────────────────────────────────────────────────
 
 export interface ManualRetryResponse {
-  job_id: string;
   file_id: string;
   processing_status: ProcessingStatus;
   triggered_by: string;
@@ -137,6 +138,7 @@ export const STATUS_BADGE_MAP: Record<ProcessingStatus, BadgeVariant> = {
   max_retries_exhausted: "danger",
   processing: "info",
   pending: "neutral",
+  superseded: "neutral",
 };
 
 export const TRIGGER_BADGE_MAP: Record<TriggerType, BadgeVariant> = {
@@ -157,7 +159,8 @@ export const STATUS_LABELS: Record<ProcessingStatus, string> = {
   failed: "Failed",
   max_retries_exhausted: "Max Retries",
   processing: "Processing",
-  pending: "Pending",
+  pending: "Tertunda",
+  superseded: "Digantikan",
 };
 
 export const FILE_TYPE_LABELS: Record<FileType, string> = {
@@ -184,5 +187,6 @@ export const STATUS_BADGE_CONFIG: Record<ProcessingStatus, StatusBadgeConfig> = 
   failed: { variant: "danger", icon: XCircle, label: "Failed" },
   max_retries_exhausted: { variant: "danger", icon: AlertTriangle, label: "Max Retries" },
   processing: { variant: "info", icon: Loader, label: "Processing" },
-  pending: { variant: "neutral", icon: Clock, label: "Pending" },
+  pending: { variant: "neutral", icon: Clock, label: "Tertunda" },
+  superseded: { variant: "neutral", icon: Layers, label: "Digantikan" },
 };

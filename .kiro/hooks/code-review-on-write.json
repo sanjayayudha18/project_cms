@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "code-review-on-write",
+      "description": "Performs a quick code review after write operations to catch common issues\n\nMigration note: Tool categories were converted to the tool-name matcher `^(fs_write|fs_append|str_replace|delete_file|code)$`, reconstructed from the built-in tool list. Confirm it covers the tools you meant, then enable the hook.",
+      "trigger": "PostToolUse",
+      "matcher": "^(fs_write|fs_append|str_replace|delete_file|code)$",
+      "action": {
+        "type": "agent",
+        "prompt": "Code was just written or modified. Perform a quick review checking for: 1) Common security issues (SQL injection, XSS, etc.), 2) Error handling, 3) Code clarity and maintainability, 4) Potential bugs or edge cases. Only comment if you find issues worth addressing."
+      },
+      "enabled": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "cms-frontend-dev",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Cross-platform launcher to run the CMS frontends locally without Docker.",
+  "scripts": {
+    "dev": "pnpm -C CompanyPortal-Vite dev",
+    "dev:company": "pnpm -C CompanyPortal-Vite dev",
+    "dev:vendor": "pnpm -C VendorPortal-Vite dev",
+    "dev:all": "pnpm run \"/^dev:(company|vendor)$/\"",
+    "install:company": "pnpm -C CompanyPortal-Vite install",
+    "install:vendor": "pnpm -C VendorPortal-Vite install",
+    "install:all": "pnpm run \"/^install:(company|vendor)$/\"",
+    "build:company": "pnpm -C CompanyPortal-Vite build",
+    "build:vendor": "pnpm -C VendorPortal-Vite build",
+    "preview:company": "pnpm -C CompanyPortal-Vite preview",
+    "preview:vendor": "pnpm -C VendorPortal-Vite preview"
+  }
+}

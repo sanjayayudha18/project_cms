@@ -5,6 +5,7 @@ import { create } from "zustand";
 export type DbRole =
   | "ADMIN"
   | "ADMIN_PARAM"
+  | "APPACCESS"
   | "ATM-USER"
   | "ATM-SPV"
   | "BRANCH-USER"
@@ -33,7 +34,7 @@ export interface AuthState {
 }
 
 export interface AuthActions {
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   initialize: () => Promise<void>;
@@ -46,9 +47,18 @@ export type AuthStore = AuthState & AuthActions;
 
 const AUTH_API_BASE = "/api/v1/auth";
 
+/** Query param the login page reads to show the "session ended" notice. */
+export const SESSION_EXPIRED_REASON = "session_expired";
+export const SESSION_EXPIRED_MESSAGE = "Sesi berakhir, silakan login kembali";
+
 // ─── Single-flight refresh ────────────────────────────────────────────────────
 
 let refreshPromise: Promise<boolean> | null = null;
+
+// Same for initialize(): React StrictMode runs the root effect twice in dev, and refresh tokens
+// rotate, so a second concurrent /refresh presents the already-used cookie, gets a 401 and would
+// overwrite the session the first call just restored.
+let initializePromise: Promise<void> | null = null;
 
 // ─── Backend response types ───────────────────────────────────────────────────
 
@@ -95,7 +105,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
   error: null,
   rateLimitRetryAfter: null,
 
-  login: async (username: string, password: string) => {
+  login: async (email: string, password: string) => {
     set({ error: null, rateLimitRetryAfter: null });
 
     try {
@@ -105,7 +115,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
           "Content-Type": "application/json",
           "X-Portal-Type": "company",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
         credentials: "include",
       });
 
@@ -125,7 +135,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
       // Handle error responses
       switch (response.status) {
         case 401: {
-          set({ error: "Username atau password salah" });
+          set({ error: "Email atau password salah" });
           return;
         }
         case 403: {
@@ -217,7 +227,7 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
             rateLimitRetryAfter: null,
           });
           const currentPath = window.location.pathname + window.location.search;
-          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}&reason=${SESSION_EXPIRED_REASON}`;
           return false;
         }
 
@@ -265,38 +275,49 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
     return refreshPromise;
   },
 
-  initialize: async () => {
-    set({ isAuthLoading: true });
+  initialize: () => {
+    if (initializePromise) return initializePromise;
 
-    try {
-      const response = await fetch(`${AUTH_API_BASE}/refresh`, {
-        method: "POST",
-        credentials: "include",
-      });
+    initializePromise = (async () => {
+      set({ isAuthLoading: true });
 
-      if (response.ok) {
-        const data = (await response.json()) as LoginSuccessResponse;
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/refresh`, {
+          method: "POST",
+          credentials: "include",
+        });
 
-        // Guard: reject VENDOR-USER on the company portal.
-        // Prevents cross-portal session leakage when both portals
-        // share the same refresh token cookie on localhost.
-        if (data.user.role === "VENDOR-USER") {
+        if (response.ok) {
+          const data = (await response.json()) as LoginSuccessResponse;
+
+          // Guard: reject VENDOR-USER on the company portal.
+          // Prevents cross-portal session leakage when both portals
+          // share the same refresh token cookie on localhost.
+          if (data.user.role === "VENDOR-USER") {
+            set({
+              user: null,
+              accessToken: null,
+              isAuthenticated: false,
+              isAuthLoading: false,
+            });
+            return;
+          }
+
+          set({
+            user: mapUserResponse(data.user),
+            accessToken: data.access_token,
+            isAuthenticated: true,
+            isAuthLoading: false,
+          });
+        } else {
           set({
             user: null,
             accessToken: null,
             isAuthenticated: false,
             isAuthLoading: false,
           });
-          return;
         }
-
-        set({
-          user: mapUserResponse(data.user),
-          accessToken: data.access_token,
-          isAuthenticated: true,
-          isAuthLoading: false,
-        });
-      } else {
+      } catch {
         set({
           user: null,
           accessToken: null,
@@ -304,14 +325,11 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
           isAuthLoading: false,
         });
       }
-    } catch {
-      set({
-        user: null,
-        accessToken: null,
-        isAuthenticated: false,
-        isAuthLoading: false,
-      });
-    }
+    })().finally(() => {
+      initializePromise = null;
+    });
+
+    return initializePromise;
   },
 
   clearError: () => {

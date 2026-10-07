@@ -1,0 +1,58 @@
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import type { AdminRegionsUrlParams } from "../useAdminRegionsUrlState";
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Aktif" },
+  { value: "inactive", label: "Nonaktif" },
+  { value: "all", label: "Semua" },
+];
+
+interface RegionFilterBarProps {
+  params: AdminRegionsUrlParams;
+  searchInput: string;
+  onSearchInputChange: (value: string) => void;
+  onParamsChange: (partial: Partial<AdminRegionsUrlParams>) => void;
+}
+
+/** Search + status filter for the admin regions list (Req 1.4). */
+export function RegionFilterBar({
+  params,
+  searchInput,
+  onSearchInputChange,
+  onParamsChange,
+}: RegionFilterBarProps) {
+  return (
+    <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="admin-regions-search"
+          className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
+        >
+          Cari
+        </label>
+        <input
+          id="admin-regions-search"
+          type="text"
+          value={searchInput}
+          onChange={(e) => onSearchInputChange(e.target.value.slice(0, 100))}
+          maxLength={100}
+          placeholder="Kode atau nama region"
+          className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+        />
+      </div>
+
+      <FilterSelect
+        label="Status"
+        options={STATUS_OPTIONS}
+        value={params.status}
+        onChange={(value) =>
+          onParamsChange({
+            status: (value as AdminRegionsUrlParams["status"] | null) ?? "active",
+            page: 1,
+          })
+        }
+        placeholder="Aktif"
+      />
+    </div>
+  );
+}

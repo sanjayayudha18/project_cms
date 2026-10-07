@@ -59,19 +59,19 @@ function mockOkLogin() {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("LoginPage", () => {
-  it("renders exactly one username and one password field with required attributes", () => {
+  it("renders exactly one email and one password field with required attributes", () => {
     render(<LoginPage />);
 
-    const username = screen.getByLabelText("Username");
+    const email = screen.getByLabelText("Email");
     const password = screen.getByLabelText("Kata Sandi");
 
-    expect(screen.getAllByLabelText("Username")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Email")).toHaveLength(1);
     expect(screen.getAllByLabelText("Kata Sandi")).toHaveLength(1);
 
-    expect(username).toHaveAttribute("id", "username");
-    expect(username).toHaveAttribute("type", "text");
-    expect(username).toHaveAttribute("autocomplete", "username");
-    expect(username).toHaveAttribute("placeholder", "Username");
+    expect(email).toHaveAttribute("id", "email");
+    expect(email).toHaveAttribute("type", "email");
+    expect(email).toHaveAttribute("autocomplete", "email");
+    expect(email).toHaveAttribute("placeholder", "Email");
 
     expect(password).toHaveAttribute("id", "password");
     expect(password).toHaveAttribute("type", "password");
@@ -110,7 +110,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "   ");
+    await user.type(screen.getByLabelText("Email"), "   ");
     await user.type(screen.getByLabelText("Kata Sandi"), "\t\n");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -120,11 +120,11 @@ describe("LoginPage", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("rejects username longer than 128 characters", async () => {
+  it("rejects email longer than 128 characters", async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "a".repeat(129));
+    await user.type(screen.getByLabelText("Email"), "a".repeat(129));
     await user.type(screen.getByLabelText("Kata Sandi"), "validpass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -134,11 +134,25 @@ describe("LoginPage", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it("rejects an email without a valid format", async () => {
+    const user = userEvent.setup();
+    render(<LoginPage />);
+
+    await user.type(screen.getByLabelText("Email"), "not-an-email");
+    await user.type(screen.getByLabelText("Kata Sandi"), "validpass");
+    await user.click(screen.getByRole("button", { name: "Masuk" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/format email tidak valid/i)).toBeInTheDocument();
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it("rejects password longer than 72 characters", async () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "validuser");
+    await user.type(screen.getByLabelText("Email"), "validuser@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "p".repeat(73));
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -155,7 +169,7 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Username")).toHaveFocus();
+      expect(screen.getByLabelText("Email")).toHaveFocus();
     });
   });
 
@@ -164,7 +178,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "john.admin");
+    await user.type(screen.getByLabelText("Email"), "john.admin@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "Password123!{Enter}");
 
     await waitFor(() => {
@@ -176,19 +190,19 @@ describe("LoginPage", () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
-      json: async () => ({ error: "auth_failed", message: "Username atau password salah" }),
+      json: async () => ({ error: "auth_failed", message: "Email atau password salah" }),
     });
 
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "wronguser");
+    await user.type(screen.getByLabelText("Email"), "wronguser@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "wrongpass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("login-error")).toBeInTheDocument();
-      expect(screen.getByTestId("login-error")).toHaveTextContent("Username atau password salah");
+      expect(screen.getByTestId("login-error")).toHaveTextContent("Email atau password salah");
     });
   });
 
@@ -202,7 +216,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "inactive");
+    await user.type(screen.getByLabelText("Email"), "inactive@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -221,7 +235,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "user");
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -236,7 +250,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "user");
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -253,7 +267,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "john.admin");
+    await user.type(screen.getByLabelText("Email"), "john.admin@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "Password123!");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -266,13 +280,13 @@ describe("LoginPage", () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
-      json: async () => ({ error: "auth_failed", message: "Username atau password salah" }),
+      json: async () => ({ error: "auth_failed", message: "Email atau password salah" }),
     });
 
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "user");
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -293,7 +307,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "john.admin");
+    await user.type(screen.getByLabelText("Email"), "john.admin@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "Password123!");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -303,7 +317,7 @@ describe("LoginPage", () => {
 
     const form = screen.getByRole("button", { name: /Memproses/i }).closest("form");
     expect(form).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByLabelText("Username")).toHaveValue("john.admin");
+    expect(screen.getByLabelText("Email")).toHaveValue("john.admin@example.com");
     expect(screen.getByLabelText("Kata Sandi")).toHaveValue("Password123!");
 
     resolveFetch({
@@ -366,7 +380,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "user");
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -396,7 +410,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "user");
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "pass");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
@@ -424,7 +438,7 @@ describe("LoginPage", () => {
     render(<LoginPage />);
 
     expect(screen.getByTestId("navigate")).toHaveAttribute("data-to", "/");
-    expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
   });
 
   it("wires field errors with aria-invalid and aria-describedby", async () => {
@@ -434,9 +448,9 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 
     await waitFor(() => {
-      const username = screen.getByLabelText("Username");
-      expect(username).toHaveAttribute("aria-invalid", "true");
-      const describedBy = username.getAttribute("aria-describedby");
+      const email = screen.getByLabelText("Email");
+      expect(email).toHaveAttribute("aria-invalid", "true");
+      const describedBy = email.getAttribute("aria-describedby");
       expect(describedBy).toBeTruthy();
       // biome-ignore lint/style/noNonNullAssertion: asserted above
       expect(document.getElementById(describedBy!)).toHaveTextContent("Wajib diisi");
@@ -448,7 +462,7 @@ describe("LoginPage", () => {
       .mockResolvedValueOnce({
         ok: false,
         status: 401,
-        json: async () => ({ error: "auth_failed", message: "Username atau password salah" }),
+        json: async () => ({ error: "auth_failed", message: "Email atau password salah" }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -470,7 +484,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
-    await user.type(screen.getByLabelText("Username"), "john.admin");
+    await user.type(screen.getByLabelText("Email"), "john.admin@example.com");
     await user.type(screen.getByLabelText("Kata Sandi"), "wrong");
     await user.click(screen.getByRole("button", { name: "Masuk" }));
 

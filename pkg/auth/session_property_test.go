@@ -18,7 +18,7 @@ func newTestTokenServiceWithRedis(secret []byte, redisClient *redis.Client) *Tok
 	return NewTokenService(TokenConfig{
 		SecretKey:          secret,
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}, NewRedisTokenBlacklist(redisClient))
 }
 
@@ -103,7 +103,7 @@ func TestProperty_Session_IdempotentLogout(t *testing.T) {
 			expiredTS := NewTokenService(TokenConfig{
 				SecretKey:          secret,
 				AccessTokenExpiry:  15 * time.Minute,
-				RefreshTokenExpiry: -1 * time.Second, // already expired
+				SessionMaxLifetime: -1 * time.Second, // already expired
 			}, NewRedisTokenBlacklist(redisClient))
 			_, refreshToken, err := expiredTS.GenerateTokenPair(identity)
 			if err != nil {

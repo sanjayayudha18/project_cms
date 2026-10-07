@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { Header } from "./Header";
 
 const mockUser: AuthUser = {
-  id: "user-1",
+  id: 1,
+  username: "budi.santoso",
   fullName: "Budi Santoso",
   email: "budi@cimb.com",
-  roles: ["Admin", "Approver"],
-  primaryRole: "Admin",
+  role: "ADMIN",
+  isKaryawan: true,
+  vendorId: null,
 };
 
 function renderHeader(overrides: Partial<Parameters<typeof Header>[0]> = {}) {
@@ -31,21 +33,10 @@ describe("Header", () => {
     expect(screen.getByTestId("header-user-name")).toHaveTextContent("Budi Santoso");
   });
 
-  it("displays primary role in a badge", () => {
+  it("displays email inside the user dropdown", () => {
     renderHeader();
-    // Role badge lives inside the user dropdown — open it first.
     fireEvent.click(screen.getByTestId("header-user-name"));
-    expect(screen.getByTestId("header-role-badge")).toHaveTextContent("Admin");
-  });
-
-  it("displays different role correctly", () => {
-    const user: AuthUser = {
-      ...mockUser,
-      primaryRole: "Cash_Management",
-    };
-    renderHeader({ user });
-    fireEvent.click(screen.getByTestId("header-user-name"));
-    expect(screen.getByTestId("header-role-badge")).toHaveTextContent("Cash_Management");
+    expect(screen.getByTestId("header-email")).toHaveTextContent(mockUser.email);
   });
 
   it("calls onLogout when logout button is clicked", () => {

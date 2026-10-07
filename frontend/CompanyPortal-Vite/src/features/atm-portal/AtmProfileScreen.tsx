@@ -12,6 +12,7 @@ import { AtmHeader } from "./components/AtmHeader";
 import { CashposProfileTable } from "./components/CashposProfileTable";
 import { ReplenishTable } from "./components/ReplenishTable";
 import { TabNavigation } from "./components/TabNavigation";
+import { VisitQuotaCard } from "./components/VisitQuotaCard";
 import {
   useAtmCashposHistory,
   useAtmMasterData,
@@ -98,6 +99,8 @@ export function AtmProfileScreen() {
 
       <div className="flex flex-col gap-6">
         <AtmHeader data={masterQuery.data} isLoading={masterQuery.isLoading} />
+
+        <VisitQuotaCard terminalId={terminalId} />
 
         <div>
           <TabNavigation activeTab={tab} onTabChange={setTab} />

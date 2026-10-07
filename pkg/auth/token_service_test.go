@@ -42,7 +42,7 @@ func testTokenConfig() TokenConfig {
 	return TokenConfig{
 		SecretKey:          []byte("test-secret-key-minimum-32-bytes!"),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}
 }
 
@@ -67,6 +67,62 @@ func signTokenWithKey(t *testing.T, claims jwt.Claims, key []byte) string {
 		t.Fatalf("failed to sign token: %v", err)
 	}
 	return signed
+}
+
+// TestTokenService_AccessToken_CarriesApprovalLevelAndSupervisorID verifies
+// RBAC-Setup Task 8's requirement: approval_level (+ optional supervisor_id)
+// round-trips through the access token claims.
+func TestTokenService_AccessToken_CarriesApprovalLevelAndSupervisorID(t *testing.T) {
+	bl := newMockBlacklist()
+	svc := NewTokenService(testTokenConfig(), bl)
+
+	level := int32(3)
+	supervisorID := int64(42)
+	identity := testIdentity()
+	identity.ApprovalLevel = &level
+	identity.SupervisorID = &supervisorID
+
+	accessToken, _, err := svc.GenerateTokenPair(identity)
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	claims, err := svc.ValidateAccessToken(accessToken)
+	if err != nil {
+		t.Fatalf("ValidateAccessToken: %v", err)
+	}
+
+	if claims.ApprovalLevel == nil || *claims.ApprovalLevel != level {
+		t.Errorf("ApprovalLevel = %v, want %d", claims.ApprovalLevel, level)
+	}
+	if claims.SupervisorID == nil || *claims.SupervisorID != supervisorID {
+		t.Errorf("SupervisorID = %v, want %d", claims.SupervisorID, supervisorID)
+	}
+}
+
+// TestTokenService_AccessToken_ApprovalLevelOmittedWhenNil verifies a user
+// with no approval_level (not an approver) yields nil claims, not a zero value
+// that could be mistaken for level 0.
+func TestTokenService_AccessToken_ApprovalLevelOmittedWhenNil(t *testing.T) {
+	bl := newMockBlacklist()
+	svc := NewTokenService(testTokenConfig(), bl)
+
+	accessToken, _, err := svc.GenerateTokenPair(testIdentity())
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	claims, err := svc.ValidateAccessToken(accessToken)
+	if err != nil {
+		t.Fatalf("ValidateAccessToken: %v", err)
+	}
+
+	if claims.ApprovalLevel != nil {
+		t.Errorf("ApprovalLevel = %v, want nil", claims.ApprovalLevel)
+	}
+	if claims.SupervisorID != nil {
+		t.Errorf("SupervisorID = %v, want nil", claims.SupervisorID)
+	}
 }
 
 func TestTokenService_GenerateTokenPair_Valid(t *testing.T) {
@@ -282,5 +338,92 @@ func TestTokenService_ValidateAccessToken_WrongSigningKey(t *testing.T) {
 	_, err := svc.ValidateAccessToken(tokenStr)
 	if !errors.Is(err, ErrTokenInvalid) {
 		t.Errorf("expected ErrTokenInvalid for wrong signing key, got: %v", err)
+	}
+}
+
+func TestRotateTokenPair_SessionDeadline(t *testing.T) {
+	const life = time.Hour
+	svc := NewTokenService(TokenConfig{
+		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
+		AccessTokenExpiry:  15 * time.Minute,
+		SessionMaxLifetime: life,
+	}, &mockBlacklist{})
+	ctx := context.Background()
+	near := func(got, want time.Time) bool { return got.Sub(want).Abs() < 3*time.Second }
+	refreshExp := func(tok string) time.Time {
+		c, err := svc.ValidateRefreshToken(ctx, tok)
+		if err != nil {
+			t.Fatalf("validate refresh: %v", err)
+		}
+		return c.ExpiresAt.Time
+	}
+
+	// login: exp = now+1h
+	_, rt, _ := svc.GenerateTokenPair(testIdentity())
+	if !near(refreshExp(rt), time.Now().Add(life)) {
+		t.Errorf("login exp = %v, want ~now+1h", refreshExp(rt))
+	}
+
+	// rotation at minute 30 inherits the deadline unchanged
+	deadline := time.Now().Add(30 * time.Minute)
+	_, rt, _ = svc.RotateTokenPair(testIdentity(), deadline)
+	if !near(refreshExp(rt), deadline) {
+		t.Errorf("rotated exp = %v, want inherited %v", refreshExp(rt), deadline)
+	}
+
+	// legacy 7-day deadline is clamped to now+1h
+	_, rt, _ = svc.RotateTokenPair(testIdentity(), time.Now().Add(7*24*time.Hour))
+	if !near(refreshExp(rt), time.Now().Add(life)) {
+		t.Errorf("clamped exp = %v, want ~now+1h", refreshExp(rt))
+	}
+
+	// access token capped to remaining session (5m < 15m)
+	deadline = time.Now().Add(5 * time.Minute)
+	at, _, _ := svc.RotateTokenPair(testIdentity(), deadline)
+	c, err := svc.ValidateAccessToken(at)
+	if err != nil {
+		t.Fatalf("validate access: %v", err)
+	}
+	if !near(c.ExpiresAt.Time, deadline) {
+		t.Errorf("access exp = %v, want capped to %v", c.ExpiresAt.Time, deadline)
+	}
+}
+
+func TestRefreshDeadline(t *testing.T) {
+	svc := NewTokenService(TokenConfig{
+		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
+		AccessTokenExpiry:  15 * time.Minute,
+		SessionMaxLifetime: time.Hour,
+	}, &mockBlacklist{})
+	
+	// Valid token: returns deadline
+	_, rt, _ := svc.GenerateTokenPair(testIdentity())
+	deadline := svc.RefreshDeadline(rt)
+	if deadline.IsZero() {
+		t.Errorf("RefreshDeadline returned zero for valid token")
+	}
+	
+	// Invalid token: returns zero
+	invalidRT := svc.RefreshDeadline("invalid.token.string")
+	if !invalidRT.IsZero() {
+		t.Errorf("RefreshDeadline = %v, want zero for invalid token", invalidRT)
+	}
+	
+	// Empty token: returns zero
+	emptyRT := svc.RefreshDeadline("")
+	if !emptyRT.IsZero() {
+		t.Errorf("RefreshDeadline = %v, want zero for empty token", emptyRT)
+	}
+}
+
+func TestRotateTokenPair_IdentityNil(t *testing.T) {
+	svc := NewTokenService(TokenConfig{
+		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
+		SessionMaxLifetime: time.Hour,
+	}, &mockBlacklist{})
+	
+	_, _, err := svc.RotateTokenPair(nil, time.Now().Add(time.Hour))
+	if err == nil {
+		t.Fatal("expected error for nil identity")
 	}
 }

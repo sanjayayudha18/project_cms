@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { filterSchedules, sortByStatusPriority } from "../replenishment.utils";
@@ -95,6 +97,14 @@ vi.mock("@/lib/hooks/useToast", () => ({
 
 import { ReplenishmentScreen } from "../ReplenishmentScreen";
 
+/** ReplenishmentScreen calls useCitData (a real useQuery), so it needs a
+ *  QueryClientProvider. The cit-orders query feeds only the evidence column
+ *  and CitSummary; the table itself reads the mocked schedules JSON. */
+function renderScreen(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 // ─── sortByStatusPriority Tests ──────────────────────────────────────────────
 
 describe("sortByStatusPriority", () => {
@@ -189,7 +199,7 @@ describe("filterSchedules", () => {
 
 describe("ReplenishmentScreen - Column rendering", () => {
   it("renders all expected column headers", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("Jadwal")).toBeInTheDocument();
     // "Wilayah" appears as both filter label and column header
@@ -203,35 +213,35 @@ describe("ReplenishmentScreen - Column rendering", () => {
   });
 
   it("renders schedule IDs and route codes", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("SCH-003")).toBeInTheDocument();
     expect(screen.getByText("BDG-C-003")).toBeInTheDocument();
   });
 
   it("renders region values", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getAllByText("South Jakarta").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Bandung").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders vendor values", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getAllByText("PT Gardanet").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("PT SSI").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders time window formatted as start–end", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("08:00\u201312:00")).toBeInTheDocument();
     expect(screen.getByText("09:00\u201313:00")).toBeInTheDocument();
   });
 
   it("renders status badges with correct labels", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("Dalam perjalanan")).toBeInTheDocument();
     expect(screen.getByText("Terlambat")).toBeInTheDocument();
@@ -241,14 +251,14 @@ describe("ReplenishmentScreen - Column rendering", () => {
   });
 
   it("renders page header with correct title", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("Jadwal pengisian ulang")).toBeInTheDocument();
     expect(screen.getByText(/Pantau rute CIT harian/)).toBeInTheDocument();
   });
 
   it("renders data sorted by status priority (delayed first)", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     // Get all rows (skipping header)
     const rows = screen.getAllByRole("row").slice(1);
@@ -261,13 +271,13 @@ describe("ReplenishmentScreen - Column rendering", () => {
 
 describe("ReplenishmentScreen - Filter behavior", () => {
   it("displays all records count initially", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     expect(screen.getByText("6 jadwal")).toBeInTheDocument();
   });
 
   it("filters by region when region filter is changed", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     // Region filter is the second combobox (first is date)
@@ -277,7 +287,7 @@ describe("ReplenishmentScreen - Filter behavior", () => {
   });
 
   it("filters by vendor when vendor filter is changed", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     // Vendor filter is the third combobox
@@ -287,7 +297,7 @@ describe("ReplenishmentScreen - Filter behavior", () => {
   });
 
   it("applies combined region + vendor filter", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     fireEvent.change(selects[1], { target: { value: "South Jakarta" } });
@@ -297,7 +307,7 @@ describe("ReplenishmentScreen - Filter behavior", () => {
   });
 
   it("resets filter when set back to empty (null)", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     // Filter to South Jakarta
@@ -314,7 +324,7 @@ describe("ReplenishmentScreen - Filter behavior", () => {
 
 describe("ReplenishmentScreen - Empty state", () => {
   it("displays empty state when filters match no records", () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     // Filter to Bandung + PT Gardanet (no match in mock data)
@@ -326,7 +336,7 @@ describe("ReplenishmentScreen - Empty state", () => {
   });
 
   it('shows "0 jadwal" count when empty state is displayed', () => {
-    render(<ReplenishmentScreen />);
+    renderScreen(<ReplenishmentScreen />);
 
     const selects = screen.getAllByRole("combobox");
     fireEvent.change(selects[1], { target: { value: "Bandung" } });
@@ -343,7 +353,7 @@ describe("ReplenishmentScreen - Empty state", () => {
     }));
 
     const { ReplenishmentScreen: EmptyScreen } = await import("../ReplenishmentScreen");
-    render(<EmptyScreen />);
+    renderScreen(<EmptyScreen />);
 
     expect(screen.getByText("Tidak ada jadwal ditemukan")).toBeInTheDocument();
   });
@@ -356,7 +366,7 @@ describe("ReplenishmentScreen - Empty state", () => {
     }));
 
     const { ReplenishmentScreen: EmptyScreen } = await import("../ReplenishmentScreen");
-    render(<EmptyScreen />);
+    renderScreen(<EmptyScreen />);
 
     expect(screen.getByText("Jadwal pengisian ulang")).toBeInTheDocument();
   });

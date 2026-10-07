@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -14,12 +16,21 @@ import (
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
 
+// ChangePasswordService is the subset of auth.ChangePasswordService the
+// handler needs (mirrors the ApprovalOrchestrator/ApprovalReader pattern in
+// approval_handler.go — a narrow interface so handler tests can fake it
+// without a real DB).
+type ChangePasswordService interface {
+	ChangePassword(ctx context.Context, userID int64, req auth.ChangePasswordRequest, actorIP string) error
+}
+
 // AuthHandler handles authentication-related HTTP endpoints.
 type AuthHandler struct {
-	authService  *auth.Service
-	tokenService *pkgauth.TokenService
-	userRepo     pkgauth.UserRepository
-	rateLimiter  *middleware.RateLimiter
+	authService       *auth.Service
+	tokenService      *pkgauth.TokenService
+	userRepo          pkgauth.UserRepository
+	rateLimiter       *middleware.RateLimiter
+	changePasswordSvc ChangePasswordService
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
@@ -28,12 +39,14 @@ func NewAuthHandler(
 	tokenService *pkgauth.TokenService,
 	userRepo pkgauth.UserRepository,
 	rateLimiter *middleware.RateLimiter,
+	changePasswordSvc ChangePasswordService,
 ) *AuthHandler {
 	return &AuthHandler{
-		authService:  authService,
-		tokenService: tokenService,
-		userRepo:     userRepo,
-		rateLimiter:  rateLimiter,
+		authService:       authService,
+		tokenService:      tokenService,
+		userRepo:          userRepo,
+		rateLimiter:       rateLimiter,
+		changePasswordSvc: changePasswordSvc,
 	}
 }
 
@@ -44,12 +57,13 @@ func (h *AuthHandler) Routes() chi.Router {
 	r.Post("/refresh", h.Refresh)
 	r.Post("/logout", h.Logout)
 	r.With(middleware.RequireAuth(h.tokenService)).Get("/me", h.Me)
+	r.With(middleware.RequireAuth(h.tokenService)).Post("/change-password", h.ChangePassword)
 	return r
 }
 
 // loginRequest is the expected JSON body for POST /login.
 type loginRequest struct {
-	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -57,6 +71,10 @@ type loginRequest struct {
 type loginResponse struct {
 	AccessToken string           `json:"access_token"`
 	User        auth.UserProfile `json:"user"`
+	// PasswordDaysLeft/MustChangePassword mirror auth.LoginResponse — additive
+	// fields, existing FE clients that don't read them are unaffected.
+	PasswordDaysLeft   *int `json:"password_days_left,omitempty"`
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 // Login handles POST /login — authenticates user and returns tokens.
@@ -71,7 +89,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	clientIP := extractClientIP(r)
 
 	loginReq := auth.LoginRequest{
-		Username:   req.Username,
+		Email:      req.Email,
 		Password:   req.Password,
 		PortalType: portalType,
 		IP:         clientIP,
@@ -84,11 +102,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set refresh token as httpOnly cookie
-	setRefreshCookie(w, refreshToken)
+	setRefreshCookie(w, refreshToken, h.tokenService.RefreshDeadline(refreshToken))
 
 	writeJSON(w, http.StatusOK, loginResponse{
-		AccessToken: resp.AccessToken,
-		User:        resp.User,
+		AccessToken:        resp.AccessToken,
+		User:               resp.User,
+		PasswordDaysLeft:   resp.PasswordDaysLeft,
+		MustChangePassword: resp.MustChangePassword,
 	})
 }
 
@@ -102,7 +122,11 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.tokenService.ValidateRefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		writeUnauthorized(w, "Sesi telah berakhir")
+		if !errors.Is(err, pkgauth.ErrServiceUnavailable) {
+			// Session over (or token dead): stop the browser resending it.
+			clearRefreshCookie(w)
+		}
+		writeUnauthorized(w, "Sesi berakhir, silakan login kembali")
 		return
 	}
 
@@ -125,14 +149,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		VendorID:   user.VendorID,
 	}
 
-	accessToken, refreshTokenNew, err := h.tokenService.GenerateTokenPair(identity)
+	accessToken, refreshTokenNew, err := h.tokenService.RotateTokenPair(identity, claims.ExpiresAt.Time)
 	if err != nil {
 		writeServiceUnavailable(w, "Gagal memperbarui sesi")
 		return
 	}
 
 	// Set new refresh cookie
-	setRefreshCookie(w, refreshTokenNew)
+	setRefreshCookie(w, refreshTokenNew, h.tokenService.RefreshDeadline(refreshTokenNew))
 
 	writeJSON(w, http.StatusOK, loginResponse{
 		AccessToken: accessToken,
@@ -191,6 +215,62 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// changePasswordRequest is the expected JSON body for POST /change-password.
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+// ChangePassword handles POST /change-password — self-service password
+// change for the caller's own account (RequireAuth). Requires the correct
+// old password; not an admin reset. LDAP/Entra accounts are rejected.
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "Request body tidak valid")
+		return
+	}
+
+	err := h.changePasswordSvc.ChangePassword(r.Context(), authCtx.UserID, auth.ChangePasswordRequest{
+		OldPassword: req.OldPassword,
+		NewPassword: req.NewPassword,
+	}, extractClientIP(r))
+	if err != nil {
+		h.handleChangePasswordError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Password berhasil diubah"})
+}
+
+// handleChangePasswordError maps ChangePassword errors to HTTP responses.
+func (h *AuthHandler) handleChangePasswordError(w http.ResponseWriter, err error) {
+	var validationErr *pkgauth.ValidationError
+	if errors.As(err, &validationErr) {
+		writeValidationError(w, validationErr.Field, validationErr.Message)
+		return
+	}
+
+	switch {
+	case errors.Is(err, pkgauth.ErrInvalidCredentials):
+		writeUnauthorized(w, "Password lama salah")
+	case errors.Is(err, pkgauth.ErrChangeNotAllowed):
+		writeError(w, http.StatusForbidden, "change_not_allowed", pkgauth.ErrChangeNotAllowed.Error())
+	case errors.Is(err, pkgauth.ErrPasswordUnchanged):
+		writeError(w, http.StatusBadRequest, "password_unchanged", pkgauth.ErrPasswordUnchanged.Error())
+	case errors.Is(err, pkgauth.ErrServiceUnavailable):
+		writeServiceUnavailable(w, "Layanan sedang tidak tersedia")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+	}
+}
+
 // handleAuthError maps auth package errors to appropriate HTTP responses.
 func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 	var validationErr *pkgauth.ValidationError
@@ -212,6 +292,10 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "account_inactive", "Akun tidak aktif")
 	case errors.Is(err, pkgauth.ErrPortalMismatch):
 		writeError(w, http.StatusForbidden, "portal_mismatch", "Akun tidak memiliki akses ke portal ini")
+	case errors.Is(err, pkgauth.ErrPasswordExpired):
+		writeError(w, http.StatusForbidden, "password_expired", pkgauth.ErrPasswordExpired.Error())
+	case errors.Is(err, pkgauth.ErrAccountLocked):
+		writeError(w, http.StatusForbidden, "account_locked", pkgauth.ErrAccountLocked.Error())
 	case errors.Is(err, pkgauth.ErrLDAPNotConfigured):
 		writeServiceUnavailable(w, "LDAP authentication tidak tersedia")
 	case errors.Is(err, pkgauth.ErrServiceUnavailable):
@@ -221,13 +305,15 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 	}
 }
 
-// setRefreshCookie sets the refresh_token httpOnly cookie.
-func setRefreshCookie(w http.ResponseWriter, token string) {
+// setRefreshCookie sets the refresh_token httpOnly cookie, living until the
+// absolute session deadline.
+func setRefreshCookie(w http.ResponseWriter, token string, deadline time.Time) {
+	maxAge := max(int(time.Until(deadline).Seconds()), 0)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,
 		Path:     "/api/v1/auth",
-		MaxAge:   604800, // 7 days in seconds
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,

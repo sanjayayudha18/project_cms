@@ -1,0 +1,57 @@
+Mari saya investigasi arsitektur aplikasi, khususnya flow upload DSR dan konfigurasi backend/DB/Redis.I'll investigate the CMS2 backend architecture systematically. Let me start by exploring the directory structure and key files in parallel.Good progress. Both main.go files read. DSR handler/service live in `internal/handler`, `internal/service`. Let me locate the DSR-specific files, config, database pool, auth, and rate limiter in parallel.Key findings so far: CIT DSR is an empty stub (`package dsr` only, no endpoints). No `pkg/database` directory exists — pools are created inline in each main.go via `pgxpool.New`. No max-connection settings in `pkg/config`. Let me now read the DSR handler/service/parser, the auth package, and the rate limiter.Excellent detail. The DSR flow is now clear — parsing is delegated to an external Python `service_dsr_etl` service via synchronous HTTP (not a Go worker, not asynq). Now let me read the rate limiter, token service, and the local auth provider/login service to complete the auth picture.I have nearly everything. The `internal/auth` login service (LocalProvider, Service) isn't at the path I searched. Let me find it and confirm no LDAP/asynq/worker exists, and check the DSR SQL for idempotency by checksum.I have enough to answer comprehensively. Let me read the login `Service` core and `local_provider.go` to confirm password verification and DB writes, and confirm the DSR table naming (`dsr_uploads` vs `atm_dsr_uploads`).I now have all the facts needed. Let me report my findings.Saya sekarang punya gambaran arsitektur yang cukup akurat. Beberapa temuan penting membuat rekomendasi stress test berbeda dari asumsi awal. Mari saya cek kapasitas VM deployment dan apakah sudah ada tooling load test.No existing load-test tooling and no DB pool tuning. That confirms the key findings. I have enough to give a grounded recommendation. Let me give the assessment directly rather than write files (you didn't ask me to create anything yet).
+
+## Ringkasan: apa yang sebenarnya perlu di-stress test
+
+Sebelum ke angka target, ada temuan arsitektur yang mengubah cara kita harus stress test aplikasi ini. Ini penting karena beberapa asumsi umum tidak berlaku di sini:
+
+**Temuan kunci dari kode (bukan asumsi):**
+
+1. **Upload DSR bukan proses in-process Go.** Handler Go memanggil **service Python eksternal** (`service_dsr_etl` di `http://localhost:8090`) secara **sinkron/blocking** lewat HTTP, sampai **25 detik** per fase. Ada dua fase: `POST /uploads` (dry-run) lalu `POST /uploads/confirm` (commit). Parsing Excel + tulis ke DB dilakukan Python, bukan Go. → **Bottleneck 100 upload bersamaan ada di service Python, bukan di Go.** Ini yang paling rapuh.
+
+2. **`WriteTimeout` server = 30 detik**, tapi handler DSR bisa blocking ~25 detik nunggu Python. Di bawah beban, upload DSR duduk sangat dekat dengan plafon timeout. Satu goroutine per upload tertahan selama itu.
+
+3. **DB pool tidak di-tune sama sekali.** `pgxpool.New(cfg.DatabaseURL)` pakai default pgx (max = `max(4, NumCPU)`). Tidak ada `pool_max_conns`. → dengan 500 user, pool default kemungkinan jadi pembatas keras. Ini harus diukur.
+
+4. **Rate limit DSR = 10 upload/jam/vendor.** Jadi "100 upload bersamaan" hanya realistis jika datang dari **≥10 vendor berbeda** (100 upload / 10 per vendor). Kalau dari 1 vendor, 90 akan kena HTTP 429 — itu perilaku benar, bukan bug. Skenario test harus pakai banyak vendor.
+
+5. **Path authenticated murah.** Validasi access token = JWT murni, tanpa Redis/DB. Jadi 500 user yang browsing/list/dashboard akan dibatasi oleh **DB pool tunggal**, bukan auth.
+
+6. **Replica pool belum disambung** — semua read+write ke primary yang sama. `DATABASE_REPLICA_URL` dibaca tapi tidak dipakai. Dashboard "berat" yang harusnya ke replica sekarang menekan primary.
+
+7. **backend-cit hanya health check** — belum ada endpoint nyata, tidak perlu load test berat sekarang.
+
+## Rekomendasi target stress test
+
+**1. 500 concurrent users** — realistis, ini memang NFR (300 concurrent di URS, jadi 500 memberi headroom). Tapi definisikan "user" sebagai *sesi aktif dengan pola campuran*, bukan 500 request identik. Pakai distribusi: ~70% read (list/dashboard/detail), ~20% aksi ringan (approval submit, login), ~10% upload.
+
+**2. 100 upload DSR bersamaan** — bisa, dengan syarat:
+- Sebar ke ≥10 vendor (karena rate limit 10/jam/vendor), idealnya 20-50 vendor.
+- Yang di-test bukan cuma Go — **service Python ETL adalah subjek utama**. Ukur berapa upload paralel yang bisa ditangani Python sebelum antre/timeout.
+- Uji dua fase (dry-run + confirm) karena keduanya blocking.
+
+## Stress test lain yang saya rekomendasikan
+
+| # | Skenario | Kenapa penting | Target awal |
+|---|----------|----------------|-------------|
+| 1 | **DB pool exhaustion** | Pool default pgx sangat kecil, single primary. Cari titik di mana request antre menunggu koneksi. | Naikkan concurrent read sampai p95 latency meledak; catat angka pool yang benar |
+| 2 | **Login/auth burst** | Rate limiter fail-**closed**: kalau Redis lambat/down, semua login ditolak. Uji Redis di bawah beban. | 500 login dalam <1 menit + simulasi Redis latency |
+| 3 | **ETL service saturation** | Python ETL adalah dependensi blocking eksternal. Titik jenuhnya menentukan kapasitas upload nyata. | Ramp upload paralel: 10 → 50 → 100, ukur antrean & timeout |
+| 4 | **Timeout boundary** | Upload dekat plafon `WriteTimeout` 30s. Uji apa yang terjadi saat ETL sengaja lambat (>25s). | Inject delay di ETL, verifikasi error bersih bukan koneksi menggantung |
+| 5 | **Soak test** | Cari memory leak (`io.ReadAll` baca seluruh file ke memori) & kebocoran koneksi. | Beban sedang selama 2-4 jam |
+| 6 | **Spike test** | Simulasi deadline DSR jam 09:00 — semua vendor upload berbarengan. | Lonjakan mendadak 0 → 100 upload |
+| 7 | **Redis dependency failure** | Redis mati → login & rate limit gagal-tertutup. Uji perilaku degradasi. | Matikan Redis saat beban jalan |
+| 8 | **EOD batch vs transactional** | Steering bilang batch & transaksional tak boleh tumpang tindih. Verifikasi resource saat keduanya jalan. | Jalankan `cmd/batch` saat beban transaksional aktif |
+
+## Tooling yang saya sarankan
+
+Belum ada tooling load test di repo. Untuk stack Go + upload multipart, saya rekomendasikan **k6** (skrip JavaScript, dukungan multipart & metrik bagus, gampang di-CI). Alternatif **Vegeta** untuk uji throughput endpoint tunggal yang cepat.
+
+## Yang saya butuhkan sebelum lanjut
+
+Supaya rekomendasi ini jadi angka pass/fail yang benar (bukan tebakan):
+
+1. **Spec VM produksi** — vCPU & RAM VM Compute Engine, dan tier CloudSQL (max connections instance). Ini menentukan target pool & concurrency realistis.
+2. **Ukuran file DSR tipikal** — jumlah baris rata-rata (steering bilang <1000 baris) untuk skrip test yang representatif.
+3. **Environment target** — apakah test jalan di staging yang menyerupai prod, atau lokal?
+
+Mau saya lanjut buatkan **skrip k6 lengkap** untuk skenario 500 user + 100 upload (poin 1 & 2) plus dokumen rencana test di `.kiro/`? Kalau iya, konfirmasi tooling (k6?) dan spec VM/CloudSQL di atas, supaya threshold pass/fail-nya akurat.

@@ -75,7 +75,7 @@ export function AppShell({ children }: AppShellProps) {
       className="grid h-screen overflow-hidden"
       style={{
         gridTemplateColumns: `${sidebarWidth} 1fr`,
-        gridTemplateRows: "auto 1fr",
+        gridTemplateRows: "auto minmax(0, 1fr)",
       }}
     >
       {/* Sidebar — spans both rows */}
@@ -165,12 +165,14 @@ export function AppShell({ children }: AppShellProps) {
         )}
       </header>
 
-      {/* Main content — scrollable area */}
+      {/* Main content — scrollable area. `relative` makes <main> the containing
+          block for absolutely-positioned descendants (e.g. `sr-only`), so they are
+          clipped by its scroll instead of stretching the document height. */}
       <main
         ref={mainRef}
         tabIndex={-1}
         id="main-content"
-        className="overflow-y-auto px-[var(--space-6)] py-[var(--space-6)] outline-none"
+        className="relative overflow-y-auto px-[var(--space-6)] py-[var(--space-6)] outline-none"
         style={{ backgroundColor: "var(--n-50)" }}
       >
         {children}

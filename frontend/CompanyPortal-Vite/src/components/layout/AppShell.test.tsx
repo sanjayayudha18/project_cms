@@ -79,7 +79,7 @@ describe("AppShell", () => {
     const grid = container.firstElementChild as HTMLElement;
     expect(grid).toHaveClass("grid", "h-screen", "overflow-hidden");
     expect(grid.style.gridTemplateColumns).toBe("256px 1fr");
-    expect(grid.style.gridTemplateRows).toBe("auto 1fr");
+    expect(grid.style.gridTemplateRows).toBe("auto minmax(0, 1fr)");
   });
 
   it("renders sidebar with navigation landmark", () => {
@@ -194,6 +194,7 @@ describe("AppShell", () => {
     );
 
     const main = screen.getByRole("main");
-    expect(main).toHaveClass("overflow-y-auto");
+    // `relative` keeps absolute descendants (sr-only) inside main's scroll box
+    expect(main).toHaveClass("overflow-y-auto", "relative");
   });
 });

@@ -1,4 +1,4 @@
-import type { AuthUser, Role } from "@/lib/auth";
+import type { AuthUser, DbRole } from "@/lib/auth";
 import { fireEvent, render, screen } from "@testing-library/react";
 import * as fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
@@ -8,40 +8,31 @@ import { Header } from "./Header";
  * Property 8: Header User Info Display
  * Validates: Requirements 1.7
  *
- * For any valid AuthUser object with a non-empty fullName and a valid primaryRole,
- * rendering the Header component SHALL produce output containing the user's fullName
- * text and the primaryRole badge text.
+ * For any valid AuthUser object with a non-empty fullName, rendering the Header
+ * component SHALL produce output containing the user's fullName and email text.
  */
 describe("Header — Property 8: Header User Info Display", () => {
-  const ALL_ROLES: Role[] = [
-    "Admin",
-    "ATM_Support",
-    "Cash_Management",
-    "Vendor",
-    "WMO",
-    "Finance",
-    "Cash_Count_PIC",
-    "Cash_Count_Lead",
-    "Branch",
-    "Approver",
+  const ALL_ROLES: DbRole[] = [
+    "ADMIN",
+    "ADMIN_PARAM",
+    "ATM-USER",
+    "ATM-SPV",
+    "BRANCH-USER",
+    "BRANCH-SPV",
+    "BRANCH-ATM-USER",
+    "BRANCH-ATM-SPV",
+    "VENDOR-USER",
   ];
 
-  const arbRole = fc.constantFrom(...ALL_ROLES);
-
-  const arbRolesIncluding = (primary: Role) =>
-    fc
-      .uniqueArray(arbRole, { minLength: 1 })
-      .map((roles) => (roles.includes(primary) ? roles : [primary, ...roles]));
-
-  const arbAuthUser: fc.Arbitrary<AuthUser> = arbRole.chain((primaryRole) =>
-    fc.record({
-      id: fc.string({ minLength: 1 }),
-      fullName: fc.string({ minLength: 1, unit: "grapheme" }).filter((s) => s.trim().length > 0),
-      email: fc.emailAddress(),
-      roles: arbRolesIncluding(primaryRole),
-      primaryRole: fc.constant(primaryRole),
-    }),
-  );
+  const arbAuthUser: fc.Arbitrary<AuthUser> = fc.record({
+    id: fc.integer({ min: 1 }),
+    username: fc.string({ minLength: 1 }),
+    fullName: fc.string({ minLength: 1, unit: "grapheme" }).filter((s) => s.trim().length > 0),
+    email: fc.emailAddress(),
+    role: fc.constantFrom(...ALL_ROLES),
+    isKaryawan: fc.boolean(),
+    vendorId: fc.option(fc.integer({ min: 1 }), { nil: null }),
+  });
 
   const arbSidebarCollapsed = fc.boolean();
 
@@ -70,7 +61,7 @@ describe("Header — Property 8: Header User Info Display", () => {
     );
   });
 
-  it("rendered output contains the user's primaryRole in the badge", () => {
+  it("rendered output contains the user's email in the dropdown", () => {
     fc.assert(
       fc.property(arbAuthUser, arbSidebarCollapsed, (user, sidebarCollapsed) => {
         const { unmount } = render(
@@ -82,11 +73,11 @@ describe("Header — Property 8: Header User Info Display", () => {
           />,
         );
 
-        // The role badge lives inside the user dropdown — open it first.
+        // The email lives inside the user dropdown — open it first.
         fireEvent.click(screen.getByTestId("header-user-name"));
 
-        const badgeEl = screen.getByTestId("header-role-badge");
-        expect(badgeEl.textContent).toBe(user.primaryRole);
+        const emailEl = screen.getByTestId("header-email");
+        expect(emailEl.textContent).toBe(user.email);
 
         unmount();
       }),

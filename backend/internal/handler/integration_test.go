@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
 	"github.com/cimb-niaga/cms/pkg/middleware"
@@ -38,8 +39,13 @@ const (
 	// testVendorUser has role VENDOR-USER, is_karyawan=false, vendor_id set (vendor portal).
 	// Both authenticate with testDevPassword — 003_seed_roles_users.sql's
 	// password_hash values are a verified bcrypt hash of "password123".
-	testCompanyUser = "Yudha"
-	testVendorUser  = "vendor.ssi"
+	// testCompanyUser/testVendorUser are the seeded usernames (still the
+	// returned identifier in resp.User.Username); login itself now goes by
+	// email, hence the matching *Email constants used in doLogin calls.
+	testCompanyUser  = "Yudha"
+	testVendorUser   = "vendor.ssi"
+	testCompanyEmail = "admin@cimbniaga.co.id"
+	testVendorEmail  = "ahmad.hidayat@ssi.co.id"
 )
 
 // ─── Test Harness ─────────────────────────────────────────────────────────────
@@ -80,6 +86,12 @@ func setupHarness(t *testing.T) *testHarness {
 	// Run migrations against the test DB
 	runMigrations(t, pool)
 
+	// The seeded accounts are real rows on the shared dev DB and login
+	// failures commit real lockouts (no tx rollback here) — reset both
+	// before every test so a prior run's lockout never leaks in.
+	resetAccountLockout(t, pool, testCompanyEmail)
+	resetAccountLockout(t, pool, testVendorEmail)
+
 	// Start miniredis
 	mr, err := miniredis.Run()
 	if err != nil {
@@ -97,7 +109,7 @@ func setupHarness(t *testing.T) *testHarness {
 	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}
 	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 
@@ -117,7 +129,8 @@ func setupHarness(t *testing.T) *testHarness {
 		rateLimiter,
 	)
 
-	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter)
+	changePasswordSvc := auth.NewChangePasswordService(repo, audit.NewWriter(pool))
+	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter, changePasswordSvc)
 
 	// Build router
 	r := chi.NewRouter()
@@ -153,22 +166,11 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 		return
 	}
 
-	// Order matters: 001.1_vendor_vaults.sql adds an FK to vendor_branches,
-	// which is created in 002_cms_tables.sql, so it must run after it.
-	// 001_create_db_cms.sql is excluded — it issues CREATE DATABASE, which
-	// cannot run from a pool already connected to that database.
+	// Baseline = pg_dump of the fully migrated schema + reference seed data.
+	// Pre-baseline history lives in migrations/archives/2026-09-18_pre-baseline.
 	migrations := []string{
-		"../../migrations/002_cms_tables.sql",
-		"../../migrations/001.1_vendor_vaults.sql",
-		"../../migrations/003_seed_roles_users.sql",
-		"../../migrations/004_seed_regions_locations.sql",
-		"../../migrations/005_seed_vendors.sql",
-		"../../migrations/006_seed_vendor_branches_fixed.sql",
-		"../../migrations/007_seed_vendor_vaults_hardened.sql",
-		"../../migrations/008_seed_atms.sql",
-		"../../migrations/009_itm_cashpos.sql",
-		"../../migrations/010_rename_itm_cashpos_to_itm_replenish.sql",
-		"../../migrations/011_itm_cashpos.sql",
+		"../../migrations/001_baseline_schema.sql",
+		"../../migrations/002_baseline_seed.sql",
 	}
 
 	for _, path := range migrations {
@@ -184,8 +186,8 @@ func runMigrations(t *testing.T, pool *pgxpool.Pool) {
 
 // ─── HTTP Helpers ─────────────────────────────────────────────────────────────
 
-func doLogin(h http.Handler, username, password, portal string) *httptest.ResponseRecorder {
-	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
+func doLogin(h http.Handler, email, password, portal string) *httptest.ResponseRecorder {
+	body := fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login",
 		strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -193,6 +195,19 @@ func doLogin(h http.Handler, username, password, portal string) *httptest.Respon
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 	return w
+}
+
+// resetAccountLockout clears failed_login_attempts/locked_until for the given
+// user on the shared dev DB. TestIntegration_RateLimitEnforcement trips a real
+// lockout on the seeded testCompanyEmail account; without resetting it, the
+// lockout survives past the test (no tx rollback here, real commits) and
+// fails every other test in this file that logs in as the same user.
+func resetAccountLockout(t *testing.T, pool *pgxpool.Pool, email string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE email = $1`, email); err != nil {
+		t.Fatalf("resetting account lockout for %s: %v", email, err)
+	}
 }
 
 func doRefresh(h http.Handler, refreshCookie string) *httptest.ResponseRecorder {
@@ -244,7 +259,7 @@ func TestIntegration_CompanyLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
 	// testCompanyUser is an internal user (is_karyawan=true), role ADMIN
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -279,7 +294,7 @@ func TestIntegration_VendorLogin_Success(t *testing.T) {
 	h := setupHarness(t)
 
 	// testVendorUser is a vendor user (is_karyawan=false, vendor_id set), role VENDOR-USER
-	w := doLogin(h.router, testVendorUser, testDevPassword, vendorPortal)
+	w := doLogin(h.router, testVendorEmail, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -308,7 +323,7 @@ func TestIntegration_PortalMismatch_InternalOnVendor(t *testing.T) {
 	h := setupHarness(t)
 
 	// Internal user trying to login via vendor portal
-	w := doLogin(h.router, testCompanyUser, testDevPassword, vendorPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, vendorPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -325,7 +340,7 @@ func TestIntegration_PortalMismatch_VendorOnCompany(t *testing.T) {
 	h := setupHarness(t)
 
 	// Vendor user trying to login via company portal
-	w := doLogin(h.router, testVendorUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testVendorEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
@@ -338,33 +353,31 @@ func TestIntegration_PortalMismatch_VendorOnCompany(t *testing.T) {
 	}
 }
 
-func TestIntegration_RateLimitEnforcement(t *testing.T) {
+func TestIntegration_AccountLockoutEnforcement(t *testing.T) {
 	h := setupHarness(t)
+	t.Cleanup(func() { resetAccountLockout(t, h.pool, testCompanyEmail) })
 
-	// Exhaust 5 failed attempts for a username
-	for i := 0; i < 5; i++ {
-		w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
+	// pkgauth.MaxFailedLogins is 3: the account-level lockout (DB-persisted,
+	// keyed on the user) trips before the username rate limiter's 5-attempt
+	// threshold ever can, so exhausting failed attempts on a real account
+	// always surfaces as a lockout, not a 429. Exhaust exactly MaxFailedLogins.
+	for i := 0; i < pkgauth.MaxFailedLogins; i++ {
+		w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: expected 401, got %d", i+1, w.Code)
 		}
 	}
 
-	// 6th attempt should be rate limited
-	w := doLogin(h.router, testCompanyUser, "wrong-password", companyPortal)
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected 429, got %d: %s", w.Code, w.Body.String())
+	// The attempt after the threshold should be locked out.
+	w := doLogin(h.router, testCompanyEmail, "wrong-password", companyPortal)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 (account_locked), got %d: %s", w.Code, w.Body.String())
 	}
 
-	// Retry-After header should be present
-	retryAfter := w.Header().Get("Retry-After")
-	if retryAfter == "" {
-		t.Error("Retry-After header should be set on 429")
-	}
-
-	// Even correct password should be blocked
-	w = doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
-	if w.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected 429 even with correct pw, got %d", w.Code)
+	// Even correct password should be blocked while locked out.
+	w = doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 (account_locked) even with correct pw, got %d", w.Code)
 	}
 }
 
@@ -372,7 +385,7 @@ func TestIntegration_TokenRefresh(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login first to get a refresh token
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d %s", w.Code, w.Body.String())
 	}
@@ -411,7 +424,7 @@ func TestIntegration_Logout_BlacklistsJTI(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -435,7 +448,7 @@ func TestIntegration_RefreshAfterLogout_Fails(t *testing.T) {
 	h := setupHarness(t)
 
 	// Login
-	w := doLogin(h.router, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(h.router, testCompanyEmail, testDevPassword, companyPortal)
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d", w.Code)
 	}
@@ -491,7 +504,7 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 	tokenCfg := pkgauth.TokenConfig{
 		SecretKey:          []byte(testJWTSecret),
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}
 	tokenSvc := pkgauth.NewTokenService(tokenCfg, blacklist)
 	localProvider := auth.NewLocalProvider(repo)
@@ -508,13 +521,14 @@ func TestIntegration_RedisUnavailable_Returns503(t *testing.T) {
 		tokenSvc, repo, rateLimiter,
 	)
 
-	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter)
+	changePasswordSvc := auth.NewChangePasswordService(repo, audit.NewWriter(pool))
+	authHandler := NewAuthHandler(authSvc, tokenSvc, repo, rateLimiter, changePasswordSvc)
 
 	r := chi.NewRouter()
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
 	// Attempt login — should get 503 because Redis is unreachable (fail-closed)
-	w := doLogin(r, testCompanyUser, testDevPassword, companyPortal)
+	w := doLogin(r, testCompanyEmail, testDevPassword, companyPortal)
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when Redis down, got %d: %s",

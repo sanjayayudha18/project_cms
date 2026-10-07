@@ -55,7 +55,7 @@ func main() {
 	tokenService := auth.NewTokenService(auth.TokenConfig{
 		SecretKey:          cfg.JWTSecret,
 		AccessTokenExpiry:  cfg.AccessTokenExpiry,
-		RefreshTokenExpiry: cfg.RefreshTokenExpiry,
+		SessionMaxLifetime: cfg.SessionMaxLifetime,
 	}, tokenBlacklist)
 
 	r := chi.NewRouter()

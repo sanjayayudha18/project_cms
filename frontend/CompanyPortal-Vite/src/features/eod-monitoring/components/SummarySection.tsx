@@ -39,7 +39,7 @@ export function SummarySection({ processingDate, refetchInterval }: SummarySecti
 
       {!isLoading && !isError && data && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <SummaryCard label="Pending" value={data.counts.pending} format="number" />
+          <SummaryCard label="Tertunda" value={data.counts.pending} format="number" />
           <SummaryCard label="Processing" value={data.counts.processing} format="number" />
           <SummaryCard label="Completed" value={data.counts.completed} format="number" />
           <SummaryCard label="Failed" value={data.counts.failed} format="number" />

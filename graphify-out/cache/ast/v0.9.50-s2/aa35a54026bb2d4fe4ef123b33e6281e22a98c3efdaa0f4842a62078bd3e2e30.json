@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_queries_master_data_sql", "label": "master_data.sql", "file_type": "code", "source_file": "backend/queries/master_data.sql", "source_location": null}], "edges": []}

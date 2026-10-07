@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -20,12 +21,52 @@ func (m *mockUserRepository) FindByUsername(_ context.Context, _ string) (*pkgau
 	return m.user, m.err
 }
 
+func (m *mockUserRepository) FindByEmail(_ context.Context, _ string) (*pkgauth.UserRecord, error) {
+	return m.user, m.err
+}
+
 func (m *mockUserRepository) UpdateLastLogin(_ context.Context, _ int64) error {
 	return nil
 }
 
 func (m *mockUserRepository) GetUserProfile(_ context.Context, _ int64) (*pkgauth.UserRecord, error) {
 	return m.user, m.err
+}
+
+func (m *mockUserRepository) MarkPasswordExpired(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (m *mockUserRepository) IncrementFailedLogin(_ context.Context, _ int64) (int32, error) {
+	return 0, nil
+}
+
+func (m *mockUserRepository) LockAccount(_ context.Context, _ int64, _ time.Time) error {
+	return nil
+}
+
+func (m *mockUserRepository) ResetLockout(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (m *mockUserRepository) FindByID(_ context.Context, _ int64) (*pkgauth.UserRecord, error) {
+	return m.user, m.err
+}
+
+func (m *mockUserRepository) SetPassword(_ context.Context, _ int64, _ string) error {
+	return nil
+}
+
+func (m *mockUserRepository) SetInitialPassword(_ context.Context, _ int64, _ string) error {
+	return nil
+}
+
+func (m *mockUserRepository) Deactivate(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (m *mockUserRepository) Reactivate(_ context.Context, _ int64) error {
+	return nil
 }
 
 // hashPassword is a test helper that generates a bcrypt hash.

@@ -63,7 +63,7 @@ func newTestTokenService(secret []byte) *TokenService {
 	return NewTokenService(TokenConfig{
 		SecretKey:          secret,
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: time.Hour,
 	}, &mockBlacklist{})
 }
 
@@ -177,7 +177,7 @@ func TestProperty_Token_RefreshTokenUniquenessAndRotation(t *testing.T) {
 				t.Fatalf("refresh token exp is nil at iteration %d", i)
 			}
 
-			expectedExpiry := 7 * 24 * time.Hour
+			expectedExpiry := time.Hour
 			diff := claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time)
 			if diff != expectedExpiry {
 				t.Fatalf("refresh exp - iat = %v, want %v (7 days) at iteration %d", diff, expectedExpiry, i)

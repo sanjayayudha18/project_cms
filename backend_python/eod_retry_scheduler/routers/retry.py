@@ -1,0 +1,37 @@
+"""POST /retry/{file_id} -- manual retry (task 14.3)."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Path, Request, Response
+
+from lib.dependencies import extract_user_id, require_eod_role
+from lib.services.scheduler_service import FileNotFoundInTrackingError, RetryConflictError
+
+router = APIRouter(dependencies=[Depends(require_eod_role)])
+
+
+@router.post("/retry/{file_id}")
+async def manual_retry(
+    request: Request, response: Response,
+    file_id: int = Path(ge=1, le=9223372036854775807), auth=Depends(require_eod_role),
+):
+    user_id = extract_user_id(auth)
+    scheduler_service = request.app.state.scheduler_service
+    ip = request.client.host if request.client else None
+
+    try:
+        result = await scheduler_service.process_manual_retry(file_id, user_id, ip=ip)
+    except FileNotFoundInTrackingError as e:
+        response.status_code = 404
+        return {"status": "error", "data": None, "error": str(e)}
+    except RetryConflictError as e:
+        response.status_code = 409
+        return {"status": "error", "data": None, "error": str(e)}
+
+    return {
+        "status": "success",
+        "data": {
+            "file_id": str(result["file_id"]),
+            "processing_status": result["processing_status"],
+            "triggered_by": result["triggered_by"],
+        },
+    }

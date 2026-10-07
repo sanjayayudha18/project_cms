@@ -38,7 +38,7 @@ func newTestTokenService() *auth.TokenService {
 	config := auth.TokenConfig{
 		SecretKey:          secret,
 		AccessTokenExpiry:  15 * time.Minute,
-		RefreshTokenExpiry: 7 * 24 * time.Hour,
+		SessionMaxLifetime: 7 * 24 * time.Hour,
 	}
 	return auth.NewTokenService(config, &noopBlacklist{})
 }

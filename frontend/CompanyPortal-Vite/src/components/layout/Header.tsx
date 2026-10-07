@@ -136,7 +136,7 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
           {/* Dropdown menu */}
           {dropdownOpen && (
             <div
-              className="absolute right-0 top-full z-50 mt-[var(--space-1)] w-48 rounded-[var(--radius-md)] border py-[var(--space-1)]"
+              className="absolute right-0 top-full z-50 mt-[var(--space-1)] w-48 overflow-hidden rounded-[var(--radius-md)] border py-[var(--space-1)]"
               style={{
                 backgroundColor: "var(--n-0)",
                 borderColor: "var(--n-200)",
@@ -157,19 +157,16 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                 </span>
               </div>
 
-              {/* Role badge row */}
+              {/* Email row */}
               <div
-                className="flex items-center gap-[var(--space-2)] px-[var(--space-3)] py-[var(--space-2)]"
+                className="flex items-center px-[var(--space-3)] py-[var(--space-2)]"
                 style={{ borderBottom: "1px solid var(--n-100)" }}
               >
                 <span
-                  className="inline-flex items-center rounded-full px-[var(--space-2)] py-[2px] text-[11px] font-medium"
-                  style={{ backgroundColor: "var(--red-50)", color: "var(--red-700)" }}
-                  data-testid="header-role-badge"
+                  className="min-w-0 truncate text-xs"
+                  style={{ color: "var(--n-500)" }}
+                  data-testid="header-email"
                 >
-                  {user.role}
-                </span>
-                <span className="text-xs" style={{ color: "var(--n-500)" }}>
                   {user.email}
                 </span>
               </div>
@@ -190,8 +187,8 @@ export function Header({ user, onLogout, onSidebarToggle, sidebarCollapsed }: He
                 data-testid="header-logout-button"
                 aria-label="Keluar dari sistem"
               >
-                <LogOut size={15} aria-hidden="true" />
-                Keluar dari sistem
+                <LogOut size={15} className="shrink-0" aria-hidden="true" />
+                <span className="min-w-0 truncate">Keluar dari sistem</span>
               </button>
             </div>
           )}

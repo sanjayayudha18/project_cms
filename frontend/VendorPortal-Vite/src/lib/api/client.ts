@@ -94,8 +94,12 @@ async function handleUnauthorized(config: RequestConfig): Promise<Response | nul
 async function executeRequest(config: RequestConfig, isRetry = false): Promise<Response> {
   const url = config.path.startsWith("http") ? config.path : config.path;
 
+  // FormData (file uploads): let the browser set Content-Type itself so it
+  // includes the multipart boundary, and pass the body through unserialized.
+  const isFormData = config.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...config.headers,
   };
 
@@ -104,7 +108,11 @@ async function executeRequest(config: RequestConfig, isRetry = false): Promise<R
   const fetchOptions: RequestInit = {
     method: config.method,
     headers: finalHeaders,
-    body: config.body ? JSON.stringify(config.body) : undefined,
+    body: isFormData
+      ? (config.body as FormData)
+      : config.body
+        ? JSON.stringify(config.body)
+        : undefined,
     credentials: "include",
   };
 

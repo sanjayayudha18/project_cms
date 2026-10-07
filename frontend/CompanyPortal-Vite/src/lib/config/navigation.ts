@@ -2,31 +2,33 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
-  Calculator,
   Calendar,
   CalendarDays,
-  CheckCircle,
   ClipboardCheck,
-  FileOutput,
+  ClipboardList,
   FileText,
   GitCompare,
   LayoutDashboard,
-  ListChecks,
   Monitor,
   Receipt,
-  Scale,
+  ScrollText,
+  Search,
   Settings,
   Table,
-  TrendingUp,
   Truck,
-  Upload,
 } from "lucide-react";
 
 import type { DbRole } from "@/lib/auth/store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type NavGroup = "general" | "monitoring" | "forecasting" | "invoice" | "cash-count";
+export type NavGroup =
+  | "general"
+  | "monitoring"
+  | "forecasting"
+  | "replenish"
+  | "invoice"
+  | "cash-count";
 
 export interface NavItem {
   id: string;
@@ -44,6 +46,7 @@ export const GROUP_LABELS: Record<NavGroup, string> = {
   general: "Umum",
   monitoring: "Monitoring",
   forecasting: "Peramalan",
+  replenish: "Replenish",
   invoice: "Tagihan",
   "cash-count": "Perhitungan Kas",
 };
@@ -69,19 +72,11 @@ export const NAV_CONFIG: NavItem[] = [
     group: "general",
   },
   {
-    id: "cit",
-    label: "CIT Tracker",
-    icon: Truck,
-    href: "/cit",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "general",
-  },
-  {
-    id: "replenishment",
-    label: "Pengisian Ulang",
-    icon: Truck,
-    href: "/replenishment",
-    roles: ["ATM-USER", "ATM-SPV"],
+    id: "approvals",
+    label: "Persetujuan",
+    icon: ClipboardCheck,
+    href: "/approvals",
+    roles: ["*"],
     group: "general",
   },
   {
@@ -89,10 +84,45 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pengaturan",
     icon: Settings,
     href: "/settings",
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "ADMIN_PARAM", "APPACCESS"],
     group: "general",
   },
 
+  // Replenish
+  {
+    id: "forecast-browser",
+    label: "Rekomendasi CIT",
+    icon: Search,
+    href: "/replenishment/forecast-browser",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    group: "replenish",
+  },
+  {
+    id: "vendor-requests",
+    label: "Request CIT",
+    icon: ClipboardList,
+    href: "/replenishment/vendor-requests",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    group: "replenish",
+  },
+  {
+    id: "replenishment",
+    label: "Jadwal CIT",
+    icon: Truck,
+    href: "/replenishment",
+    roles: ["ATM-USER", "ATM-SPV"],
+    group: "replenish",
+  },
+  /*
+  {
+    id: "cit",
+    label: "CIT Tracker",
+    icon: Truck,
+    href: "/cit",
+    roles: ["ATM-USER", "ATM-SPV"],
+    group: "general",
+  },
+  */
   // Monitoring
   {
     id: "atm-portal",
@@ -102,8 +132,25 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV"],
     group: "monitoring",
   },
+  {
+    id: "eod-monitoring",
+    label: "EOD Monitoring",
+    icon: Activity,
+    href: "/eod-monitoring",
+    roles: ["ADMIN", "ADMIN_PARAM"],
+    group: "monitoring",
+  },
+  {
+    id: "audit-logs",
+    label: "Log Audit",
+    icon: ScrollText,
+    href: "/audit-logs",
+    roles: ["ADMIN", "ADMIN_PARAM"],
+    group: "monitoring",
+  },
 
   // Forecasting
+  /*
   {
     id: "dsr-upload",
     label: "Unggah DSR",
@@ -112,6 +159,7 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"],
     group: "forecasting",
   },
+  */
   {
     id: "dsr-dashboard",
     label: "DSR Dashboard",
@@ -120,14 +168,15 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
     group: "forecasting",
   },
-  {
-    id: "forecast",
-    label: "Forecasting",
-    icon: TrendingUp,
-    href: "/forecasting/forecast",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "forecasting",
-  },
+  // Manually hidden from sidebar — route still exists, just not listed in nav.
+  // {
+  //   id: "forecast",
+  //   label: "Forecasting",
+  //   icon: TrendingUp,
+  //   href: "/forecasting/forecast",
+  //   roles: ["ATM-USER", "ATM-SPV"],
+  //   group: "forecasting",
+  // },
   {
     id: "dmaa-forecast",
     label: "DMAA Forecast",
@@ -136,7 +185,7 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
     group: "forecasting",
   },
-  {
+  /*  {
     id: "fill-instruction",
     label: "Instruksi Pengisian",
     icon: FileText,
@@ -179,6 +228,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "forecasting",
     disabled: true,
   },
+  */
   {
     id: "holiday-calendar",
     label: "Kalender Libur",
@@ -216,6 +266,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "invoice",
     disabled: false,
   },
+  /*
   {
     id: "charge-calc",
     label: "Perhitungan Beban",
@@ -234,7 +285,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "invoice",
     disabled: true,
   },
-
+  */
   // Cash Count
   {
     id: "scheduling",
@@ -245,6 +296,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  /*
   {
     id: "tier-analysis",
     label: "Analisis Tier Saldo",
@@ -254,6 +306,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  */
   {
     id: "execution",
     label: "Pelaksanaan (BA)",
@@ -263,6 +316,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  /*
   {
     id: "checklists",
     label: "Checklist",
@@ -281,6 +335,7 @@ export const NAV_CONFIG: NavItem[] = [
     group: "cash-count",
     disabled: true,
   },
+  */
   {
     id: "recapitulation",
     label: "Rekapitulasi",

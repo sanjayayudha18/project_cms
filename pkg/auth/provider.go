@@ -4,11 +4,13 @@ import "context"
 
 // AuthIdentity is the result of successful authentication.
 type AuthIdentity struct {
-	UserID     int64
-	Username   string
-	Role       string
-	IsKaryawan bool
-	VendorID   *int64
+	UserID        int64
+	Username      string
+	Role          string
+	IsKaryawan    bool
+	VendorID      *int64
+	SupervisorID  *int64 // nullable — reporting line (RBAC-Setup)
+	ApprovalLevel *int32 // nullable — maker-checker level, independent of Role
 }
 
 // Provider abstracts credential verification.

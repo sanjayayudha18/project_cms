@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { listVendorPackages } from "../../admin-vendors/api";
-import { formatIDR } from "../../admin-vendors/lib/packagePrice";
 import { type ATMAssignmentSource, type ATMPackageOption, listATMPackageOptions } from "../api";
 
 const inputClass =
@@ -31,13 +30,11 @@ interface Props {
  * "Jenis paket" choice + the Paket dropdown it drives. The cabang stays chosen
  * outside (it is the managing branch in both modes); only where the package list
  * comes from differs: the branch's own packages, or the vendor-wide tariff rows
- * matching this ATM. Vendor-wide shows one option per tariff (code · tier ·
- * price) but reports only its label upward -- the assignment stores the label.
+ * matching this ATM. Vendor-wide shows one option per tariff (code · label)
+ * but reports only its label upward -- the assignment stores the label.
  */
 function vendorOptionLabel(o: ATMPackageOption): string {
-  const tier = o.tier_max === null ? `${o.tier_min}+` : `${o.tier_min}-${o.tier_max}`;
-  const price = o.base_price === "" ? "—" : formatIDR(o.base_price);
-  return `${o.package_code} · ${o.package} · tingkat ${tier} · ${price}`;
+  return `${o.package_code} · ${o.package}`;
 }
 
 export function PackageSourceFields({

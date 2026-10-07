@@ -146,7 +146,7 @@ describe("ATMAssignmentsDialog", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("option", {
-          name: "PKG4_ABA_005 · PAKET 4 · tingkat 51+ · —",
+          name: "PKG4_ABA_005 · PAKET 4",
         }),
       ).toBeTruthy(),
     );
@@ -156,7 +156,7 @@ describe("ATMAssignmentsDialog", () => {
     );
   });
 
-  it("vendor-wide: picks a tariff row (code · tier · price) and submits vendor, cabang and its label", async () => {
+  it("vendor-wide: picks a tariff row (code · label) and submits vendor, cabang and its label", async () => {
     vi.mocked(createATMAssignment).mockClear();
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -180,7 +180,7 @@ describe("ATMAssignmentsDialog", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("option", {
-          name: "PKG4_ABA_005 · PAKET 4 · tingkat 51+ · —",
+          name: "PKG4_ABA_005 · PAKET 4",
         }),
       ).toBeTruthy(),
     );

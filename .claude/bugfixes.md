@@ -16,9 +16,9 @@ Template:
 ---
 
 ## 2026-10-07 — Kelolaan ATM: dropdown "Paket seluruh vendor" hanya label + tabel terpotong
-- **Symptom**: di `/settings/admin/atms` → Kelolaan ATM, mode "Paket seluruh vendor" hanya menampilkan label (PAKET 3/4/5) tanpa kode paket/tingkat/harga; modal terlalu sempit sehingga kolom tabel riwayat kelolaan terpotong.
+- **Symptom**: di `/settings/admin/atms` → Kelolaan ATM, mode "Paket seluruh vendor" hanya menampilkan label (PAKET 3/4/5) tanpa kode paket; modal terlalu sempit sehingga kolom tabel riwayat kelolaan terpotong.
 - **Root cause**: `ListATMPackageOptions` mengembalikan `DISTINCT package` saja; `ATMAssignmentsDialog` memakai lebar default `Dialog` (`max-w-lg`).
-- **Fix**: query `ListATMPackageOptions` (`backend/queries/atm_assignments_admin.sql` + sqlc regen) kini mengembalikan baris tarif (`package`, `package_code`, `tier_min`, `tier_max`, `base_price` sebagai teks, `currency`); signature repo/service/handler ikut. `PackageSourceFields.tsx` menampilkan `kode · label · tingkat · harga` per opsi; yang dikirim saat submit tetap label (`avp.package`) — kontrak API create tidak berubah. `ATMAssignmentsDialog.tsx` → `max-w-4xl` + tabel dibungkus `overflow-x-auto`. Endpoint `GET .../assignment-package-options` berubah shape: `packages` kini array objek (satu-satunya konsumen adalah dialog ini).
+- **Fix**: query `ListATMPackageOptions` (`backend/queries/atm_assignments_admin.sql` + sqlc regen) kini mengembalikan baris tarif (`package`, `package_code`, `tier_min`, `tier_max`, `base_price` sebagai teks, `currency`); signature repo/service/handler ikut. `PackageSourceFields.tsx` menampilkan `kode · label` per opsi (mis. `PKG3_ABA_001 · PAKET 3`); yang dikirim saat submit tetap label (`avp.package`) — kontrak API create tidak berubah. `ATMAssignmentsDialog.tsx` → `max-w-4xl` + tabel dibungkus `overflow-x-auto`. Endpoint `GET .../assignment-package-options` berubah shape: `packages` kini array objek (satu-satunya konsumen adalah dialog ini).
 - **Tests**: Go handler/service/repository unit + `-tags integration TestIntegration_VendorWideAssignment*` lulus; vitest `admin-atms` 84/84, lint + build lulus; manual browser verification: outstanding.
 - **Commit**: _(belum)_
 

@@ -1,6 +1,6 @@
 # Development Progress — CMS2 Cash Management System
 
-**Last Updated:** 2026-10-07
+**Last Updated:** 2026-10-08
 
 Branch: `dev1` = `main` (PR #1 dev1 → main merged, `38eb0a1`; latest `87b2d78`). Uncommitted: Phase 0.1 + intents 0.3/0.4 (2026-10-07).
 
@@ -19,6 +19,7 @@ Branch: `dev1` = `main` (PR #1 dev1 → main merged, `38eb0a1`; latest `87b2d78`
 | Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (review 2026-09-30) | ✅ built, merged to main (`7f6d16b`, R1 `a9873d2`) | manual browser check (user) |
 | Kelolaan ATM: paket khusus cabang / vendor-wide | `atm-package-source/` | 5 Deploy (review 2026-10-07) | ✅ built, merged to main (`ff005fa` + fixes `321a10b`, `00b05a1`; mig 023 applied to dev); tests green; review R1 fixed | manual browser check (user) |
 | Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (review 2026-10-01) | ✅ built, merged to main (committed in `ff005fa`; mig 021 applied to dev); review R1 fixed | manual browser check (user, seed kelolaan dulu) |
+| Nomor tiket replenish per ATM | `replenish-ticket/` | 5 Deploy (review 2026-10-08) | ✅ built (uncommitted); mig 026 applied to dev; review R1/R2 fixed | manual browser check (user); isi `region_code` cabang yang masih kosong; commit → code owner merge |
 | Vendor PKS / CIS limit | `vendor-pks-cis-limit/` | 1 Plan (intent draft 2026-10-05) | ⏳ not built; columns approved 2026-10-05 (CLAUDE.md Sec 3), migration `022` not created | PO accept intent → spec → migration 022 |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
 | Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 5 Deploy (review 2026-10-07) | ✅ built (`eb457cf`, review R1–R3 fixed): `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |

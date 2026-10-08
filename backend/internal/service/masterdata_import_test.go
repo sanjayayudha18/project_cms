@@ -31,7 +31,7 @@ func (fakeImportRepo) Vendors(_ context.Context, after int64, _ string, limit in
 }
 
 func (fakeImportRepo) VendorBranches(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
-	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", LocationID: "5", IsActive: true}}
+	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", LocationID: "5", IsActive: true}}
 	return page(all, after, limit, func(r db.ExportVendorBranchesBatchRow) int64 { return r.ID }), nil
 }
 
@@ -378,6 +378,21 @@ func TestImport_AssignmentLegacyHeaderStillAccepted(t *testing.T) {
 	res := dryRun(t, ExportATMAssignments, h+"1,T1,V1,B1,P1,2026-01-01,2026-06-30,true\n")
 	if len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
 		t.Errorf("legacy file re-importing an unchanged branch row must be a no-op, got %+v", res.Preview)
+	}
+}
+
+func TestImport_VendorBranchRegionCode(t *testing.T) {
+	legacy := "id,vendor_code,branch_code,branch_name,region,location_id,is_active\n"
+	if res := dryRun(t, ExportVendorBranches, legacy+"1,V1,B1,Cabang 1,Jakarta,5,true\n"); len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+		t.Errorf("pre-026 file without region_code must keep the code (no-op), got %+v", res.Preview)
+	}
+	h := "id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n"
+	res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Jakarta, jktbar ,5,true\n")
+	if len(res.Preview.Errors) != 0 || res.Preview.Updates != 1 || res.Rows[0].Cells["region_code"] != "JKTBAR" {
+		t.Errorf("region_code should normalize to JKTBAR as an update, got %+v", res.Preview)
+	}
+	if res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Jakarta,JKT-1,5,true\n"); !hasErr(res, 2, "region_code") {
+		t.Errorf("invalid region_code must be a row error, got %+v", res.Preview.Errors)
 	}
 }
 

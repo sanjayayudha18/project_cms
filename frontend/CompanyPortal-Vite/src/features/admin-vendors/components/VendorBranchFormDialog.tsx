@@ -7,7 +7,11 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateVendorBranch } from "../hooks";
-import { type VendorBranchFormValues, vendorBranchFormSchema } from "../lib/vendorBranchFormSchema";
+import {
+  type VendorBranchFormValues,
+  toRegionCode,
+  vendorBranchFormSchema,
+} from "../lib/vendorBranchFormSchema";
 import { VENDOR_VAULT_CATEGORIES } from "../lib/vendorVaultFormSchema";
 import type { CreateVendorBranchPayload } from "../types";
 
@@ -22,6 +26,7 @@ const EMPTY_VALUES: VendorBranchFormValues = {
   branch_name: "",
   location_id: "",
   region: "",
+  region_code: "",
   category: "ATM",
 };
 
@@ -53,6 +58,7 @@ export function VendorBranchFormDialog({ open, onClose, vendorId }: VendorBranch
         branch_name: values.branch_name,
         location_id: values.location_id ? Number(values.location_id) : null,
         region: values.region || null,
+        region_code: toRegionCode(values.region_code),
         category: values.category,
       };
       const res = await createMutation.mutateAsync(payload);
@@ -85,6 +91,14 @@ export function VendorBranchFormDialog({ open, onClose, vendorId }: VendorBranch
 
         <Field label="Wilayah" error={form.formState.errors.region?.message}>
           <input {...form.register("region")} className={inputClass} />
+        </Field>
+
+        <Field label="Kode Region" error={form.formState.errors.region_code?.message}>
+          <input
+            {...form.register("region_code")}
+            placeholder="mis. JKT"
+            className={`${inputClass} uppercase`}
+          />
         </Field>
 
         <Field label="Tipe" error={form.formState.errors.category?.message}>

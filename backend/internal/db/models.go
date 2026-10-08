@@ -683,6 +683,8 @@ type VendorBranch struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 	// Tipe cabang: ATM, CASH, or ATM_CASH -- mirrors vendor_vaults.category. Added per .claude/sdlc/vendor-branch-tipe/plan.md; existing rows default to ATM pending re-seed.
 	Category string `json:"category"`
+	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
+	RegionCode *string `json:"region_code"`
 }
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
@@ -790,14 +792,8 @@ type VendorRequest struct {
 	CompletionRejectedBy      *int64             `json:"completion_rejected_by"`
 	CompletionRejectedAt      pgtype.Timestamptz `json:"completion_rejected_at"`
 	CompletionRejectionReason *string            `json:"completion_rejection_reason"`
-}
-
-// Hasil laporan selesai per ATM (terminal distinct dari vendor_request_items). Ditimpa saat laporan diajukan ulang setelah ditolak. Migrasi 021.
-type VendorRequestAtmResult struct {
-	VendorRequestID int64              `json:"vendor_request_id"`
-	TerminalID      string             `json:"terminal_id"`
-	Result          string             `json:"result"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	// Snapshot kode region vendor cabang saat create. NULL = request format nomor lama.
+	RegionCode *string `json:"region_code"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
@@ -819,9 +815,26 @@ type VendorRequestItem struct {
 
 // Atomic per-(vendor, replenish_date) sequence backing the REP<prefix><YYYYMMDD><seq> request-number format (Req 4, Q3).
 type VendorRequestNumberSeq struct {
-	VendorID int64       `json:"vendor_id"`
-	SeqDate  pgtype.Date `json:"seq_date"`
-	LastSeq  int32       `json:"last_seq"`
+	VendorID   int64       `json:"vendor_id"`
+	SeqDate    pgtype.Date `json:"seq_date"`
+	LastSeq    int32       `json:"last_seq"`
+	RegionCode *string     `json:"region_code"`
+}
+
+// Tiket replenish: satu aktif per (request, ATM) = satu jalan. NNN global per (terminal_id, replenish_date), tidak dipakai ulang.
+type VendorRequestTicket struct {
+	ID              int64              `json:"id"`
+	RequestNumber   string             `json:"request_number"`
+	TerminalID      string             `json:"terminal_id"`
+	DenomCode       string             `json:"denom_code"`
+	ReplenishDate   pgtype.Date        `json:"replenish_date"`
+	Seq             int16              `json:"seq"`
+	TicketNumber    string             `json:"ticket_number"`
+	IsActive        bool               `json:"is_active"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
+	Result          *string            `json:"result"`
+	ResultUpdatedAt pgtype.Timestamptz `json:"result_updated_at"`
 }
 
 type VendorVault struct {

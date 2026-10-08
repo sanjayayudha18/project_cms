@@ -81,8 +81,8 @@ func TestIntegration_VendorWideAssignment_ForecastCountSummaryAndVendorResolver(
 	}
 
 	got, err := q.GetActiveVendorForTerminal(ctx, db.GetActiveVendorForTerminalParams{AsOfDate: toPgDate(time.Now()), TerminalID: "ITEST-VW2"})
-	if err != nil || got != vendorID {
-		t.Errorf("GetActiveVendorForTerminal = %d err=%v, want %d", got, err, vendorID)
+	if err != nil || got.VendorID != vendorID {
+		t.Errorf("GetActiveVendorForTerminal = %d err=%v, want %d", got.VendorID, err, vendorID)
 	}
 }
 

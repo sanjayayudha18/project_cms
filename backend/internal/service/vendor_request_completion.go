@@ -133,7 +133,7 @@ func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id
 // SubmitCompletion: approved -> completion_pending with per-ATM results.
 // A resubmission after rejection overwrites the previous results (FR1.1).
 func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor, id int64, results []CompletionResultInput) (*VendorRequestDetail, error) {
-	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
+	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		terminals, err := q.ListDistinctRequestTerminals(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("list terminals of %d: %w", id, err)
@@ -143,8 +143,9 @@ func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor
 		}
 		byTerminal := make(map[string]string, len(results))
 		for _, r := range results {
-			if err := q.UpsertVendorRequestAtmResult(ctx, db.UpsertVendorRequestAtmResultParams{
-				VendorRequestID: id, TerminalID: r.TerminalID, Result: r.Result,
+			// replenish-ticket FR9.2: the result lives on the ATM's active ticket.
+			if _, err := q.SetVendorRequestTicketResult(ctx, db.SetVendorRequestTicketResultParams{
+				RequestNumber: req.RequestNumber, TerminalID: r.TerminalID, Result: r.Result,
 			}); err != nil {
 				return nil, fmt.Errorf("save result %s: %w", r.TerminalID, err)
 			}
@@ -172,14 +173,14 @@ func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor
 func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Actor, id int64) (*VendorRequestDetail, []string, error) {
 	overQuota := []string{}
 	err := s.completionTx(ctx, actor, id, actionApproveCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
-		results, err := q.ListVendorRequestAtmResults(ctx, id)
+		results, err := q.ListActiveVendorRequestTickets(ctx, req.RequestNumber)
 		if err != nil {
 			return nil, fmt.Errorf("list results of %d: %w", id, err)
 		}
 		today := jakartaCalendarDate(0)
 		visits := make([]visitOutcome, 0, len(results))
 		for _, r := range results {
-			if r.Result != completionSuccess {
+			if r.Result == nil || *r.Result != completionSuccess {
 				continue
 			}
 			out, err := recordVisit(ctx, q, id, r.TerminalID, today)
@@ -239,15 +240,12 @@ func (s *VendorRequestService) RejectCompletion(ctx context.Context, actor Actor
 }
 
 // requestAtmStatuses merges the report results with current kuota per
-// distinct terminal of the request (detail screen, FR6.2/6.3).
-func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64) ([]RequestAtmStatus, error) {
-	results, err := s.read.ListVendorRequestAtmResults(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("list completion results of %d: %w", id, err)
-	}
-	byTerminal := make(map[string]string, len(results))
-	for _, r := range results {
-		byTerminal[r.TerminalID] = r.Result
+// distinct terminal of the request (detail screen, FR6.2/6.3); results and
+// ticket numbers come from the active tickets (replenish-ticket FR9.3).
+func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64, tickets []db.ListActiveVendorRequestTicketsRow) ([]RequestAtmStatus, error) {
+	byTerminal := make(map[string]db.ListActiveVendorRequestTicketsRow, len(tickets))
+	for _, t := range tickets {
+		byTerminal[t.TerminalID] = t
 	}
 	rows, err := s.read.ListRequestVisitInfo(ctx, id)
 	if err != nil {
@@ -261,8 +259,9 @@ func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64)
 			VisitQuotaTotal: r.VisitQuotaTotal,
 			IsOverQuota:     r.IsOverQuota,
 		}
-		if res, ok := byTerminal[r.TerminalID]; ok {
-			out[i].CompletionResult = &res
+		if t, ok := byTerminal[r.TerminalID]; ok {
+			out[i].TicketNumber = t.TicketNumber
+			out[i].CompletionResult = t.Result
 		}
 	}
 	return out, nil

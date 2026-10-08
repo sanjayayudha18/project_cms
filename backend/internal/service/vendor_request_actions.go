@@ -308,8 +308,19 @@ func (s *VendorRequestService) Get(ctx context.Context, id int64) (*VendorReques
 		return nil, fmt.Errorf("list items for vendor request %d: %w", id, err)
 	}
 
+	tickets, err := s.read.ListActiveVendorRequestTickets(ctx, header.RequestNumber)
+	if err != nil {
+		return nil, fmt.Errorf("list tickets for vendor request %d: %w", id, err)
+	}
 	detail := mapDetail(header, items)
-	if detail.Atms, err = s.requestAtmStatuses(ctx, id); err != nil {
+	ticketNumbers := make(map[string]string, len(tickets))
+	for _, t := range tickets {
+		ticketNumbers[t.TerminalID] = t.TicketNumber
+	}
+	for i := range detail.Items {
+		detail.Items[i].TicketNumber = ticketNumbers[detail.Items[i].TerminalID]
+	}
+	if detail.Atms, err = s.requestAtmStatuses(ctx, id, tickets); err != nil {
 		return nil, err
 	}
 	return detail, nil
@@ -401,12 +412,17 @@ func (s *VendorRequestService) Create(ctx context.Context, actor Actor, in Creat
 	if err != nil {
 		return nil, err
 	}
-	if err := validateItemsSingleVendor(ctx, q, in.VendorID, resolved); err != nil {
+	atms, err := validateItemsSingleVendor(ctx, q, in.VendorID, resolved)
+	if err != nil {
+		return nil, err
+	}
+	regionCode, err := singleRegion(atms, "")
+	if err != nil {
 		return nil, err
 	}
 
 	forecastDate := toPgDate(in.ForecastDate)
-	requestID, err := createWithRetryingNumber(ctx, tx, q, in, forecastDate, actor)
+	requestID, requestNumber, err := createWithRetryingNumber(ctx, tx, q, in, regionCode, forecastDate, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -429,12 +445,17 @@ func (s *VendorRequestService) Create(ctx context.Context, actor Actor, in Creat
 			overrides = append(overrides, r.input.TerminalID)
 		}
 	}
+	tickets, err := applyTicketPlan(ctx, q, requestNumber, toPgDate(in.ReplenishDate), planTickets(nil, wantedCodes(resolved)))
+	if err != nil {
+		return nil, err
+	}
 
 	// Req 3.13 + replenishment-request-enhancements Req 1.13: every create
 	// audit carries the category (validation above guarantees one of the
 	// three values), state, actor; the audit.Writer stamps the UTC timestamp.
 	metadata := map[string]any{
 		"state": "draft", "is_manual": in.IsManual, "request_category": in.RequestCategory,
+		"region_code": regionCode, "tickets": tickets.Added, // replenish-ticket FR6.1
 	}
 	if len(overrides) > 0 {
 		metadata["amount_overrides"] = overrides // Req 4.5: manual override discrepancy
@@ -528,9 +549,11 @@ func acceptItems(items []ItemInput, replenishDate time.Time) ([]resolvedItem, er
 // request's chosen vendor_id -- catching a stale Forecast Browser selection
 // or a manual entry against the wrong vendor's ATM. An item whose ATM has no
 // resolvable active vendor package also counts as a mismatch: the request
-// cannot be confirmed to belong to the chosen vendor.
-func validateItemsSingleVendor(ctx context.Context, q *db.Queries, vendorID int64, resolved []resolvedItem) error {
+// cannot be confirmed to belong to the chosen vendor. Returns each ATM's
+// managing cabang + region code for singleRegion (replenish-ticket FR10.1).
+func validateItemsSingleVendor(ctx context.Context, q *db.Queries, vendorID int64, resolved []resolvedItem) (map[string]branchRegion, error) {
 	var mismatched []string
+	atms := make(map[string]branchRegion, len(resolved))
 	for _, r := range resolved {
 		vendor, err := q.GetActiveVendorForTerminal(ctx, db.GetActiveVendorForTerminalParams{
 			TerminalID: r.input.TerminalID,
@@ -541,20 +564,22 @@ func validateItemsSingleVendor(ctx context.Context, q *db.Queries, vendorID int6
 				mismatched = append(mismatched, r.input.TerminalID)
 				continue
 			}
-			return fmt.Errorf("resolve active vendor for %s: %w", r.input.TerminalID, err)
+			return nil, fmt.Errorf("resolve active vendor for %s: %w", r.input.TerminalID, err)
 		}
-		if vendor != vendorID {
+		if vendor.VendorID != vendorID {
 			mismatched = append(mismatched, r.input.TerminalID)
 		}
+		atms[r.input.TerminalID] = branchRegion{branchCode: vendor.BranchCode, regionCode: vendor.RegionCode}
 	}
 	if len(mismatched) > 0 {
-		return &ValidationError{Field: "items", Message: "item tidak sesuai dengan vendor yang dipilih: " + strings.Join(mismatched, ", ")}
+		return nil, &ValidationError{Field: "items", Message: "item tidak sesuai dengan vendor yang dipilih: " + strings.Join(mismatched, ", ")}
 	}
-	return nil
+	return atms, nil
 }
 
-// createWithRetryingNumber generates a REP-<prefix>-<YYYYMMDD>-<seq> request
-// number (Req 4.1; replenishment-request-enhancements Req 4 inserts the
+// createWithRetryingNumber generates a REP-<prefix>-<region>-<YYYYMMDD>-<seq>
+// request number (region segment + per-region counter: replenish-ticket
+// FR10, migration 026) (Req 4.1; replenishment-request-enhancements Req 4 inserts the
 // hyphen separators — prefix/date/seq sources are unchanged, Req 4.2) and
 // inserts the header, retrying up to 5 times on a request_number
 // unique-constraint race (Req 4.6). The date segment and the
@@ -562,10 +587,10 @@ func validateItemsSingleVendor(ctx context.Context, q *db.Queries, vendorID int6
 // (Q5, Req 4.4): the number is an operational identifier for the day cash is
 // delivered, not the DMAA periode it was drawn from. Legacy VR-YYYYMMDD-NNNN
 // rows are never rewritten (Req 4.9) -- this only affects new creates.
-func createWithRetryingNumber(ctx context.Context, tx pgx.Tx, q *db.Queries, in CreateVendorRequestInput, forecastDate pgtype.Date, actor Actor) (int64, error) {
+func createWithRetryingNumber(ctx context.Context, tx pgx.Tx, q *db.Queries, in CreateVendorRequestInput, regionCode string, forecastDate pgtype.Date, actor Actor) (int64, string, error) {
 	prefix, err := resolveVendorPrefix(ctx, q, in.VendorID)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	replenishDate := toPgDate(in.ReplenishDate)
 	dateSeg := in.ReplenishDate.Format("20060102")
@@ -573,19 +598,19 @@ func createWithRetryingNumber(ctx context.Context, tx pgx.Tx, q *db.Queries, in 
 	const maxAttempts = 5
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		requestID, err := attemptCreateWithNumber(ctx, tx, in, prefix, dateSeg, replenishDate, forecastDate, actor)
+		request, err := attemptCreateWithNumber(ctx, tx, in, prefix, regionCode, dateSeg, replenishDate, forecastDate, actor)
 		if err == nil {
-			return requestID, nil
+			return request.ID, request.RequestNumber, nil
 		}
 		if errors.Is(err, ErrNumberExhausted) {
-			return 0, err
+			return 0, "", err
 		}
 		if !isUniqueViolation(err) {
-			return 0, fmt.Errorf("create vendor request: %w", err)
+			return 0, "", fmt.Errorf("create vendor request: %w", err)
 		}
 		lastErr = err
 	}
-	return 0, fmt.Errorf("%w: %v", ErrNumberGeneration, lastErr)
+	return 0, "", fmt.Errorf("%w: %v", ErrNumberGeneration, lastErr)
 }
 
 // attemptCreateWithNumber runs one number-generation + insert attempt inside
@@ -598,31 +623,32 @@ func createWithRetryingNumber(ctx context.Context, tx pgx.Tx, q *db.Queries, in 
 // guarantee (Req 4.6) the very first time two creates ever raced. Scoping
 // each attempt to its own savepoint means only that attempt rolls back on
 // conflict, leaving the outer tx healthy for the next one.
-func attemptCreateWithNumber(ctx context.Context, tx pgx.Tx, in CreateVendorRequestInput, prefix, dateSeg string, replenishDate, forecastDate pgtype.Date, actor Actor) (int64, error) {
+func attemptCreateWithNumber(ctx context.Context, tx pgx.Tx, in CreateVendorRequestInput, prefix, regionCode, dateSeg string, replenishDate, forecastDate pgtype.Date, actor Actor) (db.VendorRequest, error) {
 	savepoint, err := tx.Begin(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("begin savepoint: %w", err)
+		return db.VendorRequest{}, fmt.Errorf("begin savepoint: %w", err)
 	}
 	defer func() { _ = savepoint.Rollback(ctx) }()
 	q := db.New(savepoint)
 
 	seq, err := q.NextRequestNumberSeq(ctx, db.NextRequestNumberSeqParams{
-		VendorID: in.VendorID,
-		SeqDate:  replenishDate,
+		VendorID:   in.VendorID,
+		RegionCode: regionCode,
+		SeqDate:    replenishDate,
 	})
 	if err != nil {
 		if isSequenceExhausted(err) {
-			return 0, ErrNumberExhausted
+			return db.VendorRequest{}, ErrNumberExhausted
 		}
-		return 0, fmt.Errorf("next request number seq: %w", err)
+		return db.VendorRequest{}, fmt.Errorf("next request number seq: %w", err)
 	}
 	// Belt-and-suspenders (design.md): the vendor_request_number_seq_last_chk
 	// CHECK is the primary guard (surfaced above via isSequenceExhausted),
 	// but this catches exhaustion even if that CHECK were ever relaxed.
 	if seq > 999 {
-		return 0, ErrNumberExhausted
+		return db.VendorRequest{}, ErrNumberExhausted
 	}
-	requestNumber := fmt.Sprintf("REP-%s-%s-%03d", prefix, dateSeg, seq)
+	requestNumber := fmt.Sprintf("REP-%s-%s-%s-%03d", prefix, regionCode, dateSeg, seq)
 
 	request, err := q.CreateVendorRequest(ctx, db.CreateVendorRequestParams{
 		RequestNumber:   requestNumber,
@@ -631,16 +657,17 @@ func attemptCreateWithNumber(ctx context.Context, tx pgx.Tx, in CreateVendorRequ
 		RequestCategory: categoryOrNil(in),
 		IsManual:        in.IsManual,
 		VendorID:        in.VendorID,
+		RegionCode:      regionCode,
 		Notes:           stringPtrOrNil(in.Notes),
 		CreatedBy:       actor.UserID,
 	})
 	if err != nil {
-		return 0, err
+		return db.VendorRequest{}, err
 	}
 	if err := savepoint.Commit(ctx); err != nil {
-		return 0, fmt.Errorf("commit savepoint: %w", err)
+		return db.VendorRequest{}, fmt.Errorf("commit savepoint: %w", err)
 	}
-	return request.ID, nil
+	return request, nil
 }
 
 // isSequenceExhausted reports whether err is the
@@ -731,6 +758,17 @@ func (s *VendorRequestService) UpdateItems(ctx context.Context, actor Actor, id 
 	if err != nil {
 		return nil, err
 	}
+	// replenish-ticket FR10.4: a request with a region code keeps it; old
+	// requests (region_code NULL) are not checked, as before.
+	if req.RegionCode != nil && req.VendorID != nil {
+		atms, err := validateItemsSingleVendor(ctx, q, *req.VendorID, resolved)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := singleRegion(atms, *req.RegionCode); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := q.DeleteVendorRequestItems(ctx, id); err != nil {
 		return nil, fmt.Errorf("delete existing items for %d: %w", id, err)
@@ -752,10 +790,20 @@ func (s *VendorRequestService) UpdateItems(ctx context.Context, actor Actor, id 
 		}
 	}
 
+	existing, err := q.ListVendorRequestTickets(ctx, req.RequestNumber)
+	if err != nil {
+		return nil, fmt.Errorf("list tickets for %d: %w", id, err)
+	}
+	tickets, err := applyTicketPlan(ctx, q, req.RequestNumber, ticketDate(req), planTickets(existing, wantedCodes(resolved)))
+	if err != nil {
+		return nil, err
+	}
+
 	metadata := map[string]any{"state": req.Status, "items_added": len(resolved), "items_removed": 0, "items_modified": 0}
 	if len(overrides) > 0 {
 		metadata["amount_overrides"] = overrides
 	}
+	tickets.addTo(metadata)
 	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
 		ActorID: actor.UserID, Action: "update_items", EntityType: "vendor_request", EntityID: id,
 		Before: map[string]string{"state": req.Status}, After: metadata, IP: actor.IP,
@@ -1029,6 +1077,7 @@ func mapDetail(h db.GetVendorRequestDetailRow, itemRows []db.VendorRequestItem) 
 		IsCanceled:         h.IsCanceled,
 		IsManual:           h.IsManual,
 		CancellationReason: h.CancellationReason,
+		RegionCode:         h.RegionCode,
 	}
 	if h.ApprovedBy != nil {
 		detail.ApprovedBy = &UserRef{ID: *h.ApprovedBy, FullName: notesOrEmpty(h.ApprovedByName)}

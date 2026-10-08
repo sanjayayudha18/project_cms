@@ -109,7 +109,7 @@ func export(t *testing.T, e *MasterDataExporter, entity, status string) (header 
 func TestExport_HeaderContract(t *testing.T) {
 	want := map[string][]string{
 		ExportVendors:        {"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
+		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
 		ExportVendorVaults:   {"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
 		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
 		ExportATMs:           {"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},

@@ -33,6 +33,7 @@ SELECT b.id,
        b.branch_code,
        b.branch_name,
        COALESCE(b.region, '')::text         AS region,
+       COALESCE(b.region_code, '')::text    AS region_code,
        COALESCE(b.location_id::text, '')::text AS location_id,
        b.is_active
 FROM vendor_branches b

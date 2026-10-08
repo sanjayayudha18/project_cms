@@ -43,6 +43,7 @@ export function CompletionAtmTable({ atms }: { atms: RequestAtmStatus[] }) {
           <thead>
             <tr className="border-[var(--n-200)] border-b bg-[var(--n-50)]">
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">ATM ID</th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">No. Tiket</th>
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">Hasil</th>
               <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">
                 Sisa Kunjungan
@@ -54,6 +55,7 @@ export function CompletionAtmTable({ atms }: { atms: RequestAtmStatus[] }) {
             {atms.map((atm) => (
               <tr key={atm.terminal_id} className="border-[var(--n-100)] border-b last:border-0">
                 <td className="px-3 py-2 font-mono">{atm.terminal_id}</td>
+                <td className="px-3 py-2 font-mono">{atm.ticket_number || "-"}</td>
                 <td className="px-3 py-2">
                   <ResultBadge result={atm.completion_result} />
                 </td>

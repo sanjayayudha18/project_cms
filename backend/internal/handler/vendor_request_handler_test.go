@@ -194,6 +194,33 @@ func TestVendorRequestHandler_Get_HappyPath(t *testing.T) {
 	}
 }
 
+// replenish-ticket FR5.1: ticket numbers on items + atms, region_code on the header.
+func TestVendorRequestHandler_Get_TicketAndRegion(t *testing.T) {
+	region := "JKT"
+	svc := &fakeVendorRequestServicer{
+		getResult: &service.VendorRequestDetail{
+			ID: 1, RequestNumber: "REP-BJK-JKT-20261008-001", Status: "draft", RegionCode: &region,
+			CreatedBy: service.UserRef{ID: 5, FullName: "Budi"},
+			Items:     []service.VendorRequestItemOut{{ID: 7, TerminalID: "Y18X", Denom: 50000, TicketNumber: "Y18X_50K_20261008_001"}},
+			Atms:      []service.RequestAtmStatus{{TerminalID: "Y18X", TicketNumber: "Y18X_50K_20261008_001"}},
+		},
+	}
+	router, ts := mountVendorRequestHandler(t, svc)
+
+	rec := vendorRequestDoRequest(router, http.MethodGet, "/api/v1/vendor-requests/1",
+		vendorRequestTokenFor(t, ts, 5, "ATM-USER"), "")
+
+	body := rec.Body.String()
+	for _, want := range []string{`"region_code":"JKT"`, `"ticket_number":"Y18X_50K_20261008_001"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %s: %s", want, body)
+		}
+	}
+	if strings.Count(body, `"ticket_number"`) != 2 {
+		t.Errorf("want ticket_number on the item and the atm, body=%s", body)
+	}
+}
+
 func TestVendorRequestHandler_Get_NotFound(t *testing.T) {
 	svc := &fakeVendorRequestServicer{getErr: service.ErrNotFound}
 	router, ts := mountVendorRequestHandler(t, svc)

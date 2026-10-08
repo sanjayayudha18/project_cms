@@ -86,11 +86,15 @@ var exportSpecs = map[string]exportSpec{
 		},
 	},
 	ExportVendorBranches: {
-		header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
+		header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
+		// Files exported before migration 026 have no region_code: keep the
+		// branch's current code instead of clearing it.
+		legacyHeader: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
+		legacyFill:   keepRegionCode,
 		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 			rows, err := r.VendorBranches(ctx, after, status, limit)
 			return exportPage(rows, err, func(x db.ExportVendorBranchesBatchRow) int64 { return x.ID }, func(x db.ExportVendorBranchesBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.BranchName, x.Region, x.LocationID, boolCell(x.IsActive)}
+				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.BranchName, x.Region, x.RegionCode, x.LocationID, boolCell(x.IsActive)}
 			})
 		},
 	},

@@ -290,6 +290,7 @@ export function VendorRequestDetail() {
           <thead>
             <tr className="border-[var(--n-200)] border-b bg-[var(--n-50)]">
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">ATM ID</th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">No. Tiket</th>
               <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">Denominasi</th>
               <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">
                 Amount Replenish
@@ -300,6 +301,7 @@ export function VendorRequestDetail() {
             {items.map((item) => (
               <tr key={item.id} className="border-[var(--n-100)] border-b last:border-0">
                 <td className="px-3 py-2">{item.terminal_id}</td>
+                <td className="px-3 py-2 font-mono">{item.ticket_number || "-"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatIDR(item.denom)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">
                   {editingItems ? (

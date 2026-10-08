@@ -74,7 +74,7 @@ func (f *fakeForecastRepo) ForecastRowExists(context.Context, db.ForecastRowExis
 func (f *fakeForecastRepo) UpdateVendorRequestStatus(context.Context, db.UpdateVendorRequestStatusParams) (db.VendorRequest, error) {
 	return db.VendorRequest{}, nil
 }
-func (f *fakeForecastRepo) ListVendorRequestAtmResults(context.Context, int64) ([]db.VendorRequestAtmResult, error) {
+func (f *fakeForecastRepo) ListActiveVendorRequestTickets(context.Context, string) ([]db.ListActiveVendorRequestTicketsRow, error) {
 	return nil, nil
 }
 func (f *fakeForecastRepo) ListRequestVisitInfo(context.Context, int64) ([]db.ListRequestVisitInfoRow, error) {

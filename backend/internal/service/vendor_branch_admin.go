@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -22,6 +23,30 @@ var validVendorBranchCategories = map[string]bool{
 	"ATM":      true,
 	"CASH":     true,
 	"ATM_CASH": true,
+}
+
+// keepRegionCode is the CSV legacyFill for vendor-branch files without the
+// region_code column; the importer swaps it for the row's current code.
+const keepRegionCode = "<keep>" // never a valid code (branchRegionCodeRe)
+
+// branchRegionCodeRe mirrors vendor_branches_region_code_chk (migration 026).
+var branchRegionCodeRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)
+
+// normalizeBranchRegionCode trims + upper-cases a vendor cabang region code; blank
+// = NULL (replenish-ticket plan D6). The code is the request-number segment
+// REP-<vendor>-<region_code>-..., so the DB CHECK is only the last net.
+func normalizeBranchRegionCode(in *string) (*string, error) {
+	if in == nil {
+		return nil, nil
+	}
+	code := strings.ToUpper(strings.TrimSpace(*in))
+	if code == "" {
+		return nil, nil
+	}
+	if !branchRegionCodeRe.MatchString(code) {
+		return nil, &ValidationError{Field: "region_code", Message: "harus 2-10 huruf besar/angka"}
+	}
+	return &code, nil
 }
 
 // VendorBranchSubmitter is the narrow MasterDataChangeService surface
@@ -80,6 +105,7 @@ type VendorBranchPayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
 }
 
@@ -90,6 +116,7 @@ type VendorBranchUpdatePayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	RegionCode *string `json:"region_code"` // nil = cleared (form always sends the current value)
 	Category   string  `json:"category"`
 }
 
@@ -127,6 +154,11 @@ func (s *VendorBranchAdminService) Create(ctx context.Context, makerID int64, re
 	if !validVendorBranchCategories[req.Category] {
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "category", Message: "harus ATM, CASH, atau ATM_CASH"}
 	}
+	regionCode, err := normalizeBranchRegionCode(req.RegionCode)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	req.RegionCode = regionCode
 
 	existing, err := s.repo.FindByCode(ctx, req.BranchCode)
 	if err != nil {
@@ -161,6 +193,11 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 	if !validVendorBranchCategories[req.Category] {
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "category", Message: "harus ATM, CASH, atau ATM_CASH"}
 	}
+	regionCode, err := normalizeBranchRegionCode(req.RegionCode)
+	if err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
+	req.RegionCode = regionCode
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{
 		EntityType: "vendor_branch",

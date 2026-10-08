@@ -88,6 +88,7 @@ const BASE_DETAIL: VendorRequestDetailType = {
       denom: 100000,
       amount_replenish: 5_000_000,
       amount_refund: 0,
+      ticket_number: "ATM001_100K_20260913_001",
     },
   ],
   total_amount: 5_000_000,
@@ -96,6 +97,7 @@ const BASE_DETAIL: VendorRequestDetailType = {
   is_canceled: false,
   is_manual: false,
   cancellation_reason: null,
+  region_code: "JKT",
   completion_submitted_by: null,
   completion_submitted_at: null,
   completion_approved_by: null,
@@ -313,6 +315,7 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
   const ATMS = [
     {
       terminal_id: "ATM001",
+      ticket_number: "ATM001_100K_20260913_001",
       completion_result: null,
       visit_remaining: 3,
       visit_quota_total: 5,
@@ -320,6 +323,7 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
     },
     {
       terminal_id: "ATM002",
+      ticket_number: "ATM002_MIX_20260913_002",
       completion_result: null,
       visit_remaining: 0,
       visit_quota_total: 4,
@@ -330,6 +334,15 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
   beforeEach(() => {
     submitCompletionSpy.mockReset().mockResolvedValue(undefined);
     approveCompletionSpy.mockReset().mockResolvedValue({ over_quota_terminals: ["ATM002"] });
+  });
+
+  it("shows the ticket number per ATM (replenish-ticket FR8.1)", () => {
+    mockDetail({ status: "approved", atms: ATMS });
+    setUser(1, "ATM-USER");
+    renderWithProviders();
+    expect(screen.getAllByRole("columnheader", { name: "No. Tiket" })).toHaveLength(2);
+    expect(screen.getAllByText("ATM001_100K_20260913_001")).toHaveLength(2); // item row + ATM status row
+    expect(screen.getByText("ATM002_MIX_20260913_002")).toBeInTheDocument();
   });
 
   it("approved + maker sees Laporkan Selesai; checker does not", () => {

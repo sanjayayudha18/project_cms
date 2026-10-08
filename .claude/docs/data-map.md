@@ -22,9 +22,18 @@ Plan/spec: `.claude/sdlc/atm-visit-quota/`. Migration `021_atm_visit_quota.sql`,
 
 *   **Kuota source**: `package_frequencies.cr_frequency` for `(vendor_packages_branch.package_code, atms.price_machine_group)` of the ATM's active `atm_vendor_packages` row (same LATERAL + `avp.id DESC` tie-breaker as `ListForecastForDate`). Read-only — this feature never writes `package_frequencies`. `package_code` is free text with no FK, so a label without a `package_frequencies` row (or a NULL `price_machine_group`) = **kuota tidak diketahui**: never guessed.
 *   `vendor_requests`: CHECK `vendor_requests_status_chk` gains `completion_pending`. New nullable columns `completion_submitted_by/at` (maker of the laporan selesai), `completion_approved_by/at`, `completion_rejected_by/at`, `completion_rejection_reason` (FKs → `users`). Flow: `approved → completion_pending → completed`; reject → back to `approved` (rejected_* kept until the next submit clears them). `cancel` is not allowed from `completion_pending`.
-*   `vendor_request_atm_results` — PK `(vendor_request_id, terminal_id)`, `result` `success|failed`, `updated_at`. One row per distinct terminal of the request's items; overwritten on resubmission. `terminal_id` is text (items have no ATM FK).
+*   ~~`vendor_request_atm_results`~~ — dropped by migration 026; the per-ATM `result` now lives on the active `vendor_request_tickets` row (see below).
 *   `atm_visit_quotas` — PK/FK `atm_id → atms`; `package_code` + `quota_total` (> 0) are a snapshot taken at reset or at the first counted visit; `remaining` integer, **may be negative** (display: sisa = max(remaining, 0), kelebihan = max(−remaining, 0)); `reset_at` (period start, `clock_timestamp()`), `reset_by` (NULL = auto-created by the first visit). `updated_at` trigger. No automatic reset — a checker resets it to the active package's `cr_frequency`; a package change does not touch the row until then.
 *   `atm_visits` — identity PK; `atm_id`, `vendor_request_id`; UNIQUE `(vendor_request_id, atm_id)` (double approve can't decrement twice); `quota_known` (false = recorded without a kuota row); `is_over_quota`; `created_at` (`clock_timestamp()`, so the period boundary `created_at >= reset_at` orders correctly even inside one tx); soft-cancel `cancelled_at/by/cancel_reason` (all-or-none CHECK). Index `(atm_id, created_at DESC)`. Never hard-deleted; cancelling a current-period visit gives the kuota back (+1).
+
+## Replenish ticket + request region (migration 026)
+
+Plan/spec: `.claude/sdlc/replenish-ticket/`. Migration `026_replenish_ticket_region.sql`, applied to dev DB 2026-10-08 (backfill: 174 tickets for 174 (request, ATM) pairs; 356 cabang seeded with a code, 66 left NULL).
+
+*   `vendor_branches.region_code` text, CHECK `^[A-Z0-9]{2,10}$`, nullable. Seeded from the free-text `region` (table in spec FR11.3); `region` itself is unchanged (Forecast Browser still uses it). Edited via the vendor-branch maker-checker form/CSV only. NULL = requests for ATMs of that cabang are rejected (422).
+*   `vendor_requests.region_code` — snapshot at create; NULL = request numbered before 026.
+*   `vendor_request_number_seq` — + `region_code`; PK replaced by `UNIQUE NULLS NOT DISTINCT (vendor_id, region_code, seq_date)` (old rows keep NULL).
+*   `vendor_request_tickets` — identity PK; `request_number` FK → `vendor_requests(request_number)` ON DELETE RESTRICT; `terminal_id` text; `denom_code` `<n>K|MIX`; `replenish_date` (old `VR-` requests: `created_at` in Asia/Jakarta); `seq` 1..999 (`vendor_request_tickets_seq_chk`); `ticket_number` UNIQUE; `is_active`, `deactivated_at`; `result` `success|failed` + `result_updated_at`. UNIQUE `(terminal_id, replenish_date, seq)`, UNIQUE `(request_number, terminal_id, denom_code)`, partial UNIQUE `(request_number, terminal_id) WHERE is_active`; CHECK inactive ⇒ `deactivated_at` set and `result` NULL. Never deleted.
 
 ## ATM assignment package source (migration 023)
 

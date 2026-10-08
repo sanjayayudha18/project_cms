@@ -62,8 +62,8 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 		t.Fatalf("insert vendor: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region)
-		VALUES ($1, $2, 'Number Test Branch', 'Integration Test Region') RETURNING id`,
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region, region_code)
+		VALUES ($1, $2, 'Number Test Branch', 'Integration Test Region', 'ITEST') RETURNING id`,
 		vendorID, marker).Scan(&branchID); err != nil {
 		t.Fatalf("insert vendor branch: %v", err)
 	}
@@ -83,6 +83,7 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 	vid := vendorID
 	t.Cleanup(func() {
 		cleanupCtx := context.Background()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_request_tickets WHERE request_number IN (SELECT request_number FROM vendor_requests WHERE vendor_id = $1)`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_requests WHERE vendor_id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_request_number_seq WHERE vendor_id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM atm_vendor_packages WHERE atm_id = $1`, atmID)
@@ -97,7 +98,8 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 	return pool, vendorID, createdBy, terminalID
 }
 
-var requestNumberFormat = regexp.MustCompile(`^REP-[A-Z0-9]{3}-\d{8}-\d{3}$`)
+// REP-<prefix>-<region_code>-<YYYYMMDD>-<seq> (replenish-ticket FR10).
+var requestNumberFormat = regexp.MustCompile(`^REP-[A-Z0-9]{3}-[A-Z0-9]{2,10}-\d{8}-\d{3}$`)
 
 // manualCreateInput builds a manual (Emergency, H+0) create input against the
 // harness's seeded ATM/vendor — the simplest path that skips DMAA seeding
@@ -133,7 +135,7 @@ func TestIntegration_RequestNumber_PerVendorPerDayScoping(t *testing.T) {
 		t.Fatalf("first create: %v", err)
 	}
 	if !requestNumberFormat.MatchString(first.RequestNumber) {
-		t.Fatalf("request_number %q does not match REP-<3>-<8>-<3> format", first.RequestNumber)
+		t.Fatalf("request_number %q does not match REP-<3>-<region>-<8>-<3> format", first.RequestNumber)
 	}
 	if got := first.RequestNumber[len(first.RequestNumber)-3:]; got != "001" {
 		t.Errorf("first create in a fresh scope: seq = %q, want 001", got)
@@ -206,9 +208,9 @@ func TestIntegration_RequestNumber_ExhaustionRejectsWithoutPersisting(t *testing
 
 	today := jakartaCalendarDate(0)
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO vendor_request_number_seq (vendor_id, seq_date, last_seq)
-		VALUES ($1, $2, 999)
-		ON CONFLICT (vendor_id, seq_date) DO UPDATE SET last_seq = 999`,
+		INSERT INTO vendor_request_number_seq (vendor_id, region_code, seq_date, last_seq)
+		VALUES ($1, 'ITEST', $2, 999)
+		ON CONFLICT (vendor_id, region_code, seq_date) DO UPDATE SET last_seq = 999`,
 		vendorID, today); err != nil {
 		t.Fatalf("pre-seed sequence at 999: %v", err)
 	}
@@ -256,7 +258,7 @@ func TestIntegration_RequestNumber_RetryExhaustionReturnsErrNumberGeneration(t *
 	// Pre-seed a row for every seq createWithRetryingNumber's 5 attempts will
 	// try, so each attempt's INSERT collides on vendor_requests_number_uq.
 	for seq := 1; seq <= 5; seq++ {
-		blocker := fmt.Sprintf("REP-%s-%s-%03d", prefix, dateSeg, seq)
+		blocker := fmt.Sprintf("REP-%s-ITEST-%s-%03d", prefix, dateSeg, seq)
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO vendor_requests (request_number, forecast_date, created_by, vendor_id)
 			VALUES ($1, $2, $3, $4)`,
@@ -330,7 +332,7 @@ func TestIntegration_RequestNumber_SearchMatchesHyphenatedFullAndPartial(t *test
 	}
 	full := created.RequestNumber
 	if !requestNumberFormat.MatchString(full) {
-		t.Fatalf("seeded request_number %q does not match REP-<3>-<8>-<3> format", full)
+		t.Fatalf("seeded request_number %q does not match REP-<3>-<region>-<8>-<3> format", full)
 	}
 	// A partial segment spanning the date-seq hyphen boundary, e.g. the last
 	// 6 characters ("<4 date digits>-<seq>"), still contains a literal '-'.

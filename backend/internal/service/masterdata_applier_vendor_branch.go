@@ -48,6 +48,7 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
 			Region:     p.Region,
+			RegionCode: p.RegionCode,
 			Category:   p.Category,
 		})
 		if err != nil {
@@ -68,6 +69,7 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
 			Region:     p.Region,
+			RegionCode: p.RegionCode,
 			Category:   p.Category,
 		})
 		if err != nil {

@@ -148,6 +148,8 @@ export interface VendorRequestItem {
   denom: number;
   amount_replenish: number;
   amount_refund: number;
+  /** replenish-ticket: the ATM's active ticket, e.g. "Y18X_MIX_20261008_001". */
+  ticket_number: string;
 }
 
 export interface VendorRequestDetail {
@@ -183,6 +185,8 @@ export interface VendorRequestDetail {
    * before this column existed (their reason lives only in the audit log).
    */
   cancellation_reason: string | null;
+  /** replenish-ticket: vendor cabang region code; null for requests before migration 026. */
+  region_code: string | null;
   // atm-visit-quota (FR5): laporan selesai replenish.
   completion_submitted_by: UserRef | null;
   completion_submitted_at: string | null;
@@ -201,6 +205,8 @@ export type CompletionResult = "success" | "failed";
 
 export interface RequestAtmStatus {
   terminal_id: string;
+  /** replenish-ticket: one ticket per ATM per request (= one trip). */
+  ticket_number: string;
   /** null until a laporan selesai has been submitted. */
   completion_result: CompletionResult | null;
   /** Current sisa (may be negative); null = kuota tidak diketahui / belum ada. */

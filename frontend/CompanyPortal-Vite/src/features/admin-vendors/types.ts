@@ -77,6 +77,8 @@ export interface AdminVendorBranch {
   branch_name: string;
   location_id: number | null;
   region: string | null;
+  /** replenish-ticket: segment of the request number; null = requests for this cabang are rejected. */
+  region_code: string | null;
   category: VendorVaultCategory;
   is_active: boolean;
   deleted_at: string | null;
@@ -101,6 +103,7 @@ export interface CreateVendorBranchPayload {
   branch_name: string;
   location_id: number | null;
   region: string | null;
+  region_code: string | null;
   category: VendorVaultCategory;
 }
 
@@ -108,6 +111,7 @@ export interface UpdateVendorBranchPayload {
   branch_name: string;
   location_id: number | null;
   region: string | null;
+  region_code: string | null;
   category: VendorVaultCategory;
 }
 

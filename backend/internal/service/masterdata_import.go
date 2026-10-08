@@ -517,6 +517,9 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		e.seenID[id] = rec.line
 	}
 	creating := id == 0
+	if e.entity == ExportVendorBranches && v["region_code"] == keepRegionCode {
+		v["region_code"] = e.cur[id]["region_code"] // pre-026 file: keep the current code ("" when creating)
+	}
 
 	e.validateFields(v, creating, add, fromErr)
 	if len(errs) > 0 {
@@ -665,6 +668,12 @@ func (e *importEnv) validateFields(v map[string]string, creating bool, add func(
 		requiredCols(v, add, "vendor_code", "branch_code", "branch_name")
 		if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
 			add("vendor_code", "vendor tidak ditemukan atau nonaktif")
+		}
+		rc := v["region_code"]
+		if n, err := normalizeBranchRegionCode(&rc); err != nil {
+			fromErr(err)
+		} else {
+			v["region_code"] = notesOrEmpty(n)
 		}
 		e.location(v, add, false)
 	case ExportVendorVaults:

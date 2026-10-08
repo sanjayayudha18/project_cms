@@ -134,6 +134,7 @@ type VendorRequestItemOut struct {
 	Denom           int32
 	AmountReplenish int64
 	AmountRefund    int64
+	TicketNumber    string // replenish-ticket FR5.1: the ATM's active ticket
 }
 
 // VendorRequestDetail is the full single-request response shape (Req 9.6).
@@ -161,6 +162,7 @@ type VendorRequestDetail struct {
 	IsCanceled         bool
 	IsManual           bool
 	CancellationReason *string // nil unless canceled after migration 038 (Req 3.11 Opsi B)
+	RegionCode         *string // replenish-ticket FR10.3; nil for requests before migration 026
 
 	// atm-visit-quota (spec FR5): laporan selesai + per-ATM kuota info.
 	CompletionSubmittedBy     *UserRef
@@ -179,6 +181,7 @@ type VendorRequestDetail struct {
 // request's (uncancelled) visit for the ATM went over quota.
 type RequestAtmStatus struct {
 	TerminalID       string
+	TicketNumber     string // replenish-ticket FR5.1
 	CompletionResult *string
 	VisitRemaining   *int32
 	VisitQuotaTotal  *int32
@@ -381,8 +384,8 @@ type VendorRequestRepository interface {
 	// ListVendorOptions support (Req 1.2, 1.3, 3 Q2).
 	ListActiveVendors(ctx context.Context) ([]db.ListActiveVendorsRow, error)
 	ListDistinctVendorBranchRegions(ctx context.Context) ([]*string, error)
-	// atm-visit-quota: detail per-ATM status.
-	ListVendorRequestAtmResults(ctx context.Context, vendorRequestID int64) ([]db.VendorRequestAtmResult, error)
+	// atm-visit-quota + replenish-ticket: detail per-ATM ticket + status.
+	ListActiveVendorRequestTickets(ctx context.Context, requestNumber string) ([]db.ListActiveVendorRequestTicketsRow, error)
 	ListRequestVisitInfo(ctx context.Context, id int64) ([]db.ListRequestVisitInfoRow, error)
 }
 

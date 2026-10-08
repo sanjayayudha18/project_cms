@@ -177,6 +177,7 @@ SELECT b.id,
        b.branch_name,
        COALESCE(b.region, '')::text         AS region,
        COALESCE(b.region_code, '')::text    AS region_code,
+       b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
        b.is_active
 FROM vendor_branches b
@@ -202,6 +203,7 @@ type ExportVendorBranchesBatchRow struct {
 	BranchName string `json:"branch_name"`
 	Region     string `json:"region"`
 	RegionCode string `json:"region_code"`
+	Category   string `json:"category"`
 	LocationID string `json:"location_id"`
 	IsActive   bool   `json:"is_active"`
 }
@@ -222,6 +224,7 @@ func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendo
 			&i.BranchName,
 			&i.Region,
 			&i.RegionCode,
+			&i.Category,
 			&i.LocationID,
 			&i.IsActive,
 		); err != nil {

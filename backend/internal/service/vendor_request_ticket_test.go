@@ -123,7 +123,7 @@ func TestNormalizeBranchRegionCode(t *testing.T) {
 			t.Errorf("normalize(blank) = %v, %v; want nil, nil", got, err)
 		}
 	}
-	for _, bad := range []string{"J", "JKT-1", "ABCDEFGHIJK", keepRegionCode} {
+	for _, bad := range []string{"J", "JKT-1", "ABCDEFGHIJK", keepCurrentCell} {
 		if _, err := normalizeBranchRegionCode(strp(bad)); err == nil {
 			t.Errorf("normalize(%q) accepted, want 422", bad)
 		}

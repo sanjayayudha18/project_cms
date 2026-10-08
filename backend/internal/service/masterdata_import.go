@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func cleanCell(s string) string {
 // (whichever the header line uses -- Excel in an Indonesian locale writes `;`),
 // header validation, empty-row skipping. A non-empty errs means the file is
 // unusable as a whole (bad CSV / wrong header) and no row was processed.
-func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (recs []importRecord, errs []ImportRowError, err error) {
+func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill map[string]string) (recs []importRecord, errs []ImportRowError, err error) {
 	data, err := io.ReadAll(io.LimitReader(r, MasterDataImportMaxBytes+1))
 	if err != nil {
 		return nil, nil, err
@@ -146,7 +147,8 @@ func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (rec
 	cr.FieldsPerRecord = -1
 
 	gotHeader := false
-	padAt := -1 // column index to insert legacyFill at when the file uses the legacy header
+	var pick []int // legacy header in use: header column -> file column, -1 = fill
+	legacyLen := -1
 	for {
 		rec, rerr := cr.Read()
 		if errors.Is(rerr, io.EOF) {
@@ -163,11 +165,16 @@ func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (rec
 		line, _ := cr.FieldPos(0)
 		if !gotHeader {
 			gotHeader = true
-			switch {
-			case headerMatches(rec, header):
-			case legacy != nil && headerMatches(rec, legacy):
-				padAt = missingColumn(header, legacy)
-			default:
+			if headerMatches(rec, header) {
+				continue
+			}
+			for _, l := range legacy {
+				if headerMatches(rec, l) {
+					pick, legacyLen = legacyPick(header, l), len(l)
+					break
+				}
+			}
+			if pick == nil {
 				return nil, []ImportRowError{{Row: 1, Field: "header", Message: "kolom header tidak sesuai; diharapkan persis: " + strings.Join(header, ",")}}, nil
 			}
 			continue
@@ -183,8 +190,16 @@ func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (rec
 		if empty {
 			continue
 		}
-		if padAt >= 0 && len(cells) == len(header)-1 {
-			cells = append(cells[:padAt], append([]string{legacyFill}, cells[padAt:]...)...)
+		if len(cells) == legacyLen {
+			full := make([]string, len(header))
+			for c, from := range pick {
+				if from < 0 {
+					full[c] = legacyFill[header[c]]
+				} else {
+					full[c] = cells[from]
+				}
+			}
+			cells = full
 		}
 		if len(recs) >= MasterDataImportMaxRows {
 			return nil, nil, &ValidationError{Field: "file", Message: fmt.Sprintf("jumlah baris melebihi %d", MasterDataImportMaxRows)}
@@ -197,14 +212,13 @@ func readImportCSV(r io.Reader, header, legacy []string, legacyFill string) (rec
 	return recs, nil, nil
 }
 
-// missingColumn is the index in full of the one column legacy lacks.
-func missingColumn(full, legacy []string) int {
-	for i := range legacy {
-		if full[i] != legacy[i] {
-			return i
-		}
+// legacyPick maps each column of full to its index in legacy (-1 = missing).
+func legacyPick(full, legacy []string) []int {
+	pick := make([]int, len(full))
+	for c, h := range full {
+		pick[c] = slices.Index(legacy, h)
 	}
-	return len(legacy)
+	return pick
 }
 
 func headerMatches(got, want []string) bool {
@@ -406,7 +420,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	}
 	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}}}
 
-	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeader, spec.legacyFill)
+	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill)
 	if err != nil {
 		return nil, err
 	}
@@ -517,8 +531,12 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		e.seenID[id] = rec.line
 	}
 	creating := id == 0
-	if e.entity == ExportVendorBranches && v["region_code"] == keepRegionCode {
-		v["region_code"] = e.cur[id]["region_code"] // pre-026 file: keep the current code ("" when creating)
+	if e.entity == ExportVendorBranches {
+		for _, col := range []string{"region_code", "category"} {
+			if v[col] == keepCurrentCell {
+				v[col] = e.cur[id][col] // older file without the column: keep the current value ("" when creating)
+			}
+		}
 	}
 
 	e.validateFields(v, creating, add, fromErr)
@@ -674,6 +692,10 @@ func (e *importEnv) validateFields(v map[string]string, creating bool, add func(
 			fromErr(err)
 		} else {
 			v["region_code"] = notesOrEmpty(n)
+		}
+		v["category"] = strings.ToUpper(v["category"])
+		if !validVendorBranchCategories[v["category"]] {
+			add("category", "harus ATM, CASH, atau ATM_CASH")
 		}
 		e.location(v, add, false)
 	case ExportVendorVaults:

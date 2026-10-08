@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-08 — Import CSV cabang vendor selalu gagal "category: harus ATM, CASH, atau ATM_CASH"
+- **Symptom**: import master-data `vendor-branches` (create maupun update) ditolak per baris dengan error category, walaupun file hasil export sendiri.
+- **Root cause**: `stageCreate`/`stageUpdate` (`masterdata_import_confirm.go`) membangun `VendorBranchPayload`/`VendorBranchUpdatePayload` tanpa `Category`, sedangkan `VendorBranchAdminService.Create/Update` mewajibkan category. Export `vendor-branches` juga tidak punya kolom `category`, jadi round-trip tidak bisa membawanya.
+- **Fix**: query `ExportVendorBranchesBatch` (`backend/queries/master_data_export.sql` + sqlc regen) + header export kini punya `category` (setelah `region_code`). Importer: `category` divalidasi (uppercase, ATM/CASH/ATM_CASH) di `validateFields` dan diteruskan di stageCreate/stageUpdate. File lama tanpa `category` (dengan atau tanpa `region_code`) tetap diterima: update mempertahankan category (dan region_code) saat ini, create → error baris `category`. Mekanisme legacy header digeneralisasi: `exportSpec.legacyHeaders [][]string` + `legacyFill map[kolom]nilai` (sebelumnya satu header kurang satu kolom); sentinel `keepRegionCode` → `keepCurrentCell`.
+- **Tests**: `TestImport_VendorBranchCategory` (normalisasi, wajib saat create, invalid, dua bentuk file lama) + `TestImport_VendorBranchStagesCategory` (dry-run → stageRow lewat service asli; gagal tanpa fix), `TestExport_HeaderContract` diperbarui. `go test ./...` + `go test -tags integration ./...` (dev DB localhost) lulus. Manual browser verification: outstanding (export → import cabang vendor di halaman admin).
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-07 — Phase 0.1: read-replica routing selesai (Go + Python)
 - **Symptom**: read untuk list/viewer/laporan masih ke primary (TODO `ponytail: swap dbPool for the dbRead pool` di `cmd/api/main.go`); service EOD Python tidak punya pool replica (deferred dari import-export-jobs C2).
 - **Root cause**: pool replica baru dipakai export master-data, region, dan branch-ATM; repo lain belum dipisah.

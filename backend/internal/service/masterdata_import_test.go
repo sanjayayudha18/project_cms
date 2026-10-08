@@ -31,7 +31,7 @@ func (fakeImportRepo) Vendors(_ context.Context, after int64, _ string, limit in
 }
 
 func (fakeImportRepo) VendorBranches(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
-	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", LocationID: "5", IsActive: true}}
+	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", Category: "ATM", LocationID: "5", IsActive: true}}
 	return page(all, after, limit, func(r db.ExportVendorBranchesBatchRow) int64 { return r.ID }), nil
 }
 
@@ -405,5 +405,72 @@ func TestAssignmentFields_BySource(t *testing.T) {
 	v := assignmentFields(map[string]string{"package_source": "vendor", "vendor_code": "V1", "branch_code": "B1", "package_code": "PAKET 4", "effective_start_date": "2026-01-01"}, env)
 	if v.Source != AssignmentSourceVendor || v.VendorPackageID != 0 || v.VendorID != 3 || v.VendorBranchID != 9 || v.Package != "PAKET 4" {
 		t.Errorf("vendor payload wrong: %+v", v)
+	}
+}
+
+func TestImport_VendorBranchCategory(t *testing.T) {
+	h := "id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active\n"
+	cases := []struct {
+		name, row, wantErr, wantCategory string
+	}{
+		{"create normalizes case", ",V1,B2,Cabang 2,Jakarta,JKT, cash ,5,true", "", "CASH"},
+		{"create without category", ",V1,B2,Cabang 2,Jakarta,JKT,,5,true", "category", ""},
+		{"invalid category", "1,V1,B1,Cabang 1,Jakarta,JKT,VAULT,5,true", "category", ""},
+		{"update changes category", "1,V1,B1,Cabang 1,Jakarta,JKT,ATM_CASH,5,true", "", "ATM_CASH"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := dryRun(t, ExportVendorBranches, h+tc.row+"\n")
+			if tc.wantErr != "" {
+				if !hasErr(res, 2, tc.wantErr) {
+					t.Fatalf("want a %s row error, got %+v", tc.wantErr, res.Preview.Errors)
+				}
+				return
+			}
+			if len(res.Preview.Errors) != 0 || res.Rows[0].Cells["category"] != tc.wantCategory {
+				t.Fatalf("want category %q, got %+v / %+v", tc.wantCategory, res.Preview, res.Rows)
+			}
+		})
+	}
+
+	// Files exported before the category column (with or without region_code) keep the current category.
+	for _, legacy := range []string{
+		"id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n1,V1,B1,Cabang 1,Jakarta,JKT,5,true\n",
+		"id,vendor_code,branch_code,branch_name,region,location_id,is_active\n1,V1,B1,Cabang 1,Jakarta,5,true\n",
+	} {
+		if res := dryRun(t, ExportVendorBranches, legacy); len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+			t.Errorf("file without category must keep the current one (no-op), got %+v", res.Preview)
+		}
+	}
+	legacyCreate := "id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n,V1,B2,Cabang 2,Jakarta,JKT,5,true\n"
+	if res := dryRun(t, ExportVendorBranches, legacyCreate); !hasErr(res, 2, "category") {
+		t.Errorf("a new branch from a file without category must be a row error, got %+v", res.Preview.Errors)
+	}
+}
+
+// The staged payload must pass VendorBranchAdminService's own category check
+// (the regression: stageCreate/stageUpdate dropped category, so every row failed).
+func TestImport_VendorBranchStagesCategory(t *testing.T) {
+	repo := &fakeVendorBranchAdminRepo{getByIDFunc: func(context.Context, int64) (*db.GetVendorBranchAdminByIDRow, error) {
+		return &db.GetVendorBranchAdminByIDRow{ID: 1}, nil
+	}}
+	sub := &fakeVendorBranchSubmitter{}
+	svcs := ImportServices{Branches: NewVendorBranchAdminService(repo, sub, &fakeVendorBranchChildCounter{})}
+
+	res := dryRun(t, ExportVendorBranches, "id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active\n,V1,B2,Cabang 2,Jakarta,JKT,CASH,5,true\n")
+	if err := stageRow(adminCtx(7), 7, ExportVendorBranches, res.Rows[0], res.env, svcs, "127.0.0.1"); err != nil {
+		t.Fatalf("stage create: %v", err)
+	}
+	if p, ok := sub.lastRequest.Payload.(VendorBranchPayload); !ok || p.Category != "CASH" {
+		t.Errorf("create payload = %#v, want category CASH", sub.lastRequest.Payload)
+	}
+
+	// Legacy file (no category) editing the name: the update carries the current category.
+	res = dryRun(t, ExportVendorBranches, "id,vendor_code,branch_code,branch_name,region,location_id,is_active\n1,V1,B1,Cabang Baru,Jakarta,5,true\n")
+	if err := stageRow(adminCtx(7), 7, ExportVendorBranches, res.Rows[0], res.env, svcs, "127.0.0.1"); err != nil {
+		t.Fatalf("stage update: %v", err)
+	}
+	if p, ok := sub.lastRequest.Payload.(VendorBranchUpdatePayload); !ok || p.Category != "ATM" || p.RegionCode == nil || *p.RegionCode != "JKT" {
+		t.Errorf("update payload = %#v, want current category ATM and region code JKT", sub.lastRequest.Payload)
 	}
 }

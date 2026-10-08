@@ -47,11 +47,11 @@ type MasterDataExportRepo interface {
 // exportSpec is one entity's stable CSV header and its page -> cells mapping.
 type exportSpec struct {
 	header []string
-	// legacyHeader, when set, is an older header the importer still accepts: the
-	// same columns minus one (the missing column is filled with legacyFill).
-	legacyHeader []string
-	legacyFill   string
-	page   func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) (rows [][]string, lastID int64, err error)
+	// legacyHeaders are older headers the importer still accepts: the same
+	// columns minus some; each missing column is filled with legacyFill[column].
+	legacyHeaders [][]string
+	legacyFill    map[string]string
+	page          func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) (rows [][]string, lastID int64, err error)
 }
 
 // exportPage converts one repo page into CSV cells and the last row's id (the
@@ -86,15 +86,18 @@ var exportSpecs = map[string]exportSpec{
 		},
 	},
 	ExportVendorBranches: {
-		header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
-		// Files exported before migration 026 have no region_code: keep the
-		// branch's current code instead of clearing it.
-		legacyHeader: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
-		legacyFill:   keepRegionCode,
+		header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
+		// Older files have no category (and, before migration 026, no
+		// region_code): keep the branch's current value instead of clearing it.
+		legacyHeaders: [][]string{
+			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
+			{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
+		},
+		legacyFill: map[string]string{"region_code": keepCurrentCell, "category": keepCurrentCell},
 		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 			rows, err := r.VendorBranches(ctx, after, status, limit)
 			return exportPage(rows, err, func(x db.ExportVendorBranchesBatchRow) int64 { return x.ID }, func(x db.ExportVendorBranchesBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.BranchName, x.Region, x.RegionCode, x.LocationID, boolCell(x.IsActive)}
+				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.BranchName, x.Region, x.RegionCode, x.Category, x.LocationID, boolCell(x.IsActive)}
 			})
 		},
 	},
@@ -128,9 +131,9 @@ var exportSpecs = map[string]exportSpec{
 		},
 	},
 	ExportATMAssignments: {
-		header:       []string{"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
-		legacyHeader: []string{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"},
-		legacyFill:   AssignmentSourceBranch,
+		header:        []string{"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
+		legacyHeaders: [][]string{{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"}},
+		legacyFill:    map[string]string{"package_source": AssignmentSourceBranch},
 		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 			rows, err := r.ATMAssignments(ctx, after, status, limit)
 			return exportPage(rows, err, func(x db.ExportATMAssignmentsBatchRow) int64 { return x.ID }, func(x db.ExportATMAssignmentsBatchRow) []string {

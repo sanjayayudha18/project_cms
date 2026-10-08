@@ -25,9 +25,10 @@ var validVendorBranchCategories = map[string]bool{
 	"ATM_CASH": true,
 }
 
-// keepRegionCode is the CSV legacyFill for vendor-branch files without the
-// region_code column; the importer swaps it for the row's current code.
-const keepRegionCode = "<keep>" // never a valid code (branchRegionCodeRe)
+// keepCurrentCell is the CSV legacyFill for vendor-branch files without the
+// region_code/category columns; the importer swaps it for the row's current
+// value ("" when creating).
+const keepCurrentCell = "<keep>" // never a valid code (branchRegionCodeRe) or category
 
 // branchRegionCodeRe mirrors vendor_branches_region_code_chk (migration 026).
 var branchRegionCodeRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)

@@ -16,7 +16,8 @@ Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + c
 | 2c | F14 | `go.work` di-gitignore tapi di-`COPY` Dockerfile → build Docker dari clone bersih gagal | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 2d | F15 | Tidak ada `.dockerignore` di root (context build = root repo) + CLAUDE.md menyebut root `docker-compose.yml` yang tidak ada | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
-| 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [ ] |
+| 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
+| 4a | F16 | `page` tanpa batas atas → `int32(Page)` wrap → offset negatif (500) di ±8 list endpoint | LOW | S | `bugfixes.md` | [ ] |
 | 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
 | 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [ ] |
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [ ] |
@@ -98,6 +99,12 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
   - `backend/internal/service/atm_portal.go:213-214` dan `atm_portal_cashpos.go:124-125`: sudah aman (PageSize 1–100). Cukup beri komentar/nolint. (Catatan: gosec G115 tidak deterministik antar-run, kadang hanya salah satu yang muncul.)
 - **Selesai bila**: tiap konversi punya batas yang terbukti (validasi + test), gosec G115 bersih atau di-nolint dengan alasan.
 
+## F16 — `page` tanpa batas atas
+- **Ditemukan**: saat F4. Semua parser `page` hanya mengecek `≥ 1`; service lalu `int32(params.Page)` (dan `vendor_order.go:139` menghitung `(Page-1)*PageSize` di int lalu `int32`). `page=3000000000` → wrap negatif → Postgres menolak OFFSET negatif → 500. Tidak ada korupsi data; murni input absurd → 500 bukan 400.
+- **Lokasi parser**: `handler/admin_user_handler.go:408` `parsePageParams` (dipakai 12 handler admin), `handler/atm_portal_handler.go` `parseIntParam` (4×), `admin_region_handler.go:63` (inline), `vendor_order_handler.go:84` (`Atoi`, error diabaikan), handler DSR/DMAA/vendor request (cek). Konversi: `atm_portal.go:213`, `atm_portal_cashpos.go:124`, `atm_portal_profile.go:287,332`, `dmaa_forecast.go:122`, `dsr_upload.go:509`, `vendor_order.go:139`, `vendor_request_actions.go:82,245`.
+- **Arah fix**: satu konstanta `maxPage` (mis. 100000 — dengan page_size 100 = 10 juta baris) di parser; tolak 400 di atasnya. Contoh yang sudah benar: `notification_handler.go` `parseBoundedInt(..., 1, 1<<20)`. Lalu `//nolint:gosec` dengan alasan di konversi.
+- **Selesai bila**: `page=3000000000` → 400 di semua list endpoint (test handler), gosec G115 bersih.
+
 ## F5 — Permission file upload DSR
 - **Lokasi**: `backend/internal/service/dsr_upload.go:191` (`MkdirAll 0o755`), `:195` (`WriteFile 0o644`).
 - **Langkah**: ubah ke `0o750` / `0o640`. Cek bahwa proses Python `service_dsr_etl` membaca folder yang sama dengan user/grup yang sama (docker-compose / deploy doc). Kalau beda user, catat syarat grup bersama di `docs/deployment.md`.
@@ -175,4 +182,5 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F12 | `9f44cf0` | chi v5.3.0, pgx v5.9.2, x/text v0.41.0; `toolchain go1.26.9` di go.mod 3 modul; Dockerfile `golang:1.26.9-alpine`. govulncheck bersih di 3 modul; build/vet/test + integration hijau. Temuan baru: F13 (RealIP/XFF spoofing), F14 (go.work gitignored). Detail di `.claude/bugfixes.md`. |
 | 2026-10-09 | F14 | `21f8cff` | `go.work` + `go.work.sum` di-commit, `.gitignore` diperbarui. Docker build kedua backend dari export index (setara clone bersih) berhasil. Temuan baru: F15 (`.dockerignore` root tidak ada, `.env` ikut context; CLAUDE.md compose basi). |
 | 2026-10-09 | F15 | `ce9fa0f` | `.dockerignore` root (allowlist) — context 8.1MB, tanpa `.env`/`.md`; `backend/.dockerignore` mati dihapus; CLAUDE.md Sec 9 diperbaiki. Docker build kedua backend berhasil. |
-| 2026-10-09 | F3 | (belum di-commit) | 9 call site di 5 file → `_ =` sesuai konvensi repo (bukan `slog.Warn` seperti rencana awal: neighbour pattern menang, perilaku sama). errcheck bersih; semua test + integration hijau. |
+| 2026-10-09 | F3 | `e2de53d` | 9 call site di 5 file → `_ =` sesuai konvensi repo (bukan `slog.Warn` seperti rencana awal: neighbour pattern menang, perilaku sama). errcheck bersih; semua test + integration hijau. |
+| 2026-10-09 | F4 | (belum di-commit) | Tier ternyata **bug nyata** (tanpa batas atas → wrap int32 diam-diam saat approve): `maxTier = 999_999_999` di kedua validator + test 7 kasus. `RowCount` aman (≤ 2000) → nolint. Konversi page **bukan** false positive → dipisah ke F16. |

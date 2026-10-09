@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F4: tier paket/harga tanpa batas atas (int64 → int32 terpotong)
+- **Symptom**: gosec G115 di applier `vendor_packages_branch` / `vendor_package_prices` (`int32(p.TierMin)`, `tierMaxInt32`). Validasi submit hanya mengecek `tier_min ≥ 1` dan `tier_max ≥ tier_min`, jadi tier > 2³¹ lolos dan saat approve ter-wrap diam-diam ke angka lain di kolom int4 — tarif bisa jatuh ke tier yang salah.
+- **Root cause**: payload memakai `int64`, kolom DB `integer`, tanpa batas atas di `validatePackageGrain` / `validatePriceGrain`.
+- **Fix**: konstanta `maxTier = 999_999_999` (`vendor_package_admin.go`) = sentinel range terbuka di exclusion constraint migration 009 (`COALESCE(tier_max, 999999999)`), muat di int4. `tier_min` > maxTier → 422 `tier_min` ("harus antara 1 dan 999999999"; pesan untuk < 1 ikut berubah), `tier_max` > maxTier → 422 `tier_max`. Berlaku di kedua validator (paket khusus cabang + harga vendor-wide). Import CSV tidak membawa tier; Update tidak mengubah tier. Konversi yang batasnya kini terbukti diberi `//nolint:gosec` + alasan: kedua applier, dan `RowCount int32(len(rows))` (≤ `MasterDataImportMaxRows` 2000). Konversi `int32(Page)` **tidak** di-nolint — page tanpa batas atas dipisah jadi QC F16.
+- **Tests**: `TestPackageAndPriceGrain_TierUpperBound` (7 kasus × 2 validator; gagal compile/RED tanpa fix). build + vet + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: outstanding (form paket/harga admin — isi tier 1000000000 → pesan error di field tier).
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F3: errcheck di kode produksi
 - **Symptom**: golangci-lint errcheck melaporkan return error yang tidak dicek di 5 file produksi.
 - **Root cause**: pemanggilan Close/Write/Encode best-effort ditulis tanpa `_ =`, berbeda dengan konvensi yang sudah ada (`error_response.go:26`, `dsr_upload_handler.go:103`, `backend/cmd/api/main.go:89,108`).
 - **Fix**: ikut konvensi itu, perilaku tidak berubah — `admin_master_data_import_handler.go:59,106` `defer func() { _ = file.Close() }()`; `notification/smtp.go:51,56,59` `_ = conn.Close()` / `defer func() { _ = c.Close() }()`; `pkg/middleware/rbac.go:113` + `pkg/response/response.go:42` `_ = json.NewEncoder(w).Encode(...)` (header sudah terkirim, tidak ada yang bisa dilakukan); `backend-cit/cmd/api/main.go:51,70` `redisClient.Close` / `w.Write`.
 - **Tests**: errcheck bersih di 3 modul; build + vet + `go test ./...` (pkg, backend-cit) + `go test -tags integration -p 1 ./...` (backend, dev DB) lulus. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `e2de53d`
 
 ---
 

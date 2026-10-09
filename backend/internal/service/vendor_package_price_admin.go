@@ -290,11 +290,14 @@ func validatePriceGrain(p *VendorPackagePriceCreatePayload) (time.Time, error) {
 	if p.TierMin == 0 {
 		p.TierMin = 1
 	}
-	if p.TierMin < 1 {
-		return time.Time{}, &ValidationError{Field: "tier_min", Message: "minimal 1"}
+	if p.TierMin < 1 || p.TierMin > maxTier {
+		return time.Time{}, &ValidationError{Field: "tier_min", Message: fmt.Sprintf("harus antara 1 dan %d", maxTier)}
 	}
 	if p.TierMax != nil && *p.TierMax < p.TierMin {
 		return time.Time{}, &ValidationError{Field: "tier_max", Message: "tidak boleh kurang dari tier_min"}
+	}
+	if p.TierMax != nil && *p.TierMax > maxTier {
+		return time.Time{}, &ValidationError{Field: "tier_max", Message: fmt.Sprintf("maksimal %d", maxTier)}
 	}
 	if p.VendorBranchID != nil && p.AtmID != nil {
 		return time.Time{}, &ValidationError{Field: "atm_id", Message: "tidak boleh diisi bersamaan dengan vendor_branch_id"}

@@ -178,6 +178,11 @@ func (s *VendorPackageAdminService) Get(ctx context.Context, vendorID, id int64)
 // rules as validatePriceGrain (vendor_package_prices) minus the currency-vs-
 // vendor_branch_id-and-atm_id exclusivity check -- atm_id here is a further
 // override WITHIN the row's own branch, not an alternative to it.
+// maxTier is the largest accepted tier_min/tier_max. It equals the open-range
+// sentinel of the tier exclusion constraints (migration 009: COALESCE(tier_max,
+// 999999999)) and fits the int4 columns the appliers convert to with int32().
+const maxTier = 999_999_999
+
 func validatePackageGrain(p *VendorPackageCreatePayload) (time.Time, error) {
 	if p.VendorBranchID == 0 {
 		return time.Time{}, &ValidationError{Field: "vendor_branch_id", Message: "wajib diisi"}
@@ -197,11 +202,14 @@ func validatePackageGrain(p *VendorPackageCreatePayload) (time.Time, error) {
 	if p.TierMin == 0 {
 		p.TierMin = 1
 	}
-	if p.TierMin < 1 {
-		return time.Time{}, &ValidationError{Field: "tier_min", Message: "minimal 1"}
+	if p.TierMin < 1 || p.TierMin > maxTier {
+		return time.Time{}, &ValidationError{Field: "tier_min", Message: fmt.Sprintf("harus antara 1 dan %d", maxTier)}
 	}
 	if p.TierMax != nil && *p.TierMax < p.TierMin {
 		return time.Time{}, &ValidationError{Field: "tier_max", Message: "tidak boleh kurang dari tier_min"}
+	}
+	if p.TierMax != nil && *p.TierMax > maxTier {
+		return time.Time{}, &ValidationError{Field: "tier_max", Message: fmt.Sprintf("maksimal %d", maxTier)}
 	}
 	p.Currency = strings.TrimSpace(strings.ToUpper(p.Currency))
 	if p.Currency == "" {

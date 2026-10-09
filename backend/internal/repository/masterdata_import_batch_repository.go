@@ -89,7 +89,7 @@ func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fi
 	}
 
 	b, err := q.CreateMasterDataImportBatch(ctx, db.CreateMasterDataImportBatchParams{
-		Entity: entity, FileHash: fileHash, MakerID: makerID, RowCount: int32(len(rows)),
+		Entity: entity, FileHash: fileHash, MakerID: makerID, RowCount: int32(len(rows)), //nolint:gosec // G115: rows <= MasterDataImportMaxRows (2000)
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("create batch: %w", err)

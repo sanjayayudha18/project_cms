@@ -54,7 +54,7 @@ func (VendorPackageApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Mast
 		}
 		created, err := q.CreateVendorPackageAdmin(ctx, db.CreateVendorPackageAdminParams{
 			VendorBranchID: &p.VendorBranchID, PackageCode: p.PackageCode, MachineGroup: p.MachineGroup, PriceClass: p.PriceClass,
-			TierMin: int32(p.TierMin), TierMax: tierMaxInt32(p.TierMax),
+			TierMin: int32(p.TierMin), TierMax: tierMaxInt32(p.TierMax), //nolint:gosec // G115: tier <= maxTier, validated at submit
 			BasePrice: base, AtmID: p.AtmID, SlaNote: p.SlaNote, Currency: p.Currency,
 			EffectiveStartDate: start, EffectiveEndDate: end,
 		})

@@ -1,0 +1,30 @@
+# Shared lint config for the Go workspace (backend/, backend-cit/, pkg/).
+# Run per module: cd backend && golangci-lint run --build-tags integration ./...
+version: "2"
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused
+  default: standard
+  enable:
+    - gosec
+    - gocyclo
+  settings:
+    gocyclo:
+      # Guard rail, not a target. Known offenders are tracked in backend_QC_fixes.md F10.
+      min-complexity: 30
+  exclusions:
+    generated: lax
+    paths:
+      - internal/db/ # sqlc-generated
+    rules:
+      # Tests: best-effort cleanup (Close/Rollback/Decode) and long table-driven
+      # scenario functions are fine; style quickfixes are noise.
+      - path: _test\.go
+        linters: [errcheck, gosec, gocyclo]
+      - path: _test\.go
+        linters: [staticcheck]
+        text: QF
+      # User-facing Indonesian messages are returned verbatim to the login screen.
+      - path: pkg/auth/errors\.go
+        linters: [staticcheck]
+        text: ST1005

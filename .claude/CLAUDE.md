@@ -66,6 +66,10 @@ cd backend-cit && go test ./...
 cd pkg && go test ./...
 cd backend && go run ./cmd/api       # ATM API :8080  (backend-cit: go run ./cmd/api → :8081)
 
+# Lint + vuln scan (config: root .golangci.yml; run per module)
+cd backend && golangci-lint run --build-tags integration ./...
+cd backend && govulncheck ./...      # go install golang.org/x/vuln/cmd/govulncheck@latest
+
 # sqlc (after editing backend/queries/*.sql)
 cd backend && sqlc generate          # MUST be v1.31.1 — see note below
 

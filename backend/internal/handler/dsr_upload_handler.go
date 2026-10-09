@@ -90,7 +90,7 @@ func (h *DsrUploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Cap the whole request body slightly above the file cap (multipart
 	// framing overhead) -- ValidateUpload re-checks the exact file size.
 	r.Body = http.MaxBytesReader(w, r.Body, service.DsrMaxUploadBytes+64*1024)
-	if err := r.ParseMultipartForm(service.DsrMaxUploadBytes + 64*1024); err != nil {
+	if err := r.ParseMultipartForm(service.DsrMaxUploadBytes + 64*1024); err != nil { //nolint:gosec // G120: body capped by MaxBytesReader above
 		writeError(w, http.StatusBadRequest, "bad_request", "File terlalu besar atau request tidak valid")
 		return
 	}

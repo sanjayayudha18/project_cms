@@ -10,7 +10,8 @@ Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + c
 | # | ID | Item | Prio | Ukuran | Dok. (saran) | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | F1 | `gofmt -w` 12 file | LOW | XS | tidak perlu (format saja) | [x] 2026-10-09 |
-| 2 | F2 | Tambah `.golangci.yml` + pasang `govulncheck` | LOW | S | `bugfixes.md` | [ ] |
+| 2 | F2 | Tambah `.golangci.yml` + pasang `govulncheck` | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
+| 2a | F12 | **Upgrade dependency + toolchain yang kena CVE** (hasil govulncheck F2) | **HIGH** | S–M | `bugfixes.md` | [ ] |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [ ] |
 | 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [ ] |
 | 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
@@ -39,9 +40,25 @@ Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M
 - **Selesai bila**: `golangci-lint run ./...` di 3 modul hanya menampilkan isu yang memang tercatat di F3–F4; hasil govulncheck tercatat (CVE ditemukan → item baru di file ini).
 - **Catatan**: menambah tool dev, bukan library aplikasi. Tetap minta OK user (Golden Rule #1).
 
+## F12 — CVE dari govulncheck  ⚠️ security
+Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reachable):
+
+| Sumber | Versi sekarang | Perbaiki ke | Advisory | Modul terdampak |
+| --- | --- | --- | --- | --- |
+| `github.com/go-chi/chi/v5` | v5.2.1 | ≥ v5.3.0 | GO-2025-3770 (host header → open redirect di `RedirectSlashes`), GO-2026-5777 | backend, backend-cit |
+| `github.com/jackc/pgx/v5` | v5.7.4 | ≥ v5.9.2 | GO-2026-5004 | backend |
+| `golang.org/x/text` | v0.40.0 | ≥ v0.41.0 | GO-2026-6629 | backend, backend-cit |
+| Go stdlib (`crypto/tls`, `crypto/x509`, `encoding/asn1`, `encoding/xml`, `net/http`, `net/textproto`, `net/url`) | go1.26.3 (lokal) | ≥ go1.26.9 | GO-2026-5856, -6090, -6607, -5037, -5972, -6088, -6089, -6617, -5039, -6608, -6218 | semua |
+
+- **Langkah**:
+  1. Upgrade modul di `backend/` dan `backend-cit/`: `go get github.com/go-chi/chi/v5@v5.3.0 github.com/jackc/pgx/v5@v5.9.2 golang.org/x/text@v0.41.0 && go mod tidy` (pkg/ juga kalau memakai chi/pgx). Ini upgrade library yang sudah ada, bukan library baru, tetapi tetap minta OK user (Golden Rule #1). Baca changelog chi v5.3 dan pgx v5.8–5.9 untuk breaking change.
+  2. Toolchain: dev lokal ke Go ≥ 1.26.9. Dockerfile `backend/` & `backend-cit/` memakai `golang:1.25-alpine` (tag mengambang, versi patch tidak terkunci); pin ke versi patch yang sudah bebas CVE di atas (cek govulncheck dengan toolchain itu), dan samakan `go` directive di `go.work`/`go.mod` (sekarang `go 1.25.0`).
+  3. Jalankan ulang build + test `-tags integration` + govulncheck; target: tidak ada temuan reachable.
+- **Selesai bila**: govulncheck "No vulnerabilities found" (reachable) di 3 modul; test hijau.
+
 ## F3 — errcheck di kode produksi
 - **Lokasi**:
-  - `backend/internal/handler/admin_master_data_import_handler.go:106` `defer file.Close()`
+  - `backend/internal/handler/admin_master_data_import_handler.go:59,106` `defer file.Close()`
   - `backend/internal/notification/smtp.go:51,56,59` `conn.Close()` / `defer c.Close()`
   - `pkg/middleware/rbac.go:113` `json.NewEncoder(w).Encode(...)`
   - `pkg/response/response.go:42` `json.NewEncoder(w).Encode(v)`
@@ -53,7 +70,7 @@ Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M
 - **Lokasi**:
   - `backend/internal/repository/masterdata_import_batch_repository.go:92` `RowCount: int32(len(rows))`. Cek bahwa importer sudah membatasi jumlah baris (`MasterDataImportMaxBytes`); kalau batas baris tidak eksplisit, tambah guard.
   - `backend/internal/service/masterdata_applier_vendor_package.go:57`, `masterdata_applier_vendor_package_price.go:45,142` `int32(p.TierMin)` / `tierMaxInt32`. Pastikan validasi submit membatasi tier ke rentang kecil; tambah guard di validasi (bukan di applier) bila belum.
-  - `backend/internal/service/atm_portal.go:213-214`: sudah aman (PageSize 1–100). Cukup beri komentar/nolint.
+  - `backend/internal/service/atm_portal.go:213-214` dan `atm_portal_cashpos.go:124-125`: sudah aman (PageSize 1–100). Cukup beri komentar/nolint. (Catatan: gosec G115 tidak deterministik antar-run, kadang hanya salah satu yang muncul.)
 - **Selesai bila**: tiap konversi punya batas yang terbukti (validasi + test), gosec G115 bersih atau di-nolint dengan alasan.
 
 ## F5 — Permission file upload DSR
@@ -129,3 +146,4 @@ Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M
 | Tanggal | ID | Commit | Catatan |
 | --- | --- | --- | --- |
 | 2026-10-09 | F1 | (belum di-commit) | `gofmt -w` 12 file. 8 file berubah di git (59+/59−, whitespace + 1 baris `//` doc comment); 4 sisanya hanya beda line ending (dinormalisasi git). `gofmt -l` bersih, build/vet/test backend + pkg hijau. |
+| 2026-10-09 | F2 | (lihat commit F2) | `.golangci.yml` di root (standard + gosec + gocyclo≥30; exclude `internal/db`, errcheck/gosec/gocyclo/QF di test, ST1005 `pkg/auth/errors.go`). `//nolint:gosec` G120 di `dsr_upload_handler.go:93`. Perintah lint + govulncheck ditambah ke CLAUDE.md Sec 2a. Sisa temuan lint = F3/F4/F5/F10 saja (backend 17, backend-cit 2, pkg 2). govulncheck menemukan CVE → item baru F12. |

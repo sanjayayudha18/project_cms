@@ -13,25 +13,27 @@ import (
 // for VendorPackageAdminService. Mutation queries run only inside
 // VendorPackageApplier (tx-scoped), not through this repository.
 //
-// ponytail: primary pool for reads too; swap List/Count to dbRead when
-// DATABASE_REPLICA_URL wiring lands (same TODO as VendorBranchAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); every other lookup stays on
+// the primary because Submit uses it as the "before" snapshot / pre-check.
 type VendorPackageAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewVendorPackageAdminRepository creates a VendorPackageAdminRepository wrapping the given database connection.
-func NewVendorPackageAdminRepository(dbConn db.DBTX) *VendorPackageAdminRepository {
-	return &VendorPackageAdminRepository{queries: db.New(dbConn)}
+// NewVendorPackageAdminRepository creates a VendorPackageAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewVendorPackageAdminRepository(primary, replica db.DBTX) *VendorPackageAdminRepository {
+	return &VendorPackageAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of a vendor's packages (via its branches).
 func (r *VendorPackageAdminRepository) List(ctx context.Context, arg db.ListVendorPackagesAdminParams) ([]db.ListVendorPackagesAdminRow, error) {
-	return r.queries.ListVendorPackagesAdmin(ctx, arg)
+	return r.dbRead.ListVendorPackagesAdmin(ctx, arg)
 }
 
 // Count returns the total number of packages matching List's filters.
 func (r *VendorPackageAdminRepository) Count(ctx context.Context, arg db.CountVendorPackagesAdminParams) (int64, error) {
-	return r.queries.CountVendorPackagesAdmin(ctx, arg)
+	return r.dbRead.CountVendorPackagesAdmin(ctx, arg)
 }
 
 // GetByID returns a package by id incl. soft-disabled rows; nil, nil if absent.

@@ -62,7 +62,7 @@ func TestVendorBranchAdminRepository(t *testing.T) {
 		t.Fatalf("seed disabled branch: %v", err)
 	}
 
-	repo := NewVendorBranchAdminRepository(tx)
+	repo := NewVendorBranchAdminRepository(tx, tx)
 
 	t.Run("List scoped to vendor_id, default active status excludes disabled", func(t *testing.T) {
 		got, err := repo.List(ctx, db.ListVendorBranchesAdminParams{

@@ -14,25 +14,27 @@ import (
 // queries run only inside VendorPackagePriceApplier (tx-scoped), not through
 // this repository.
 //
-// ponytail: primary pool for reads too; swap List/Count to dbRead when
-// DATABASE_REPLICA_URL wiring lands (same TODO as VendorPackageAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); every other lookup stays on
+// the primary because Submit uses it as the "before" snapshot / pre-check.
 type VendorPackagePriceAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewVendorPackagePriceAdminRepository creates a VendorPackagePriceAdminRepository wrapping the given database connection.
-func NewVendorPackagePriceAdminRepository(dbConn db.DBTX) *VendorPackagePriceAdminRepository {
-	return &VendorPackagePriceAdminRepository{queries: db.New(dbConn)}
+// NewVendorPackagePriceAdminRepository creates a VendorPackagePriceAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewVendorPackagePriceAdminRepository(primary, replica db.DBTX) *VendorPackagePriceAdminRepository {
+	return &VendorPackagePriceAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of a vendor's package prices.
 func (r *VendorPackagePriceAdminRepository) List(ctx context.Context, arg db.ListVendorPackagePricesAdminParams) ([]db.ListVendorPackagePricesAdminRow, error) {
-	return r.queries.ListVendorPackagePricesAdmin(ctx, arg)
+	return r.dbRead.ListVendorPackagePricesAdmin(ctx, arg)
 }
 
 // Count returns the total number of package prices matching List's filters.
 func (r *VendorPackagePriceAdminRepository) Count(ctx context.Context, arg db.CountVendorPackagePricesAdminParams) (int64, error) {
-	return r.queries.CountVendorPackagePricesAdmin(ctx, arg)
+	return r.dbRead.CountVendorPackagePricesAdmin(ctx, arg)
 }
 
 // GetByID returns a package price by id incl. expired rows; nil, nil if absent.

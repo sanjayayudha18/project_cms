@@ -306,7 +306,7 @@ func main() {
 	// maker-checker-native flow as branches below. Built before the branch
 	// service so its repo can back the branch-disable "no active children"
 	// guard (branchChildCounter below).
-	vendorVaultAdminRepo := repository.NewVendorVaultAdminRepository(dbPool)
+	vendorVaultAdminRepo := repository.NewVendorVaultAdminRepository(dbPool, dbReadPool)
 	vendorVaultAdminService := service.NewVendorVaultAdminService(vendorVaultAdminRepo, masterDataChangeService)
 	adminVendorVaultHandler := handler.NewAdminVendorVaultHandler(vendorVaultAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/vaults", adminVendorVaultHandler.Routes())
@@ -318,14 +318,14 @@ func main() {
 
 	// ADMIN/ADMIN_PARAM-only: vendor PIC CRUD (plan.md T3.3), same
 	// maker-checker-native flow; list also returns non-blocking warnings.
-	vendorPicAdminRepo := repository.NewVendorPicAdminRepository(dbPool)
+	vendorPicAdminRepo := repository.NewVendorPicAdminRepository(dbPool, dbReadPool)
 	vendorPicAdminService := service.NewVendorPicAdminService(vendorPicAdminRepo, masterDataChangeService)
 	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same
 	// maker-checker-native flow; price is a decimal string (numeric(20,2)).
-	vendorPackageAdminRepo := repository.NewVendorPackageAdminRepository(dbPool)
+	vendorPackageAdminRepo := repository.NewVendorPackageAdminRepository(dbPool, dbReadPool)
 	vendorPackageAdminService := service.NewVendorPackageAdminService(vendorPackageAdminRepo, masterDataChangeService)
 	adminVendorPackageHandler := handler.NewAdminVendorPackageHandler(vendorPackageAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/packages", adminVendorPackageHandler.Routes())
@@ -335,7 +335,7 @@ func main() {
 	// strings (numeric(20,2)); there is no Enable since a price row is
 	// effective-dated history, not a togglable entity -- Disable ends its
 	// validity, a new period is a new row.
-	vendorPackagePriceAdminRepo := repository.NewVendorPackagePriceAdminRepository(dbPool)
+	vendorPackagePriceAdminRepo := repository.NewVendorPackagePriceAdminRepository(dbPool, dbReadPool)
 	vendorPackagePriceAdminService := service.NewVendorPackagePriceAdminService(vendorPackagePriceAdminRepo, masterDataChangeService)
 	adminVendorPackagePriceHandler := handler.NewAdminVendorPackagePriceHandler(vendorPackagePriceAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/package-prices", adminVendorPackagePriceHandler.Routes())
@@ -345,7 +345,7 @@ func main() {
 	// VendorBranchApplier once approved via /api/v1/approvals above.
 	// branchChildCounter backs Disable's "no active vault/PIC/package" guard
 	// (perbaikan-rbac plan.md): reuses the vault/pic/package repos built above.
-	vendorBranchAdminRepo := repository.NewVendorBranchAdminRepository(dbPool)
+	vendorBranchAdminRepo := repository.NewVendorBranchAdminRepository(dbPool, dbReadPool)
 	branchChildCounter := branchChildCounterAdapter{vaults: vendorVaultAdminRepo, pics: vendorPicAdminRepo, packages: vendorPackageAdminRepo}
 	vendorBranchAdminService := service.NewVendorBranchAdminService(vendorBranchAdminRepo, masterDataChangeService, branchChildCounter)
 	adminVendorBranchHandler := handler.NewAdminVendorBranchHandler(vendorBranchAdminService)
@@ -364,7 +364,7 @@ func main() {
 	// again at apply time (exclusion constraint, see ATMAssignmentApplier).
 	// Mounted beside /api/v1/admin/atms above -- chi picks the more specific
 	// {atmID}/assignments pattern (route-mount cleanup is T3.6).
-	atmAssignmentAdminRepo := repository.NewATMAssignmentAdminRepository(dbPool)
+	atmAssignmentAdminRepo := repository.NewATMAssignmentAdminRepository(dbPool, dbReadPool)
 	atmAssignmentAdminService := service.NewATMAssignmentAdminService(atmAssignmentAdminRepo, masterDataChangeService)
 	adminATMAssignmentHandler := handler.NewAdminATMAssignmentHandler(atmAssignmentAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/atms/{atmID}/assignments", adminATMAssignmentHandler.Routes())

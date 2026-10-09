@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F6: repo admin master-data membaca list dari replica
+- **Symptom**: `dbReadPool` sudah di-wire di `cmd/api/main.go` (Phase 0.1), tetapi 7 repo admin masih primary-only dengan komentar TODO basi "swap List/Count to dbRead when DATABASE_REPLICA_URL wiring lands".
+- **Root cause**: Phase 0.1 (2026-10-07) hanya memindahkan Vendor/ATM/Region/DSR-location-map; repo lain tertinggal.
+- **Fix**: `VendorVault`, `VendorPic`, `VendorPackage`, `VendorPackagePrice`, `VendorBranch`, `ATMAssignment` AdminRepository → constructor `(primary, replica)` seperti `VendorAdminRepository`; **hanya List/Count** ke replica, GetByID + pre-check submit tetap primary (snapshot "before"). `main.go` memberi `dbReadPool`. Aman terhadap replica lag karena master-data maker-checker: row baru berubah setelah approve. **`UserAdminRepository` sengaja tetap primary-only** — create/update user apply langsung dan layar me-list ulang tepat setelah write (alasan sama dengan `MasterDataChangeRepository`); TODO diganti komentar alasan.
+- **Tests**: `TestAdminRepositories_ReadTopology` (18 kasus, probe DBTX tanpa DB: List/Count → replica, GetByID → primary). build + vet + `go test -tags integration -p 1 ./...` (dev DB, primary=replica) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list cabang/vault/PIC/paket/harga/kelolaan di admin; di dev replica = primary).
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F5: permission file upload DSR (diterima, didokumentasikan)
 - **Symptom**: gosec G301/G306 di `dsr_upload.go` (`MkdirAll 0755`, `WriteFile 0644`) untuk file DSR vendor (data cash).
 - **Root cause**: bukan bug — container Go (`appuser`) menulis ke bind mount `FTP_DATA`, dan `backend_python` (user host lain, tidak di-container-kan) harus membaca + `shutil.move` file itu ke `backups/` (`dsr_etl.py:117,680`). 0640 akan memutus flow DSR di server kecuali ada grup bersama.
 - **Fix**: keputusan user 2026-10-09 — **terima 0644/0755**. Komentar alasan + `//nolint:gosec` di `backend/internal/service/dsr_upload.go`; catatan deploy di `.claude/docs/deployment.md` (VM khusus aplikasi; `FTP_DATA` harus writable user Python; perketat ke 0640/0750 + `group_add` saat Python di-container-kan). Perilaku tidak berubah.
 - **Tests**: build + gosec bersih untuk `dsr_upload.go`; `go test -run Dsr ./internal/...` lulus. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `e69e4ef`
 
 ---
 

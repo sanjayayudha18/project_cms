@@ -14,9 +14,10 @@ import (
 // enable reuse the existing AuthRepository.Deactivate/Reactivate via
 // DeactivateUserService — not duplicated here.
 //
-// ponytail: uses dbPool for both reads and writes; swap List/Count to the
-// dbRead pool when DATABASE_REPLICA_URL wiring lands (same TODO convention
-// as AuditLogRepository / RbacReadRepository).
+// Deliberately primary-only (no replica): user create/update apply immediately
+// (not maker-checker), and the admin screen re-lists right after a write, so
+// replica lag would hide the user just created (same reason as
+// MasterDataChangeRepository List/Count).
 type UserAdminRepository struct {
 	queries *db.Queries
 }

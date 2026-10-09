@@ -20,7 +20,7 @@ Template:
 - **Root cause**: parser `page` tersebar (shared `parseIntParam`, `parsePageParams` admin, `parseRegionPageParams`, `Atoi` di vendor order) tanpa batas atas; service mengonversi ke int32.
 - **Fix**: `maxPage = 1_000_000` + helper `parsePageParam` (`handler/atm_portal_handler.go`) dipakai 9 pemanggil yang dulu `parseIntParam(q, "page", …)` (ATM portal ×4, audit log, DMAA forecast, DSR uploads, vendor request ×2) — pesan 400 jadi "page harus berupa angka (maksimal 1000000)". `parsePageParams` (12 handler admin) dan `parseRegionPageParams`: `page > maxPage` → "page tidak valid". Vendor order: tetap lenient untuk non-angka, tapi `page > maxPage` → 422 `page`. Notifikasi sudah dibatasi (`parseBoundedInt`, 2²⁰). Semua konversi `int32` page/page_size di service + 2 batch `len(rows)` + audit handler diberi `//nolint:gosec` dengan alasan. gosec kini bersih.
 - **Tests**: `TestPageParsers_RejectAboveMaxPage` (RED tanpa fix: `maxPage`/`parsePageParam` undefined). build + vet + golangci-lint (gosec 0) + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: tidak relevan (UI tidak mengirim page sebesar itu); opsional cek `GET /api/v1/atm-portal/atms?page=3000000000` → 400.
-- **Commit**: _(belum)_
+- **Commit**: `255c6a8`
 
 ---
 

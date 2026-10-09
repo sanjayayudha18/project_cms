@@ -14,7 +14,8 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | F7 | Uang `float64` → string desimal (3 endpoint + `computeReplenishmentStatus` + 2 frontend) | Money + kontrak API 2 frontend → AI-DLC penuh | PO accept `intent.md` + jawab Q1–Q6 | `.claude/sdlc/money-decimal-string/intent.md` (draft) → `spec.md` |
 | F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | Topologi proxy prod: Nginx / GCP LB / keduanya, berapa hop tepercaya | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | GitHub Actions atau Cloud Build? Postgres untuk test integrasi? | Bagian F11 |
-| F8 | Coverage `repository` / `handler` / `service` ke ≥ 80% | Besar, bertahap per batch | — (bisa mulai kapan saja, batch kecil) | Bagian F8, mulai dari path Sec 4 #7 |
+| F8 | Coverage `repository` / `handler` / `service` ke ≥ 80% | Besar, bertahap per batch | — (bisa mulai kapan saja, batch kecil) | **Batch 1 selesai 2026-10-09** (applier harga vendor-wide, service 73.0→74.3%). Batch berikut: kandidat di bagian F8 |
+| F17 | **Bug**: harga (vendor-wide `vendor_package_prices` + paket cabang `vendor_packages_branch`) yang mulai hari ini/masa depan **tidak bisa di-disable** — `effective_end_date = CURRENT_DATE - 1` melanggar `*_period_chk` (`end >= start`) → apply gagal saat approve | Money/master data + semantik produk (Sec 4 #7) | Keputusan PO: disable harga yang belum berlaku = apa? (mis. `end = start` → berlaku 1 hari; atau tolak di submit dengan pesan jelas; atau status/batal terpisah) | `queries/vendor_package_prices_admin.sql:104`, `queries/vendor_packages_admin.sql:88`; test di `masterdata_applier_price_integration_test.go` |
 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; butuh F8 dulu agar perilaku terkunci test | F8 untuk fungsi terkait | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | Hindari bentrok dengan pekerjaan Vendor Request yang sedang jalan | Fitur berikutnya yang menyentuh Vendor Request | Bagian F9 (gabung dengan F10 `UpdateItems`/`transition`) |
 
@@ -161,6 +162,9 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
   4. `pkg/response`: 1 test kecil.
 - **Alat**: `go test -tags integration -coverprofile=c.out ./internal/... && go tool cover -func=c.out | sort -k3 -n` untuk mencari fungsi 0%.
 - **Selesai bila**: tiap package `internal/*` ≥ 80% dengan tag integration.
+- **Progres**:
+  - Batch 1 (2026-10-09): `VendorPackagePriceApplier` + `mapPackageDBError` — service 73.0% → 74.3%. Menemukan bug F17.
+  - Kandidat batch 2 (0% / rendah, dari coverprofile): `CurrentState` di 6 applier (atm_assignment, dsr_location_map, vendor_branch, vendor_package, vendor_pic, vendor_vault); `VendorRequestService.ListVendorOptions` + `AuditLog` (0%); `VaultPlanService.Reject` (62.5%), `SaveAssignments` (68.2%); `UpdateItems` (64.8%); `vendor_party.cancelVendorParties` (72.7%).
 
 ## F9 — Pecah `vendor_request_actions.go`
 - **Kondisi**: 1210 baris (batas 800). Isinya create/edit, transition, completion, dll. dalam satu file.
@@ -201,3 +205,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F6 | `4298546` | 6 repo admin master-data: List/Count → replica (GetByID/pre-check tetap primary). `UserAdminRepository` **sengaja tetap primary** (apply langsung + re-list setelah write). Test topologi 18 kasus. TODO basi = 0. |
 | 2026-10-09 | F7 | — | AI-DLC dimulai: `.claude/sdlc/money-decimal-string/intent.md` (draft). Temuan tambahan: `computeReplenishmentStatus` membandingkan uang dalam float (logika, bukan hanya tampilan). Menunggu PO accept + jawaban Q1–Q6. |
 | 2026-10-09 | F16 | `255c6a8` | `maxPage = 1_000_000` + `parsePageParam` di semua parser page (9 + admin + region + vendor order). Offset SQL dihitung int4, jadi ini juga mencegah overflow di SQL. gosec 0; sisa lint hanya F10 (gocyclo) + F13 (RealIP), keduanya ditunda. |
+| 2026-10-09 | F8 b1 | (belum di-commit) | Test applier harga vendor-wide (unit + integration). service 73.0→74.3%, `VendorPackagePriceApplier.Apply` 0→83.3%. Temuan bug **F17** (disable harga yang belum/baru berlaku gagal) → ditunda, butuh keputusan PO. |

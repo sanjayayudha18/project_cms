@@ -15,6 +15,16 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 1: test applier harga vendor-wide (money, maker-checker)
+- **Symptom**: `VendorPackagePriceApplier.Apply` (apply-on-approve harga vendor-wide) 0% coverage, termasuk generator `package_code` (`nextPackageCode`, `digitsOrFallback`) dan pemetaan error DB (`mapPriceDBError`, `mapPackageDBError`).
+- **Root cause**: hanya diuji tidak langsung lewat seed SQL; tidak ada test applier.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_price_test.go` (unit: digit label → kode, termasuk fallback `0`; exclusion → `ErrVendorPackagePriceOverlap`/`ErrVendorPackageOverlap`, unique `package_code` → `ErrVendorPackageCodeConflict`, error lain diteruskan; Apply menolak op tak dikenal, update/disable tanpa `entity_id`, payload/base_price/tanggal rusak). `masterdata_applier_price_integration_test.go` (tx rollback: create → `PKG3_ITPX_001` lalu `PKG0_ITPX_002`, `base_price` desimal eksak `1250000.50`; update hanya content + money eksak; disable menutup periode; `CurrentState`; overlap grain sama → `ErrVendorPackagePriceOverlap`).
+- **Temuan**: disable harga yang mulai hari ini/di masa depan gagal (`CURRENT_DATE - 1 < effective_start_date` melanggar `vpp_period_chk`), juga di `vendor_packages_branch` → **QC F17**, butuh keputusan produk (Sec 4 #7), tidak diperbaiki di batch ini.
+- **Tests**: coverage `internal/service` 73.0% → 74.3% (`-tags integration`); `VendorPackagePriceApplier.Apply` 0% → 83.3%, `mapPriceDBError`/`mapPackageDBError`/`digitsOrFallback` 100%. Lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F16: `page` tanpa batas atas → OFFSET negatif / overflow int4 (500)
 - **Symptom**: semua list endpoint hanya mengecek `page ≥ 1`. `page=3000000000` → `int32(params.Page)` wrap ke negatif, atau `(page-1)*page_size` overflow int4 di SQL (`queries/atm_portal.sql:103,252,314`) → Postgres error → 500, bukan 400.
 - **Root cause**: parser `page` tersebar (shared `parseIntParam`, `parsePageParams` admin, `parseRegionPageParams`, `Atoi` di vendor order) tanpa batas atas; service mengonversi ke int32.

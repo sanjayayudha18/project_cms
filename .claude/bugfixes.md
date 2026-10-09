@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F5: permission file upload DSR (diterima, didokumentasikan)
+- **Symptom**: gosec G301/G306 di `dsr_upload.go` (`MkdirAll 0755`, `WriteFile 0644`) untuk file DSR vendor (data cash).
+- **Root cause**: bukan bug — container Go (`appuser`) menulis ke bind mount `FTP_DATA`, dan `backend_python` (user host lain, tidak di-container-kan) harus membaca + `shutil.move` file itu ke `backups/` (`dsr_etl.py:117,680`). 0640 akan memutus flow DSR di server kecuali ada grup bersama.
+- **Fix**: keputusan user 2026-10-09 — **terima 0644/0755**. Komentar alasan + `//nolint:gosec` di `backend/internal/service/dsr_upload.go`; catatan deploy di `.claude/docs/deployment.md` (VM khusus aplikasi; `FTP_DATA` harus writable user Python; perketat ke 0640/0750 + `group_add` saat Python di-container-kan). Perilaku tidak berubah.
+- **Tests**: build + gosec bersih untuk `dsr_upload.go`; `go test -run Dsr ./internal/...` lulus. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F4: tier paket/harga tanpa batas atas (int64 → int32 terpotong)
 - **Symptom**: gosec G115 di applier `vendor_packages_branch` / `vendor_package_prices` (`int32(p.TierMin)`, `tierMaxInt32`). Validasi submit hanya mengecek `tier_min ≥ 1` dan `tier_max ≥ tier_min`, jadi tier > 2³¹ lolos dan saat approve ter-wrap diam-diam ke angka lain di kolom int4 — tarif bisa jatuh ke tier yang salah.
 - **Root cause**: payload memakai `int64`, kolom DB `integer`, tanpa batas atas di `validatePackageGrain` / `validatePriceGrain`.
 - **Fix**: konstanta `maxTier = 999_999_999` (`vendor_package_admin.go`) = sentinel range terbuka di exclusion constraint migration 009 (`COALESCE(tier_max, 999999999)`), muat di int4. `tier_min` > maxTier → 422 `tier_min` ("harus antara 1 dan 999999999"; pesan untuk < 1 ikut berubah), `tier_max` > maxTier → 422 `tier_max`. Berlaku di kedua validator (paket khusus cabang + harga vendor-wide). Import CSV tidak membawa tier; Update tidak mengubah tier. Konversi yang batasnya kini terbukti diberi `//nolint:gosec` + alasan: kedua applier, dan `RowCount int32(len(rows))` (≤ `MasterDataImportMaxRows` 2000). Konversi `int32(Page)` **tidak** di-nolint — page tanpa batas atas dipisah jadi QC F16.
 - **Tests**: `TestPackageAndPriceGrain_TierUpperBound` (7 kasus × 2 validator; gagal compile/RED tanpa fix). build + vet + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: outstanding (form paket/harga admin — isi tier 1000000000 → pesan error di field tier).
-- **Commit**: _(belum)_
+- **Commit**: `ebcd87a`
 
 ---
 

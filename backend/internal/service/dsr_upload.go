@@ -188,11 +188,15 @@ func (s *DsrService) WriteAndDryRun(ctx context.Context, vendorCode string, user
 	// <vendor_code>__<user_id>__<original_filename> -- the filename contract
 	// backend_python/dsr/dsr_etl.py's parse_upload_filename expects.
 	diskName := fmt.Sprintf("%s__%d__%s", vendorCode, userID, sanitizedName)
-	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil {
+	// 0755/0644 on purpose: backend_python (a different host user, outside this
+	// container) must read the file and move it to backups/. Accepted because the
+	// VM is application-only; tighten to a shared group once Python is containerised
+	// (backend_QC_fixes.md F5, docs/deployment.md).
+	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil { //nolint:gosec // G301: see above
 		return nil, fmt.Errorf("creating upload dir: %w", err)
 	}
 	diskPath := filepath.Join(s.uploadDir, diskName)
-	if err := os.WriteFile(diskPath, content, 0o644); err != nil {
+	if err := os.WriteFile(diskPath, content, 0o644); err != nil { //nolint:gosec // G306: see above
 		return nil, fmt.Errorf("writing upload: %w", err)
 	}
 

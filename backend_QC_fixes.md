@@ -18,7 +18,7 @@ Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + c
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
 | 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 4a | F16 | `page` tanpa batas atas → `int32(Page)` wrap → offset negatif (500) di ±8 list endpoint | LOW | S | `bugfixes.md` | [ ] |
-| 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
+| 5 | F5 | Permission file upload DSR 0755/0644 → **diterima** (lihat log) | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [ ] |
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [ ] |
 | 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [ ] |
@@ -183,4 +183,5 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F14 | `21f8cff` | `go.work` + `go.work.sum` di-commit, `.gitignore` diperbarui. Docker build kedua backend dari export index (setara clone bersih) berhasil. Temuan baru: F15 (`.dockerignore` root tidak ada, `.env` ikut context; CLAUDE.md compose basi). |
 | 2026-10-09 | F15 | `ce9fa0f` | `.dockerignore` root (allowlist) — context 8.1MB, tanpa `.env`/`.md`; `backend/.dockerignore` mati dihapus; CLAUDE.md Sec 9 diperbaiki. Docker build kedua backend berhasil. |
 | 2026-10-09 | F3 | `e2de53d` | 9 call site di 5 file → `_ =` sesuai konvensi repo (bukan `slog.Warn` seperti rencana awal: neighbour pattern menang, perilaku sama). errcheck bersih; semua test + integration hijau. |
-| 2026-10-09 | F4 | (belum di-commit) | Tier ternyata **bug nyata** (tanpa batas atas → wrap int32 diam-diam saat approve): `maxTier = 999_999_999` di kedua validator + test 7 kasus. `RowCount` aman (≤ 2000) → nolint. Konversi page **bukan** false positive → dipisah ke F16. |
+| 2026-10-09 | F4 | `ebcd87a` | Tier ternyata **bug nyata** (tanpa batas atas → wrap int32 diam-diam saat approve): `maxTier = 999_999_999` di kedua validator + test 7 kasus. `RowCount` aman (≤ 2000) → nolint. Konversi page **bukan** false positive → dipisah ke F16. |
+| 2026-10-09 | F5 | (belum di-commit) | Keputusan user: **terima 0644/0755** — Python ETL (user host lain, tidak di-container-kan) harus baca + pindahkan file; 0640 akan memutus DSR di server. Komentar + nolint di `dsr_upload.go`, catatan di `docs/deployment.md`. Perketat saat Python di-container-kan. |

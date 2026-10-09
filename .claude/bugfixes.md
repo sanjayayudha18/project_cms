@@ -15,12 +15,22 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 9: test service DSR vendor + baca harga admin
+- **Symptom**: `DsrService` (`ValidateUpload`, `sanitizeFilename`, `ResolveVendor`, `CheckUploadRate`, `GetSaldoFile`, `GetRencanaIsiFile`, `ListUploads` + mapper) 0% di package `service` (test handler di package lain tidak dihitung); List/Count/Get `VendorPackageAdminService` + `VendorPackagePriceAdminService` (mapper `base_price`) 0%.
+- **Root cause**: belum ada test di package `service` untuk jalur ini.
+- **Fix** (test saja, kode produksi tidak berubah): `dsr_upload_read_test.go` (unit: xlsx/xls diterima, kosong / > 10MB / bukan workbook / nama `..` atau kosong ditolak, `../../etc/dsr.xlsx` → `dsr.xlsx`; vendor tidak ada → `ErrDsrVendorNotFound`, error DB lain dibungkus; upload ke-11 per vendor per jam → `ErrDsrRateLimited`, vendor lain punya counter sendiri, key ber-TTL ≤ 1 jam, Redis mati → error biasa; detail daily/rencana isi hanya untuk vendor pemilik (lain → `ErrDsrFileNotFound`), success = row − error, nominal NULL tetap nil; list meneruskan vendor + paging, validasi page/page_size/tanggal). `vendor_price_read_integration_test.go` (repo asli, tx rollback: `base_price` `1250000.50` / `99999999.99` eksak sebagai string, periode berakhir tidak terhitung `active`, Get oleh vendor lain → nil, nil).
+- **Catatan F7**: nominal DSR di test unit masih diassert sebagai `*float64` (perilaku sekarang); ikut diganti saat F7.
+- **Tests**: coverage `internal/service` 75.6% → 78.9% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 8: handler ≥ 80% (pemetaan error login, toggle admin)
 - **Symptom**: `handleAuthError` (pemetaan error login → HTTP) 52.9%; cabang id rusak di toggle disable/enable handler admin ~53%; handler 79.6%, kurang dari target 80%.
 - **Root cause**: belum ada test untuk cabang-cabang ini.
 - **Fix** (test saja, kode produksi tidak berubah): `auth_error_mapping_test.go` (tabel: validasi 422, rate limit 429 + `Retry-After`, kredensial salah 401 termasuk yang di-wrap, akun nonaktif/portal salah/password kedaluwarsa/terkunci 403 dengan kode masing-masing, LDAP/layanan tidak tersedia 503, error tak dikenal 500 tanpa membocorkan detail internal). `admin_update_handlers_test.go`: id rusak di disable/enable → 400 untuk vault/pic/branch/kelolaan ATM/paket cabang; paket cabang tidak punya route enable → 404 (by design, effective-dated). `extractClientIP` sengaja tidak diuji: akan diubah di F13 (proxy tepercaya).
 - **Tests**: coverage `internal/handler` 79.6% → 80.3% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `d1e2ca1`
 
 ---
 

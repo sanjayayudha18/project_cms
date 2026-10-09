@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 4: test repo auth + staging maker-checker
+- **Symptom**: `AuthRepository` (jalur login: cari user by email/username/id, lockout, set password, soft-delete) dan `MasterDataChangeRepository` (staging maker-checker) 0% coverage di package `repository` — hanya teruji tidak langsung lewat service/handler.
+- **Root cause**: belum ada test repo langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `auth_repository_test.go` (integration, tx rollback: user tidak ada → `(nil, nil)`; increment/lock/reset lockout; `SetInitialPassword` memaksa ganti, `SetPassword` membersihkan paksa-ganti + counter; `MarkPasswordExpired`; `UpdateLastLogin`; `Deactivate` menutup login + profil, `Reactivate` membuka lagi). `TestAuthRepository_PropagatesDBErrors` (unit, `poolProbe`): error DB selain no-rows diteruskan, bukan dibaca "user tidak ada". `masterdata_change_repository_test.go` (integration: guard pending per entity, link `approval_request_id`, approved-but-not-applied menyimpan error, stale, rejected, List/Count filter, ListByBatch).
+- **Tests**: coverage `internal/repository` 42.9% → 57.1% (`-tags integration`); semua fungsi kedua repo 100% (kecuali `FindPending` 83.3%: cabang error DB). `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 3: guard vault plan ACM, `UpdateItems`, cancel party withdrawn
 - **Symptom**: cabang guard yang tidak tersentuh test alur utama: `SaveAssignments`/`validateAssignments` (ATM duplikat, branch vault tidak valid, alasan urgent < 10 / > 500 / kosong, edit plan yang sudah pending), `Submit` ulang, `Reject` (alasan kosong, plan masih draft, maker menolak plan sendiri); `UpdateItems` (item kosong, request tidak ada, bukan creator, bukan draft); `cancelVendorParties` melewati party `withdrawn`.
 - **Root cause**: belum ada test untuk jalur gagal / four-eyes ini.
 - **Fix** (test saja, kode produksi tidak berubah): `vault_plan_guards_integration_test.go` (fixture `newVaultPlanFixture`), `vendor_request_update_items_integration_test.go` (harness nomor request), `TestIntegration_VendorOrder_CancelSkipsWithdrawnParty` di `vendor_order_integration_test.go` (party withdrawn → tanpa event `cancelled`, tanpa notifikasi ke vendornya).
 - **Tests**: coverage `internal/service` 75.3% → 75.6% (`-tags integration`); `Reject` 62.5→87.5%, `SaveAssignments` 68.2→72.7%, `validateAssignments` 93.8%, `UpdateItems` 64.8→74.1%, `cancelVendorParties` 72.7→81.8% (sisa = error DB). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `01e2472`
 
 ---
 

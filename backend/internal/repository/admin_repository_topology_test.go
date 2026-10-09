@@ -120,3 +120,20 @@ func TestAdminRepositories_ReadTopology(t *testing.T) {
 		})
 	}
 }
+
+// A DB failure other than "no rows" must surface, not read as "user not found".
+func TestAuthRepository_PropagatesDBErrors(t *testing.T) {
+	ctx := context.Background()
+	var hits []string
+	repo := NewAuthRepository(poolProbe{"primary", &hits})
+	for name, find := range map[string]func() error{
+		"email":    func() error { _, err := repo.FindByEmail(ctx, "x"); return err },
+		"username": func() error { _, err := repo.FindByUsername(ctx, "x"); return err },
+		"id":       func() error { _, err := repo.FindByID(ctx, 1); return err },
+		"profile":  func() error { _, err := repo.GetUserProfile(ctx, 1); return err },
+	} {
+		if err := find(); !errors.Is(err, errPoolProbe) {
+			t.Errorf("%s: want probe error, got %v", name, err)
+		}
+	}
+}

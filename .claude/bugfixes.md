@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 3: guard vault plan ACM, `UpdateItems`, cancel party withdrawn
+- **Symptom**: cabang guard yang tidak tersentuh test alur utama: `SaveAssignments`/`validateAssignments` (ATM duplikat, branch vault tidak valid, alasan urgent < 10 / > 500 / kosong, edit plan yang sudah pending), `Submit` ulang, `Reject` (alasan kosong, plan masih draft, maker menolak plan sendiri); `UpdateItems` (item kosong, request tidak ada, bukan creator, bukan draft); `cancelVendorParties` melewati party `withdrawn`.
+- **Root cause**: belum ada test untuk jalur gagal / four-eyes ini.
+- **Fix** (test saja, kode produksi tidak berubah): `vault_plan_guards_integration_test.go` (fixture `newVaultPlanFixture`), `vendor_request_update_items_integration_test.go` (harness nomor request), `TestIntegration_VendorOrder_CancelSkipsWithdrawnParty` di `vendor_order_integration_test.go` (party withdrawn → tanpa event `cancelled`, tanpa notifikasi ke vendornya).
+- **Tests**: coverage `internal/service` 75.3% → 75.6% (`-tags integration`); `Reject` 62.5→87.5%, `SaveAssignments` 68.2→72.7%, `validateAssignments` 93.8%, `UpdateItems` 64.8→74.1%, `cancelVendorParties` 72.7→81.8% (sisa = error DB). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 2: test `CurrentState` applier + opsi/audit Vendor Request
 - **Symptom**: `CurrentState` (snapshot stale-check saat approve, maker-checker) di 6 applier — atm_assignment, dsr_location_map, vendor_branch, vendor_package, vendor_pic, vendor_vault — 0% coverage; `VendorRequestService.ListVendorOptions` dan `AuditLog` 0%.
 - **Root cause**: belum ada test langsung.
 - **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_current_state_integration_test.go` (tx rollback: seed tiap entity, `CurrentState` mengembalikan tipe row `Get*AdminByIDRow` yang sama dengan Before; id hilang → `pgx.ErrNoRows`). `vendor_request_options_audit_test.go` (unit, fake repo: region NULL dilewati, error diteruskan; `AuditLog` request hilang → `ErrNotFound`, error lain dibungkus, `state`/metadata dipetakan, query `entity_type=vendor_request`).
 - **Tests**: coverage `internal/service` 74.3% → 75.3% (`-tags integration`); 6× `CurrentState` 100%, `ListVendorOptions` 92.3%, `AuditLog` 90.9%. `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `44dabe8`
 
 ---
 

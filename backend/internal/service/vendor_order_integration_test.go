@@ -487,3 +487,23 @@ func TestIntegration_VendorOrder_CompletionGateAndCancel(t *testing.T) {
 		t.Fatalf("vendor view after cancel = %+v %v, want canceled, no action, party status kept", d, err)
 	}
 }
+
+// cit-send-vendor FR6.4: cancel skips withdrawn parties -- no cancelled event,
+// no notice to a vendor that no longer has a part in the request.
+func TestIntegration_VendorOrder_CancelSkipsWithdrawnParty(t *testing.T) {
+	f := newVendorOrderFixture(t)
+	ctx := context.Background()
+	if _, err := f.pool.Exec(ctx, `UPDATE vendor_request_vendor_parties SET status = 'withdrawn' WHERE id = $1`, f.party(t, f.cash2, partyRoleVault)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Cancel(ctx, f.checker, f.reqID, "ATM ditutup"); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_vendor_party_events e JOIN vendor_request_vendor_parties p ON p.id = e.party_id
+		WHERE p.vendor_request_id = $1 AND e.event = 'cancelled'`, f.reqID); n != 3 {
+		t.Fatalf("cancelled events = %d, want 3 (withdrawn party skipped)", n)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM notifications WHERE recipient_user_id = $1 AND type = 'vendor_order.cancelled'`, f.cash2User.UserID); n != 0 {
+		t.Fatalf("withdrawn vendor cancel notifications = %d, want 0", n)
+	}
+}

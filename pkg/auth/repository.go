@@ -7,24 +7,24 @@ import (
 
 // UserRecord represents a user row from the database, including the joined role name.
 type UserRecord struct {
-	ID           int64
-	Username     string
-	FullName     string
-	Email        string
-	PasswordHash *string // nullable for LDAP users
-	AuthSource   string  // "ldap", "local", "local_dev"
-	RoleID       int64
-	Role         string // joined from roles table
-	IsKaryawan   bool
-	VendorID     *int64 // nullable — only set for vendor users
-	IsActive     bool
-	DeletedAt    *time.Time // nullable (soft delete)
-	SupervisorID *int64     // nullable — reporting line (RBAC-Setup)
-	ApprovalLevel *int32    // nullable — maker-checker level, independent of Role
-	PasswordChangedAt *time.Time // nullable — local-password policy only (Auth-Local-Lifecycle); nil = not yet evaluated
-	FailedLoginAttempts int32    // local-password lockout policy only; 0 for LDAP users
-	LockedUntil       *time.Time // nullable — local-password lockout policy only; nil = not locked
-	MustChangePassword bool      // forces a password change on next login (Auth-Local-Lifecycle)
+	ID                  int64
+	Username            string
+	FullName            string
+	Email               string
+	PasswordHash        *string // nullable for LDAP users
+	AuthSource          string  // "ldap", "local", "local_dev"
+	RoleID              int64
+	Role                string // joined from roles table
+	IsKaryawan          bool
+	VendorID            *int64 // nullable — only set for vendor users
+	IsActive            bool
+	DeletedAt           *time.Time // nullable (soft delete)
+	SupervisorID        *int64     // nullable — reporting line (RBAC-Setup)
+	ApprovalLevel       *int32     // nullable — maker-checker level, independent of Role
+	PasswordChangedAt   *time.Time // nullable — local-password policy only (Auth-Local-Lifecycle); nil = not yet evaluated
+	FailedLoginAttempts int32      // local-password lockout policy only; 0 for LDAP users
+	LockedUntil         *time.Time // nullable — local-password lockout policy only; nil = not locked
+	MustChangePassword  bool       // forces a password change on next login (Auth-Local-Lifecycle)
 }
 
 // UserRepository abstracts database access for user-related queries

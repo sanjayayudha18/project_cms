@@ -298,7 +298,7 @@ func (h *AdminRegionHandler) handleRegionAdminError(w http.ResponseWriter, err e
 func regionToResponse(reg db.Region) map[string]any {
 	return map[string]any{
 		"id": reg.ID, "code": reg.Code, "region": reg.Region,
-		"is_active": reg.IsActive,
+		"is_active":  reg.IsActive,
 		"created_at": formatTimestamptz(reg.CreatedAt), "updated_at": formatTimestamptz(reg.UpdatedAt),
 		"deleted_at": formatTimestamptz(reg.DeletedAt),
 	}

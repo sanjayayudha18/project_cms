@@ -11,7 +11,6 @@ import (
 
 // Repository is the repository backing Role Management (Req 8: writes +
 // read-after-write -> primary, list/catalog reads -> replica).
-//
 type Repository struct {
 	db     *db.Queries // primary: writes + read-after-write
 	dbRead *db.Queries // replica: list/catalog reads

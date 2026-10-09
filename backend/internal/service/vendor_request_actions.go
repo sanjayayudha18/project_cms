@@ -22,7 +22,7 @@ const pgCheckViolation = "23514"
 
 var validVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected", "processing", "completed", "cancelled",
-	"completion_pending", // atm-visit-quota (migration 021)
+	"completion_pending",                        // atm-visit-quota (migration 021)
 	"vault_assignment", "vault_review", "ready", // cit-acm-plan (migration 027)
 	"sent_to_vendor", "vendor_accepted", "vendor_rejected", // cit-send-vendor (migration 029)
 }

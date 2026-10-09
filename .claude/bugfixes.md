@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 7: sisa handler 0% (RetryApply, /auth/me, update admin, dll.)
+- **Symptom**: fungsi handler 0%: `RetryApply`/`WithApplyRetry` (terapkan ulang perubahan master-data approved), `AuthHandler.Me`, ACM area `EligibleUsers`/`BranchOptions`/`Rename`, `Update` admin vault/pic/branch/kelolaan ATM + `Enable` branch, Vendor Request `UpdateItems`/`Revise`, `VaultPlanHandler.Audit`, respons sukses upload/confirm DSR.
+- **Root cause**: belum ada test HTTP untuk jalur ini.
+- **Fix** (test saja, kode produksi tidak berubah): `retry_apply_me_handler_test.go` (retry hanya untuk `master_data` + `approved` → retrier dipanggil dengan change id + actor; pending / dokumen lain / approval tidak ada → 409 tanpa retry; retrier tidak terpasang → 404; `ErrNotAuthorized` → 403. `/me`: profil tanpa field password, user terhapus → 401, DB error → 503, tanpa token → 401). `admin_update_handlers_test.go` (PUT 202 + `change_request_id` di 4 handler admin, body/id rusak 400, role non-admin 403; enable branch 202 / pending 409; UpdateItems 200, periode_pred wajib → 400, bukan creator 403, checker 403 di route; Revise 200 / state salah 409). Baris tabel baru di `admin_acm_area_handler_test.go` dan `vault_plan_handler_test.go`. `dsr_upload_handler_test.go`: dry-run + confirm terhadap ETL tiruan (`httptest`), memeriksa kontrak nama file `<vendor_code>__<user_id>__<basename>` (path dibuang) dan confirm tanpa checksum → 400.
+- **Tests**: coverage `internal/handler` 75.0% → 79.6% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 6: test handler harga vendor-wide, upload DSR, review vault
 - **Symptom**: `AdminVendorPackagePriceHandler` 0% seluruhnya (endpoint money + maker-checker); `DsrUploadHandler` Upload/GetRencanaIsi/ListUploads/`handleServiceError` 0% (endpoint vendor); `VaultAssignments`/`VaultApprove`/`VaultReject` (review vault ATM-SPV) 0%; `writeTooManyRequests` 0%.
 - **Root cause**: belum ada test HTTP untuk handler ini.
 - **Fix** (test saja, kode produksi tidak berubah): `admin_vendor_package_price_handler_test.go` (fake service: list meneruskan filter + offset, `base_price` tetap string desimal, create/update/disable → 202 + `change_request_id`, 400 path/body rusak, pemetaan error 422/404/409/403/500, role non-admin 403, tanpa token 401). `dsr_upload_handler_test.go` (fake repo terscope vendor + miniredis: detail daily/rencana isi + list, upload id vendor lain → 404, query rusak → 400, non-vendor 403; upload tanpa file/kosong/bukan workbook → 400, dry-run gagal → 502, upload ke-11 dalam satu jam → 429 + `Retry-After: 3600`; nominal dicek sebagai digit agar tahan perubahan F7). `vendor_request_vault_handler_test.go` (fake reviewer: snapshot kosong → `null`, approve/reject meneruskan actor + alasan, maker 403 di route, `ErrSelfApproval`/`ErrNotChecker` 403, `ErrInvalidTransition` 409, alasan kosong 422).
 - **Tests**: coverage `internal/handler` 68.1% → 75.0% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `dfa53f9`
 
 ---
 

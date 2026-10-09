@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -59,7 +60,7 @@ func (detailFakeDsrRepo) CountDsrUploadsByVendor(context.Context, db.CountDsrUpl
 	return 1, nil
 }
 
-func mountDsrDetailHandler(t *testing.T) (http.Handler, *pkgauth.TokenService, *miniredis.Miniredis) {
+func mountDsrDetailHandler(t *testing.T, etlURL string) (http.Handler, *pkgauth.TokenService, *miniredis.Miniredis) {
 	t.Helper()
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
@@ -70,7 +71,7 @@ func mountDsrDetailHandler(t *testing.T) (http.Handler, *pkgauth.TokenService, *
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	svc := service.NewDsrService(detailFakeDsrRepo{scopeFakeDsrRepo{code: "BIJAK", name: "Vendor BIJAK"}},
-		rdb, http.DefaultClient, t.TempDir(), "http://127.0.0.1:0", "")
+		rdb, http.DefaultClient, t.TempDir(), etlURL, "")
 	r := chi.NewRouter()
 	r.With(custommw.RequireAuth(tokenSvc)).Mount("/api/v1/dsr", NewDsrUploadHandler(svc).Routes())
 	return r, tokenSvc, mr
@@ -79,7 +80,7 @@ func mountDsrDetailHandler(t *testing.T) (http.Handler, *pkgauth.TokenService, *
 // Money amounts are asserted as digits only, so the check survives the planned
 // float -> decimal string switch (QC F7).
 func TestDsrUploadHandler_DetailAndList(t *testing.T) {
-	router, ts, _ := mountDsrDetailHandler(t)
+	router, ts, _ := mountDsrDetailHandler(t, "http://127.0.0.1:0")
 	token := tokenForVendor(t, ts, 1, 7)
 
 	rec := doRequest(router, http.MethodGet, "/api/v1/dsr/uploads/daily/5", token, "")
@@ -132,7 +133,7 @@ func dsrUploadRequest(t *testing.T, token, filename string, content []byte) *htt
 }
 
 func TestDsrUploadHandler_Upload(t *testing.T) {
-	router, ts, mr := mountDsrDetailHandler(t)
+	router, ts, mr := mountDsrDetailHandler(t, "http://127.0.0.1:0")
 	token := tokenForVendor(t, ts, 1, 7)
 	upload := func(filename string, content []byte) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
@@ -168,5 +169,44 @@ func TestDsrUploadHandler_Upload(t *testing.T) {
 	rec := upload("", nil)
 	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "3600" {
 		t.Fatalf("11th upload = %d (Retry-After %q), want 429 / 3600", rec.Code, rec.Header().Get("Retry-After"))
+	}
+}
+
+// Happy path against a stand-in service_dsr_etl: the dry-run preview is relayed
+// as-is (nothing persisted yet), and confirm commits only the vendor's own
+// staged file, then reads the result back (no row yet -> both sheets pending).
+func TestDsrUploadHandler_DryRunAndConfirm(t *testing.T) {
+	var calls []string
+	etl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Filename string `json:"filename"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		calls = append(calls, r.URL.Path+" "+body.Filename)
+		_, _ = w.Write([]byte(`{"status":"success","data":{"checksum":"abc","staged_filename":"` + body.Filename + `","daily":{"rows":[]}}}`))
+	}))
+	t.Cleanup(etl.Close)
+	router, ts, _ := mountDsrDetailHandler(t, etl.URL)
+	token := tokenForVendor(t, ts, 1, 7)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, dsrUploadRequest(t, token, "../laporan.xlsx", append([]byte{'P', 'K', 3, 4}, make([]byte, 16)...)))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"checksum":"abc"`) {
+		t.Fatalf("dry-run = %d %s", rec.Code, rec.Body.String())
+	}
+	// Filename contract: <vendor_code>__<user_id>__<basename>, path stripped.
+	if len(calls) != 1 || calls[0] != "/process/dsr/dry-run BIJAK__7__laporan.xlsx" {
+		t.Fatalf("etl calls = %v", calls)
+	}
+
+	rec = doRequest(router, http.MethodPost, "/api/v1/dsr/uploads/confirm", token, `{"staged_filename":"BIJAK__7__laporan.xlsx","checksum":"abc"}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"pending"`) {
+		t.Fatalf("confirm = %d %s", rec.Code, rec.Body.String())
+	}
+	if len(calls) != 2 || calls[1] != "/process/dsr/commit BIJAK__7__laporan.xlsx" {
+		t.Fatalf("etl calls = %v", calls)
+	}
+	if rec := doRequest(router, http.MethodPost, "/api/v1/dsr/uploads/confirm", token, `{"staged_filename":"BIJAK__7__x.xlsx"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("confirm without checksum = %d, want 400", rec.Code)
 	}
 }

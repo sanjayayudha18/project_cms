@@ -74,6 +74,12 @@ func TestAdminAcmAreaHandler(t *testing.T) {
 		{"links field required", "ADMIN", http.MethodPut, base + "/2/members", `{}`, nil, http.StatusUnprocessableEntity, `user_ids`},
 		{"members ok", "ADMIN", http.MethodPut, base + "/2/members", `{"user_ids":[]}`, nil, http.StatusOK, ""},
 		{"disable", "ADMIN", http.MethodPost, base + "/1/disable", "", nil, http.StatusOK, ""},
+		{"eligible users", "ADMIN", http.MethodGet, base + "/eligible-users", "", nil, http.StatusOK, `"users"`},
+		{"branch options", "ADMIN", http.MethodGet, base + "/branch-options", "", nil, http.StatusOK, `"branches"`},
+		{"rename", "ADMIN", http.MethodPut, base + "/1", `{"name":"Jakarta"}`, nil, http.StatusOK, `"id":1`},
+		{"rename bad body", "ADMIN", http.MethodPut, base + "/1", `{bad`, nil, http.StatusBadRequest, ""},
+		{"rename bad id", "ADMIN", http.MethodPut, base + "/x", `{"name":"Jakarta"}`, nil, http.StatusBadRequest, ""},
+		{"rename duplicate 409", "ADMIN", http.MethodPut, base + "/1", `{"name":"Jakarta"}`, service.ErrAcmAreaNameConflict, http.StatusConflict, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -79,6 +79,9 @@ func TestVaultPlanHandler(t *testing.T) {
 		{"wrong state 409", "ACM-SPV", http.MethodPost, base + "/1/approve", "", service.ErrInvalidTransition, http.StatusConflict, ""},
 		{"reject needs reason", "ACM-SPV", http.MethodPost, base + "/1/reject", `{}`, service.ErrRejectReasonEmpty, http.StatusUnprocessableEntity, "rejection_reason"},
 		{"validation names field", "ACM-USER", http.MethodPut, base + "/1/assignments", `{"assignments":[]}`, &service.ValidationError{Field: "assignments", Message: "x"}, http.StatusUnprocessableEntity, "assignments"},
+		{"audit", "ACM-SPV", http.MethodGet, base + "/1/audit", "", nil, http.StatusOK, ""},
+		{"audit non-member 404", "ACM-USER", http.MethodGet, base + "/1/audit", "", service.ErrVaultPlanNotFound, http.StatusNotFound, ""},
+		{"audit bad id", "ACM-USER", http.MethodGet, base + "/x/audit", "", nil, http.StatusBadRequest, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

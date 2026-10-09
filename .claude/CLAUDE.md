@@ -277,10 +277,10 @@ LOG_LEVEL=info
 ```
 
 *   Never commit `.env`. Never log secrets/JWTs/LDAP/SMTP creds.
-*   docker-compose (local, root `docker-compose.yml`): backend + backend-cit + redis. Postgres external. Frontends have their own Dockerfiles/compose, not yet wired into this file.
+*   docker-compose (local): one file per backend — `backend/docker-compose.yaml` (backend + redis) and `backend-cit/docker-compose.yaml`, both `context: ..` (repo root). Postgres external. Frontends: `frontend/docker-compose.yml` (each app builds from its own folder).
 *   Backend Dockerfile: multi-stage, distroless/alpine, non-root, HEALTHCHECK on /health. `backend/Dockerfile` and `backend-cit/Dockerfile` both build from repo root (context `.`) to resolve `pkg/` via `go.work`.
 *   Frontend Dockerfiles: Vite build -> Nginx serve dist (one image per frontend).
-*   .dockerignore: node\_modules, dist, .env, .git.
+*   .dockerignore: root `.dockerignore` is an allowlist for the backend builds (`go.work*`, `pkg/`, `backend/`, `backend-cit/`; never `.env`). Docker only reads the one at the context root, so per-folder files under `backend*/` are ignored. Frontends keep their own (node\_modules, dist, .env, .git).
 
 * * *
 ## 10\. GCP Deployment

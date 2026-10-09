@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F15: context build Docker backend membawa seluruh repo + `.env`
+- **Symptom**: compose kedua backend memakai `context: ..` (root repo), tapi tidak ada `.dockerignore` di root; `backend/.dockerignore` tidak pernah dibaca Docker (Docker hanya membaca yang ada di root context). Seluruh repo ikut jadi context, dan `COPY backend/` membawa `backend/.env` ke stage builder (tidak ke image final, tapi ada di cache layer builder). CLAUDE.md Sec 9 menyebut root `docker-compose.yml` yang tidak ada.
+- **Root cause**: `.dockerignore` ditaruh per folder backend, padahal context build dipindah ke root saat split `pkg/` + `go.work`.
+- **Fix**: `.dockerignore` root berbentuk allowlist (`go.work`, `go.work.sum`, `pkg/`, `backend/`, `backend-cit/`) + exclude `**/.env`, `**/.env.*`, `**/bin/`, `*.exe`, `*.test`, `*.out`, `*.md`. `backend/.dockerignore` (mati) dihapus. CLAUDE.md Sec 9: teks compose + dockerignore diperbaiki. Frontend tidak terpengaruh (context folder sendiri).
+- **Tests**: Dockerfile probe (`COPY . /ctx`) dari working tree yang berisi `.env` asli → context 8.1MB, hanya `backend/ backend-cit/ go.work go.work.sum pkg/`, tanpa `.env*` dan `*.md`. `docker build` kedua backend berhasil. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F14: `go.work` di-gitignore padahal di-COPY Dockerfile
 - **Symptom**: `backend/Dockerfile` & `backend-cit/Dockerfile` menjalankan `COPY go.work go.work.sum ./`, tetapi kedua file di-gitignore → `docker build` dari clone bersih (CI/Cloud Build) gagal; hanya jalan di mesin dev yang kebetulan punya file lokal.
 - **Root cause**: `.gitignore` memakai default template Go ("go.work tidak di-commit"), sedangkan repo ini sengaja memakai workspace (CLAUDE.md Sec 3).
 - **Fix**: `.gitignore` tidak lagi mengabaikan `go.work`/`go.work.sum`; keduanya di-commit (`go.work` berisi `toolchain go1.26.9` dari F12).
 - **Tests**: export index git (`git checkout-index`, setara clone bersih) → `docker build -f backend/Dockerfile .` dan `-f backend-cit/Dockerfile .` berhasil (67.1MB / 37.7MB). Tidak ada perubahan kode; manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `21f8cff`
 
 ---
 

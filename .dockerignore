@@ -1,0 +1,18 @@
+# Build context for backend/Dockerfile and backend-cit/Dockerfile is the repo
+# root (their compose files use `context: ..`). Allowlist only what Go needs.
+# Frontends build from their own folder and use their own .dockerignore.
+*
+!go.work
+!go.work.sum
+!pkg/
+!backend/
+!backend-cit/
+
+# Never ship secrets or local build output, even inside allowed folders.
+**/.env
+**/.env.*
+**/bin/
+**/*.exe
+**/*.test
+**/*.out
+**/*.md

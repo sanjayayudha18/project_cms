@@ -14,7 +14,7 @@ Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + c
 | 2a | F12 | **Upgrade dependency + toolchain yang kena CVE** (hasil govulncheck F2) | **HIGH** | S–M | `bugfixes.md` | [x] 2026-10-09 |
 | 2b | F13 | **IP client bisa dipalsukan via `X-Forwarded-For`** (rate limit login + IP audit) | **HIGH** | S–M | AI-DLC atau bugfix (auth, Sec 4 #7) — butuh info topologi proxy | [ ] |
 | 2c | F14 | `go.work` di-gitignore tapi di-`COPY` Dockerfile → build Docker dari clone bersih gagal | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
-| 2d | F15 | Tidak ada `.dockerignore` di root (context build = root repo) + CLAUDE.md menyebut root `docker-compose.yml` yang tidak ada | LOW | XS | `bugfixes.md` | [ ] |
+| 2d | F15 | Tidak ada `.dockerignore` di root (context build = root repo) + CLAUDE.md menyebut root `docker-compose.yml` yang tidak ada | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [ ] |
 | 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [ ] |
 | 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
@@ -173,4 +173,5 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F1 | `5feca65` | `gofmt -w` 12 file. 8 file berubah di git (59+/59−, whitespace + 1 baris `//` doc comment); 4 sisanya hanya beda line ending (dinormalisasi git). `gofmt -l` bersih, build/vet/test backend + pkg hijau. |
 | 2026-10-09 | F2 | `72e8610` | `.golangci.yml` di root (standard + gosec + gocyclo≥30; exclude `internal/db`, errcheck/gosec/gocyclo/QF di test, ST1005 `pkg/auth/errors.go`). `//nolint:gosec` G120 di `dsr_upload_handler.go:93`. Perintah lint + govulncheck ditambah ke CLAUDE.md Sec 2a. Sisa temuan lint = F3/F4/F5/F10 saja (backend 17, backend-cit 2, pkg 2). govulncheck menemukan CVE → item baru F12. |
 | 2026-10-09 | F12 | `9f44cf0` | chi v5.3.0, pgx v5.9.2, x/text v0.41.0; `toolchain go1.26.9` di go.mod 3 modul; Dockerfile `golang:1.26.9-alpine`. govulncheck bersih di 3 modul; build/vet/test + integration hijau. Temuan baru: F13 (RealIP/XFF spoofing), F14 (go.work gitignored). Detail di `.claude/bugfixes.md`. |
-| 2026-10-09 | F14 | (belum di-commit) | `go.work` + `go.work.sum` di-commit, `.gitignore` diperbarui. Docker build kedua backend dari export index (setara clone bersih) berhasil. Temuan baru: F15 (`.dockerignore` root tidak ada, `.env` ikut context; CLAUDE.md compose basi). |
+| 2026-10-09 | F14 | `21f8cff` | `go.work` + `go.work.sum` di-commit, `.gitignore` diperbarui. Docker build kedua backend dari export index (setara clone bersih) berhasil. Temuan baru: F15 (`.dockerignore` root tidak ada, `.env` ikut context; CLAUDE.md compose basi). |
+| 2026-10-09 | F15 | (belum di-commit) | `.dockerignore` root (allowlist) — context 8.1MB, tanpa `.env`/`.md`; `backend/.dockerignore` mati dihapus; CLAUDE.md Sec 9 diperbaiki. Docker build kedua backend berhasil. |

@@ -15,6 +15,8 @@ type fakeQuerier struct {
 	byRoles   []db.ListActiveUserRecipientsByRolesRow
 	byVendors []db.ListActiveUserRecipientsByVendorsRow
 	pics      []string
+	byBranch  []db.ListActiveUserRecipientsByVendorBranchesRow
+	branchPic []string
 
 	calls         []string
 	notifications []db.InsertNotificationParams
@@ -41,6 +43,16 @@ func (f *fakeQuerier) ListActiveUserRecipientsByVendors(_ context.Context, _ []i
 func (f *fakeQuerier) ListVendorNotificationPicEmails(_ context.Context, _ []int64) ([]string, error) {
 	f.calls = append(f.calls, "pics")
 	return f.pics, nil
+}
+
+func (f *fakeQuerier) ListActiveUserRecipientsByVendorBranches(_ context.Context, _ []int64) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error) {
+	f.calls = append(f.calls, "byBranch")
+	return f.byBranch, nil
+}
+
+func (f *fakeQuerier) ListVendorBranchNotificationPicEmails(_ context.Context, _ []int64) ([]string, error) {
+	f.calls = append(f.calls, "branchPics")
+	return f.branchPic, nil
 }
 
 func (f *fakeQuerier) InsertNotification(_ context.Context, arg db.InsertNotificationParams) (int64, error) {
@@ -201,4 +213,40 @@ func equalInts(a, b []int64) bool {
 		}
 	}
 	return true
+}
+
+// cit-send-vendor FR7.1: branch recipients merge with the others and dedupe
+// like vendor recipients; PIC lookups only run when the message is emailed.
+func TestSend_VendorBranchRecipients(t *testing.T) {
+	q := &fakeQuerier{
+		byIDs:     []db.ListActiveUserRecipientsByIDsRow{{ID: 30, Email: "ops@vendor.co.id"}},
+		byBranch:  []db.ListActiveUserRecipientsByVendorBranchesRow{{ID: 30, Email: "ops@vendor.co.id"}, {ID: 31, Email: "branch@vendor.co.id"}},
+		branchPic: []string{"pic.branch@vendor.co.id", "BRANCH@vendor.co.id"},
+	}
+	if err := NewService(true).Send(context.Background(), q, validMsg(),
+		Recipients{UserIDs: []int64{30}, VendorBranchIDs: []int64{5}}); err != nil {
+		t.Fatal(err)
+	}
+	gotUsers := []int64{}
+	for _, n := range q.notifications {
+		gotUsers = append(gotUsers, n.RecipientUserID)
+	}
+	if want := []int64{30, 31}; !equalInts(gotUsers, want) {
+		t.Fatalf("in-app recipients = %v, want %v", gotUsers, want)
+	}
+	if len(q.emails) != 3 {
+		t.Fatalf("emails = %d (%v), want 3 (2 users + 1 new PIC)", len(q.emails), q.emails)
+	}
+
+	noMail := &fakeQuerier{byBranch: []db.ListActiveUserRecipientsByVendorBranchesRow{{ID: 31, Email: "branch@vendor.co.id"}}}
+	msg := validMsg()
+	msg.Email = false
+	if err := NewService(true).Send(context.Background(), noMail, msg, Recipients{VendorBranchIDs: []int64{5}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range noMail.calls {
+		if c == "branchPics" {
+			t.Fatal("PIC emails queried for an in-app-only message")
+		}
+	}
 }

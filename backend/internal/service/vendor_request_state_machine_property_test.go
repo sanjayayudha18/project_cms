@@ -22,12 +22,13 @@ var allVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected",
 	"processing", "completed", "failed", "cancelled",
 	"completion_pending", "vault_assignment", "vault_review", "ready",
+	"sent_to_vendor", "vendor_accepted", "vendor_rejected",
 }
 
 var allVendorRequestActions = []action{
 	actionSubmit, actionApprove, actionReject, actionRevise, actionCancel,
 	actionSubmitCompletion, actionApproveCompletion, actionRejectCompletion,
-	actionVaultReady, actionVaultApprove, actionVaultReject,
+	actionVaultReady, actionVaultApprove, actionVaultReject, actionVendorReturn,
 }
 
 // wantTransitions is the spec, kept independent of the production
@@ -39,9 +40,13 @@ var wantTransitions = map[string]map[action]string{
 	"rejected":         {actionRevise: "draft"},
 	// cit-acm-plan spec "Alur & status".
 	"vault_assignment": {actionVaultReady: "vault_review", actionCancel: "cancelled"},
-	"vault_review":     {actionVaultApprove: "ready", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
-	"ready":            {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
-	"approved":         {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// cit-send-vendor spec "Alur & status": vault approve sends to the vendors; ready is legacy.
+	"vault_review":    {actionVaultApprove: "sent_to_vendor", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
+	"sent_to_vendor":  {actionCancel: "cancelled"},
+	"vendor_accepted": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"vendor_rejected": {actionCancel: "cancelled", actionVendorReturn: "rejected"},
+	"ready":           {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"approved":        {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
 	// reject_completion's static target; vault_flow requests are redirected to ready in completionTx.
 	"completion_pending": {actionApproveCompletion: "completed", actionRejectCompletion: "approved"},
 }

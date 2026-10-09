@@ -1,6 +1,5 @@
 import { AppShell } from "@/app/AppShell";
 import { NotFound } from "@/components/NotFound";
-import ordersData from "@/data/orders.json";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthLayout, ProtectedLayout } from "@/features/auth/ProtectedRoute";
@@ -10,7 +9,6 @@ import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { OrdersPage } from "@/features/orders/OrdersPage";
 import { SchedulePage } from "@/features/schedule/SchedulePage";
 import { queryClient } from "@/lib/queryClient";
-import type { CITOrder } from "@/lib/types";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -27,6 +25,33 @@ import { afterEach, beforeEach, vi } from "vitest";
 import { z } from "zod";
 
 // ─── Mock fetch ───────────────────────────────────────────────────────────────
+
+const ORDER_NUMBER = "REP-GRD-JKT-20261009-001";
+const ORDER_LIST = {
+  items: [
+    {
+      id: 11,
+      role: "replenish",
+      status: "pending",
+      request_number: ORDER_NUMBER,
+      replenish_date: "2026-10-09T00:00:00Z",
+      request_status: "sent_to_vendor",
+      is_canceled: false,
+      branch_id: 27,
+      branch_code: "GRD-JKT",
+      branch_name: "Gardanet Jakarta",
+      atm_count: 2,
+      totals: [{ denom: 100000, amount: 2000000 }],
+      currency: "IDR",
+      sent_at: "2026-10-08T03:00:00Z",
+      decided_at: null,
+      can_decide: true,
+    },
+  ],
+  total: 1,
+  page: 1,
+  page_size: 20,
+};
 
 const mockFetch = vi.fn();
 
@@ -48,9 +73,7 @@ beforeEach(() => {
             email: "budi@gardanet.com",
             role: "VENDOR-USER",
             is_karyawan: false,
-            // Must match the vendorId used in orders.json seed data.
-            // useOrders() filters with String(vendorId), so this string flows through unchanged.
-            vendor_id: "vendor-gardanet",
+            vendor_id: 4,
           },
         }),
         { status: 200 },
@@ -58,6 +81,9 @@ beforeEach(() => {
     }
     if (typeof url === "string" && url.includes("/logout")) {
       return new Response(null, { status: 200 });
+    }
+    if (typeof url === "string" && url.includes("/api/v1/vendor/replenish-orders")) {
+      return new Response(JSON.stringify(ORDER_LIST), { status: 200 });
     }
     return new Response(null, { status: 404 });
   });
@@ -210,17 +236,17 @@ describe("Login → redirect → data display flow", () => {
       expect(screen.getByRole("heading", { name: /cit orders/i })).toBeInTheDocument();
     });
 
-    // Verify orders data is displayed (Gardanet ATM IDs visible)
-    await waitFor(() => {
-      expect(screen.getByText("ATM-JKT-001")).toBeInTheDocument();
-    });
+    // Orders come from the API (cit-send-vendor), not the old mock
+    expect(await screen.findByText(ORDER_NUMBER)).toBeInTheDocument();
   });
 });
 
 // ===== Test 2: Vendor scoping =====
 
 describe("Vendor scoping", () => {
-  it("logged in as Gardanet shows only Gardanet data, no SSI or G4S data", async () => {
+  // Scope is enforced by the backend (service + SQL, covered by Go tests): the
+  // page shows what the API returns and never sends a vendor parameter.
+  it("shows the orders the API returns without sending a vendor filter", async () => {
     const user = userEvent.setup();
     renderApp("/orders");
 
@@ -235,23 +261,14 @@ describe("Vendor scoping", () => {
       expect(screen.getByRole("heading", { name: /cit orders/i })).toBeInTheDocument();
     });
 
-    // Wait for data to load — check a known Gardanet ATM ID
-    await waitFor(() => {
-      expect(screen.getByText("ATM-JKT-001")).toBeInTheDocument();
-    });
-
-    // Verify Gardanet ATM IDs are present (first 3 Gardanet orders)
-    const gardanetOrders = (ordersData as CITOrder[]).filter(
-      (o) => o.vendorId === "vendor-gardanet",
-    );
-    for (const order of gardanetOrders.slice(0, 3)) {
-      expect(screen.getByText(order.atmId)).toBeInTheDocument();
+    expect(await screen.findByText(ORDER_NUMBER)).toBeInTheDocument();
+    const orderCalls = mockFetch.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("/api/v1/vendor/replenish-orders"));
+    expect(orderCalls.length).toBeGreaterThan(0);
+    for (const url of orderCalls) {
+      expect(url).not.toMatch(/vendor_id=/);
     }
-
-    // Verify SSI ATM IDs are NOT visible (ATM-SBY-001 belongs to SSI)
-    expect(screen.queryByText("ATM-SBY-001")).not.toBeInTheDocument();
-    // Verify G4S ATM IDs are NOT visible (ATM-SMG-001 belongs to G4S)
-    expect(screen.queryByText("ATM-SMG-001")).not.toBeInTheDocument();
   });
 });
 

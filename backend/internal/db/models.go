@@ -835,6 +835,11 @@ type VendorRequest struct {
 	VaultReviewedBy      *int64             `json:"vault_reviewed_by"`
 	VaultReviewedAt      pgtype.Timestamptz `json:"vault_reviewed_at"`
 	VaultRejectionReason *string            `json:"vault_rejection_reason"`
+	// true = request pernah dikirim ke vendor (2.2b); laporan selesai ditolak -> vendor_accepted. false = ready/approved lama.
+	VendorSent bool `json:"vendor_sent"`
+	// Waktu kirim (ulang) terakhir ke vendor.
+	SentAt           pgtype.Timestamptz `json:"sent_at"`
+	VendorAcceptedAt pgtype.Timestamptz `json:"vendor_accepted_at"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
@@ -910,6 +915,32 @@ type VendorRequestVaultPlan struct {
 	RejectionReason *string            `json:"rejection_reason"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVendorParty struct {
+	ID              int64  `json:"id"`
+	VendorRequestID int64  `json:"vendor_request_id"`
+	VendorBranchID  int64  `json:"vendor_branch_id"`
+	Role            string `json:"role"`
+	Status          string `json:"status"`
+	// Snapshot isi yang dilihat vendor saat dikirim (ATM, nominal per denom, pihak lawan). Tidak memuat data internal (saldo, tier, urgent, harga).
+	Content         []byte             `json:"content"`
+	SentAt          pgtype.Timestamptz `json:"sent_at"`
+	DecidedBy       *int64             `json:"decided_by"`
+	DecidedAt       pgtype.Timestamptz `json:"decided_at"`
+	RejectionReason *string            `json:"rejection_reason"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVendorPartyEvent struct {
+	ID        int64              `json:"id"`
+	PartyID   int64              `json:"party_id"`
+	Event     string             `json:"event"`
+	ActorID   int64              `json:"actor_id"`
+	Reason    *string            `json:"reason"`
+	Content   []byte             `json:"content"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type VendorVault struct {

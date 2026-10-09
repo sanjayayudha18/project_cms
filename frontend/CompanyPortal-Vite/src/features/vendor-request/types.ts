@@ -20,8 +20,14 @@ export type VendorRequestStatus =
   | "vault_assignment"
   /** cit-acm-plan: ATM-SPV mereview penetapan vault dari ACM. */
   | "vault_review"
-  /** cit-acm-plan: penetapan vault disetujui; laporan selesai boleh dibuat. */
-  | "ready";
+  /** cit-acm-plan (legacy since cit-send-vendor): penetapan vault disetujui; laporan selesai boleh dibuat. */
+  | "ready"
+  /** cit-send-vendor: terkirim ke branch replenish + branch vault, menunggu keputusan vendor. */
+  | "sent_to_vendor"
+  /** cit-send-vendor: semua branch vendor menerima; laporan selesai boleh dibuat. */
+  | "vendor_accepted"
+  /** cit-send-vendor: branch replenish menolak; ATM-SPV mengembalikan ke pembuat atau membatalkan. */
+  | "vendor_rejected";
 
 /**
  * CIT-2 (cit-vendor-request-enhancements spec): a Manual_Request's
@@ -366,4 +372,7 @@ export const VENDOR_REQUEST_STATUSES: VendorRequestStatus[] = [
   "vault_assignment",
   "vault_review",
   "ready",
+  "sent_to_vendor",
+  "vendor_accepted",
+  "vendor_rejected",
 ];

@@ -276,7 +276,8 @@ func (s *VaultPlanService) Reject(ctx context.Context, actor Actor, id int64, re
 }
 
 // ReviewRequest is the ATM-SPV / BRANCH-ATM-SPV decision on the whole
-// recommendation (FR5.2/5.3): approve -> ready; reject (reason) ->
+// recommendation (FR5.2/5.3): approve -> sent_to_vendor, parties synced and
+// notified in the same tx (cit-send-vendor FR2); reject (reason) ->
 // vault_assignment with every area plan back to draft. The checker must not be
 // anyone who submitted or approved an area plan of the request.
 func (s *VaultPlanService) ReviewRequest(ctx context.Context, actor Actor, requestID int64, approve bool, reason string) error {
@@ -332,12 +333,22 @@ func (s *VaultPlanService) ReviewRequest(ctx context.Context, actor Actor, reque
 	if r != nil {
 		after["rejection_reason"] = *r
 	}
+	var notices []partyNotice
+	if approve {
+		if notices, err = syncVendorParties(ctx, q, actor.UserID, req); err != nil {
+			return err
+		}
+		after["vendor_parties"] = auditParties(notices)
+	}
 	if err := audit.NewWriter(tx).Write(ctx, audit.Entry{ActorID: actor.UserID, Action: string(a), EntityType: "vendor_request",
 		EntityID: requestID, Before: map[string]string{"state": req.Status}, After: after, IP: actor.IP}); err != nil {
 		return fmt.Errorf("write audit log: %w", err)
 	}
 
-	title, body := "Penetapan vault disetujui tim ATM", fmt.Sprintf("Penetapan vault %s disetujui; request siap.", req.RequestNumber)
+	if err := notifyParties(ctx, s.notifier, q, req, notices); err != nil {
+		return err
+	}
+	title, body := "Penetapan vault disetujui tim ATM", fmt.Sprintf("Penetapan vault %s disetujui; request dikirim ke vendor.", req.RequestNumber)
 	if !approve {
 		title, body = "Penetapan vault ditolak tim ATM", fmt.Sprintf("Penetapan vault %s ditolak: %s", req.RequestNumber, *r)
 	}

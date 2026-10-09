@@ -24,6 +24,9 @@ const STATUS_CONFIG: Record<VendorRequestStatus, { variant: BadgeVariant; label:
   vault_assignment: { variant: "info", label: "Penetapan Vault (ACM)" },
   vault_review: { variant: "warning", label: "Review Penetapan Vault" },
   ready: { variant: "success", label: "Siap" },
+  sent_to_vendor: { variant: "info", label: "Terkirim ke Vendor" },
+  vendor_accepted: { variant: "success", label: "Diterima Vendor" },
+  vendor_rejected: { variant: "danger", label: "Ditolak Vendor" },
 };
 
 interface StatusBadgeProps {

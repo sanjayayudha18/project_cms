@@ -28,6 +28,26 @@ WHERE p.vendor_id = ANY(sqlc.arg('vendor_ids')::bigint[])
   AND p.is_active = true AND p.deleted_at IS NULL
   AND COALESCE(btrim(p.email), '') <> '';
 
+-- name: ListActiveUserRecipientsByVendorBranches :many
+-- cit-send-vendor FR7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL).
+SELECT u.id, u.email
+FROM users u
+JOIN vendor_branches b ON b.vendor_id = u.vendor_id
+WHERE b.id = ANY(sqlc.arg('branch_ids')::bigint[])
+  AND (u.vendor_branch_id IS NULL OR u.vendor_branch_id = b.id)
+  AND u.is_active = true AND u.deleted_at IS NULL;
+
+-- name: ListVendorBranchNotificationPicEmails :many
+-- cit-send-vendor S4: PIC (email saja) branch itu atau vendor-wide.
+SELECT p.email::text AS email
+FROM vendor_pics p
+JOIN vendor_branches b ON b.vendor_id = p.vendor_id
+WHERE b.id = ANY(sqlc.arg('branch_ids')::bigint[])
+  AND (p.vendor_branch_id IS NULL OR p.vendor_branch_id = b.id)
+  AND p.is_notification_recipient = true
+  AND p.is_active = true AND p.deleted_at IS NULL
+  AND COALESCE(btrim(p.email), '') <> '';
+
 -- name: InsertNotification :one
 INSERT INTO notifications (recipient_user_id, type, title, body, link, entity_type, entity_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)

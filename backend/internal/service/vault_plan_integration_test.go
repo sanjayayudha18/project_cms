@@ -91,6 +91,7 @@ func newVaultPlanFixture(t *testing.T) *vaultPlanFixture {
 	t.Cleanup(func() {
 		c := context.Background()
 		ex := func(sql string, args ...any) { _, _ = pool.Exec(c, sql, args...) }
+		cleanupVendorParties(c, pool, f.vendorID)
 		ex(`DELETE FROM vendor_request_vault_assignments WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, f.vendorID)
 		ex(`DELETE FROM vendor_request_vault_plans WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, f.vendorID)
 		ex(`DELETE FROM acm_area_members WHERE user_id = $1`, f.spvID)
@@ -273,7 +274,7 @@ func TestIntegration_VaultPlan_FullFlow(t *testing.T) {
 		t.Fatalf("request after all areas approved = %s, want vault_review", s)
 	}
 
-	// ATM-SPV review: ACM people cannot review (four-eyes across layers); reject resets; approve -> ready.
+	// ATM-SPV review: ACM people cannot review (four-eyes across layers); reject resets; approve -> sent_to_vendor.
 	if err := f.plans.ReviewRequest(ctx, Actor{UserID: f.spvID, Role: "ATM-SPV"}, reqID, true, ""); !errors.Is(err, ErrSelfApproval) {
 		t.Fatalf("ACM approver reviewing: want ErrSelfApproval, got %v", err)
 	}
@@ -298,8 +299,8 @@ func TestIntegration_VaultPlan_FullFlow(t *testing.T) {
 	if err := f.plans.ReviewRequest(ctx, f.checker, reqID, true, ""); err != nil {
 		t.Fatalf("vault approve: %v", err)
 	}
-	if s := f.requestStatus(t, reqID); s != "ready" {
-		t.Fatalf("after vault approve = %s, want ready", s)
+	if s := f.requestStatus(t, reqID); s != "sent_to_vendor" {
+		t.Fatalf("after vault approve = %s, want sent_to_vendor", s)
 	}
 
 	// Notifications: ACM-SPV got the submits; audit trail exists for the plan.

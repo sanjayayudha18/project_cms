@@ -477,6 +477,10 @@ const (
 	actionVaultReady   action = "vault_ready"
 	actionVaultApprove action = "vault_approve"
 	actionVaultReject  action = "vault_reject"
+
+	// cit-send-vendor FR6.1: ATM-SPV returns a request a replenish branch
+	// rejected to its maker (vendor_rejected -> rejected -> revise -> draft).
+	actionVendorReturn action = "vendor_return"
 )
 
 // transitions is the valid-transition table (Req 2.1). approved->processing,
@@ -485,14 +489,19 @@ const (
 // requirement or endpoint here triggers them — they belong to whatever
 // downstream module executes the approved order.
 var transitions = map[string]map[action]string{
-	"draft":            {actionSubmit: "pending_approval", actionCancel: "cancelled"},
+	"draft": {actionSubmit: "pending_approval", actionCancel: "cancelled"},
 	// cit-acm-plan S5: approve now hands the request to ACM (vault_assignment)
 	// instead of approved.
 	"pending_approval": {actionApprove: "vault_assignment", actionReject: "rejected", actionCancel: "cancelled"},
 	"rejected":         {actionRevise: "draft"},
 	"vault_assignment": {actionVaultReady: "vault_review", actionCancel: "cancelled"},
-	"vault_review":     {actionVaultApprove: "ready", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
-	"ready":            {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// cit-send-vendor S1: vault approve sends the request to the vendors
+	// (sent_to_vendor); ready is legacy (2.2a requests approved before 2.2b).
+	"vault_review":    {actionVaultApprove: "sent_to_vendor", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
+	"ready":           {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"sent_to_vendor":  {actionCancel: "cancelled"},
+	"vendor_accepted": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"vendor_rejected": {actionCancel: "cancelled", actionVendorReturn: "rejected"},
 	// approved = legacy: requests approved before the vault flow (F12/N2) keep
 	// their old path, including laporan selesai.
 	"approved": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
@@ -528,7 +537,7 @@ func checkActor(actor Actor, req db.VendorRequest, a action) error {
 		if actor.UserID != req.CreatedBy {
 			return ErrNotCreator
 		}
-	case actionApprove, actionReject:
+	case actionApprove, actionReject, actionVendorReturn:
 		if !isChecker(actor.Role) {
 			return ErrNotChecker
 		}
@@ -541,7 +550,7 @@ func checkActor(actor Actor, req db.VendorRequest, a action) error {
 			if actor.UserID != req.CreatedBy {
 				return ErrNotCreator
 			}
-		case "approved", "vault_assignment", "vault_review", "ready":
+		case "approved", "vault_assignment", "vault_review", "ready", "sent_to_vendor", "vendor_accepted", "vendor_rejected":
 			if !isChecker(actor.Role) {
 				return ErrNotChecker
 			}

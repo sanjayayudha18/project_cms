@@ -22,6 +22,7 @@ import {
   toCompletionPayload,
 } from "./CompletionPanels";
 import { StatusBadge } from "./StatusBadge";
+import { VendorPartiesPanel } from "./VendorPartiesPanel";
 import {
   getVendorRequestErrorMessage,
   useApproveVendorRequest,
@@ -40,6 +41,7 @@ import type {
   VendorRequestDetail as VendorRequestDetailType,
   VendorRequestItem,
 } from "./types";
+import { useVendorReturn } from "./vendorSide";
 
 const MAKER_ROLES = ["ADMIN", "ATM-USER", "BRANCH-ATM-USER"];
 const CHECKER_ROLES = ["ADMIN", "ATM-SPV", "BRANCH-ATM-SPV"];
@@ -47,14 +49,32 @@ const ERROR_TOAST_MS = 5000;
 const OVER_QUOTA_TOAST_MS = 8000;
 // atm-visit-quota: the per-ATM completion/kuota table is shown once a request
 // can be (or has been) reported as replenished.
-const COMPLETION_STATUSES = ["approved", "ready", "completion_pending", "completed"];
+const COMPLETION_STATUSES = [
+  "approved",
+  "ready",
+  "vendor_accepted",
+  "completion_pending",
+  "completed",
+];
 // cit-acm-plan FR5.5: after approval, cancel is checker-only in every post-approve state.
-const CHECKER_CANCEL_STATUSES = ["approved", "vault_assignment", "vault_review", "ready"];
+const CHECKER_CANCEL_STATUSES = [
+  "approved",
+  "vault_assignment",
+  "vault_review",
+  "ready",
+  // cit-send-vendor FR6.4
+  "sent_to_vendor",
+  "vendor_accepted",
+  "vendor_rejected",
+];
 // cit-acm-plan FR5: the Penetapan Vault panel (renders nothing for legacy, non-vault requests).
 const VAULT_PANEL_STATUSES = [
   "vault_assignment",
   "vault_review",
   "ready",
+  "sent_to_vendor",
+  "vendor_accepted",
+  "vendor_rejected",
   "completion_pending",
   "completed",
 ];
@@ -79,6 +99,9 @@ export function VendorRequestDetail() {
   const [approveCompletionOpen, setApproveCompletionOpen] = useState(false);
   const [rejectCompletionOpen, setRejectCompletionOpen] = useState(false);
   const [rejectCompletionReason, setRejectCompletionReason] = useState("");
+  // cit-send-vendor FR6.1: "Kembalikan ke pembuat" after a replenish branch rejects.
+  const [vendorReturnOpen, setVendorReturnOpen] = useState(false);
+  const [vendorReturnReason, setVendorReturnReason] = useState("");
 
   const updateItemsMutation = useUpdateVendorRequestItems();
   const submitMutation = useSubmitVendorRequest();
@@ -89,6 +112,7 @@ export function VendorRequestDetail() {
   const submitCompletionMutation = useSubmitVendorRequestCompletion();
   const approveCompletionMutation = useApproveVendorRequestCompletion();
   const rejectCompletionMutation = useRejectVendorRequestCompletion();
+  const vendorReturnMutation = useVendorReturn();
 
   const isBusy =
     updateItemsMutation.isPending ||
@@ -99,7 +123,8 @@ export function VendorRequestDetail() {
     cancelMutation.isPending ||
     submitCompletionMutation.isPending ||
     approveCompletionMutation.isPending ||
-    rejectCompletionMutation.isPending;
+    rejectCompletionMutation.isPending ||
+    vendorReturnMutation.isPending;
 
   function showErrorToast(message: string): void {
     const toastId = toast({ type: "error", message });
@@ -161,11 +186,15 @@ export function VendorRequestDetail() {
     ((isCreator || (isChecker && !isCreator)) &&
       (data.status === "draft" || data.status === "pending_approval")) ||
     (isChecker && CHECKER_CANCEL_STATUSES.includes(data.status));
-  // atm-visit-quota FR1: maker reports a request as replenished -- from ready
-  // (vault flow, cit-acm-plan FR5.4) or approved (legacy); a checker other than
-  // the reporter approves/rejects that report.
+  // atm-visit-quota FR1: maker reports a request as replenished -- from
+  // vendor_accepted (cit-send-vendor FR6.3), or ready / approved (legacy); a
+  // checker other than the reporter approves/rejects that report.
   const canReportCompletion =
-    (data.status === "ready" || data.status === "approved") && isMaker && !data.is_canceled;
+    (data.status === "vendor_accepted" || data.status === "ready" || data.status === "approved") &&
+    isMaker &&
+    !data.is_canceled;
+  const canVendorReturn =
+    data.status === "vendor_rejected" && isChecker && !isCreator && !data.is_canceled;
   const isReporter =
     user !== null && user !== undefined && data.completion_submitted_by?.id === user.id;
   const canReviewCompletion = data.status === "completion_pending" && isChecker && !isReporter;
@@ -206,6 +235,17 @@ export function VendorRequestDetail() {
       await rejectMutation.mutateAsync({ id: data.id, reason });
       setRejectOpen(false);
       setRejectReason("");
+    });
+  }
+
+  async function handleVendorReturn(): Promise<void> {
+    if (!data) return;
+    const reason = vendorReturnReason.trim();
+    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
+    await runAction(async () => {
+      await vendorReturnMutation.mutateAsync({ id: data.id, reason });
+      setVendorReturnOpen(false);
+      setVendorReturnReason("");
     });
   }
 
@@ -269,6 +309,9 @@ export function VendorRequestDetail() {
     rejectReason.trim().length >= 1 && rejectReason.trim().length <= REJECTION_REASON_MAX;
   const cancelValid =
     cancelReason.trim().length >= 1 && cancelReason.trim().length <= REJECTION_REASON_MAX;
+  const vendorReturnValid =
+    vendorReturnReason.trim().length >= 1 &&
+    vendorReturnReason.trim().length <= REJECTION_REASON_MAX;
   const rejectCompletionValid =
     rejectCompletionReason.trim().length >= 1 &&
     rejectCompletionReason.trim().length <= REJECTION_REASON_MAX;
@@ -390,6 +433,15 @@ export function VendorRequestDetail() {
                   {reviseMutation.isPending ? "Merevisi..." : "Revisi"}
                 </Button>
               )}
+              {canVendorReturn && (
+                <Button
+                  variant="secondary"
+                  disabled={isBusy}
+                  onClick={() => setVendorReturnOpen(true)}
+                >
+                  Kembalikan ke Pembuat
+                </Button>
+              )}
               {canCancel && (
                 <Button variant="danger" disabled={isBusy} onClick={() => setCancelOpen(true)}>
                   <Ban className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -428,6 +480,8 @@ export function VendorRequestDetail() {
           canReview={data.status === "vault_review" && isChecker && !data.is_canceled}
         />
       )}
+
+      <VendorPartiesPanel requestId={data.id} />
 
       {showCompletionTable && <CompletionAtmTable atms={data.atms} />}
 
@@ -488,6 +542,24 @@ export function VendorRequestDetail() {
           onDismiss={() => {
             setRejectOpen(false);
             setRejectReason("");
+          }}
+        />
+      )}
+
+      {vendorReturnOpen && (
+        <ReasonModal
+          title="Kembalikan ke Pembuat"
+          reasonLabel="Alasan (dibaca pembuat request)"
+          confirmLabel="Kembalikan"
+          busyLabel="Mengembalikan..."
+          reason={vendorReturnReason}
+          onReasonChange={setVendorReturnReason}
+          valid={vendorReturnValid}
+          busy={vendorReturnMutation.isPending}
+          onConfirm={handleVendorReturn}
+          onDismiss={() => {
+            setVendorReturnOpen(false);
+            setVendorReturnReason("");
           }}
         />
       )}

@@ -1,164 +1,162 @@
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FilterTabs } from "@/components/ui/FilterTabs";
-import { OrderSummaryBar } from "@/features/orders/OrderSummaryBar";
+import { ORDER_PAGE_SIZE, type PartyStatus, type VendorOrderSummary } from "@/features/orders/api";
+import { ROLE_LABEL, formatDate, orderStatus, totalsText } from "@/features/orders/labels";
 import { useOrders } from "@/features/orders/useOrders";
-import { formatIDR } from "@/lib/formatters";
-import type { CITOrder } from "@/lib/types";
-import { type ColumnDef, type SortingState, createColumnHelper } from "@tanstack/react-table";
+import { Link } from "@tanstack/react-router";
+import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { PackageSearch } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-type OrderStatus = CITOrder["status"];
-type StatusFilter = "All" | OrderStatus;
+// cit-send-vendor FR9.1: replenish requests sent to this vendor, one row per
+// (request, branch, role). Filters and paging run on the server.
 
-const statusBadgeMap: Record<OrderStatus, "info" | "warning" | "success" | "danger"> = {
-  Scheduled: "info",
-  "In Transit": "warning",
-  Completed: "success",
-  Failed: "danger",
-};
+type StatusFilter = "all" | PartyStatus;
 
-const columnHelper = createColumnHelper<CITOrder>();
+const FILTERS: readonly { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "Semua" },
+  { value: "pending", label: "Menunggu keputusan" },
+  { value: "accepted", label: "Diterima" },
+  { value: "rejected", label: "Ditolak" },
+  { value: "withdrawn", label: "Ditarik" },
+];
 
-const columns: ColumnDef<CITOrder, unknown>[] = [
-  columnHelper.accessor("id", {
-    header: "Order ID",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("atmId", {
-    header: "ATM ID",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("location", {
-    header: "Location",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("orderType", {
-    header: "Order Type",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("scheduledDate", {
-    header: "Scheduled Date",
-    cell: (info) => {
-      const date = new Date(info.getValue());
-      return date.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    },
-  }),
-  columnHelper.accessor("amount", {
-    header: "Amount",
-    cell: (info) => formatIDR(info.getValue()),
-    meta: { numeric: true },
-  }),
-  columnHelper.accessor("status", {
-    header: "Status",
-    cell: (info) => {
-      const status = info.getValue();
-      return <Badge variant={statusBadgeMap[status]}>{status}</Badge>;
-    },
+const columnHelper = createColumnHelper<VendorOrderSummary>();
+
+const columns = [
+  columnHelper.accessor("request_number", {
+    header: "Nomor Request",
+    cell: (info) => (
+      <Link
+        to="/orders/$id"
+        params={{ id: String(info.row.original.id) }}
+        className="font-medium text-sidebar-active underline-offset-2 hover:underline"
+      >
+        {info.getValue()}
+      </Link>
+    ),
     enableSorting: false,
   }),
-] as ColumnDef<CITOrder, unknown>[];
+  columnHelper.accessor("replenish_date", {
+    header: "Tanggal Replenish",
+    cell: (info) => formatDate(info.getValue()),
+    enableSorting: false,
+  }),
+  columnHelper.accessor("role", {
+    header: "Peran",
+    cell: (info) => ROLE_LABEL[info.getValue()],
+    enableSorting: false,
+  }),
+  columnHelper.accessor("branch_name", {
+    header: "Branch",
+    cell: (info) => info.getValue(),
+    enableSorting: false,
+  }),
+  columnHelper.accessor("atm_count", {
+    header: "Jumlah ATM",
+    cell: (info) => info.getValue(),
+    meta: { numeric: true },
+    enableSorting: false,
+  }),
+  columnHelper.accessor("totals", {
+    header: "Total per Denom",
+    cell: (info) => totalsText(info.getValue()),
+    meta: { numeric: true },
+    enableSorting: false,
+  }),
+  columnHelper.display({
+    id: "status",
+    header: "Status",
+    cell: (info) => {
+      const s = orderStatus(info.row.original);
+      return <Badge variant={s.variant}>{s.label}</Badge>;
+    },
+  }),
+] as ColumnDef<VendorOrderSummary, unknown>[];
 
 export function OrdersPage() {
-  const { data: orders = [], isLoading } = useOrders();
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState<string | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([{ id: "scheduledDate", desc: true }]);
+  const { data, isLoading, isError } = useOrders({
+    partyStatus: status === "all" ? "" : status,
+    from,
+    to,
+    page,
+  });
+  const items = data?.items ?? [];
+  const lastPage = Math.max(1, Math.ceil((data?.total ?? 0) / ORDER_PAGE_SIZE));
 
-  // Compute counts per status from UNFILTERED data (for filter tabs)
-  const statusCounts = useMemo(() => {
-    const counts: Record<StatusFilter, number> = {
-      All: orders.length,
-      Scheduled: 0,
-      "In Transit": 0,
-      Completed: 0,
-      Failed: 0,
-    };
-    for (const order of orders) {
-      counts[order.status]++;
-    }
-    return counts;
-  }, [orders]);
-
-  // Apply filters: status AND date range (AND logic)
-  const filteredOrders = useMemo(() => {
-    let result = orders;
-
-    // Status filter
-    if (statusFilter !== "All") {
-      result = result.filter((o) => o.status === statusFilter);
-    }
-
-    // Date range filter (inclusive)
-    if (startDate) {
-      result = result.filter((o) => o.scheduledDate >= startDate);
-    }
-    if (endDate) {
-      result = result.filter((o) => o.scheduledDate <= endDate);
-    }
-
-    return result;
-  }, [orders, statusFilter, startDate, endDate]);
-
-  // Filter tab options with counts
-  const filterOptions: readonly { value: StatusFilter; label: string; count: number }[] = [
-    { value: "All", label: "All", count: statusCounts.All },
-    { value: "Scheduled", label: "Scheduled", count: statusCounts.Scheduled },
-    { value: "In Transit", label: "In Transit", count: statusCounts["In Transit"] },
-    { value: "Completed", label: "Completed", count: statusCounts.Completed },
-    { value: "Failed", label: "Failed", count: statusCounts.Failed },
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-6">
-        <h1 className="text-xl font-semibold text-surface-text">CIT Orders</h1>
-        <p className="text-sm text-neutral-500">Memuat data...</p>
-      </div>
-    );
+  function handleStatus(v: StatusFilter) {
+    setStatus(v);
+    setPage(1);
+  }
+  function handleFrom(v: string | null) {
+    setFrom(v);
+    setPage(1);
+  }
+  function handleTo(v: string | null) {
+    setTo(v);
+    setPage(1);
   }
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold text-surface-text">CIT Orders</h1>
 
-      {/* Summary bar — always uses unfiltered data */}
-      <OrderSummaryBar orders={orders} />
-
-      {/* Filters */}
       <div className="flex flex-col gap-4">
-        <FilterTabs options={filterOptions} selected={statusFilter} onChange={setStatusFilter} />
+        <FilterTabs options={FILTERS} selected={status} onChange={handleStatus} />
         <DatePicker
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
+          startDate={from}
+          endDate={to}
+          onStartDateChange={handleFrom}
+          onEndDateChange={handleTo}
         />
       </div>
 
-      {/* Data table or empty state */}
-      {filteredOrders.length === 0 ? (
+      {isLoading ? (
+        <p className="text-sm text-neutral-500">Memuat data...</p>
+      ) : isError ? (
+        <p role="alert" className="text-sm font-semibold text-danger-fg">
+          Gagal memuat request. Coba muat ulang halaman.
+        </p>
+      ) : items.length === 0 ? (
         <EmptyState
           icon={PackageSearch}
-          title="Tidak ada order yang cocok"
-          description="Tidak ditemukan order CIT yang sesuai dengan filter yang dipilih."
+          title="Belum ada request"
+          description="Tidak ada request replenish yang sesuai dengan filter yang dipilih."
         />
       ) : (
-        <DataTable
-          data={filteredOrders}
-          columns={columns}
-          sorting={sorting}
-          onSortingChange={setSorting}
-        />
+        <>
+          <DataTable data={items} columns={columns} />
+          <nav aria-label="Halaman" className="flex items-center justify-end gap-3 text-sm">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              Sebelumnya
+            </Button>
+            <span className="tabular-nums">
+              Halaman {page} dari {lastPage}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page >= lastPage}
+              onClick={() => setPage(page + 1)}
+            >
+              Berikutnya
+            </Button>
+          </nav>
+        </>
       )}
     </div>
   );

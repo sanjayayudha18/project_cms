@@ -447,8 +447,13 @@ func main() {
 	// backs the ATM-SPV vault review routes on Vendor Request.
 	vaultPlanService := service.NewVaultPlanService(dbPool, dbReadPool).WithNotifier(notificationService)
 	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ACM-USER", "ACM-SPV", "ADMIN")).Mount("/api/v1/vault-plans", handler.NewVaultPlanHandler(vaultPlanService).Routes())
-	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService).WithVaultReview(vaultPlanService)
+	// Kirim ke vendor (cit-send-vendor): VendorPortal orders for VENDOR-USER
+	// (scope re-read from users in the service); list on the replica.
+	vendorOrderService := service.NewVendorOrderService(dbPool, dbReadPool).WithNotifier(notificationService)
+	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService).WithVaultReview(vaultPlanService).
+		WithVendorSide(vendorOrderService, vendorRequestService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-orders", handler.NewVendorOrderHandler(vendorOrderService).Routes())
 
 	// Kuota kunjungan replenish per ATM (.claude/sdlc/atm-visit-quota): read
 	// for viewers, reset/cancel-visit for checkers (re-checked in service).

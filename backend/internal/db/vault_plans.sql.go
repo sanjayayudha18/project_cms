@@ -108,12 +108,43 @@ func (q *Queries) CreateMissingVaultPlans(ctx context.Context, requestID *int64)
 	return items, nil
 }
 
+const deleteVaultAssignmentsOfRemovedAtms = `-- name: DeleteVaultAssignmentsOfRemovedAtms :many
+DELETE FROM vendor_request_vault_assignments a
+WHERE a.vendor_request_id = $1
+  AND NOT EXISTS (SELECT 1 FROM vendor_request_items i WHERE i.vendor_request_id = a.vendor_request_id AND i.terminal_id = a.terminal_id)
+RETURNING a.terminal_id
+`
+
+// cit-send-vendor FR6.2: an edit (draft only) removed ATMs from the request; their vault assignments go
+// (draft rows, same rule as replace-all in 2.2a S1; caller audits). ATMs still in the request keep theirs.
+func (q *Queries) DeleteVaultAssignmentsOfRemovedAtms(ctx context.Context, vendorRequestID int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, deleteVaultAssignmentsOfRemovedAtms, vendorRequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var terminal_id string
+		if err := rows.Scan(&terminal_id); err != nil {
+			return nil, err
+		}
+		items = append(items, terminal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getVaultPlan = `-- name: GetVaultPlan :one
 
 SELECT p.id, p.vendor_request_id, p.acm_area_id, p.status, p.submitted_by, p.submitted_at,
        p.approved_by, p.approved_at, p.rejected_by, p.rejected_at, p.rejection_reason,
        vr.request_number, vr.replenish_date, vr.vendor_id, vr.status AS request_status,
-       vr.vault_rejection_reason, ar.name AS acm_area_name
+       vr.vault_rejection_reason, ar.name AS acm_area_name,
+       -- cit-send-vendor FR4.3: the plan went back to draft because a vault vendor rejected it.
+       EXISTS (SELECT 1 FROM users ru WHERE ru.id = p.rejected_by AND ru.vendor_id IS NOT NULL) AS rejected_by_vendor
 FROM vendor_request_vault_plans p
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 JOIN acm_areas ar ON ar.id = p.acm_area_id
@@ -138,6 +169,7 @@ type GetVaultPlanRow struct {
 	RequestStatus        string             `json:"request_status"`
 	VaultRejectionReason *string            `json:"vault_rejection_reason"`
 	AcmAreaName          string             `json:"acm_area_name"`
+	RejectedByVendor     bool               `json:"rejected_by_vendor"`
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +197,7 @@ func (q *Queries) GetVaultPlan(ctx context.Context, id int64) (GetVaultPlanRow, 
 		&i.RequestStatus,
 		&i.VaultRejectionReason,
 		&i.AcmAreaName,
+		&i.RejectedByVendor,
 	)
 	return i, err
 }
@@ -247,6 +280,38 @@ func (q *Queries) ListAcmAreaMemberIDsByRole(ctx context.Context, arg ListAcmAre
 			return nil, err
 		}
 		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllVaultPlansForRequest = `-- name: ListAllVaultPlansForRequest :many
+SELECT id, acm_area_id, status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 ORDER BY id
+`
+
+type ListAllVaultPlansForRequestRow struct {
+	ID        int64  `json:"id"`
+	AcmAreaID int64  `json:"acm_area_id"`
+	Status    string `json:"status"`
+}
+
+// cit-send-vendor FR6.2: re-approval after an edit reopens every plan, including ones cancelled because
+// an earlier edit left their area without ATMs (the unique (request, area) blocks recreating them).
+func (q *Queries) ListAllVaultPlansForRequest(ctx context.Context, vendorRequestID int64) ([]ListAllVaultPlansForRequestRow, error) {
+	rows, err := q.db.Query(ctx, listAllVaultPlansForRequest, vendorRequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllVaultPlansForRequestRow{}
+	for rows.Next() {
+		var i ListAllVaultPlansForRequestRow
+		if err := rows.Scan(&i.ID, &i.AcmAreaID, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -823,7 +888,9 @@ UPDATE vendor_requests
 SET status = $1::text,
     vault_reviewed_by = $2::bigint,
     vault_reviewed_at = now(),
-    vault_rejection_reason = $3::text
+    vault_rejection_reason = $3::text,
+    vendor_sent = vendor_sent OR $1::text = 'sent_to_vendor',
+    sent_at = CASE WHEN $1::text = 'sent_to_vendor' THEN now() ELSE sent_at END
 WHERE id = $4::bigint
 `
 
@@ -834,7 +901,7 @@ type SetVendorRequestVaultReviewParams struct {
 	ID      int64   `json:"id"`
 }
 
-// vault_review -> ready | vault_assignment by the ATM-SPV (FR5.2).
+// vault_review -> sent_to_vendor (cit-send-vendor S1; ready = legacy) | vault_assignment by the ATM-SPV (FR5.2).
 func (q *Queries) SetVendorRequestVaultReview(ctx context.Context, arg SetVendorRequestVaultReviewParams) error {
 	_, err := q.db.Exec(ctx, setVendorRequestVaultReview,
 		arg.Status,

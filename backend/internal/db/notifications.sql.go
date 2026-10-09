@@ -233,6 +233,41 @@ func (q *Queries) ListActiveUserRecipientsByRoles(ctx context.Context, roles []s
 	return items, nil
 }
 
+const listActiveUserRecipientsByVendorBranches = `-- name: ListActiveUserRecipientsByVendorBranches :many
+SELECT u.id, u.email
+FROM users u
+JOIN vendor_branches b ON b.vendor_id = u.vendor_id
+WHERE b.id = ANY($1::bigint[])
+  AND (u.vendor_branch_id IS NULL OR u.vendor_branch_id = b.id)
+  AND u.is_active = true AND u.deleted_at IS NULL
+`
+
+type ListActiveUserRecipientsByVendorBranchesRow struct {
+	ID    int64  `json:"id"`
+	Email string `json:"email"`
+}
+
+// cit-send-vendor FR7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL).
+func (q *Queries) ListActiveUserRecipientsByVendorBranches(ctx context.Context, branchIds []int64) ([]ListActiveUserRecipientsByVendorBranchesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveUserRecipientsByVendorBranches, branchIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveUserRecipientsByVendorBranchesRow{}
+	for rows.Next() {
+		var i ListActiveUserRecipientsByVendorBranchesRow
+		if err := rows.Scan(&i.ID, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveUserRecipientsByVendors = `-- name: ListActiveUserRecipientsByVendors :many
 SELECT u.id, u.email
 FROM users u
@@ -317,6 +352,38 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVendorBranchNotificationPicEmails = `-- name: ListVendorBranchNotificationPicEmails :many
+SELECT p.email::text AS email
+FROM vendor_pics p
+JOIN vendor_branches b ON b.vendor_id = p.vendor_id
+WHERE b.id = ANY($1::bigint[])
+  AND (p.vendor_branch_id IS NULL OR p.vendor_branch_id = b.id)
+  AND p.is_notification_recipient = true
+  AND p.is_active = true AND p.deleted_at IS NULL
+  AND COALESCE(btrim(p.email), '') <> ''
+`
+
+// cit-send-vendor S4: PIC (email saja) branch itu atau vendor-wide.
+func (q *Queries) ListVendorBranchNotificationPicEmails(ctx context.Context, branchIds []int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVendorBranchNotificationPicEmails, branchIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		items = append(items, email)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

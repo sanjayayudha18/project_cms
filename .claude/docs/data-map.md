@@ -48,6 +48,17 @@ Plan/spec: `.claude/sdlc/cit-acm-plan/` (Phase 2.2a). Migration `027_acm_vault_a
 *   `vendor_request_vault_assignments` — one per (request, terminal_id), UNIQUE; `replenish_branch_id`, `vault_branch_id`, `tier` 1–3, `is_urgent` + `urgent_reason` 10–500 (CHECK), tier 3 ⇒ urgent (CHECK); `saldo_snapshot`/`capacity_snapshot` jsonb `{"<denom>": "<whole IDR string>"}` (`null` = unknown; the DB comment shows `.00` but the service writes whole rupiah), `capacity_warning`. Replaced (deleted + re-inserted, audited) only while the plan is `draft`.
 *   Roles `ACM-USER`, `ACM-SPV`; `menu_features` `cit`, `cit.vault-plan`, `settings.acm-areas` + `role_permissions`.
 
+## Send to vendor (migration 029)
+
+Plan/spec: `.claude/sdlc/cit-send-vendor/` (Phase 2.2b). Migration `029_vendor_request_send.sql` applied to dev DB 2026-10-09.
+
+*   `vendor_requests` — status CHECK + `sent_to_vendor`, `vendor_accepted`, `vendor_rejected`. `vendor_sent` bool (true once sent; laporan selesai ditolak → `vendor_accepted`), `sent_at` (last (re)send), `vendor_accepted_at`. ATM-SPV vault approve goes **straight** to `sent_to_vendor`; a `ready` row in the DB is a legacy 2.2a request (no marker, no backfill).
+*   `vendor_request_vendor_parties` — one per (request, `vendor_branch_id`, `role` replenish|vault), UNIQUE; derived from `vendor_request_vault_assignments` (each distinct `replenish_branch_id` / `vault_branch_id`; a branch that is both = two parties). `status` pending → accepted | rejected (reason 10–500, CHECK) | withdrawn (no longer in the request); CHECKs tie `decided_by/_at` to accepted/rejected. `content` jsonb = what the vendor saw: `{role, branch, atms[{terminal_id, lokasi, ticket_number, denoms[{denom, amount}], counterpart{…, address for a vault}}], totals[{denom, amount}], currency:"IDR"}` — built only from whitelisted columns (no saldo/kapasitas, tier, urgent, price). Never deleted.
+*   `vendor_request_vendor_party_events` — append-only history: `sent`, `resent`, `accepted`, `rejected`, `withdrawn`, `cancelled` + actor, reason, content snapshot.
+*   Vendor scope (not stored): `users.vendor_id` must equal the JWT `vendor_id` claim; `users.vendor_branch_id` NULL = every branch of the vendor, else that branch only — read from the primary per call.
+*   Resend rules: new party → `sent`; changed content, or previously rejected/withdrawn → `resent` (pending); unchanged pending/accepted kept; missing → `withdrawn`. Re-approval after an edit (`approved_at` later than every party `sent_at`) resends every party. A vault rejection moves the request with `SetVendorRequestStatusOnly` so `approved_at` is untouched.
+*   `vendor_request_vault_plans` reused: a vault rejection sets only the affected plans back to `draft` with `rejected_by` = the vendor user; `GetVaultPlan.rejected_by_vendor` drives the "Ditolak vendor" label.
+
 ## ATM assignment package source (migration 023)
 
 Plan/spec: `.claude/sdlc/atm-package-source/`. Migration `023_atm_assignment_vendor_source.sql`, applied to dev DB 2026-10-07.

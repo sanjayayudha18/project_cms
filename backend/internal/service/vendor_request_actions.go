@@ -14,6 +14,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
 
 const pgUniqueViolation = "23505"
@@ -23,6 +24,7 @@ var validVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected", "processing", "completed", "cancelled",
 	"completion_pending", // atm-visit-quota (migration 021)
 	"vault_assignment", "vault_review", "ready", // cit-acm-plan (migration 027)
+	"sent_to_vendor", "vendor_accepted", "vendor_rejected", // cit-send-vendor (migration 029)
 }
 
 // --- Reads (no transaction needed) --------------------------------------
@@ -805,6 +807,14 @@ func (s *VendorRequestService) UpdateItems(ctx context.Context, actor Actor, id 
 		metadata["amount_overrides"] = overrides
 	}
 	tickets.addTo(metadata)
+	// cit-send-vendor FR6.2: vault assignments of removed ATMs go with them.
+	removed, err := q.DeleteVaultAssignmentsOfRemovedAtms(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("drop vault assignments of removed atms for %d: %w", id, err)
+	}
+	if len(removed) > 0 {
+		metadata["vault_assignments_removed"] = removed
+	}
 	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
 		ActorID: actor.UserID, Action: "update_items", EntityType: "vendor_request", EntityID: id,
 		Before: map[string]string{"state": req.Status}, After: metadata, IP: actor.IP,
@@ -843,6 +853,16 @@ func (s *VendorRequestService) Reject(ctx context.Context, actor Actor, id int64
 		return nil, &ValidationError{Field: "rejection_reason", Message: "maksimal 500 karakter"}
 	}
 	return s.transition(ctx, actor, id, transitionOpts{action: actionReject, auditAction: "reject", rejectionReason: trimmed})
+}
+
+// VendorReturn: vendor_rejected -> rejected (cit-send-vendor FR6.1), same
+// reason bounds and four-eyes as Reject; the maker then revises and edits.
+func (s *VendorRequestService) VendorReturn(ctx context.Context, actor Actor, id int64, reason string) (*VendorRequestDetail, error) {
+	trimmed, err := checkReason(reason, "rejection_reason")
+	if err != nil {
+		return nil, err
+	}
+	return s.transition(ctx, actor, id, transitionOpts{action: actionVendorReturn, auditAction: "vendor_return", rejectionReason: trimmed})
 }
 
 // Revise: rejected -> draft (Req 7).
@@ -903,6 +923,10 @@ func (s *VendorRequestService) Cancel(ctx context.Context, actor Actor, id int64
 	// cit-acm-plan FR5.5: the ACM area plans die with the request.
 	if err := q.CancelVaultPlansForRequest(ctx, id); err != nil {
 		return nil, fmt.Errorf("cancel vault plans of %d: %w", id, err)
+	}
+	// cit-send-vendor FR6.4: vendors already reached are told; parties keep their status (history).
+	if err := cancelVendorParties(ctx, q, s.notifier, actor, req); err != nil {
+		return nil, err
 	}
 
 	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
@@ -966,7 +990,7 @@ func (s *VendorRequestService) transition(ctx context.Context, actor Actor, id i
 	}
 
 	var reasonParam *string
-	if opts.action == actionReject {
+	if opts.action == actionReject || opts.action == actionVendorReturn {
 		reasonParam = &opts.rejectionReason
 	}
 	if _, err := q.UpdateVendorRequestStatus(ctx, db.UpdateVendorRequestStatusParams{
@@ -979,7 +1003,7 @@ func (s *VendorRequestService) transition(ctx context.Context, actor Actor, id i
 	}
 
 	after := map[string]any{"state": newStatus}
-	if opts.action == actionReject {
+	if opts.action == actionReject || opts.action == actionVendorReturn {
 		after["rejection_reason"] = opts.rejectionReason // Req 16.2
 	}
 	aw := newAuditWriter(tx)
@@ -990,8 +1014,22 @@ func (s *VendorRequestService) transition(ctx context.Context, actor Actor, id i
 		return nil, fmt.Errorf("write audit log: %w", err)
 	}
 	if newStatus == "vault_assignment" && opts.action == actionApprove {
+		// cit-send-vendor FR6.2: a request re-approved after an edit keeps its
+		// area plans; they go back to draft for ACM to review again.
+		if err := resetVaultPlansForReapproval(ctx, q, aw, s.notifier, actor, req); err != nil {
+			return nil, err
+		}
 		if err := createVaultPlans(ctx, q, aw, s.notifier, actor, &id); err != nil {
 			return nil, err
+		}
+	}
+	if opts.action == actionVendorReturn && s.notifier != nil {
+		if err := s.notifier.Send(ctx, q, notification.Message{
+			Type: "vendor_request.vendor_returned", Title: "Request dikembalikan untuk revisi",
+			Body: fmt.Sprintf("Request %s ditolak branch replenish dan dikembalikan: %s", req.RequestNumber, opts.rejectionReason),
+			Link: fmt.Sprintf("/replenishment/vendor-requests/%d", id), EntityType: "vendor_request", EntityID: &id, Email: true,
+		}, notification.Recipients{UserIDs: []int64{req.CreatedBy}}); err != nil {
+			return nil, fmt.Errorf("notify vendor return: %w", err)
 		}
 	}
 

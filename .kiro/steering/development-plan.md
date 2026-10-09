@@ -150,13 +150,13 @@ Binding rules (from `project-context.md`):
 ### 2.2 Replenishment — split 2026-10-08 (user) into 2.2a → 2.2b → 2.2c
 Vendor Request `approved` = replenishment instruction (no `replenishment_instructions` table). CIT functions live in `backend/` (not `backend-cit`).
 
-#### 2.2a Penetapan branch vault (penyedia uang) per ATM oleh ACM ← **NEXT**
+#### 2.2a Penetapan branch vault (penyedia uang) per ATM oleh ACM — ✅ committed `ef6dbfe`
 - `.claude/sdlc/cit-acm-plan/` (intent + spec revisi 2, 2026-10-08). Flow: ATM-USER request → ATM-SPV approve → request `vault_assignment` → dipecah per Area ACM (branch replenish) → ACM-USER pilih **satu branch vault per ATM** (rekomendasi: vendor sama + region sama → vendor lain region sama → urgent lintas region) dengan saldo DSR + kapasitas sebagai **peringatan** → ACM-SPV approve → ATM-SPV/BRANCH-ATM-SPV approve → request `ready`. Fase berhenti di sini.
 - Branch replenish (pelaksana, kelolaan) vs branch vault (penyedia uang) mulai dibedakan. New: roles ACM-USER/ACM-SPV, Area ACM (ADMIN, immediate + audit), DSR location → vault mapping (maker-checker), ETL saves SALDO AKHIR per vault. No pindah buku/escrow.
 - **Depends on:** Vendor Request + tickets ✅, DSR ✅, 0.3 ✅. **Model:** Opus, Effort: High.
 
-#### 2.2b Kirim CIT approved ke vendor
-- Create/send the replenish request to vendors (branch replenish + branch vault) for `ready` requests — intent not written yet.
+#### 2.2b Kirim CIT approved ke vendor — ✅ built 2026-10-09 (stage 4, uncommitted; review + manual browser check next)
+- `.claude/sdlc/cit-send-vendor/` (intent draft 2026-10-09): `ready` → auto `sent_to_vendor`; branch replenish + branch vault see it in VendorPortal Orders, accept/reject per (request × branch); all accepted → `vendor_accepted` (gate laporan selesai). Pickup flow out of scope.
 - **Depends on:** 2.2a.
 
 #### 2.2c Realisasi vs order (was 2.2 intent)

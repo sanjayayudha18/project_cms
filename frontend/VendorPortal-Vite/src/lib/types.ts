@@ -46,18 +46,6 @@ export interface JwtPayload {
 
 // ─── Domain Types ─────────────────────────────────────────────────────────────
 
-export interface CITOrder {
-  readonly id: string;
-  readonly atmId: string;
-  readonly location: string;
-  readonly orderType: "Pickup" | "Delivery";
-  readonly scheduledDate: string; // ISO date
-  readonly amount: number; // IDR integer
-  readonly status: "Scheduled" | "In Transit" | "Completed" | "Failed";
-  readonly vendorId: string;
-  readonly hasEvidence: boolean;
-}
-
 export interface HandoverEvidence {
   readonly orderId: string;
   readonly files: readonly EvidenceFile[];

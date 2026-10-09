@@ -130,7 +130,7 @@ func vaultPlanJSON(d *service.VaultPlanDetail) map[string]any {
 		"status": p.Status, "submitted_by": p.SubmittedBy, "submitted_at": formatTimestamptz(p.SubmittedAt),
 		"approved_by": p.ApprovedBy, "approved_at": formatTimestamptz(p.ApprovedAt),
 		"rejected_by": p.RejectedBy, "rejected_at": formatTimestamptz(p.RejectedAt), "rejection_reason": p.RejectionReason,
-		"atms": d.Atms,
+		"rejected_by_vendor": p.RejectedByVendor, "atms": d.Atms,
 	}
 }
 

@@ -122,7 +122,7 @@ VALUES (
     $8::text,
     $9::bigint
 )
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at
 `
 
 type CreateVendorRequestParams struct {
@@ -197,6 +197,9 @@ func (q *Queries) CreateVendorRequest(ctx context.Context, arg CreateVendorReque
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }
@@ -320,7 +323,7 @@ func (q *Queries) GetVendorForRequestNumber(ctx context.Context, id int64) (GetV
 }
 
 const getVendorRequest = `-- name: GetVendorRequest :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason FROM vendor_requests WHERE id = $1
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at FROM vendor_requests WHERE id = $1
 `
 
 // Plain read, no joins -- used where only the request's own columns are
@@ -362,13 +365,16 @@ func (q *Queries) GetVendorRequest(ctx context.Context, id int64) (VendorRequest
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }
 
 const getVendorRequestDetail = `-- name: GetVendorRequestDetail :one
 SELECT
-    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at, vr.is_canceled, vr.request_category, vr.replenish_date, vr.is_manual, vr.vendor_id, vr.cancellation_reason, vr.completion_submitted_by, vr.completion_submitted_at, vr.completion_approved_by, vr.completion_approved_at, vr.completion_rejected_by, vr.completion_rejected_at, vr.completion_rejection_reason, vr.region_code, vr.vault_flow, vr.vault_reviewed_by, vr.vault_reviewed_at, vr.vault_rejection_reason,
+    vr.id, vr.request_number, vr.forecast_date, vr.status, vr.notes, vr.created_by, vr.approved_by, vr.rejected_by, vr.rejection_reason, vr.created_at, vr.updated_at, vr.submitted_at, vr.approved_at, vr.rejected_at, vr.is_canceled, vr.request_category, vr.replenish_date, vr.is_manual, vr.vendor_id, vr.cancellation_reason, vr.completion_submitted_by, vr.completion_submitted_at, vr.completion_approved_by, vr.completion_approved_at, vr.completion_rejected_by, vr.completion_rejected_at, vr.completion_rejection_reason, vr.region_code, vr.vault_flow, vr.vault_reviewed_by, vr.vault_reviewed_at, vr.vault_rejection_reason, vr.vendor_sent, vr.sent_at, vr.vendor_accepted_at,
     cu.full_name AS created_by_name,
     au.full_name AS approved_by_name,
     ru.full_name AS rejected_by_name,
@@ -418,6 +424,9 @@ type GetVendorRequestDetailRow struct {
 	VaultReviewedBy           *int64             `json:"vault_reviewed_by"`
 	VaultReviewedAt           pgtype.Timestamptz `json:"vault_reviewed_at"`
 	VaultRejectionReason      *string            `json:"vault_rejection_reason"`
+	VendorSent                bool               `json:"vendor_sent"`
+	SentAt                    pgtype.Timestamptz `json:"sent_at"`
+	VendorAcceptedAt          pgtype.Timestamptz `json:"vendor_accepted_at"`
 	CreatedByName             string             `json:"created_by_name"`
 	ApprovedByName            *string            `json:"approved_by_name"`
 	RejectedByName            *string            `json:"rejected_by_name"`
@@ -466,6 +475,9 @@ func (q *Queries) GetVendorRequestDetail(ctx context.Context, id int64) (GetVend
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 		&i.CreatedByName,
 		&i.ApprovedByName,
 		&i.RejectedByName,
@@ -477,7 +489,7 @@ func (q *Queries) GetVendorRequestDetail(ctx context.Context, id int64) (GetVend
 }
 
 const getVendorRequestForUpdate = `-- name: GetVendorRequestForUpdate :one
-SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason FROM vendor_requests WHERE id = $1 FOR UPDATE
+SELECT id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at FROM vendor_requests WHERE id = $1 FOR UPDATE
 `
 
 // Row-locking read for every state transition (submit/approve/reject/revise/
@@ -521,6 +533,9 @@ func (q *Queries) GetVendorRequestForUpdate(ctx context.Context, id int64) (Vend
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }
@@ -1278,7 +1293,7 @@ const softCancelVendorRequest = `-- name: SoftCancelVendorRequest :one
 UPDATE vendor_requests
 SET status = 'cancelled', is_canceled = true, cancellation_reason = $1::text
 WHERE id = $2::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at
 `
 
 type SoftCancelVendorRequestParams struct {
@@ -1329,6 +1344,9 @@ func (q *Queries) SoftCancelVendorRequest(ctx context.Context, arg SoftCancelVen
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }
@@ -1450,14 +1468,14 @@ SET
     completion_submitted_at = CASE WHEN $1::text = 'completion_pending' THEN now() ELSE completion_submitted_at END,
     completion_approved_by  = CASE WHEN $1::text = 'completed' THEN $2::bigint ELSE completion_approved_by END,
     completion_approved_at  = CASE WHEN $1::text = 'completed' THEN now() ELSE completion_approved_at END,
-    completion_rejected_by  = CASE WHEN $1::text IN ('approved', 'ready') THEN $2::bigint
+    completion_rejected_by  = CASE WHEN $1::text IN ('approved', 'ready', 'vendor_accepted') THEN $2::bigint
                                    WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejected_by END,
-    completion_rejected_at  = CASE WHEN $1::text IN ('approved', 'ready') THEN now()
+    completion_rejected_at  = CASE WHEN $1::text IN ('approved', 'ready', 'vendor_accepted') THEN now()
                                    WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejected_at END,
-    completion_rejection_reason = CASE WHEN $1::text IN ('approved', 'ready') THEN $3::text
+    completion_rejection_reason = CASE WHEN $1::text IN ('approved', 'ready', 'vendor_accepted') THEN $3::text
                                    WHEN $1::text = 'completion_pending' THEN NULL ELSE completion_rejection_reason END
 WHERE id = $4::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at
 `
 
 type UpdateVendorRequestCompletionParams struct {
@@ -1472,8 +1490,8 @@ type UpdateVendorRequestCompletionParams struct {
 // ---------------------------------------------------------------------------
 // One query for the three completion transitions, same CASE-guard idea as
 // UpdateVendorRequestStatus: completion_pending stamps the maker (and clears a
-// previous rejection), completed stamps the approver, approved (= laporan
-// ditolak, back to the maker) stamps the rejecter + reason.
+// previous rejection), completed stamps the approver, approved / ready /
+// vendor_accepted (= laporan ditolak, back to the maker) stamps the rejecter + reason.
 func (q *Queries) UpdateVendorRequestCompletion(ctx context.Context, arg UpdateVendorRequestCompletionParams) (VendorRequest, error) {
 	row := q.db.QueryRow(ctx, updateVendorRequestCompletion,
 		arg.Status,
@@ -1515,6 +1533,9 @@ func (q *Queries) UpdateVendorRequestCompletion(ctx context.Context, arg UpdateV
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }
@@ -1529,11 +1550,15 @@ SET
     approved_at = CASE WHEN $1::text IN ('approved', 'vault_assignment') THEN now() ELSE approved_at END,
     approved_by = CASE WHEN $1::text IN ('approved', 'vault_assignment') THEN $2::bigint ELSE approved_by END,
     vault_flow = vault_flow OR $1::text = 'vault_assignment',
+    -- cit-send-vendor: sent_to_vendor marks the request as sent (laporan selesai reject -> vendor_accepted).
+    vendor_sent = vendor_sent OR $1::text = 'sent_to_vendor',
+    sent_at = CASE WHEN $1::text = 'sent_to_vendor' THEN now() ELSE sent_at END,
+    vendor_accepted_at = CASE WHEN $1::text = 'vendor_accepted' THEN now() ELSE vendor_accepted_at END,
     rejected_at = CASE WHEN $1::text = 'rejected' THEN now() ELSE rejected_at END,
     rejected_by = CASE WHEN $1::text = 'rejected' THEN $2::bigint ELSE rejected_by END,
     rejection_reason = CASE WHEN $1::text = 'rejected' THEN $3::text ELSE rejection_reason END
 WHERE id = $4::bigint
-RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason
+RETURNING id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason, created_at, updated_at, submitted_at, approved_at, rejected_at, is_canceled, request_category, replenish_date, is_manual, vendor_id, cancellation_reason, completion_submitted_by, completion_submitted_at, completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at, completion_rejection_reason, region_code, vault_flow, vault_reviewed_by, vault_reviewed_at, vault_rejection_reason, vendor_sent, sent_at, vendor_accepted_at
 `
 
 type UpdateVendorRequestStatusParams struct {
@@ -1589,6 +1614,9 @@ func (q *Queries) UpdateVendorRequestStatus(ctx context.Context, arg UpdateVendo
 		&i.VaultReviewedBy,
 		&i.VaultReviewedAt,
 		&i.VaultRejectionReason,
+		&i.VendorSent,
+		&i.SentAt,
+		&i.VendorAcceptedAt,
 	)
 	return i, err
 }

@@ -262,6 +262,9 @@ async function settle() {
 // run, which is memory-heavy. The non-interactive redirect check stays at 100 runs;
 // interactive checks use a smaller-but-still-broad sample to stay within heap limits.
 const INTERACTIVE_RUNS = 40;
+// 40 rendered login round-trips per test: the 5 s vitest default is too tight
+// once the full suite runs in parallel (seen flaky 2026-10-09).
+const INTERACTIVE_TIMEOUT_MS = 30_000;
 
 // ─── Property 1: Route-Guard Round-Trip ─────────────────────────────────────────
 
@@ -278,7 +281,7 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 1: Route-Gu
         await settle();
 
         // Redirected to /login
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
+        expect(await screen.findByTestId("login-page")).toBeInTheDocument();
         expect(screen.getByTestId("pathname").textContent).toBe("/login");
 
         // redirect target preserves the original full path (pathname + search)
@@ -292,37 +295,41 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 1: Route-Gu
     );
   });
 
-  it("after successful login, user is returned to the originally requested path", async () => {
-    const user = userEvent.setup();
-    await fc.assert(
-      fc.asyncProperty(protectedPathArb, async (path) => {
-        cleanup();
-        queryClient.clear();
-        const router = buildRouter(path);
-        const { unmount } = render(<RouterProvider router={router} />);
+  it(
+    "after successful login, user is returned to the originally requested path",
+    async () => {
+      const user = userEvent.setup();
+      await fc.assert(
+        fc.asyncProperty(protectedPathArb, async (path) => {
+          cleanup();
+          queryClient.clear();
+          const router = buildRouter(path);
+          const { unmount } = render(<RouterProvider router={router} />);
 
-        await settle();
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
-        // The guard must have preserved the requested path into the redirect target
-        // before we log in, otherwise post-login would fall back to /orders.
-        await waitFor(() => {
-          expect(screen.getByTestId("redirect-target").textContent).toBe(path);
-        });
+          await settle();
+          expect(await screen.findByTestId("login-page")).toBeInTheDocument();
+          // The guard must have preserved the requested path into the redirect target
+          // before we log in, otherwise post-login would fall back to /orders.
+          await waitFor(() => {
+            expect(screen.getByTestId("redirect-target").textContent).toBe(path);
+          });
 
-        await user.click(screen.getByTestId("do-login"));
-        await settle();
+          await user.click(screen.getByTestId("do-login"));
+          await settle();
 
-        // Back on the protected page at the original path
-        expect(screen.getByTestId("protected-page")).toBeInTheDocument();
-        expect(screen.getByTestId("pathname").textContent).toBe(path);
+          // Back on the protected page at the original path
+          expect(await screen.findByTestId("protected-page")).toBeInTheDocument();
+          expect(screen.getByTestId("pathname").textContent).toBe(path);
 
-        unmount();
-        cleanup();
-        queryClient.clear();
-      }),
-      { numRuns: INTERACTIVE_RUNS },
-    );
-  });
+          unmount();
+          cleanup();
+          queryClient.clear();
+        }),
+        { numRuns: INTERACTIVE_RUNS },
+      );
+    },
+    INTERACTIVE_TIMEOUT_MS,
+  );
 });
 
 // ─── Property 2: Sanitasi Redirect Param ────────────────────────────────────────
@@ -340,31 +347,35 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 2: Sanitasi
       .filter((s) => !s.startsWith("/")),
   );
 
-  it("unsafe redirect values result in landing on /orders after login", async () => {
-    const user = userEvent.setup();
-    await fc.assert(
-      fc.asyncProperty(unsafeRedirectArb, async (unsafe) => {
-        cleanup();
-        queryClient.clear();
-        const router = buildRouter(`/login?redirect=${encodeURIComponent(unsafe)}`);
-        const { unmount } = render(<RouterProvider router={router} />);
+  it(
+    "unsafe redirect values result in landing on /orders after login",
+    async () => {
+      const user = userEvent.setup();
+      await fc.assert(
+        fc.asyncProperty(unsafeRedirectArb, async (unsafe) => {
+          cleanup();
+          queryClient.clear();
+          const router = buildRouter(`/login?redirect=${encodeURIComponent(unsafe)}`);
+          const { unmount } = render(<RouterProvider router={router} />);
 
-        await settle();
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
-        // sanitized target falls back to /orders
-        expect(screen.getByTestId("redirect-target").textContent).toBe("/orders");
+          await settle();
+          expect(await screen.findByTestId("login-page")).toBeInTheDocument();
+          // sanitized target falls back to /orders
+          expect(screen.getByTestId("redirect-target").textContent).toBe("/orders");
 
-        await user.click(screen.getByTestId("do-login"));
-        await settle();
+          await user.click(screen.getByTestId("do-login"));
+          await settle();
 
-        expect(screen.getByTestId("protected-page")).toBeInTheDocument();
-        expect(screen.getByTestId("pathname").textContent).toBe("/orders");
+          expect(await screen.findByTestId("protected-page")).toBeInTheDocument();
+          expect(screen.getByTestId("pathname").textContent).toBe("/orders");
 
-        unmount();
-        cleanup();
-        queryClient.clear();
-      }),
-      { numRuns: INTERACTIVE_RUNS },
-    );
-  });
+          unmount();
+          cleanup();
+          queryClient.clear();
+        }),
+        { numRuns: INTERACTIVE_RUNS },
+      );
+    },
+    INTERACTIVE_TIMEOUT_MS,
+  );
 });

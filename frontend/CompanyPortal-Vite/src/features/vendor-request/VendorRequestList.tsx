@@ -33,6 +33,9 @@ const STATUS_LABELS: Record<VendorRequestStatus, string> = {
   vault_assignment: "Penetapan Vault (ACM)",
   vault_review: "Review Penetapan Vault",
   ready: "Siap",
+  sent_to_vendor: "Terkirim ke Vendor",
+  vendor_accepted: "Diterima Vendor",
+  vendor_rejected: "Ditolak Vendor",
 };
 
 export function VendorRequestList() {

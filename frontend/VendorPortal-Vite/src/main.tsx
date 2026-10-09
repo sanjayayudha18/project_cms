@@ -14,6 +14,7 @@ import { invoicesRoute } from "@/routes/invoices";
 import { loginRoute } from "@/routes/login";
 import { notificationsRoute } from "@/routes/notifications";
 import { ordersRoute } from "@/routes/orders";
+import { orderDetailRoute } from "@/routes/orders.$id";
 import { evidenceRoute } from "@/routes/orders.$id.evidence";
 import { reconciliationRoute } from "@/routes/reconciliation";
 import { scheduleRoute } from "@/routes/schedule";
@@ -25,6 +26,7 @@ const routeTree = rootRoute.addChildren([
   protectedRoute.addChildren([
     shellRoute.addChildren([
       ordersRoute,
+      orderDetailRoute,
       evidenceRoute,
       invoicesRoute,
       scheduleRoute,

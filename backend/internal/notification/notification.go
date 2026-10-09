@@ -46,11 +46,14 @@ type Message struct {
 
 // Recipients is the union of specific users, every active user of a role
 // (expanded at send time), and vendors (their active users in-app + email,
-// plus email-only to vendor_pics flagged is_notification_recipient).
+// plus email-only to vendor_pics flagged is_notification_recipient), and
+// vendor branches (cit-send-vendor FR7.1: same, limited to users/PICs pinned
+// to that branch or vendor-wide).
 type Recipients struct {
-	UserIDs   []int64
-	Roles     []string
-	VendorIDs []int64
+	UserIDs         []int64
+	Roles           []string
+	VendorIDs       []int64
+	VendorBranchIDs []int64
 }
 
 // Querier is the subset of *db.Queries Send needs; pass the caller's
@@ -60,6 +63,8 @@ type Querier interface {
 	ListActiveUserRecipientsByRoles(ctx context.Context, roles []string) ([]db.ListActiveUserRecipientsByRolesRow, error)
 	ListActiveUserRecipientsByVendors(ctx context.Context, vendorIds []int64) ([]db.ListActiveUserRecipientsByVendorsRow, error)
 	ListVendorNotificationPicEmails(ctx context.Context, vendorIds []int64) ([]string, error)
+	ListActiveUserRecipientsByVendorBranches(ctx context.Context, branchIds []int64) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error)
+	ListVendorBranchNotificationPicEmails(ctx context.Context, branchIds []int64) ([]string, error)
 	InsertNotification(ctx context.Context, arg db.InsertNotificationParams) (int64, error)
 	InsertNotificationEmail(ctx context.Context, arg db.InsertNotificationEmailParams) error
 }
@@ -95,6 +100,13 @@ func (s *Service) Send(ctx context.Context, q Querier, msg Message, to Recipient
 		if picEmails, err = q.ListVendorNotificationPicEmails(ctx, to.VendorIDs); err != nil {
 			return fmt.Errorf("list vendor pic emails: %w", err)
 		}
+	}
+	if msg.Email && len(to.VendorBranchIDs) > 0 {
+		branchPics, err := q.ListVendorBranchNotificationPicEmails(ctx, to.VendorBranchIDs)
+		if err != nil {
+			return fmt.Errorf("list vendor branch pic emails: %w", err)
+		}
+		picEmails = append(picEmails, branchPics...)
 	}
 	if len(users) == 0 && len(picEmails) == 0 {
 		slog.InfoContext(ctx, "notification has no recipients", "type", msg.Type)
@@ -186,6 +198,15 @@ func resolveUsers(ctx context.Context, q Querier, to Recipients) ([]userRecipien
 		rows, err := q.ListActiveUserRecipientsByVendors(ctx, to.VendorIDs)
 		if err != nil {
 			return nil, fmt.Errorf("list recipients by vendor: %w", err)
+		}
+		for _, r := range rows {
+			add(r.ID, r.Email)
+		}
+	}
+	if len(to.VendorBranchIDs) > 0 {
+		rows, err := q.ListActiveUserRecipientsByVendorBranches(ctx, to.VendorBranchIDs)
+		if err != nil {
+			return nil, fmt.Errorf("list recipients by vendor branch: %w", err)
 		}
 		for _, r := range rows {
 			add(r.ID, r.Email)

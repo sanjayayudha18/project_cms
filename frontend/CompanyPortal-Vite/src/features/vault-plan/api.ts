@@ -60,6 +60,8 @@ export interface VaultPlanDetail {
   replenish_date: string | null;
   request_status: string;
   vault_rejection_reason: string | null;
+  /** cit-send-vendor FR4.3: back to draft because a vault vendor rejected. */
+  rejected_by_vendor: boolean;
   acm_area_id: number;
   acm_area_name: string;
   status: VaultPlanStatus;

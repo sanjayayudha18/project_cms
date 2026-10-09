@@ -120,6 +120,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     replenish_date: "2026-10-09",
     request_status: "vault_assignment",
     vault_rejection_reason: null,
+    rejected_by_vendor: false,
     acm_area_id: 2,
     acm_area_name: "Jabo",
     status: "draft",
@@ -232,6 +233,20 @@ describe("VaultPlanDetail", () => {
     });
     render(<VaultPlanDetail />);
     expect(screen.getByText("vault terlalu jauh")).toBeInTheDocument();
+  });
+
+  // cit-send-vendor FR4.3: a vault vendor's rejection is labelled as such, not as ACM-SPV.
+  it("labels a plan sent back by a vault vendor", () => {
+    setRole(1, "ACM-USER");
+    usePlan.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: plan({ rejection_reason: "saldo vault tidak cukup", rejected_by_vendor: true }),
+    });
+    render(<VaultPlanDetail />);
+    expect(screen.getByText(/Ditolak vendor \(branch vault\)/)).toBeInTheDocument();
+    expect(screen.getByText("saldo vault tidak cukup")).toBeInTheDocument();
+    expect(screen.queryByText("Ditolak ACM-SPV")).not.toBeInTheDocument();
   });
 });
 

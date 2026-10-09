@@ -122,6 +122,56 @@ func TestIntegration_SendExpandsVendorUsersAndPICs(t *testing.T) {
 	}
 }
 
+// cit-send-vendor FR7.1 / S4: a branch reaches users pinned to it plus
+// vendor-wide users, and flagged PICs of that branch or vendor-wide; a user or
+// PIC pinned to a sibling branch of the same vendor is left out.
+func TestIntegration_SendScopesToVendorBranch(t *testing.T) {
+	tx := integrationTx(t)
+	ctx := context.Background()
+	var vendorID, branchA, branchB int64
+	if err := tx.QueryRow(ctx, `INSERT INTO vendors (code, name) VALUES ('NTF-BR', 'NTF-BR') RETURNING id`).Scan(&vendorID); err != nil {
+		t.Fatal(err)
+	}
+	for code, dst := range map[string]*int64{"NTF-A": &branchA, "NTF-B": &branchB} {
+		if err := tx.QueryRow(ctx, `INSERT INTO vendor_branches (vendor_id, branch_code, branch_name) VALUES ($1, $2, $2) RETURNING id`,
+			vendorID, code).Scan(dst); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, email, is_notification_recipient) VALUES
+		  ($1, $2,   'pic a',    'pic.a@vendor.test',    true),
+		  ($1, $3,   'pic b',    'pic.b@vendor.test',    true),
+		  ($1, NULL, 'pic wide', 'pic.wide@vendor.test', true)`, vendorID, branchA, branchB); err != nil {
+		t.Fatal(err)
+	}
+	users := activeUserIDs(t, tx, 3)
+	pinned, wide, sibling := users[0], users[1], users[2]
+	for _, u := range []struct {
+		id     int64
+		branch *int64
+	}{{pinned, &branchA}, {wide, nil}, {sibling, &branchB}} {
+		if _, err := tx.Exec(ctx, `UPDATE users SET vendor_id = $1, vendor_branch_id = $2 WHERE id = $3`, vendorID, u.branch, u.id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	msg := Message{Type: testType, Title: "Uji branch", Email: true}
+	if err := NewService(true).Send(ctx, db.New(tx), msg, Recipients{VendorBranchIDs: []int64{branchA}}); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[int64]int{pinned: 1, wide: 1, sibling: 0} {
+		if got := countFor(t, tx, "SELECT count(*) FROM notifications WHERE type = $1 AND recipient_user_id = $2", testType, id); got != want {
+			t.Fatalf("user %d notifications = %d, want %d", id, got, want)
+		}
+	}
+	for addr, want := range map[string]int{"pic.a@vendor.test": 1, "pic.wide@vendor.test": 1, "pic.b@vendor.test": 0} {
+		if got := countFor(t, tx, "SELECT count(*) FROM notification_emails WHERE to_address = $1", addr); got != want {
+			t.Fatalf("emails to %s = %d, want %d", addr, got, want)
+		}
+	}
+}
+
 func TestIntegration_RepositoryScopesToOwner(t *testing.T) {
 	tx := integrationTx(t)
 	ctx := context.Background()

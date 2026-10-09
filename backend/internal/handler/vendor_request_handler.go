@@ -37,6 +37,7 @@ var (
 type VendorRequestHandler struct {
 	service service.VendorRequestServicer
 	vault   VendorRequestVaultReviewer // nil = vault routes not mounted
+	vendor  *vendorSide                // nil = cit-send-vendor routes not mounted
 }
 
 // NewVendorRequestHandler creates a new VendorRequestHandler with the given service.
@@ -72,6 +73,11 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vault-assignments", h.VaultAssignments)
 		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-approve", h.VaultApprove)
 		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-reject", h.VaultReject)
+	}
+	if h.vendor != nil {
+		// cit-send-vendor FR6.1/FR6.6: vendor status panel + return to maker.
+		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vendor-parties", h.VendorParties)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vendor-return", h.VendorReturn)
 	}
 	return r
 }

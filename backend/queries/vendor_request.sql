@@ -77,6 +77,10 @@ SET
     approved_at = CASE WHEN sqlc.arg('status')::text IN ('approved', 'vault_assignment') THEN now() ELSE approved_at END,
     approved_by = CASE WHEN sqlc.arg('status')::text IN ('approved', 'vault_assignment') THEN sqlc.narg('actor_id')::bigint ELSE approved_by END,
     vault_flow = vault_flow OR sqlc.arg('status')::text = 'vault_assignment',
+    -- cit-send-vendor: sent_to_vendor marks the request as sent (laporan selesai reject -> vendor_accepted).
+    vendor_sent = vendor_sent OR sqlc.arg('status')::text = 'sent_to_vendor',
+    sent_at = CASE WHEN sqlc.arg('status')::text = 'sent_to_vendor' THEN now() ELSE sent_at END,
+    vendor_accepted_at = CASE WHEN sqlc.arg('status')::text = 'vendor_accepted' THEN now() ELSE vendor_accepted_at END,
     rejected_at = CASE WHEN sqlc.arg('status')::text = 'rejected' THEN now() ELSE rejected_at END,
     rejected_by = CASE WHEN sqlc.arg('status')::text = 'rejected' THEN sqlc.narg('actor_id')::bigint ELSE rejected_by END,
     rejection_reason = CASE WHEN sqlc.arg('status')::text = 'rejected' THEN sqlc.narg('rejection_reason')::text ELSE rejection_reason END
@@ -482,8 +486,8 @@ WHERE terminal_id = sqlc.arg('terminal_id')::text
 -- name: UpdateVendorRequestCompletion :one
 -- One query for the three completion transitions, same CASE-guard idea as
 -- UpdateVendorRequestStatus: completion_pending stamps the maker (and clears a
--- previous rejection), completed stamps the approver, approved (= laporan
--- ditolak, back to the maker) stamps the rejecter + reason.
+-- previous rejection), completed stamps the approver, approved / ready /
+-- vendor_accepted (= laporan ditolak, back to the maker) stamps the rejecter + reason.
 UPDATE vendor_requests
 SET
     status = sqlc.arg('status')::text,
@@ -491,11 +495,11 @@ SET
     completion_submitted_at = CASE WHEN sqlc.arg('status')::text = 'completion_pending' THEN now() ELSE completion_submitted_at END,
     completion_approved_by  = CASE WHEN sqlc.arg('status')::text = 'completed' THEN sqlc.arg('actor_id')::bigint ELSE completion_approved_by END,
     completion_approved_at  = CASE WHEN sqlc.arg('status')::text = 'completed' THEN now() ELSE completion_approved_at END,
-    completion_rejected_by  = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready') THEN sqlc.arg('actor_id')::bigint
+    completion_rejected_by  = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready', 'vendor_accepted') THEN sqlc.arg('actor_id')::bigint
                                    WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejected_by END,
-    completion_rejected_at  = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready') THEN now()
+    completion_rejected_at  = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready', 'vendor_accepted') THEN now()
                                    WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejected_at END,
-    completion_rejection_reason = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready') THEN sqlc.narg('reason')::text
+    completion_rejection_reason = CASE WHEN sqlc.arg('status')::text IN ('approved', 'ready', 'vendor_accepted') THEN sqlc.narg('reason')::text
                                    WHEN sqlc.arg('status')::text = 'completion_pending' THEN NULL ELSE completion_rejection_reason END
 WHERE id = sqlc.arg('id')::bigint
 RETURNING *;

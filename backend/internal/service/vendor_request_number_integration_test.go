@@ -83,6 +83,7 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 	vid := vendorID
 	t.Cleanup(func() {
 		cleanupCtx := context.Background()
+		cleanupVendorParties(cleanupCtx, pool, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_request_tickets WHERE request_number IN (SELECT request_number FROM vendor_requests WHERE vendor_id = $1)`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_requests WHERE vendor_id = $1`, vid)
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM vendor_request_number_seq WHERE vendor_id = $1`, vid)
@@ -96,6 +97,20 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 	})
 
 	return pool, vendorID, createdBy, terminalID
+}
+
+// cleanupVendorParties removes the cit-send-vendor rows (party notifications,
+// events, parties) of every request of vendorID; they reference both
+// vendor_requests and vendor_branches, so they go before either.
+func cleanupVendorParties(ctx context.Context, pool *pgxpool.Pool, vendorID int64) {
+	const parties = `SELECT p.id FROM vendor_request_vendor_parties p JOIN vendor_requests vr ON vr.id = p.vendor_request_id WHERE vr.vendor_id = $1`
+	_, _ = pool.Exec(ctx, `DELETE FROM notification_emails WHERE notification_id IN (SELECT id FROM notifications WHERE entity_type = 'vendor_request_vendor_party' AND entity_id IN (`+parties+`))`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM notifications WHERE entity_type = 'vendor_request_vendor_party' AND entity_id IN (`+parties+`)`, vendorID)
+	const requestNotes = `SELECT id FROM notifications WHERE entity_type = 'vendor_request' AND type LIKE 'vendor_order.%' AND entity_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`
+	_, _ = pool.Exec(ctx, `DELETE FROM notification_emails WHERE notification_id IN (`+requestNotes+`)`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM notifications WHERE id IN (`+requestNotes+`)`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_vendor_party_events WHERE party_id IN (`+parties+`)`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_vendor_parties WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
 }
 
 // REP-<prefix>-<region_code>-<YYYYMMDD>-<seq> (replenish-ticket FR10).

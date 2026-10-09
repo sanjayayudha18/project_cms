@@ -134,7 +134,11 @@ function PlanEditor({ plan }: { plan: VaultPlanDetailType }) {
         <NoticeBanner
           icon={AlertTriangle}
           variant="warning"
-          title="Ditolak ACM-SPV"
+          title={
+            plan.rejected_by_vendor
+              ? "Ditolak vendor (branch vault) — pilih vault lain"
+              : "Ditolak ACM-SPV"
+          }
           description={plan.rejection_reason}
         />
       )}

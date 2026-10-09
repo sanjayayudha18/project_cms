@@ -50,7 +50,9 @@ WHERE vendor_request_id = $1 AND status <> 'cancelled';
 SELECT p.id, p.vendor_request_id, p.acm_area_id, p.status, p.submitted_by, p.submitted_at,
        p.approved_by, p.approved_at, p.rejected_by, p.rejected_at, p.rejection_reason,
        vr.request_number, vr.replenish_date, vr.vendor_id, vr.status AS request_status,
-       vr.vault_rejection_reason, ar.name AS acm_area_name
+       vr.vault_rejection_reason, ar.name AS acm_area_name,
+       -- cit-send-vendor FR4.3: the plan went back to draft because a vault vendor rejected it.
+       EXISTS (SELECT 1 FROM users ru WHERE ru.id = p.rejected_by AND ru.vendor_id IS NOT NULL) AS rejected_by_vendor
 FROM vendor_request_vault_plans p
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 JOIN acm_areas ar ON ar.id = p.acm_area_id
@@ -217,6 +219,11 @@ SET status = sqlc.arg('status')::text,
     rejection_reason = CASE WHEN sqlc.narg('reason')::text IS NOT NULL THEN sqlc.narg('reason')::text ELSE rejection_reason END
 WHERE id = sqlc.arg('id')::bigint;
 
+-- name: ListAllVaultPlansForRequest :many
+-- cit-send-vendor FR6.2: re-approval after an edit reopens every plan, including ones cancelled because
+-- an earlier edit left their area without ATMs (the unique (request, area) blocks recreating them).
+SELECT id, acm_area_id, status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 ORDER BY id;
+
 -- name: ListVaultPlansForRequest :many
 SELECT p.id, p.acm_area_id, ar.name AS acm_area_name, p.status, p.submitted_by, p.approved_by,
        p.rejection_reason
@@ -249,6 +256,14 @@ WHERE i.vendor_request_id = $1
         JOIN vendor_request_vault_plans p ON p.id = x.vault_plan_id AND p.status = 'acm_approved'
         WHERE x.vendor_request_id = i.vendor_request_id AND x.terminal_id = i.terminal_id);
 
+-- name: DeleteVaultAssignmentsOfRemovedAtms :many
+-- cit-send-vendor FR6.2: an edit (draft only) removed ATMs from the request; their vault assignments go
+-- (draft rows, same rule as replace-all in 2.2a S1; caller audits). ATMs still in the request keep theirs.
+DELETE FROM vendor_request_vault_assignments a
+WHERE a.vendor_request_id = $1
+  AND NOT EXISTS (SELECT 1 FROM vendor_request_items i WHERE i.vendor_request_id = a.vendor_request_id AND i.terminal_id = a.terminal_id)
+RETURNING a.terminal_id;
+
 -- name: ResetVaultPlansToDraft :exec
 -- FR5.2: ATM-SPV rejects the recommendation -> every area plan back to draft.
 UPDATE vendor_request_vault_plans
@@ -256,12 +271,14 @@ SET status = 'draft', approved_by = NULL, approved_at = NULL
 WHERE vendor_request_id = $1 AND status <> 'cancelled';
 
 -- name: SetVendorRequestVaultReview :exec
--- vault_review -> ready | vault_assignment by the ATM-SPV (FR5.2).
+-- vault_review -> sent_to_vendor (cit-send-vendor S1; ready = legacy) | vault_assignment by the ATM-SPV (FR5.2).
 UPDATE vendor_requests
 SET status = sqlc.arg('status')::text,
     vault_reviewed_by = sqlc.arg('actor_id')::bigint,
     vault_reviewed_at = now(),
-    vault_rejection_reason = sqlc.narg('reason')::text
+    vault_rejection_reason = sqlc.narg('reason')::text,
+    vendor_sent = vendor_sent OR sqlc.arg('status')::text = 'sent_to_vendor',
+    sent_at = CASE WHEN sqlc.arg('status')::text = 'sent_to_vendor' THEN now() ELSE sent_at END
 WHERE id = sqlc.arg('id')::bigint;
 
 -- name: SetVendorRequestStatusOnly :exec

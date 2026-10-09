@@ -15,6 +15,16 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F12: dependency + toolchain Go yang kena CVE
+- **Symptom**: `govulncheck` (QC F2) melaporkan CVE yang reachable: chi v5.2.1 (GO-2025-3770 open redirect `RedirectSlashes`, GO-2026-5777), pgx v5.7.4 (GO-2026-5004), `golang.org/x/text` v0.40.0 (GO-2026-6629), dan 11 advisory stdlib (crypto/tls, x509, asn1, xml, net/http, textproto, url) di go1.26.3 lokal. Dockerfile memakai `golang:1.25-alpine` — seri 1.25 sudah tidak didukung (rilis yang didukung: 1.26.9, 1.27.2), beberapa CVE tidak punya fix di 1.25.
+- **Root cause**: versi dependency tidak pernah di-scan/di-upgrade; image builder memakai tag mengambang di seri yang sudah EOL.
+- **Fix**: `backend/` + `backend-cit/` go.mod/go.sum: chi v5.3.0, pgx v5.9.2, x/text v0.41.0 (`go mod tidy` juga menghapus require indirect testify/x/crypto yang tak terpakai di backend-cit). `toolchain go1.26.9` di `go.mod` ketiga modul (+ `go.work` lokal; `go.work` di-gitignore). `go` directive tetap `1.25.0`. Dockerfile `backend/` & `backend-cit/` → `golang:1.26.9-alpine`.
+- **Tests**: govulncheck 3 modul dengan go1.26.9 → "No vulnerabilities found". build + vet + `go test ./...` (3 modul) + `go test -tags integration -p 1 ./internal/...` (dev DB) lulus. Docker build belum dijalankan (lihat QC F14: `go.work` di-gitignore tapi di-COPY Dockerfile). Tidak ada UI berubah; manual browser verification: outstanding (smoke login + 1 halaman admin).
+- **Catatan**: chi v5.3 menandai `middleware.RealIP` deprecated (IP spoofing) → lint SA1019 di `cmd/api/main.go` kedua backend; ditangani terpisah sebagai QC F13 (auth, Sec 4 #7).
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-08 — Import CSV cabang vendor selalu gagal "category: harus ATM, CASH, atau ATM_CASH"
 - **Symptom**: import master-data `vendor-branches` (create maupun update) ditolak per baris dengan error category, walaupun file hasil export sendiri.
 - **Root cause**: `stageCreate`/`stageUpdate` (`masterdata_import_confirm.go`) membangun `VendorBranchPayload`/`VendorBranchUpdatePayload` tanpa `Category`, sedangkan `VendorBranchAdminService.Create/Update` mewajibkan category. Export `vendor-branches` juga tidak punya kolom `category`, jadi round-trip tidak bisa membawanya.

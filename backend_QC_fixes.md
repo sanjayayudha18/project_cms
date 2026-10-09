@@ -11,7 +11,9 @@ Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + c
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | F1 | `gofmt -w` 12 file | LOW | XS | tidak perlu (format saja) | [x] 2026-10-09 |
 | 2 | F2 | Tambah `.golangci.yml` + pasang `govulncheck` | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
-| 2a | F12 | **Upgrade dependency + toolchain yang kena CVE** (hasil govulncheck F2) | **HIGH** | S–M | `bugfixes.md` | [ ] |
+| 2a | F12 | **Upgrade dependency + toolchain yang kena CVE** (hasil govulncheck F2) | **HIGH** | S–M | `bugfixes.md` | [x] 2026-10-09 |
+| 2b | F13 | **IP client bisa dipalsukan via `X-Forwarded-For`** (rate limit login + IP audit) | **HIGH** | S–M | AI-DLC atau bugfix (auth, Sec 4 #7) — butuh info topologi proxy | [ ] |
+| 2c | F14 | `go.work` di-gitignore tapi di-`COPY` Dockerfile → build Docker dari clone bersih gagal | MEDIUM | XS | `bugfixes.md` | [ ] |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [ ] |
 | 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [ ] |
 | 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
@@ -55,6 +57,21 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
   2. Toolchain: dev lokal ke Go ≥ 1.26.9. Dockerfile `backend/` & `backend-cit/` memakai `golang:1.25-alpine` (tag mengambang, versi patch tidak terkunci); pin ke versi patch yang sudah bebas CVE di atas (cek govulncheck dengan toolchain itu), dan samakan `go` directive di `go.work`/`go.mod` (sekarang `go 1.25.0`).
   3. Jalankan ulang build + test `-tags integration` + govulncheck; target: tidak ada temuan reachable.
 - **Selesai bila**: govulncheck "No vulnerabilities found" (reachable) di 3 modul; test hijau.
+
+## F13 — Spoofing IP client  ⚠️ auth (Sec 4 #7)
+- **Ditemukan**: saat F12, chi v5.3.0 menandai `middleware.RealIP` deprecated (GHSA-3fxj-6jh8-hvhx dkk.): ia menimpa `r.RemoteAddr` dengan nilai header `X-Forwarded-For`/`X-Real-IP`/`True-Client-IP` apa pun dari client.
+- **Masalah lebih luas** (sudah ada sebelum upgrade): `extractClientIP` (`backend/internal/handler/auth_handler.go:337`) mengambil IP **paling kiri** dari `X-Forwarded-For` tanpa memeriksa proxy tepercaya. Dipakai untuk:
+  - rate limit login per (email, IP) — `backend/internal/auth/service.go:85,127` → attacker bisa memutar IP palsu untuk menghindari limit per-IP (lockout per-akun lokal tetap berlaku, jadi brute force satu akun tetap dibatasi);
+  - `ip` di `audit_logs` untuk semua aksi master-data/admin → IP audit bisa dipalsukan (Sec 5: audit wajib mencatat IP).
+- **Lokasi**: `backend/cmd/api/main.go:100` & `backend-cit/cmd/api/main.go:63` (`r.Use(middleware.RealIP)`), `extractClientIP` + ±40 pemanggilnya (lewat helper, jadi cukup diperbaiki di satu tempat), komentar `backend/internal/audit/writer.go:3`.
+- **Keputusan yang dibutuhkan dari user**: topologi proxy produksi: Nginx frontend → backend? GCP Load Balancer di depan (Sec 10)? Berapa hop proxy tepercaya? (LB GCP menambahkan `<client>,<lb>` di akhir XFF.)
+- **Arah fix**: hapus `middleware.RealIP`; `extractClientIP` ambil IP dari **kanan** `X-Forwarded-For` dikurangi N hop proxy tepercaya (N dari config env, default 0 = pakai `RemoteAddr`), hanya bila `RemoteAddr` berasal dari proxy tepercaya. Test: header palsu tidak mengubah IP; rate limit tetap per IP asli.
+- **Selesai bila**: lint SA1019 hilang, test spoofing lulus, `.env.example` + docs/deployment.md mencatat config proxy.
+
+## F14 — `go.work` di-gitignore vs Dockerfile
+- **Masalah**: `.gitignore:18-19` mengabaikan `go.work`/`go.work.sum`, tetapi `backend/Dockerfile` & `backend-cit/Dockerfile` menjalankan `COPY go.work go.work.sum ./`. Build di mesin dev berhasil (file ada lokal), tetapi dari clone bersih (CI/Cloud Build) gagal. Pin `toolchain` di `go.work` (F12) juga tidak ikut ter-commit, makanya pin ada di `go.mod`.
+- **Pilihan**: (a) commit `go.work` + `go.work.sum` (umum untuk monorepo yang sengaja memakai workspace, seperti di sini); atau (b) Dockerfile tidak memakai workspace (`GOWORK=off`, cukup `replace ../pkg` yang sudah ada di go.mod). Saran: (a), lebih sederhana dan konsisten dengan CLAUDE.md Sec 3 (`go.work` bagian dari layout).
+- **Selesai bila**: `docker build` dari clone bersih berhasil untuk kedua backend.
 
 ## F3 — errcheck di kode produksi
 - **Lokasi**:
@@ -145,5 +162,6 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 ## Log pengerjaan
 | Tanggal | ID | Commit | Catatan |
 | --- | --- | --- | --- |
-| 2026-10-09 | F1 | (belum di-commit) | `gofmt -w` 12 file. 8 file berubah di git (59+/59−, whitespace + 1 baris `//` doc comment); 4 sisanya hanya beda line ending (dinormalisasi git). `gofmt -l` bersih, build/vet/test backend + pkg hijau. |
-| 2026-10-09 | F2 | (lihat commit F2) | `.golangci.yml` di root (standard + gosec + gocyclo≥30; exclude `internal/db`, errcheck/gosec/gocyclo/QF di test, ST1005 `pkg/auth/errors.go`). `//nolint:gosec` G120 di `dsr_upload_handler.go:93`. Perintah lint + govulncheck ditambah ke CLAUDE.md Sec 2a. Sisa temuan lint = F3/F4/F5/F10 saja (backend 17, backend-cit 2, pkg 2). govulncheck menemukan CVE → item baru F12. |
+| 2026-10-09 | F1 | `5feca65` | `gofmt -w` 12 file. 8 file berubah di git (59+/59−, whitespace + 1 baris `//` doc comment); 4 sisanya hanya beda line ending (dinormalisasi git). `gofmt -l` bersih, build/vet/test backend + pkg hijau. |
+| 2026-10-09 | F2 | `72e8610` | `.golangci.yml` di root (standard + gosec + gocyclo≥30; exclude `internal/db`, errcheck/gosec/gocyclo/QF di test, ST1005 `pkg/auth/errors.go`). `//nolint:gosec` G120 di `dsr_upload_handler.go:93`. Perintah lint + govulncheck ditambah ke CLAUDE.md Sec 2a. Sisa temuan lint = F3/F4/F5/F10 saja (backend 17, backend-cit 2, pkg 2). govulncheck menemukan CVE → item baru F12. |
+| 2026-10-09 | F12 | (belum di-commit) | chi v5.3.0, pgx v5.9.2, x/text v0.41.0; `toolchain go1.26.9` di go.mod 3 modul; Dockerfile `golang:1.26.9-alpine`. govulncheck bersih di 3 modul; build/vet/test + integration hijau. Temuan baru: F13 (RealIP/XFF spoofing), F14 (go.work gitignored). Detail di `.claude/bugfixes.md`. |

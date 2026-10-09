@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 8: handler ≥ 80% (pemetaan error login, toggle admin)
+- **Symptom**: `handleAuthError` (pemetaan error login → HTTP) 52.9%; cabang id rusak di toggle disable/enable handler admin ~53%; handler 79.6%, kurang dari target 80%.
+- **Root cause**: belum ada test untuk cabang-cabang ini.
+- **Fix** (test saja, kode produksi tidak berubah): `auth_error_mapping_test.go` (tabel: validasi 422, rate limit 429 + `Retry-After`, kredensial salah 401 termasuk yang di-wrap, akun nonaktif/portal salah/password kedaluwarsa/terkunci 403 dengan kode masing-masing, LDAP/layanan tidak tersedia 503, error tak dikenal 500 tanpa membocorkan detail internal). `admin_update_handlers_test.go`: id rusak di disable/enable → 400 untuk vault/pic/branch/kelolaan ATM/paket cabang; paket cabang tidak punya route enable → 404 (by design, effective-dated). `extractClientIP` sengaja tidak diuji: akan diubah di F13 (proxy tepercaya).
+- **Tests**: coverage `internal/handler` 79.6% → 80.3% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 7: sisa handler 0% (RetryApply, /auth/me, update admin, dll.)
 - **Symptom**: fungsi handler 0%: `RetryApply`/`WithApplyRetry` (terapkan ulang perubahan master-data approved), `AuthHandler.Me`, ACM area `EligibleUsers`/`BranchOptions`/`Rename`, `Update` admin vault/pic/branch/kelolaan ATM + `Enable` branch, Vendor Request `UpdateItems`/`Revise`, `VaultPlanHandler.Audit`, respons sukses upload/confirm DSR.
 - **Root cause**: belum ada test HTTP untuk jalur ini.
 - **Fix** (test saja, kode produksi tidak berubah): `retry_apply_me_handler_test.go` (retry hanya untuk `master_data` + `approved` → retrier dipanggil dengan change id + actor; pending / dokumen lain / approval tidak ada → 409 tanpa retry; retrier tidak terpasang → 404; `ErrNotAuthorized` → 403. `/me`: profil tanpa field password, user terhapus → 401, DB error → 503, tanpa token → 401). `admin_update_handlers_test.go` (PUT 202 + `change_request_id` di 4 handler admin, body/id rusak 400, role non-admin 403; enable branch 202 / pending 409; UpdateItems 200, periode_pred wajib → 400, bukan creator 403, checker 403 di route; Revise 200 / state salah 409). Baris tabel baru di `admin_acm_area_handler_test.go` dan `vault_plan_handler_test.go`. `dsr_upload_handler_test.go`: dry-run + confirm terhadap ETL tiruan (`httptest`), memeriksa kontrak nama file `<vendor_code>__<user_id>__<basename>` (path dibuang) dan confirm tanpa checksum → 400.
 - **Tests**: coverage `internal/handler` 75.0% → 79.6% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `151d2d2`
 
 ---
 

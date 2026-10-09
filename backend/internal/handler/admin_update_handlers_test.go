@@ -15,22 +15,26 @@ import (
 func TestAdminMasterDataUpdate_Returns202And400(t *testing.T) {
 	type mount func() (http.Handler, *pkgauth.TokenService)
 	cases := []struct {
-		name  string
-		mount mount
-		base  string
+		name     string
+		mount    mount
+		base     string
+		noEnable bool // effective-dated prices have no enable, only an end date
 	}{
 		{"vault", func() (http.Handler, *pkgauth.TokenService) {
 			return mountAdminVendorVaultHandler(&fakeVendorVaultAdminServicer{})
-		}, "/api/v1/admin/vendors/3/vaults"},
+		}, "/api/v1/admin/vendors/3/vaults", false},
 		{"pic", func() (http.Handler, *pkgauth.TokenService) {
 			return mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{})
-		}, "/api/v1/admin/vendors/3/pics"},
+		}, "/api/v1/admin/vendors/3/pics", false},
 		{"branch", func() (http.Handler, *pkgauth.TokenService) {
 			return mountAdminVendorBranchHandler(&fakeVendorBranchAdminServicer{updateResult: db.MasterDataChangeRequest{ID: 8, Status: "pending"}})
-		}, "/api/v1/admin/vendors/3/branches"},
+		}, "/api/v1/admin/vendors/3/branches", false},
 		{"atm assignment", func() (http.Handler, *pkgauth.TokenService) {
 			return mountAdminATMAssignmentHandler(&fakeATMAssignmentAdminServicer{})
-		}, "/api/v1/admin/atms/4/assignments"},
+		}, "/api/v1/admin/atms/4/assignments", false},
+		{"branch package", func() (http.Handler, *pkgauth.TokenService) {
+			return mountAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{})
+		}, "/api/v1/admin/vendors/3/packages", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -46,6 +50,16 @@ func TestAdminMasterDataUpdate_Returns202And400(t *testing.T) {
 			}
 			if rec := doRequest(router, http.MethodPut, tc.base+"/1", tokenForRole(t, ts, 1, "ATM-USER"), `{}`); rec.Code != http.StatusForbidden {
 				t.Errorf("ATM-USER update = %d, want 403", rec.Code)
+			}
+			if rec := doRequest(router, http.MethodPost, tc.base+"/x/disable", token, ""); rec.Code != http.StatusBadRequest {
+				t.Errorf("disable with bad id = %d, want 400", rec.Code)
+			}
+			wantEnable := http.StatusBadRequest
+			if tc.noEnable {
+				wantEnable = http.StatusNotFound
+			}
+			if rec := doRequest(router, http.MethodPost, tc.base+"/x/enable", token, ""); rec.Code != wantEnable {
+				t.Errorf("enable with bad id = %d, want %d", rec.Code, wantEnable)
 			}
 		})
 	}

@@ -48,15 +48,15 @@ func (m *SMTPMailer) Send(ctx context.Context, to, subject, body string) error {
 		return fmt.Errorf("smtp dial: %w", err)
 	}
 	if err := conn.SetDeadline(time.Now().Add(orDefault(m.IOTimeout, defaultIOTimeout))); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("smtp deadline: %w", err)
 	}
 	c, err := smtp.NewClient(conn, m.Host)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("smtp greeting: %w", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	if ok, _ := c.Extension("STARTTLS"); ok {
 		if err := c.StartTLS(&tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12}); err != nil {

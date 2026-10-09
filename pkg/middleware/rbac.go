@@ -110,7 +110,7 @@ func GetAuthContext(ctx context.Context) (*AuthContext, bool) {
 func writeJSONError(w http.ResponseWriter, statusCode int, errorCode, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"error":   errorCode,
 		"message": message,
 	})

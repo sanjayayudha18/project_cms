@@ -56,7 +56,7 @@ func (h *AdminMasterDataImportHandler) DryRun(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	res, err := h.svc.DryRun(r.Context(), entity, file)
 	if err != nil {
@@ -103,7 +103,7 @@ func (h *AdminMasterDataImportHandler) Confirm(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	res, err := h.svc.Confirm(r.Context(), authCtx.UserID, entity, file, extractClientIP(r))
 	if err != nil {

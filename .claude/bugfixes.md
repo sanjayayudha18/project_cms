@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F3: errcheck di kode produksi
+- **Symptom**: golangci-lint errcheck melaporkan return error yang tidak dicek di 5 file produksi.
+- **Root cause**: pemanggilan Close/Write/Encode best-effort ditulis tanpa `_ =`, berbeda dengan konvensi yang sudah ada (`error_response.go:26`, `dsr_upload_handler.go:103`, `backend/cmd/api/main.go:89,108`).
+- **Fix**: ikut konvensi itu, perilaku tidak berubah — `admin_master_data_import_handler.go:59,106` `defer func() { _ = file.Close() }()`; `notification/smtp.go:51,56,59` `_ = conn.Close()` / `defer func() { _ = c.Close() }()`; `pkg/middleware/rbac.go:113` + `pkg/response/response.go:42` `_ = json.NewEncoder(w).Encode(...)` (header sudah terkirim, tidak ada yang bisa dilakukan); `backend-cit/cmd/api/main.go:51,70` `redisClient.Close` / `w.Write`.
+- **Tests**: errcheck bersih di 3 modul; build + vet + `go test ./...` (pkg, backend-cit) + `go test -tags integration -p 1 ./...` (backend, dev DB) lulus. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F15: context build Docker backend membawa seluruh repo + `.env`
 - **Symptom**: compose kedua backend memakai `context: ..` (root repo), tapi tidak ada `.dockerignore` di root; `backend/.dockerignore` tidak pernah dibaca Docker (Docker hanya membaca yang ada di root context). Seluruh repo ikut jadi context, dan `COPY backend/` membawa `backend/.env` ke stage builder (tidak ke image final, tapi ada di cache layer builder). CLAUDE.md Sec 9 menyebut root `docker-compose.yml` yang tidak ada.
 - **Root cause**: `.dockerignore` ditaruh per folder backend, padahal context build dipindah ke root saat split `pkg/` + `go.work`.
 - **Fix**: `.dockerignore` root berbentuk allowlist (`go.work`, `go.work.sum`, `pkg/`, `backend/`, `backend-cit/`) + exclude `**/.env`, `**/.env.*`, `**/bin/`, `*.exe`, `*.test`, `*.out`, `*.md`. `backend/.dockerignore` (mati) dihapus. CLAUDE.md Sec 9: teks compose + dockerignore diperbaiki. Frontend tidak terpengaruh (context folder sendiri).
 - **Tests**: Dockerfile probe (`COPY . /ctx`) dari working tree yang berisi `.env` asli → context 8.1MB, hanya `backend/ backend-cit/ go.work go.work.sum pkg/`, tanpa `.env*` dan `*.md`. `docker build` kedua backend berhasil. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `ce9fa0f`
 
 ---
 

@@ -82,6 +82,10 @@ func (h *VendorOrderHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f.Page, _ = strconv.Atoi(q.Get("page"))
+	if f.Page > maxPage {
+		writeValidationError(w, "page", "maksimal "+strconv.Itoa(maxPage))
+		return
+	}
 	f.PageSize, _ = strconv.Atoi(q.Get("page_size"))
 	out, err := h.svc.List(r.Context(), va, f)
 	if err != nil {

@@ -284,8 +284,8 @@ func (s *AtmPortalService) ListATMReplenish(ctx context.Context, params ListATMR
 		TerminalID: params.TerminalID,
 		DateFrom:   params.DateFrom,
 		DateTo:     params.DateTo,
-		Page:       int32(params.Page),
-		PageSize:   int32(params.PageSize),
+		Page:       int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:   int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing atm replenish: %w", err)
@@ -329,8 +329,8 @@ func (s *AtmPortalService) ListATMCashpos(ctx context.Context, params ListATMCas
 		TerminalID: params.TerminalID,
 		DateFrom:   params.DateFrom,
 		DateTo:     params.DateTo,
-		Page:       int32(params.Page),
-		PageSize:   int32(params.PageSize),
+		Page:       int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:   int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing atm cashpos: %w", err)

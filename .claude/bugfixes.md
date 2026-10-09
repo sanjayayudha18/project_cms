@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F16: `page` tanpa batas atas → OFFSET negatif / overflow int4 (500)
+- **Symptom**: semua list endpoint hanya mengecek `page ≥ 1`. `page=3000000000` → `int32(params.Page)` wrap ke negatif, atau `(page-1)*page_size` overflow int4 di SQL (`queries/atm_portal.sql:103,252,314`) → Postgres error → 500, bukan 400.
+- **Root cause**: parser `page` tersebar (shared `parseIntParam`, `parsePageParams` admin, `parseRegionPageParams`, `Atoi` di vendor order) tanpa batas atas; service mengonversi ke int32.
+- **Fix**: `maxPage = 1_000_000` + helper `parsePageParam` (`handler/atm_portal_handler.go`) dipakai 9 pemanggil yang dulu `parseIntParam(q, "page", …)` (ATM portal ×4, audit log, DMAA forecast, DSR uploads, vendor request ×2) — pesan 400 jadi "page harus berupa angka (maksimal 1000000)". `parsePageParams` (12 handler admin) dan `parseRegionPageParams`: `page > maxPage` → "page tidak valid". Vendor order: tetap lenient untuk non-angka, tapi `page > maxPage` → 422 `page`. Notifikasi sudah dibatasi (`parseBoundedInt`, 2²⁰). Semua konversi `int32` page/page_size di service + 2 batch `len(rows)` + audit handler diberi `//nolint:gosec` dengan alasan. gosec kini bersih.
+- **Tests**: `TestPageParsers_RejectAboveMaxPage` (RED tanpa fix: `maxPage`/`parsePageParam` undefined). build + vet + golangci-lint (gosec 0) + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: tidak relevan (UI tidak mengirim page sebesar itu); opsional cek `GET /api/v1/atm-portal/atms?page=3000000000` → 400.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F6: repo admin master-data membaca list dari replica
 - **Symptom**: `dbReadPool` sudah di-wire di `cmd/api/main.go` (Phase 0.1), tetapi 7 repo admin masih primary-only dengan komentar TODO basi "swap List/Count to dbRead when DATABASE_REPLICA_URL wiring lands".
 - **Root cause**: Phase 0.1 (2026-10-07) hanya memindahkan Vendor/ATM/Region/DSR-location-map; repo lain tertinggal.
 - **Fix**: `VendorVault`, `VendorPic`, `VendorPackage`, `VendorPackagePrice`, `VendorBranch`, `ATMAssignment` AdminRepository → constructor `(primary, replica)` seperti `VendorAdminRepository`; **hanya List/Count** ke replica, GetByID + pre-check submit tetap primary (snapshot "before"). `main.go` memberi `dbReadPool`. Aman terhadap replica lag karena master-data maker-checker: row baru berubah setelah approve. **`UserAdminRepository` sengaja tetap primary-only** — create/update user apply langsung dan layar me-list ulang tepat setelah write (alasan sama dengan `MasterDataChangeRepository`); TODO diganti komentar alasan.
 - **Tests**: `TestAdminRepositories_ReadTopology` (18 kasus, probe DBTX tanpa DB: List/Count → replica, GetByID → primary). build + vet + `go test -tags integration -p 1 ./...` (dev DB, primary=replica) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list cabang/vault/PIC/paket/harga/kelolaan di admin; di dev replica = primary).
-- **Commit**: _(belum)_
+- **Commit**: `4298546`
 
 ---
 

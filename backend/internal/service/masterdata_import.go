@@ -312,7 +312,7 @@ func (i *MasterDataImporter) loadAll(ctx context.Context, entity string) ([]map[
 			}
 			out = append(out, m)
 		}
-		if int32(len(rows)) < masterDataExportBatchSize {
+		if int32(len(rows)) < masterDataExportBatchSize { //nolint:gosec // G115: len(rows) <= batch size (SQL LIMIT)
 			return out, nil
 		}
 		after = last

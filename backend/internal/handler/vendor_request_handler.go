@@ -87,9 +87,9 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 // BrowseForecast handles GET /forecast (Req 3).
 func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka")
+		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka (maksimal 1000000)")
 		return
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultVendorRequestPageSize)
@@ -453,9 +453,9 @@ func (h *VendorRequestHandler) doTransition(w http.ResponseWriter, r *http.Reque
 // List handles GET / (Req 9.1-9.5).
 func (h *VendorRequestHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka")
+		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka (maksimal 1000000)")
 		return
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultVendorRequestPageSize)

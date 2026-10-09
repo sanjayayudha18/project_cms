@@ -30,7 +30,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 2d | F15 | Tidak ada `.dockerignore` di root (context build = root repo) + CLAUDE.md menyebut root `docker-compose.yml` yang tidak ada | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
 | 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
-| 4a | F16 | `page` tanpa batas atas → `int32(Page)` wrap → offset negatif (500) di ±8 list endpoint | LOW | S | `bugfixes.md` | [ ] |
+| 4a | F16 | `page` tanpa batas atas → `int32(Page)` wrap → offset negatif (500) di ±8 list endpoint | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
 | 5 | F5 | Permission file upload DSR 0755/0644 → **diterima** (lihat log) | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [x] 2026-10-09 |
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [~] intent draft |
@@ -200,3 +200,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F5 | `e69e4ef` | Keputusan user: **terima 0644/0755** — Python ETL (user host lain, tidak di-container-kan) harus baca + pindahkan file; 0640 akan memutus DSR di server. Komentar + nolint di `dsr_upload.go`, catatan di `docs/deployment.md`. Perketat saat Python di-container-kan. |
 | 2026-10-09 | F6 | `4298546` | 6 repo admin master-data: List/Count → replica (GetByID/pre-check tetap primary). `UserAdminRepository` **sengaja tetap primary** (apply langsung + re-list setelah write). Test topologi 18 kasus. TODO basi = 0. |
 | 2026-10-09 | F7 | — | AI-DLC dimulai: `.claude/sdlc/money-decimal-string/intent.md` (draft). Temuan tambahan: `computeReplenishmentStatus` membandingkan uang dalam float (logika, bukan hanya tampilan). Menunggu PO accept + jawaban Q1–Q6. |
+| 2026-10-09 | F16 | (belum di-commit) | `maxPage = 1_000_000` + `parsePageParam` di semua parser page (9 + admin + region + vendor order). Offset SQL dihitung int4, jadi ini juga mencegah overflow di SQL. gosec 0; sisa lint hanya F10 (gocyclo) + F13 (RealIP), keduanya ditunda. |

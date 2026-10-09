@@ -57,9 +57,9 @@ func (h *DmaaForecastHandler) ListDmaaForecast(w http.ResponseWriter, r *http.Re
 // parseDmaaForecastParams parses query params into
 // service.ListDmaaForecastParams, applying API-contract defaults.
 func parseDmaaForecastParams(q url.Values) (service.ListDmaaForecastParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.ListDmaaForecastParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListDmaaForecastParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {

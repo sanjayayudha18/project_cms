@@ -281,7 +281,7 @@ func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w
 			flush()
 		}
 
-		if int32(len(rows)) < e.batchSize {
+		if int32(len(rows)) < e.batchSize { //nolint:gosec // G115: len(rows) <= batchSize (SQL LIMIT)
 			return total, nil
 		}
 		afterID = lastID

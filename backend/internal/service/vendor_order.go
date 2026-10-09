@@ -136,7 +136,7 @@ func (s *VendorOrderService) List(ctx context.Context, va VendorActor, f VendorO
 	from, to := optDate(f.From), optDate(f.To)
 	rows, err := s.read.ListVendorOrders(ctx, db.ListVendorOrdersParams{
 		VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyStatus: f.PartyStatus, RequestStatus: f.RequestStatus,
-		FromDate: from, ToDate: to, PageOffset: int32((f.Page - 1) * f.PageSize), PageLimit: int32(f.PageSize),
+		FromDate: from, ToDate: to, PageOffset: int32((f.Page - 1) * f.PageSize), PageLimit: int32(f.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list vendor orders: %w", err)

@@ -409,7 +409,7 @@ func parsePageParams(q url.Values) (page, pageSize int, err error) {
 	page, pageSize = 1, 25
 	if v := q.Get("page"); v != "" {
 		page, err = strconv.Atoi(v)
-		if err != nil || page < 1 {
+		if err != nil || page < 1 || page > maxPage {
 			return 0, 0, errors.New("page tidak valid")
 		}
 	}

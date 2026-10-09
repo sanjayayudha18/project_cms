@@ -79,8 +79,8 @@ func (s *VendorRequestService) BrowseForecast(ctx context.Context, params Browse
 		FlmVendorRegion: params.FLMVendorRegion,
 		Unassigned:      params.Unassigned,
 		NoRegion:        params.NoRegion,
-		Page:            int32(params.Page),
-		PageSize:        int32(params.PageSize),
+		Page:            int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:        int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing forecast for %s: %w", params.ForecastDate, err)
@@ -242,8 +242,8 @@ func (s *VendorRequestService) List(ctx context.Context, params ListVendorReques
 		CreatedBy:       params.CreatedBy,
 		RequestNumber:   params.RequestNumber,
 		IncludeCanceled: params.IncludeCanceled,
-		Page:            int32(params.Page),
-		PageSize:        int32(params.PageSize),
+		Page:            int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:        int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	}
 	rows, err := s.read.ListVendorRequests(ctx, arg)
 	if err != nil {

@@ -510,7 +510,7 @@ func (s *DsrService) ListUploads(ctx context.Context, params DsrListUploadsParam
 
 	uploads, err := s.repo.ListDsrUploadsByVendor(ctx, db.ListDsrUploadsByVendorParams{
 		Vendor: params.VendorName, DateFrom: params.DateFrom, DateTo: params.DateTo,
-		Page: int32(params.Page), PageSize: int32(params.PageSize),
+		Page: int32(params.Page), PageSize: int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing uploads: %w", err)

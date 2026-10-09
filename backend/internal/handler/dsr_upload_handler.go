@@ -238,9 +238,9 @@ func parseFileID(r *http.Request) (int64, error) {
 }
 
 func parseDsrListUploadsParams(vendorName string, q url.Values) (service.DsrListUploadsParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.DsrListUploadsParams{}, fmt.Errorf("page harus berupa angka")
+		return service.DsrListUploadsParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {

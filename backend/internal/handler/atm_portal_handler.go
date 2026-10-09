@@ -117,9 +117,9 @@ func (h *AtmPortalHandler) ListATMCashpos(w http.ResponseWriter, r *http.Request
 // parseListATMReplenishParams parses path + query params for the replenish
 // history endpoint, applying API-contract defaults.
 func parseListATMReplenishParams(terminalID string, q url.Values) (service.ListATMReplenishParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.ListATMReplenishParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListATMReplenishParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {
@@ -138,9 +138,9 @@ func parseListATMReplenishParams(terminalID string, q url.Values) (service.ListA
 // parseListATMCashposParams parses path + query params for the cash
 // position history endpoint, applying API-contract defaults.
 func parseListATMCashposParams(terminalID string, q url.Values) (service.ListATMCashposParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.ListATMCashposParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListATMCashposParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {
@@ -194,9 +194,9 @@ func (h *AtmPortalHandler) ListCashpos(w http.ResponseWriter, r *http.Request) {
 
 // parseListCashposParams parses cashpos query params with API defaults.
 func parseListCashposParams(q url.Values) (service.ListCashposParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.ListCashposParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListCashposParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {
@@ -217,9 +217,9 @@ func parseListCashposParams(q url.Values) (service.ListCashposParams, error) {
 // parseListATMsParams parses query params into service.ListATMsParams,
 // applying API-contract defaults for any parameter that's absent.
 func parseListATMsParams(q url.Values) (service.ListATMsParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.ListATMsParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListATMsParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {
@@ -250,6 +250,24 @@ func parseIntParam(q url.Values, key string, def int) (int, error) {
 		return def, nil
 	}
 	return strconv.Atoi(raw)
+}
+
+// maxPage caps every list endpoint's page number. page feeds int4 SQL math
+// (OFFSET (page-1)*page_size) and int32() conversions; with page_size <= 100
+// this keeps the offset far below 2^31 instead of wrapping into a 500.
+const maxPage = 1_000_000
+
+// parsePageParam is parseIntParam for "page", additionally rejecting values
+// above maxPage. Values < 1 are left to each service's own validation.
+func parsePageParam(q url.Values, def int) (int, error) {
+	page, err := parseIntParam(q, "page", def)
+	if err != nil {
+		return 0, err
+	}
+	if page > maxPage {
+		return 0, fmt.Errorf("page maksimal %d", maxPage)
+	}
+	return page, nil
 }
 
 // queryOrDefault returns the query param value, or def when absent/empty.

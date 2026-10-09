@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 5: test repo import batch + guard admin master-data
+- **Symptom**: sisa fungsi 0% di `repository`: `MasterDataImportBatchRepository` (staging CSV import), cek submit kelolaan ATM (`HasOverlap`, `ATMActive`, `PackageActive`, lookup vendor-wide), repo peta lokasi DSR, `CountActiveByBranch`/`BranchVendorID`/`FindByCode` (guard disable cabang), `VendorKind`, `FindByEmployeeID*`, set referensi import.
+- **Root cause**: hanya teruji tidak langsung lewat service; belum ada test repo langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_import_batch_repository_test.go` (helper `integrationTx`; batch dibuat atomik, upload ulang file sama → batch lama `existing=true` tanpa row baru, satu approval untuk semua row, row bentrok dengan pending lain → `BatchRowError` index 1 dan seluruh batch batal). `admin_guard_repository_test.go` (overlap open-ended / exclude diri / periode sebelum mulai; ATM & paket aktif vs berakhir vs tidak ada; label DSR case-insensitive + exclude diri; vault aktif → vendor; hitung anak cabang; pemilik cabang; `VendorKind` FLM_VENDOR; `employee_id` termasuk exclude diri; lokasi baru muncul di referensi import).
+- **Tests**: coverage `internal/repository` 57.1% → 86.9% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 4: test repo auth + staging maker-checker
 - **Symptom**: `AuthRepository` (jalur login: cari user by email/username/id, lockout, set password, soft-delete) dan `MasterDataChangeRepository` (staging maker-checker) 0% coverage di package `repository` — hanya teruji tidak langsung lewat service/handler.
 - **Root cause**: belum ada test repo langsung.
 - **Fix** (test saja, kode produksi tidak berubah): `auth_repository_test.go` (integration, tx rollback: user tidak ada → `(nil, nil)`; increment/lock/reset lockout; `SetInitialPassword` memaksa ganti, `SetPassword` membersihkan paksa-ganti + counter; `MarkPasswordExpired`; `UpdateLastLogin`; `Deactivate` menutup login + profil, `Reactivate` membuka lagi). `TestAuthRepository_PropagatesDBErrors` (unit, `poolProbe`): error DB selain no-rows diteruskan, bukan dibaca "user tidak ada". `masterdata_change_repository_test.go` (integration: guard pending per entity, link `approval_request_id`, approved-but-not-applied menyimpan error, stale, rejected, List/Count filter, ListByBatch).
 - **Tests**: coverage `internal/repository` 42.9% → 57.1% (`-tags integration`); semua fungsi kedua repo 100% (kecuali `FindPending` 83.3%: cabang error DB). `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `aaedccf`
 
 ---
 

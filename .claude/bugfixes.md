@@ -15,12 +15,21 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 6: test handler harga vendor-wide, upload DSR, review vault
+- **Symptom**: `AdminVendorPackagePriceHandler` 0% seluruhnya (endpoint money + maker-checker); `DsrUploadHandler` Upload/GetRencanaIsi/ListUploads/`handleServiceError` 0% (endpoint vendor); `VaultAssignments`/`VaultApprove`/`VaultReject` (review vault ATM-SPV) 0%; `writeTooManyRequests` 0%.
+- **Root cause**: belum ada test HTTP untuk handler ini.
+- **Fix** (test saja, kode produksi tidak berubah): `admin_vendor_package_price_handler_test.go` (fake service: list meneruskan filter + offset, `base_price` tetap string desimal, create/update/disable → 202 + `change_request_id`, 400 path/body rusak, pemetaan error 422/404/409/403/500, role non-admin 403, tanpa token 401). `dsr_upload_handler_test.go` (fake repo terscope vendor + miniredis: detail daily/rencana isi + list, upload id vendor lain → 404, query rusak → 400, non-vendor 403; upload tanpa file/kosong/bukan workbook → 400, dry-run gagal → 502, upload ke-11 dalam satu jam → 429 + `Retry-After: 3600`; nominal dicek sebagai digit agar tahan perubahan F7). `vendor_request_vault_handler_test.go` (fake reviewer: snapshot kosong → `null`, approve/reject meneruskan actor + alasan, maker 403 di route, `ErrSelfApproval`/`ErrNotChecker` 403, `ErrInvalidTransition` 409, alasan kosong 422).
+- **Tests**: coverage `internal/handler` 68.1% → 75.0% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 5: test repo import batch + guard admin master-data
 - **Symptom**: sisa fungsi 0% di `repository`: `MasterDataImportBatchRepository` (staging CSV import), cek submit kelolaan ATM (`HasOverlap`, `ATMActive`, `PackageActive`, lookup vendor-wide), repo peta lokasi DSR, `CountActiveByBranch`/`BranchVendorID`/`FindByCode` (guard disable cabang), `VendorKind`, `FindByEmployeeID*`, set referensi import.
 - **Root cause**: hanya teruji tidak langsung lewat service; belum ada test repo langsung.
 - **Fix** (test saja, kode produksi tidak berubah): `masterdata_import_batch_repository_test.go` (helper `integrationTx`; batch dibuat atomik, upload ulang file sama → batch lama `existing=true` tanpa row baru, satu approval untuk semua row, row bentrok dengan pending lain → `BatchRowError` index 1 dan seluruh batch batal). `admin_guard_repository_test.go` (overlap open-ended / exclude diri / periode sebelum mulai; ATM & paket aktif vs berakhir vs tidak ada; label DSR case-insensitive + exclude diri; vault aktif → vendor; hitung anak cabang; pemilik cabang; `VendorKind` FLM_VENDOR; `employee_id` termasuk exclude diri; lokasi baru muncul di referensi import).
 - **Tests**: coverage `internal/repository` 57.1% → 86.9% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `a571719`
 
 ---
 

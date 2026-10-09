@@ -15,13 +15,22 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F14: `go.work` di-gitignore padahal di-COPY Dockerfile
+- **Symptom**: `backend/Dockerfile` & `backend-cit/Dockerfile` menjalankan `COPY go.work go.work.sum ./`, tetapi kedua file di-gitignore → `docker build` dari clone bersih (CI/Cloud Build) gagal; hanya jalan di mesin dev yang kebetulan punya file lokal.
+- **Root cause**: `.gitignore` memakai default template Go ("go.work tidak di-commit"), sedangkan repo ini sengaja memakai workspace (CLAUDE.md Sec 3).
+- **Fix**: `.gitignore` tidak lagi mengabaikan `go.work`/`go.work.sum`; keduanya di-commit (`go.work` berisi `toolchain go1.26.9` dari F12).
+- **Tests**: export index git (`git checkout-index`, setara clone bersih) → `docker build -f backend/Dockerfile .` dan `-f backend-cit/Dockerfile .` berhasil (67.1MB / 37.7MB). Tidak ada perubahan kode; manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F12: dependency + toolchain Go yang kena CVE
 - **Symptom**: `govulncheck` (QC F2) melaporkan CVE yang reachable: chi v5.2.1 (GO-2025-3770 open redirect `RedirectSlashes`, GO-2026-5777), pgx v5.7.4 (GO-2026-5004), `golang.org/x/text` v0.40.0 (GO-2026-6629), dan 11 advisory stdlib (crypto/tls, x509, asn1, xml, net/http, textproto, url) di go1.26.3 lokal. Dockerfile memakai `golang:1.25-alpine` — seri 1.25 sudah tidak didukung (rilis yang didukung: 1.26.9, 1.27.2), beberapa CVE tidak punya fix di 1.25.
 - **Root cause**: versi dependency tidak pernah di-scan/di-upgrade; image builder memakai tag mengambang di seri yang sudah EOL.
 - **Fix**: `backend/` + `backend-cit/` go.mod/go.sum: chi v5.3.0, pgx v5.9.2, x/text v0.41.0 (`go mod tidy` juga menghapus require indirect testify/x/crypto yang tak terpakai di backend-cit). `toolchain go1.26.9` di `go.mod` ketiga modul (+ `go.work` lokal; `go.work` di-gitignore). `go` directive tetap `1.25.0`. Dockerfile `backend/` & `backend-cit/` → `golang:1.26.9-alpine`.
-- **Tests**: govulncheck 3 modul dengan go1.26.9 → "No vulnerabilities found". build + vet + `go test ./...` (3 modul) + `go test -tags integration -p 1 ./internal/...` (dev DB) lulus. Docker build belum dijalankan (lihat QC F14: `go.work` di-gitignore tapi di-COPY Dockerfile). Tidak ada UI berubah; manual browser verification: outstanding (smoke login + 1 halaman admin).
+- **Tests**: govulncheck 3 modul dengan go1.26.9 → "No vulnerabilities found". build + vet + `go test ./...` (3 modul) + `go test -tags integration -p 1 ./internal/...` (dev DB) lulus. Docker build diverifikasi di F14. Tidak ada UI berubah; manual browser verification: outstanding (smoke login + 1 halaman admin).
 - **Catatan**: chi v5.3 menandai `middleware.RealIP` deprecated (IP spoofing) → lint SA1019 di `cmd/api/main.go` kedua backend; ditangani terpisah sebagai QC F13 (auth, Sec 4 #7).
-- **Commit**: _(belum)_
+- **Commit**: `9f44cf0`
 
 ---
 

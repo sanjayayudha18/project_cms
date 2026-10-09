@@ -14,9 +14,7 @@
 *.out
 coverage.*
 
-# Go workspace file
-go.work
-go.work.sum
+# Go workspace file (go.work, go.work.sum) is committed: Dockerfiles COPY it and it pins the toolchain.
 
 # Vendor (uncomment if you don't vendor deps)
 # /vendor/

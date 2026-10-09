@@ -1,0 +1,131 @@
+# Backend QC — Daftar Perbaikan
+
+Sumber: [backend_QC_result.md](./backend_QC_result.md) (QC 2026-10-09, commit `42e7b08`).
+Cara pakai: kerjakan **satu item per sesi/commit**, urut dari atas. Sebelum mulai setiap item, AI tetap bertanya (CLAUDE.md Sec 4a rule 0): *AI-DLC baru atau cukup dicatat di `bugfixes.md`?* Kolom "Dok." di bawah hanya saran.
+
+Status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai (isi tanggal + commit)
+
+## Urutan eksekusi
+
+| # | ID | Item | Prio | Ukuran | Dok. (saran) | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | F1 | `gofmt -w` 12 file | LOW | XS | tidak perlu (format saja) | [x] 2026-10-09 |
+| 2 | F2 | Tambah `.golangci.yml` + pasang `govulncheck` | LOW | S | `bugfixes.md` | [ ] |
+| 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [ ] |
+| 4 | F4 | Guard konversi int → int32 (gosec G115) | LOW | XS | `bugfixes.md` | [ ] |
+| 5 | F5 | Permission file upload DSR 0755/0644 → 0750/0640 | MEDIUM | XS | `bugfixes.md` | [ ] |
+| 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [ ] |
+| 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [ ] |
+| 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [ ] |
+| 9 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | MEDIUM | M | ikut fitur berikutnya | [ ] |
+| 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [ ] |
+| — | F11 | Setup CI (build, vet, lint, test `-tags integration`) | — | M | butuh keputusan user | [ ] |
+
+Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M5). Keduanya diterima apa adanya; tangani hanya kalau ada perubahan yang harus diterapkan ke semua handler sekaligus. ST1005 di `pkg/auth/errors.go` juga disengaja (pesan ditampilkan ke user); di-exclude lewat F2.
+
+---
+
+## F1 — gofmt
+- **File**: `backend/cmd/hashpw/main.go`, `backend/tools.go`, `backend/internal/auth/service.go`, `backend/internal/auth/service_test.go`, `backend/internal/handler/admin_region_handler.go`, `backend/internal/repository/auth_repository.go`, `backend/internal/rolemgmt/repository.go`, `backend/internal/service/atm_visit_quota_integration_test.go`, `backend/internal/service/vendor_request_actions.go`, `backend/internal/service/vendor_request_ticket.go`, `pkg/auth/repository.go`, `pkg/auth/token_service_test.go`.
+- **Langkah**: `gofmt -w` pada file di atas, tanpa menyentuh `internal/db/`.
+- **Selesai bila**: `gofmt -l .` kosong di `backend/` & `pkg/` (kecuali `internal/db`), `go build` + `go test` hijau. Commit terpisah: `chore: gofmt backend and pkg`.
+
+## F2 — Konfigurasi lint + govulncheck
+- **Masalah**: belum ada `.golangci.yml`, jadi tiap developer memakai default yang berbeda. `govulncheck` belum terpasang.
+- **Langkah**:
+  1. Tambah `.golangci.yml` di root (dipakai ketiga modul). Linter yang diaktifkan: default (errcheck, govet, staticcheck, unused, ineffassign) + `gosec` + `gocyclo` (min 30, sebagai pagar, bukan target). Exclude `internal/db/` dan exclude errcheck di `_test.go` untuk `Close`/`Rollback`. Exclude ST1005 untuk `pkg/auth/errors.go`.
+  2. `go install golang.org/x/vuln/cmd/govulncheck@latest` (tool dev, bukan dependency proyek), lalu jalankan di 3 modul dan catat hasilnya.
+  3. Tambah perintah lint + govulncheck ke CLAUDE.md Sec 2a (Commands).
+- **Selesai bila**: `golangci-lint run ./...` di 3 modul hanya menampilkan isu yang memang tercatat di F3–F4; hasil govulncheck tercatat (CVE ditemukan → item baru di file ini).
+- **Catatan**: menambah tool dev, bukan library aplikasi. Tetap minta OK user (Golden Rule #1).
+
+## F3 — errcheck di kode produksi
+- **Lokasi**:
+  - `backend/internal/handler/admin_master_data_import_handler.go:106` `defer file.Close()`
+  - `backend/internal/notification/smtp.go:51,56,59` `conn.Close()` / `defer c.Close()`
+  - `pkg/middleware/rbac.go:113` `json.NewEncoder(w).Encode(...)`
+  - `pkg/response/response.go:42` `json.NewEncoder(w).Encode(v)`
+  - `backend-cit/cmd/api/main.go:51` `defer redisClient.Close()`, `:70` `w.Write(...)`
+- **Langkah**: close pada file read-only/koneksi yang sudah gagal → `_ = x.Close()` (eksplisit diabaikan). `Encode` gagal setelah header terkirim → log via `slog.Warn`, tidak mengubah response. Jangan mengubah perilaku.
+- **Selesai bila**: errcheck bersih di kode non-test, test hijau.
+
+## F4 — Guard konversi int → int32
+- **Lokasi**:
+  - `backend/internal/repository/masterdata_import_batch_repository.go:92` `RowCount: int32(len(rows))`. Cek bahwa importer sudah membatasi jumlah baris (`MasterDataImportMaxBytes`); kalau batas baris tidak eksplisit, tambah guard.
+  - `backend/internal/service/masterdata_applier_vendor_package.go:57`, `masterdata_applier_vendor_package_price.go:45,142` `int32(p.TierMin)` / `tierMaxInt32`. Pastikan validasi submit membatasi tier ke rentang kecil; tambah guard di validasi (bukan di applier) bila belum.
+  - `backend/internal/service/atm_portal.go:213-214`: sudah aman (PageSize 1–100). Cukup beri komentar/nolint.
+- **Selesai bila**: tiap konversi punya batas yang terbukti (validasi + test), gosec G115 bersih atau di-nolint dengan alasan.
+
+## F5 — Permission file upload DSR
+- **Lokasi**: `backend/internal/service/dsr_upload.go:191` (`MkdirAll 0o755`), `:195` (`WriteFile 0o644`).
+- **Langkah**: ubah ke `0o750` / `0o640`. Cek bahwa proses Python `service_dsr_etl` membaca folder yang sama dengan user/grup yang sama (docker-compose / deploy doc). Kalau beda user, catat syarat grup bersama di `docs/deployment.md`.
+- **Catatan**: di Windows dev, permission ini praktis tidak berpengaruh; efeknya di VM Linux.
+- **Selesai bila**: test DSR upload hijau, catatan deploy diperbarui bila perlu.
+
+## F6 — Repo admin pakai replica untuk read
+- **Masalah**: `main.go` sudah membuat `dbReadPool` (`backend/cmd/api/main.go:60-80`), tetapi repo berikut masih hanya menerima `dbPool` dan komentarnya masih "TODO saat DATABASE_REPLICA_URL di-wire":
+  - `NewUserAdminRepository` (`main.go:152`, `user_admin_repository.go:18`)
+  - `NewVendorVaultAdminRepository` (`:309`, `vendor_vault_admin_repository.go:17`)
+  - `NewVendorPicAdminRepository` (`:321`, `vendor_pic_admin_repository.go:17`)
+  - `NewVendorPackageAdminRepository` (`:328`, `vendor_package_admin_repository.go:17`)
+  - `NewVendorPackagePriceAdminRepository` (`:338`, `vendor_package_price_admin_repository.go:18`)
+  - `NewVendorBranchAdminRepository` (`:348`, `vendor_branch_admin_repository.go:17`)
+  - ATM assignment admin repo (`atm_assignment_admin_repository.go:20`)
+- **Langkah**: ikuti pola yang sudah ada di `NewVendorAdminRepository(dbPool, dbReadPool)`. List/get layar → `dbRead`; lookup di dalam flow submit/apply (read-after-write, validasi stale) tetap ke primary. Hapus komentar TODO.
+- **Risiko**: replica lag. Layar yang langsung me-refresh setelah submit bisa menampilkan data lama. Karena master data maker-checker (row baru berubah setelah approve), dampaknya kecil. `users` (apply langsung, bukan maker-checker) perlu dicek khusus: setelah create/update, response sebaiknya dibaca dari primary.
+- **Selesai bila**: semua repo di atas menerima `(db, dbRead)`, test integrasi hijau, `grep "DATABASE_REPLICA_URL wiring lands"` kosong.
+
+## F7 — Uang `float64` → string desimal  ⚠️ Sec 4 #7 (money)
+- **Masalah**: nilai IDR dikonversi `pgtype.Numeric` → `float64` untuk response (melanggar CLAUDE.md Sec 6). Read-only, tetapi kontrak API-nya salah.
+- **Lokasi backend**:
+  - `backend/internal/service/atm_portal.go:131-137`, `:286-302`, helper `numericToFloat64Ptr` `:327` (threshold, refund_total, replenish_total, escrow)
+  - `backend/internal/handler/atm_portal_handler.go:295-301`
+  - `backend/internal/service/dsr_upload.go:338-357`, `:568-...` (denom_*, line_total_idr, fill_*_idr, splank_balance_0800_idr)
+  - `backend/internal/handler/dsr_upload_handler.go:326-344`
+- **Reuse**: helper `numericToDecimalStringPtr` sudah ada (`backend/internal/service/atm_portal_profile.go:421`). Setelah migrasi, hapus `numericToFloat64Ptr`.
+- **Dampak frontend** (kontrak berubah number → string):
+  - CompanyPortal: `src/features/atm-portal/types.ts`, `components/AtmTable.tsx`, `AtmHeader.tsx`, `ReplenishTable.tsx` + test terkait
+  - VendorPortal: `src/features/dsr/dsrUploadApi.ts`, `DsrDetailDialog.tsx`, `DsrUploadDialog.tsx` + `__tests__/DsrUploadDialog.test.tsx`
+  - Format tampilan tetap IDR, `tabular-nums`, rata kanan (Sec 13). Jangan `parseFloat` lalu menghitung; untuk format, pakai util format IDR yang sudah ada di masing-masing app.
+- **Dok.**: AI-DLC (`.claude/sdlc/money-decimal-string/`) karena menyentuh money + kontrak API dua frontend.
+- **Selesai bila**: `grep float64` di `internal/service` & `internal/handler` (non-test) tidak mengenai field uang; test backend + `pnpm test` + `build` kedua frontend hijau; verifikasi browser dicatat *outstanding* (tugas user).
+
+## F8 — Coverage ≥ 80%
+- **Kondisi** (dengan `-tags integration`): `repository` 33.5%, `handler` 68.0%, `service` 72.5%, `pkg/response` 0%.
+- **Langkah** (batch kecil, satu commit per batch, prioritas Sec 4 #7 dulu):
+  1. `service`: `vendor_request_actions.go`, `vault_plan_actions.go`, `vendor_party.go`, master-data applier. Fokus cabang gagal/RBAC/maker≠checker.
+  2. `repository`: integration test repo admin read-only (list/filter/pagination), sekalian memverifikasi routing replica F6.
+  3. `handler`: jalur 4xx (parse/validasi/forbidden) yang belum tersentuh.
+  4. `pkg/response`: 1 test kecil.
+- **Alat**: `go test -tags integration -coverprofile=c.out ./internal/... && go tool cover -func=c.out | sort -k3 -n` untuk mencari fungsi 0%.
+- **Selesai bila**: tiap package `internal/*` ≥ 80% dengan tag integration.
+
+## F9 — Pecah `vendor_request_actions.go`
+- **Kondisi**: 1210 baris (batas 800). Isinya create/edit, transition, completion, dll. dalam satu file.
+- **Langkah**: pindah fungsi ke file per kelompok (mis. `vendor_request_edit.go`, `vendor_request_transition.go`, `vendor_request_completion.go`) dalam package yang sama. Murni pindah, tanpa ubah logika.
+- **Kapan**: saat fitur berikutnya menyentuh Vendor Request, supaya diff tidak bentrok dengan pekerjaan yang sedang jalan.
+- **Selesai bila**: tidak ada file > 800 baris, diff hanya pemindahan, test hijau.
+
+## F10 — Fungsi kompleks (gocyclo > 20)
+| Fungsi | Lokasi | Cyclo | Rencana |
+| --- | --- | --- | --- |
+| `importEnv.validateFields` / `validateRow` / `buildEnv` / `readImportCSV` | `backend/internal/service/masterdata_import.go:669/490/338/127` | 47/40/21/22 | **Jangan refactor terpisah**: dikerjakan saat import diganti flow FSD replace-all (Sec 12) |
+| `UserAdminService.Create` / `Update` | `backend/internal/auth/user_admin.go:154/294` | 34/34 | Ekstrak validasi input ke satu fungsi bersama (auth → STOP & flag, Sec 4 #7) |
+| `VaultPlanService.ReviewRequest` | `backend/internal/service/vault_plan_actions.go:283` | 25 | Ekstrak cabang approve/reject |
+| `syncVendorParties` | `backend/internal/service/vendor_party.go:132` | 24 | Ekstrak diff party lama vs baru |
+| `VendorRequestService.UpdateItems` / `transition` | `backend/internal/service/vendor_request_actions.go:734/958` | 23/23 | Gabung dengan F9 |
+| `ATMAssignmentApplier.Apply` | `backend/internal/service/masterdata_applier_atm_assignment.go:88` | 21 | Ekstrak validasi sumber paket |
+
+- **Syarat**: refactor hanya setelah coverage fungsi tersebut cukup (F8), supaya perilaku terkunci test.
+
+## F11 — CI (perlu keputusan user)
+- **Kondisi**: tidak ada `.github/workflows/` (atau pipeline lain) di repo. Test integrasi butuh `-tags integration` + Postgres; tanpa itu, coverage `service` hanya 37.8%.
+- **Pertanyaan**: CI di mana? (GitHub Actions / Cloud Build sesuai `docs/deployment.md`.) Postgres service container untuk test integrasi?
+- **Isi minimal**: build + vet + golangci-lint + `go test -tags integration` (3 modul) + govulncheck; frontend `pnpm test/lint/build` kedua app.
+
+---
+
+## Log pengerjaan
+| Tanggal | ID | Commit | Catatan |
+| --- | --- | --- | --- |
+| 2026-10-09 | F1 | (belum di-commit) | `gofmt -w` 12 file. 8 file berubah di git (59+/59−, whitespace + 1 baris `//` doc comment); 4 sisanya hanya beda line ending (dinormalisasi git). `gofmt -l` bersih, build/vet/test backend + pkg hijau. |

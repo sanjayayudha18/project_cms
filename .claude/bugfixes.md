@@ -15,13 +15,22 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 2: test `CurrentState` applier + opsi/audit Vendor Request
+- **Symptom**: `CurrentState` (snapshot stale-check saat approve, maker-checker) di 6 applier — atm_assignment, dsr_location_map, vendor_branch, vendor_package, vendor_pic, vendor_vault — 0% coverage; `VendorRequestService.ListVendorOptions` dan `AuditLog` 0%.
+- **Root cause**: belum ada test langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_current_state_integration_test.go` (tx rollback: seed tiap entity, `CurrentState` mengembalikan tipe row `Get*AdminByIDRow` yang sama dengan Before; id hilang → `pgx.ErrNoRows`). `vendor_request_options_audit_test.go` (unit, fake repo: region NULL dilewati, error diteruskan; `AuditLog` request hilang → `ErrNotFound`, error lain dibungkus, `state`/metadata dipetakan, query `entity_type=vendor_request`).
+- **Tests**: coverage `internal/service` 74.3% → 75.3% (`-tags integration`); 6× `CurrentState` 100%, `ListVendorOptions` 92.3%, `AuditLog` 90.9%. `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 1: test applier harga vendor-wide (money, maker-checker)
 - **Symptom**: `VendorPackagePriceApplier.Apply` (apply-on-approve harga vendor-wide) 0% coverage, termasuk generator `package_code` (`nextPackageCode`, `digitsOrFallback`) dan pemetaan error DB (`mapPriceDBError`, `mapPackageDBError`).
 - **Root cause**: hanya diuji tidak langsung lewat seed SQL; tidak ada test applier.
 - **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_price_test.go` (unit: digit label → kode, termasuk fallback `0`; exclusion → `ErrVendorPackagePriceOverlap`/`ErrVendorPackageOverlap`, unique `package_code` → `ErrVendorPackageCodeConflict`, error lain diteruskan; Apply menolak op tak dikenal, update/disable tanpa `entity_id`, payload/base_price/tanggal rusak). `masterdata_applier_price_integration_test.go` (tx rollback: create → `PKG3_ITPX_001` lalu `PKG0_ITPX_002`, `base_price` desimal eksak `1250000.50`; update hanya content + money eksak; disable menutup periode; `CurrentState`; overlap grain sama → `ErrVendorPackagePriceOverlap`).
 - **Temuan**: disable harga yang mulai hari ini/di masa depan gagal (`CURRENT_DATE - 1 < effective_start_date` melanggar `vpp_period_chk`), juga di `vendor_packages_branch` → **QC F17**, butuh keputusan produk (Sec 4 #7), tidak diperbaiki di batch ini.
 - **Tests**: coverage `internal/service` 73.0% → 74.3% (`-tags integration`); `VendorPackagePriceApplier.Apply` 0% → 83.3%, `mapPriceDBError`/`mapPackageDBError`/`digitsOrFallback` 100%. Lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `67c9e54`
 
 ---
 

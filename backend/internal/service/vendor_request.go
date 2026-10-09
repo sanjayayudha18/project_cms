@@ -470,6 +470,13 @@ const (
 	actionSubmitCompletion  action = "submit_completion"
 	actionApproveCompletion action = "approve_completion"
 	actionRejectCompletion  action = "reject_completion"
+
+	// cit-acm-plan: penetapan vault. vault_ready is the system step taken when
+	// every ACM area plan is approved (FR4.6); vault_approve/vault_reject are
+	// the ATM-SPV review of the ACM recommendation (FR5.2).
+	actionVaultReady   action = "vault_ready"
+	actionVaultApprove action = "vault_approve"
+	actionVaultReject  action = "vault_reject"
 )
 
 // transitions is the valid-transition table (Req 2.1). approved->processing,
@@ -479,11 +486,19 @@ const (
 // downstream module executes the approved order.
 var transitions = map[string]map[action]string{
 	"draft":            {actionSubmit: "pending_approval", actionCancel: "cancelled"},
-	"pending_approval": {actionApprove: "approved", actionReject: "rejected", actionCancel: "cancelled"},
+	// cit-acm-plan S5: approve now hands the request to ACM (vault_assignment)
+	// instead of approved.
+	"pending_approval": {actionApprove: "vault_assignment", actionReject: "rejected", actionCancel: "cancelled"},
 	"rejected":         {actionRevise: "draft"},
-	"approved":         {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
-	// atm-visit-quota FR1: a rejected report goes back to approved so the
-	// maker can resubmit; no cancel from completion_pending (FR1.4).
+	"vault_assignment": {actionVaultReady: "vault_review", actionCancel: "cancelled"},
+	"vault_review":     {actionVaultApprove: "ready", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
+	"ready":            {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// approved = legacy: requests approved before the vault flow (F12/N2) keep
+	// their old path, including laporan selesai.
+	"approved": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// atm-visit-quota FR1: a rejected report goes back for resubmission -- to
+	// approved here, or to ready for vault_flow requests (completionTx);
+	// no cancel from completion_pending (FR1.4).
 	"completion_pending": {actionApproveCompletion: "completed", actionRejectCompletion: "approved"},
 }
 
@@ -526,7 +541,7 @@ func checkActor(actor Actor, req db.VendorRequest, a action) error {
 			if actor.UserID != req.CreatedBy {
 				return ErrNotCreator
 			}
-		case "approved":
+		case "approved", "vault_assignment", "vault_review", "ready":
 			if !isChecker(actor.Role) {
 				return ErrNotChecker
 			}

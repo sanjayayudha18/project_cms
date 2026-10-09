@@ -8,6 +8,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AcmArea struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedBy int64              `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AcmAreaBranch struct {
+	AcmAreaID      int64              `json:"acm_area_id"`
+	VendorBranchID int64              `json:"vendor_branch_id"`
+	CreatedBy      int64              `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type AcmAreaMember struct {
+	AcmAreaID int64              `json:"acm_area_id"`
+	UserID    int64              `json:"user_id"`
+	CreatedBy int64              `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 // Explicit fallback: while from_user_id cannot act (see user_leaves), to_user_id acts in their place. Overlap-range rejection is enforced at the admin endpoint layer (Task 8), not here.
 type ApprovalDelegation struct {
 	ID         int64              `json:"id"`
@@ -224,7 +248,7 @@ type DsrDailyRow struct {
 	Location *string `json:"location"`
 	// d0 = section 1 (report_date, settled, sampai pukul 00:00). d1 = section 2 (daily_status_date, status sementara).
 	Section string `json:"section"`
-	// saldo_awal = opening balance (d0 only). penerimaan / pengeluaran = receipt / disbursement line, sign stored verbatim as printed. status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak), d1 only.
+	// saldo_awal = opening balance (d0 only). penerimaan / pengeluaran = receipt / disbursement line, sign stored verbatim as printed. status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak), d1 only. saldo_akhir = closing balance per vault block (d0, located blocks only; since 027, feeds vault saldo via dsr_location_vault_maps).
 	Flow string `json:"flow"`
 	// Uraian text verbatim, e.g. Dari CIMB Niaga CIT, Untuk Cartridge Replenishment ATM & CRM.
 	LineLabel string `json:"line_label"`
@@ -242,6 +266,18 @@ type DsrDailyRow struct {
 	LineTotalIdr pgtype.Numeric     `json:"line_total_idr"`
 	Remarks      *string            `json:"remarks"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+// Label lokasi blok DSR (dsr_daily_rows.location) per vendor -> vendor_vaults. DSR dikaitkan ke vendor via dsr_uploads.vendor = vendors.name.
+type DsrLocationVaultMap struct {
+	ID            int64              `json:"id"`
+	VendorID      int64              `json:"vendor_id"`
+	DsrLocation   string             `json:"dsr_location"`
+	VendorVaultID int64              `json:"vendor_vault_id"`
+	IsActive      bool               `json:"is_active"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type DsrRencanaIsiRow struct {
@@ -794,6 +830,11 @@ type VendorRequest struct {
 	CompletionRejectionReason *string            `json:"completion_rejection_reason"`
 	// Snapshot kode region vendor cabang saat create. NULL = request format nomor lama.
 	RegionCode *string `json:"region_code"`
+	// true = request di-approve setelah rilis 2.2a dan melewati penetapan vault ACM (laporan selesai ditolak -> ready). false = request lama (-> approved).
+	VaultFlow            bool               `json:"vault_flow"`
+	VaultReviewedBy      *int64             `json:"vault_reviewed_by"`
+	VaultReviewedAt      pgtype.Timestamptz `json:"vault_reviewed_at"`
+	VaultRejectionReason *string            `json:"vault_rejection_reason"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
@@ -835,6 +876,40 @@ type VendorRequestTicket struct {
 	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
 	Result          *string            `json:"result"`
 	ResultUpdatedAt pgtype.Timestamptz `json:"result_updated_at"`
+}
+
+type VendorRequestVaultAssignment struct {
+	ID                int64   `json:"id"`
+	VaultPlanID       int64   `json:"vault_plan_id"`
+	VendorRequestID   int64   `json:"vendor_request_id"`
+	TerminalID        string  `json:"terminal_id"`
+	ReplenishBranchID int64   `json:"replenish_branch_id"`
+	VaultBranchID     int64   `json:"vault_branch_id"`
+	Tier              int16   `json:"tier"`
+	IsUrgent          bool    `json:"is_urgent"`
+	UrgentReason      *string `json:"urgent_reason"`
+	// Saldo branch vault per denom saat disimpan, {"100000": "123000000.00", ...}; null per denom = tidak diketahui.
+	SaldoSnapshot    []byte             `json:"saldo_snapshot"`
+	CapacitySnapshot []byte             `json:"capacity_snapshot"`
+	CapacityWarning  bool               `json:"capacity_warning"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVaultPlan struct {
+	ID              int64              `json:"id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	AcmAreaID       int64              `json:"acm_area_id"`
+	Status          string             `json:"status"`
+	SubmittedBy     *int64             `json:"submitted_by"`
+	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedBy      *int64             `json:"approved_by"`
+	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
+	RejectedBy      *int64             `json:"rejected_by"`
+	RejectedAt      pgtype.Timestamptz `json:"rejected_at"`
+	RejectionReason *string            `json:"rejection_reason"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type VendorVault struct {

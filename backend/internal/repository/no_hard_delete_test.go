@@ -54,7 +54,7 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
-		"regions",
+		"regions", "dsr_location_vault_maps",
 	}
 
 	for _, f := range files {
@@ -82,7 +82,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 	guarded := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
-		"regions",
+		"regions", "dsr_location_vault_maps",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

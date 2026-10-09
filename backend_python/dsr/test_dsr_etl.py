@@ -91,6 +91,59 @@ def _build_synthetic_workbook(path: Path) -> None:
     wb.save(path)
 
 
+def _write_block(ws, top: int, title: str, saldo_100k: int, saldo_50k: int) -> None:
+    """One DSR block: title in A, Deno header, denom row, SALDO AWAL, SALDO AKHIR (d0)."""
+    ws[f"A{top}"] = title
+    ws[f"C{top + 1}"] = "Uraian"
+    ws[f"F{top + 1}"] = "Deno (lembar)"
+    ws[f"K{top + 1}"] = "Total Rupiah x1.000"
+    ws[f"F{top + 2}"] = 100000
+    ws[f"G{top + 2}"] = 50000
+    ws[f"C{top + 3}"] = "SALDO AWAL"
+    ws[f"F{top + 3}"] = 1
+    ws[f"G{top + 3}"] = 1
+    ws[f"K{top + 3}"] = 2
+    ws[f"C{top + 4}"] = "SALDO AKHIR SAMPAI PUKUL 00:00"
+    ws[f"F{top + 4}"] = saldo_100k
+    ws[f"G{top + 4}"] = saldo_50k
+    ws[f"K{top + 4}"] = saldo_100k + saldo_50k
+
+
+def _build_multi_vault_workbook(path: Path) -> None:
+    wb = openpyxl.Workbook()
+    daily = wb.active
+    daily.title = "Daily"
+    daily["D5"] = "Tanggal   :"
+    daily["E5"] = date(2026, 7, 15)
+    _write_block(daily, 8, "SALDO HARIAN ATM", 9000000, 1000000)
+    _write_block(daily, 16, "LENTENG AGUNG", 6000000, 400000)
+    _write_block(daily, 24, "BINTARO", 3000000, 600000)
+    wb.save(path)
+
+
+class DsrSaldoAkhirPerVaultTests(unittest.TestCase):
+    def test_saldo_akhir_stored_per_vault_block_not_for_total_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "VENDOR__1__multi.xlsx"
+            _build_multi_vault_workbook(path)
+            fields, rows, error_count = read_daily_rows(path)
+
+        saldo = {r["location"]: r for r in rows if r["flow"] == "saldo_akhir"}
+        self.assertEqual({"LENTENG AGUNG", "BINTARO"}, set(saldo))  # total block not stored
+        self.assertEqual(Decimal("6000000"), saldo["LENTENG AGUNG"]["denom_100k"])
+        self.assertEqual(Decimal("400000"), saldo["LENTENG AGUNG"]["denom_50k"])
+        self.assertEqual(Decimal("3000000"), saldo["BINTARO"]["denom_100k"])
+        self.assertEqual(Decimal("3600000"), saldo["BINTARO"]["line_total_idr"])
+        self.assertEqual(Decimal(0), saldo["BINTARO"]["denom_20k"])
+        self.assertEqual("d0", saldo["BINTARO"]["section"])
+        self.assertEqual(Decimal("10000000"), fields["saldo_akhir_0000_total_idr"])
+        self.assertEqual(0, error_count)
+
+        # every row carries its block's location; the total block's rows stay NULL
+        by_loc = [r["location"] for r in rows if r["flow"] == "saldo_awal"]
+        self.assertEqual([None, "LENTENG AGUNG", "BINTARO"], by_loc)
+
+
 class SafeChildTests(unittest.TestCase):
     def test_bare_file_names_are_accepted(self) -> None:
         base = Path(tempfile.gettempdir())

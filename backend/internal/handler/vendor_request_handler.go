@@ -36,6 +36,7 @@ var (
 // VendorRequestHandler handles Vendor Request HTTP endpoints.
 type VendorRequestHandler struct {
 	service service.VendorRequestServicer
+	vault   VendorRequestVaultReviewer // nil = vault routes not mounted
 }
 
 // NewVendorRequestHandler creates a new VendorRequestHandler with the given service.
@@ -66,6 +67,12 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/", h.List)
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}", h.Get)
 	r.With(middleware.RequireRoles(vendorRequestAuditRoles...)).Get("/{id}/audit-log", h.AuditLog)
+	if h.vault != nil {
+		// cit-acm-plan FR5: ATM-SPV review of the ACM vault recommendation.
+		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vault-assignments", h.VaultAssignments)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-approve", h.VaultApprove)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-reject", h.VaultReject)
+	}
 	return r
 }
 

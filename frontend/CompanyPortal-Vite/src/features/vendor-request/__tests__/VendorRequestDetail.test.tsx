@@ -43,6 +43,13 @@ vi.mock("../hooks", async (importOriginal) => {
   };
 });
 
+// cit-acm-plan: the panel is covered in features/vault-plan/VaultPlan.test.tsx; here only its gating.
+vi.mock("@/features/vault-plan/RequestVaultPanel", () => ({
+  RequestVaultPanel: ({ canReview }: { canReview: boolean }) => (
+    <p>{canReview ? "vault-panel:review" : "vault-panel:read-only"}</p>
+  ),
+}));
+
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -162,6 +169,25 @@ describe("VendorRequestDetail", () => {
     renderWithProviders();
 
     expect(screen.getByRole("heading", { name: /tidak ditemukan/i })).toBeInTheDocument();
+  });
+
+  it("vault panel: ATM-SPV reviews only in vault_review; hidden for legacy approved", () => {
+    mockDetail({ status: "vault_review" });
+    setUser(2, "ATM-SPV");
+    const first = renderWithProviders();
+    expect(screen.getByText("vault-panel:review")).toBeInTheDocument();
+    first.unmount();
+
+    mockDetail({ status: "vault_review" });
+    setUser(1, "ATM-USER");
+    const second = renderWithProviders();
+    expect(screen.getByText("vault-panel:read-only")).toBeInTheDocument();
+    second.unmount();
+
+    mockDetail({ status: "approved" });
+    setUser(2, "ATM-SPV");
+    renderWithProviders();
+    expect(screen.queryByText(/vault-panel/)).not.toBeInTheDocument();
   });
 
   it("draft + creator sees Edit Item, Submit, and Cancel — not Approve/Reject", () => {

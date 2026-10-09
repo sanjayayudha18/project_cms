@@ -1,7 +1,7 @@
 # Feature Flow — Dashboard & Pelaporan
 
 Sumber: URS v0.3 Phase 1 · To-be "Dashboard & Pelaporan" · FNC 003
-Modul: dashboard read-only di atas `internal/forecast`, `internal/replenishment`, `internal/dsr`, `internal/cashcount`, `internal/export`
+Modul: dashboard read-only di atas data DMAA (`dmaa_atm_forecast`), `internal/replenishment`, `internal/dsr`, `internal/cashcount`, `internal/export`
 
 ## Konten (FNC 003)
 - **ATM Forecasting**: daily instruction (amount & term ID), rekap keterlambatan DSR

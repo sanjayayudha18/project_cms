@@ -251,6 +251,7 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
 
         section = "d0"
         flow: str | None = None
+        block_start = len(rows)
 
         for r in range(data_start, data_end):
             row = grid.iloc[r]
@@ -293,9 +294,17 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
             elif label.startswith("SUBTOTAL"):
                 flow = None
             elif label.startswith("SALDO AKHIR"):
-                if location is None and section == "d0":
+                if section == "d0" and location is None:
                     _, total_amt, _ = totals()
                     file_fields["saldo_akhir_0000_total_idr"] = total_amt
+                elif section == "d0":
+                    # Per-vault saldo akhir 00:00 -- the vault-capacity source (cit-acm-plan FR1).
+                    denoms, total_amt, err = totals()
+                    error_count += err
+                    row_no += 1
+                    rows.append({"row_no": row_no, "section": section, "flow": "saldo_akhir",
+                                  "line_label": col2, "memo_no": None,
+                                  **denoms, "line_total_idr": total_amt, "remarks": None})
                 flow = None
             elif label.startswith("SALDO SEMENTARA"):
                 if location is None:
@@ -355,6 +364,9 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
                 rows.append({"row_no": row_no, "section": section, "flow": flow,
                               "line_label": col3 or col2, "memo_no": _extract_memo(col2),
                               **denoms, "line_total_idr": total_amt, "remarks": None})
+
+        for row in rows[block_start:]:
+            row["location"] = location
 
     for row in rows:
         for key in DENOM_VALUES.values():

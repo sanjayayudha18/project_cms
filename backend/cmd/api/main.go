@@ -222,6 +222,7 @@ func main() {
 		"vendor_package":       service.VendorPackageApplier{},
 		"vendor_package_price": service.VendorPackagePriceApplier{},
 		"atm_assignment":       service.ATMAssignmentApplier{},
+		"dsr_location_map":     service.DsrLocationMapApplier{},
 	}
 	masterDataChangeRepo := repository.NewMasterDataChangeRepository(dbPool)
 
@@ -309,6 +310,11 @@ func main() {
 	vendorVaultAdminService := service.NewVendorVaultAdminService(vendorVaultAdminRepo, masterDataChangeService)
 	adminVendorVaultHandler := handler.NewAdminVendorVaultHandler(vendorVaultAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/vaults", adminVendorVaultHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: Mapping DSR lokasi -> vault (cit-acm-plan FR2),
+	// maker-checker-native; lists read from the replica.
+	dsrLocationMapAdminService := service.NewDsrLocationMapAdminService(repository.NewDsrLocationMapAdminRepository(dbPool, dbReadPool), masterDataChangeService)
+	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/dsr-location-maps", handler.NewAdminDsrLocationMapHandler(dsrLocationMapAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor PIC CRUD (plan.md T3.3), same
 	// maker-checker-native flow; list also returns non-blocking warnings.
@@ -430,7 +436,18 @@ func main() {
 	smtpMailer, notifyInterval := loadNotificationConfig()
 	notificationService := notification.NewService(smtpMailer != nil)
 	vendorRequestService := service.NewVendorRequestService(dbPool).WithNotifier(notificationService)
-	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService)
+
+	// ADMIN-only: Area ACM (cit-acm-plan FR7) -- immediate-apply + audit in tx,
+	// same documented GR#3 deviation as regions; role re-checked in the service.
+	// Built after notificationService: assigning branches creates vault plans and notifies (FR7.3).
+	adminAcmAreaHandler := handler.NewAdminAcmAreaHandler(service.NewAcmAreaAdminService(dbPool, dbReadPool).WithNotifier(notificationService))
+	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ADMIN")).Mount("/api/v1/admin/acm-areas", adminAcmAreaHandler.Routes())
+	// CIT -> Penetapan Vault (cit-acm-plan FR3-FR6): ACM area plans; membership +
+	// per-action role re-checked in the service (ADMIN read-only). The same service
+	// backs the ATM-SPV vault review routes on Vendor Request.
+	vaultPlanService := service.NewVaultPlanService(dbPool, dbReadPool).WithNotifier(notificationService)
+	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ACM-USER", "ACM-SPV", "ADMIN")).Mount("/api/v1/vault-plans", handler.NewVaultPlanHandler(vaultPlanService).Routes())
+	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService).WithVaultReview(vaultPlanService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
 
 	// Kuota kunjungan replenish per ATM (.claude/sdlc/atm-visit-quota): read

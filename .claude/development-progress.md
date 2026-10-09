@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-10-08
 
-Branch: `dev1` = `main` (PR #1 dev1 → main merged, `38eb0a1`; latest `87b2d78`). Uncommitted: Phase 0.1 + intents 0.3/0.4 (2026-10-07).
+Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` — Phase 0 + replenish ticket). Merge `dev1` → `main` pending.
 
 ## Overview
 
@@ -15,14 +15,17 @@ Branch: `dev1` = `main` (PR #1 dev1 → main merged, `38eb0a1`; latest `87b2d78`
 | Vendor package pricing | `vendor-pricing/` | 3 Build | 🟡 schema (mig 009/010/017) + backend + CompanyPortal panel built | Per-ATM special price not seeded |
 | Perbaikan RBAC (kelolaan cabang → vault/PIC/paket) | `perbaikan-rbac/` | 3 Build | 🟡 mostly built — backend contract, 4 dialogs, branch drill-down, vendor-wide PIC, pending badges; 2026-09-30 server-side paging + branch search (G1), pending creates visible (G2), tests (G3) | Automated tests for approve/reject/apply-failure, double-submit/cross-tab conflict, per-entity CRUD payloads; manual browser check (user) |
 | `import_jobs`/`export_jobs` + idempotensi (Phase 0.2) | `import-export-jobs/` | 4 Test | ✅ built Fases 1–7 (Python + frontend); T8.1 tests green, T8.2 reviews fixed (migration 020, DSR path traversal); Go helper deferred to 2.1 | A17 manual browser check of EOD monitoring (user) — `/api/eod` routing ready (S6) |
+| Penetapan branch vault per ATM oleh ACM (Phase 2.2a) | `cit-acm-plan/` | 5 Deploy (`review.md`, 2026-10-08) | ✅ built S1–S8 (mig 027 + comment 028 applied to dev); review R1 (branch pindah area) + R2 (link notifikasi) fixed, no open Important; tests green; not committed | manual browser check (user); commit; then 2.2b |
+| Replenishment realisasi vs order (Phase 2.2c) | `replenishment-realisasi/` | 1 Plan (intent draft 2026-10-08) | ⏳ not built, after 2.2a/2.2b | questions answered 2026-10-08; PO accept intent |
 | Laporan DSR telat / tidak kirim (Phase 2.3) | `dsr-late-report/` | 1 Plan (intent draft 2026-09-28) | ⏳ not built | PO acceptance; depends on 0.3 notification + DSR per-cabang schema change |
 | Forecast Browser ringkasan vendor × region | `forecast-browser-summary/` | 5 Deploy (review 2026-09-30) | ✅ built, merged to main (`7f6d16b`, R1 `a9873d2`) | manual browser check (user) |
 | Kelolaan ATM: paket khusus cabang / vendor-wide | `atm-package-source/` | 5 Deploy (review 2026-10-07) | ✅ built, merged to main (`ff005fa` + fixes `321a10b`, `00b05a1`; mig 023 applied to dev); tests green; review R1 fixed | manual browser check (user) |
 | Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (review 2026-10-01) | ✅ built, merged to main (committed in `ff005fa`; mig 021 applied to dev); review R1 fixed | manual browser check (user, seed kelolaan dulu) |
-| Nomor tiket replenish per ATM | `replenish-ticket/` | 5 Deploy (review 2026-10-08) | ✅ built (uncommitted); mig 026 applied to dev; review R1/R2 fixed | manual browser check (user); isi `region_code` cabang yang masih kosong; commit → code owner merge |
+| Nomor tiket replenish per ATM | `replenish-ticket/` | 5 Deploy (review 2026-10-08) | ✅ built, committed `291f488`; mig 026 applied to dev; review R1/R2 fixed | manual browser check (user); isi `region_code` cabang yang masih kosong; merge `dev1` → `main` |
 | Vendor PKS / CIS limit | `vendor-pks-cis-limit/` | 1 Plan (intent draft 2026-10-05) | ⏳ not built; columns approved 2026-10-05 (CLAUDE.md Sec 3), migration `022` not created | PO accept intent → spec → migration 022 |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
 | Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 5 Deploy (review 2026-10-07) | ✅ built (`eb457cf`, review R1–R3 fixed): `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |
+| Forecast / Order ATM (Phase 2.1) | — (re-scoped by user 2026-10-08) | closed | ✅ no engine: DMAA sends the forecast, `backend_python/dmaa/dmaa_etl.py` ingests it, DMAA `amount_replenish` = final order amount; consumed by Forecast Browser → Vendor Request. `internal/forecast` + `forecast_runs/results` dropped | refund: DMAA sends later → extend ETL then (`amount_refund = 0` today); problem-ATM exclusion stays with CROWN → Phase 2.4; CLAUDE.md Sec 3/3a corrected 2026-10-08 |
 | Penyimpanan dokumen (Phase 0.4) | `document/` | 1 Plan (intent accepted) | ⏸ deferred to Phase 3/5 (PO 2026-10-07) | spec when first consumer starts |
 
 Manual browser verification is always the user's job (Golden Rule #10) and stays "outstanding" until the user confirms it.
@@ -41,7 +44,8 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ## Next Phase
 
-1. User: manual browser checks — A17 EOD monitoring (closes Phase 0.2), perbaikan-rbac (ROH paging, pending creates), Forecast Browser, kelolaan ATM paket source, kuota kunjungan.
+0. **Phase 2.2 split (user 2026-10-08):** 2.2a penetapan branch vault per ATM oleh ACM (`cit-acm-plan/`, next) → 2.2b kirim CIT ke vendor → 2.2c realisasi vs order (`replenishment-realisasi/intent.md`). 2.1 closed (no forecast engine). Also new: 2.4 problem-ATM exclusion. `backend-cit` to be renamed `backend-exq` by the user (export + dashboard queries).
+1. User: manual browser checks — A17 EOD monitoring (closes Phase 0.2), perbaikan-rbac (ROH paging, pending creates), Forecast Browser, kelolaan ATM paket source, kuota kunjungan, tiket replenish.
 2. Finish `perbaikan-rbac` acceptance: approve/reject/apply-failure states, double-submit + cross-tab conflict (check backend rejects duplicates first), per-entity CRUD tests.
 3. `notification/` (0.3): commit review fixes R1–R3 → code owner merge; user: browser check of bell + VendorPortal page; real SMTP send once relay creds exist. 0.4 + 0.5 deferred.
 4. PO acceptance of `dsr-late-report/intent.md` → spec.

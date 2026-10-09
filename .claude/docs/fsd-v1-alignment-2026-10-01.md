@@ -8,7 +8,7 @@ Source document: `DSR End To End Cash Management V01.docx` (repo root) — FSD "
 
 | # | Topic | Before (URS) | Now (FSD) | Code impact |
 |---|---|---|---|---|
-| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | None (`internal/forecast` not built) |
+| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | None — **superseded 2026-10-08**: CROWN does no forecasting; DMAA `amount_replenish` is final (CLAUDE.md Sec 3a) |
 | 2 | Cash count reconciliation | In-system 3-way (cash count vs escrow H-1 vs proofing) | CROWN builds the recap report → reconciliation runs externally in **Rec 7** | None (`internal/cashcount` not built) |
 | 3 | Master data upload | Upsert, all-or-nothing batch, one approval | **Replace-all**; rejected records corrected + re-uploaded; checker approves only clean data | **Yes** — `backend/internal/service/masterdata_import*.go`; needs AI-DLC (Sec 4 #7) |
 | 4 | Pemenuhan dana | Surat tugas, KTP/NIP, maker-checker on officer data | Head approval → ACM Branch Coordinator (escrow H-1, manual pindah buku in BDS) → Vendor Receiver/Provider pickup with employee ID + plate validation | None (not built) |

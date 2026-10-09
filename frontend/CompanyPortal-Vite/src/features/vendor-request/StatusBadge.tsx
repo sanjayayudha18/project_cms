@@ -21,6 +21,9 @@ const STATUS_CONFIG: Record<VendorRequestStatus, { variant: BadgeVariant; label:
   failed: { variant: "danger", label: "Gagal" },
   cancelled: { variant: "neutral", label: "Dibatalkan" },
   completion_pending: { variant: "warning", label: "Menunggu Persetujuan Laporan" },
+  vault_assignment: { variant: "info", label: "Penetapan Vault (ACM)" },
+  vault_review: { variant: "warning", label: "Review Penetapan Vault" },
+  ready: { variant: "success", label: "Siap" },
 };
 
 interface StatusBadgeProps {

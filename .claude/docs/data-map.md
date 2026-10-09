@@ -35,6 +35,19 @@ Plan/spec: `.claude/sdlc/replenish-ticket/`. Migration `026_replenish_ticket_reg
 *   `vendor_request_number_seq` — + `region_code`; PK replaced by `UNIQUE NULLS NOT DISTINCT (vendor_id, region_code, seq_date)` (old rows keep NULL).
 *   `vendor_request_tickets` — identity PK; `request_number` FK → `vendor_requests(request_number)` ON DELETE RESTRICT; `terminal_id` text; `denom_code` `<n>K|MIX`; `replenish_date` (old `VR-` requests: `created_at` in Asia/Jakarta); `seq` 1..999 (`vendor_request_tickets_seq_chk`); `ticket_number` UNIQUE; `is_active`, `deactivated_at`; `result` `success|failed` + `result_updated_at`. UNIQUE `(terminal_id, replenish_date, seq)`, UNIQUE `(request_number, terminal_id, denom_code)`, partial UNIQUE `(request_number, terminal_id) WHERE is_active`; CHECK inactive ⇒ `deactivated_at` set and `result` NULL. Never deleted.
 
+## ACM vault assignment (migration 027, + comment 028)
+
+Plan/spec: `.claude/sdlc/cit-acm-plan/` (Phase 2.2a). Migration `027_acm_vault_assignment.sql` applied to dev DB 2026-10-08; `028_dsr_flow_comment.sql` (column comment only) applied 2026-10-08.
+
+*   `vendor_requests` — status CHECK + `vault_assignment`, `vault_review`, `ready`. `vault_flow` bool (true once ATM-SPV approves after 2.2a; laporan selesai ditolak → `ready`, else → `approved`), `vault_reviewed_by/_at`, `vault_rejection_reason` (1–500, set by ATM-SPV reject, shown to ACM on the plan).
+*   `dsr_daily_rows.flow` + `saldo_akhir` (d0, one row per denom per **located** vault block; the total block is not stored). `dsr_daily_rows.location` is now filled per block by the ETL (was always NULL before S2).
+*   `dsr_location_vault_maps` — (`vendor_id`, `dsr_location` label) → `vendor_vaults.id`; partial UNIQUE `(vendor_id, lower(dsr_location)) WHERE is_active`; soft-disable. Master data via maker-checker (entity `dsr_location_map`, label immutable, update = vault only). DSR → vendor join is `dsr_uploads.vendor = vendors.name` (name, not id).
+*   **Saldo branch vault** (computed, not stored): Σ `saldo_akhir` of DSR `daily_status='completed'`, `report_date` = replenish date, over every active vault of the branch via the mapping; **unknown** (not 0) if the branch has no vault, or any active vault has no mapping / no row that day.
+*   `acm_areas` (name unique among active, soft-disable; disabling releases its branches), `acm_area_branches` (link, UNIQUE `vendor_branch_id` = one area per branch, rows deleted on unassign — audited), `acm_area_members` (link, ACM-USER/ACM-SPV, user may be in many areas). ADMIN, immediate apply + audit in tx (GR#3 deviation, Sec 12).
+*   `vendor_request_vault_plans` — one per (request, area), UNIQUE; status `draft → pending_acm_approval → acm_approved`, reject → `draft`, `cancelled` on request cancel; `submitted_*`, `approved_*`, `rejected_*`, `rejection_reason` 1–500.
+*   `vendor_request_vault_assignments` — one per (request, terminal_id), UNIQUE; `replenish_branch_id`, `vault_branch_id`, `tier` 1–3, `is_urgent` + `urgent_reason` 10–500 (CHECK), tier 3 ⇒ urgent (CHECK); `saldo_snapshot`/`capacity_snapshot` jsonb `{"<denom>": "<whole IDR string>"}` (`null` = unknown; the DB comment shows `.00` but the service writes whole rupiah), `capacity_warning`. Replaced (deleted + re-inserted, audited) only while the plan is `draft`.
+*   Roles `ACM-USER`, `ACM-SPV`; `menu_features` `cit`, `cit.vault-plan`, `settings.acm-areas` + `role_permissions`.
+
 ## ATM assignment package source (migration 023)
 
 Plan/spec: `.claude/sdlc/atm-package-source/`. Migration `023_atm_assignment_vendor_source.sql`, applied to dev DB 2026-10-07.

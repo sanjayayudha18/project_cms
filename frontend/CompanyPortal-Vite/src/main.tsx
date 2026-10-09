@@ -11,6 +11,7 @@ import { auditLogsRoute } from "./routes/audit-logs";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { citRoute } from "./routes/cit";
+import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
 import { eodMonitoringRoute } from "./routes/eod-monitoring";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { dsrDashboardRoute } from "./routes/forecasting/dsr-dashboard";
@@ -28,6 +29,7 @@ import { vendorRequestDetailRoute } from "./routes/replenishment/vendor-requests
 import { vendorRequestListRoute } from "./routes/replenishment/vendor-requests/index";
 import { vendorRequestNewRoute } from "./routes/replenishment/vendor-requests/new";
 import { settingsRoute } from "./routes/settings";
+import { adminAcmAreasRoute } from "./routes/settings/admin/acm-areas";
 import { adminATMsRoute } from "./routes/settings/admin/atms";
 import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
 import { adminRegionsRoute } from "./routes/settings/admin/regions";
@@ -53,6 +55,8 @@ const routeTree = rootRoute.addChildren([
     atmProfileRoute,
     cashFlowRoute,
     citRoute,
+    vaultPlanListRoute,
+    vaultPlanDetailRoute,
     replenishmentRoute,
     forecastBrowserRoute,
     vendorRequestNewRoute,
@@ -78,6 +82,7 @@ const routeTree = rootRoute.addChildren([
     adminMasterDataIORoute,
     adminATMsRoute,
     adminRegionsRoute,
+    adminAcmAreasRoute,
     approvalsRoute,
     rbacUsersRoute,
     rbacDelegationsRoute,

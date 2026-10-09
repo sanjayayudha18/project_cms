@@ -1,7 +1,7 @@
 # Feature Flow — Siklus Lengkap Order ATM (Forecast → Approval → CIT Pickup → Realisasi)
 
 Sumber: URS v0.3 Phase 1 · FNC 001 · FSD "DSR End To End Cash Management" v1.0
-Modul: `internal/forecast`, `internal/replenishment`, `internal/dsr`, `internal/approval`, `internal/audit`, `internal/notification`, `backend-cit/internal/cit`
+Modul: `backend_python/dmaa/dmaa_etl.py` (ingest DMAA), vendor request / `internal/replenishment`, `internal/dsr`, `internal/approval`, `internal/audit`, `internal/notification`, `backend-cit/internal/cit`
 
 > Flow lintas-fase ini merangkai empat tahap jadi satu siklus end-to-end order ATM:
 > (1) persiapan & forecast order, (2) approval maker-checker, (3) CIT cash pickup, (4) realisasi & klasifikasi.
@@ -10,17 +10,15 @@ Modul: `internal/forecast`, `internal/replenishment`, `internal/dsr`, `internal/
 ## Timeline H0
 - 06:00 — Rekomendasi DMAA / Data Science siap
 - 06:30–09:00 — Vendor upload Saldo DSR (deadline 09:00)
-- 09:30–10:00 — Hitung forecast
+- 09:30–10:00 — Susun draft order dari data DMAA (tanpa hitung ulang)
 - 12:30 — Final Replenishment Order terbit
 
-## Formula
-```
-Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund
-```
-- Sumber: FSD v1.0 — menggantikan rumus URS (diputuskan 2026-10-01)
-- Forecast Refund per ID = opening balance H − transaksi prediksi H & H+1
+## Order amount (diputuskan 2026-10-08)
+- **CROWN tidak menghitung forecast.** Angka order = `amount_replenish` dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), **sudah final**.
+- Rumus FSD `Forecast Amount − Saldo DSR + Forecast Refund` (2026-10-01) **tidak dipakai** di CROWN.
+- Refund: dikirim DMAA nanti; sampai itu `amount_refund = 0`.
+- Exclude ATM bermasalah + list input FSD (complaint/project/problem/adjustment) tetap tugas CROWN (Phase 2.4, belum dibangun).
 - Uang disimpan numeric / minor unit, IDR eksplisit, tidak pernah float
-- ⚠️ Open question: fallback jika DSR tidak ada / telat belum didefinisikan FSD
 
 ## Aturan non-negosiasi
 - Setiap state-change tulis `audit_logs` (who, what, before/after, when, ip)
@@ -52,7 +50,7 @@ flowchart TD
         M3 --> DUPX[Exclude - cegah order ganda]
         DUP -->|Ya| DUPX
         DUP -->|Tidak| DRAFT[Draft Order ATM]
-        DRAFT --> CALC[Hitung: Forecast Replenish =<br/>Forecast Amount - Saldo DSR + Forecast Refund]
+        DRAFT --> CALC[Nominal = amount_replenish DMAA<br/>final, tanpa hitung ulang]
         CALC --> GROUP[Kelompokkan per vendor / vault / denominasi]
     end
 

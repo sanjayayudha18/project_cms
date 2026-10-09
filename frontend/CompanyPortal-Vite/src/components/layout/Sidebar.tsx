@@ -22,6 +22,7 @@ interface SidebarProps {
 const GROUP_ORDER: NavGroup[] = [
   "general",
   "replenish",
+  "cit",
   "monitoring",
   "forecasting",
   "invoice",

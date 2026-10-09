@@ -169,6 +169,8 @@ describe("NAV_CONFIG", () => {
       "BRANCH-ATM-USER",
       "BRANCH-ATM-SPV",
       "VENDOR-USER",
+      "ACM-USER",
+      "ACM-SPV",
     ];
     for (const item of NAV_CONFIG) {
       for (const role of item.roles) {
@@ -187,5 +189,6 @@ describe("GROUP_LABELS", () => {
     expect(GROUP_LABELS.forecasting).toBe("Peramalan");
     expect(GROUP_LABELS.invoice).toBe("Tagihan");
     expect(GROUP_LABELS["cash-count"]).toBe("Perhitungan Kas");
+    expect(GROUP_LABELS.cit).toBe("CIT");
   });
 });

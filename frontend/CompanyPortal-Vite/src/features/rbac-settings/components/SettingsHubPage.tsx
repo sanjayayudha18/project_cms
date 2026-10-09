@@ -24,6 +24,7 @@ import {
   Landmark,
   Lock,
   Map as MapIcon,
+  MapPinned,
   Scale,
   Search,
   Shield,
@@ -129,6 +130,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Kelola region dan status aktifnya.",
     href: "/settings/admin/regions",
     icon: MapIcon,
+    category: "master",
+  },
+  {
+    id: "admin-acm-areas",
+    title: "Area ACM",
+    description: "Kelompokkan cabang vendor dan anggota tim ACM per area.",
+    href: "/settings/admin/acm-areas",
+    icon: MapPinned,
     category: "master",
   },
 ];
@@ -348,7 +357,10 @@ export function SettingsHubPage() {
       )
     : [];
   const masterCards = showMaster
-    ? MASTER_DATA_CARDS.filter((c) => matchesQuery(c, normalizedQuery))
+    ? MASTER_DATA_CARDS.filter(
+        (c) =>
+          matchesQuery(c, normalizedQuery) && (c.id !== "admin-acm-areas" || userRole === "ADMIN"),
+      )
     : [];
 
   const hasResults = showFeatured || rbacCards.length > 0 || masterCards.length > 0;

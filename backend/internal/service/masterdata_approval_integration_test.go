@@ -151,6 +151,11 @@ func (h *testHelpers) cleanup() {
 			h.t.Logf("cleanup: delete vendor_pics: %v", err)
 		}
 	}
+	if len(h.vendorIDs) > 0 {
+		if _, err := h.pool.Exec(h.ctx, `DELETE FROM dsr_location_vault_maps WHERE vendor_id = ANY($1)`, h.vendorIDs); err != nil {
+			h.t.Logf("cleanup: delete dsr_location_vault_maps: %v", err)
+		}
+	}
 	if len(h.vendorVaultIDs) > 0 {
 		if _, err := h.pool.Exec(h.ctx, `DELETE FROM audit_logs WHERE entity_type = 'vendor_vault' AND entity_id = ANY($1)`, h.vendorVaultIDs); err != nil {
 			h.t.Logf("cleanup: delete audit_logs (vendor_vaults): %v", err)
@@ -222,13 +227,14 @@ func harness(t *testing.T) (svc *MasterDataApprovalService, tag string, h *testH
 
 	repo := repository.NewMasterDataChangeRepository(pool)
 	svc = NewMasterDataApprovalService(nil, repo, pool, ApplierRegistry{
-		"vendor":         VendorApplier{},
-		"vendor_branch":  VendorBranchApplier{},
-		"vendor_vault":   VendorVaultApplier{},
-		"vendor_pic":     VendorPicApplier{},
-		"vendor_package": VendorPackageApplier{},
-		"atm_assignment": ATMAssignmentApplier{},
-		"atm":            ATMApplier{},
+		"vendor":           VendorApplier{},
+		"vendor_branch":    VendorBranchApplier{},
+		"vendor_vault":     VendorVaultApplier{},
+		"vendor_pic":       VendorPicApplier{},
+		"vendor_package":   VendorPackageApplier{},
+		"atm_assignment":   ATMAssignmentApplier{},
+		"atm":              ATMApplier{},
+		"dsr_location_map": DsrLocationMapApplier{},
 	}, audit.NewWriter(pool))
 
 	return svc, strconv.FormatInt(time.Now().UnixNano(), 10), h

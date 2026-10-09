@@ -22,6 +22,7 @@ const pgCheckViolation = "23514"
 var validVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected", "processing", "completed", "cancelled",
 	"completion_pending", // atm-visit-quota (migration 021)
+	"vault_assignment", "vault_review", "ready", // cit-acm-plan (migration 027)
 }
 
 // --- Reads (no transaction needed) --------------------------------------
@@ -822,7 +823,8 @@ func (s *VendorRequestService) Submit(ctx context.Context, actor Actor, id int64
 	return s.transition(ctx, actor, id, transitionOpts{action: actionSubmit, auditAction: "submit", requireItems: true})
 }
 
-// Approve: pending_approval -> approved (Req 6).
+// Approve: pending_approval -> vault_assignment (Req 6; cit-acm-plan FR4.1:
+// also creates the ACM area plans and notifies ACM-USER, same tx).
 func (s *VendorRequestService) Approve(ctx context.Context, actor Actor, id int64) (*VendorRequestDetail, error) {
 	return s.transition(ctx, actor, id, transitionOpts{action: actionApprove, auditAction: "approve"})
 }
@@ -897,6 +899,10 @@ func (s *VendorRequestService) Cancel(ctx context.Context, actor Actor, id int64
 
 	if _, err := q.SoftCancelVendorRequest(ctx, db.SoftCancelVendorRequestParams{ID: id, CancellationReason: trimmed}); err != nil {
 		return nil, fmt.Errorf("soft cancel vendor request %d: %w", id, err)
+	}
+	// cit-acm-plan FR5.5: the ACM area plans die with the request.
+	if err := q.CancelVaultPlansForRequest(ctx, id); err != nil {
+		return nil, fmt.Errorf("cancel vault plans of %d: %w", id, err)
 	}
 
 	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
@@ -976,11 +982,17 @@ func (s *VendorRequestService) transition(ctx context.Context, actor Actor, id i
 	if opts.action == actionReject {
 		after["rejection_reason"] = opts.rejectionReason // Req 16.2
 	}
-	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
+	aw := newAuditWriter(tx)
+	if err := aw.Write(ctx, audit.Entry{
 		ActorID: actor.UserID, Action: opts.auditAction, EntityType: "vendor_request", EntityID: id,
 		Before: map[string]string{"state": req.Status}, After: after, IP: actor.IP,
 	}); err != nil {
 		return nil, fmt.Errorf("write audit log: %w", err)
+	}
+	if newStatus == "vault_assignment" && opts.action == actionApprove {
+		if err := createVaultPlans(ctx, q, aw, s.notifier, actor, &id); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

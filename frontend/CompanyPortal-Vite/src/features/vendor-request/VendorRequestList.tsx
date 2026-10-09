@@ -30,6 +30,9 @@ const STATUS_LABELS: Record<VendorRequestStatus, string> = {
   failed: "Gagal",
   cancelled: "Dibatalkan",
   completion_pending: "Menunggu Persetujuan Laporan",
+  vault_assignment: "Penetapan Vault (ACM)",
+  vault_review: "Review Penetapan Vault",
+  ready: "Siap",
 };
 
 export function VendorRequestList() {

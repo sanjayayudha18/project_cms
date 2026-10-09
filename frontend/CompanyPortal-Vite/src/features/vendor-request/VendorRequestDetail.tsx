@@ -8,6 +8,7 @@
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatAtmDateTime } from "@/features/atm-portal/lib/formatters";
+import { RequestVaultPanel } from "@/features/vault-plan/RequestVaultPanel";
 import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDR } from "@/lib/utils/formatCurrency";
@@ -46,7 +47,17 @@ const ERROR_TOAST_MS = 5000;
 const OVER_QUOTA_TOAST_MS = 8000;
 // atm-visit-quota: the per-ATM completion/kuota table is shown once a request
 // can be (or has been) reported as replenished.
-const COMPLETION_STATUSES = ["approved", "completion_pending", "completed"];
+const COMPLETION_STATUSES = ["approved", "ready", "completion_pending", "completed"];
+// cit-acm-plan FR5.5: after approval, cancel is checker-only in every post-approve state.
+const CHECKER_CANCEL_STATUSES = ["approved", "vault_assignment", "vault_review", "ready"];
+// cit-acm-plan FR5: the Penetapan Vault panel (renders nothing for legacy, non-vault requests).
+const VAULT_PANEL_STATUSES = [
+  "vault_assignment",
+  "vault_review",
+  "ready",
+  "completion_pending",
+  "completed",
+];
 const REJECTION_REASON_MAX = 500;
 const AMOUNT_MIN = 1;
 
@@ -149,10 +160,12 @@ export function VendorRequestDetail() {
   const canCancel =
     ((isCreator || (isChecker && !isCreator)) &&
       (data.status === "draft" || data.status === "pending_approval")) ||
-    (isChecker && data.status === "approved");
-  // atm-visit-quota FR1: maker reports an approved request as replenished;
-  // a checker other than the reporter approves/rejects that report.
-  const canReportCompletion = data.status === "approved" && isMaker && !data.is_canceled;
+    (isChecker && CHECKER_CANCEL_STATUSES.includes(data.status));
+  // atm-visit-quota FR1: maker reports a request as replenished -- from ready
+  // (vault flow, cit-acm-plan FR5.4) or approved (legacy); a checker other than
+  // the reporter approves/rejects that report.
+  const canReportCompletion =
+    (data.status === "ready" || data.status === "approved") && isMaker && !data.is_canceled;
   const isReporter =
     user !== null && user !== undefined && data.completion_submitted_by?.id === user.id;
   const canReviewCompletion = data.status === "completion_pending" && isChecker && !isReporter;
@@ -408,6 +421,13 @@ export function VendorRequestDetail() {
           )}
         </div>
       </div>
+
+      {VAULT_PANEL_STATUSES.includes(data.status) && (
+        <RequestVaultPanel
+          requestId={data.id}
+          canReview={data.status === "vault_review" && isChecker && !data.is_canceled}
+        />
+      )}
 
       {showCompletionTable && <CompletionAtmTable atms={data.atms} />}
 

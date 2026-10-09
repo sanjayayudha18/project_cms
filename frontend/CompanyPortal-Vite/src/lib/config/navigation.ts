@@ -8,6 +8,7 @@ import {
   ClipboardList,
   FileText,
   GitCompare,
+  Landmark,
   LayoutDashboard,
   Monitor,
   Receipt,
@@ -27,6 +28,7 @@ export type NavGroup =
   | "monitoring"
   | "forecasting"
   | "replenish"
+  | "cit"
   | "invoice"
   | "cash-count";
 
@@ -47,6 +49,7 @@ export const GROUP_LABELS: Record<NavGroup, string> = {
   monitoring: "Monitoring",
   forecasting: "Peramalan",
   replenish: "Replenish",
+  cit: "CIT",
   invoice: "Tagihan",
   "cash-count": "Perhitungan Kas",
 };
@@ -112,6 +115,15 @@ export const NAV_CONFIG: NavItem[] = [
     href: "/replenishment",
     roles: ["ATM-USER", "ATM-SPV"],
     group: "replenish",
+  },
+  // CIT (cit-acm-plan): tim ACM menetapkan branch vault per ATM.
+  {
+    id: "vault-plans",
+    label: "Penetapan Vault",
+    icon: Landmark,
+    href: "/cit/vault-plans",
+    roles: ["ACM-USER", "ACM-SPV"],
+    group: "cit",
   },
   /*
   {

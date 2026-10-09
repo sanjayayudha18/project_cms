@@ -1,17 +1,13 @@
 # Feature Flow — ATM Cash Forecasting Harian (Order ATM)
 
 Sumber: URS v0.3 Phase 1 · To-be "ATM Cash Forecasting Harian" · FNC 001
-Modul: `internal/forecast`, `internal/replenishment`, `internal/dsr`, `internal/approval`, `internal/notification`
+Modul: `backend_python/dmaa/dmaa_etl.py` (ingest DMAA), vendor request / `internal/replenishment`, `internal/dsr`, `internal/approval`, `internal/notification`
 
-## Formula
-```
-Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund
-```
-- Sumber: FSD "DSR End To End Cash Management" v1.0 — menggantikan rumus URS (diputuskan 2026-10-01)
-- Forecast Amount = hasil forecast EDP/DMAA (siap 06:00); Saldo DSR = upload vendor 06:30–09:00; hitung 09:30–10:00
-- Forecast Refund per ID = opening balance H − transaksi prediksi H & H+1
-- Rencana Isi Hari-H tidak lagi dipakai di rumus
-- ⚠️ Open question: fallback jika DSR tidak ada/telat belum didefinisikan FSD
+## Order amount (diputuskan 2026-10-08)
+- **CROWN tidak menghitung forecast.** Angka order = `amount_replenish` dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), **sudah final**.
+- Rumus FSD `Forecast Amount − Saldo DSR + Forecast Refund` (2026-10-01) **tidak dipakai** di CROWN.
+- Refund: dikirim DMAA nanti; sampai itu `amount_refund = 0`.
+- Exclude ATM bermasalah + list input FSD (complaint/project/problem/adjustment) tetap tugas CROWN (Phase 2.4, belum dibangun).
 
 ## Flow: end-to-end
 
@@ -42,14 +38,9 @@ flowchart TD
         C3 --> D1
     end
 
-    subgraph CALC[3. Perhitungan Kebutuhan]
-        E --> F[Ambil Saldo DSR vendor]
-        F --> G[Ambil Proyeksi Refund]
-        G --> I{DSR tersedia?}
-        I -->|Ya| J[Hitung Forecast Replenish]
-        I -->|Tidak| K[Fallback: open question]
+    subgraph CALC[3. Nominal Order]
+        E --> J[Pakai amount_replenish DMAA - final, tanpa hitung ulang]
         J --> L[Kelompokkan per vendor · vault · denom]
-        K --> L
     end
 
     subgraph APPR[4. Approval & Publikasi]

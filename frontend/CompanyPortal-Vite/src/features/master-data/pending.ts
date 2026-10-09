@@ -16,7 +16,8 @@ type PendingEntityType =
   | "vendor_vault"
   | "vendor_pic"
   | "vendor_package"
-  | "vendor_package_price";
+  | "vendor_package_price"
+  | "dsr_location_map";
 
 interface PendingChange {
   id: number;

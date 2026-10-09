@@ -109,6 +109,9 @@ func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id
 	if !ok {
 		return ErrInvalidTransition
 	}
+	if a == actionRejectCompletion && req.VaultFlow {
+		newStatus = "ready" // cit-acm-plan FR5.4: back to where the report was made from
+	}
 	if err := checkCompletionActor(actor, req, a); err != nil {
 		return err
 	}

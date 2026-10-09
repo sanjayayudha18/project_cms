@@ -174,7 +174,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 ### Modules (create ONLY these unless told)
 **Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
-**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/forecast` (H+2) · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3 DB map note)
+**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3 DB map note)
 **Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
 **CIT**: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
 **Integration**: `internal/corebanking` (escrow batch file ingest + parse -> feeds reconciliation)
@@ -183,7 +183,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 *   **Auth**: `roles`, `users` (add `auth_source` = ldap|local; password hash only for local)
 *   **Core**: `audit_logs`, `approval_requests`, `documents`, `notifications`, `import_jobs`, `export_jobs`
 *   **Master**: `vendors`, `vendor_pics`, `vendor_vaults`, `locations`, `atms`, `vendor_assignments`
-*   **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
+*   **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
 *   **Finance**: `invoice_uploads`, `invoice_items`, `invoice_reconciliation_results`
 *   **CIT**: `cit_orders`, `cit_handover_evidences`, `cit_journals`, `cit_dsr_uploads`, `cit_reconciliation_results`
 *   **Integration**: `escrow_batch_files`, `escrow_batch_rows`, `escrow_reconciliation_results`
@@ -194,7 +194,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 ## 3a. Business Rules & Requirements (from URS v0.3 Rev1, `archives/UR New Template v0.3...docx`)
 > Source-of-truth requirements doc. Anything below not yet reflected in code/schema is a **spec**, not an implemented behavior — check code before assuming it's live.
 
-*   **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
+*   **Forecast / Order ATM (decided 2026-10-08)**: CROWN has no forecast engine. DMAA sends `Order_All_*.xlsx`, `backend_python/dmaa/dmaa_etl.py` loads `dmaa_atm_forecast`; DMAA `amount_replenish` is the final order amount (no in-CROWN formula). Refund comes from DMAA later (`amount_refund = 0` today). Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
     `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
 *   DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis.
 *   Duplicate-order prevention: an ATM with an active order is not reissued a new one for the same period.
@@ -251,7 +251,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 | Replenishment | Instruction + execution to refill ATM cash. |
 | Vault | Vendor cash vault holding bank cash. |
 | Escrow reconciliation | Match CMS cash position vs Corebanking escrow batch file. |
-| Forecast (H+2) | 2-day-ahead cash need -> shortage -> vendor cash need. |
+| Forecast (DMAA) | Order amount per ATM/denom/date received from DMAA; final, not recomputed by CROWN. |
 | Cash count | Physical count: vault (vendor) + selective machine. |
 | Maker-checker | Two-person approval control. |
 | Invoice reconciliation | Validate invoice vs executed CIT/replenishment; approve only, no payment. |
@@ -390,7 +390,7 @@ Both run on the **same VM**. Because their active windows don't overlap, each ge
 
 **Handoff rules (NON-NEGOTIABLE):**
 *   EOD output is written to **DB = source of truth** (durable, queryable, auditable). Redis only as a cache layer on top, never the store of record for EOD results.
-*   Every EOD run is tracked in a run table (`forecast_runs` / an `eod_runs` table): `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
+*   Every EOD run is tracked in a run table (an `eod_runs` table): `processing_date`, status (running/success/failed), started\_at, finished\_at, records\_processed, error.
 *   Transactional module reads a `processing_date` only after its run is marked **success**. Never read partial/in-progress data.
 *   On completion, emit a domain event (`EODCompleted` / `SummaryReady`) — fits the in-process event-driven model.
 *   Batch ingests are idempotent per file/`processing_date` (re-run safe).

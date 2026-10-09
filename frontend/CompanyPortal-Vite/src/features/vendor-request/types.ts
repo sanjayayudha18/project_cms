@@ -15,7 +15,13 @@ export type VendorRequestStatus =
   | "failed"
   | "cancelled"
   /** atm-visit-quota: laporan selesai replenish menunggu persetujuan SPV. */
-  | "completion_pending";
+  | "completion_pending"
+  /** cit-acm-plan: ACM menetapkan branch vault per ATM. */
+  | "vault_assignment"
+  /** cit-acm-plan: ATM-SPV mereview penetapan vault dari ACM. */
+  | "vault_review"
+  /** cit-acm-plan: penetapan vault disetujui; laporan selesai boleh dibuat. */
+  | "ready";
 
 /**
  * CIT-2 (cit-vendor-request-enhancements spec): a Manual_Request's
@@ -357,4 +363,7 @@ export const VENDOR_REQUEST_STATUSES: VendorRequestStatus[] = [
   "failed",
   "cancelled",
   "completion_pending",
+  "vault_assignment",
+  "vault_review",
+  "ready",
 ];

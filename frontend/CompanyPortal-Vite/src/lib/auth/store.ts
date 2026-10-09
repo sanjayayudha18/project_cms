@@ -12,7 +12,10 @@ export type DbRole =
   | "BRANCH-SPV"
   | "BRANCH-ATM-USER"
   | "BRANCH-ATM-SPV"
-  | "VENDOR-USER";
+  | "VENDOR-USER"
+  /** cit-acm-plan: tim ACM (penetapan vault). */
+  | "ACM-USER"
+  | "ACM-SPV";
 
 export interface AuthUser {
   id: number;

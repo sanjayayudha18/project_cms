@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import uvicorn
 
+from lib.utils.proxy import uvicorn_proxy_kwargs
+
 from .config import Settings
 
 
@@ -13,6 +15,7 @@ def main() -> None:
         host="0.0.0.0",
         port=8090,
         log_level=settings.log_level.lower(),
+        **uvicorn_proxy_kwargs(settings.trusted_proxies),
     )
 
 

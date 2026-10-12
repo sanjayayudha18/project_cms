@@ -1,4 +1,6 @@
-# TODO: IP client di service Python EOD (di luar scope QC F13)
+# TODO (SELESAI 2026-10-12): IP client di service Python EOD (lanjutan QC F13)
+
+> **Status: selesai 2026-10-12**: `lib/utils/proxy.py` + `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES`. Detail di `.claude/bugfixes.md`. Isi di bawah dibiarkan sebagai catatan asal.
 
 Dicatat 2026-10-12 atas permintaan user saat menyusun F13 (`.claude/sdlc/client-ip-trust/intent.md`, Q5): *"di luar scope, tapi tolong di catat ke file .md baru, agar tidak lupa"*.
 

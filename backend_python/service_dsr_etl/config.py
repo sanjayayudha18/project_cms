@@ -12,6 +12,8 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from lib.utils.proxy import parse_trusted_proxies
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DSR_ETL_", env_file=".env", extra="ignore")
@@ -52,6 +54,17 @@ class Settings(BaseSettings):
     # Service
     service_version: str = "1.0.0"
     log_level: str = "INFO"
+
+    # Proxies (Nginx) whose X-Forwarded-For is believed for the client IP
+    # (manual-retry audit). Comma-separated CIDRs/IPs; empty = none, client IP
+    # is the connection address. Invalid entry = fail at start (QC F13 rule).
+    trusted_proxies: str = ""
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def validate_trusted_proxies(cls, v: str) -> str:
+        parse_trusted_proxies(v)
+        return v
 
     @field_validator("sla_dsr")
     @classmethod

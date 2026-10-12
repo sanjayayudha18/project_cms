@@ -40,4 +40,4 @@
 *   **If left empty in prod**, every user is recorded with Nginx's IP and the per-IP login limit (`RATE_LIMIT_IP`, default 20 / 15 min) is shared by everyone → mass login lockout. An invalid entry stops the service at start.
 *   Close port 8080 from outside the VM (firewall / don't publish it) so every request goes through Nginx (defense in depth; the narrow CIDR already stops spoofing from direct callers).
 *   When a GCP Load Balancer / Cloud Armor (#11) is added in front of Nginx: append the LB address ranges to `TRUSTED_PROXIES`; no code change.
-*   `backend-cit` reads the variable but does not use it yet. Python EOD services: see `python_eod_client_ip_todo.md`.
+*   `backend-cit` reads the variable but does not use it yet. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.

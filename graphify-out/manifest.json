@@ -5550,9 +5550,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_test.go": {
-    "mtime": 1791440474.594018,
-    "seen": 1791440606.6025531,
-    "ast_hash": "fd96c4d6466c392f07d490071ca3db3c",
+    "mtime": 1791802829.10657,
+    "seen": 1791802994.007619,
+    "ast_hash": "88ae7ff953b801ae881f1a5bb85f05db",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_branch_admin.go": {
@@ -6702,9 +6702,9 @@
     "semantic_hash": ""
   },
   ".claude/bugfixes.md": {
-    "mtime": 1791800199.823756,
-    "seen": 1791800270.4646783,
-    "ast_hash": "e1d7660583a64be3f88ec17506b23fcd",
+    "mtime": 1791802948.6606529,
+    "seen": 1791802994.008483,
+    "ast_hash": "900d19b4440a21641c64f390c49d84d3",
     "semantic_hash": ""
   },
   ".claude/sdlc/forecast-browser-summary/intent.md": {
@@ -7638,9 +7638,9 @@
     "semantic_hash": ""
   },
   "backend_QC_fixes.md": {
-    "mtime": 1791800223.0056624,
-    "seen": 1791800270.4648638,
-    "ast_hash": "0a742065768177d3f49197a13f3fbfc9",
+    "mtime": 1791801406.0103042,
+    "seen": 1791802994.008667,
+    "ast_hash": "55466986d8d4ae5ed91ae50baf88656c",
     "semantic_hash": ""
   },
   "backend_QC_result.md": {

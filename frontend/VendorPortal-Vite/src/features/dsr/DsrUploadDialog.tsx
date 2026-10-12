@@ -8,7 +8,7 @@ import {
 import type { ApiError } from "@/lib/api/client";
 import { formatDecimalIDR } from "@/lib/formatters";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface DsrUploadDialogProps {
   readonly onClose: () => void;
@@ -68,14 +68,28 @@ export function DsrUploadDialog({ onClose, onConfirmed }: DsrUploadDialogProps) 
     setStage("pick");
   };
 
+  const busy = stage === "uploading" || stage === "confirming";
+
+  // Escape closes the dialog like the overlay click, but not mid-upload/confirm.
+  useEffect(() => {
+    if (busy) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onClose]);
+
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: overlay click has a keyboard counterpart (Escape, above)
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      // biome-ignore lint/a11y/useSemanticElements: custom modal overlay; native <dialog> deferred (user 2026-10-12)
       role="dialog"
       aria-modal="true"
       aria-labelledby="dsr-upload-title"
       onClick={(e) => {
-        if (e.target === e.currentTarget && stage !== "uploading" && stage !== "confirming") {
+        if (e.target === e.currentTarget && !busy) {
           onClose();
         }
       }}

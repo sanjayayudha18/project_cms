@@ -141,3 +141,14 @@ describe("DsrUploadDialog", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DsrUploadDialog keyboard", () => {
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<DsrUploadDialog onClose={onClose} />);
+
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

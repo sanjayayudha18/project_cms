@@ -78,3 +78,35 @@ describe("DataTable", () => {
     expect(amountCell).toHaveClass("tabular-nums");
   });
 });
+
+describe("DataTable keyboard access", () => {
+  it("sorts via the header button with the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<DataTable data={testData} columns={testColumns} />);
+
+    screen.getByRole("button", { name: "Name" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getAllByRole("row")[1]).toHaveTextContent("Alpha");
+    expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+  });
+
+  it("opens a clickable row with Enter and Space", async () => {
+    const user = userEvent.setup();
+    const clicked: TestRow[] = [];
+    render(<DataTable data={testData} columns={testColumns} onRowClick={(r) => clicked.push(r)} />);
+
+    const firstRow = screen.getAllByRole("row")[1];
+    firstRow.focus();
+    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
+    expect(clicked.map((r) => r.id)).toEqual(["1", "1"]);
+  });
+
+  it("rows without onRowClick are not focusable", () => {
+    render(<DataTable data={testData} columns={testColumns} />);
+    expect(screen.getAllByRole("row")[1]).not.toHaveAttribute("tabindex");
+  });
+});

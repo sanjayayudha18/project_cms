@@ -133,6 +133,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
       <div className="flex flex-1 pt-14">
         {/* Backdrop — visible only when mobile overlay is open */}
         {mobileOpen && (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: decorative backdrop (aria-hidden); keyboard closes the overlay with Escape (effect above)
           <div
             className="fixed inset-0 z-30 bg-black/50 lg:hidden"
             aria-hidden="true"

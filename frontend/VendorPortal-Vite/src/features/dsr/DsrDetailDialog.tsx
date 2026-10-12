@@ -3,6 +3,7 @@ import { getDsrDailyDetail, getDsrRencanaIsiDetail } from "@/features/dsr/dsrUpl
 import { formatDecimalIDR } from "@/lib/formatters";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
+import { useEffect } from "react";
 
 interface DsrDetailDialogProps {
   readonly item: DsrUploadListItem;
@@ -31,9 +32,20 @@ export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
 
   const isLoading = dailyQuery.isLoading || rencanaQuery.isLoading;
 
+  // Escape closes the dialog (keyboard counterpart of the overlay click).
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: overlay click has a keyboard counterpart (Escape, above)
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      // biome-ignore lint/a11y/useSemanticElements: custom modal overlay; native <dialog> deferred (user 2026-10-12)
       role="dialog"
       aria-modal="true"
       aria-labelledby="dsr-detail-title"

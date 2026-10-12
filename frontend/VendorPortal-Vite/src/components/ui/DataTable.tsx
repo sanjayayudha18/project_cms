@@ -76,14 +76,26 @@ export function DataTable<T>({
               {headerGroup.headers.map((header) => {
                 const isNumeric = header.column.columnDef.meta?.numeric;
                 const canSort = header.column.getCanSort();
+                const label = (
+                  <>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {canSort && header.column.getIsSorted() === "asc" && (
+                      <ChevronUp className="size-3.5" aria-hidden="true" />
+                    )}
+                    {canSort && header.column.getIsSorted() === "desc" && (
+                      <ChevronDown className="size-3.5" aria-hidden="true" />
+                    )}
+                  </>
+                );
 
                 return (
                   <th
                     key={header.id}
                     className={`px-4 py-3 font-medium select-none ${
                       isNumeric ? "text-right" : "text-left"
-                    } ${canSort ? "cursor-pointer" : ""}`}
-                    onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                    }`}
                     aria-sort={
                       header.column.getIsSorted() === "asc"
                         ? "ascending"
@@ -92,17 +104,18 @@ export function DataTable<T>({
                           : "none"
                     }
                   >
-                    <span className="inline-flex items-center gap-1">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                      {canSort && header.column.getIsSorted() === "asc" && (
-                        <ChevronUp className="size-3.5" aria-hidden="true" />
-                      )}
-                      {canSort && header.column.getIsSorted() === "desc" && (
-                        <ChevronDown className="size-3.5" aria-hidden="true" />
-                      )}
-                    </span>
+                    {canSort ? (
+                      // A real button so sorting works from the keyboard (Tab + Enter/Space).
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className="inline-flex items-center gap-1 cursor-pointer font-medium uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active"
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">{label}</span>
+                    )}
                   </th>
                 );
               })}
@@ -121,7 +134,23 @@ export function DataTable<T>({
               <tr
                 key={row.id}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                className={`border-b border-neutral-100 hover:bg-red-50/30 ${onRowClick ? "cursor-pointer" : ""}`}
+                // Keyboard path for clickable rows: focus with Tab, open with Enter/Space.
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(row.original);
+                        }
+                      }
+                    : undefined
+                }
+                className={`border-b border-neutral-100 hover:bg-red-50/30 ${
+                  onRowClick
+                    ? "cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-active"
+                    : ""
+                }`}
               >
                 {row.getVisibleCells().map((cell) => {
                   const isNumeric = cell.column.columnDef.meta?.numeric;

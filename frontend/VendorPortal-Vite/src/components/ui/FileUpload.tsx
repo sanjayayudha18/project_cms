@@ -133,6 +133,7 @@ export function FileUpload({
   return (
     <div className="flex flex-col gap-3">
       {/* Drop zone */}
+      {/* biome-ignore lint/a11y/useSemanticElements: drag-and-drop zone with its own Enter/Space handler (handleZoneKeyDown), not a plain button */}
       <div
         role="button"
         tabIndex={0}

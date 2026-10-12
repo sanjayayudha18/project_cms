@@ -20,7 +20,7 @@ Template:
 - **Root cause**: test import hanya mencakup vendor, cabang, ATM, dan kelolaan; fake repo tidak punya PIC.
 - **Fix** (test saja, kode produksi tidak berubah): `TestImport_VendorPICRowRules` di `backend/internal/service/masterdata_import_test.go`. Dua create valid (PIC cabang, PIC vendor-wide), lalu error per field untuk: vendor_code + name kosong, vendor tidak dikenal, cabang bukan milik vendor, email rusak, telepon rusak, recipient bukan true/false. Juga dicek recipient kosong → `false` dan `TRUE` → `true`.
 - **Tests**: `validatePIC` 0 → 100%. Uji mutasi lewat `go test -overlay` (tanpa mengubah file): cek telepon dimatikan → test gagal; default recipient diubah ke `true` → test gagal. `go test -tags integration ./internal/service/` hijau, lint 0. Manual browser verification: tidak relevan.
-- **Commit**: _(diisi setelah commit)_
+- **Commit**: `ace023e`
 
 ## 2026-10-12 — QC F10: kompleksitas import master data (`masterdata_import.go`)
 - **Symptom**: golangci-lint gocyclo: `importEnv.validateFields` cyclo 47 dan `validateRow` 40 (> 30); `readImportCSV` 22 dan `buildEnv` 21 (> 20, target F10).

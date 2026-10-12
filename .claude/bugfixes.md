@@ -24,7 +24,7 @@ Template:
   - `backend/internal/auth/user_admin.go`: `changesImmutable`, `uniqueOnUpdate`, `mapUserUpdateError`. Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
   - `backend/internal/service/masterdata_applier_atm_assignment.go`: `applyAssignmentCreate`, `applyAssignmentUpdate`.
 - **Tests**: test lama tetap hijau tanpa diubah; full `go test -tags integration -p 1 ./...` hijau (service 81.1%, auth 90.1%), lint 0. gocyclo > 20 di backend tinggal `UpdateItems`/`transition` (23/23), sengaja ikut F9 (keputusan user). Manual browser verification (review vault ATM-SPV, kirim ke vendor, ubah user, approve kelolaan ATM): outstanding.
-- **Commit**: _(diisi setelah commit)_
+- **Commit**: `e926f1e`
 
 ## 2026-10-12 — Test validasi PIC vendor di import master data
 - **Symptom**: `importEnv.validatePIC` 0% coverage: aturan baris PIC saat dry-run import CSV (wajib isi, vendor/cabang aktif, email, telepon, `is_notification_recipient`) tidak pernah diuji (temuan refactor F10 `9a2460e`).

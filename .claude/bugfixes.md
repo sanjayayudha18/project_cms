@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — QC F10 (sebagian): kompleksitas `UserAdminService` Create/Update
+- **Symptom**: golangci-lint gocyclo: `UserAdminService.Create` dan `Update` cyclo 34 (> 30).
+- **Root cause**: validasi profil, aturan `auth_source`, cek unik, dan resolusi referensi ditulis inline dan terduplikasi di kedua fungsi.
+- **Fix** (refactor, perilaku tidak berubah): `backend/internal/auth/user_admin.go`. Logika diekstrak ke helper privat `validateProfile`, `localCredentials` (hash bcrypt hanya untuk local; `must_change_password` = ada hash), `uniqueness`, dan `resolveReferences`. Urutan error, field error, dan pesan wrap tetap sama. API dan signature publik tidak berubah. Auth (Sec 4 #7) sudah di-flag; user memilih dokumentasi bugfix.
+- **Tests**: 17 test `user_admin_test.go` tetap hijau tanpa diubah. Coverage Create 89 → 97%, Update 84 → 90%. Lint sekarang tinggal 3 temuan: gocyclo `masterdata_import` (ditunda, menunggu FSD replace-all) dan F13. Manual browser verification (form tambah/ubah user): outstanding.
+- **Commit**: _(belum)_
+
 ## 2026-10-09 — QC F8 batch 10 (selesai): submit harga vendor-wide, helper import, `pkg/response`
 - **Symptom**: `VendorPackagePriceAdminService` Create/Update/Disable/`checkVendor` 0% (jalur submit maker-checker harga); helper import CSV (`vaultFields`, `picFields`, `atmFields`, `stageToggle`, `rowRejection`) + `ParseExportEntity`/`WriteExportTemplate` 0%; baca admin `MasterDataChangeService`/`VendorBranchAdminService`/`DsrLocationMapAdminService` 0%; `pkg/response` 0%. service 78.9% (< 80%).
 - **Root cause**: belum ada test langsung.

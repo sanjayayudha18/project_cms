@@ -15,7 +15,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | Topologi proxy prod: Nginx / GCP LB / keduanya, berapa hop tepercaya | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | GitHub Actions atau Cloud Build? Postgres untuk test integrasi? | Bagian F11 |
 | F17 | **Bug**: harga (vendor-wide `vendor_package_prices` + paket cabang `vendor_packages_branch`) yang mulai hari ini/masa depan **tidak bisa di-disable** — `effective_end_date = CURRENT_DATE - 1` melanggar `*_period_chk` (`end >= start`) → apply gagal saat approve | Money/master data + semantik produk (Sec 4 #7) | Keputusan PO: disable harga yang belum berlaku = apa? (mis. `end = start` → berlaku 1 hari; atau tolak di submit dengan pesan jelas; atau status/batal terpisah) | `queries/vendor_package_prices_admin.sql:104`, `queries/vendor_packages_admin.sql:88`; test di `masterdata_applier_price_integration_test.go` |
-| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai 2026-10-09 — tinggal dijadwalkan | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
+| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai; `user_admin` selesai 2026-10-12. Sisa: `masterdata_import` (tunggu FSD replace-all) + fungsi cyclo 21–25 (di bawah ambang lint 30) | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | Hindari bentrok dengan pekerjaan Vendor Request yang sedang jalan | Fitur berikutnya yang menyentuh Vendor Request | Bagian F9 (gabung dengan F10 `UpdateItems`/`transition`) |
 
 ## Urutan eksekusi
@@ -36,7 +36,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [~] intent draft |
 | 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [x] 2026-10-09, 10 batch |
 | 9 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | MEDIUM | M | ikut fitur berikutnya | [ ] |
-| 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [ ] |
+| 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [~] 2026-10-12 `user_admin` |
 | — | F11 | Setup CI (build, vet, lint, test `-tags integration`) | — | M | butuh keputusan user | [ ] |
 
 Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M5). Keduanya diterima apa adanya; tangani hanya kalau ada perubahan yang harus diterapkan ke semua handler sekaligus. ST1005 di `pkg/auth/errors.go` juga disengaja (pesan ditampilkan ke user); di-exclude lewat F2.
@@ -184,7 +184,7 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | Fungsi | Lokasi | Cyclo | Rencana |
 | --- | --- | --- | --- |
 | `importEnv.validateFields` / `validateRow` / `buildEnv` / `readImportCSV` | `backend/internal/service/masterdata_import.go:669/490/338/127` | 47/40/21/22 | **Jangan refactor terpisah**: dikerjakan saat import diganti flow FSD replace-all (Sec 12) |
-| `UserAdminService.Create` / `Update` | `backend/internal/auth/user_admin.go:154/294` | 34/34 | Ekstrak validasi input ke satu fungsi bersama (auth → STOP & flag, Sec 4 #7) |
+| `UserAdminService.Create` / `Update` | `backend/internal/auth/user_admin.go:154/294` | 34/34 | ✅ 2026-10-12: helper `validateProfile`/`localCredentials`/`uniqueness`/`resolveReferences` (auth di-flag, user pilih bugfix) |
 | `VaultPlanService.ReviewRequest` | `backend/internal/service/vault_plan_actions.go:283` | 25 | Ekstrak cabang approve/reject |
 | `syncVendorParties` | `backend/internal/service/vendor_party.go:132` | 24 | Ekstrak diff party lama vs baru |
 | `VendorRequestService.UpdateItems` / `transition` | `backend/internal/service/vendor_request_actions.go:734/958` | 23/23 | Gabung dengan F9 |
@@ -223,3 +223,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F8 b8 | `d1e2ca1` | Test `handleAuthError` + id rusak disable/enable admin. handler 79.6→80.3% (≥ 80%). |
 | 2026-10-09 | F8 b9 | `b9d8793` | Test `DsrService` (unit, fake repo + miniredis) + baca harga admin cabang/vendor-wide (integration). service 75.6→78.9%. |
 | 2026-10-09 | F8 b10 | `b21f2e4` | Test submit harga vendor-wide, helper import/export CSV, baca admin via repo asli, `pkg/response`. service 78.9→80.6%. **F8 selesai**: semua `internal/*` ≥ 80%. |
+| 2026-10-12 | F10 user_admin | (belum di-commit) | Refactor `UserAdminService.Create`/`Update` (cyclo 34/34 → di bawah 30) ke 4 helper privat, perilaku sama, 17 test lama tetap hijau. Lint tinggal 3: gocyclo `masterdata_import` ×2 (ditunda) + F13. |

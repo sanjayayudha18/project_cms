@@ -157,100 +157,42 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 	email := strings.TrimSpace(req.Email)
 	role := strings.TrimSpace(req.Role)
 	authSource := strings.TrimSpace(req.AuthSource)
+	employeeID := strings.TrimSpace(req.EmployeeID)
 
 	if username == "" {
 		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "username", Message: "wajib diisi"}
 	}
-	if fullName == "" {
-		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "full_name", Message: "wajib diisi"}
+	if err := validateProfile(fullName, email, role); err != nil {
+		return db.CreateUserAdminRow{}, err
 	}
-	if email == "" {
-		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "email", Message: "wajib diisi"}
-	}
-	if !isValidEmail(email) {
-		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "email", Message: "format email tidak valid"}
-	}
-	if role == "" {
-		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "role", Message: "wajib diisi"}
-	}
-	if authSource != "ldap" && authSource != "local" {
-		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "auth_source", Message: "harus ldap atau local"}
-	}
-
-	var passwordHash *string
-	mustChangePassword := false
-
-	switch authSource {
-	case "local":
-		if req.VendorID == nil {
-			return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "vendor_id", Message: "wajib diisi untuk auth_source local"}
-		}
-		if req.TemporaryPassword == "" {
-			return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "temporary_password", Message: "wajib diisi untuk auth_source local"}
-		}
-		if err := auth.ValidatePasswordStrength(req.TemporaryPassword); err != nil {
-			return db.CreateUserAdminRow{}, remapPasswordFieldError(err)
-		}
-		hash, err := bcrypt.GenerateFromPassword([]byte(req.TemporaryPassword), BcryptCost)
-		if err != nil {
-			return db.CreateUserAdminRow{}, auth.ErrServiceUnavailable
-		}
-		h := string(hash)
-		passwordHash = &h
-		mustChangePassword = true
-	case "ldap":
-		if req.VendorID != nil || req.TemporaryPassword != "" {
-			return db.CreateUserAdminRow{}, ErrLdapFieldsNotAllowed
-		}
-	}
-
-	if existingID, err := s.repo.FindByUsername(ctx, username); err != nil {
-		return db.CreateUserAdminRow{}, fmt.Errorf("checking username uniqueness: %w", err)
-	} else if existingID != nil {
-		return db.CreateUserAdminRow{}, &ConflictError{Field: "username", Message: "sudah digunakan"}
-	}
-	if existingID, err := s.repo.FindByEmail(ctx, email); err != nil {
-		return db.CreateUserAdminRow{}, fmt.Errorf("checking email uniqueness: %w", err)
-	} else if existingID != nil {
-		return db.CreateUserAdminRow{}, &ConflictError{Field: "email", Message: "sudah digunakan"}
-	}
-	employeeID := strings.TrimSpace(req.EmployeeID)
-	if employeeID != "" {
-		if existingID, err := s.repo.FindByEmployeeID(ctx, employeeID); err != nil {
-			return db.CreateUserAdminRow{}, fmt.Errorf("checking employee_id uniqueness: %w", err)
-		} else if existingID != nil {
-			return db.CreateUserAdminRow{}, &ConflictError{Field: "employee_id", Message: "sudah digunakan"}
-		}
-	}
-
-	roleRow, err := s.repo.GetRoleByName(ctx, role)
+	// Only local users get a hash, and they must change it on first login.
+	passwordHash, err := localCredentials(authSource, req.VendorID, req.TemporaryPassword)
 	if err != nil {
-		return db.CreateUserAdminRow{}, fmt.Errorf("resolving role: %w", err)
+		return db.CreateUserAdminRow{}, err
 	}
-	if roleRow == nil {
-		return db.CreateUserAdminRow{}, &ReferenceError{Field: "role", Message: "tidak ditemukan"}
+
+	existingID, err := s.repo.FindByUsername(ctx, username)
+	if err := uniqueness("username", existingID, err); err != nil {
+		return db.CreateUserAdminRow{}, err
 	}
-	if req.VendorID != nil {
-		ok, err := s.repo.VendorExists(ctx, *req.VendorID)
-		if err != nil {
-			return db.CreateUserAdminRow{}, fmt.Errorf("checking vendor reference: %w", err)
-		}
-		if !ok {
-			return db.CreateUserAdminRow{}, &ReferenceError{Field: "vendor_id", Message: "tidak ditemukan"}
+	existingID, err = s.repo.FindByEmail(ctx, email)
+	if err := uniqueness("email", existingID, err); err != nil {
+		return db.CreateUserAdminRow{}, err
+	}
+	if employeeID != "" {
+		existingID, err = s.repo.FindByEmployeeID(ctx, employeeID)
+		if err := uniqueness("employee_id", existingID, err); err != nil {
+			return db.CreateUserAdminRow{}, err
 		}
 	}
-	if req.SupervisorID != nil {
-		ok, err := s.repo.SupervisorExists(ctx, *req.SupervisorID)
-		if err != nil {
-			return db.CreateUserAdminRow{}, fmt.Errorf("checking supervisor reference: %w", err)
-		}
-		if !ok {
-			return db.CreateUserAdminRow{}, &ReferenceError{Field: "supervisor_id", Message: "tidak ditemukan"}
-		}
+
+	roleID, err := s.resolveReferences(ctx, role, req.VendorID, req.SupervisorID)
+	if err != nil {
+		return db.CreateUserAdminRow{}, err
 	}
 
 	created, err := s.repo.Create(ctx, db.CreateUserAdminParams{
-		RoleID:             roleRow.ID,
+		RoleID:             roleID,
 		EmployeeID:         nilIfEmpty(employeeID),
 		Username:           username,
 		FullName:           fullName,
@@ -261,7 +203,7 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 		VendorID:           req.VendorID,
 		SupervisorID:       req.SupervisorID,
 		ApprovalLevel:      req.ApprovalLevel,
-		MustChangePassword: mustChangePassword,
+		MustChangePassword: passwordHash != nil,
 	})
 	if err != nil {
 		if field, ok := conflictFieldFromPgError(err); ok {
@@ -310,74 +252,39 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 	fullName := strings.TrimSpace(req.FullName)
 	email := strings.TrimSpace(req.Email)
 	role := strings.TrimSpace(req.Role)
-	if fullName == "" {
-		return db.UpdateUserAdminRow{}, &auth.ValidationError{Field: "full_name", Message: "wajib diisi"}
-	}
-	if email == "" {
-		return db.UpdateUserAdminRow{}, &auth.ValidationError{Field: "email", Message: "wajib diisi"}
-	}
-	if !isValidEmail(email) {
-		return db.UpdateUserAdminRow{}, &auth.ValidationError{Field: "email", Message: "format email tidak valid"}
-	}
-	if role == "" {
-		return db.UpdateUserAdminRow{}, &auth.ValidationError{Field: "role", Message: "wajib diisi"}
+	if err := validateProfile(fullName, email, role); err != nil {
+		return db.UpdateUserAdminRow{}, err
 	}
 
 	if req.SupervisorID != nil && *req.SupervisorID == id {
 		return db.UpdateUserAdminRow{}, ErrSelfSupervision
 	}
 
+	// Uniqueness is only re-checked for values that actually changed.
 	if email != before.Email {
-		if existingID, err := s.repo.FindByEmailExcludingID(ctx, email, id); err != nil {
-			return db.UpdateUserAdminRow{}, fmt.Errorf("checking email uniqueness: %w", err)
-		} else if existingID != nil {
-			return db.UpdateUserAdminRow{}, &ConflictError{Field: "email", Message: "sudah digunakan"}
+		existingID, err := s.repo.FindByEmailExcludingID(ctx, email, id)
+		if err := uniqueness("email", existingID, err); err != nil {
+			return db.UpdateUserAdminRow{}, err
 		}
 	}
 	employeeID := strings.TrimSpace(req.EmployeeID)
-	beforeEmployeeID := ""
-	if before.EmployeeID != nil {
-		beforeEmployeeID = *before.EmployeeID
-	}
-	if employeeID != "" && employeeID != beforeEmployeeID {
-		if existingID, err := s.repo.FindByEmployeeIDExcludingID(ctx, employeeID, id); err != nil {
-			return db.UpdateUserAdminRow{}, fmt.Errorf("checking employee_id uniqueness: %w", err)
-		} else if existingID != nil {
-			return db.UpdateUserAdminRow{}, &ConflictError{Field: "employee_id", Message: "sudah digunakan"}
+	if employeeID != "" && (before.EmployeeID == nil || employeeID != *before.EmployeeID) {
+		existingID, err := s.repo.FindByEmployeeIDExcludingID(ctx, employeeID, id)
+		if err := uniqueness("employee_id", existingID, err); err != nil {
+			return db.UpdateUserAdminRow{}, err
 		}
 	}
 
-	roleRow, err := s.repo.GetRoleByName(ctx, role)
+	roleID, err := s.resolveReferences(ctx, role, req.VendorID, req.SupervisorID)
 	if err != nil {
-		return db.UpdateUserAdminRow{}, fmt.Errorf("resolving role: %w", err)
-	}
-	if roleRow == nil {
-		return db.UpdateUserAdminRow{}, &ReferenceError{Field: "role", Message: "tidak ditemukan"}
-	}
-	if req.VendorID != nil {
-		ok, err := s.repo.VendorExists(ctx, *req.VendorID)
-		if err != nil {
-			return db.UpdateUserAdminRow{}, fmt.Errorf("checking vendor reference: %w", err)
-		}
-		if !ok {
-			return db.UpdateUserAdminRow{}, &ReferenceError{Field: "vendor_id", Message: "tidak ditemukan"}
-		}
-	}
-	if req.SupervisorID != nil {
-		ok, err := s.repo.SupervisorExists(ctx, *req.SupervisorID)
-		if err != nil {
-			return db.UpdateUserAdminRow{}, fmt.Errorf("checking supervisor reference: %w", err)
-		}
-		if !ok {
-			return db.UpdateUserAdminRow{}, &ReferenceError{Field: "supervisor_id", Message: "tidak ditemukan"}
-		}
+		return db.UpdateUserAdminRow{}, err
 	}
 
 	updated, err := s.repo.Update(ctx, db.UpdateUserAdminParams{
 		ID:            id,
 		FullName:      fullName,
 		Email:         email,
-		RoleID:        roleRow.ID,
+		RoleID:        roleID,
 		IsKaryawan:    req.IsKaryawan,
 		EmployeeID:    nilIfEmpty(employeeID),
 		VendorID:      req.VendorID,
@@ -409,6 +316,95 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 	}
 
 	return updated, nil
+}
+
+// validateProfile checks the fields Create and Update share, in the order the
+// form shows them (first failing field wins).
+func validateProfile(fullName, email, role string) error {
+	switch {
+	case fullName == "":
+		return &auth.ValidationError{Field: "full_name", Message: "wajib diisi"}
+	case email == "":
+		return &auth.ValidationError{Field: "email", Message: "wajib diisi"}
+	case !isValidEmail(email):
+		return &auth.ValidationError{Field: "email", Message: "format email tidak valid"}
+	case role == "":
+		return &auth.ValidationError{Field: "role", Message: "wajib diisi"}
+	}
+	return nil
+}
+
+// localCredentials enforces the auth_source rules (Req 3.4, Resolved Decision
+// 5) and returns the bcrypt hash of the temporary password for a local user,
+// nil for an LDAP user (who never has a local password).
+func localCredentials(authSource string, vendorID *int64, temporaryPassword string) (*string, error) {
+	switch authSource {
+	case "ldap":
+		if vendorID != nil || temporaryPassword != "" {
+			return nil, ErrLdapFieldsNotAllowed
+		}
+		return nil, nil
+	case "local":
+		if vendorID == nil {
+			return nil, &auth.ValidationError{Field: "vendor_id", Message: "wajib diisi untuk auth_source local"}
+		}
+		if temporaryPassword == "" {
+			return nil, &auth.ValidationError{Field: "temporary_password", Message: "wajib diisi untuk auth_source local"}
+		}
+		if err := auth.ValidatePasswordStrength(temporaryPassword); err != nil {
+			return nil, remapPasswordFieldError(err)
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(temporaryPassword), BcryptCost)
+		if err != nil {
+			return nil, auth.ErrServiceUnavailable
+		}
+		h := string(hash)
+		return &h, nil
+	}
+	return nil, &auth.ValidationError{Field: "auth_source", Message: "harus ldap atau local"}
+}
+
+// uniqueness turns a FindByXxx lookup result into a 409 when another user
+// already holds the value.
+func uniqueness(field string, existingID *int64, err error) error {
+	if err != nil {
+		return fmt.Errorf("checking %s uniqueness: %w", field, err)
+	}
+	if existingID != nil {
+		return &ConflictError{Field: field, Message: "sudah digunakan"}
+	}
+	return nil
+}
+
+// resolveReferences resolves the role name to its id and checks that the
+// optional vendor/supervisor exist (Req 3.6, 3.7, 4.7).
+func (s *UserAdminService) resolveReferences(ctx context.Context, role string, vendorID, supervisorID *int64) (int64, error) {
+	roleRow, err := s.repo.GetRoleByName(ctx, role)
+	if err != nil {
+		return 0, fmt.Errorf("resolving role: %w", err)
+	}
+	if roleRow == nil {
+		return 0, &ReferenceError{Field: "role", Message: "tidak ditemukan"}
+	}
+	if vendorID != nil {
+		ok, err := s.repo.VendorExists(ctx, *vendorID)
+		if err != nil {
+			return 0, fmt.Errorf("checking vendor reference: %w", err)
+		}
+		if !ok {
+			return 0, &ReferenceError{Field: "vendor_id", Message: "tidak ditemukan"}
+		}
+	}
+	if supervisorID != nil {
+		ok, err := s.repo.SupervisorExists(ctx, *supervisorID)
+		if err != nil {
+			return 0, fmt.Errorf("checking supervisor reference: %w", err)
+		}
+		if !ok {
+			return 0, &ReferenceError{Field: "supervisor_id", Message: "tidak ditemukan"}
+		}
+	}
+	return roleRow.ID, nil
 }
 
 // remapPasswordFieldError rewrites a *pkg/auth.ValidationError from

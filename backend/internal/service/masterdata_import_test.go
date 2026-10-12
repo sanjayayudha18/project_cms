@@ -185,6 +185,40 @@ func TestImport_VendorRowRules(t *testing.T) {
 	}
 }
 
+func TestImport_VendorPICRowRules(t *testing.T) {
+	h := "id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active\n"
+	csvText := h +
+		",V1,B1,Ani,Supervisor,+62 (812) 345-678,ani@v1.id,,\n" + // row 2: valid branch PIC; recipient blank -> false
+		",V1,,Budi,,,,TRUE,\n" + // row 3: valid vendor-wide PIC; recipient normalized
+		",,,,Manager,,,,\n" + // row 4: vendor_code + name missing
+		",V9,,Cici,,,,,\n" + // row 5: unknown vendor
+		",V1,B9,Dedi,,,,,\n" + // row 6: branch not of this vendor
+		",V1,,Eka,,,eka <eka@v1.id>,,\n" + // row 7: bad email
+		",V1,,Fajar,,12ab,,,\n" + // row 8: bad phone
+		",V1,,Gita,,,,ya,\n" // row 9: recipient not true/false
+
+	res := dryRun(t, ExportVendorPICs, csvText)
+
+	for _, want := range []struct {
+		row   int
+		field string
+	}{{4, "vendor_code"}, {4, "name"}, {5, "vendor_code"}, {6, "branch_code"}, {7, "email"}, {8, "phone"}, {9, "is_notification_recipient"}} {
+		if !hasErr(res, want.row, want.field) {
+			t.Errorf("missing error row %d field %s in %+v", want.row, want.field, res.Preview.Errors)
+		}
+	}
+	if p := res.Preview; p.ValidRows != 2 || p.Creates != 2 {
+		t.Errorf("want rows 2 and 3 valid creates, got %+v", p)
+	}
+	recipient := map[int]string{}
+	for _, r := range res.Rows {
+		recipient[r.Row] = r.Cells["is_notification_recipient"]
+	}
+	if recipient[2] != "false" || recipient[3] != "true" {
+		t.Errorf("is_notification_recipient = %v, want row 2 false (default) and row 3 true", recipient)
+	}
+}
+
 func TestImport_VendorUpdateResolvesToUpdateOrUnchanged(t *testing.T) {
 	res := dryRun(t, ExportVendors, vendorHeader+"1,V1,Vendor Satu Baru,PT Satu,012345678901234,a@v1.id,+62 812-345,'= Jl. Mawar,true\n")
 

@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — Test validasi PIC vendor di import master data
+- **Symptom**: `importEnv.validatePIC` 0% coverage: aturan baris PIC saat dry-run import CSV (wajib isi, vendor/cabang aktif, email, telepon, `is_notification_recipient`) tidak pernah diuji (temuan refactor F10 `9a2460e`).
+- **Root cause**: test import hanya mencakup vendor, cabang, ATM, dan kelolaan; fake repo tidak punya PIC.
+- **Fix** (test saja, kode produksi tidak berubah): `TestImport_VendorPICRowRules` di `backend/internal/service/masterdata_import_test.go`. Dua create valid (PIC cabang, PIC vendor-wide), lalu error per field untuk: vendor_code + name kosong, vendor tidak dikenal, cabang bukan milik vendor, email rusak, telepon rusak, recipient bukan true/false. Juga dicek recipient kosong → `false` dan `TRUE` → `true`.
+- **Tests**: `validatePIC` 0 → 100%. Uji mutasi lewat `go test -overlay` (tanpa mengubah file): cek telepon dimatikan → test gagal; default recipient diubah ke `true` → test gagal. `go test -tags integration ./internal/service/` hijau, lint 0. Manual browser verification: tidak relevan.
+- **Commit**: _(diisi setelah commit)_
+
 ## 2026-10-12 — QC F10: kompleksitas import master data (`masterdata_import.go`)
 - **Symptom**: golangci-lint gocyclo: `importEnv.validateFields` cyclo 47 dan `validateRow` 40 (> 30); `readImportCSV` 22 dan `buildEnv` 21 (> 20, target F10).
 - **Root cause**: validasi semua entity (vendor, cabang, vault, PIC, ATM, kelolaan) dan semua aturan baris (id, natural key, kolom immutable, toggle aktif, tumpang tindih periode, op) ditulis inline di satu fungsi.

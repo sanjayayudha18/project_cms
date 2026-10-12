@@ -14,9 +14,8 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | F7 | Uang `float64` → string desimal (3 endpoint + `computeReplenishmentStatus` + 2 frontend) | Money + kontrak API 2 frontend → AI-DLC penuh | PO accept `intent.md` + jawab Q1–Q6 | `.claude/sdlc/money-decimal-string/intent.md` (draft) → `spec.md` |
 | F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | Topologi proxy prod: Nginx / GCP LB / keduanya, berapa hop tepercaya | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | GitHub Actions atau Cloud Build? Postgres untuk test integrasi? | Bagian F11 |
-| F8 | Coverage `repository` / `handler` / `service` ke ≥ 80% | Besar, bertahap per batch | — (bisa mulai kapan saja, batch kecil) | **Batch 1–9 selesai 2026-10-09** (service 73.0→78.9%, repository →86.9% ✅, handler 68.1→80.3% ✅). Batch berikut: kandidat di bagian F8 |
 | F17 | **Bug**: harga (vendor-wide `vendor_package_prices` + paket cabang `vendor_packages_branch`) yang mulai hari ini/masa depan **tidak bisa di-disable** — `effective_end_date = CURRENT_DATE - 1` melanggar `*_period_chk` (`end >= start`) → apply gagal saat approve | Money/master data + semantik produk (Sec 4 #7) | Keputusan PO: disable harga yang belum berlaku = apa? (mis. `end = start` → berlaku 1 hari; atau tolak di submit dengan pesan jelas; atau status/batal terpisah) | `queries/vendor_package_prices_admin.sql:104`, `queries/vendor_packages_admin.sql:88`; test di `masterdata_applier_price_integration_test.go` |
-| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; butuh F8 dulu agar perilaku terkunci test | F8 untuk fungsi terkait | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
+| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai 2026-10-09 — tinggal dijadwalkan | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | Hindari bentrok dengan pekerjaan Vendor Request yang sedang jalan | Fitur berikutnya yang menyentuh Vendor Request | Bagian F9 (gabung dengan F10 `UpdateItems`/`transition`) |
 
 ## Urutan eksekusi
@@ -35,7 +34,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 5 | F5 | Permission file upload DSR 0755/0644 → **diterima** (lihat log) | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [x] 2026-10-09 |
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [~] intent draft |
-| 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [ ] |
+| 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [x] 2026-10-09, 10 batch |
 | 9 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | MEDIUM | M | ikut fitur berikutnya | [ ] |
 | 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [ ] |
 | — | F11 | Setup CI (build, vet, lint, test `-tags integration`) | — | M | butuh keputusan user | [ ] |
@@ -172,7 +171,8 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
   - Batch 7 (2026-10-09): `handler` — ACM area (eligible users, branch options, rename), update/enable admin vault/pic/branch/kelolaan ATM, Vendor Request `UpdateItems`/`Revise`, audit vault plan, `RetryApply` (maker-checker: hanya master_data `approved`), `/auth/me`, jalur sukses upload DSR (dry-run + confirm via ETL tiruan). handler 75.0% → 79.6% (sisa 0.4 poin, tak ada lagi fungsi 0%).
   - Batch 8 (2026-10-09): `handler` — pemetaan error login `handleAuthError` (401/403 kode akun/429 + Retry-After/503, error internal tidak bocor), id rusak di disable/enable 5 handler admin (paket cabang memang tanpa enable → 404). handler 79.6% → **80.3%** ✅. `extractClientIP` sengaja tidak diuji: perilakunya akan berubah di F13.
   - Batch 9 (2026-10-09): `service` — `DsrService` (validasi file + strip path traversal, resolve vendor, rate limit 10/jam per vendor via miniredis + TTL, detail terscope vendor, list + validasi parameter) dan baca harga admin (cabang + vendor-wide) via repo asli: `base_price` string desimal eksak, periode berakhir, row vendor lain → nil. service 75.6% → 78.9%. **Catatan F7**: assert nominal DSR di `dsr_upload_read_test.go` masih `*float64` — ikut diubah saat F7.
-  - Berikutnya: sisa `service` (1.1 poin lagi) — kandidat 0%: `masterdata_change` Get/List/Count, `vendor_branch_admin` List/Count/Get, `dsr_location_map_admin` List/ListUnmapped, `masterdata_export` ParseExportEntity/WriteExportTemplate, `masterdata_import_confirm` vaultFields/picFields/atmFields/stageToggle.
+  - Batch 10 (2026-10-09): `service` — submit harga vendor-wide (`VendorPackagePriceAdminService` Create/Update/Disable: vendor tak dikenal / INTERNAL ROH ditolak tanpa submit, row vendor lain / periode berakhir → not found, end < start → 422, update/disable membawa snapshot before), helper import CSV (mapper vault/pic/atm, `stageToggle`, `rowRejection`), template export, baca admin (change request, cabang, peta lokasi DSR + label belum dipetakan) via repo asli; `pkg/response` (envelope) 0 → 100%. service 78.9% → **80.6%** ✅.
+  - **Selesai 2026-10-09**: semua package `internal/*` ≥ 80% dengan tag integration — service 80.6, handler 80.3, repository 86.9, approval 81.3, audit 86.7, auth 88.0, notification 83.9, rolemgmt 85.4; `pkg/*` auth 83.9, config 100, middleware 85.9, response 100. `internal/db` (sqlc generated) dikecualikan, sama seperti lint.
 
 ## F9 — Pecah `vendor_request_actions.go`
 - **Kondisi**: 1210 baris (batas 800). Isinya create/edit, transition, completion, dll. dalam satu file.
@@ -221,4 +221,5 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F8 b6 | `dfa53f9` | Test handler harga vendor-wide, upload DSR vendor, review vault ATM-SPV (unit, fake service / miniredis). handler 68.1→75.0%. |
 | 2026-10-09 | F8 b7 | `151d2d2` | Test handler 0% tersisa: ACM area, update/enable admin, UpdateItems/Revise, audit vault plan, RetryApply, /auth/me, sukses upload+confirm DSR. handler 75.0→79.6%. |
 | 2026-10-09 | F8 b8 | `d1e2ca1` | Test `handleAuthError` + id rusak disable/enable admin. handler 79.6→80.3% (≥ 80%). |
-| 2026-10-09 | F8 b9 | (belum di-commit) | Test `DsrService` (unit, fake repo + miniredis) + baca harga admin cabang/vendor-wide (integration). service 75.6→78.9%. |
+| 2026-10-09 | F8 b9 | `b9d8793` | Test `DsrService` (unit, fake repo + miniredis) + baca harga admin cabang/vendor-wide (integration). service 75.6→78.9%. |
+| 2026-10-09 | F8 b10 | (belum di-commit) | Test submit harga vendor-wide, helper import/export CSV, baca admin via repo asli, `pkg/response`. service 78.9→80.6%. **F8 selesai**: semua `internal/*` ≥ 80%. |

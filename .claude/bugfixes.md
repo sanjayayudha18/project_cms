@@ -15,13 +15,22 @@ Template:
 
 ---
 
+## 2026-10-09 — QC F8 batch 10 (selesai): submit harga vendor-wide, helper import, `pkg/response`
+- **Symptom**: `VendorPackagePriceAdminService` Create/Update/Disable/`checkVendor` 0% (jalur submit maker-checker harga); helper import CSV (`vaultFields`, `picFields`, `atmFields`, `stageToggle`, `rowRejection`) + `ParseExportEntity`/`WriteExportTemplate` 0%; baca admin `MasterDataChangeService`/`VendorBranchAdminService`/`DsrLocationMapAdminService` 0%; `pkg/response` 0%. service 78.9% (< 80%).
+- **Root cause**: belum ada test langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `vendor_package_price_admin_test.go` (unit: vendor tak dikenal / INTERNAL (ROH) / label kosong / harga rusak / gagal cek vendor → ditolak tanpa `Submit`; update row vendor lain / tidak ada / sudah berakhir → `ErrVendorPackagePriceNotFound`, end < start → 422; update + disable mengirim `EntityID` + snapshot `Before`). `masterdata_import_helpers_test.go` (unit: nominal sel tetap string eksak, sel opsional kosong → nil, PIC tanpa `branch_code` = vendor-wide, hanya `"true"` persis yang mem-blacklist; baris toggle → enable/disable bukan update; error validasi/konflik → error baris 422, error lain tetap 500; template = BOM + header saja). `admin_reads_integration_test.go` (repo asli, tx rollback: change request pending, cabang, peta lokasi DSR + label DSR yang belum dipetakan). `pkg/response/response_test.go` (envelope success/created/error/validation, field kosong tidak dikirim).
+- **Tests**: coverage `internal/service` 78.9% → 80.6%, `pkg/response` 0 → 100%. **F8 selesai**: semua package `internal/*` ≥ 80% (`internal/db` generated dikecualikan). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: _(belum)_
+
+---
+
 ## 2026-10-09 — QC F8 batch 9: test service DSR vendor + baca harga admin
 - **Symptom**: `DsrService` (`ValidateUpload`, `sanitizeFilename`, `ResolveVendor`, `CheckUploadRate`, `GetSaldoFile`, `GetRencanaIsiFile`, `ListUploads` + mapper) 0% di package `service` (test handler di package lain tidak dihitung); List/Count/Get `VendorPackageAdminService` + `VendorPackagePriceAdminService` (mapper `base_price`) 0%.
 - **Root cause**: belum ada test di package `service` untuk jalur ini.
 - **Fix** (test saja, kode produksi tidak berubah): `dsr_upload_read_test.go` (unit: xlsx/xls diterima, kosong / > 10MB / bukan workbook / nama `..` atau kosong ditolak, `../../etc/dsr.xlsx` → `dsr.xlsx`; vendor tidak ada → `ErrDsrVendorNotFound`, error DB lain dibungkus; upload ke-11 per vendor per jam → `ErrDsrRateLimited`, vendor lain punya counter sendiri, key ber-TTL ≤ 1 jam, Redis mati → error biasa; detail daily/rencana isi hanya untuk vendor pemilik (lain → `ErrDsrFileNotFound`), success = row − error, nominal NULL tetap nil; list meneruskan vendor + paging, validasi page/page_size/tanggal). `vendor_price_read_integration_test.go` (repo asli, tx rollback: `base_price` `1250000.50` / `99999999.99` eksak sebagai string, periode berakhir tidak terhitung `active`, Get oleh vendor lain → nil, nil).
 - **Catatan F7**: nominal DSR di test unit masih diassert sebagai `*float64` (perilaku sekarang); ikut diganti saat F7.
 - **Tests**: coverage `internal/service` 75.6% → 78.9% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `b9d8793`
 
 ---
 

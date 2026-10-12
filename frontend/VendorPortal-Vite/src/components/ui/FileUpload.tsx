@@ -184,6 +184,7 @@ export function FileUpload({
       {allErrors.length > 0 && (
         <ul className="flex flex-col gap-1" role="alert">
           {allErrors.map((error, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: list is rebuilt wholesale each render and messages can repeat
             <li key={i} className="text-sm text-danger-fg">
               {error}
             </li>

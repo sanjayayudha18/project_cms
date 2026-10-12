@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — Lint VendorPortal gagal (format test + warning ringan)
+- **Symptom**: `pnpm --dir frontend/VendorPortal-Vite run lint` exit 1 (sudah sejak sebelum QC F7): 1 error + 16 warning.
+- **Root cause**: error = `src/features/dsr/__tests__/DsrUploadDialog.test.tsx` belum diformat biome (baris fixture terlalu panjang). Warning ringan: 2 unused type param, 4 non-null assertion (`!`), 1 key index array.
+- **Fix** (cakupan dipilih user: error + warning ringan, a11y dibiarkan): format test file (hanya pemecahan baris). `DsrDetailDialog.tsx`: `queryFn` dijaga `item.daily ? … : Promise.reject(...)` (dan `rencana_isi`) — tidak berubah di runtime karena query hanya jalan saat `enabled`. `SchedulePage.tsx` + `__tests__/grouping.property.test.ts`: `groupMap.get(date) ?? []` (key selalu ada dari `groupMap.keys()`). `biome-ignore` dengan alasan untuk 2 hal yang memang benar: `DataTable.tsx` `ColumnMeta<TData, TValue>` (declaration merging wajib memakai type parameter TanStack yang sama) dan `FileUpload.tsx` `key={i}` (daftar error dibangun ulang tiap render, pesan bisa sama).
+- **Tests**: `lint` exit 0 (0 error, sisa 9 warning a11y: `useKeyWithClickEvents`/`useSemanticElements` di `DataTable`, `AppShell`, `FileUpload`, dialog DSR, `InvoicesPage` — belum dikerjakan, perlu keputusan markup/keyboard). `test` 18 file / 123 test hijau, `build` hijau. Manual browser verification (detail DSR + halaman Schedule tampil sama): outstanding.
+- **Commit**: _(belum)_
+
 ## 2026-10-12 — IP client retry manual di Python EOD (lanjutan QC F13)
 - **Symptom**: `POST /retry/{file_id}` di `eod_retry_scheduler` dan `service_dsr_etl` mencatat `request.client.host` sebagai IP audit retry; di belakang Nginx nilainya selalu IP Nginx/gateway Docker, bukan IP user.
 - **Root cause**: `uvicorn.run` di kedua `run.py` tanpa konfigurasi proxy: default uvicorn hanya memercayai `X-Forwarded-For` dari `127.0.0.1`, jadi IP Nginx tidak pernah diganti. Entri yang rusak di `forwarded_allow_ips` juga diam-diam diabaikan uvicorn.

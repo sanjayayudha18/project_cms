@@ -15,6 +15,7 @@ import { useState } from "react";
  * Columns with `meta: { numeric: true }` get right-aligned text and tabular-nums.
  */
 declare module "@tanstack/react-table" {
+  // biome-ignore lint/correctness/noUnusedVariables: declaration merging requires TanStack's exact type parameters
   interface ColumnMeta<TData extends RowData, TValue> {
     numeric?: boolean;
   }

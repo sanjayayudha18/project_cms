@@ -12,13 +12,20 @@ interface DsrDetailDialogProps {
 export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
   const dailyQuery = useQuery({
     queryKey: ["dsr-daily-detail", item.daily?.file_id],
-    queryFn: () => getDsrDailyDetail(item.daily!.file_id),
+    // Only runs when enabled (file present); the guard just satisfies the type.
+    queryFn: () =>
+      item.daily
+        ? getDsrDailyDetail(item.daily.file_id)
+        : Promise.reject(new Error("no daily file")),
     enabled: item.daily !== null,
   });
 
   const rencanaQuery = useQuery({
     queryKey: ["dsr-rencana-detail", item.rencana_isi?.file_id],
-    queryFn: () => getDsrRencanaIsiDetail(item.rencana_isi!.file_id),
+    queryFn: () =>
+      item.rencana_isi
+        ? getDsrRencanaIsiDetail(item.rencana_isi.file_id)
+        : Promise.reject(new Error("no rencana isi file")),
     enabled: item.rencana_isi !== null,
   });
 

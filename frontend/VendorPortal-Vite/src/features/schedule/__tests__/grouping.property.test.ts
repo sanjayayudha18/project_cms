@@ -55,7 +55,7 @@ function groupAndSort(schedules: Schedule[]): DateGroup[] {
   const sortedDates = [...groupMap.keys()].sort((a, b) => a.localeCompare(b));
 
   return sortedDates.map((date) => {
-    const items = groupMap.get(date)!;
+    const items = groupMap.get(date) ?? [];
     items.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
     const totalAmount = items.reduce((sum, s) => sum + s.recommendedAmount, 0);
     return { date, totalAmount, count: items.length, schedules: items };

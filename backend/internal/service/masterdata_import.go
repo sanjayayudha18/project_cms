@@ -179,27 +179,12 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 			}
 			continue
 		}
-		cells := make([]string, len(rec))
-		empty := true
-		for i, c := range rec {
-			cells[i] = cleanCell(c)
-			if cells[i] != "" {
-				empty = false
-			}
-		}
+		cells, empty := cleanRecord(rec)
 		if empty {
 			continue
 		}
 		if len(cells) == legacyLen {
-			full := make([]string, len(header))
-			for c, from := range pick {
-				if from < 0 {
-					full[c] = legacyFill[header[c]]
-				} else {
-					full[c] = cells[from]
-				}
-			}
-			cells = full
+			cells = expandLegacy(cells, header, pick, legacyFill)
 		}
 		if len(recs) >= MasterDataImportMaxRows {
 			return nil, nil, &ValidationError{Field: "file", Message: fmt.Sprintf("jumlah baris melebihi %d", MasterDataImportMaxRows)}
@@ -210,6 +195,33 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 		return nil, []ImportRowError{{Row: 1, Field: "header", Message: "file kosong"}}, nil
 	}
 	return recs, nil, nil
+}
+
+// cleanRecord applies cleanCell to every cell; empty reports an all-blank row.
+func cleanRecord(rec []string) (cells []string, empty bool) {
+	cells = make([]string, len(rec))
+	empty = true
+	for i, c := range rec {
+		cells[i] = cleanCell(c)
+		if cells[i] != "" {
+			empty = false
+		}
+	}
+	return cells, empty
+}
+
+// expandLegacy reorders a legacy-header row into header order, filling the
+// columns the legacy file lacks from legacyFill.
+func expandLegacy(cells, header []string, pick []int, legacyFill map[string]string) []string {
+	full := make([]string, len(header))
+	for c, from := range pick {
+		if from < 0 {
+			full[c] = legacyFill[header[c]]
+		} else {
+			full[c] = cells[from]
+		}
+	}
+	return full
 }
 
 // legacyPick maps each column of full to its index in legacy (-1 = missing).
@@ -387,24 +399,33 @@ func (i *MasterDataImporter) buildEnv(ctx context.Context, entity string) (*impo
 		if env.branches, err = i.activeSet(ctx, ExportVendorBranches, branchKey); err != nil {
 			return nil, err
 		}
-		labels, err := i.repo.PackageLabels(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading package labels for import: %w", err)
-		}
-		env.labels = make(map[string]bool, len(labels))
-		for _, l := range labels {
-			env.labels[l.VendorCode+"|"+l.Package] = true
-		}
-		keys, err := i.repo.PackageKeys(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading packages for import: %w", err)
-		}
-		env.packages = make(map[string]int64, len(keys))
-		for _, k := range keys {
-			env.packages[k.VendorCode+"|"+k.BranchCode+"|"+k.PackageCode] = k.ID
+		if err := i.loadPackages(ctx, env); err != nil {
+			return nil, err
 		}
 	}
 	return env, nil
+}
+
+// loadPackages fills the kelolaan package lookups: vendor-wide tariff labels
+// and branch special packages.
+func (i *MasterDataImporter) loadPackages(ctx context.Context, env *importEnv) error {
+	labels, err := i.repo.PackageLabels(ctx)
+	if err != nil {
+		return fmt.Errorf("loading package labels for import: %w", err)
+	}
+	env.labels = make(map[string]bool, len(labels))
+	for _, l := range labels {
+		env.labels[l.VendorCode+"|"+l.Package] = true
+	}
+	keys, err := i.repo.PackageKeys(ctx)
+	if err != nil {
+		return fmt.Errorf("loading packages for import: %w", err)
+	}
+	env.packages = make(map[string]int64, len(keys))
+	for _, k := range keys {
+		env.packages[k.VendorCode+"|"+k.BranchCode+"|"+k.PackageCode] = k.ID
+	}
+	return nil
 }
 
 // DryRun validates the CSV read from r against current master data and returns
@@ -512,23 +533,9 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		v["package_source"] = assignmentSourceCell(v)
 	}
 
-	var id int64
-	if v["id"] != "" {
-		n, err := strconv.ParseInt(v["id"], 10, 64)
-		if err != nil || n <= 0 {
-			add("id", "harus bilangan bulat positif, atau kosong untuk data baru")
-			return ImportRow{}, errs
-		}
-		id = n
-		if _, ok := e.cur[id]; !ok {
-			add("id", "id tidak ditemukan")
-			return ImportRow{}, errs
-		}
-		if first, dup := e.seenID[id]; dup {
-			add("id", fmt.Sprintf("duplikat dengan baris %d", first))
-			return ImportRow{}, errs
-		}
-		e.seenID[id] = rec.line
+	id, ok := e.rowID(v["id"], rec.line, add)
+	if !ok {
+		return ImportRow{}, errs
 	}
 	creating := id == 0
 	if e.entity == ExportVendorBranches {
@@ -544,77 +551,126 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		return ImportRow{}, errs
 	}
 
-	nk := importNatKey(e.entity, v)
-	if nk != "" {
-		if first, dup := e.seenKey[nk]; dup {
-			add(header[1], fmt.Sprintf("duplikat dengan baris %d", first))
-			return ImportRow{}, errs
-		}
-		e.seenKey[nk] = rec.line
-		if owner, exists := e.natKeys[nk]; exists && owner != id {
-			if creating {
-				add(header[1], fmt.Sprintf("sudah ada (id %d); isi kolom id untuk mengubahnya", owner))
-			} else {
-				add(header[1], fmt.Sprintf("bentrok dengan data lain (id %d)", owner))
-			}
-			return ImportRow{}, errs
-		}
-	}
-	if !creating {
-		for _, col := range importImmutable[e.entity] {
-			if v[col] != e.cur[id][col] {
-				add(col, fmt.Sprintf("tidak boleh diubah (nilai saat ini: %q)", e.cur[id][col]))
-			}
-		}
-		if len(errs) > 0 {
-			return ImportRow{}, errs
-		}
+	if !e.checkNatKey(header[1], v, id, rec.line, add) {
+		return ImportRow{}, errs
 	}
 	toggle := false
 	if !creating {
-		changedOther := false
-		for _, h := range header[1:] {
-			if h != "is_active" && v[h] != e.cur[id][h] {
-				changedOther = true
-			}
-		}
-		toggle = v["is_active"] != e.cur[id]["is_active"]
-		switch {
-		case toggle && changedOther:
-			add("is_active", "data dan status aktif tidak bisa diubah dalam satu baris; pisahkan menjadi dua impor")
-		case changedOther && e.cur[id]["is_active"] == "false":
-			add("is_active", "data nonaktif tidak bisa diubah; aktifkan dulu lewat impor terpisah")
-		}
-		if len(errs) > 0 {
+		if toggle, ok = e.checkUpdate(header, v, id, add); !ok {
 			return ImportRow{}, errs
 		}
 	}
-	if e.entity == ExportATMAssignments && v["is_active"] == "true" {
-		s := importSpan{start: v["effective_start_date"], end: v["effective_end_date"], id: id, row: rec.line}
-		for _, other := range e.spans[v["terminal_id"]] {
-			if spansOverlap(s, other) {
-				where := fmt.Sprintf("id %d", other.id)
-				if other.row > 0 {
-					where = fmt.Sprintf("baris %d", other.row)
-				}
-				add("effective_start_date", "periode tumpang tindih dengan kelolaan aktif lain ("+where+")")
-				return ImportRow{}, errs
-			}
-		}
-		e.spans[v["terminal_id"]] = append(e.spans[v["terminal_id"]], s)
+	if e.entity == ExportATMAssignments && v["is_active"] == "true" && !e.checkSpan(v, id, rec.line, add) {
+		return ImportRow{}, errs
 	}
+	return ImportRow{Row: rec.line, Op: e.rowOp(header, v, id), ID: id, Cells: v, Toggle: toggle}, nil
+}
 
-	op := ImportOpCreate
-	if !creating {
-		op = ImportOpUnchanged
-		for _, h := range header[1:] {
-			if v[h] != e.cur[id][h] {
-				op = ImportOpUpdate
-				break
-			}
+// rowID parses and checks the id cell; blank means create (0).
+func (e *importEnv) rowID(raw string, line int, add func(string, string)) (int64, bool) {
+	if raw == "" {
+		return 0, true
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		add("id", "harus bilangan bulat positif, atau kosong untuk data baru")
+		return 0, false
+	}
+	if _, ok := e.cur[id]; !ok {
+		add("id", "id tidak ditemukan")
+		return 0, false
+	}
+	if first, dup := e.seenID[id]; dup {
+		add("id", fmt.Sprintf("duplikat dengan baris %d", first))
+		return 0, false
+	}
+	e.seenID[id] = line
+	return id, true
+}
+
+// checkNatKey rejects a natural key repeated in the file or owned by another row.
+func (e *importEnv) checkNatKey(col string, v map[string]string, id int64, line int, add func(string, string)) bool {
+	nk := importNatKey(e.entity, v)
+	if nk == "" {
+		return true
+	}
+	if first, dup := e.seenKey[nk]; dup {
+		add(col, fmt.Sprintf("duplikat dengan baris %d", first))
+		return false
+	}
+	e.seenKey[nk] = line
+	owner, exists := e.natKeys[nk]
+	switch {
+	case !exists || owner == id:
+		return true
+	case id == 0:
+		add(col, fmt.Sprintf("sudah ada (id %d); isi kolom id untuk mengubahnya", owner))
+	default:
+		add(col, fmt.Sprintf("bentrok dengan data lain (id %d)", owner))
+	}
+	return false
+}
+
+// checkUpdate enforces the update rules for an existing row: immutable columns,
+// and data vs is_active changes never mixed nor applied to an inactive row.
+func (e *importEnv) checkUpdate(header []string, v map[string]string, id int64, add func(string, string)) (toggle, ok bool) {
+	cur := e.cur[id]
+	ok = true
+	for _, col := range importImmutable[e.entity] {
+		if v[col] != cur[col] {
+			add(col, fmt.Sprintf("tidak boleh diubah (nilai saat ini: %q)", cur[col]))
+			ok = false
 		}
 	}
-	return ImportRow{Row: rec.line, Op: op, ID: id, Cells: v, Toggle: toggle}, nil
+	if !ok {
+		return false, false
+	}
+	changedOther := false
+	for _, h := range header[1:] {
+		if h != "is_active" && v[h] != cur[h] {
+			changedOther = true
+		}
+	}
+	toggle = v["is_active"] != cur["is_active"]
+	switch {
+	case toggle && changedOther:
+		add("is_active", "data dan status aktif tidak bisa diubah dalam satu baris; pisahkan menjadi dua impor")
+		return toggle, false
+	case changedOther && cur["is_active"] == "false":
+		add("is_active", "data nonaktif tidak bisa diubah; aktifkan dulu lewat impor terpisah")
+		return toggle, false
+	}
+	return toggle, true
+}
+
+// checkSpan rejects an active kelolaan overlapping another one of the same ATM
+// (current or earlier in the file), then records its span.
+func (e *importEnv) checkSpan(v map[string]string, id int64, line int, add func(string, string)) bool {
+	s := importSpan{start: v["effective_start_date"], end: v["effective_end_date"], id: id, row: line}
+	for _, other := range e.spans[v["terminal_id"]] {
+		if spansOverlap(s, other) {
+			where := fmt.Sprintf("id %d", other.id)
+			if other.row > 0 {
+				where = fmt.Sprintf("baris %d", other.row)
+			}
+			add("effective_start_date", "periode tumpang tindih dengan kelolaan aktif lain ("+where+")")
+			return false
+		}
+	}
+	e.spans[v["terminal_id"]] = append(e.spans[v["terminal_id"]], s)
+	return true
+}
+
+func (e *importEnv) rowOp(header []string, v map[string]string, id int64) string {
+	if id == 0 {
+		return ImportOpCreate
+	}
+	for _, h := range header[1:] {
+		if v[h] != e.cur[id][h] {
+			return ImportOpUpdate
+		}
+	}
+	return ImportOpUnchanged
 }
 
 func optStr(s string) *string {
@@ -673,104 +729,134 @@ func (e *importEnv) validateFields(v map[string]string, creating bool, add func(
 	}
 	switch e.entity {
 	case ExportVendors:
-		requiredCols(v, add, "code", "name")
-		if v["contact_email"] != "" && !isValidEmail(v["contact_email"]) {
-			add("contact_email", "format email tidak valid")
-		}
-		if n, err := normalizeNPWP(v["npwp"]); err != nil {
-			fromErr(err)
-		} else {
-			v["npwp"] = n
-		}
+		validateVendor(v, add, fromErr)
 	case ExportVendorBranches:
-		requiredCols(v, add, "vendor_code", "branch_code", "branch_name")
+		e.validateVendorBranch(v, add, fromErr)
+	case ExportVendorVaults:
+		e.validateVault(v, add, fromErr)
+	case ExportVendorPICs:
+		e.validatePIC(v, creating, add)
+	case ExportATMs:
+		e.validateATM(v, creating, add, fromErr)
+	case ExportATMAssignments:
+		e.validateAssignment(v, add)
+	}
+}
+
+func validateVendor(v map[string]string, add func(string, string), fromErr func(error)) {
+	requiredCols(v, add, "code", "name")
+	if v["contact_email"] != "" && !isValidEmail(v["contact_email"]) {
+		add("contact_email", "format email tidak valid")
+	}
+	if n, err := normalizeNPWP(v["npwp"]); err != nil {
+		fromErr(err)
+	} else {
+		v["npwp"] = n
+	}
+}
+
+func (e *importEnv) validateVendorBranch(v map[string]string, add func(string, string), fromErr func(error)) {
+	requiredCols(v, add, "vendor_code", "branch_code", "branch_name")
+	if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
+		add("vendor_code", "vendor tidak ditemukan atau nonaktif")
+	}
+	rc := v["region_code"]
+	if n, err := normalizeBranchRegionCode(&rc); err != nil {
+		fromErr(err)
+	} else {
+		v["region_code"] = notesOrEmpty(n)
+	}
+	v["category"] = strings.ToUpper(v["category"])
+	if !validVendorBranchCategories[v["category"]] {
+		add("category", "harus ATM, CASH, atau ATM_CASH")
+	}
+	e.location(v, add, false)
+}
+
+func (e *importEnv) validateVault(v map[string]string, add func(string, string), fromErr func(error)) {
+	requiredCols(v, add, "vendor_code", "branch_code", "vault_code")
+	if v["vendor_code"] != "" && v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
+		add("branch_code", "cabang tidak ditemukan atau nonaktif")
+	}
+	p := VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
+		MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
+		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"])}
+	if err := validateVaultFields(&p); err != nil {
+		fromErr(err)
+	} else {
+		v["category"], v["currency_code"] = p.Category, p.CurrencyCode
+	}
+	e.location(v, add, false)
+}
+
+func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(string, string)) {
+	requiredCols(v, add, "vendor_code", "name")
+	if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
+		add("vendor_code", "vendor tidak ditemukan atau nonaktif")
+	}
+	if v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
+		add("branch_code", "cabang tidak ditemukan atau nonaktif untuk vendor ini")
+	}
+	// Same rules as VendorPicAdminService.validate.
+	if v["email"] != "" && (!isValidEmail(v["email"]) || strings.ContainsAny(v["email"], "<> ")) {
+		add("email", "format email tidak valid")
+	}
+	if v["phone"] != "" && !phoneRe.MatchString(strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(v["phone"])) {
+		add("phone", "format telepon tidak valid (6-15 digit, boleh diawali +)")
+	}
+	boolCol(v, "is_notification_recipient", "false", creating, add)
+}
+
+func (e *importEnv) validateATM(v map[string]string, creating bool, add func(string, string), fromErr func(error)) {
+	requiredCols(v, add, "terminal_id")
+	e.location(v, add, true)
+	locID, _ := strconv.ParseInt(v["location_id"], 10, 64)
+	if _, _, _, _, _, err := validateATMEditableFields(locID, v["machine_type"], v["brand"], v["model"], v["operation_hours"], v["deployment_type"],
+		optStr(v["priority_class"]), optStr(v["capacity_amount"]), optStr(v["low_threshold_amount"]), optStr(v["critical_threshold_amount"])); err != nil {
+		fromErr(err)
+	}
+	boolCol(v, "blacklisted", "false", creating, add)
+}
+
+func (e *importEnv) validateAssignment(v map[string]string, add func(string, string)) {
+	requiredCols(v, add, "terminal_id", "vendor_code", "branch_code", "package_code")
+	if v["terminal_id"] != "" && e.atms[v["terminal_id"]] == 0 {
+		add("terminal_id", "ATM tidak ditemukan atau nonaktif")
+	}
+	e.validateAssignmentPackage(v, add)
+	start, serr := time.Parse(assignmentDateLayout, v["effective_start_date"])
+	if serr != nil {
+		add("effective_start_date", "wajib format YYYY-MM-DD")
+	}
+	if v["effective_end_date"] != "" {
+		end, eerr := time.Parse(assignmentDateLayout, v["effective_end_date"])
+		switch {
+		case eerr != nil:
+			add("effective_end_date", "wajib format YYYY-MM-DD")
+		case serr == nil && end.Before(start):
+			add("effective_end_date", "tidak boleh sebelum tanggal mulai")
+		}
+	}
+}
+
+// validateAssignmentPackage checks the package against its source: a branch special
+// package, or a vendor-wide tariff label on an active vendor cabang.
+func (e *importEnv) validateAssignmentPackage(v map[string]string, add func(string, string)) {
+	switch v["package_source"] {
+	case AssignmentSourceBranch:
+		if v["package_code"] != "" && e.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]] == 0 {
+			add("package_code", "paket tidak ditemukan atau nonaktif")
+		}
+	case AssignmentSourceVendor:
 		if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
 			add("vendor_code", "vendor tidak ditemukan atau nonaktif")
-		}
-		rc := v["region_code"]
-		if n, err := normalizeBranchRegionCode(&rc); err != nil {
-			fromErr(err)
-		} else {
-			v["region_code"] = notesOrEmpty(n)
-		}
-		v["category"] = strings.ToUpper(v["category"])
-		if !validVendorBranchCategories[v["category"]] {
-			add("category", "harus ATM, CASH, atau ATM_CASH")
-		}
-		e.location(v, add, false)
-	case ExportVendorVaults:
-		requiredCols(v, add, "vendor_code", "branch_code", "vault_code")
-		if v["vendor_code"] != "" && v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
+		} else if v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
 			add("branch_code", "cabang tidak ditemukan atau nonaktif")
 		}
-		p := VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
-			MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
-			Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"])}
-		if err := validateVaultFields(&p); err != nil {
-			fromErr(err)
-		} else {
-			v["category"], v["currency_code"] = p.Category, p.CurrencyCode
+		if v["package_code"] != "" && !e.labels[v["vendor_code"]+"|"+v["package_code"]] {
+			add("package_code", "vendor tidak punya tarif aktif untuk paket ini")
 		}
-		e.location(v, add, false)
-	case ExportVendorPICs:
-		requiredCols(v, add, "vendor_code", "name")
-		if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
-			add("vendor_code", "vendor tidak ditemukan atau nonaktif")
-		}
-		if v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
-			add("branch_code", "cabang tidak ditemukan atau nonaktif untuk vendor ini")
-		}
-		// Same rules as VendorPicAdminService.validate.
-		if v["email"] != "" && (!isValidEmail(v["email"]) || strings.ContainsAny(v["email"], "<> ")) {
-			add("email", "format email tidak valid")
-		}
-		if v["phone"] != "" && !phoneRe.MatchString(strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(v["phone"])) {
-			add("phone", "format telepon tidak valid (6-15 digit, boleh diawali +)")
-		}
-		boolCol(v, "is_notification_recipient", "false", creating, add)
-	case ExportATMs:
-		requiredCols(v, add, "terminal_id")
-		e.location(v, add, true)
-		locID, _ := strconv.ParseInt(v["location_id"], 10, 64)
-		if _, _, _, _, _, err := validateATMEditableFields(locID, v["machine_type"], v["brand"], v["model"], v["operation_hours"], v["deployment_type"],
-			optStr(v["priority_class"]), optStr(v["capacity_amount"]), optStr(v["low_threshold_amount"]), optStr(v["critical_threshold_amount"])); err != nil {
-			fromErr(err)
-		}
-		boolCol(v, "blacklisted", "false", creating, add)
-	case ExportATMAssignments:
-		requiredCols(v, add, "terminal_id", "vendor_code", "branch_code", "package_code")
-		if v["terminal_id"] != "" && e.atms[v["terminal_id"]] == 0 {
-			add("terminal_id", "ATM tidak ditemukan atau nonaktif")
-		}
-		switch v["package_source"] {
-		case AssignmentSourceBranch:
-			if v["package_code"] != "" && e.packages[v["vendor_code"]+"|"+v["branch_code"]+"|"+v["package_code"]] == 0 {
-				add("package_code", "paket tidak ditemukan atau nonaktif")
-			}
-		case AssignmentSourceVendor:
-			if v["vendor_code"] != "" && e.vendors[v["vendor_code"]] == 0 {
-				add("vendor_code", "vendor tidak ditemukan atau nonaktif")
-			} else if v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
-				add("branch_code", "cabang tidak ditemukan atau nonaktif")
-			}
-			if v["package_code"] != "" && !e.labels[v["vendor_code"]+"|"+v["package_code"]] {
-				add("package_code", "vendor tidak punya tarif aktif untuk paket ini")
-			}
-		default:
-			add("package_source", "harus branch atau vendor")
-		}
-		start, serr := time.Parse(assignmentDateLayout, v["effective_start_date"])
-		if serr != nil {
-			add("effective_start_date", "wajib format YYYY-MM-DD")
-		}
-		if v["effective_end_date"] != "" {
-			end, eerr := time.Parse(assignmentDateLayout, v["effective_end_date"])
-			switch {
-			case eerr != nil:
-				add("effective_end_date", "wajib format YYYY-MM-DD")
-			case serr == nil && end.Before(start):
-				add("effective_end_date", "tidak boleh sebelum tanggal mulai")
-			}
-		}
+	default:
+		add("package_source", "harus branch atau vendor")
 	}
 }

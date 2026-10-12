@@ -13,7 +13,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | --- | --- | --- | --- | --- |
 | F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | ✅ 2026-10-12: prod = **Nginx → backend (1 hop tepercaya)**; dok = AI-DLC penuh (`.claude/sdlc/client-ip-trust/`, Q1–Q5 dijawab). Python EOD di luar scope → `python_eod_client_ip_todo.md` | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | **Ditunda oleh user 2026-10-12** (belum perlu CI) | Bagian F11 |
-| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai; `user_admin` selesai 2026-10-12. Sisa: `masterdata_import` (tunggu FSD replace-all) + fungsi cyclo 21–25 (di bawah ambang lint 30) | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
+| F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai; `user_admin` + `masterdata_import` selesai 2026-10-12 (lint 0). Sisa: fungsi cyclo 21–25 (di bawah ambang lint 30) | Bagian F10 |
 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | Hindari bentrok dengan pekerjaan Vendor Request yang sedang jalan | Fitur berikutnya yang menyentuh Vendor Request | Bagian F9 (gabung dengan F10 `UpdateItems`/`transition`) |
 
 ## Urutan eksekusi
@@ -34,7 +34,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | AI-DLC `.claude/sdlc/money-decimal-string/` (S1–S7, T1–T8 hijau 2026-10-12) | [x] |
 | 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [x] 2026-10-09, 10 batch |
 | 9 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | MEDIUM | M | ikut fitur berikutnya | [ ] |
-| 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [~] 2026-10-12 `user_admin` |
+| 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [~] 2026-10-12 `user_admin` + `masterdata_import` |
 | — | F11 | Setup CI (build, vet, lint, test `-tags integration`) | — | M | butuh keputusan user | [ ] |
 
 Tidak dimasukkan (sengaja): duplikasi handler admin (M4) dan `main()` panjang (M5). Keduanya diterima apa adanya; tangani hanya kalau ada perubahan yang harus diterapkan ke semua handler sekaligus. ST1005 di `pkg/auth/errors.go` juga disengaja (pesan ditampilkan ke user); di-exclude lewat F2.
@@ -181,7 +181,7 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 ## F10 — Fungsi kompleks (gocyclo > 20)
 | Fungsi | Lokasi | Cyclo | Rencana |
 | --- | --- | --- | --- |
-| `importEnv.validateFields` / `validateRow` / `buildEnv` / `readImportCSV` | `backend/internal/service/masterdata_import.go:669/490/338/127` | 47/40/21/22 | **Jangan refactor terpisah**: dikerjakan saat import diganti flow FSD replace-all (Sec 12) |
+| `importEnv.validateFields` / `validateRow` / `buildEnv` / `readImportCSV` | `backend/internal/service/masterdata_import.go:669/490/338/127` | 47/40/21/22 | ✅ 2026-10-12: refactor saja (user), helper privat per aturan baris + per entity; maks cyclo 19. Replace-all FSD tetap fitur terpisah |
 | `UserAdminService.Create` / `Update` | `backend/internal/auth/user_admin.go:154/294` | 34/34 | ✅ 2026-10-12: helper `validateProfile`/`localCredentials`/`uniqueness`/`resolveReferences` (auth di-flag, user pilih bugfix) |
 | `VaultPlanService.ReviewRequest` | `backend/internal/service/vault_plan_actions.go:283` | 25 | Ekstrak cabang approve/reject |
 | `syncVendorParties` | `backend/internal/service/vendor_party.go:132` | 24 | Ekstrak diff party lama vs baru |
@@ -225,3 +225,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-12 | F17 | `491a61f` | Keputusan PO: tolak disable harga yang belum berlaku saat submit. `rejectNotYetEffective` (start ≥ hari ini WIB → 422 `effective_start_date`) di `Disable` harga vendor-wide + harga khusus cabang. Tanpa perubahan SQL/skema. Test unit 2 service + full integration hijau. |
 | 2026-10-12 | F13 | `59e1e71` | `TRUSTED_PROXIES` (CIDR/IP, `pkg/config`, entri rusak = gagal start) + `pkg/middleware.TrustedRealIP` (XFF dibaca dari kanan hanya dari proxy tepercaya, ganti chi `RealIP`); `extractClientIP` = host `RemoteAddr` saja; `RealIP` dihapus di backend-cit. T1–T8 + full integration hijau; lint tinggal gocyclo `masterdata_import` ×2. Manual check outstanding (user). |
 | 2026-10-12 | F7 | `a03bf9b` | 3 endpoint (list ATM portal 5 field, detail DSR Saldo/Rencana Isi 11 field) kirim uang sebagai string desimal; status profil ATM dibandingkan eksak (`numericToRat` + `big.Rat`); `numericToFloat64Ptr` dihapus. CompanyPortal list pakai `formatRupiahDecimal` (pecahan non-nol kini selalu 2 digit, juga di profil/cashpos); VendorPortal `formatDecimalIDR` string (detail + dry-run). `formatRupiah` dipertahankan untuk DMAA (int64, sesuai Sec 6). Backend + integration, kedua FE test/build hijau. Manual check outstanding (user). Rilis backend + 2 FE bersamaan. |
+| 2026-10-12 | F10 masterdata_import | — | Refactor `validateFields`/`validateRow`/`readImportCSV`/`buildEnv` (cyclo 47/40/22/21 → maks 19) ke helper privat, perilaku sama, test lama hijau tanpa diubah. **golangci-lint backend 0 temuan.** Flow upsert tetap (replace-all FSD = fitur terpisah). Sisa F10: 6 fungsi cyclo 21–25 (di bawah ambang lint). |

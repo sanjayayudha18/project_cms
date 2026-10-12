@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — QC F10: kompleksitas import master data (`masterdata_import.go`)
+- **Symptom**: golangci-lint gocyclo: `importEnv.validateFields` cyclo 47 dan `validateRow` 40 (> 30); `readImportCSV` 22 dan `buildEnv` 21 (> 20, target F10).
+- **Root cause**: validasi semua entity (vendor, cabang, vault, PIC, ATM, kelolaan) dan semua aturan baris (id, natural key, kolom immutable, toggle aktif, tumpang tindih periode, op) ditulis inline di satu fungsi.
+- **Fix** (refactor, perilaku tidak berubah): `backend/internal/service/masterdata_import.go`. Helper privat baru: `rowID`, `checkNatKey`, `checkUpdate`, `checkSpan`, `rowOp` (dari `validateRow`); `validateVendor`/`validateVendorBranch`/`validateVault`/`validatePIC`/`validateATM`/`validateAssignment`/`validateAssignmentPackage` (dari `validateFields`); `cleanRecord`, `expandLegacy` (dari `readImportCSV`); `loadPackages` (dari `buildEnv`). Urutan cek, field error, dan pesan tetap sama; API publik tidak berubah. Flow upsert tetap; replace-all FSD tetap fitur terpisah (user memilih "refactor saja").
+- **Tests**: test import yang ada tetap hijau tanpa diubah; full `go test -tags integration -p 1 ./...` hijau, `internal/service` 80.7%. Cyclo sekarang maks 19 di file ini (validateRow 16, validateFields < 15). `golangci-lint` backend **0 temuan**. Catatan: `validatePIC` 0% coverage (sudah 0% sebelum refactor sebagai cabang PIC di `validateFields`). Manual browser verification (dry-run import CSV): outstanding.
+- **Commit**: _(diisi setelah commit)_
+
 ## 2026-10-12 — Flaky `routeGuard.property.test.tsx` (VendorPortal) saat CPU sibuk
 - **Symptom**: full suite VendorPortal kadang gagal di `src/features/auth/__tests__/routeGuard.property.test.tsx` ("Test timed out in 5000ms", "Unable to find ... login-page / redirect-target"); lolos bila dijalankan sendiri.
 - **Root cause**: timing test, bukan bug guard/sanitasi. Reproduksi 2026-10-12: dua full suite paralel → gagal 3/3, counterexample selalu input pertama tanpa shrink (`"//evil.com"`, `"/dsr"` — nilai yang lolos di run normal). Test pertama Property 1 (100 run) masih memakai timeout default 5 s (dua test interaktif sudah 30 s sejak 2026-10-09), dan `findByTestId`/`waitFor` memakai batas default 1 s, terlalu pendek saat render router lambat.

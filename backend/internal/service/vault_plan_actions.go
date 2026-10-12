@@ -316,10 +316,8 @@ func (s *VaultPlanService) ReviewRequest(ctx context.Context, actor Actor, reque
 	if err != nil {
 		return fmt.Errorf("list plans of request %d: %w", requestID, err)
 	}
-	for _, p := range plans {
-		if deref(p.SubmittedBy) == actor.UserID || deref(p.ApprovedBy) == actor.UserID {
-			return ErrSelfApproval
-		}
+	if plannedBy(plans, actor.UserID) {
+		return ErrSelfApproval
 	}
 	if !approve {
 		if err := q.ResetVaultPlansToDraft(ctx, requestID); err != nil {
@@ -348,9 +346,28 @@ func (s *VaultPlanService) ReviewRequest(ctx context.Context, actor Actor, reque
 	if err := notifyParties(ctx, s.notifier, q, req, notices); err != nil {
 		return err
 	}
+	if err := s.notifyReviewed(ctx, q, req, plans, r); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// plannedBy reports whether userID submitted or approved any area plan.
+func plannedBy(plans []db.ListVaultPlansForRequestRow, userID int64) bool {
+	for _, p := range plans {
+		if deref(p.SubmittedBy) == userID || deref(p.ApprovedBy) == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// notifyReviewed tells each area's ACM-USERs and the request creator about the
+// ATM-SPV decision; rejection carries the reason (nil reason = approved).
+func (s *VaultPlanService) notifyReviewed(ctx context.Context, q *db.Queries, req db.VendorRequest, plans []db.ListVaultPlansForRequestRow, reason *string) error {
 	title, body := "Penetapan vault disetujui tim ATM", fmt.Sprintf("Penetapan vault %s disetujui; request dikirim ke vendor.", req.RequestNumber)
-	if !approve {
-		title, body = "Penetapan vault ditolak tim ATM", fmt.Sprintf("Penetapan vault %s ditolak: %s", req.RequestNumber, *r)
+	if reason != nil {
+		title, body = "Penetapan vault ditolak tim ATM", fmt.Sprintf("Penetapan vault %s ditolak: %s", req.RequestNumber, *reason)
 	}
 	// Each recipient gets a link it can open (review R3): ACM-USERs cannot open
 	// Vendor Request pages, so they get their area's plan; the creator gets the request.
@@ -363,13 +380,11 @@ func (s *VaultPlanService) ReviewRequest(ctx context.Context, actor Actor, reque
 			return err
 		}
 	}
-	if err := s.notify(ctx, q, nil, "", []int64{req.CreatedBy}, notification.Message{
+	requestID := req.ID
+	return s.notify(ctx, q, nil, "", []int64{req.CreatedBy}, notification.Message{
 		Type: "vault_plan.reviewed", Title: title, Body: body,
 		Link: fmt.Sprintf("/replenishment/vendor-requests/%d", requestID), EntityType: "vendor_request", EntityID: &requestID, Email: true,
-	}); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	})
 }
 
 // notify sends msg to the members of areas holding role plus extra users (FR6.3), inside the caller's tx.

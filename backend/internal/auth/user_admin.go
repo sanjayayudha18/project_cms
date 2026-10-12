@@ -242,10 +242,7 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 		return db.UpdateUserAdminRow{}, auth.ErrUserNotFound
 	}
 
-	if req.Username != nil && strings.TrimSpace(*req.Username) != before.Username {
-		return db.UpdateUserAdminRow{}, ErrImmutableField
-	}
-	if req.AuthSource != nil && strings.TrimSpace(*req.AuthSource) != before.AuthSource {
+	if changesImmutable(req, before) {
 		return db.UpdateUserAdminRow{}, ErrImmutableField
 	}
 
@@ -260,19 +257,9 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 		return db.UpdateUserAdminRow{}, ErrSelfSupervision
 	}
 
-	// Uniqueness is only re-checked for values that actually changed.
-	if email != before.Email {
-		existingID, err := s.repo.FindByEmailExcludingID(ctx, email, id)
-		if err := uniqueness("email", existingID, err); err != nil {
-			return db.UpdateUserAdminRow{}, err
-		}
-	}
 	employeeID := strings.TrimSpace(req.EmployeeID)
-	if employeeID != "" && (before.EmployeeID == nil || employeeID != *before.EmployeeID) {
-		existingID, err := s.repo.FindByEmployeeIDExcludingID(ctx, employeeID, id)
-		if err := uniqueness("employee_id", existingID, err); err != nil {
-			return db.UpdateUserAdminRow{}, err
-		}
+	if err := s.uniqueOnUpdate(ctx, id, before, email, employeeID); err != nil {
+		return db.UpdateUserAdminRow{}, err
 	}
 
 	roleID, err := s.resolveReferences(ctx, role, req.VendorID, req.SupervisorID)
@@ -292,15 +279,7 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 		ApprovalLevel: req.ApprovalLevel,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			// The query filters deleted_at IS NULL -- a race where the user
-			// was disabled between the pre-check and this UPDATE lands here too.
-			return db.UpdateUserAdminRow{}, auth.ErrUserNotFound
-		}
-		if field, ok := conflictFieldFromPgError(err); ok {
-			return db.UpdateUserAdminRow{}, &ConflictError{Field: field, Message: "sudah digunakan"}
-		}
-		return db.UpdateUserAdminRow{}, fmt.Errorf("updating user: %w", err)
+		return db.UpdateUserAdminRow{}, mapUserUpdateError(err)
 	}
 
 	if err := s.audit.Write(ctx, audit.Entry{
@@ -316,6 +295,41 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 	}
 
 	return updated, nil
+}
+
+// changesImmutable reports an attempt to change username or auth_source.
+func changesImmutable(req UpdateUserRequest, before *db.GetUserAdminByIDRow) bool {
+	return (req.Username != nil && strings.TrimSpace(*req.Username) != before.Username) ||
+		(req.AuthSource != nil && strings.TrimSpace(*req.AuthSource) != before.AuthSource)
+}
+
+// uniqueOnUpdate re-checks uniqueness only for values that actually changed.
+func (s *UserAdminService) uniqueOnUpdate(ctx context.Context, id int64, before *db.GetUserAdminByIDRow, email, employeeID string) error {
+	if email != before.Email {
+		existingID, err := s.repo.FindByEmailExcludingID(ctx, email, id)
+		if err := uniqueness("email", existingID, err); err != nil {
+			return err
+		}
+	}
+	if employeeID != "" && (before.EmployeeID == nil || employeeID != *before.EmployeeID) {
+		existingID, err := s.repo.FindByEmployeeIDExcludingID(ctx, employeeID, id)
+		if err := uniqueness("employee_id", existingID, err); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mapUserUpdateError(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The query filters deleted_at IS NULL -- a race where the user
+		// was disabled between the pre-check and this UPDATE lands here too.
+		return auth.ErrUserNotFound
+	}
+	if field, ok := conflictFieldFromPgError(err); ok {
+		return &ConflictError{Field: field, Message: "sudah digunakan"}
+	}
+	return fmt.Errorf("updating user: %w", err)
 }
 
 // validateProfile checks the fields Create and Update share, in the order the

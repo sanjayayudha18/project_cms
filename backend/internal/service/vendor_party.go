@@ -159,52 +159,15 @@ func syncVendorParties(ctx context.Context, q *db.Queries, actorID int64, req db
 	for _, p := range existing {
 		k := partyKey{p.VendorBranchID, p.Role}
 		c, ok := built[k]
-		if !ok {
-			if p.Status == "withdrawn" {
-				continue
-			}
-			w, err := q.WithdrawVendorParty(ctx, p.ID)
-			if err != nil {
-				return nil, fmt.Errorf("withdraw party %d: %w", p.ID, err)
-			}
-			if err := record(w, "withdrawn", nil); err != nil {
-				return nil, err
-			}
-			continue
+		if ok {
+			seen[k] = true
 		}
-		seen[k] = true
-		fresh, err := json.Marshal(c)
-		if err != nil {
-			return nil, fmt.Errorf("encode party content: %w", err)
-		}
-		// Unchanged pending/accepted parties are left alone (FR2.2); a rejected or
-		// withdrawn party always gets the request again.
-		unchanged := sameContent(p.Content, fresh) && (p.Status == "accepted" || p.Status == "pending")
-		if unchanged && !forceAll {
-			continue
-		}
-		r, err := q.ResendVendorParty(ctx, db.ResendVendorPartyParams{Content: fresh, ID: p.ID})
-		if err != nil {
-			return nil, fmt.Errorf("resend party %d: %w", p.ID, err)
-		}
-		if err := record(r, "resent", fresh); err != nil {
+		if err := refreshParty(ctx, q, p, c, ok, forceAll, record); err != nil {
 			return nil, err
 		}
 	}
 
-	keys := make([]partyKey, 0, len(built))
-	for k := range built {
-		if !seen[k] {
-			keys = append(keys, k)
-		}
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].branchID != keys[j].branchID {
-			return keys[i].branchID < keys[j].branchID
-		}
-		return keys[i].role < keys[j].role
-	})
-	for _, k := range keys {
+	for _, k := range newPartyKeys(built, seen) {
 		fresh, err := json.Marshal(built[k])
 		if err != nil {
 			return nil, fmt.Errorf("encode party content: %w", err)
@@ -220,6 +183,55 @@ func syncVendorParties(ctx context.Context, q *db.Queries, actorID int64, req db
 		}
 	}
 	return notices, nil
+}
+
+// refreshParty brings one existing party in line with the request: withdrawn
+// when it is no longer part of it (wanted=false), resent when its content
+// changed, it was rejected/withdrawn, or forceAll; otherwise left alone.
+func refreshParty(ctx context.Context, q *db.Queries, p db.VendorRequestVendorParty, c *PartyContent, wanted, forceAll bool,
+	record func(db.VendorRequestVendorParty, string, []byte) error) error {
+	if !wanted {
+		if p.Status == "withdrawn" {
+			return nil
+		}
+		w, err := q.WithdrawVendorParty(ctx, p.ID)
+		if err != nil {
+			return fmt.Errorf("withdraw party %d: %w", p.ID, err)
+		}
+		return record(w, "withdrawn", nil)
+	}
+	fresh, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("encode party content: %w", err)
+	}
+	// Unchanged pending/accepted parties are left alone (FR2.2); a rejected or
+	// withdrawn party always gets the request again.
+	unchanged := sameContent(p.Content, fresh) && (p.Status == "accepted" || p.Status == "pending")
+	if unchanged && !forceAll {
+		return nil
+	}
+	r, err := q.ResendVendorParty(ctx, db.ResendVendorPartyParams{Content: fresh, ID: p.ID})
+	if err != nil {
+		return fmt.Errorf("resend party %d: %w", p.ID, err)
+	}
+	return record(r, "resent", fresh)
+}
+
+// newPartyKeys lists the built parties not yet stored, ordered by branch then role.
+func newPartyKeys(built map[partyKey]*PartyContent, seen map[partyKey]bool) []partyKey {
+	keys := make([]partyKey, 0, len(built))
+	for k := range built {
+		if !seen[k] {
+			keys = append(keys, k)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].branchID != keys[j].branchID {
+			return keys[i].branchID < keys[j].branchID
+		}
+		return keys[i].role < keys[j].role
+	})
+	return keys
 }
 
 // reapprovedSinceSent reports whether req went back through ATM-SPV approve

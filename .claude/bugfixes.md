@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — Flaky `routeGuard.property.test.tsx` (VendorPortal) saat CPU sibuk
+- **Symptom**: full suite VendorPortal kadang gagal di `src/features/auth/__tests__/routeGuard.property.test.tsx` ("Test timed out in 5000ms", "Unable to find ... login-page / redirect-target"); lolos bila dijalankan sendiri.
+- **Root cause**: timing test, bukan bug guard/sanitasi. Reproduksi 2026-10-12: dua full suite paralel → gagal 3/3, counterexample selalu input pertama tanpa shrink (`"//evil.com"`, `"/dsr"` — nilai yang lolos di run normal). Test pertama Property 1 (100 run) masih memakai timeout default 5 s (dua test interaktif sudah 30 s sejak 2026-10-09), dan `findByTestId`/`waitFor` memakai batas default 1 s, terlalu pendek saat render router lambat.
+- **Fix** (test saja, kode produksi tidak berubah): konstanta `WAIT = { timeout: 5_000 }` untuk semua `findByTestId`/`waitFor` di file itu, dan test pertama memakai `INTERACTIVE_TIMEOUT_MS` (30 s). Batas yang lebih longgar hanya terpakai saat render benar-benar lambat.
+- **Tests**: skenario beban yang sama (2 full suite paralel × 3) → 6/6 run 127/127 hijau. `lint` bersih.
+- **Commit**: _(belum)_
+
 ## 2026-10-12 — A11y VendorPortal: sort, baris DSR, dialog DSR, baris invoice lewat keyboard
 - **Symptom**: 9 warning biome a11y. Yang nyata: sort kolom `DataTable` dan buka detail DSR (klik baris) tidak bisa lewat keyboard; dialog DSR tidak tertutup dengan Escape; baris invoice `<tr role="button">` merusak semantik tabel untuk screen reader.
 - **Root cause**: handler `onClick` dipasang di `<th>`/`<tr>`/overlay tanpa jalur keyboard; baris invoice dijadikan tombol.

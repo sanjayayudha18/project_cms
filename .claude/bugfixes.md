@@ -20,7 +20,7 @@ Template:
 - **Root cause**: belum ada test langsung.
 - **Fix** (test saja, kode produksi tidak berubah): `vendor_package_price_admin_test.go` (unit: vendor tak dikenal / INTERNAL (ROH) / label kosong / harga rusak / gagal cek vendor → ditolak tanpa `Submit`; update row vendor lain / tidak ada / sudah berakhir → `ErrVendorPackagePriceNotFound`, end < start → 422; update + disable mengirim `EntityID` + snapshot `Before`). `masterdata_import_helpers_test.go` (unit: nominal sel tetap string eksak, sel opsional kosong → nil, PIC tanpa `branch_code` = vendor-wide, hanya `"true"` persis yang mem-blacklist; baris toggle → enable/disable bukan update; error validasi/konflik → error baris 422, error lain tetap 500; template = BOM + header saja). `admin_reads_integration_test.go` (repo asli, tx rollback: change request pending, cabang, peta lokasi DSR + label DSR yang belum dipetakan). `pkg/response/response_test.go` (envelope success/created/error/validation, field kosong tidak dikirim).
 - **Tests**: coverage `internal/service` 78.9% → 80.6%, `pkg/response` 0 → 100%. **F8 selesai**: semua package `internal/*` ≥ 80% (`internal/db` generated dikecualikan). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
-- **Commit**: _(belum)_
+- **Commit**: `b21f2e4`
 
 ---
 

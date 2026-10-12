@@ -222,4 +222,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F8 b7 | `151d2d2` | Test handler 0% tersisa: ACM area, update/enable admin, UpdateItems/Revise, audit vault plan, RetryApply, /auth/me, sukses upload+confirm DSR. handler 75.0→79.6%. |
 | 2026-10-09 | F8 b8 | `d1e2ca1` | Test `handleAuthError` + id rusak disable/enable admin. handler 79.6→80.3% (≥ 80%). |
 | 2026-10-09 | F8 b9 | `b9d8793` | Test `DsrService` (unit, fake repo + miniredis) + baca harga admin cabang/vendor-wide (integration). service 75.6→78.9%. |
-| 2026-10-09 | F8 b10 | (belum di-commit) | Test submit harga vendor-wide, helper import/export CSV, baca admin via repo asli, `pkg/response`. service 78.9→80.6%. **F8 selesai**: semua `internal/*` ≥ 80%. |
+| 2026-10-09 | F8 b10 | `b21f2e4` | Test submit harga vendor-wide, helper import/export CSV, baca admin via repo asli, `pkg/response`. service 78.9→80.6%. **F8 selesai**: semua `internal/*` ≥ 80%. |

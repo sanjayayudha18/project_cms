@@ -20,7 +20,7 @@ Template:
 - **Root cause**: handler `onClick` dipasang di `<th>`/`<tr>`/overlay tanpa jalur keyboard; baris invoice dijadikan tombol.
 - **Fix** (keputusan user 2026-10-12, semua opsi rekomendasi): `components/ui/DataTable.tsx` — header sortable jadi `<button>` di dalam `<th>` (`aria-sort` tetap di `<th>`), baris dengan `onRowClick` dapat `tabIndex=0` + Enter/Space + focus ring. `features/dsr/DsrDetailDialog.tsx` + `DsrUploadDialog.tsx` — Escape menutup dialog (upload: tidak saat `uploading`/`confirming`, sama dengan klik overlay); `<dialog>` native ditunda (biome-ignore beralasan). `features/invoices/InvoicesPage.tsx` — `role="button"`/`aria-expanded`/`aria-label` pindah ke `<button>` chevron di sel pertama; klik tombol (juga Enter/Space) bubble ke `onToggle` baris; `handleRowKeyDown` + prop `onKeyDown` dihapus. `biome-ignore` beralasan untuk `FileUpload` drop zone (sudah punya Enter/Space) dan backdrop `AppShell` (`aria-hidden`, Escape sudah ada).
 - **Tests**: `DataTable.test.tsx` +3 (sort via tombol header + `aria-sort`, Enter/Space di baris klik, baris tanpa `onRowClick` tidak fokusabel), `DsrUploadDialog.test.tsx` +1 (Escape menutup). `lint` 0 error / 0 warning, `test` 18 file / 127 test hijau, `build` hijau. Catatan: `routeGuard.property.test.tsx` sekali gagal flaky saat full run, lolos 5/5 terpisah dan 3/3 di HEAD — tidak terkait. Manual browser verification (Tab ke header & baris DSR, Escape di dialog, expand invoice dengan keyboard, tampilan header/baris tidak berubah): outstanding.
-- **Commit**: _(belum)_
+- **Commit**: `434336a`
 
 ## 2026-10-12 — Lint VendorPortal gagal (format test + warning ringan)
 - **Symptom**: `pnpm --dir frontend/VendorPortal-Vite run lint` exit 1 (sudah sejak sebelum QC F7): 1 error + 16 warning.

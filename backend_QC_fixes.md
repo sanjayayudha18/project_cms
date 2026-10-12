@@ -12,7 +12,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | ID | Item | Kenapa ditunda | Yang dibutuhkan untuk mulai | Titik lanjut |
 | --- | --- | --- | --- | --- |
 | F7 | Uang `float64` → string desimal (3 endpoint + `computeReplenishmentStatus` + 2 frontend) | Money + kontrak API 2 frontend → AI-DLC penuh | ✅ intent accepted + Q1–Q6 dijawab 2026-10-12 → lanjut `spec.md` | `.claude/sdlc/money-decimal-string/intent.md` (draft) → `spec.md` |
-| F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | ✅ 2026-10-12: prod = **Nginx → backend (1 hop tepercaya)**; dok = AI-DLC penuh | Bagian F13 di file ini |
+| F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | ✅ 2026-10-12: prod = **Nginx → backend (1 hop tepercaya)**; dok = AI-DLC penuh (`.claude/sdlc/client-ip-trust/`, Q1–Q5 dijawab). Python EOD di luar scope → `python_eod_client_ip_todo.md` | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | **Ditunda oleh user 2026-10-12** (belum perlu CI) | Bagian F11 |
 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai; `user_admin` selesai 2026-10-12. Sisa: `masterdata_import` (tunggu FSD replace-all) + fungsi cyclo 21–25 (di bawah ambang lint 30) | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | Hindari bentrok dengan pekerjaan Vendor Request yang sedang jalan | Fitur berikutnya yang menyentuh Vendor Request | Bagian F9 (gabung dengan F10 `UpdateItems`/`transition`) |

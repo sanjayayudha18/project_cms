@@ -20,7 +20,7 @@ Template:
 - **Root cause**: `uvicorn.run` di kedua `run.py` tanpa konfigurasi proxy: default uvicorn hanya memercayai `X-Forwarded-For` dari `127.0.0.1`, jadi IP Nginx tidak pernah diganti. Entri yang rusak di `forwarded_allow_ips` juga diam-diam diabaikan uvicorn.
 - **Fix**: helper baru `backend_python/lib/utils/proxy.py` (`parse_trusted_proxies`, `uvicorn_proxy_kwargs`). Setting `trusted_proxies` (`RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES`, validator = gagal start bila rusak) di kedua `config.py`, dan kedua `run.py` meneruskan `proxy_headers` + `forwarded_allow_ips`. Kosong = proxy header dimatikan total (juga untuk 127.0.0.1); terisi = middleware uvicorn ≥ 0.30 membaca XFF dari kanan dan melewati hop tepercaya, sama dengan Go `TrustedRealIP`. `retry.py` tidak diubah. Dokumen: kedua `.env.example`, `.claude/docs/deployment.md`, `python_eod_client_ip_todo.md` (selesai).
 - **Tests**: `python -m unittest lib.utils.test_proxy` (8 test: parser, fail-fast kedua `Settings`, kosong = header diabaikan bahkan dari localhost, klien tidak tepercaya tidak bisa memalsukan XFF, Nginx → IP paling kanan, hop LB dilewati; memakai `ProxyHeadersMiddleware` asli uvicorn 0.52.4). `lib` 65 test (dengan DB dev), `dsr` + `itm/cashpos` hijau. Manual (retry manual dari halaman EOD Monitoring lewat Nginx → `retry_audit_logs`/`audit_logs` berisi IP browser): outstanding.
-- **Commit**: _(belum)_
+- **Commit**: `5f0ced8`
 
 ## 2026-10-12 — QC F17: harga yang belum berlaku tidak bisa di-disable (approve gagal 409)
 - **Symptom**: disable harga vendor-wide (`vendor_package_prices`) atau harga khusus cabang (`vendor_packages_branch`) yang mulai hari ini atau nanti lolos submit (202), tapi approve-nya selalu gagal 409.

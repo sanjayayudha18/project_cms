@@ -152,4 +152,21 @@ func TestVendorPackagePriceAdminService_UpdateAndDisable(t *testing.T) {
 	if _, err := svc.Disable(ctx, 7, 5, 1, "ip"); !errors.Is(err, ErrVendorPackagePriceNotFound) {
 		t.Fatalf("disable another vendor's row err = %v", err)
 	}
+
+	// QC F17: a price starting today or later cannot be ended "as of
+	// yesterday" (period CHECK end >= start) -- refused at submit, not at approve.
+	sub = &fakeVendorBranchSubmitter{}
+	future := NewVendorPackagePriceAdminService(futurePriceRepo{}, sub)
+	var ve *ValidationError
+	if _, err := future.Disable(ctx, 7, 3, 1, "ip"); !errors.As(err, &ve) || ve.Field != "effective_start_date" || sub.submitCalled {
+		t.Fatalf("disable not-yet-effective price = %v (submitted %v), want effective_start_date ValidationError", err, sub.submitCalled)
+	}
+}
+
+// futurePriceRepo serves vendor 3's price 1 starting today (WIB).
+type futurePriceRepo struct{ fakePriceAdminRepo }
+
+func (futurePriceRepo) GetByID(context.Context, int64) (*db.GetVendorPackagePriceAdminByIDRow, error) {
+	return &db.GetVendorPackagePriceAdminByIDRow{ID: 1, VendorID: 3,
+		EffectiveStartDate: pgtype.Date{Time: jakartaCalendarDate(0), Valid: true}}, nil
 }

@@ -15,6 +15,13 @@ Template:
 
 ---
 
+## 2026-10-12 — QC F17: harga yang belum berlaku tidak bisa di-disable (approve gagal 409)
+- **Symptom**: disable harga vendor-wide (`vendor_package_prices`) atau harga khusus cabang (`vendor_packages_branch`) yang mulai hari ini atau nanti lolos submit (202), tapi approve-nya selalu gagal 409.
+- **Root cause**: disable mengisi `effective_end_date = CURRENT_DATE - 1` (`queries/vendor_package_prices_admin.sql`, `queries/vendor_packages_admin.sql`), sehingga untuk start ≥ hari ini melanggar `*_period_chk` (`end >= start`). Submit tidak mengecek hal ini.
+- **Fix** (keputusan PO 2026-10-12: tolak saat submit): helper `rejectNotYetEffective` di `backend/internal/service/vendor_package_price_admin.go`, dipanggil di `Disable` kedua service (`vendor_package_price_admin.go`, `vendor_package_admin.go`). Harga dengan start ≥ hari ini (WIB, `jakartaCalendarDate`) → `ValidationError` field `effective_start_date` → 422, tanpa staging. Harga seperti itu dipendekkan lewat Ubah (`effective_end_date`). SQL dan skema tidak berubah.
+- **Tests**: `TestVendorPackageAdminService_Disable_NotYetEffective` (kemarin → di-stage; hari ini / besok → 422 tanpa submit) dan kasus serupa di `TestVendorPackagePriceAdminService_UpdateAndDisable`. Komentar F17 di `masterdata_applier_price_integration_test.go` diperbarui. `go test -tags integration ./...` (backend) hijau. Disable yang lolos submit tetap aman di-approve kapan pun (start < hari ini ≤ tanggal approve); sisa celah hanya sekitar tengah malam bila zona waktu DB (`CURRENT_DATE`) ≠ WIB → tetap 409 seperti sebelumnya. Manual browser verification (tombol Nonaktifkan pada harga yang belum berlaku menampilkan pesan error): outstanding.
+- **Commit**: _(belum)_
+
 ## 2026-10-12 — QC F10 (sebagian): kompleksitas `UserAdminService` Create/Update
 - **Symptom**: golangci-lint gocyclo: `UserAdminService.Create` dan `Update` cyclo 34 (> 30).
 - **Root cause**: validasi profil, aturan `auth_source`, cek unik, dan resolusi referensi ditulis inline dan terduplikasi di kedua fungsi.

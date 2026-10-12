@@ -281,6 +281,9 @@ func (s *VendorPackageAdminService) Disable(ctx context.Context, makerID, vendor
 	if err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
+	if err := rejectNotYetEffective(before.EffectiveStartDate); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_package", Op: "disable", EntityID: &id, Before: before}, actorIP)
 }
 

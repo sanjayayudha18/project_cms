@@ -239,7 +239,21 @@ func (s *VendorPackagePriceAdminService) Disable(ctx context.Context, makerID, v
 	if err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
+	if err := rejectNotYetEffective(before.EffectiveStartDate); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_package_price", Op: "disable", EntityID: &id, Before: before}, actorIP)
+}
+
+// rejectNotYetEffective refuses to disable a price starting today or later:
+// disable ends the period as of yesterday, which the period CHECK (end >=
+// start) rejects at apply time (QC F17, PO 2026-10-12). Such a price is
+// shortened via Update's effective_end_date instead.
+func rejectNotYetEffective(start pgtype.Date) error {
+	if start.Valid && !start.Time.Before(jakartaCalendarDate(0)) {
+		return &ValidationError{Field: "effective_start_date", Message: "harga yang belum berlaku tidak dapat dinonaktifkan; ubah tanggal berakhirnya"}
+	}
+	return nil
 }
 
 func (s *VendorPackagePriceAdminService) load(ctx context.Context, vendorID, id int64) (*db.GetVendorPackagePriceAdminByIDRow, error) {

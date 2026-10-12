@@ -74,8 +74,8 @@ func TestIntegration_VendorPackagePriceApplier(t *testing.T) {
 	}
 
 	// disable closes a running period (end = yesterday) instead of deleting the row.
-	// A period starting today or later cannot be disabled yet: CURRENT_DATE-1 <
-	// start violates vpp_period_chk -- tracked as backend_QC_fixes.md F17.
+	// A period starting today or later would violate vpp_period_chk here, so
+	// the service refuses to stage that disable (QC F17, rejectNotYetEffective).
 	if _, err := applyPriceChange(t, tx, "disable", &second, map[string]any{}); err != nil {
 		t.Fatalf("disable: %v", err)
 	}

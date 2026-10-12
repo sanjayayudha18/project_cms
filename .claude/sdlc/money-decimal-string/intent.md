@@ -1,6 +1,6 @@
 # Intent: Nilai uang di API sebagai string desimal, bukan `float64` (QC F7)
 
-Author: user (product owner), ditulis bersama Claude. Status: **draft 2026-10-09** — menunggu PO accept.
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-12** (PO, Q1–Q6 dijawab di bawah).
 Stage: 1 Plan. Stage berikut: `spec.md`.
 Asal: Backend QC 2026-10-09, temuan H2 (`backend_QC_result.md`), item F7 (`backend_QC_fixes.md`).
 Menyentuh Sec 4 #7: **uang** (representasi nominal IDR + logika status berbasis nominal) + **kontrak API dua frontend** → wajib AI-DLC penuh. Tidak ada migrasi skema.
@@ -48,3 +48,11 @@ Risiko nyata saat ini rendah (nilai IDR bulat aman di float64 sampai 2⁵³), te
 4. Apakah frontend boleh melakukan aritmetika (total/agregat) atas nilai ini di masa depan? Kalau ya, perlu util desimal di FE (tanpa library baru) — atau aturan: agregat selalu dari backend.
 5. Perlu sekalian menyamakan nama field list (`low_threshold`) dengan profil (`low_threshold_amount`)? (Saran Claude: **tidak**, di luar scope — hanya tipe.)
 6. Satu rilis untuk backend + kedua frontend OK, atau perlu masa transisi (field lama + baru)?
+
+## Jawaban PO (2026-10-12)
+1. **Sorting**: sudah di SQL (`backend/queries/atm_portal.sql:96-99`, `ORDER BY` atas kolom numeric), jadi tetap numerik walau response jadi string. Frontend tidak men-sort nilai uang. (Dicek Claude di kode.)
+2. **Konsumen lain**: tidak ada, hanya CompanyPortal + VendorPortal.
+3. **Format**: ikut `numericToDecimalString` yang sudah ada (mis. `"1250000.00"`); kolom NULL tetap `null`, bukan `"0.00"`.
+4. **Aritmetika di FE**: tidak. Frontend hanya memformat untuk tampilan; agregat apa pun dihitung backend (numeric). Tidak ada util desimal di FE.
+5. **Rename `low_threshold` → `low_threshold_amount`**: tidak, di luar scope (hanya tipe).
+6. **Rilis**: backend + kedua frontend dalam satu rilis, tanpa field ganda/masa transisi.

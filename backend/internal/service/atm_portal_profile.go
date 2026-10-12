@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -187,11 +188,11 @@ func (s *AtmPortalService) GetATMProfile(ctx context.Context, terminalID string)
 		return nil, fmt.Errorf("getting latest replenish: %w", err)
 	}
 
-	lowThreshold, err := numericToFloat64Ptr(atmRow.LowThresholdAmount)
+	lowThreshold, err := numericToRat(atmRow.LowThresholdAmount)
 	if err != nil {
 		return nil, fmt.Errorf("low_threshold_amount: %w", err)
 	}
-	criticalThreshold, err := numericToFloat64Ptr(atmRow.CriticalThresholdAmount)
+	criticalThreshold, err := numericToRat(atmRow.CriticalThresholdAmount)
 	if err != nil {
 		return nil, fmt.Errorf("critical_threshold_amount: %w", err)
 	}
@@ -230,7 +231,7 @@ func (s *AtmPortalService) GetATMProfile(ctx context.Context, terminalID string)
 // latestRefundTotal fetches the latest replenish record's refund_total,
 // returning hasReplenish=false (not an error) when the terminal has no
 // replenish history yet.
-func latestRefundTotal(ctx context.Context, repo AtmPortalProfileRepository, terminalID string) (*float64, bool, error) {
+func latestRefundTotal(ctx context.Context, repo AtmPortalProfileRepository, terminalID string) (*big.Rat, bool, error) {
 	n, err := repo.GetLatestReplenishForTerminal(ctx, terminalID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -238,7 +239,7 @@ func latestRefundTotal(ctx context.Context, repo AtmPortalProfileRepository, ter
 		}
 		return nil, false, err
 	}
-	v, err := numericToFloat64Ptr(n)
+	v, err := numericToRat(n)
 	if err != nil {
 		return nil, false, err
 	}
@@ -247,17 +248,18 @@ func latestRefundTotal(ctx context.Context, repo AtmPortalProfileRepository, ter
 
 // computeReplenishmentStatus applies the strict precedence order from
 // design.md Property 4: unconfigured > no_data > critical > low > normal.
-func computeReplenishmentStatus(lowThreshold, criticalThreshold *float64, hasReplenish bool, refundTotal *float64) string {
+// Money is compared exactly (big.Rat), never as float (QC F7).
+func computeReplenishmentStatus(lowThreshold, criticalThreshold *big.Rat, hasReplenish bool, refundTotal *big.Rat) string {
 	if lowThreshold == nil {
 		return "unconfigured"
 	}
 	if !hasReplenish || refundTotal == nil {
 		return "no_data"
 	}
-	if criticalThreshold != nil && *refundTotal <= *criticalThreshold {
+	if criticalThreshold != nil && refundTotal.Cmp(criticalThreshold) <= 0 {
 		return "critical"
 	}
-	if *refundTotal <= *lowThreshold {
+	if refundTotal.Cmp(lowThreshold) <= 0 {
 		return "low"
 	}
 	return "normal"
@@ -427,4 +429,19 @@ func numericToDecimalStringPtr(n pgtype.Numeric) (*string, error) {
 		return nil, err
 	}
 	return &s, nil
+}
+
+// numericToRat converts a nullable pgtype.Numeric into an exact *big.Rat for
+// money comparisons, nil for SQL NULL. Goes through numericToDecimalStringPtr
+// so NaN/infinity are rejected the same way.
+func numericToRat(n pgtype.Numeric) (*big.Rat, error) {
+	s, err := numericToDecimalStringPtr(n)
+	if err != nil || s == nil {
+		return nil, err
+	}
+	r, ok := new(big.Rat).SetString(*s)
+	if !ok {
+		return nil, fmt.Errorf("parsing decimal %q", *s)
+	}
+	return r, nil
 }

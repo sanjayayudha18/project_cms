@@ -128,13 +128,13 @@ type AtmWithCashPos struct {
 	MachineType             string
 	Brand                   string
 	DeploymentType          string
-	LowThresholdAmount      *float64
-	CriticalThresholdAmount *float64
+	LowThresholdAmount      *string
+	CriticalThresholdAmount *string
 	LastReplenishDate       *time.Time
 	LastReplenishTime       *string
-	RefundTotal             *float64
-	ReplenishTotal          *float64
-	Escrow                  *float64
+	RefundTotal             *string
+	ReplenishTotal          *string
+	Escrow                  *string
 	Status                  string
 }
 
@@ -283,23 +283,23 @@ func (s *AtmPortalService) ListATMs(ctx context.Context, params ListATMsParams) 
 // public AtmWithCashPos, unwrapping pgtype nullable values into plain Go
 // pointer types.
 func rowToAtmWithCashPos(row db.ListATMsWithCashPosRow) (AtmWithCashPos, error) {
-	lowThreshold, err := numericToFloat64Ptr(row.LowThresholdAmount)
+	lowThreshold, err := numericToDecimalStringPtr(row.LowThresholdAmount)
 	if err != nil {
 		return AtmWithCashPos{}, fmt.Errorf("low_threshold_amount: %w", err)
 	}
-	criticalThreshold, err := numericToFloat64Ptr(row.CriticalThresholdAmount)
+	criticalThreshold, err := numericToDecimalStringPtr(row.CriticalThresholdAmount)
 	if err != nil {
 		return AtmWithCashPos{}, fmt.Errorf("critical_threshold_amount: %w", err)
 	}
-	refundTotal, err := numericToFloat64Ptr(row.RefundTotal)
+	refundTotal, err := numericToDecimalStringPtr(row.RefundTotal)
 	if err != nil {
 		return AtmWithCashPos{}, fmt.Errorf("refund_total: %w", err)
 	}
-	replenishTotal, err := numericToFloat64Ptr(row.ReplenishTotal)
+	replenishTotal, err := numericToDecimalStringPtr(row.ReplenishTotal)
 	if err != nil {
 		return AtmWithCashPos{}, fmt.Errorf("replenish_total: %w", err)
 	}
-	escrow, err := numericToFloat64Ptr(row.Escrow)
+	escrow, err := numericToDecimalStringPtr(row.Escrow)
 	if err != nil {
 		return AtmWithCashPos{}, fmt.Errorf("escrow: %w", err)
 	}
@@ -320,20 +320,6 @@ func rowToAtmWithCashPos(row db.ListATMsWithCashPosRow) (AtmWithCashPos, error) 
 		Escrow:                  escrow,
 		Status:                  row.Status,
 	}, nil
-}
-
-// numericToFloat64Ptr converts a pgtype.Numeric into a *float64, returning
-// nil for SQL NULL.
-func numericToFloat64Ptr(n pgtype.Numeric) (*float64, error) {
-	if !n.Valid {
-		return nil, nil
-	}
-	f, err := n.Float64Value()
-	if err != nil {
-		return nil, fmt.Errorf("converting numeric to float64: %w", err)
-	}
-	v := f.Float64
-	return &v, nil
 }
 
 // dateToTimePtr converts a pgtype.Date into a *time.Time, returning nil for

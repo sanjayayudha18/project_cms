@@ -1,5 +1,6 @@
 import {
   formatBadgeCount,
+  formatDecimalIDR,
   formatIDR,
   formatRp,
   getBalanceStatus,
@@ -184,6 +185,36 @@ describe("Property 5: Balance Status Classification", () => {
         }
       }),
       { numRuns: 100 },
+    );
+  });
+});
+
+// QC F7: API money arrives as an exact decimal string; formatting never goes through float.
+describe("formatDecimalIDR", () => {
+  it.each([
+    ["1500000.00", "1.500.000"],
+    ["1500000", "1.500.000"],
+    ["1250000.50", "1.250.000,50"],
+    ["1250000.5", "1.250.000,50"],
+    ["0.00", "0"],
+    ["-2500.75", "-2.500,75"],
+    ["9999999999999999.99", "9.999.999.999.999.999,99"],
+    ["abc", "abc"],
+  ])("%s → %s", (input, want) => {
+    expect(formatDecimalIDR(input)).toBe(want);
+  });
+
+  it("returns - for null/undefined/empty", () => {
+    expect(formatDecimalIDR(null)).toBe("-");
+    expect(formatDecimalIDR(undefined)).toBe("-");
+    expect(formatDecimalIDR("")).toBe("-");
+  });
+
+  it("matches toLocaleString for whole rupiah values (display unchanged)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 1_000_000_000_000 }), (n) => {
+        expect(formatDecimalIDR(`${n}.00`)).toBe(n.toLocaleString("id-ID"));
+      }),
     );
   });
 });

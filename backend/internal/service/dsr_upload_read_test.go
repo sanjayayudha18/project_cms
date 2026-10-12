@@ -160,7 +160,7 @@ func TestDsrService_SheetDetailIsVendorScoped(t *testing.T) {
 		daily.ReportDate == nil || len(daily.Errors) != 1 || daily.Errors[0].Label != "SALDO ?" {
 		t.Errorf("daily detail = %+v", daily)
 	}
-	if len(daily.DailyRows) != 1 || daily.DailyRows[0].LineTotalIdr == nil || *daily.DailyRows[0].LineTotalIdr != 1500000 || daily.DailyRows[0].Denom100k != nil {
+	if len(daily.DailyRows) != 1 || daily.DailyRows[0].LineTotalIdr == nil || *daily.DailyRows[0].LineTotalIdr != "1500000.00" || daily.DailyRows[0].Denom100k != nil {
 		t.Errorf("daily rows = %+v (NULL denom must stay nil)", daily.DailyRows)
 	}
 
@@ -169,7 +169,7 @@ func TestDsrService_SheetDetailIsVendorScoped(t *testing.T) {
 		t.Fatal(err)
 	}
 	if rencana.Status != "failed" || rencana.RowCount != 0 || len(rencana.RencanaIsiRows) != 1 ||
-		rencana.RencanaIsiRows[0].Fill100kIdr == nil || *rencana.RencanaIsiRows[0].Fill100kIdr != 2000000 {
+		rencana.RencanaIsiRows[0].Fill100kIdr == nil || *rencana.RencanaIsiRows[0].Fill100kIdr != "2000000.00" {
 		t.Errorf("rencana detail = %+v", rencana)
 	}
 

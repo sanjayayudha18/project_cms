@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/Button";
 import {
-  confirmDsrUpload,
-  uploadDsrFile,
   type DsrConfirmResponse,
   type DsrDryRunResponse,
+  confirmDsrUpload,
+  uploadDsrFile,
 } from "@/features/dsr/dsrUploadApi";
 import type { ApiError } from "@/lib/api/client";
+import { formatDecimalIDR } from "@/lib/formatters";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -15,13 +16,6 @@ interface DsrUploadDialogProps {
 }
 
 type Stage = "pick" | "uploading" | "preview" | "confirming" | "success" | "error";
-
-function formatDecimalIDR(value: string | undefined | null): string {
-  if (value === undefined || value === null) return "-";
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  return n.toLocaleString("id-ID");
-}
 
 function errorMessage(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
@@ -152,16 +146,12 @@ export function DsrUploadDialog({ onClose, onConfirmed }: DsrUploadDialogProps) 
           {stage === "success" && (
             <div className="flex flex-col items-center gap-3 py-12">
               <CheckCircle2 className="size-10 text-success-fg" aria-hidden="true" />
-              <p className="text-sm font-medium text-surface-text">
-                Data DSR berhasil disimpan.
-              </p>
+              <p className="text-sm font-medium text-surface-text">Data DSR berhasil disimpan.</p>
               <Button onClick={onClose}>Selesai</Button>
             </div>
           )}
 
-          {stage === "preview" && preview && (
-            <DsrPreviewReview preview={preview} />
-          )}
+          {stage === "preview" && preview && <DsrPreviewReview preview={preview} />}
         </div>
 
         {stage === "preview" && (
@@ -190,8 +180,8 @@ function DsrPreviewReview({ preview }: { readonly preview: DsrDryRunResponse }) 
           <span className="font-medium">File:</span> {preview.original_filename}
         </p>
         <p className="mt-1 text-xs text-neutral-400">
-          Periksa data di bawah ini sebelum menyimpan. Klik "Batal / Ganti File" jika ada yang
-          perlu diperbaiki di file sumber.
+          Periksa data di bawah ini sebelum menyimpan. Klik "Batal / Ganti File" jika ada yang perlu
+          diperbaiki di file sumber.
         </p>
       </div>
 
@@ -236,7 +226,9 @@ function DsrPreviewReview({ preview }: { readonly preview: DsrDryRunResponse }) 
       <section>
         <h3 className="mb-2 text-sm font-semibold text-surface-text">Rencana Isi</h3>
         {rencanaIsi.error ? (
-          <p className="text-sm text-danger-fg">Gagal membaca sheet Rencana Isi: {rencanaIsi.error}</p>
+          <p className="text-sm text-danger-fg">
+            Gagal membaca sheet Rencana Isi: {rencanaIsi.error}
+          </p>
         ) : (
           <div className="max-h-64 overflow-auto rounded-md border border-neutral-200">
             <table className="w-full text-sm">

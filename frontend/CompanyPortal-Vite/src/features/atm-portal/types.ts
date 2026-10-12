@@ -21,13 +21,13 @@ export interface AtmRecord {
   readonly machine_type: string;
   readonly brand: string;
   readonly deployment_type: string;
-  readonly low_threshold: number | null;
-  readonly critical_threshold: number | null;
+  readonly low_threshold: string | null;
+  readonly critical_threshold: string | null;
   readonly last_replenish_date: string | null;
   readonly last_replenish_time: string | null;
-  readonly refund_total: number | null;
-  readonly replenish_total: number | null;
-  readonly escrow: number | null;
+  readonly refund_total: string | null;
+  readonly replenish_total: string | null;
+  readonly escrow: string | null;
   readonly status: ReplenishmentStatus;
 }
 

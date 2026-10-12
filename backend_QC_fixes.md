@@ -11,7 +11,6 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 
 | ID | Item | Kenapa ditunda | Yang dibutuhkan untuk mulai | Titik lanjut |
 | --- | --- | --- | --- | --- |
-| F7 | Uang `float64` → string desimal (3 endpoint + `computeReplenishmentStatus` + 2 frontend) | Money + kontrak API 2 frontend → AI-DLC penuh | ✅ intent + spec accepted 2026-10-12 (S1–S3) → `plan.md` | `.claude/sdlc/money-decimal-string/` |
 | F13 | IP client bisa dipalsukan via `X-Forwarded-For` (rate limit login + IP audit) | Auth (Sec 4 #7) | ✅ 2026-10-12: prod = **Nginx → backend (1 hop tepercaya)**; dok = AI-DLC penuh (`.claude/sdlc/client-ip-trust/`, Q1–Q5 dijawab). Python EOD di luar scope → `python_eod_client_ip_todo.md` | Bagian F13 di file ini |
 | F11 | Setup CI (build, vet, lint, govulncheck, test `-tags integration` + Postgres) | Perlu keputusan platform | **Ditunda oleh user 2026-10-12** (belum perlu CI) | Bagian F11 |
 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | Refactor logika; perlu test pengunci perilaku | ~~F8~~ selesai; `user_admin` selesai 2026-10-12. Sisa: `masterdata_import` (tunggu FSD replace-all) + fungsi cyclo 21–25 (di bawah ambang lint 30) | Bagian F10 (`masterdata_import.go` ikut flow FSD replace-all) |
@@ -32,7 +31,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 4a | F16 | `page` tanpa batas atas → `int32(Page)` wrap → offset negatif (500) di ±8 list endpoint | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
 | 5 | F5 | Permission file upload DSR 0755/0644 → **diterima** (lihat log) | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 6 | F6 | Repo admin baca dari replica + hapus TODO basi | MEDIUM | M | `bugfixes.md` | [x] 2026-10-09 |
-| 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | **AI-DLC** (money, Sec 4 #7) | [~] intent draft |
+| 7 | F7 | Uang `float64` → string desimal (API + 2 frontend) | HIGH | M–L | AI-DLC `.claude/sdlc/money-decimal-string/` (S1–S7, T1–T8 hijau 2026-10-12) | [x] |
 | 8 | F8 | Naikkan coverage `repository` / `handler` / `service` ke ≥ 80% | HIGH | L (bertahap) | `bugfixes.md` per batch | [x] 2026-10-09, 10 batch |
 | 9 | F9 | Pecah `vendor_request_actions.go` (1210 baris) | MEDIUM | M | ikut fitur berikutnya | [ ] |
 | 10 | F10 | Turunkan kompleksitas fungsi gocyclo > 20 | MEDIUM | M | ikut fitur yang menyentuh | [~] 2026-10-12 `user_admin` |
@@ -225,3 +224,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-12 | F10 user_admin | `f4d9b67` | Refactor `UserAdminService.Create`/`Update` (cyclo 34/34 → di bawah 30) ke 4 helper privat, perilaku sama, 17 test lama tetap hijau. Lint tinggal 3: gocyclo `masterdata_import` ×2 (ditunda) + F13. |
 | 2026-10-12 | F17 | `491a61f` | Keputusan PO: tolak disable harga yang belum berlaku saat submit. `rejectNotYetEffective` (start ≥ hari ini WIB → 422 `effective_start_date`) di `Disable` harga vendor-wide + harga khusus cabang. Tanpa perubahan SQL/skema. Test unit 2 service + full integration hijau. |
 | 2026-10-12 | F13 | `59e1e71` | `TRUSTED_PROXIES` (CIDR/IP, `pkg/config`, entri rusak = gagal start) + `pkg/middleware.TrustedRealIP` (XFF dibaca dari kanan hanya dari proxy tepercaya, ganti chi `RealIP`); `extractClientIP` = host `RemoteAddr` saja; `RealIP` dihapus di backend-cit. T1–T8 + full integration hijau; lint tinggal gocyclo `masterdata_import` ×2. Manual check outstanding (user). |
+| 2026-10-12 | F7 | _(belum commit)_ | 3 endpoint (list ATM portal 5 field, detail DSR Saldo/Rencana Isi 11 field) kirim uang sebagai string desimal; status profil ATM dibandingkan eksak (`numericToRat` + `big.Rat`); `numericToFloat64Ptr` dihapus. CompanyPortal list pakai `formatRupiahDecimal` (pecahan non-nol kini selalu 2 digit, juga di profil/cashpos); VendorPortal `formatDecimalIDR` string (detail + dry-run). `formatRupiah` dipertahankan untuk DMAA (int64, sesuai Sec 6). Backend + integration, kedua FE test/build hijau. Manual check outstanding (user). Rilis backend + 2 FE bersamaan. |

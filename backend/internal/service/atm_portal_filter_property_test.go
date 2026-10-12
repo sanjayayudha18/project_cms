@@ -376,9 +376,9 @@ func sortedPairOK(ctx context.Context, pool *pgxpool.Pool, sortBy, sortOrder str
 		ok, err := stringOrderOK(ctx, pool, a.Status, b.Status, asc)
 		return ok, fmt.Sprintf("%q vs %q", a.Status, b.Status), err
 	case "refund_total":
-		return nullableFloatOrderOK(a.RefundTotal, b.RefundTotal, asc), fmt.Sprintf("%v vs %v", ptrOrNil(a.RefundTotal), ptrOrNil(b.RefundTotal)), nil
+		return nullableDecimalOrderOK(a.RefundTotal, b.RefundTotal, asc), fmt.Sprintf("%v vs %v", strOrNil(a.RefundTotal), strOrNil(b.RefundTotal)), nil
 	case "replenish_total":
-		return nullableFloatOrderOK(a.ReplenishTotal, b.ReplenishTotal, asc), fmt.Sprintf("%v vs %v", ptrOrNil(a.ReplenishTotal), ptrOrNil(b.ReplenishTotal)), nil
+		return nullableDecimalOrderOK(a.ReplenishTotal, b.ReplenishTotal, asc), fmt.Sprintf("%v vs %v", strOrNil(a.ReplenishTotal), strOrNil(b.ReplenishTotal)), nil
 	case "last_replenish_date":
 		return nullableTimeOrderOK(a.LastReplenishDate, b.LastReplenishDate, asc), fmt.Sprintf("%v vs %v", a.LastReplenishDate, b.LastReplenishDate), nil
 	}
@@ -395,7 +395,8 @@ func stringOrderOK(ctx context.Context, pool *pgxpool.Pool, a, b string, asc boo
 	return ok, err
 }
 
-func nullableFloatOrderOK(a, b *float64, asc bool) bool {
+// nullableDecimalOrderOK compares decimal-string money exactly (big.Rat).
+func nullableDecimalOrderOK(a, b *string, asc bool) bool {
 	if asc {
 		// NULLS LAST: once a is nil, b must also be nil.
 		if a == nil {
@@ -404,7 +405,7 @@ func nullableFloatOrderOK(a, b *float64, asc bool) bool {
 		if b == nil {
 			return true
 		}
-		return *a <= *b
+		return rat(*a).Cmp(rat(*b)) <= 0
 	}
 	// DESC, NULLS FIRST: once a is non-nil, b must also be non-nil.
 	if a == nil {
@@ -413,7 +414,7 @@ func nullableFloatOrderOK(a, b *float64, asc bool) bool {
 	if b == nil {
 		return false
 	}
-	return *a >= *b
+	return rat(*a).Cmp(rat(*b)) >= 0
 }
 
 func nullableTimeOrderOK(a, b *time.Time, asc bool) bool {
@@ -433,4 +434,11 @@ func nullableTimeOrderOK(a, b *time.Time, asc bool) bool {
 		return false
 	}
 	return !a.Before(*b)
+}
+
+func strOrNil(v *string) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

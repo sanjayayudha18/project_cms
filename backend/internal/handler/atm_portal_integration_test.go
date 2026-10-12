@@ -206,11 +206,11 @@ func TestIntegration_AtmPortal_FullRoundTrip(t *testing.T) {
 	if normal.MachineType != "ATM" || normal.Brand != "Hyosung" || normal.DeploymentType != "ONSITE" {
 		t.Errorf("normal atm fields = %+v, want machine_type=ATM brand=Hyosung deployment_type=ONSITE", normal)
 	}
-	if normal.RefundTotal == nil || *normal.RefundTotal != 200 {
-		t.Errorf("normal atm refund_total = %v, want 200", normal.RefundTotal)
+	if normal.RefundTotal == nil || *normal.RefundTotal != "200.00" { // decimal string, not a JSON number (QC F7)
+		t.Errorf("normal atm refund_total = %v, want 200.00", normal.RefundTotal)
 	}
-	if normal.LowThreshold == nil || *normal.LowThreshold != 100 {
-		t.Errorf("normal atm low_threshold = %v, want 100", normal.LowThreshold)
+	if normal.LowThreshold == nil || *normal.LowThreshold != "100.00" {
+		t.Errorf("normal atm low_threshold = %v, want 100.00", normal.LowThreshold)
 	}
 
 	critRow := findRow(resp.Data, marker+"-critical")
@@ -332,8 +332,8 @@ func TestIntegration_AtmPortal_NullEdgeCases(t *testing.T) {
 	if noData.Status != "no_data" {
 		t.Errorf("status = %q, want no_data", noData.Status)
 	}
-	if noData.LowThreshold == nil || *noData.LowThreshold != low {
-		t.Errorf("low_threshold = %v, want %v (threshold is configured)", noData.LowThreshold, low)
+	if noData.LowThreshold == nil || *noData.LowThreshold != "100.00" {
+		t.Errorf("low_threshold = %v, want 100.00 (threshold is configured)", noData.LowThreshold)
 	}
 	if noData.RefundTotal != nil {
 		t.Errorf("expected nil refund_total for no_data atm, got %v", *noData.RefundTotal)

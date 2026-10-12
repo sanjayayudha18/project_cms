@@ -1,16 +1,12 @@
 import type { DsrUploadListItem } from "@/features/dsr/dsrUploadApi";
 import { getDsrDailyDetail, getDsrRencanaIsiDetail } from "@/features/dsr/dsrUploadApi";
+import { formatDecimalIDR } from "@/lib/formatters";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 
 interface DsrDetailDialogProps {
   readonly item: DsrUploadListItem;
   readonly onClose: () => void;
-}
-
-function formatIDR(value: number | null): string {
-  if (value === null) return "-";
-  return value.toLocaleString("id-ID");
 }
 
 export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
@@ -81,7 +77,7 @@ export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
                             <td className="px-3 py-1.5 text-neutral-400">{row.row_no}</td>
                             <td className="px-3 py-1.5">{row.line_label}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.line_total_idr)}
+                              {formatDecimalIDR(row.line_total_idr)}
                             </td>
                           </tr>
                         ))}
@@ -110,10 +106,10 @@ export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
                             <td className="px-3 py-1.5">{row.atm_terminal_id}</td>
                             <td className="px-3 py-1.5">{row.atm_location ?? "-"}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.fill_100k_idr)}
+                              {formatDecimalIDR(row.fill_100k_idr)}
                             </td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.fill_50k_idr)}
+                              {formatDecimalIDR(row.fill_50k_idr)}
                             </td>
                           </tr>
                         ))}

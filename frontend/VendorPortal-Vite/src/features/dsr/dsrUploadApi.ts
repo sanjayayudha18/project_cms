@@ -126,9 +126,7 @@ export async function listDsrUploads(params: {
   if (params.dateFrom) query.set("date_from", params.dateFrom);
   if (params.dateTo) query.set("date_to", params.dateTo);
   const qs = query.toString();
-  const { data } = await api.get<DsrUploadListResponse>(
-    `/api/v1/dsr/uploads${qs ? `?${qs}` : ""}`,
-  );
+  const { data } = await api.get<DsrUploadListResponse>(`/api/v1/dsr/uploads${qs ? `?${qs}` : ""}`);
   return data;
 }
 
@@ -140,14 +138,14 @@ export interface DsrSheetDetailDailyRow {
   flow: string;
   line_label: string;
   memo_no: string | null;
-  denom_100k: number | null;
-  denom_50k: number | null;
-  denom_20k: number | null;
-  denom_10k: number | null;
-  denom_5k: number | null;
-  denom_2k: number | null;
-  denom_1k: number | null;
-  line_total_idr: number | null;
+  denom_100k: string | null;
+  denom_50k: string | null;
+  denom_20k: string | null;
+  denom_10k: string | null;
+  denom_5k: string | null;
+  denom_2k: string | null;
+  denom_1k: string | null;
+  line_total_idr: string | null;
   remarks: string | null;
 }
 
@@ -156,9 +154,9 @@ export interface DsrSheetDetailRencanaIsiRow {
   atm_terminal_id: string;
   atm_location: string | null;
   denom_config: string | null;
-  fill_100k_idr: number | null;
-  fill_50k_idr: number | null;
-  splank_balance_0800_idr: number | null;
+  fill_100k_idr: string | null;
+  fill_50k_idr: string | null;
+  splank_balance_0800_idr: string | null;
   remarks: string | null;
 }
 

@@ -84,11 +84,11 @@ func TestDsrUploadHandler_DetailAndList(t *testing.T) {
 	token := tokenForVendor(t, ts, 1, 7)
 
 	rec := doRequest(router, http.MethodGet, "/api/v1/dsr/uploads/daily/5", token, "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"daily_rows"`) || !strings.Contains(rec.Body.String(), "1500000") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"daily_rows"`) || !strings.Contains(rec.Body.String(), `"line_total_idr":"1500000.00"`) || !strings.Contains(rec.Body.String(), `"denom_100k":null`) {
 		t.Fatalf("daily = %d %s", rec.Code, rec.Body.String())
 	}
 	rec = doRequest(router, http.MethodGet, "/api/v1/dsr/uploads/rencana-isi/5", token, "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"T001"`) || !strings.Contains(rec.Body.String(), "2000000") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"T001"`) || !strings.Contains(rec.Body.String(), `"fill_100k_idr":"2000000.00"`) {
 		t.Fatalf("rencana isi = %d %s", rec.Code, rec.Body.String())
 	}
 	rec = doRequest(router, http.MethodGet, "/api/v1/dsr/uploads?page=1&page_size=10", token, "")

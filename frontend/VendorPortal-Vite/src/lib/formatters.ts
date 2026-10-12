@@ -48,3 +48,21 @@ export function getBalanceStatus(endingBalance: number): BalanceStatus {
   if (endingBalance <= 150_000_000) return "Low";
   return "Normal";
 }
+
+/**
+ * Format an exact decimal-string amount from the API (e.g. "1500000.00")
+ * with dot-separated thousands, without Number()/float conversion (QC F7).
+ * A non-zero fraction shows at least 2 digits with a comma ("1.500.000,50");
+ * null/undefined/"" → "-".
+ */
+export function formatDecimalIDR(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "-";
+  if (!/^-?\d*(\.\d*)?$/.test(value)) return value; // not a plain decimal: show as-is
+  const neg = value.startsWith("-");
+  const [intRaw, fracRaw = ""] = (neg ? value.slice(1) : value).split(".");
+  const intDigits = (intRaw ?? "").replace(/\D/g, "").replace(/^0+(?=\d)/, "") || "0";
+  const grouped = intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const frac = fracRaw.replace(/0+$/, "");
+  const body = frac ? `${grouped},${frac.padEnd(2, "0")}` : grouped;
+  return neg && body !== "0" ? `-${body}` : body;
+}

@@ -318,31 +318,31 @@ func toDsrUploadResponse(result *service.DsrUploadResult) dsrUploadResponse {
 }
 
 type dsrDailyRowResponse struct {
-	RowNo        int32    `json:"row_no"`
-	Section      string   `json:"section"`
-	Flow         string   `json:"flow"`
-	LineLabel    string   `json:"line_label"`
-	MemoNo       *string  `json:"memo_no"`
-	Denom100k    *float64 `json:"denom_100k"`
-	Denom50k     *float64 `json:"denom_50k"`
-	Denom20k     *float64 `json:"denom_20k"`
-	Denom10k     *float64 `json:"denom_10k"`
-	Denom5k      *float64 `json:"denom_5k"`
-	Denom2k      *float64 `json:"denom_2k"`
-	Denom1k      *float64 `json:"denom_1k"`
-	LineTotalIdr *float64 `json:"line_total_idr"`
-	Remarks      *string  `json:"remarks"`
+	RowNo        int32   `json:"row_no"`
+	Section      string  `json:"section"`
+	Flow         string  `json:"flow"`
+	LineLabel    string  `json:"line_label"`
+	MemoNo       *string `json:"memo_no"`
+	Denom100k    *string `json:"denom_100k"`
+	Denom50k     *string `json:"denom_50k"`
+	Denom20k     *string `json:"denom_20k"`
+	Denom10k     *string `json:"denom_10k"`
+	Denom5k      *string `json:"denom_5k"`
+	Denom2k      *string `json:"denom_2k"`
+	Denom1k      *string `json:"denom_1k"`
+	LineTotalIdr *string `json:"line_total_idr"`
+	Remarks      *string `json:"remarks"`
 }
 
 type dsrRencanaIsiRowResponse struct {
-	RowNo                int32    `json:"row_no"`
-	AtmTerminalID        string   `json:"atm_terminal_id"`
-	AtmLocation          *string  `json:"atm_location"`
-	DenomConfig          *string  `json:"denom_config"`
-	Fill100kIdr          *float64 `json:"fill_100k_idr"`
-	Fill50kIdr           *float64 `json:"fill_50k_idr"`
-	SplankBalance0800Idr *float64 `json:"splank_balance_0800_idr"`
-	Remarks              *string  `json:"remarks"`
+	RowNo                int32   `json:"row_no"`
+	AtmTerminalID        string  `json:"atm_terminal_id"`
+	AtmLocation          *string `json:"atm_location"`
+	DenomConfig          *string `json:"denom_config"`
+	Fill100kIdr          *string `json:"fill_100k_idr"`
+	Fill50kIdr           *string `json:"fill_50k_idr"`
+	SplankBalance0800Idr *string `json:"splank_balance_0800_idr"`
+	Remarks              *string `json:"remarks"`
 }
 
 type dsrSheetDetailResponse struct {

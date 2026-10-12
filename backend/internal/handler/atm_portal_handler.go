@@ -304,20 +304,20 @@ func (h *AtmPortalHandler) handleServiceError(w http.ResponseWriter, err error) 
 // API Contract JSON field names exactly (low_threshold/critical_threshold,
 // not the low_threshold_amount/critical_threshold_amount DB column names).
 type atmPortalRow struct {
-	TerminalID        string   `json:"terminal_id"`
-	LocationName      string   `json:"location_name"`
-	Address           string   `json:"address"`
-	MachineType       string   `json:"machine_type"`
-	Brand             string   `json:"brand"`
-	DeploymentType    string   `json:"deployment_type"`
-	LowThreshold      *float64 `json:"low_threshold"`
-	CriticalThreshold *float64 `json:"critical_threshold"`
-	LastReplenishDate *string  `json:"last_replenish_date"`
-	LastReplenishTime *string  `json:"last_replenish_time"`
-	RefundTotal       *float64 `json:"refund_total"`
-	ReplenishTotal    *float64 `json:"replenish_total"`
-	Escrow            *float64 `json:"escrow"`
-	Status            string   `json:"status"`
+	TerminalID        string  `json:"terminal_id"`
+	LocationName      string  `json:"location_name"`
+	Address           string  `json:"address"`
+	MachineType       string  `json:"machine_type"`
+	Brand             string  `json:"brand"`
+	DeploymentType    string  `json:"deployment_type"`
+	LowThreshold      *string `json:"low_threshold"`
+	CriticalThreshold *string `json:"critical_threshold"`
+	LastReplenishDate *string `json:"last_replenish_date"`
+	LastReplenishTime *string `json:"last_replenish_time"`
+	RefundTotal       *string `json:"refund_total"`
+	ReplenishTotal    *string `json:"replenish_total"`
+	Escrow            *string `json:"escrow"`
+	Status            string  `json:"status"`
 }
 
 // atmSummaryResponse mirrors service.ATMSummary for JSON output.

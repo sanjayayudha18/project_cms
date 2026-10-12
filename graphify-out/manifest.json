@@ -4332,9 +4332,9 @@
     "semantic_hash": ""
   },
   "backend/internal/auth/user_admin.go": {
-    "mtime": 1791369185.2120945,
-    "seen": 1791380962.9981766,
-    "ast_hash": "6a4daa1adb66ef36074a8c1a7154fe91",
+    "mtime": 1791774282.67366,
+    "seen": 1791774407.832998,
+    "ast_hash": "36a908cb5dfde02831c715eff6ea7855",
     "semantic_hash": ""
   },
   "backend/internal/auth/user_admin_test.go": {
@@ -6702,9 +6702,9 @@
     "semantic_hash": ""
   },
   ".claude/bugfixes.md": {
-    "mtime": 1791536365.2642136,
-    "seen": 1791536411.4221144,
-    "ast_hash": "4dfb44fcf4f5904b70a06be477de7d83",
+    "mtime": 1791774335.6890903,
+    "seen": 1791774407.834265,
+    "ast_hash": "1c60c771ff52d34b7918e2302ae65f7b",
     "semantic_hash": ""
   },
   ".claude/sdlc/forecast-browser-summary/intent.md": {
@@ -7200,9 +7200,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_acm_area_handler_test.go": {
-    "mtime": 1791461947.6806967,
-    "seen": 1791472924.8522599,
-    "ast_hash": "bcbb122efe3e466ca164784819b2996b",
+    "mtime": 1791540982.8929126,
+    "seen": 1791774407.8330455,
+    "ast_hash": "761a610967e717ca080a240da8ef1a7a",
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_dsr_location_map_handler.go": {
@@ -7224,9 +7224,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/vault_plan_handler_test.go": {
-    "mtime": 1791463799.543327,
-    "seen": 1791472924.8523636,
-    "ast_hash": "c6acf7f5241ed695718d009bcfd82793",
+    "mtime": 1791540984.9285047,
+    "seen": 1791774407.833143,
+    "ast_hash": "9368e219ee53170006cd672ef782e72f",
     "semantic_hash": ""
   },
   "backend/internal/handler/vendor_request_vault_handler.go": {
@@ -7500,9 +7500,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_order_integration_test.go": {
-    "mtime": 1791529060.6150577,
-    "seen": 1791536411.4212706,
-    "ast_hash": "f75a0a32de08559ab9e9e91e8d98ce36",
+    "mtime": 1791539156.0797567,
+    "seen": 1791774407.8333254,
+    "ast_hash": "cce88ed47b25096a6247f981b189b762",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_party.go": {
@@ -7608,9 +7608,9 @@
     "semantic_hash": ""
   },
   "backend/internal/repository/admin_repository_topology_test.go": {
-    "mtime": 1791534003.8531876,
-    "seen": 1791536411.4211397,
-    "ast_hash": "aeac76c83213f4084edd2b17e2485e52",
+    "mtime": 1791539637.7912078,
+    "seen": 1791774407.8331678,
+    "ast_hash": "f077203d1bf005f608a750099a0f6e3c",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_package_tier_test.go": {
@@ -7638,15 +7638,147 @@
     "semantic_hash": ""
   },
   "backend_QC_fixes.md": {
-    "mtime": 1791536365.2642136,
-    "seen": 1791536411.4222937,
-    "ast_hash": "bda07f5cb7003e3ff5ae53ba193c543b",
+    "mtime": 1791774348.905521,
+    "seen": 1791774407.8344574,
+    "ast_hash": "d6d91ec09bef824b2ab432e286ef903f",
     "semantic_hash": ""
   },
   "backend_QC_result.md": {
     "mtime": 1791530182.8037195,
     "seen": 1791536411.4222949,
     "ast_hash": "ac8c1ea415a759ce0b44ff9bdc7d9ae0",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/admin_update_handlers_test.go": {
+    "mtime": 1791541522.4309773,
+    "seen": 1791774407.8330731,
+    "ast_hash": "11ad1b6c01bec5acd4a619c403bec0b3",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/admin_vendor_package_price_handler_test.go": {
+    "mtime": 1791540718.3977454,
+    "seen": 1791774407.8330874,
+    "ast_hash": "1cfbd00fb8d1682571887cd313f74669",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/auth_error_mapping_test.go": {
+    "mtime": 1791541461.4318192,
+    "seen": 1791774407.8331122,
+    "ast_hash": "24bd5a885eebe7682eec7e92c85c6598",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/dsr_upload_handler_test.go": {
+    "mtime": 1791541352.8275547,
+    "seen": 1791774407.833123,
+    "ast_hash": "ef0a5b6a6a033a0976b32e59d42592da",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/retry_apply_me_handler_test.go": {
+    "mtime": 1791541121.6695924,
+    "seen": 1791774407.8331351,
+    "ast_hash": "9fec622b39e9356db73aec20359c3b9f",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/vendor_request_vault_handler_test.go": {
+    "mtime": 1791540701.002917,
+    "seen": 1791774407.8331518,
+    "ast_hash": "cd4fd25e55d5dd568c52235b645ff4e7",
+    "semantic_hash": ""
+  },
+  "backend/internal/repository/admin_guard_repository_test.go": {
+    "mtime": 1791540301.2781298,
+    "seen": 1791774407.8331668,
+    "ast_hash": "074eef164064443af5e4b6e2738498a5",
+    "semantic_hash": ""
+  },
+  "backend/internal/repository/auth_repository_test.go": {
+    "mtime": 1791539637.711776,
+    "seen": 1791774407.833179,
+    "ast_hash": "e615b6ccc500cb849fe375acc40906de",
+    "semantic_hash": ""
+  },
+  "backend/internal/repository/masterdata_change_repository_test.go": {
+    "mtime": 1791539689.3301528,
+    "seen": 1791774407.8331876,
+    "ast_hash": "3aa1377b4d3bdd77055ecf8d7e6322e9",
+    "semantic_hash": ""
+  },
+  "backend/internal/repository/masterdata_import_batch_repository_test.go": {
+    "mtime": 1791540299.1813967,
+    "seen": 1791774407.8331904,
+    "ast_hash": "a83655817433e432851b19bb3e13cedc",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/admin_reads_integration_test.go": {
+    "mtime": 1791542278.7036104,
+    "seen": 1791774407.8332238,
+    "ast_hash": "40fbf861096edf0fd158157b755cc09b",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/dsr_upload_read_test.go": {
+    "mtime": 1791541787.414739,
+    "seen": 1791774407.8332624,
+    "ast_hash": "263c81529565b0c1b9fc49fae0e59a52",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_applier_current_state_integration_test.go": {
+    "mtime": 1791538744.4767983,
+    "seen": 1791774407.8332696,
+    "ast_hash": "7c308f984ceaeb008feb2a47c3f28dc2",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_applier_price_integration_test.go": {
+    "mtime": 1791537456.868793,
+    "seen": 1791774407.8332806,
+    "ast_hash": "c40c12e6cf8981b34fc9e3ad40d0ef24",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_applier_price_test.go": {
+    "mtime": 1791537394.5770261,
+    "seen": 1791774407.8332818,
+    "ast_hash": "0ebd09cab9c8d69965286318cc59a80f",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_import_helpers_test.go": {
+    "mtime": 1791542165.92449,
+    "seen": 1791774407.8333015,
+    "ast_hash": "15da652d3aa9e94c08a0d75162b58acd",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vault_plan_guards_integration_test.go": {
+    "mtime": 1791539099.3349953,
+    "seen": 1791774407.833317,
+    "ast_hash": "7aef433419d6d8499e15b0c9638fb4c2",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_package_price_admin_test.go": {
+    "mtime": 1791542533.482943,
+    "seen": 1791774407.8333302,
+    "ast_hash": "a3b83c14afb72a18dff950c1fc5a0d2c",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_price_read_integration_test.go": {
+    "mtime": 1791541873.3927703,
+    "seen": 1791774407.8333392,
+    "ast_hash": "aed2997c77b1d646f89d056f14393a32",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_request_options_audit_test.go": {
+    "mtime": 1791538744.5287309,
+    "seen": 1791774407.833354,
+    "ast_hash": "2b611a47da371ba12ff48ebe6dff8462",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_request_update_items_integration_test.go": {
+    "mtime": 1791539177.1457627,
+    "seen": 1791774407.8333669,
+    "ast_hash": "d5ef46a546c9efaa1c6f69f5cd579b1e",
+    "semantic_hash": ""
+  },
+  "pkg/response/response_test.go": {
+    "mtime": 1791542814.1642566,
+    "seen": 1791774407.834261,
+    "ast_hash": "e132eb49c2a1a0f13d96059774fbd177",
     "semantic_hash": ""
   }
 }

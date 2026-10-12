@@ -1,6 +1,6 @@
 // Package audit writes append-only audit_logs rows. It has no HTTP or auth
 // dependency: callers (handlers/services) resolve the actor and IP themselves
-// (via middleware.GetAuthContext + chi's RealIP-normalized r.RemoteAddr) and
+// (via middleware.GetAuthContext + the TrustedRealIP-normalized r.RemoteAddr) and
 // pass them in on Entry.
 package audit
 

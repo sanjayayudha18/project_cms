@@ -97,7 +97,10 @@ func main() {
 	// Set up Chi router
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// Client IP: X-Forwarded-For only from TRUSTED_PROXIES (QC F13). Empty in
+	// prod behind Nginx = every user shares Nginx's IP for the login rate limit.
+	slog.Info("trusted proxies configured", "count", len(cfg.TrustedProxies))
+	r.Use(custommw.TrustedRealIP(cfg.TrustedProxies))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 

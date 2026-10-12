@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -31,6 +33,9 @@ type Config struct {
 
 	// Server
 	Port string
+	// TrustedProxies lists the proxies (e.g. Nginx) whose X-Forwarded-For is
+	// believed. Empty = no proxy trusted, client IP = connection address.
+	TrustedProxies []netip.Prefix
 
 	// LDAP (optional, used by ATM backend)
 	LDAPURL          string
@@ -71,6 +76,12 @@ func Load(defaultPort string) (*Config, error) {
 		port = defaultPort
 	}
 
+	// TRUSTED_PROXIES — optional; a bad entry fails start instead of being dropped
+	trusted, err := parseTrustedProxies(os.Getenv("TRUSTED_PROXIES"))
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		JWTSecret:          []byte(secret),
 		AccessTokenExpiry:  parseDuration("ACCESS_TOKEN_EXPIRY", 15*time.Minute),
@@ -82,6 +93,7 @@ func Load(defaultPort string) (*Config, error) {
 		RateLimitIP:        parseInt("RATE_LIMIT_IP", 20),
 		RateLimitWindow:    parseDuration("RATE_LIMIT_WINDOW", 15*time.Minute),
 		Port:               port,
+		TrustedProxies:     trusted,
 		LDAPURL:            os.Getenv("LDAP_URL"),
 		LDAPBaseDN:         os.Getenv("LDAP_BASE_DN"),
 		LDAPBindDN:         os.Getenv("LDAP_BIND_DN"),
@@ -89,6 +101,29 @@ func Load(defaultPort string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// parseTrustedProxies parses a comma-separated list of CIDRs or single IPs
+// (a bare IP becomes /32 or /128). Blank entries are skipped.
+func parseTrustedProxies(raw string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, entry := range strings.Split(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(entry)
+		if err != nil {
+			addr, aerr := netip.ParseAddr(entry)
+			if aerr != nil {
+				return nil, fmt.Errorf("TRUSTED_PROXIES: invalid entry %q (want CIDR or IP)", entry)
+			}
+			addr = addr.Unmap()
+			p = netip.PrefixFrom(addr, addr.BitLen())
+		}
+		out = append(out, p.Masked())
+	}
+	return out, nil
 }
 
 const (

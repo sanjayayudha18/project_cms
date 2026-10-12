@@ -24,7 +24,7 @@ Jangan lupa: item di bawah **belum selesai** dan tetap wajib dikerjakan. Ambil l
 | 1 | F1 | `gofmt -w` 12 file | LOW | XS | tidak perlu (format saja) | [x] 2026-10-09 |
 | 2 | F2 | Tambah `.golangci.yml` + pasang `govulncheck` | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
 | 2a | F12 | **Upgrade dependency + toolchain yang kena CVE** (hasil govulncheck F2) | **HIGH** | S–M | `bugfixes.md` | [x] 2026-10-09 |
-| 2b | F13 | **IP client bisa dipalsukan via `X-Forwarded-For`** (rate limit login + IP audit) | **HIGH** | S–M | AI-DLC atau bugfix (auth, Sec 4 #7) — butuh info topologi proxy | [ ] |
+| 2b | F13 | **IP client bisa dipalsukan via `X-Forwarded-For`** (rate limit login + IP audit) | **HIGH** | S–M | AI-DLC `.claude/sdlc/client-ip-trust/` (S1–S5, T1–T8 hijau 2026-10-12) | [x] |
 | 2c | F14 | `go.work` di-gitignore tapi di-`COPY` Dockerfile → build Docker dari clone bersih gagal | MEDIUM | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 2d | F15 | Tidak ada `.dockerignore` di root (context build = root repo) + CLAUDE.md menyebut root `docker-compose.yml` yang tidak ada | LOW | XS | `bugfixes.md` | [x] 2026-10-09 |
 | 3 | F3 | Bereskan errcheck di kode produksi | LOW | S | `bugfixes.md` | [x] 2026-10-09 |
@@ -224,3 +224,4 @@ Hasil `govulncheck ./...` (2026-10-09). Hanya yang **dipanggil** kode kita (reac
 | 2026-10-09 | F8 b10 | `b21f2e4` | Test submit harga vendor-wide, helper import/export CSV, baca admin via repo asli, `pkg/response`. service 78.9→80.6%. **F8 selesai**: semua `internal/*` ≥ 80%. |
 | 2026-10-12 | F10 user_admin | `f4d9b67` | Refactor `UserAdminService.Create`/`Update` (cyclo 34/34 → di bawah 30) ke 4 helper privat, perilaku sama, 17 test lama tetap hijau. Lint tinggal 3: gocyclo `masterdata_import` ×2 (ditunda) + F13. |
 | 2026-10-12 | F17 | `491a61f` | Keputusan PO: tolak disable harga yang belum berlaku saat submit. `rejectNotYetEffective` (start ≥ hari ini WIB → 422 `effective_start_date`) di `Disable` harga vendor-wide + harga khusus cabang. Tanpa perubahan SQL/skema. Test unit 2 service + full integration hijau. |
+| 2026-10-12 | F13 | _(belum commit)_ | `TRUSTED_PROXIES` (CIDR/IP, `pkg/config`, entri rusak = gagal start) + `pkg/middleware.TrustedRealIP` (XFF dibaca dari kanan hanya dari proxy tepercaya, ganti chi `RealIP`); `extractClientIP` = host `RemoteAddr` saja; `RealIP` dihapus di backend-cit. T1–T8 + full integration hijau; lint tinggal gocyclo `masterdata_import` ×2. Manual check outstanding (user). |

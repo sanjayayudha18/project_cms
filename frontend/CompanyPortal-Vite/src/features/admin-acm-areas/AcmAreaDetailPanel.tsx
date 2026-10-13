@@ -6,21 +6,21 @@ import {
   type AcmAreaMutation,
   useAcmArea,
   useAcmAreaMutation,
-  useAcmBranchOptions,
   useAcmEligibleUsers,
+  useAcmRegionOptions,
 } from "./api";
 
 const inputClass =
   "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
 
-function toggle(set: Set<number>, id: number): Set<number> {
+function toggle<T>(set: Set<T>, id: T): Set<T> {
   const next = new Set(set);
   if (next.has(id)) next.delete(id);
   else next.add(id);
   return next;
 }
 
-/** Manage one area: name, branches (replace-all) and members (replace-all). */
+/** Manage one area: name, regions (replace-all, cit-vault-select FR1) and members (replace-all). */
 export function AcmAreaDetailPanel({ areaId, onClose }: { areaId: number; onClose: () => void }) {
   const detailQuery = useAcmArea(areaId);
   if (detailQuery.isLoading) return <p className="text-sm text-[var(--n-500)]">Memuat…</p>;
@@ -37,13 +37,11 @@ export function AcmAreaDetailPanel({ areaId, onClose }: { areaId: number; onClos
 function AreaEditor({ area, onClose }: { area: AcmAreaDetail; onClose: () => void }) {
   const { toast } = useToast();
   const mutation = useAcmAreaMutation();
-  const branchOptions = useAcmBranchOptions().data ?? [];
+  const regionOptions = useAcmRegionOptions().data ?? [];
   const users = useAcmEligibleUsers().data ?? [];
 
   const [name, setName] = useState(area.name);
-  const [branchIds, setBranchIds] = useState(
-    () => new Set(area.branches.map((b) => b.vendor_branch_id)),
-  );
+  const [regionCodes, setRegionCodes] = useState(() => new Set(area.region_codes));
   const [userIds, setUserIds] = useState(() => new Set(area.members.map((m) => m.user_id)));
   const [filter, setFilter] = useState("");
 
@@ -54,14 +52,21 @@ function AreaEditor({ area, onClose }: { area: AcmAreaDetail; onClose: () => voi
     });
   }
 
-  const q = filter.trim().toLowerCase();
-  const visibleBranches = branchOptions.filter(
-    (b) =>
-      !q ||
-      `${b.vendor_name} ${b.branch_code} ${b.branch_name} ${b.region_code ?? ""}`
-        .toLowerCase()
-        .includes(q),
-  );
+  // Options only list regions of active branches; keep this area's own codes visible regardless.
+  const known = new Set(regionOptions.map((r) => r.region_code));
+  const options = [
+    ...regionOptions,
+    ...area.region_codes
+      .filter((c) => !known.has(c))
+      .map((c) => ({
+        region_code: c,
+        branch_count: 0,
+        acm_area_id: area.id,
+        acm_area_name: area.name,
+      })),
+  ];
+  const q = filter.trim().toUpperCase();
+  const visibleRegions = options.filter((r) => !q || r.region_code.includes(q));
   const readOnly = !area.is_active;
 
   return (
@@ -77,7 +82,7 @@ function AreaEditor({ area, onClose }: { area: AcmAreaDetail; onClose: () => voi
       </div>
       {readOnly && (
         <p className="text-sm text-[var(--n-600)]">
-          Area nonaktif — aktifkan dulu untuk mengubah cabang dan anggota.
+          Area nonaktif — aktifkan dulu untuk mengubah region dan anggota.
         </p>
       )}
 
@@ -104,39 +109,44 @@ function AreaEditor({ area, onClose }: { area: AcmAreaDetail; onClose: () => voi
 
       <fieldset className="flex flex-col gap-2" disabled={readOnly}>
         <legend className="text-sm font-semibold text-[var(--n-800)]">
-          Cabang vendor (<span className="tabular-nums">{branchIds.size}</span> dipilih)
+          Region (<span className="tabular-nums">{regionCodes.size}</span> dipilih)
         </legend>
+        <p className="text-xs text-[var(--n-600)]">
+          Request replenish dengan kode region ini masuk ke area ini. Satu region hanya boleh di
+          satu area.
+        </p>
         <input
-          aria-label="Cari cabang"
-          placeholder="Cari vendor / kode / nama / region…"
+          aria-label="Cari region"
+          placeholder="Cari kode region…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className={inputClass}
         />
         <ul className="max-h-72 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--n-200)]">
-          {visibleBranches.map((b) => {
-            const heldElsewhere = b.acm_area_id !== null && b.acm_area_id !== area.id;
+          {visibleRegions.map((r) => {
+            const heldElsewhere = r.acm_area_id !== null && r.acm_area_id !== area.id;
             return (
               <li
-                key={b.vendor_branch_id}
+                key={r.region_code}
                 className="border-b border-[var(--n-100)] px-3 py-2 text-sm last:border-b-0"
               >
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={branchIds.has(b.vendor_branch_id)}
+                    checked={regionCodes.has(r.region_code)}
                     disabled={heldElsewhere}
-                    onChange={() => setBranchIds((s) => toggle(s, b.vendor_branch_id))}
+                    onChange={() => setRegionCodes((s) => toggle(s, r.region_code))}
                   />
                   <span>
-                    {b.vendor_name} · {b.branch_code} {b.branch_name}
-                    {b.region_code && (
-                      <span className="text-[var(--n-500)]"> · {b.region_code}</span>
-                    )}
+                    <span className="font-mono">{r.region_code}</span>
+                    <span className="text-[var(--n-500)]">
+                      {" "}
+                      · <span className="tabular-nums">{r.branch_count}</span> cabang aktif
+                    </span>
                     {heldElsewhere && (
                       <span className="text-[var(--n-500)]">
                         {" "}
-                        — sudah di area {b.acm_area_name}
+                        — sudah di area {r.acm_area_name}
                       </span>
                     )}
                   </span>
@@ -150,12 +160,12 @@ function AreaEditor({ area, onClose }: { area: AcmAreaDetail; onClose: () => voi
             disabled={mutation.isPending}
             onClick={() =>
               run(
-                { op: "branches", id: area.id, vendor_branch_ids: [...branchIds] },
-                "Cabang area disimpan",
+                { op: "regions", id: area.id, region_codes: [...regionCodes].sort() },
+                "Region area disimpan",
               )
             }
           >
-            Simpan Cabang
+            Simpan Region
           </Button>
         </div>
       </fieldset>

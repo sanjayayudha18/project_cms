@@ -5,7 +5,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync"
 	"testing"
 
@@ -106,8 +105,8 @@ func TestIntegration_VendorOrder_ScopeAndNoLeak(t *testing.T) {
 		t.Fatalf("branch-pinned user sees %+v, want only its replenish party", got)
 	}
 	got := list(f.cash2User)
-	if len(got) != 1 || got[0].ID != cash2Vault || got[0].AtmCount != 1 || !got[0].CanDecide {
-		t.Fatalf("cash2 user sees %+v, want only its vault party (1 ATM, decidable)", got)
+	if len(got) != 1 || got[0].ID != cash2Vault || got[0].AtmCount != 0 || got[0].VaultCount != 1 || !got[0].CanDecide {
+		t.Fatalf("cash2 user sees %+v, want only its vault party (1 vault, no ATM, decidable)", got)
 	}
 
 	// Leak: another vendor's party (and a sibling branch's) is a 404, also for actions.
@@ -129,8 +128,10 @@ func TestIntegration_VendorOrder_ScopeAndNoLeak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Content.Atms) != 1 || d.Content.Atms[0].TerminalID != f.terminal2 || d.Content.Atms[0].Counterpart.ID != f.replenish2(t) {
-		t.Fatalf("cash2 detail = %+v, want only terminal2 with its replenish branch", d.Content)
+	c := d.Content
+	if len(c.Atms) != 0 || len(c.Vaults) != 1 || c.Vaults[0].Vault.ID != f.vault2 || c.Vaults[0].TicketNumber != f.ticket(f.vault2, "001") ||
+		len(c.ReplenishBranches) != 2 {
+		t.Fatalf("cash2 detail = %+v, want vault2 + ticket, both replenish branches, no ATM", c)
 	}
 	if len(d.Totals) != 1 || d.Totals[0] != (DenomAmount{Denom: 100000, Amount: 1000000}) || d.Currency != "IDR" {
 		t.Fatalf("cash2 totals = %+v %s", d.Totals, d.Currency)
@@ -280,50 +281,34 @@ func TestIntegration_VendorOrder_VaultRejectBackToAcm(t *testing.T) {
 	if err := f.pool.QueryRow(ctx, `SELECT approved_at::text FROM vendor_requests WHERE id = $1`, f.reqID).Scan(&approvedAfter); err != nil || approvedAfter != approvedBefore {
 		t.Fatalf("approved_at changed %s -> %s (%v): resend would force every party", approvedBefore, approvedAfter, err)
 	}
-	// Only the area plan holding terminal2 (vault cash2) is back to draft, with the vendor's reason.
-	rows, err := f.pool.Query(ctx, `SELECT p.status, p.rejection_reason, p.rejected_by FROM vendor_request_vault_plans p
-		JOIN vendor_request_vault_assignments a ON a.vault_plan_id = p.id WHERE p.vendor_request_id = $1 ORDER BY a.terminal_id = $2`, f.reqID, f.terminal2)
-	if err != nil {
+	// The request's plan (it allocates to cash2) is back to draft, with the vendor's reason (FR7.5).
+	var plan int64
+	var planStatus string
+	var planReason *string
+	var rejectedBy *int64
+	if err := f.pool.QueryRow(ctx, `SELECT id, status, rejection_reason, rejected_by FROM vendor_request_vault_plans
+		WHERE vendor_request_id = $1 AND status <> 'cancelled'`, f.reqID).Scan(&plan, &planStatus, &planReason, &rejectedBy); err != nil {
 		t.Fatal(err)
 	}
-	var statuses []string
-	for rows.Next() {
-		var s string
-		var r *string
-		var by *int64
-		if err := rows.Scan(&s, &r, &by); err != nil {
-			t.Fatal(err)
-		}
-		if s == "draft" && (r == nil || *r != reason || by == nil || *by != f.cash2User.UserID) {
-			t.Fatalf("draft plan reason/by = %v/%v", r, by)
-		}
-		statuses = append(statuses, s)
-	}
-	rows.Close()
-	if strings.Join(statuses, ",") != "acm_approved,draft" {
-		t.Fatalf("plan statuses (terminal, terminal2) = %v, want acm_approved,draft", statuses)
+	if planStatus != "draft" || deref(planReason) != reason || deref(rejectedBy) != f.cash2User.UserID {
+		t.Fatalf("plan after vault reject = %s / %v / %v, want draft + vendor reason", planStatus, planReason, rejectedBy)
 	}
 	if n := countRows(t, f.pool, `SELECT count(*) FROM notifications WHERE recipient_user_id = $1 AND type = 'vendor_order.vault_rejected'`, f.acmUserID); n != 1 {
 		t.Fatalf("ACM-USER vault-reject notifications = %d, want 1", n)
 	}
 
-	// ACM moves terminal2 to cash1, ACM-SPV approves, ATM-SPV approves: resend only what changed.
-	var plan2 int64
-	if err := f.pool.QueryRow(ctx, `SELECT vault_plan_id FROM vendor_request_vault_assignments WHERE vendor_request_id = $1 AND terminal_id = $2`,
-		f.reqID, f.terminal2).Scan(&plan2); err != nil {
-		t.Fatal(err)
-	}
+	// ACM moves vault2's share to vault1, ACM-SPV approves, ATM-SPV approves: resend only what changed.
 	acmUser := Actor{UserID: f.acmUserID, Role: "ACM-USER"}
-	if d, err := f.plans.Get(ctx, acmUser, plan2); err != nil || !d.Plan.RejectedByVendor {
-		t.Fatalf("plan2 RejectedByVendor = %v (%v), want true (S8 label)", d != nil && d.Plan.RejectedByVendor, err)
+	if d, err := f.plans.Get(ctx, acmUser, plan); err != nil || !d.Plan.RejectedByVendor {
+		t.Fatalf("plan RejectedByVendor = %v (%v), want true (S8 label)", d != nil && d.Plan.RejectedByVendor, err)
 	}
-	if _, err := f.plans.SaveAssignments(ctx, acmUser, plan2, []VaultAssignmentInput{{TerminalID: f.terminal2, VaultBranchID: cash1}}); err != nil {
+	if _, err := f.plans.SaveAllocations(ctx, acmUser, plan, []AllocationLineInput{line(f.vault1, "2000000")}, nil); err != nil {
 		t.Fatalf("re-save: %v", err)
 	}
-	if _, err := f.plans.Submit(ctx, acmUser, plan2); err != nil {
+	if _, err := f.plans.Submit(ctx, acmUser, plan); err != nil {
 		t.Fatalf("re-submit: %v", err)
 	}
-	if _, err := f.plans.Approve(ctx, Actor{UserID: f.spvID, Role: "ACM-SPV"}, plan2); err != nil {
+	if _, err := f.plans.Approve(ctx, Actor{UserID: f.spvID, Role: "ACM-SPV"}, plan); err != nil {
 		t.Fatalf("re-approve: %v", err)
 	}
 	if err := f.plans.ReviewRequest(ctx, f.checker, f.reqID, true, ""); err != nil {
@@ -331,10 +316,13 @@ func TestIntegration_VendorOrder_VaultRejectBackToAcm(t *testing.T) {
 	}
 	after := partiesOf(t, f.pool, f.reqID)
 	want := map[partyKey]string{
-		{f.branchID, partyRoleReplenish}:      "accepted",  // unchanged, kept
-		{f.replenish2(t), partyRoleReplenish}: "pending",   // counterpart changed
-		{cash1, partyRoleVault}:               "pending",   // gained terminal2
+		{f.branchID, partyRoleReplenish}:      "pending",   // accepted, but its vault list changed (V6)
+		{f.replenish2(t), partyRoleReplenish}: "pending",   // vault list changed
+		{cash1, partyRoleVault}:               "pending",   // vault1 amount changed
 		{cash2, partyRoleVault}:               "withdrawn", // no longer used
+	}
+	if got := f.tickets(t, f.reqID); got[f.ticket(f.vault2, "001")] || !got[f.ticket(f.vault1, "001")] {
+		t.Fatalf("tickets = %v, want vault2 inactive, vault1 active", got)
 	}
 	for k, s := range want {
 		if after[k].status != s {
@@ -350,8 +338,8 @@ func TestIntegration_VendorOrder_VaultRejectBackToAcm(t *testing.T) {
 }
 
 // S5 (FR6.1/FR6.2/FR2.3): replenish reject -> ATM-SPV returns -> maker revises
-// and drops terminal2 -> re-approval reopens plan1, cancels the now-empty
-// plan2, keeps terminal's vault -> every remaining party must accept again.
+// and drops terminal2 -> re-approval reopens the request's plan with its
+// allocations -> ACM re-checks the total -> every remaining party accepts again.
 func TestIntegration_VendorOrder_ReturnEditResend(t *testing.T) {
 	f := newVendorOrderFixture(t)
 	ctx := context.Background()
@@ -386,11 +374,9 @@ func TestIntegration_VendorOrder_ReturnEditResend(t *testing.T) {
 	if _, err := f.svc.UpdateItems(ctx, f.creator, f.reqID, keep); err != nil {
 		t.Fatalf("edit: %v", err)
 	}
-	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_vault_assignments WHERE vendor_request_id = $1 AND terminal_id = $2`, f.reqID, f.terminal2); n != 0 {
-		t.Fatalf("removed ATM keeps %d vault assignment(s)", n)
-	}
-	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_vault_assignments WHERE vendor_request_id = $1 AND terminal_id = $2`, f.reqID, f.terminal); n != 1 {
-		t.Fatal("kept ATM lost its vault assignment")
+	// Allocations are per request: the edit keeps them (2 vaults, 2M) as ACM's starting point.
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_vault_allocations WHERE vendor_request_id = $1`, f.reqID); n != 2 {
+		t.Fatalf("allocations after edit = %d, want 2 (kept)", n)
 	}
 	if _, err := f.svc.Submit(ctx, f.creator, f.reqID); err != nil {
 		t.Fatalf("submit: %v", err)
@@ -398,20 +384,24 @@ func TestIntegration_VendorOrder_ReturnEditResend(t *testing.T) {
 	if _, err := f.svc.Approve(ctx, f.checker, f.reqID); err != nil {
 		t.Fatalf("re-approve: %v", err)
 	}
-	var plan1, plan2 string
-	if err := f.pool.QueryRow(ctx, `SELECT
-		(SELECT status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 AND acm_area_id = $2),
-		(SELECT status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 AND acm_area_id = $3)`,
-		f.reqID, f.area1, f.area2).Scan(&plan1, &plan2); err != nil || plan1 != "draft" || plan2 != "cancelled" {
-		t.Fatalf("plans after re-approve = %s/%s (%v), want draft/cancelled", plan1, plan2, err)
+	var planID int64
+	var planStatus string
+	if err := f.pool.QueryRow(ctx, `SELECT id, status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 AND status <> 'cancelled'`,
+		f.reqID).Scan(&planID, &planStatus); err != nil || planStatus != "draft" {
+		t.Fatalf("plan after re-approve = %s (%v), want the same plan back in draft", planStatus, err)
 	}
 
-	var planID int64
-	if err := f.pool.QueryRow(ctx, `SELECT id FROM vendor_request_vault_plans WHERE vendor_request_id = $1 AND acm_area_id = $2`, f.reqID, f.area1).Scan(&planID); err != nil {
-		t.Fatal(err)
+	// Order is now 1M: the kept 2M is excess -> submit needs a buffer reason; ACM trims to vault1 1M.
+	acmUser := Actor{UserID: f.acmUserID, Role: "ACM-USER"}
+	var ve *ValidationError
+	if _, err := f.plans.Submit(ctx, acmUser, planID); !errors.As(err, &ve) {
+		t.Fatalf("submit with excess and no reason: want ValidationError, got %v", err)
 	}
-	if _, err := f.plans.Submit(ctx, Actor{UserID: f.acmUserID, Role: "ACM-USER"}, planID); err != nil {
-		t.Fatalf("resubmit plan1: %v", err)
+	if _, err := f.plans.SaveAllocations(ctx, acmUser, planID, []AllocationLineInput{line(f.vault1, "1000000")}, nil); err != nil {
+		t.Fatalf("re-save: %v", err)
+	}
+	if _, err := f.plans.Submit(ctx, acmUser, planID); err != nil {
+		t.Fatalf("resubmit plan: %v", err)
 	}
 	if _, err := f.plans.Approve(ctx, Actor{UserID: f.spvID, Role: "ACM-SPV"}, planID); err != nil {
 		t.Fatalf("reapprove plan1: %v", err)

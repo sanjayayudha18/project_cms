@@ -34,8 +34,14 @@ func (f *fakeAcmAreaServicer) EligibleUsers(context.Context) ([]db.ListAcmEligib
 func (f *fakeAcmAreaServicer) BranchOptions(context.Context) ([]db.ListAcmBranchOptionsRow, error) {
 	return nil, nil
 }
-func (f *fakeAcmAreaServicer) Warnings(context.Context) ([]db.ListUnassignedVaultAssignmentBranchesRow, error) {
-	return []db.ListUnassignedVaultAssignmentBranchesRow{{VendorBranchID: 9, BranchCode: "BJK-01", RequestCount: 2}}, nil
+func (f *fakeAcmAreaServicer) RegionOptions(context.Context) ([]db.ListAcmRegionOptionsRow, error) {
+	return []db.ListAcmRegionOptionsRow{{RegionCode: "JKT", BranchCount: 4}}, nil
+}
+func (f *fakeAcmAreaServicer) Warnings(context.Context) ([]db.ListVaultPlanRegionWarningsRow, error) {
+	return []db.ListVaultPlanRegionWarningsRow{{VendorRequestID: 9, RequestNumber: "REP-BJK-20261008-001"}}, nil
+}
+func (f *fakeAcmAreaServicer) SetRegions(_ context.Context, _ int64, _ string, _ int64, codes []string, _ string) (*service.AcmAreaDetail, error) {
+	return &service.AcmAreaDetail{Regions: codes}, f.err
 }
 func (f *fakeAcmAreaServicer) Create(context.Context, int64, string, string, string) (db.AcmArea, error) {
 	return db.AcmArea{ID: 2, Name: "Makassar"}, f.err
@@ -63,7 +69,14 @@ func TestAdminAcmAreaHandler(t *testing.T) {
 		wantBody                       string
 	}{
 		{"list", "ADMIN", http.MethodGet, base, "", nil, http.StatusOK, `"branch_count":3`},
-		{"warnings", "ADMIN", http.MethodGet, base + "/warnings", "", nil, http.StatusOK, `"branches_without_area"`},
+		{"warnings", "ADMIN", http.MethodGet, base + "/warnings", "", nil, http.StatusOK, `"requests_without_area":[{"region_code":null`},
+		{"region options", "ADMIN", http.MethodGet, base + "/region-options", "", nil, http.StatusOK, `"region_code":"JKT"`},
+		{"get regions", "ADMIN", http.MethodGet, base + "/1/regions", "", nil, http.StatusOK, `"region_codes"`},
+		{"set regions", "ADMIN", http.MethodPut, base + "/1/regions", `{"region_codes":["JKT"]}`, nil, http.StatusOK, `"region_codes":["JKT"]`},
+		{"regions field required", "ADMIN", http.MethodPut, base + "/1/regions", `{}`, nil, http.StatusUnprocessableEntity, `region_codes`},
+		{"region conflict lists the holder", "ADMIN", http.MethodPut, base + "/2/regions", `{"region_codes":["JKT"]}`,
+			&service.AcmAreaRegionConflictError{Conflicts: []db.ListRegionsInOtherAcmAreasRow{{RegionCode: "JKT", AcmAreaID: 1, AcmAreaName: "Jabodetabek"}}},
+			http.StatusConflict, `"acm_area_name":"Jabodetabek"`},
 		{"create 201", "ADMIN", http.MethodPost, base, `{"name":"Makassar"}`, nil, http.StatusCreated, `"name":"Makassar"`},
 		{"ADMIN_PARAM denied at route", "ADMIN_PARAM", http.MethodPost, base, `{"name":"x"}`, nil, http.StatusForbidden, ""},
 		{"ACM-USER denied at route", "ACM-USER", http.MethodGet, base, "", nil, http.StatusForbidden, ""},

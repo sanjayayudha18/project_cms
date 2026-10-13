@@ -41,6 +41,21 @@ func (q *Queries) AddAcmAreaMember(ctx context.Context, arg AddAcmAreaMemberPara
 	return err
 }
 
+const addAcmAreaRegion = `-- name: AddAcmAreaRegion :exec
+INSERT INTO acm_area_regions (acm_area_id, region_code, created_by) VALUES ($1, $2, $3)
+`
+
+type AddAcmAreaRegionParams struct {
+	AcmAreaID  int64  `json:"acm_area_id"`
+	RegionCode string `json:"region_code"`
+	CreatedBy  int64  `json:"created_by"`
+}
+
+func (q *Queries) AddAcmAreaRegion(ctx context.Context, arg AddAcmAreaRegionParams) error {
+	_, err := q.db.Exec(ctx, addAcmAreaRegion, arg.AcmAreaID, arg.RegionCode, arg.CreatedBy)
+	return err
+}
+
 const clearAcmAreaBranches = `-- name: ClearAcmAreaBranches :exec
 DELETE FROM acm_area_branches WHERE acm_area_id = $1
 `
@@ -57,6 +72,16 @@ DELETE FROM acm_area_members WHERE acm_area_id = $1
 
 func (q *Queries) ClearAcmAreaMembers(ctx context.Context, acmAreaID int64) error {
 	_, err := q.db.Exec(ctx, clearAcmAreaMembers, acmAreaID)
+	return err
+}
+
+const clearAcmAreaRegions = `-- name: ClearAcmAreaRegions :exec
+DELETE FROM acm_area_regions WHERE acm_area_id = $1
+`
+
+// Link-table replace-all / release on disable (region unique across areas).
+func (q *Queries) ClearAcmAreaRegions(ctx context.Context, acmAreaID int64) error {
+	_, err := q.db.Exec(ctx, clearAcmAreaRegions, acmAreaID)
 	return err
 }
 
@@ -220,11 +245,40 @@ func (q *Queries) ListAcmAreaMembers(ctx context.Context, acmAreaID int64) ([]Li
 	return items, nil
 }
 
+const listAcmAreaRegions = `-- name: ListAcmAreaRegions :many
+
+SELECT region_code FROM acm_area_regions WHERE acm_area_id = $1 ORDER BY region_code
+`
+
+// ---------------------------------------------------------------------------
+// cit-vault-select FR1: Area ACM per region (replaces branch links for new plans)
+// ---------------------------------------------------------------------------
+func (q *Queries) ListAcmAreaRegions(ctx context.Context, acmAreaID int64) ([]string, error) {
+	rows, err := q.db.Query(ctx, listAcmAreaRegions, acmAreaID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var region_code string
+		if err := rows.Scan(&region_code); err != nil {
+			return nil, err
+		}
+		items = append(items, region_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAcmAreasAdmin = `-- name: ListAcmAreasAdmin :many
 
 SELECT a.id, a.name, a.is_active, a.deleted_at, a.created_at,
        (SELECT COUNT(*) FROM acm_area_branches b WHERE b.acm_area_id = a.id) AS branch_count,
-       (SELECT COUNT(*) FROM acm_area_members m WHERE m.acm_area_id = a.id) AS member_count
+       (SELECT COUNT(*) FROM acm_area_members m WHERE m.acm_area_id = a.id) AS member_count,
+       (SELECT COUNT(*) FROM acm_area_regions g WHERE g.acm_area_id = a.id) AS region_count
 FROM acm_areas a
 WHERE ($1::text = 'all'
        OR ($1::text = 'active' AND a.is_active)
@@ -240,6 +294,7 @@ type ListAcmAreasAdminRow struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	BranchCount int64              `json:"branch_count"`
 	MemberCount int64              `json:"member_count"`
+	RegionCount int64              `json:"region_count"`
 }
 
 // Area ACM (cit-acm-plan FR7): ADMIN-managed, immediate-apply + audit in the
@@ -262,6 +317,7 @@ func (q *Queries) ListAcmAreasAdmin(ctx context.Context, status string) ([]ListA
 			&i.CreatedAt,
 			&i.BranchCount,
 			&i.MemberCount,
+			&i.RegionCount,
 		); err != nil {
 			return nil, err
 		}
@@ -363,6 +419,49 @@ func (q *Queries) ListAcmEligibleUsers(ctx context.Context) ([]ListAcmEligibleUs
 	return items, nil
 }
 
+const listAcmRegionOptions = `-- name: ListAcmRegionOptions :many
+SELECT c.region_code, COUNT(*) AS branch_count, a.id AS acm_area_id, a.name AS acm_area_name
+FROM (SELECT region_code::text AS region_code FROM vendor_branches WHERE is_active AND region_code IS NOT NULL) c
+LEFT JOIN acm_area_regions r ON r.region_code = c.region_code
+LEFT JOIN acm_areas a ON a.id = r.acm_area_id
+GROUP BY c.region_code, a.id, a.name
+ORDER BY c.region_code
+`
+
+type ListAcmRegionOptionsRow struct {
+	RegionCode  string  `json:"region_code"`
+	BranchCount int64   `json:"branch_count"`
+	AcmAreaID   *int64  `json:"acm_area_id"`
+	AcmAreaName *string `json:"acm_area_name"`
+}
+
+// Region picker: every region code used by an active vendor branch, with the
+// area currently holding it (NULL = free).
+func (q *Queries) ListAcmRegionOptions(ctx context.Context) ([]ListAcmRegionOptionsRow, error) {
+	rows, err := q.db.Query(ctx, listAcmRegionOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAcmRegionOptionsRow{}
+	for rows.Next() {
+		var i ListAcmRegionOptionsRow
+		if err := rows.Scan(
+			&i.RegionCode,
+			&i.BranchCount,
+			&i.AcmAreaID,
+			&i.AcmAreaName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBranchesInOtherAcmAreas = `-- name: ListBranchesInOtherAcmAreas :many
 SELECT b.vendor_branch_id, a.id AS acm_area_id, a.name AS acm_area_name
 FROM acm_area_branches b JOIN acm_areas a ON a.id = b.acm_area_id
@@ -401,55 +500,78 @@ func (q *Queries) ListBranchesInOtherAcmAreas(ctx context.Context, arg ListBranc
 	return items, nil
 }
 
-const listUnassignedVaultAssignmentBranches = `-- name: ListUnassignedVaultAssignmentBranches :many
-SELECT vb.id AS vendor_branch_id, vb.branch_code, vb.branch_name, v.name AS vendor_name,
-       COUNT(DISTINCT vr.id) AS request_count
-FROM vendor_requests vr
-JOIN vendor_request_tickets t ON t.request_number = vr.request_number AND t.is_active
-JOIN atms a ON a.terminal_id = t.terminal_id
-JOIN LATERAL (
-    SELECT COALESCE(p.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
-    FROM atm_vendor_packages avp
-    LEFT JOIN vendor_packages_branch p ON p.id = avp.vendor_package_id
-    WHERE avp.atm_id = a.id AND avp.is_active
-      AND avp.effective_start_date <= t.replenish_date
-      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= t.replenish_date)
-    ORDER BY avp.effective_start_date DESC, avp.id DESC
-    LIMIT 1
-) k ON true
-JOIN vendor_branches vb ON vb.id = k.vendor_branch_id
-JOIN vendors v ON v.id = vb.vendor_id
-WHERE vr.status = 'vault_assignment'
-  AND NOT EXISTS (SELECT 1 FROM acm_area_branches ab WHERE ab.vendor_branch_id = vb.id)
-GROUP BY vb.id, vb.branch_code, vb.branch_name, v.name
-ORDER BY v.name, vb.branch_code
+const listRegionsInOtherAcmAreas = `-- name: ListRegionsInOtherAcmAreas :many
+SELECT r.region_code, a.id AS acm_area_id, a.name AS acm_area_name
+FROM acm_area_regions r JOIN acm_areas a ON a.id = r.acm_area_id
+WHERE r.region_code = ANY($1::text[]) AND r.acm_area_id <> $2
 `
 
-type ListUnassignedVaultAssignmentBranchesRow struct {
-	VendorBranchID int64  `json:"vendor_branch_id"`
-	BranchCode     string `json:"branch_code"`
-	BranchName     string `json:"branch_name"`
-	VendorName     string `json:"vendor_name"`
-	RequestCount   int64  `json:"request_count"`
+type ListRegionsInOtherAcmAreasParams struct {
+	RegionCodes []string `json:"region_codes"`
+	AcmAreaID   int64    `json:"acm_area_id"`
 }
 
-// FR7.4: replenish branches that have an ATM on a request waiting for vault
-// assignment but belong to no ACM area -- those requests cannot progress.
-func (q *Queries) ListUnassignedVaultAssignmentBranches(ctx context.Context) ([]ListUnassignedVaultAssignmentBranchesRow, error) {
-	rows, err := q.db.Query(ctx, listUnassignedVaultAssignmentBranches)
+type ListRegionsInOtherAcmAreasRow struct {
+	RegionCode  string `json:"region_code"`
+	AcmAreaID   int64  `json:"acm_area_id"`
+	AcmAreaName string `json:"acm_area_name"`
+}
+
+// Regions from the requested set already held by another area (-> 409).
+func (q *Queries) ListRegionsInOtherAcmAreas(ctx context.Context, arg ListRegionsInOtherAcmAreasParams) ([]ListRegionsInOtherAcmAreasRow, error) {
+	rows, err := q.db.Query(ctx, listRegionsInOtherAcmAreas, arg.RegionCodes, arg.AcmAreaID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUnassignedVaultAssignmentBranchesRow{}
+	items := []ListRegionsInOtherAcmAreasRow{}
 	for rows.Next() {
-		var i ListUnassignedVaultAssignmentBranchesRow
+		var i ListRegionsInOtherAcmAreasRow
+		if err := rows.Scan(&i.RegionCode, &i.AcmAreaID, &i.AcmAreaName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVaultPlanRegionWarnings = `-- name: ListVaultPlanRegionWarnings :many
+SELECT vr.id AS vendor_request_id, vr.request_number, vr.region_code, vr.replenish_date
+FROM vendor_requests vr
+WHERE vr.status = 'vault_assignment'
+  AND NOT EXISTS (SELECT 1 FROM vendor_request_vault_plans p
+                  WHERE p.vendor_request_id = vr.id AND p.status <> 'cancelled')
+  AND NOT EXISTS (SELECT 1 FROM acm_area_regions r JOIN acm_areas a ON a.id = r.acm_area_id AND a.is_active
+                  WHERE r.region_code = vr.region_code)
+ORDER BY vr.replenish_date, vr.request_number
+`
+
+type ListVaultPlanRegionWarningsRow struct {
+	VendorRequestID int64       `json:"vendor_request_id"`
+	RequestNumber   string      `json:"request_number"`
+	RegionCode      *string     `json:"region_code"`
+	ReplenishDate   pgtype.Date `json:"replenish_date"`
+}
+
+// FR1.4: requests waiting in vault_assignment without a live plan because their
+// region has no active area, or the request has no region_code (old number format).
+func (q *Queries) ListVaultPlanRegionWarnings(ctx context.Context) ([]ListVaultPlanRegionWarningsRow, error) {
+	rows, err := q.db.Query(ctx, listVaultPlanRegionWarnings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListVaultPlanRegionWarningsRow{}
+	for rows.Next() {
+		var i ListVaultPlanRegionWarningsRow
 		if err := rows.Scan(
-			&i.VendorBranchID,
-			&i.BranchCode,
-			&i.BranchName,
-			&i.VendorName,
-			&i.RequestCount,
+			&i.VendorRequestID,
+			&i.RequestNumber,
+			&i.RegionCode,
+			&i.ReplenishDate,
 		); err != nil {
 			return nil, err
 		}

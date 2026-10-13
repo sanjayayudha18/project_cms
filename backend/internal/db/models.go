@@ -32,6 +32,13 @@ type AcmAreaMember struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type AcmAreaRegion struct {
+	AcmAreaID  int64              `json:"acm_area_id"`
+	RegionCode string             `json:"region_code"`
+	CreatedBy  int64              `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 // Explicit fallback: while from_user_id cannot act (see user_leaves), to_user_id acts in their place. Overlap-range rejection is enforced at the admin endpoint layer (Task 8), not here.
 type ApprovalDelegation struct {
 	ID         int64              `json:"id"`
@@ -883,6 +890,31 @@ type VendorRequestTicket struct {
 	ResultUpdatedAt pgtype.Timestamptz `json:"result_updated_at"`
 }
 
+type VendorRequestVaultAllocation struct {
+	ID              int64   `json:"id"`
+	VaultPlanID     int64   `json:"vault_plan_id"`
+	VendorRequestID int64   `json:"vendor_request_id"`
+	VendorVaultID   int64   `json:"vendor_vault_id"`
+	VaultBranchID   int64   `json:"vault_branch_id"`
+	Tier            int16   `json:"tier"`
+	IsUrgent        bool    `json:"is_urgent"`
+	UrgentReason    *string `json:"urgent_reason"`
+	// Saldo vault per denom saat disimpan/submit, {"100000": "123000000", ...}; null = tidak diketahui.
+	SaldoSnapshot []byte `json:"saldo_snapshot"`
+	// Sisa kapasitas vault per denom (saldo - alokasi rencana lain) saat disimpan/submit; null = tidak diketahui.
+	CapacitySnapshot []byte             `json:"capacity_snapshot"`
+	CapacityWarning  bool               `json:"capacity_warning"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVaultAllocationAmount struct {
+	AllocationID int64 `json:"allocation_id"`
+	Denom        int32 `json:"denom"`
+	Amount       int64 `json:"amount"`
+}
+
+// Penetapan branch vault per ATM (027). Tidak ditulis lagi sejak 030 — diganti vendor_request_vault_allocations.
 type VendorRequestVaultAssignment struct {
 	ID                int64   `json:"id"`
 	VaultPlanID       int64   `json:"vault_plan_id"`
@@ -915,6 +947,19 @@ type VendorRequestVaultPlan struct {
 	RejectionReason *string            `json:"rejection_reason"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	BufferReason    *string            `json:"buffer_reason"`
+}
+
+type VendorRequestVaultTicket struct {
+	ID              int64              `json:"id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	VendorVaultID   int64              `json:"vendor_vault_id"`
+	ReplenishDate   pgtype.Date        `json:"replenish_date"`
+	Seq             int16              `json:"seq"`
+	TicketNumber    string             `json:"ticket_number"`
+	IsActive        bool               `json:"is_active"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
 }
 
 type VendorRequestVendorParty struct {

@@ -20,26 +20,21 @@ import (
 // (FR2.2/FR2.3).
 
 // sentToVendor drives a two-ATM request through ACM to sent_to_vendor:
-// terminal -> cash1 (same vendor), terminal2 -> cash2 (other vendor).
+// 1M to vault1 (cash1, same vendor), 1M to vault2 (cash2, other vendor).
 func (f *vaultPlanFixture) sentToVendor(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
 	acmUser := Actor{UserID: f.acmUserID, Role: "ACM-USER"}
 	acmSpv := Actor{UserID: f.spvID, Role: "ACM-SPV"}
-	reqID, plan1, plan2 := f.approvedTwoAtms(t)
-	for plan, in := range map[int64]VaultAssignmentInput{
-		plan1: {TerminalID: f.terminal, VaultBranchID: f.cash1},
-		plan2: {TerminalID: f.terminal2, VaultBranchID: f.cash2},
-	} {
-		if _, err := f.plans.SaveAssignments(ctx, acmUser, plan, []VaultAssignmentInput{in}); err != nil {
-			t.Fatalf("save plan %d: %v", plan, err)
-		}
-		if _, err := f.plans.Submit(ctx, acmUser, plan); err != nil {
-			t.Fatalf("submit plan %d: %v", plan, err)
-		}
-		if _, err := f.plans.Approve(ctx, acmSpv, plan); err != nil {
-			t.Fatalf("approve plan %d: %v", plan, err)
-		}
+	reqID, plan := f.approvedTwoAtms(t)
+	if _, err := f.plans.SaveAllocations(ctx, acmUser, plan, []AllocationLineInput{line(f.vault1, "1000000"), line(f.vault2, "1000000")}, nil); err != nil {
+		t.Fatalf("save plan %d: %v", plan, err)
+	}
+	if _, err := f.plans.Submit(ctx, acmUser, plan); err != nil {
+		t.Fatalf("submit plan %d: %v", plan, err)
+	}
+	if _, err := f.plans.Approve(ctx, acmSpv, plan); err != nil {
+		t.Fatalf("approve plan %d: %v", plan, err)
 	}
 	if err := f.plans.ReviewRequest(ctx, f.checker, reqID, true, ""); err != nil {
 		t.Fatalf("vault approve: %v", err)
@@ -129,9 +124,17 @@ func TestIntegration_VendorParty_SendAndResync(t *testing.T) {
 			replenish2 = k.branchID
 		}
 	}
+	// FR7.2: a vault party holds its own vault + ticket and no ATM; FR7.3: a
+	// replenish party holds its own ATM and every vault of the request.
 	cash2 := parties[partyKey{f.cash2, partyRoleVault}]
-	if !strings.Contains(cash2.content, f.terminal2) || strings.Contains(cash2.content, `"`+f.terminal+`"`) {
-		t.Fatalf("cash2 content must hold only %s: %s", f.terminal2, cash2.content)
+	if !strings.Contains(cash2.content, f.ticket(f.vault2, "001")) || strings.Contains(cash2.content, f.codes[f.vault1]) ||
+		strings.Contains(cash2.content, `"terminal_id"`) {
+		t.Fatalf("cash2 content must hold only vault2 (+ticket), no ATM: %s", cash2.content)
+	}
+	repl := parties[partyKey{f.branchID, partyRoleReplenish}]
+	if !strings.Contains(repl.content, `"`+f.terminal+`"`) || strings.Contains(repl.content, f.terminal2) ||
+		!strings.Contains(repl.content, f.codes[f.vault1]) || !strings.Contains(repl.content, f.codes[f.vault2]) {
+		t.Fatalf("replenish content must hold its ATM + both vaults: %s", repl.content)
 	}
 	for k, p := range parties {
 		for _, internal := range []string{"tier", "saldo", "capacity", "urgent", "price"} {
@@ -191,22 +194,35 @@ func TestIntegration_VendorParty_SendAndResync(t *testing.T) {
 		return err
 	}
 
-	t.Run("vault changed: only changed parties", func(t *testing.T) {
+	t.Run("vault amount changed: only parties that see it", func(t *testing.T) {
 		notices, after := resync(t, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(ctx, `UPDATE vendor_request_vault_assignments SET vault_branch_id = $1 WHERE vendor_request_id = $2 AND terminal_id = $3`,
-				f.cash1, reqID, f.terminal2); err != nil {
+			if _, err := tx.Exec(ctx, `UPDATE vendor_request_vault_allocation_amounts m SET amount = 1100000
+				FROM vendor_request_vault_allocations a WHERE a.id = m.allocation_id AND a.vendor_request_id = $1 AND a.vendor_vault_id = $2`,
+				reqID, f.vault2); err != nil {
 				return err
 			}
-			return decide(tx, "accepted", partyRoleReplenish, f.branchID, nil)
+			return decide(tx, "accepted", partyRoleVault, f.cash1, nil)
 		})
 		got := events(notices)
-		if len(got) != 3 || got[f.cash2] != "withdrawn" || got[f.cash1] != "resent" || got[replenish2] != "resent" {
-			t.Fatalf("notices = %v, want cash2 withdrawn, cash1 + replenish %d resent", got, replenish2)
+		if len(got) != 3 || got[f.cash2] != "resent" || got[f.branchID] != "resent" || got[replenish2] != "resent" {
+			t.Fatalf("notices = %v, want cash2 + both replenish resent", got)
 		}
-		if after[partyKey{f.branchID, partyRoleReplenish}].status != "accepted" {
-			t.Fatal("unchanged accepted party was reset")
+		if after[partyKey{f.cash1, partyRoleVault}].status != "accepted" {
+			t.Fatal("unchanged accepted vault party was reset")
 		}
-		if after[partyKey{f.cash2, partyRoleVault}].status != "withdrawn" || after[partyKey{f.cash1, partyRoleVault}].status != "pending" {
+	})
+
+	t.Run("vault moved to another branch: old vault party withdrawn", func(t *testing.T) {
+		notices, after := resync(t, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `UPDATE vendor_request_vault_allocations SET vendor_vault_id = $1, vault_branch_id = $2
+				WHERE vendor_request_id = $3 AND vendor_vault_id = $4`, f.vault1b, f.cash1, reqID, f.vault2)
+			return err
+		})
+		got := events(notices)
+		if len(got) != 4 || got[f.cash2] != "withdrawn" || got[f.cash1] != "resent" {
+			t.Fatalf("notices = %v, want cash2 withdrawn, cash1 + both replenish resent", got)
+		}
+		if after[partyKey{f.cash2, partyRoleVault}].status != "withdrawn" {
 			t.Fatalf("after = %v", after)
 		}
 	})

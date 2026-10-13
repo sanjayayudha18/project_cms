@@ -1,5 +1,6 @@
 /**
- * Area ACM (cit-acm-plan FR7) -- backend/internal/handler/admin_acm_area_handler.go,
+ * Area ACM (cit-acm-plan FR7, cit-vault-select FR1: area per region) --
+ * backend/internal/handler/admin_acm_area_handler.go,
  * mounted at /api/v1/admin/acm-areas (ADMIN only). Writes apply immediately
  * (documented GR#3 deviation, audited in the same tx) -- no maker-checker.
  */
@@ -13,17 +14,8 @@ export interface AcmArea {
   name: string;
   is_active: boolean;
   deleted_at: string | null;
-  branch_count: number;
+  region_count: number;
   member_count: number;
-}
-
-export interface AcmAreaBranch {
-  vendor_branch_id: number;
-  branch_code: string;
-  branch_name: string;
-  region_code: string | null;
-  branch_is_active: boolean;
-  vendor_name: string;
 }
 
 export interface AcmAreaMember {
@@ -38,16 +30,14 @@ export interface AcmAreaDetail {
   id: number;
   name: string;
   is_active: boolean;
-  branches: AcmAreaBranch[];
+  region_codes: string[];
   members: AcmAreaMember[];
 }
 
-export interface AcmBranchOption {
-  vendor_branch_id: number;
-  branch_code: string;
-  branch_name: string;
-  region_code: string | null;
-  vendor_name: string;
+/** A region code used by an active vendor branch, with the area holding it (null = free). */
+export interface AcmRegionOption {
+  region_code: string;
+  branch_count: number;
   acm_area_id: number | null;
   acm_area_name: string | null;
 }
@@ -59,12 +49,12 @@ export interface AcmEligibleUser {
   role: string;
 }
 
-export interface BranchWithoutArea {
-  vendor_branch_id: number;
-  branch_code: string;
-  branch_name: string;
-  vendor_name: string;
-  request_count: number;
+/** FR1.4: a request waiting in vault_assignment with no plan (region without area / no region code). */
+export interface RequestWithoutArea {
+  vendor_request_id: number;
+  request_number: string;
+  region_code: string | null;
+  replenish_date: string | null;
 }
 
 const BASE = "/admin/acm-areas";
@@ -85,11 +75,11 @@ export function useAcmArea(id: number | null) {
   });
 }
 
-export function useAcmBranchOptions() {
-  return useQuery<AcmBranchOption[], ApiError>({
-    queryKey: [...KEY, "branch-options"],
+export function useAcmRegionOptions() {
+  return useQuery<AcmRegionOption[], ApiError>({
+    queryKey: [...KEY, "region-options"],
     queryFn: async () =>
-      (await api.get<{ branches: AcmBranchOption[] }>(`${BASE}/branch-options`)).data.branches,
+      (await api.get<{ regions: AcmRegionOption[] }>(`${BASE}/region-options`)).data.regions,
   });
 }
 
@@ -102,11 +92,11 @@ export function useAcmEligibleUsers() {
 }
 
 export function useAcmAreaWarnings() {
-  return useQuery<BranchWithoutArea[], ApiError>({
+  return useQuery<RequestWithoutArea[], ApiError>({
     queryKey: [...KEY, "warnings"],
     queryFn: async () =>
-      (await api.get<{ branches_without_area: BranchWithoutArea[] }>(`${BASE}/warnings`)).data
-        .branches_without_area,
+      (await api.get<{ requests_without_area: RequestWithoutArea[] }>(`${BASE}/warnings`)).data
+        .requests_without_area,
   });
 }
 
@@ -114,7 +104,7 @@ export type AcmAreaMutation =
   | { op: "create"; name: string }
   | { op: "rename"; id: number; name: string }
   | { op: "disable" | "enable"; id: number }
-  | { op: "branches"; id: number; vendor_branch_ids: number[] }
+  | { op: "regions"; id: number; region_codes: string[] }
   | { op: "members"; id: number; user_ids: number[] };
 
 function send(m: AcmAreaMutation): Promise<unknown> {
@@ -123,8 +113,8 @@ function send(m: AcmAreaMutation): Promise<unknown> {
       return api.post(BASE, { name: m.name });
     case "rename":
       return api.put(`${BASE}/${m.id}`, { name: m.name });
-    case "branches":
-      return api.put(`${BASE}/${m.id}/branches`, { vendor_branch_ids: m.vendor_branch_ids });
+    case "regions":
+      return api.put(`${BASE}/${m.id}/regions`, { region_codes: m.region_codes });
     case "members":
       return api.put(`${BASE}/${m.id}/members`, { user_ids: m.user_ids });
     default:

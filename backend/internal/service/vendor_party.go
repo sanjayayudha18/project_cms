@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -12,9 +13,10 @@ import (
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor): one party per (request, vendor
-// branch, role). Its content is the snapshot the vendor sees (FR3); it is
-// built only from the whitelisted columns of ListRequestPartyRows, so no
-// saldo/kapasitas, tier, urgent or price can leak (FR3.3).
+// branch, role). Its content is the snapshot the vendor sees (FR3, revised by
+// cit-vault-select FR7); it is built only from the whitelisted columns of
+// ListRequestPartyAtmRows / ListRequestPartyVaultRows, so no saldo/kapasitas,
+// tier, urgent, buffer reason or price can leak (FR7.4).
 
 const (
 	partyRoleReplenish = "replenish"
@@ -39,23 +41,41 @@ type DenomAmount struct {
 	Amount int64 `json:"amount"`
 }
 
-// PartyAtm is one ATM of the party with the counterpart branch: the vault for a
-// replenish party, the replenish branch for a vault party.
+// PartyAtm is one ATM of a replenish party with its order (no vault per ATM).
 type PartyAtm struct {
 	TerminalID   string        `json:"terminal_id"`
 	Lokasi       string        `json:"lokasi"`
 	TicketNumber string        `json:"ticket_number"`
 	Denoms       []DenomAmount `json:"denoms"`
-	Counterpart  PartyBranch   `json:"counterpart"`
 }
 
-// PartyContent is vendor_request_vendor_parties.content.
+// PartyVaultRef is a vendor vault as shown to vendors (address: vault, else branch; U8).
+type PartyVaultRef struct {
+	ID      int64  `json:"id"`
+	Code    string `json:"code"`
+	Address string `json:"address,omitempty"`
+}
+
+// PartyVault is one allocated vault of the request with its tiket pemenuhan
+// vault and amounts (cit-vault-select FR7.2/FR7.3).
+type PartyVault struct {
+	TicketNumber string        `json:"ticket_number"`
+	Vault        PartyVaultRef `json:"vault"`
+	Branch       PartyBranch   `json:"branch"`
+	Denoms       []DenomAmount `json:"denoms"`
+}
+
+// PartyContent is vendor_request_vendor_parties.content. Replenish party: its
+// own ATMs + every vault of the request (V6); totals = its ATMs' order. Vault
+// party: its own vaults + the request's replenish branches; totals = its vaults.
 type PartyContent struct {
-	Role     string        `json:"role"`
-	Branch   PartyBranch   `json:"branch"`
-	Atms     []PartyAtm    `json:"atms"`
-	Totals   []DenomAmount `json:"totals"`
-	Currency string        `json:"currency"`
+	Role              string        `json:"role"`
+	Branch            PartyBranch   `json:"branch"`
+	Atms              []PartyAtm    `json:"atms"`
+	Vaults            []PartyVault  `json:"vaults"`
+	ReplenishBranches []PartyBranch `json:"replenish_branches"`
+	Totals            []DenomAmount `json:"totals"`
+	Currency          string        `json:"currency"`
 }
 
 type partyKey struct {
@@ -63,32 +83,64 @@ type partyKey struct {
 	role     string
 }
 
-// buildPartyContents groups the per-(ATM, denom) rows into one content per
-// party. Rows arrive ordered by terminal_id, denom, so ATMs and denoms keep
-// that order; totals are sorted by denom.
-func buildPartyContents(rows []db.ListRequestPartyRowsRow) map[partyKey]*PartyContent {
+func newPartyContent(role string, self PartyBranch) *PartyContent {
+	return &PartyContent{Role: role, Branch: self, Atms: []PartyAtm{}, Vaults: []PartyVault{},
+		ReplenishBranches: []PartyBranch{}, Totals: []DenomAmount{}, Currency: currencyIDR}
+}
+
+// requestVaults groups the per-(vault, denom) rows into vaults, keeping the
+// row order (branch code, vault code, denom).
+func requestVaults(rows []db.ListRequestPartyVaultRowsRow) []PartyVault {
+	out := []PartyVault{}
+	for _, r := range rows {
+		if n := len(out); n == 0 || out[n-1].Vault.ID != r.VendorVaultID {
+			out = append(out, PartyVault{TicketNumber: deref(r.TicketNumber),
+				Vault:  PartyVaultRef{ID: r.VendorVaultID, Code: r.VaultCode, Address: r.VaultAddress},
+				Branch: PartyBranch{ID: r.VaultBranchID, Code: r.VaultBranchCode, Name: r.VaultBranchName, VendorID: r.VaultVendorID, VendorName: r.VaultVendorName}})
+		}
+		v := &out[len(out)-1]
+		v.Denoms = append(v.Denoms, DenomAmount{Denom: r.Denom, Amount: r.Amount})
+	}
+	return out
+}
+
+// buildPartyContents builds one content per party (cit-vault-select FR7).
+// ATM rows arrive ordered by terminal_id, denom; totals are sorted by denom.
+func buildPartyContents(atms []db.ListRequestPartyAtmRowsRow, vaultRows []db.ListRequestPartyVaultRowsRow) map[partyKey]*PartyContent {
+	vaults := requestVaults(vaultRows)
 	out := map[partyKey]*PartyContent{}
-	add := func(k partyKey, self, counterpart PartyBranch, r db.ListRequestPartyRowsRow) {
+	replenishBranches := []PartyBranch{}
+	for _, r := range atms {
+		k := partyKey{r.ReplenishBranchID, partyRoleReplenish}
 		c, ok := out[k]
 		if !ok {
-			c = &PartyContent{Role: k.role, Branch: self, Currency: currencyIDR}
+			b := PartyBranch{ID: r.ReplenishBranchID, Code: r.ReplenishBranchCode, Name: r.ReplenishBranchName,
+				VendorID: r.ReplenishVendorID, VendorName: r.ReplenishVendorName}
+			c = newPartyContent(partyRoleReplenish, b)
+			c.Vaults = slices.Clone(vaults)
 			out[k] = c
+			replenishBranches = append(replenishBranches, b)
 		}
 		if n := len(c.Atms); n == 0 || c.Atms[n-1].TerminalID != r.TerminalID {
-			c.Atms = append(c.Atms, PartyAtm{TerminalID: r.TerminalID, Lokasi: r.LokasiAtm,
-				TicketNumber: deref(r.TicketNumber), Counterpart: counterpart})
+			c.Atms = append(c.Atms, PartyAtm{TerminalID: r.TerminalID, Lokasi: r.LokasiAtm, TicketNumber: deref(r.TicketNumber)})
 		}
 		atm := &c.Atms[len(c.Atms)-1]
 		atm.Denoms = append(atm.Denoms, DenomAmount{Denom: r.Denom, Amount: r.AmountReplenish})
 		c.Totals = addDenom(c.Totals, r.Denom, r.AmountReplenish)
 	}
-	for _, r := range rows {
-		replenish := PartyBranch{ID: r.ReplenishBranchID, Code: r.ReplenishBranchCode, Name: r.ReplenishBranchName,
-			VendorID: r.ReplenishVendorID, VendorName: r.ReplenishVendorName}
-		vault := PartyBranch{ID: r.VaultBranchID, Code: r.VaultBranchCode, Name: r.VaultBranchName,
-			VendorID: r.VaultVendorID, VendorName: r.VaultVendorName, Address: r.VaultAddress}
-		add(partyKey{r.ReplenishBranchID, partyRoleReplenish}, replenish, vault, r)
-		add(partyKey{r.VaultBranchID, partyRoleVault}, vault, replenish, r)
+	sort.Slice(replenishBranches, func(i, j int) bool { return replenishBranches[i].Code < replenishBranches[j].Code })
+	for _, v := range vaults {
+		k := partyKey{v.Branch.ID, partyRoleVault}
+		c, ok := out[k]
+		if !ok {
+			c = newPartyContent(partyRoleVault, v.Branch)
+			c.ReplenishBranches = slices.Clone(replenishBranches)
+			out[k] = c
+		}
+		c.Vaults = append(c.Vaults, v)
+		for _, d := range v.Denoms {
+			c.Totals = addDenom(c.Totals, d.Denom, d.Amount)
+		}
 	}
 	for _, c := range out {
 		sort.Slice(c.Totals, func(i, j int) bool { return c.Totals[i].Denom < c.Totals[j].Denom })
@@ -130,14 +182,18 @@ type partyNotice struct {
 // locked, so parties are locked after it, NFR3). Returns the parties to
 // notify (FR7.1), also used in the audit entry.
 func syncVendorParties(ctx context.Context, q *db.Queries, actorID int64, req db.VendorRequest) ([]partyNotice, error) {
-	rows, err := q.ListRequestPartyRows(ctx, req.ID)
+	atms, err := q.ListRequestPartyAtmRows(ctx, req.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list party rows of request %d: %w", req.ID, err)
+		return nil, fmt.Errorf("list party atm rows of request %d: %w", req.ID, err)
 	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("request %d has no vault assignments to send", req.ID)
+	vaults, err := q.ListRequestPartyVaultRows(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list party vault rows of request %d: %w", req.ID, err)
 	}
-	built := buildPartyContents(rows)
+	if len(vaults) == 0 {
+		return nil, fmt.Errorf("request %d has no vault allocations to send", req.ID)
+	}
+	built := buildPartyContents(atms, vaults)
 	existing, err := q.LockVendorPartiesForRequest(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("lock parties of request %d: %w", req.ID, err)

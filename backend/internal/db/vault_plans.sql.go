@@ -16,133 +16,18 @@ UPDATE vendor_request_vault_plans SET status = 'cancelled'
 WHERE vendor_request_id = $1 AND status <> 'cancelled'
 `
 
-// FR5.5: cancelling the request cancels every area plan.
+// FR5.5: cancelling the request cancels its plan.
 func (q *Queries) CancelVaultPlansForRequest(ctx context.Context, vendorRequestID int64) error {
 	_, err := q.db.Exec(ctx, cancelVaultPlansForRequest, vendorRequestID)
 	return err
-}
-
-const clearVaultPlanAssignments = `-- name: ClearVaultPlanAssignments :exec
-DELETE FROM vendor_request_vault_assignments WHERE vault_plan_id = $1
-`
-
-// Replace-all while the plan is draft (spec data model: draft rows are replaced, audited).
-func (q *Queries) ClearVaultPlanAssignments(ctx context.Context, vaultPlanID int64) error {
-	_, err := q.db.Exec(ctx, clearVaultPlanAssignments, vaultPlanID)
-	return err
-}
-
-const countRequestAtmsWithoutApprovedVault = `-- name: CountRequestAtmsWithoutApprovedVault :one
-SELECT COUNT(DISTINCT i.terminal_id)
-FROM vendor_request_items i
-WHERE i.vendor_request_id = $1
-  AND NOT EXISTS (
-        SELECT 1 FROM vendor_request_vault_assignments x
-        JOIN vendor_request_vault_plans p ON p.id = x.vault_plan_id AND p.status = 'acm_approved'
-        WHERE x.vendor_request_id = i.vendor_request_id AND x.terminal_id = i.terminal_id)
-`
-
-// FR4.6 gate: ATMs of the request not yet covered by an acm_approved plan
-// (includes ATMs whose branch has no area -> no plan at all).
-func (q *Queries) CountRequestAtmsWithoutApprovedVault(ctx context.Context, vendorRequestID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countRequestAtmsWithoutApprovedVault, vendorRequestID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const createMissingVaultPlans = `-- name: CreateMissingVaultPlans :many
-
-INSERT INTO vendor_request_vault_plans (vendor_request_id, acm_area_id)
-SELECT DISTINCT vr.id, ab.acm_area_id
-FROM vendor_requests vr
-JOIN vendor_request_tickets t ON t.request_number = vr.request_number AND t.is_active
-JOIN atms a ON a.terminal_id = t.terminal_id
-JOIN LATERAL (
-    SELECT COALESCE(p.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
-    FROM atm_vendor_packages avp
-    LEFT JOIN vendor_packages_branch p ON p.id = avp.vendor_package_id
-    WHERE avp.atm_id = a.id AND avp.is_active
-      AND avp.effective_start_date <= t.replenish_date
-      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= t.replenish_date)
-    ORDER BY avp.effective_start_date DESC, avp.id DESC
-    LIMIT 1
-) k ON true
-JOIN acm_area_branches ab ON ab.vendor_branch_id = k.vendor_branch_id
-JOIN acm_areas ar ON ar.id = ab.acm_area_id AND ar.is_active
-WHERE vr.status = 'vault_assignment'
-  AND ($1::bigint IS NULL OR vr.id = $1::bigint)
-ON CONFLICT (vendor_request_id, acm_area_id) DO NOTHING
-RETURNING id, vendor_request_id, acm_area_id
-`
-
-type CreateMissingVaultPlansRow struct {
-	ID              int64 `json:"id"`
-	VendorRequestID int64 `json:"vendor_request_id"`
-	AcmAreaID       int64 `json:"acm_area_id"`
-}
-
-// Penetapan vault per ATM oleh ACM (cit-acm-plan). One plan per
-// (vendor_request, acm_area); an ATM belongs to the area of its replenish
-// branch = the active kelolaan branch on the ticket's replenish_date.
-// FR4.1 / FR7.3: insert a draft plan for every (request in vault_assignment,
-// area) pair that has an ATM but no plan yet. request_id NULL = all such
-// requests (after an ADMIN assigns branches). Returns only newly created rows.
-func (q *Queries) CreateMissingVaultPlans(ctx context.Context, requestID *int64) ([]CreateMissingVaultPlansRow, error) {
-	rows, err := q.db.Query(ctx, createMissingVaultPlans, requestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CreateMissingVaultPlansRow{}
-	for rows.Next() {
-		var i CreateMissingVaultPlansRow
-		if err := rows.Scan(&i.ID, &i.VendorRequestID, &i.AcmAreaID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const deleteVaultAssignmentsOfRemovedAtms = `-- name: DeleteVaultAssignmentsOfRemovedAtms :many
-DELETE FROM vendor_request_vault_assignments a
-WHERE a.vendor_request_id = $1
-  AND NOT EXISTS (SELECT 1 FROM vendor_request_items i WHERE i.vendor_request_id = a.vendor_request_id AND i.terminal_id = a.terminal_id)
-RETURNING a.terminal_id
-`
-
-// cit-send-vendor FR6.2: an edit (draft only) removed ATMs from the request; their vault assignments go
-// (draft rows, same rule as replace-all in 2.2a S1; caller audits). ATMs still in the request keep theirs.
-func (q *Queries) DeleteVaultAssignmentsOfRemovedAtms(ctx context.Context, vendorRequestID int64) ([]string, error) {
-	rows, err := q.db.Query(ctx, deleteVaultAssignmentsOfRemovedAtms, vendorRequestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var terminal_id string
-		if err := rows.Scan(&terminal_id); err != nil {
-			return nil, err
-		}
-		items = append(items, terminal_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getVaultPlan = `-- name: GetVaultPlan :one
 
 SELECT p.id, p.vendor_request_id, p.acm_area_id, p.status, p.submitted_by, p.submitted_at,
        p.approved_by, p.approved_at, p.rejected_by, p.rejected_at, p.rejection_reason,
-       vr.request_number, vr.replenish_date, vr.vendor_id, vr.status AS request_status,
-       vr.vault_rejection_reason, ar.name AS acm_area_name,
+       p.buffer_reason, vr.request_number, vr.replenish_date, vr.vendor_id, vr.region_code,
+       vr.status AS request_status, vr.vault_rejection_reason, ar.name AS acm_area_name,
        -- cit-send-vendor FR4.3: the plan went back to draft because a vault vendor rejected it.
        EXISTS (SELECT 1 FROM users ru WHERE ru.id = p.rejected_by AND ru.vendor_id IS NOT NULL) AS rejected_by_vendor
 FROM vendor_request_vault_plans p
@@ -163,9 +48,11 @@ type GetVaultPlanRow struct {
 	RejectedBy           *int64             `json:"rejected_by"`
 	RejectedAt           pgtype.Timestamptz `json:"rejected_at"`
 	RejectionReason      *string            `json:"rejection_reason"`
+	BufferReason         *string            `json:"buffer_reason"`
 	RequestNumber        string             `json:"request_number"`
 	ReplenishDate        pgtype.Date        `json:"replenish_date"`
 	VendorID             *int64             `json:"vendor_id"`
+	RegionCode           *string            `json:"region_code"`
 	RequestStatus        string             `json:"request_status"`
 	VaultRejectionReason *string            `json:"vault_rejection_reason"`
 	AcmAreaName          string             `json:"acm_area_name"`
@@ -173,7 +60,7 @@ type GetVaultPlanRow struct {
 }
 
 // ---------------------------------------------------------------------------
-// S6: rencana vault (read, saldo/kapasitas, penetapan, transisi)
+// Rencana vault (read, transisi)
 // ---------------------------------------------------------------------------
 // Plan header with the request and area it belongs to.
 func (q *Queries) GetVaultPlan(ctx context.Context, id int64) (GetVaultPlanRow, error) {
@@ -191,50 +78,17 @@ func (q *Queries) GetVaultPlan(ctx context.Context, id int64) (GetVaultPlanRow, 
 		&i.RejectedBy,
 		&i.RejectedAt,
 		&i.RejectionReason,
+		&i.BufferReason,
 		&i.RequestNumber,
 		&i.ReplenishDate,
 		&i.VendorID,
+		&i.RegionCode,
 		&i.RequestStatus,
 		&i.VaultRejectionReason,
 		&i.AcmAreaName,
 		&i.RejectedByVendor,
 	)
 	return i, err
-}
-
-const insertVaultAssignment = `-- name: InsertVaultAssignment :one
-INSERT INTO vendor_request_vault_assignments
-    (vault_plan_id, vendor_request_id, terminal_id, replenish_branch_id, vault_branch_id, tier,
-     is_urgent, urgent_reason)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id
-`
-
-type InsertVaultAssignmentParams struct {
-	VaultPlanID       int64   `json:"vault_plan_id"`
-	VendorRequestID   int64   `json:"vendor_request_id"`
-	TerminalID        string  `json:"terminal_id"`
-	ReplenishBranchID int64   `json:"replenish_branch_id"`
-	VaultBranchID     int64   `json:"vault_branch_id"`
-	Tier              int16   `json:"tier"`
-	IsUrgent          bool    `json:"is_urgent"`
-	UrgentReason      *string `json:"urgent_reason"`
-}
-
-func (q *Queries) InsertVaultAssignment(ctx context.Context, arg InsertVaultAssignmentParams) (int64, error) {
-	row := q.db.QueryRow(ctx, insertVaultAssignment,
-		arg.VaultPlanID,
-		arg.VendorRequestID,
-		arg.TerminalID,
-		arg.ReplenishBranchID,
-		arg.VaultBranchID,
-		arg.Tier,
-		arg.IsUrgent,
-		arg.UrgentReason,
-	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
 }
 
 const isAcmAreaMember = `-- name: IsAcmAreaMember :one
@@ -254,6 +108,7 @@ func (q *Queries) IsAcmAreaMember(ctx context.Context, arg IsAcmAreaMemberParams
 }
 
 const listAcmAreaMemberIDsByRole = `-- name: ListAcmAreaMemberIDsByRole :many
+
 SELECT DISTINCT m.user_id
 FROM acm_area_members m
 JOIN users u ON u.id = m.user_id AND u.is_active AND u.deleted_at IS NULL
@@ -266,6 +121,9 @@ type ListAcmAreaMemberIDsByRoleParams struct {
 	Role    string  `json:"role"`
 }
 
+// Rencana pemenuhan vault (cit-acm-plan, revised by cit-vault-select v3):
+// one live plan per request, held by the ACM area of the request's region.
+// Allocation rows / tickets: queries/vault_allocations.sql, vault_tickets.sql.
 // Notification recipients: active members of the given areas holding role.
 func (q *Queries) ListAcmAreaMemberIDsByRole(ctx context.Context, arg ListAcmAreaMemberIDsByRoleParams) ([]int64, error) {
 	rows, err := q.db.Query(ctx, listAcmAreaMemberIDsByRole, arg.AreaIds, arg.Role)
@@ -287,305 +145,12 @@ func (q *Queries) ListAcmAreaMemberIDsByRole(ctx context.Context, arg ListAcmAre
 	return items, nil
 }
 
-const listAllVaultPlansForRequest = `-- name: ListAllVaultPlansForRequest :many
-SELECT id, acm_area_id, status FROM vendor_request_vault_plans WHERE vendor_request_id = $1 ORDER BY id
-`
-
-type ListAllVaultPlansForRequestRow struct {
-	ID        int64  `json:"id"`
-	AcmAreaID int64  `json:"acm_area_id"`
-	Status    string `json:"status"`
-}
-
-// cit-send-vendor FR6.2: re-approval after an edit reopens every plan, including ones cancelled because
-// an earlier edit left their area without ATMs (the unique (request, area) blocks recreating them).
-func (q *Queries) ListAllVaultPlansForRequest(ctx context.Context, vendorRequestID int64) ([]ListAllVaultPlansForRequestRow, error) {
-	rows, err := q.db.Query(ctx, listAllVaultPlansForRequest, vendorRequestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListAllVaultPlansForRequestRow{}
-	for rows.Next() {
-		var i ListAllVaultPlansForRequestRow
-		if err := rows.Scan(&i.ID, &i.AcmAreaID, &i.Status); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listVaultAssignmentsForRequest = `-- name: ListVaultAssignmentsForRequest :many
-SELECT x.vault_plan_id, x.terminal_id, x.replenish_branch_id, rb.branch_code AS replenish_branch_code,
-       x.vault_branch_id, vb.branch_code AS vault_branch_code, vb.branch_name AS vault_branch_name,
-       v.name AS vault_vendor_name, x.tier, x.is_urgent, x.urgent_reason,
-       x.saldo_snapshot, x.capacity_snapshot, x.capacity_warning
-FROM vendor_request_vault_assignments x
-JOIN vendor_request_vault_plans p ON p.id = x.vault_plan_id AND p.status <> 'cancelled'
-JOIN vendor_branches rb ON rb.id = x.replenish_branch_id
-JOIN vendor_branches vb ON vb.id = x.vault_branch_id
-JOIN vendors v ON v.id = vb.vendor_id
-WHERE x.vendor_request_id = $1
-ORDER BY x.terminal_id
-`
-
-type ListVaultAssignmentsForRequestRow struct {
-	VaultPlanID         int64   `json:"vault_plan_id"`
-	TerminalID          string  `json:"terminal_id"`
-	ReplenishBranchID   int64   `json:"replenish_branch_id"`
-	ReplenishBranchCode string  `json:"replenish_branch_code"`
-	VaultBranchID       int64   `json:"vault_branch_id"`
-	VaultBranchCode     string  `json:"vault_branch_code"`
-	VaultBranchName     string  `json:"vault_branch_name"`
-	VaultVendorName     string  `json:"vault_vendor_name"`
-	Tier                int16   `json:"tier"`
-	IsUrgent            bool    `json:"is_urgent"`
-	UrgentReason        *string `json:"urgent_reason"`
-	SaldoSnapshot       []byte  `json:"saldo_snapshot"`
-	CapacitySnapshot    []byte  `json:"capacity_snapshot"`
-	CapacityWarning     bool    `json:"capacity_warning"`
-}
-
-// ATM-SPV review panel (FR5.1): every assignment of the request's live plans.
-func (q *Queries) ListVaultAssignmentsForRequest(ctx context.Context, vendorRequestID int64) ([]ListVaultAssignmentsForRequestRow, error) {
-	rows, err := q.db.Query(ctx, listVaultAssignmentsForRequest, vendorRequestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVaultAssignmentsForRequestRow{}
-	for rows.Next() {
-		var i ListVaultAssignmentsForRequestRow
-		if err := rows.Scan(
-			&i.VaultPlanID,
-			&i.TerminalID,
-			&i.ReplenishBranchID,
-			&i.ReplenishBranchCode,
-			&i.VaultBranchID,
-			&i.VaultBranchCode,
-			&i.VaultBranchName,
-			&i.VaultVendorName,
-			&i.Tier,
-			&i.IsUrgent,
-			&i.UrgentReason,
-			&i.SaldoSnapshot,
-			&i.CapacitySnapshot,
-			&i.CapacityWarning,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listVaultBranchSaldo = `-- name: ListVaultBranchSaldo :many
-WITH saldo_rows AS (
-    SELECT m.vendor_vault_id, r.denom_100k_idr, r.denom_50k_idr, r.denom_20k_idr, r.denom_10k_idr,
-           r.denom_5k_idr, r.denom_2k_idr, r.denom_1k_idr
-    FROM dsr_uploads u
-    JOIN vendors vd ON vd.name = u.vendor
-    JOIN dsr_daily_rows r ON r.upload_id = u.id AND r.flow = 'saldo_akhir' AND r.section = 'd0'
-    JOIN dsr_location_vault_maps m ON m.vendor_id = vd.id AND m.is_active
-         AND lower(m.dsr_location) = lower(btrim(r.location))
-    WHERE u.report_date = $2::date AND u.daily_status = 'completed'
-)
-SELECT b.id AS vendor_branch_id,
-       (COUNT(vv.id) = 0 OR COALESCE(bool_or(s.vendor_vault_id IS NULL
-            OR s.denom_100k_idr IS NULL OR s.denom_50k_idr IS NULL OR s.denom_20k_idr IS NULL
-            OR s.denom_10k_idr IS NULL OR s.denom_5k_idr IS NULL OR s.denom_2k_idr IS NULL
-            OR s.denom_1k_idr IS NULL), false))::boolean AS unknown,
-       COALESCE(TRUNC(SUM(s.denom_100k_idr)), 0)::bigint AS d100000,
-       COALESCE(TRUNC(SUM(s.denom_50k_idr)), 0)::bigint AS d50000,
-       COALESCE(TRUNC(SUM(s.denom_20k_idr)), 0)::bigint AS d20000,
-       COALESCE(TRUNC(SUM(s.denom_10k_idr)), 0)::bigint AS d10000,
-       COALESCE(TRUNC(SUM(s.denom_5k_idr)), 0)::bigint AS d5000,
-       COALESCE(TRUNC(SUM(s.denom_2k_idr)), 0)::bigint AS d2000,
-       COALESCE(TRUNC(SUM(s.denom_1k_idr)), 0)::bigint AS d1000
-FROM vendor_branches b
-LEFT JOIN vendor_vaults vv ON vv.vendor_branch_id = b.id AND vv.deleted_at IS NULL
-LEFT JOIN saldo_rows s ON s.vendor_vault_id = vv.id
-WHERE b.id = ANY($1::bigint[])
-GROUP BY b.id
-`
-
-type ListVaultBranchSaldoParams struct {
-	BranchIds  []int64     `json:"branch_ids"`
-	ReportDate pgtype.Date `json:"report_date"`
-}
-
-type ListVaultBranchSaldoRow struct {
-	VendorBranchID int64 `json:"vendor_branch_id"`
-	Unknown        bool  `json:"unknown"`
-	D100000        int64 `json:"d100000"`
-	D50000         int64 `json:"d50000"`
-	D20000         int64 `json:"d20000"`
-	D10000         int64 `json:"d10000"`
-	D5000          int64 `json:"d5000"`
-	D2000          int64 `json:"d2000"`
-	D1000          int64 `json:"d1000"`
-}
-
-// FR3.1: saldo akhir 00:00 per branch for DSR report_date = X, summed over the
-// branch's active vaults via the DSR location map. unknown = no active vault,
-// or a vault without a mapped saldo_akhir row, or a broken (NULL) denom cell.
-// ponytail: amounts truncated to whole rupiah (DSR holds banknote totals, never cents).
-func (q *Queries) ListVaultBranchSaldo(ctx context.Context, arg ListVaultBranchSaldoParams) ([]ListVaultBranchSaldoRow, error) {
-	rows, err := q.db.Query(ctx, listVaultBranchSaldo, arg.BranchIds, arg.ReportDate)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVaultBranchSaldoRow{}
-	for rows.Next() {
-		var i ListVaultBranchSaldoRow
-		if err := rows.Scan(
-			&i.VendorBranchID,
-			&i.Unknown,
-			&i.D100000,
-			&i.D50000,
-			&i.D20000,
-			&i.D10000,
-			&i.D5000,
-			&i.D2000,
-			&i.D1000,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listVaultCandidateBranches = `-- name: ListVaultCandidateBranches :many
-SELECT vb.id, vb.branch_code, vb.branch_name, vb.region_code::text AS region_code, vb.category,
-       vb.vendor_id, v.name AS vendor_name
-FROM vendor_branches vb
-JOIN vendors v ON v.id = vb.vendor_id
-WHERE vb.is_active AND vb.category IN ('CASH', 'ATM_CASH') AND vb.region_code IS NOT NULL
-ORDER BY v.name, vb.branch_code
-`
-
-type ListVaultCandidateBranchesRow struct {
-	ID         int64  `json:"id"`
-	BranchCode string `json:"branch_code"`
-	BranchName string `json:"branch_name"`
-	RegionCode string `json:"region_code"`
-	Category   string `json:"category"`
-	VendorID   int64  `json:"vendor_id"`
-	VendorName string `json:"vendor_name"`
-}
-
-// Every branch that can provide cash: active, CASH/ATM_CASH, with a region code.
-func (q *Queries) ListVaultCandidateBranches(ctx context.Context) ([]ListVaultCandidateBranchesRow, error) {
-	rows, err := q.db.Query(ctx, listVaultCandidateBranches)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVaultCandidateBranchesRow{}
-	for rows.Next() {
-		var i ListVaultCandidateBranchesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.BranchCode,
-			&i.BranchName,
-			&i.RegionCode,
-			&i.Category,
-			&i.VendorID,
-			&i.VendorName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listVaultDemand = `-- name: ListVaultDemand :many
-SELECT vr.id AS vendor_request_id, i.terminal_id, i.denom, SUM(i.amount_replenish)::bigint AS amount,
-       k.vendor_branch_id AS replenish_branch_id, asg.vault_branch_id
-FROM vendor_requests vr
-JOIN vendor_request_items i ON i.vendor_request_id = vr.id
-JOIN atms a ON a.terminal_id = i.terminal_id
-LEFT JOIN LATERAL (
-    SELECT COALESCE(pk.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
-    FROM atm_vendor_packages avp
-    LEFT JOIN vendor_packages_branch pk ON pk.id = avp.vendor_package_id
-    WHERE avp.atm_id = a.id AND avp.is_active
-      AND avp.effective_start_date <= vr.replenish_date
-      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= vr.replenish_date)
-    ORDER BY avp.effective_start_date DESC, avp.id DESC
-    LIMIT 1
-) k ON true
-LEFT JOIN vendor_request_vault_assignments asg ON asg.vendor_request_id = vr.id AND asg.terminal_id = i.terminal_id
-     AND EXISTS (SELECT 1 FROM vendor_request_vault_plans pp WHERE pp.id = asg.vault_plan_id AND pp.status <> 'cancelled')
-WHERE vr.replenish_date = $1::date
-  AND vr.vault_flow AND NOT vr.is_canceled AND vr.status NOT IN ('cancelled', 'rejected')
-GROUP BY vr.id, i.terminal_id, i.denom, k.vendor_branch_id, asg.vault_branch_id
-`
-
-type ListVaultDemandRow struct {
-	VendorRequestID   int64  `json:"vendor_request_id"`
-	TerminalID        string `json:"terminal_id"`
-	Denom             int32  `json:"denom"`
-	Amount            int64  `json:"amount"`
-	ReplenishBranchID *int64 `json:"replenish_branch_id"`
-	VaultBranchID     *int64 `json:"vault_branch_id"`
-}
-
-// FR3.2/3.3 input: every ATM order (per denom) of vault-flow requests for
-// replenish date X that are still live, with its replenish branch and, if
-// assigned in a non-cancelled plan, its vault branch.
-func (q *Queries) ListVaultDemand(ctx context.Context, replenishDate pgtype.Date) ([]ListVaultDemandRow, error) {
-	rows, err := q.db.Query(ctx, listVaultDemand, replenishDate)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVaultDemandRow{}
-	for rows.Next() {
-		var i ListVaultDemandRow
-		if err := rows.Scan(
-			&i.VendorRequestID,
-			&i.TerminalID,
-			&i.Denom,
-			&i.Amount,
-			&i.ReplenishBranchID,
-			&i.VaultBranchID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listVaultPlanAtms = `-- name: ListVaultPlanAtms :many
 SELECT DISTINCT ON (i.terminal_id)
        i.terminal_id, vb.id AS replenish_branch_id, vb.branch_code AS replenish_branch_code,
        vb.branch_name AS replenish_branch_name, vb.region_code AS replenish_region_code,
-       vb.vendor_id AS replenish_vendor_id, v.name AS replenish_vendor_name,
-       asg.id AS assignment_id, asg.vault_branch_id, asg.tier, asg.is_urgent, asg.urgent_reason,
-       asg.saldo_snapshot, asg.capacity_snapshot, asg.capacity_warning
-FROM vendor_request_vault_plans p
-JOIN vendor_requests vr ON vr.id = p.vendor_request_id
+       vb.vendor_id AS replenish_vendor_id, v.name AS replenish_vendor_name
+FROM vendor_requests vr
 JOIN vendor_request_items i ON i.vendor_request_id = vr.id
 JOIN atms a ON a.terminal_id = i.terminal_id
 JOIN LATERAL (
@@ -600,14 +165,7 @@ JOIN LATERAL (
 ) k ON true
 JOIN vendor_branches vb ON vb.id = k.vendor_branch_id
 JOIN vendors v ON v.id = vb.vendor_id
-LEFT JOIN vendor_request_vault_assignments asg ON asg.vault_plan_id = p.id AND asg.terminal_id = i.terminal_id
-WHERE p.id = $1
-  AND (asg.id IS NOT NULL
-       OR (EXISTS (SELECT 1 FROM acm_area_branches ab
-                   WHERE ab.vendor_branch_id = k.vendor_branch_id AND ab.acm_area_id = p.acm_area_id)
-           AND NOT EXISTS (SELECT 1 FROM vendor_request_vault_assignments o
-                           JOIN vendor_request_vault_plans op ON op.id = o.vault_plan_id AND op.status <> 'cancelled'
-                           WHERE o.vendor_request_id = vr.id AND o.terminal_id = i.terminal_id AND o.vault_plan_id <> p.id)))
+WHERE vr.id = $1
 ORDER BY i.terminal_id
 `
 
@@ -619,21 +177,10 @@ type ListVaultPlanAtmsRow struct {
 	ReplenishRegionCode *string `json:"replenish_region_code"`
 	ReplenishVendorID   int64   `json:"replenish_vendor_id"`
 	ReplenishVendorName string  `json:"replenish_vendor_name"`
-	AssignmentID        *int64  `json:"assignment_id"`
-	VaultBranchID       *int64  `json:"vault_branch_id"`
-	Tier                *int16  `json:"tier"`
-	IsUrgent            *bool   `json:"is_urgent"`
-	UrgentReason        *string `json:"urgent_reason"`
-	SaldoSnapshot       []byte  `json:"saldo_snapshot"`
-	CapacitySnapshot    []byte  `json:"capacity_snapshot"`
-	CapacityWarning     *bool   `json:"capacity_warning"`
 }
 
-// ATMs of the plan, with their current assignment. An ATM with an assignment
-// row stays in the plan holding that row even if ADMIN later moves its branch
-// to another area (FR7.3: removing a branch does not change existing plans;
-// review R1). An ATM without any row follows its replenish branch's current
-// area (kelolaan on the replenish date), so a newly assigned branch is picked up.
+// cit-vault-select FR2.3: the request's ATMs (read-only context for the
+// allocation) with their replenish branch = active kelolaan on the replenish date.
 func (q *Queries) ListVaultPlanAtms(ctx context.Context, id int64) ([]ListVaultPlanAtmsRow, error) {
 	rows, err := q.db.Query(ctx, listVaultPlanAtms, id)
 	if err != nil {
@@ -651,14 +198,6 @@ func (q *Queries) ListVaultPlanAtms(ctx context.Context, id int64) ([]ListVaultP
 			&i.ReplenishRegionCode,
 			&i.ReplenishVendorID,
 			&i.ReplenishVendorName,
-			&i.AssignmentID,
-			&i.VaultBranchID,
-			&i.Tier,
-			&i.IsUrgent,
-			&i.UrgentReason,
-			&i.SaldoSnapshot,
-			&i.CapacitySnapshot,
-			&i.CapacityWarning,
 		); err != nil {
 			return nil, err
 		}
@@ -673,8 +212,8 @@ func (q *Queries) ListVaultPlanAtms(ctx context.Context, id int64) ([]ListVaultP
 const listVaultPlans = `-- name: ListVaultPlans :many
 SELECT p.id, p.vendor_request_id, p.acm_area_id, p.status, p.submitted_at, p.updated_at,
        vr.request_number, vr.replenish_date, vr.status AS request_status, ar.name AS acm_area_name,
-       (SELECT COUNT(*) FROM vendor_request_vault_assignments x WHERE x.vault_plan_id = p.id) AS assigned_count,
-       (SELECT COUNT(*) FROM vendor_request_vault_assignments x WHERE x.vault_plan_id = p.id AND x.capacity_warning) AS warning_count
+       (SELECT COUNT(*) FROM vendor_request_vault_allocations x WHERE x.vault_plan_id = p.id) AS allocation_count,
+       (SELECT COUNT(*) FROM vendor_request_vault_allocations x WHERE x.vault_plan_id = p.id AND x.capacity_warning) AS warning_count
 FROM vendor_request_vault_plans p
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 JOIN acm_areas ar ON ar.id = p.acm_area_id
@@ -707,7 +246,7 @@ type ListVaultPlansRow struct {
 	ReplenishDate   pgtype.Date        `json:"replenish_date"`
 	RequestStatus   string             `json:"request_status"`
 	AcmAreaName     string             `json:"acm_area_name"`
-	AssignedCount   int64              `json:"assigned_count"`
+	AllocationCount int64              `json:"allocation_count"`
 	WarningCount    int64              `json:"warning_count"`
 }
 
@@ -738,7 +277,7 @@ func (q *Queries) ListVaultPlans(ctx context.Context, arg ListVaultPlansParams) 
 			&i.ReplenishDate,
 			&i.RequestStatus,
 			&i.AcmAreaName,
-			&i.AssignedCount,
+			&i.AllocationCount,
 			&i.WarningCount,
 		); err != nil {
 			return nil, err
@@ -769,6 +308,7 @@ type ListVaultPlansForRequestRow struct {
 	RejectionReason *string `json:"rejection_reason"`
 }
 
+// The live plan of a request (at most one, FR2.2).
 func (q *Queries) ListVaultPlansForRequest(ctx context.Context, vendorRequestID int64) ([]ListVaultPlansForRequestRow, error) {
 	rows, err := q.db.Query(ctx, listVaultPlansForRequest, vendorRequestID)
 	if err != nil {
@@ -798,16 +338,17 @@ func (q *Queries) ListVaultPlansForRequest(ctx context.Context, vendorRequestID 
 }
 
 const lockVaultPlan = `-- name: LockVaultPlan :one
-SELECT id, vendor_request_id, acm_area_id, status, submitted_by
+SELECT id, vendor_request_id, acm_area_id, status, submitted_by, buffer_reason
 FROM vendor_request_vault_plans WHERE id = $1 FOR UPDATE
 `
 
 type LockVaultPlanRow struct {
-	ID              int64  `json:"id"`
-	VendorRequestID int64  `json:"vendor_request_id"`
-	AcmAreaID       int64  `json:"acm_area_id"`
-	Status          string `json:"status"`
-	SubmittedBy     *int64 `json:"submitted_by"`
+	ID              int64   `json:"id"`
+	VendorRequestID int64   `json:"vendor_request_id"`
+	AcmAreaID       int64   `json:"acm_area_id"`
+	Status          string  `json:"status"`
+	SubmittedBy     *int64  `json:"submitted_by"`
+	BufferReason    *string `json:"buffer_reason"`
 }
 
 func (q *Queries) LockVaultPlan(ctx context.Context, id int64) (LockVaultPlanRow, error) {
@@ -819,6 +360,7 @@ func (q *Queries) LockVaultPlan(ctx context.Context, id int64) (LockVaultPlanRow
 		&i.AcmAreaID,
 		&i.Status,
 		&i.SubmittedBy,
+		&i.BufferReason,
 	)
 	return i, err
 }
@@ -829,7 +371,7 @@ SET status = 'draft', approved_by = NULL, approved_at = NULL
 WHERE vendor_request_id = $1 AND status <> 'cancelled'
 `
 
-// FR5.2: ATM-SPV rejects the recommendation -> every area plan back to draft.
+// FR5.2 / cit-send-vendor FR6.2: ATM-SPV rejects, or the request is re-approved after an edit -> plan back to draft.
 func (q *Queries) ResetVaultPlansToDraft(ctx context.Context, vendorRequestID int64) error {
 	_, err := q.db.Exec(ctx, resetVaultPlansToDraft, vendorRequestID)
 	return err
@@ -908,29 +450,6 @@ func (q *Queries) SetVendorRequestVaultReview(ctx context.Context, arg SetVendor
 		arg.ActorID,
 		arg.Reason,
 		arg.ID,
-	)
-	return err
-}
-
-const updateVaultAssignmentSnapshot = `-- name: UpdateVaultAssignmentSnapshot :exec
-UPDATE vendor_request_vault_assignments
-SET saldo_snapshot = $2, capacity_snapshot = $3, capacity_warning = $4
-WHERE id = $1
-`
-
-type UpdateVaultAssignmentSnapshotParams struct {
-	ID               int64  `json:"id"`
-	SaldoSnapshot    []byte `json:"saldo_snapshot"`
-	CapacitySnapshot []byte `json:"capacity_snapshot"`
-	CapacityWarning  bool   `json:"capacity_warning"`
-}
-
-func (q *Queries) UpdateVaultAssignmentSnapshot(ctx context.Context, arg UpdateVaultAssignmentSnapshotParams) error {
-	_, err := q.db.Exec(ctx, updateVaultAssignmentSnapshot,
-		arg.ID,
-		arg.SaldoSnapshot,
-		arg.CapacitySnapshot,
-		arg.CapacityWarning,
 	)
 	return err
 }

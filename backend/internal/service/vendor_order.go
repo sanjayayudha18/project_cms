@@ -73,6 +73,7 @@ type VendorOrderSummary struct {
 	BranchCode    string        `json:"branch_code"`
 	BranchName    string        `json:"branch_name"`
 	AtmCount      int           `json:"atm_count"`
+	VaultCount    int           `json:"vault_count"`
 	Totals        []DenomAmount `json:"totals"`
 	Currency      string        `json:"currency"`
 	SentAt        *time.Time    `json:"sent_at"`
@@ -300,8 +301,9 @@ func (s *VendorOrderService) afterAccept(ctx context.Context, q *db.Queries, aw 
 		notification.Recipients{Roles: []string{"ATM-SPV"}, UserIDs: []int64{req.CreatedBy}})
 }
 
-// afterVaultReject: request back to vault_assignment, only the area plans
-// holding that vault go back to draft (FR4.3), ACM of those areas notified.
+// afterVaultReject: request back to vault_assignment, the request's plan (it
+// allocates to that vault branch) goes back to draft (FR4.3, cit-vault-select
+// FR7.5), ACM of its area notified.
 // SetVendorRequestStatusOnly keeps approved_at, so the later resend is not
 // mistaken for a re-approval (reapprovedSinceSent).
 func (s *VendorOrderService) afterVaultReject(ctx context.Context, q *db.Queries, aw *audit.Writer, va VendorActor,
@@ -383,7 +385,7 @@ func summary(id int64, role, status, number string, date pgtype.Date, reqStatus 
 	return VendorOrderSummary{
 		ID: id, Role: role, Status: status, RequestNumber: number, ReplenishDate: dateToPtr(date),
 		RequestStatus: reqStatus, IsCanceled: canceled, BranchID: branchID, BranchCode: code, BranchName: name,
-		AtmCount: len(c.Atms), Totals: c.Totals, Currency: currencyIDR,
+		AtmCount: len(c.Atms), VaultCount: len(c.Vaults), Totals: c.Totals, Currency: currencyIDR,
 		SentAt: timestamptzToPtr(sent), DecidedAt: timestamptzToPtr(decided),
 		CanDecide: status == "pending" && reqStatus == "sent_to_vendor" && !canceled,
 	}

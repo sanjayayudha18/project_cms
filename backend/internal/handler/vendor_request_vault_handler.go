@@ -11,7 +11,7 @@ import (
 // VendorRequestVaultReviewer is the slice of service.VaultPlanService behind
 // the ATM-SPV review routes of a Vendor Request (cit-acm-plan FR5).
 type VendorRequestVaultReviewer interface {
-	ForRequest(ctx context.Context, requestID int64) (*service.RequestVaultReview, error)
+	ForRequest(ctx context.Context, requestID int64) (*service.VaultPlanDetail, error)
 	ReviewRequest(ctx context.Context, actor service.Actor, requestID int64, approve bool, reason string) error
 }
 
@@ -21,41 +21,24 @@ func (h *VendorRequestHandler) WithVaultReview(v VendorRequestVaultReviewer) *Ve
 	return h
 }
 
-// VaultAssignments handles GET /{id}/vault-assignments (FR5.1).
+// VaultAssignments handles GET /{id}/vault-assignments (cit-vault-select
+// FR9.2): {plan: <same shape as GET /vault-plans/{id}> | null}.
 func (h *VendorRequestHandler) VaultAssignments(w http.ResponseWriter, r *http.Request) {
 	id, err := parseVendorRequestID(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	review, err := h.vault.ForRequest(r.Context(), id)
+	d, err := h.vault.ForRequest(r.Context(), id)
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
-	asg := make([]map[string]any, len(review.Assignments))
-	for i, a := range review.Assignments {
-		asg[i] = map[string]any{
-			"vault_plan_id": a.VaultPlanID, "terminal_id": a.TerminalID,
-			"replenish_branch": map[string]any{"id": a.ReplenishBranchID, "code": a.ReplenishBranchCode},
-			"vault_branch":     map[string]any{"id": a.VaultBranchID, "code": a.VaultBranchCode, "name": a.VaultBranchName, "vendor_name": a.VaultVendorName},
-			"tier":             a.Tier, "is_urgent": a.IsUrgent, "urgent_reason": a.UrgentReason,
-			"saldo_snapshot": json.RawMessage(orNull(a.SaldoSnapshot)), "capacity_snapshot": json.RawMessage(orNull(a.CapacitySnapshot)),
-			"capacity_warning": a.CapacityWarning,
-		}
+	var plan map[string]any
+	if d != nil {
+		plan = vaultPlanJSON(d)
 	}
-	plans := make([]map[string]any, len(review.Plans))
-	for i, p := range review.Plans {
-		plans[i] = map[string]any{"id": p.ID, "acm_area_id": p.AcmAreaID, "acm_area_name": p.AcmAreaName, "status": p.Status, "rejection_reason": p.RejectionReason}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"plans": plans, "assignments": asg})
-}
-
-func orNull(b []byte) []byte {
-	if len(b) == 0 {
-		return []byte("null")
-	}
-	return b
+	writeJSON(w, http.StatusOK, map[string]any{"plan": plan})
 }
 
 // VaultApprove handles POST /{id}/vault-approve: vault_review -> ready (FR5.2).

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -20,14 +19,6 @@ const (
 	planPending     = "pending_acm_approval"
 	planAcmApproved = "acm_approved"
 )
-
-// VaultAssignmentInput is one ATM's chosen vault branch (FR4.3).
-type VaultAssignmentInput struct {
-	TerminalID    string  `json:"terminal_id"`
-	VaultBranchID int64   `json:"vault_branch_id"`
-	IsUrgent      bool    `json:"is_urgent"`
-	UrgentReason  *string `json:"urgent_reason"`
-}
 
 // planTx is the shared tx -> role check -> lock request then plan -> scope
 // check -> fn -> commit flow. Lock order (request, plan) is the same in every
@@ -56,7 +47,7 @@ func (s *VaultPlanService) planTx(ctx context.Context, actor Actor, id int64, ro
 	if err != nil {
 		return fmt.Errorf("lock vault plan %d: %w", id, err)
 	}
-	p.Status, p.SubmittedBy = locked.Status, locked.SubmittedBy // fresh after the lock
+	p.Status, p.SubmittedBy, p.BufferReason = locked.Status, locked.SubmittedBy, locked.BufferReason // fresh after the lock
 
 	if err := fn(q, audit.NewWriter(tx), p, req); err != nil {
 		return err
@@ -73,38 +64,41 @@ func planAudit(actor Actor, p db.GetVaultPlanRow, action, from, to string, extra
 		Before: map[string]any{"state": from}, After: after, IP: actor.IP}
 }
 
-// SaveAssignments replaces the plan's assignments (draft only) and refreshes
-// snapshots (FR4.3). Not every ATM needs a vault yet; Submit checks that.
-func (s *VaultPlanService) SaveAssignments(ctx context.Context, actor Actor, id int64, in []VaultAssignmentInput) (*VaultPlanDetail, error) {
+// SaveAllocations replaces the plan's vault rows and buffer reason (draft
+// only) and refreshes snapshots (FR4.1, FR4.2, FR4.4). The total may still be
+// short of the order; Submit checks that.
+func (s *VaultPlanService) SaveAllocations(ctx context.Context, actor Actor, id int64, in []AllocationLineInput, bufferReason *string) (*VaultPlanDetail, error) {
 	err := s.planTx(ctx, actor, id, "ACM-USER", func(q *db.Queries, aw *audit.Writer, p db.GetVaultPlanRow, req db.VendorRequest) error {
 		if p.Status != planDraft || req.Status != "vault_assignment" {
 			return ErrInvalidTransition
 		}
-		rows, err := validateAssignments(ctx, q, p, in)
+		lines, err := checkAllocationLines(ctx, q, p, in)
 		if err != nil {
 			return err
 		}
-		if err := q.ClearVaultPlanAssignments(ctx, p.ID); err != nil {
-			return fmt.Errorf("clear assignments: %w", err)
-		}
-		logged := make([]map[string]any, len(rows))
-		for i, r := range rows {
-			if _, err := q.InsertVaultAssignment(ctx, r); err != nil {
-				var pgErr *pgconn.PgError
-				if errors.As(err, &pgErr) && pgErr.ConstraintName == "vendor_request_vault_assignments_atm_uq" {
-					// The ATM's branch moved area mid-flow; its old row sits in another area's plan.
-					return &ValidationError{Field: "assignments", Message: fmt.Sprintf(
-						"ATM %s masih tercatat di rencana area lain untuk request ini; rencana itu harus disimpan ulang (atau ditolak dulu) sebelum ATM ini ditetapkan di sini", r.TerminalID)}
-				}
-				return fmt.Errorf("insert assignment %s: %w", r.TerminalID, err)
-			}
-			logged[i] = map[string]any{"terminal_id": r.TerminalID, "vault_branch_id": r.VaultBranchID, "tier": r.Tier,
-				"is_urgent": r.IsUrgent, "urgent_reason": r.UrgentReason}
-		}
-		if err := recomputeSnapshots(ctx, q, p); err != nil {
+		buffer, err := optionalReason(bufferReason, "buffer_reason")
+		if err != nil {
 			return err
 		}
-		return aw.Write(ctx, planAudit(actor, p, "vault_assignments_saved", p.Status, p.Status, map[string]any{"assignments": logged}))
+		if err := q.ClearVaultPlanAllocations(ctx, p.ID); err != nil {
+			return fmt.Errorf("clear allocations: %w", err)
+		}
+		logged := make([]map[string]any, len(lines))
+		for i, l := range lines {
+			if err := insertAllocation(ctx, q, p, l); err != nil {
+				return err
+			}
+			logged[i] = map[string]any{"vendor_vault_id": l.vault.VendorVaultID, "vault_code": l.vault.VaultCode, "tier": l.tier,
+				"amounts": amountsJSON(l.amounts), "is_urgent": l.isUrgent, "urgent_reason": l.urgentReason}
+		}
+		if err := q.SetVaultPlanBufferReason(ctx, db.SetVaultPlanBufferReasonParams{ID: p.ID, BufferReason: buffer}); err != nil {
+			return fmt.Errorf("save buffer reason: %w", err)
+		}
+		if err := refreshAllocationSnapshots(ctx, q, p); err != nil {
+			return err
+		}
+		return aw.Write(ctx, planAudit(actor, p, "vault_allocations_saved", p.Status, p.Status,
+			map[string]any{"allocations": logged, "buffer_reason": buffer}))
 	})
 	if err != nil {
 		return nil, err
@@ -112,84 +106,106 @@ func (s *VaultPlanService) SaveAssignments(ctx context.Context, actor Actor, id 
 	return s.detail(ctx, db.New(s.pool), actor, id)
 }
 
-// validateAssignments checks FR4.3 per input and returns the rows to insert:
-// ATM belongs to the plan (once), vault is an active cash-capable branch,
-// tier 3 only as urgent, urgent reason 10-500 chars.
-func validateAssignments(ctx context.Context, q *db.Queries, p db.GetVaultPlanRow, in []VaultAssignmentInput) ([]db.InsertVaultAssignmentParams, error) {
-	atms, err := q.ListVaultPlanAtms(ctx, p.ID)
+// checkAllocationLines loads the vaults named in `in` that are eligible now and
+// runs the FR4.2 rules against the request's vendor + region.
+func checkAllocationLines(ctx context.Context, q *db.Queries, p db.GetVaultPlanRow, in []AllocationLineInput) ([]allocationLine, error) {
+	ids := make([]int64, 0, len(in)) // never nil: nil means "all vaults" to the query
+	for _, l := range in {
+		ids = append(ids, l.VendorVaultID)
+	}
+	rows, err := q.ListVaultCandidateVaults(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("list plan atms: %w", err)
+		return nil, fmt.Errorf("list eligible vaults: %w", err)
 	}
-	byTerminal := make(map[string]db.ListVaultPlanAtmsRow, len(atms))
-	for _, a := range atms {
-		byTerminal[a.TerminalID] = a
+	eligible := make(map[int64]db.ListVaultCandidateVaultsRow, len(rows))
+	for _, r := range rows {
+		eligible[r.VendorVaultID] = r
 	}
-	branches, err := candidateBranchIndex(ctx, q)
+	return validateAllocationLines(in, eligible, requestScope{vendorID: deref(p.VendorID), regionCode: p.RegionCode})
+}
+
+func insertAllocation(ctx context.Context, q *db.Queries, p db.GetVaultPlanRow, l allocationLine) error {
+	allocID, err := q.InsertVaultAllocation(ctx, db.InsertVaultAllocationParams{VaultPlanID: p.ID, VendorRequestID: p.VendorRequestID,
+		VendorVaultID: l.vault.VendorVaultID, VaultBranchID: l.vault.VendorBranchID, Tier: l.tier, IsUrgent: l.isUrgent, UrgentReason: l.urgentReason})
+	if err != nil {
+		return fmt.Errorf("insert allocation %s: %w", l.vault.VaultCode, err)
+	}
+	for d, a := range l.amounts {
+		if err := q.InsertVaultAllocationAmount(ctx, db.InsertVaultAllocationAmountParams{AllocationID: allocID, Denom: d, Amount: a}); err != nil {
+			return fmt.Errorf("insert allocation amount %s %d: %w", l.vault.VaultCode, d, err)
+		}
+	}
+	return nil
+}
+
+// optionalReason trims r; empty = nil, else 10-500 chars.
+func optionalReason(r *string, field string) (*string, error) {
+	t := strings.TrimSpace(deref(r))
+	if t == "" {
+		return nil, nil
+	}
+	if n := len([]rune(t)); n < reasonMinLen || n > reasonMaxLen {
+		return nil, &ValidationError{Field: field, Message: fmt.Sprintf("wajib %d-%d karakter", reasonMinLen, reasonMaxLen)}
+	}
+	return &t, nil
+}
+
+// storedAllocationLines re-reads the saved rows as inputs, so Submit
+// re-validates them against current data (FR4.3).
+func storedAllocationLines(ctx context.Context, q *db.Queries, planID int64) ([]AllocationLineInput, error) {
+	rows, amounts, err := planAllocations(ctx, q, planID)
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
-	out := make([]db.InsertVaultAssignmentParams, 0, len(in))
-	for _, a := range in {
-		atm, ok := byTerminal[a.TerminalID]
-		if !ok {
-			return nil, &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s bukan bagian dari rencana ini", a.TerminalID)}
-		}
-		if seen[a.TerminalID] {
-			return nil, &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s muncul lebih dari sekali", a.TerminalID)}
-		}
-		seen[a.TerminalID] = true
-		b, ok := branches[a.VaultBranchID]
-		if !ok {
-			return nil, &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s: branch vault tidak aktif / bukan CASH-ATM_CASH / tanpa kode region", a.TerminalID)}
-		}
-		tier := vaultTier(b.VendorID, b.RegionCode, atm.ReplenishVendorID, atm.ReplenishRegionCode)
-		var reason *string
-		if a.IsUrgent {
-			r := strings.TrimSpace(deref(a.UrgentReason))
-			if n := len([]rune(r)); n < 10 || n > 500 {
-				return nil, &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s: alasan urgent wajib 10-500 karakter", a.TerminalID)}
-			}
-			reason = &r
-		}
-		if tier == 3 && !a.IsUrgent {
-			return nil, &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s: branch beda region hanya boleh sebagai urgent", a.TerminalID)}
-		}
-		out = append(out, db.InsertVaultAssignmentParams{VaultPlanID: p.ID, VendorRequestID: p.VendorRequestID, TerminalID: a.TerminalID,
-			ReplenishBranchID: atm.ReplenishBranchID, VaultBranchID: a.VaultBranchID, Tier: tier, IsUrgent: a.IsUrgent, UrgentReason: reason})
+	out := make([]AllocationLineInput, len(rows))
+	for i, r := range rows {
+		out[i] = AllocationLineInput{VendorVaultID: r.VendorVaultID, Amounts: amountsJSON(amounts[r.ID]), IsUrgent: r.IsUrgent, UrgentReason: r.UrgentReason}
 	}
 	return out, nil
 }
 
-// Submit sends a complete draft plan to the area's ACM-SPV (FR4.4): every ATM
-// assigned, assignments re-validated against current data, snapshots refreshed.
+// Submit sends the draft plan to the area's ACM-SPV (FR4.3-FR4.5): saved rows
+// re-validated, every denom covered (excess needs the buffer reason),
+// snapshots refreshed and vault tickets synced (FR6.2), all in one tx.
 func (s *VaultPlanService) Submit(ctx context.Context, actor Actor, id int64) (*VaultPlanDetail, error) {
 	err := s.planTx(ctx, actor, id, "ACM-USER", func(q *db.Queries, aw *audit.Writer, p db.GetVaultPlanRow, req db.VendorRequest) error {
 		if p.Status != planDraft || req.Status != "vault_assignment" {
 			return ErrInvalidTransition
 		}
-		atms, err := q.ListVaultPlanAtms(ctx, p.ID)
+		stored, err := storedAllocationLines(ctx, q, p.ID)
 		if err != nil {
-			return fmt.Errorf("list plan atms: %w", err)
-		}
-		current := make([]VaultAssignmentInput, 0, len(atms))
-		for _, a := range atms {
-			if a.VaultBranchID == nil {
-				return &ValidationError{Field: "assignments", Message: fmt.Sprintf("ATM %s belum punya branch vault", a.TerminalID)}
-			}
-			current = append(current, VaultAssignmentInput{TerminalID: a.TerminalID, VaultBranchID: *a.VaultBranchID,
-				IsUrgent: deref(a.IsUrgent), UrgentReason: a.UrgentReason})
-		}
-		if _, err := validateAssignments(ctx, q, p, current); err != nil {
 			return err
 		}
-		if err := recomputeSnapshots(ctx, q, p); err != nil {
+		if len(stored) == 0 {
+			return allocErr("pilih minimal satu vault")
+		}
+		lines, err := checkAllocationLines(ctx, q, p, stored)
+		if err != nil {
+			return err
+		}
+		order, err := orderTotals(ctx, q, p.VendorRequestID)
+		if err != nil {
+			return err
+		}
+		buffer, err := checkCoverage(order, allocationTotals(lines), p.BufferReason)
+		if err != nil {
+			return err
+		}
+		if err := q.SetVaultPlanBufferReason(ctx, db.SetVaultPlanBufferReasonParams{ID: p.ID, BufferReason: buffer}); err != nil {
+			return fmt.Errorf("save buffer reason: %w", err)
+		}
+		if err := refreshAllocationSnapshots(ctx, q, p); err != nil {
+			return err
+		}
+		tickets, err := syncVaultTickets(ctx, q, req, lines)
+		if err != nil {
 			return err
 		}
 		if err := q.SetVaultPlanStatus(ctx, db.SetVaultPlanStatusParams{Status: planPending, ActorID: &actor.UserID, ID: p.ID}); err != nil {
 			return fmt.Errorf("submit vault plan: %w", err)
 		}
-		if err := aw.Write(ctx, planAudit(actor, p, "submit", p.Status, planPending, nil)); err != nil {
+		if err := aw.Write(ctx, planAudit(actor, p, "submit", p.Status, planPending,
+			map[string]any{"vault_tickets": tickets, "buffer_reason": buffer})); err != nil {
 			return err
 		}
 		return s.notify(ctx, q, []int64{p.AcmAreaID}, "ACM-SPV", nil, notification.Message{
@@ -204,9 +220,23 @@ func (s *VaultPlanService) Submit(ctx context.Context, actor Actor, id int64) (*
 	return s.detail(ctx, db.New(s.pool), actor, id)
 }
 
-// Approve is the ACM-SPV approval of one area plan (FR4.5). When every ATM of
-// the request is covered by an approved plan, the request moves to
-// vault_review in the same tx (FR4.6, no notification by N1).
+// syncVaultTickets issues / keeps / reactivates / deactivates the request's
+// vault tickets to match the allocated vaults (FR6.2).
+func syncVaultTickets(ctx context.Context, q *db.Queries, req db.VendorRequest, lines []allocationLine) (vaultTicketAudit, error) {
+	existing, err := q.ListVaultTicketsForRequest(ctx, req.ID)
+	if err != nil {
+		return vaultTicketAudit{}, fmt.Errorf("list vault tickets: %w", err)
+	}
+	wanted := make([]int64, len(lines))
+	for i, l := range lines {
+		wanted[i] = l.vault.VendorVaultID
+	}
+	return applyVaultTickets(ctx, q, req.ID, req.ReplenishDate, planVaultTickets(existing, wanted))
+}
+
+// Approve is the ACM-SPV approval of the request's plan (FR4.5). One plan per
+// request, so the request moves to vault_review in the same tx (FR4.6, no
+// notification by N1).
 func (s *VaultPlanService) Approve(ctx context.Context, actor Actor, id int64) (*VaultPlanDetail, error) {
 	err := s.planTx(ctx, actor, id, "ACM-SPV", func(q *db.Queries, aw *audit.Writer, p db.GetVaultPlanRow, req db.VendorRequest) error {
 		if p.Status != planPending || req.Status != "vault_assignment" {
@@ -220,13 +250,6 @@ func (s *VaultPlanService) Approve(ctx context.Context, actor Actor, id int64) (
 		}
 		if err := aw.Write(ctx, planAudit(actor, p, "approve", p.Status, planAcmApproved, nil)); err != nil {
 			return err
-		}
-		missing, err := q.CountRequestAtmsWithoutApprovedVault(ctx, req.ID)
-		if err != nil {
-			return fmt.Errorf("check request coverage: %w", err)
-		}
-		if missing > 0 {
-			return nil
 		}
 		next, ok := nextState(req.Status, actionVaultReady)
 		if !ok {

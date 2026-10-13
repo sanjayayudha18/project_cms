@@ -18,8 +18,8 @@ import (
 type VaultPlanServicer interface {
 	List(ctx context.Context, actor service.Actor, f service.VaultPlanListFilter) ([]db.ListVaultPlansRow, error)
 	Get(ctx context.Context, actor service.Actor, id int64) (*service.VaultPlanDetail, error)
-	Candidates(ctx context.Context, actor service.Actor, id int64, terminalID string, urgent bool) ([]service.VaultCandidate, error)
-	SaveAssignments(ctx context.Context, actor service.Actor, id int64, in []service.VaultAssignmentInput) (*service.VaultPlanDetail, error)
+	Candidates(ctx context.Context, actor service.Actor, id int64, urgent bool) ([]service.VaultBranchOption, error)
+	SaveAllocations(ctx context.Context, actor service.Actor, id int64, in []service.AllocationLineInput, bufferReason *string) (*service.VaultPlanDetail, error)
 	Submit(ctx context.Context, actor service.Actor, id int64) (*service.VaultPlanDetail, error)
 	Approve(ctx context.Context, actor service.Actor, id int64) (*service.VaultPlanDetail, error)
 	Reject(ctx context.Context, actor service.Actor, id int64, reason string) (*service.VaultPlanDetail, error)
@@ -45,7 +45,7 @@ func (h *VaultPlanHandler) Routes() chi.Router {
 	r.Get("/{id}", h.Get)
 	r.Get("/{id}/candidates", h.Candidates)
 	r.Get("/{id}/audit", h.Audit)
-	r.Put("/{id}/assignments", h.SaveAssignments)
+	r.Put("/{id}/allocations", h.SaveAllocations)
 	r.Post("/{id}/submit", h.transition(func(ctx context.Context, a service.Actor, id int64, _ *http.Request) (*service.VaultPlanDetail, error) {
 		return h.svc.Submit(ctx, a, id)
 	}))
@@ -115,7 +115,7 @@ func (h *VaultPlanHandler) List(w http.ResponseWriter, r *http.Request) {
 			"id": p.ID, "vendor_request_id": p.VendorRequestID, "request_number": p.RequestNumber,
 			"replenish_date": formatPgDate(p.ReplenishDate), "request_status": p.RequestStatus,
 			"acm_area_id": p.AcmAreaID, "acm_area_name": p.AcmAreaName, "status": p.Status,
-			"assigned_count": p.AssignedCount, "warning_count": p.WarningCount, "submitted_at": formatTimestamptz(p.SubmittedAt),
+			"allocation_count": p.AllocationCount, "warning_count": p.WarningCount, "submitted_at": formatTimestamptz(p.SubmittedAt),
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"plans": items})
@@ -123,14 +123,20 @@ func (h *VaultPlanHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func vaultPlanJSON(d *service.VaultPlanDetail) map[string]any {
 	p := d.Plan
+	tickets := make([]map[string]any, len(d.Tickets))
+	for i, t := range d.Tickets {
+		tickets[i] = map[string]any{"ticket_number": t.TicketNumber, "vendor_vault_id": t.VendorVaultID, "vault_code": t.VaultCode,
+			"is_active": t.IsActive, "created_at": formatTimestamptz(t.CreatedAt), "deactivated_at": formatTimestamptz(t.DeactivatedAt)}
+	}
 	return map[string]any{
 		"id": p.ID, "vendor_request_id": p.VendorRequestID, "request_number": p.RequestNumber,
-		"replenish_date": formatPgDate(p.ReplenishDate), "request_status": p.RequestStatus,
+		"replenish_date": formatPgDate(p.ReplenishDate), "region_code": p.RegionCode, "request_status": p.RequestStatus,
 		"vault_rejection_reason": p.VaultRejectionReason, "acm_area_id": p.AcmAreaID, "acm_area_name": p.AcmAreaName,
 		"status": p.Status, "submitted_by": p.SubmittedBy, "submitted_at": formatTimestamptz(p.SubmittedAt),
 		"approved_by": p.ApprovedBy, "approved_at": formatTimestamptz(p.ApprovedAt),
 		"rejected_by": p.RejectedBy, "rejected_at": formatTimestamptz(p.RejectedAt), "rejection_reason": p.RejectionReason,
-		"rejected_by_vendor": p.RejectedByVendor, "atms": d.Atms,
+		"rejected_by_vendor": p.RejectedByVendor, "buffer_reason": p.BufferReason,
+		"atms": d.Atms, "order_totals": d.OrderTotals, "allocations": d.Allocations, "vault_tickets": tickets,
 	}
 }
 
@@ -162,39 +168,35 @@ func (h *VaultPlanHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, vaultPlanJSON(d))
 }
 
-// Candidates handles GET /{id}/candidates?terminal_id=&urgent=true.
+// Candidates handles GET /{id}/candidates?urgent=true -- branches with their eligible vaults.
 func (h *VaultPlanHandler) Candidates(w http.ResponseWriter, r *http.Request) {
 	actor, id, ok := h.actorAndID(w, r)
 	if !ok {
 		return
 	}
-	q := r.URL.Query()
-	if q.Get("terminal_id") == "" {
-		writeValidationError(w, "terminal_id", "wajib diisi")
-		return
-	}
-	c, err := h.svc.Candidates(r.Context(), actor, id, q.Get("terminal_id"), q.Get("urgent") == "true")
+	c, err := h.svc.Candidates(r.Context(), actor, id, r.URL.Query().Get("urgent") == "true")
 	if err != nil {
 		h.handleError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"candidates": c})
+	writeJSON(w, http.StatusOK, map[string]any{"branches": c})
 }
 
-// SaveAssignments handles PUT /{id}/assignments {assignments: [...]} (replace-all, draft only).
-func (h *VaultPlanHandler) SaveAssignments(w http.ResponseWriter, r *http.Request) {
+// SaveAllocations handles PUT /{id}/allocations {allocations: [...], buffer_reason} (replace-all, draft only).
+func (h *VaultPlanHandler) SaveAllocations(w http.ResponseWriter, r *http.Request) {
 	actor, id, ok := h.actorAndID(w, r)
 	if !ok {
 		return
 	}
 	var body struct {
-		Assignments []service.VaultAssignmentInput `json:"assignments"`
+		Allocations  []service.AllocationLineInput `json:"allocations"`
+		BufferReason *string                       `json:"buffer_reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
 		return
 	}
-	d, err := h.svc.SaveAssignments(r.Context(), actor, id, body.Assignments)
+	d, err := h.svc.SaveAllocations(r.Context(), actor, id, body.Allocations, body.BufferReason)
 	if err != nil {
 		h.handleError(w, err)
 		return

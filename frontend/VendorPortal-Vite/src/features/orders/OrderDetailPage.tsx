@@ -1,7 +1,13 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import type { PartyAtm, VendorOrderDetail } from "@/features/orders/api";
+import type {
+  DenomAmount,
+  PartyAtm,
+  PartyBranch,
+  PartyVault,
+  VendorOrderDetail,
+} from "@/features/orders/api";
 import { ROLE_LABEL, denomLabel, formatDate, orderStatus } from "@/features/orders/labels";
 import { useDecideOrder, useOrder } from "@/features/orders/useOrders";
 import type { ApiError } from "@/lib/api/client";
@@ -10,10 +16,12 @@ import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
-// cit-send-vendor FR3/FR4/FR9.2: one party of a replenish request. A replenish
-// branch sees where to collect cash (vault branch + address); a vault branch
-// sees who collects and how much to prepare per denom. Accept / reject only
-// while the request is with the vendors (can_decide, re-checked server-side).
+// cit-send-vendor FR3/FR4/FR9.2 + cit-vault-select FR7/FR9.4: one party of a
+// replenish request. A replenish branch sees its ATMs and every vault of the
+// request (ticket, address, amount) to collect from; a vault branch sees its own
+// vaults (ticket + amount to prepare) and the replenish branches that collect.
+// Accept / reject only while the request is with the vendors (can_decide,
+// re-checked server-side).
 
 const REASON_MIN = 10;
 const REASON_MAX = 500;
@@ -55,7 +63,7 @@ export function OrderDetailPage() {
 function OrderDetail({ order }: { readonly order: VendorOrderDetail }) {
   const status = orderStatus(order);
   const isVault = order.role === "vault";
-  const denoms = order.content.totals.map((t) => t.denom);
+  const { content } = order;
 
   return (
     <>
@@ -80,7 +88,7 @@ function OrderDetail({ order }: { readonly order: VendorOrderDetail }) {
           {isVault ? "Total uang yang harus disiapkan" : "Total order"}
         </h2>
         <div className="flex flex-wrap gap-3">
-          {order.content.totals.map((t) => (
+          {content.totals.map((t) => (
             <Card key={t.denom} className="min-w-[160px]">
               <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
                 Denom {denomLabel(t.denom)}
@@ -93,74 +101,156 @@ function OrderDetail({ order }: { readonly order: VendorOrderDetail }) {
         </div>
       </section>
 
-      <section aria-labelledby="atms-heading" className="flex flex-col gap-3">
-        <h2 id="atms-heading" className="text-base font-semibold text-surface-text">
-          ATM ({order.atm_count})
+      {!isVault && (
+        <section aria-labelledby="atms-heading" className="flex flex-col gap-3">
+          <h2 id="atms-heading" className="text-base font-semibold text-surface-text">
+            ATM ({content.atms.length})
+          </h2>
+          <AtmTable atms={content.atms} />
+        </section>
+      )}
+
+      <section aria-labelledby="vaults-heading" className="flex flex-col gap-3">
+        <h2 id="vaults-heading" className="text-base font-semibold text-surface-text">
+          {isVault ? "Vault Anda" : "Ambil uang di vault"} ({content.vaults.length})
         </h2>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th scope="col" className="px-3 py-2">
-                  Terminal
-                </th>
-                <th scope="col" className="px-3 py-2">
-                  Lokasi
-                </th>
-                {!isVault && (
-                  <th scope="col" className="px-3 py-2">
-                    Tiket
-                  </th>
-                )}
-                {denoms.map((d) => (
-                  <th key={d} scope="col" className="px-3 py-2 text-right">
-                    {denomLabel(d)} (IDR)
-                  </th>
-                ))}
-                <th scope="col" className="px-3 py-2">
-                  {isVault ? "Diambil oleh (replenish)" : "Ambil uang di (vault)"}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.content.atms.map((atm) => (
-                <AtmRow key={atm.terminal_id} atm={atm} denoms={denoms} showTicket={!isVault} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <VaultTable vaults={content.vaults} showBranch={!isVault} />
       </section>
+
+      {isVault && <CollectorList branches={content.replenish_branches} />}
 
       {order.can_decide && <DecisionPanel partyID={order.id} />}
     </>
   );
 }
 
-function AtmRow({
-  atm,
+/** Denoms present in any row, high to low. */
+function denomsOf(rows: readonly { readonly denoms: readonly DenomAmount[] }[]): number[] {
+  return [...new Set(rows.flatMap((r) => r.denoms.map((d) => d.denom)))].sort((a, b) => b - a);
+}
+
+const thClass = "px-3 py-2";
+const tableWrap = "overflow-x-auto rounded-lg border border-neutral-200 bg-white";
+const theadClass = "bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500";
+
+function DenomHeaders({ denoms }: { readonly denoms: readonly number[] }) {
+  return denoms.map((d) => (
+    <th key={d} scope="col" className={`${thClass} text-right`}>
+      {denomLabel(d)} (IDR)
+    </th>
+  ));
+}
+
+function AmountCells({
   denoms,
-  showTicket,
-}: { readonly atm: PartyAtm; readonly denoms: readonly number[]; readonly showTicket: boolean }) {
-  const amountOf = (d: number) => atm.denoms.find((x) => x.denom === d)?.amount;
-  const c = atm.counterpart;
-  return (
-    <tr className="border-t border-neutral-100">
-      <td className="px-3 py-2 font-medium">{atm.terminal_id}</td>
-      <td className="px-3 py-2">{atm.lokasi || "-"}</td>
-      {showTicket && <td className="px-3 py-2 tabular-nums">{atm.ticket_number || "-"}</td>}
-      {denoms.map((d) => {
-        const amount = amountOf(d);
-        return (
-          <td key={d} className="px-3 py-2 text-right tabular-nums">
-            {amount === undefined ? "-" : amount.toLocaleString("id-ID")}
-          </td>
-        );
-      })}
-      <td className="px-3 py-2">
-        <span className="font-medium">{c.name}</span> · {c.vendor_name}
-        {c.address && <span className="block text-xs text-neutral-500">{c.address}</span>}
+  amounts,
+}: { readonly denoms: readonly number[]; readonly amounts: readonly DenomAmount[] }) {
+  return denoms.map((d) => {
+    const amount = amounts.find((x) => x.denom === d)?.amount;
+    return (
+      <td key={d} className="px-3 py-2 text-right tabular-nums">
+        {amount === undefined ? "-" : amount.toLocaleString("id-ID")}
       </td>
-    </tr>
+    );
+  });
+}
+
+function AtmTable({ atms }: { readonly atms: readonly PartyAtm[] }) {
+  const denoms = denomsOf(atms);
+  return (
+    <div className={tableWrap}>
+      <table className="w-full text-sm">
+        <thead className={theadClass}>
+          <tr>
+            <th scope="col" className={thClass}>
+              Terminal
+            </th>
+            <th scope="col" className={thClass}>
+              Lokasi
+            </th>
+            <th scope="col" className={thClass}>
+              Tiket
+            </th>
+            <DenomHeaders denoms={denoms} />
+          </tr>
+        </thead>
+        <tbody>
+          {atms.map((atm) => (
+            <tr key={atm.terminal_id} className="border-t border-neutral-100">
+              <td className="px-3 py-2 font-medium">{atm.terminal_id}</td>
+              <td className="px-3 py-2">{atm.lokasi || "-"}</td>
+              <td className="px-3 py-2 tabular-nums">{atm.ticket_number || "-"}</td>
+              <AmountCells denoms={denoms} amounts={atm.denoms} />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function VaultTable({
+  vaults,
+  showBranch,
+}: { readonly vaults: readonly PartyVault[]; readonly showBranch: boolean }) {
+  const denoms = denomsOf(vaults);
+  return (
+    <div className={tableWrap}>
+      <table className="w-full text-sm">
+        <thead className={theadClass}>
+          <tr>
+            <th scope="col" className={thClass}>
+              Vault
+            </th>
+            <th scope="col" className={thClass}>
+              Tiket vault
+            </th>
+            {showBranch && (
+              <th scope="col" className={thClass}>
+                Branch vault
+              </th>
+            )}
+            <th scope="col" className={thClass}>
+              Alamat
+            </th>
+            <DenomHeaders denoms={denoms} />
+          </tr>
+        </thead>
+        <tbody>
+          {vaults.map((v) => (
+            <tr key={v.vault.id} className="border-t border-neutral-100">
+              <td className="px-3 py-2 font-medium">{v.vault.code}</td>
+              <td className="px-3 py-2 tabular-nums">{v.ticket_number || "-"}</td>
+              {showBranch && (
+                <td className="px-3 py-2">
+                  <span className="font-medium">{v.branch.name}</span> · {v.branch.vendor_name}
+                </td>
+              )}
+              <td className="px-3 py-2">{v.vault.address || "-"}</td>
+              <AmountCells denoms={denoms} amounts={v.denoms} />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Vault party: the replenish branches that collect from its vaults. */
+function CollectorList({ branches }: { readonly branches: readonly PartyBranch[] }) {
+  return (
+    <section aria-labelledby="collectors-heading" className="flex flex-col gap-2">
+      <h2 id="collectors-heading" className="text-base font-semibold text-surface-text">
+        Diambil oleh (cabang pengisi)
+      </h2>
+      <ul className="flex flex-col gap-1 text-sm">
+        {branches.map((b) => (
+          <li key={b.id}>
+            <span className="font-medium">{b.name}</span> ({b.code}) · {b.vendor_name}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

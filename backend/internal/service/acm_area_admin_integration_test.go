@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -153,6 +154,60 @@ func TestAcmAreaAdmin_Lifecycle_Integration(t *testing.T) {
 		if countAudit(t, tx, jkt.ID, a) < 1 {
 			t.Errorf("%s not audited", a)
 		}
+	}
+}
+
+// cit-vault-select FR1.1/FR1.2: region codes per area -- normalized, unique
+// across areas (409 naming the holder), released on disable, audited.
+func TestAcmAreaAdmin_Regions_Integration(t *testing.T) {
+	svc, tx, adminID, tag := acmAreaHarness(t)
+	ctx := context.Background()
+	r1 := "R" + strings.ToUpper(tag[len(tag)-6:])
+	r2 := "Q" + strings.ToUpper(tag[len(tag)-6:])
+
+	jkt, err := svc.Create(ctx, adminID, "ADMIN", "Jabodetabek "+tag, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mks, err := svc.Create(ctx, adminID, "ADMIN", "Makassar "+tag, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetRegions(ctx, adminID, "ATM-SPV", jkt.ID, []string{r1}, ""); !errors.Is(err, ErrNotAuthorized) {
+		t.Fatalf("non-ADMIN: want ErrNotAuthorized, got %v", err)
+	}
+	d, err := svc.SetRegions(ctx, adminID, "ADMIN", jkt.ID, []string{" " + strings.ToLower(r1) + " ", r1, r2}, "")
+	if err != nil || len(d.Regions) != 2 || d.Regions[0] != r2 || d.Regions[1] != r1 {
+		t.Fatalf("SetRegions = %+v %v, want [%s %s]", d, err, r2, r1)
+	}
+	var ve *ValidationError
+	if _, err := svc.SetRegions(ctx, adminID, "ADMIN", jkt.ID, []string{"x"}, ""); !errors.As(err, &ve) {
+		t.Fatalf("bad code: want ValidationError, got %v", err)
+	}
+	var conflict *AcmAreaRegionConflictError
+	if _, err := svc.SetRegions(ctx, adminID, "ADMIN", mks.ID, []string{r1}, ""); !errors.As(err, &conflict) ||
+		len(conflict.Conflicts) != 1 || conflict.Conflicts[0].AcmAreaID != jkt.ID {
+		t.Fatalf("region held by another area: want conflict naming %d, got %v", jkt.ID, err)
+	}
+	if countAudit(t, tx, jkt.ID, "acm_area_regions_set") != 1 {
+		t.Error("regions_set not audited")
+	}
+	if _, err := svc.RegionOptions(ctx); err != nil {
+		t.Fatalf("RegionOptions: %v", err)
+	}
+
+	// Disable releases the regions; another area can take them; inactive areas refuse.
+	if _, err := svc.SetActive(ctx, adminID, "ADMIN", jkt.ID, false, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetRegions(ctx, adminID, "ADMIN", jkt.ID, []string{r1}, ""); !errors.Is(err, ErrAcmAreaInactive) {
+		t.Fatalf("inactive area: want ErrAcmAreaInactive, got %v", err)
+	}
+	if d, err := svc.SetRegions(ctx, adminID, "ADMIN", mks.ID, []string{r1}, ""); err != nil || len(d.Regions) != 1 {
+		t.Fatalf("released region reassigned: %+v %v", d, err)
+	}
+	if got, err := svc.Get(ctx, jkt.ID); err != nil || len(got.Regions) != 0 {
+		t.Fatalf("disabled area regions = %+v %v, want none", got, err)
 	}
 }
 

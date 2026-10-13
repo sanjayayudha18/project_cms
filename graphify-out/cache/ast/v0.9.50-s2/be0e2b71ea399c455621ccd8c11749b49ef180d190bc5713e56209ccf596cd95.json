@@ -1,0 +1,1 @@
+{"nodes": [{"id": "$graphify-root$_backend_queries_vault_plans_sql", "label": "vault_plans.sql", "file_type": "code", "source_file": "backend/queries/vault_plans.sql", "source_location": null}], "edges": []}

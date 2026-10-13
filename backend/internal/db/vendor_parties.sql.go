@@ -232,38 +232,39 @@ func (q *Queries) InsertVendorPartyEvent(ctx context.Context, arg InsertVendorPa
 	return err
 }
 
-const listRequestPartyRows = `-- name: ListRequestPartyRows :many
+const listRequestPartyAtmRows = `-- name: ListRequestPartyAtmRows :many
 
 
-SELECT asg.terminal_id,
+SELECT i.terminal_id,
        COALESCE(max(i.lokasi_atm), '')::text AS lokasi_atm,
        t.ticket_number,
        i.denom,
        sum(i.amount_replenish)::bigint AS amount_replenish,
-       asg.replenish_branch_id, rb.branch_code AS replenish_branch_code, rb.branch_name AS replenish_branch_name,
-       rv.id AS replenish_vendor_id, rv.name AS replenish_vendor_name,
-       asg.vault_branch_id, vb.branch_code AS vault_branch_code, vb.branch_name AS vault_branch_name,
-       vv.id AS vault_vendor_id, vv.name AS vault_vendor_name,
-       concat_ws(', ', NULLIF(l.address_line1, ''), NULLIF(l.address_line2, ''), NULLIF(l.city_or_regency, ''),
-                 NULLIF(l.province, ''))::text AS vault_address
-FROM vendor_request_vault_assignments asg
-JOIN vendor_requests vr ON vr.id = asg.vendor_request_id
-JOIN vendor_request_items i ON i.vendor_request_id = asg.vendor_request_id AND i.terminal_id = asg.terminal_id
-JOIN vendor_branches rb ON rb.id = asg.replenish_branch_id
+       rb.id AS replenish_branch_id, rb.branch_code AS replenish_branch_code, rb.branch_name AS replenish_branch_name,
+       rv.id AS replenish_vendor_id, rv.name AS replenish_vendor_name
+FROM vendor_requests vr
+JOIN vendor_request_items i ON i.vendor_request_id = vr.id
+JOIN atms a ON a.terminal_id = i.terminal_id
+JOIN LATERAL (
+    SELECT COALESCE(pk.vendor_branch_id, avp.vendor_branch_id) AS vendor_branch_id
+    FROM atm_vendor_packages avp
+    LEFT JOIN vendor_packages_branch pk ON pk.id = avp.vendor_package_id
+    WHERE avp.atm_id = a.id AND avp.is_active
+      AND avp.effective_start_date <= vr.replenish_date
+      AND (avp.effective_end_date IS NULL OR avp.effective_end_date >= vr.replenish_date)
+    ORDER BY avp.effective_start_date DESC, avp.id DESC
+    LIMIT 1
+) k ON true
+JOIN vendor_branches rb ON rb.id = k.vendor_branch_id
 JOIN vendors rv ON rv.id = rb.vendor_id
-JOIN vendor_branches vb ON vb.id = asg.vault_branch_id
-JOIN vendors vv ON vv.id = vb.vendor_id
-LEFT JOIN locations l ON l.id = vb.location_id
 LEFT JOIN vendor_request_tickets t
-       ON t.request_number = vr.request_number AND t.terminal_id = asg.terminal_id AND t.is_active
-WHERE asg.vendor_request_id = $1
-GROUP BY asg.terminal_id, t.ticket_number, i.denom, asg.replenish_branch_id, rb.branch_code, rb.branch_name, rv.id, rv.name,
-         asg.vault_branch_id, vb.branch_code, vb.branch_name, vv.id, vv.name, l.address_line1, l.address_line2,
-         l.city_or_regency, l.province
-ORDER BY asg.terminal_id, i.denom
+       ON t.request_number = vr.request_number AND t.terminal_id = i.terminal_id AND t.is_active
+WHERE vr.id = $1
+GROUP BY i.terminal_id, t.ticket_number, i.denom, rb.id, rb.branch_code, rb.branch_name, rv.id, rv.name
+ORDER BY i.terminal_id, i.denom
 `
 
-type ListRequestPartyRowsRow struct {
+type ListRequestPartyAtmRowsRow struct {
 	TerminalID          string  `json:"terminal_id"`
 	LokasiAtm           string  `json:"lokasi_atm"`
 	TicketNumber        *string `json:"ticket_number"`
@@ -274,28 +275,23 @@ type ListRequestPartyRowsRow struct {
 	ReplenishBranchName string  `json:"replenish_branch_name"`
 	ReplenishVendorID   int64   `json:"replenish_vendor_id"`
 	ReplenishVendorName string  `json:"replenish_vendor_name"`
-	VaultBranchID       int64   `json:"vault_branch_id"`
-	VaultBranchCode     string  `json:"vault_branch_code"`
-	VaultBranchName     string  `json:"vault_branch_name"`
-	VaultVendorID       int64   `json:"vault_vendor_id"`
-	VaultVendorName     string  `json:"vault_vendor_name"`
-	VaultAddress        string  `json:"vault_address"`
 }
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor): pihak vendor per Vendor Request + keputusan terima/tolak.
 // ---------------------------------------------------------------------------
-// Isi pihak (FR1, FR3). Satu baris per (ATM, denom) dari penetapan vault 2.2a.
-// Kolom di-whitelist: tidak ada saldo/kapasitas, tier, urgent, harga (FR3.3).
+// Isi pihak (cit-send-vendor FR1/FR3, revised by cit-vault-select FR7).
+// Kolom di-whitelist: tidak ada saldo/kapasitas, tier, urgent, alasan buffer, harga (FR7.4).
 // ---------------------------------------------------------------------------
-func (q *Queries) ListRequestPartyRows(ctx context.Context, vendorRequestID int64) ([]ListRequestPartyRowsRow, error) {
-	rows, err := q.db.Query(ctx, listRequestPartyRows, vendorRequestID)
+// One row per (ATM, denom) with the replenish branch = active kelolaan on the replenish date.
+func (q *Queries) ListRequestPartyAtmRows(ctx context.Context, id int64) ([]ListRequestPartyAtmRowsRow, error) {
+	rows, err := q.db.Query(ctx, listRequestPartyAtmRows, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRequestPartyRowsRow{}
+	items := []ListRequestPartyAtmRowsRow{}
 	for rows.Next() {
-		var i ListRequestPartyRowsRow
+		var i ListRequestPartyAtmRowsRow
 		if err := rows.Scan(
 			&i.TerminalID,
 			&i.LokasiAtm,
@@ -307,12 +303,74 @@ func (q *Queries) ListRequestPartyRows(ctx context.Context, vendorRequestID int6
 			&i.ReplenishBranchName,
 			&i.ReplenishVendorID,
 			&i.ReplenishVendorName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRequestPartyVaultRows = `-- name: ListRequestPartyVaultRows :many
+SELECT a.vendor_vault_id, vv.vault_code, t.ticket_number,
+       a.vault_branch_id, vb.branch_code AS vault_branch_code, vb.branch_name AS vault_branch_name,
+       v.id AS vault_vendor_id, v.name AS vault_vendor_name,
+       concat_ws(', ', NULLIF(l.address_line1, ''), NULLIF(l.address_line2, ''), NULLIF(l.city_or_regency, ''),
+                 NULLIF(l.province, ''))::text AS vault_address,
+       m.denom, m.amount
+FROM vendor_request_vault_allocations a
+JOIN vendor_request_vault_plans p ON p.id = a.vault_plan_id AND p.status <> 'cancelled'
+JOIN vendor_request_vault_allocation_amounts m ON m.allocation_id = a.id
+JOIN vendor_vaults vv ON vv.id = a.vendor_vault_id
+JOIN vendor_branches vb ON vb.id = a.vault_branch_id
+JOIN vendors v ON v.id = vb.vendor_id
+LEFT JOIN locations l ON l.id = COALESCE(vv.location_id, vb.location_id)
+LEFT JOIN vendor_request_vault_tickets t
+       ON t.vendor_request_id = a.vendor_request_id AND t.vendor_vault_id = a.vendor_vault_id AND t.is_active
+WHERE a.vendor_request_id = $1
+ORDER BY vb.branch_code, vv.vault_code, m.denom
+`
+
+type ListRequestPartyVaultRowsRow struct {
+	VendorVaultID   int64   `json:"vendor_vault_id"`
+	VaultCode       string  `json:"vault_code"`
+	TicketNumber    *string `json:"ticket_number"`
+	VaultBranchID   int64   `json:"vault_branch_id"`
+	VaultBranchCode string  `json:"vault_branch_code"`
+	VaultBranchName string  `json:"vault_branch_name"`
+	VaultVendorID   int64   `json:"vault_vendor_id"`
+	VaultVendorName string  `json:"vault_vendor_name"`
+	VaultAddress    string  `json:"vault_address"`
+	Denom           int32   `json:"denom"`
+	Amount          int64   `json:"amount"`
+}
+
+// One row per (allocated vault, denom) of the request's live plan, with the
+// active vault ticket and the vault address (vault location, else branch location; U8).
+func (q *Queries) ListRequestPartyVaultRows(ctx context.Context, vendorRequestID int64) ([]ListRequestPartyVaultRowsRow, error) {
+	rows, err := q.db.Query(ctx, listRequestPartyVaultRows, vendorRequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRequestPartyVaultRowsRow{}
+	for rows.Next() {
+		var i ListRequestPartyVaultRowsRow
+		if err := rows.Scan(
+			&i.VendorVaultID,
+			&i.VaultCode,
+			&i.TicketNumber,
 			&i.VaultBranchID,
 			&i.VaultBranchCode,
 			&i.VaultBranchName,
 			&i.VaultVendorID,
 			&i.VaultVendorName,
 			&i.VaultAddress,
+			&i.Denom,
+			&i.Amount,
 		); err != nil {
 			return nil, err
 		}
@@ -629,7 +687,7 @@ UPDATE vendor_request_vault_plans p
 SET status = 'draft', approved_by = NULL, approved_at = NULL,
     rejected_by = $1::bigint, rejected_at = now(), rejection_reason = $2::text
 WHERE p.vendor_request_id = $3::bigint AND p.status <> 'cancelled'
-  AND p.id IN (SELECT a.vault_plan_id FROM vendor_request_vault_assignments a
+  AND p.id IN (SELECT a.vault_plan_id FROM vendor_request_vault_allocations a
                WHERE a.vendor_request_id = $3::bigint AND a.vault_branch_id = $4::bigint)
 RETURNING p.id, p.acm_area_id
 `
@@ -646,7 +704,7 @@ type ReturnVaultPlansForVaultBranchRow struct {
 	AcmAreaID int64 `json:"acm_area_id"`
 }
 
-// FR4.3: branch vault menolak -> hanya plan area yang memuat ATM dengan vault itu kembali draft; alasan vendor
+// FR4.3 / cit-vault-select FR7.5: branch vault menolak -> plan request (yang memuat vault branch itu) kembali draft; alasan vendor
 // tercatat sebagai penolakan plan (rejected_by = user vendor, dipakai UI untuk label "Ditolak vendor").
 func (q *Queries) ReturnVaultPlansForVaultBranch(ctx context.Context, arg ReturnVaultPlansForVaultBranchParams) ([]ReturnVaultPlansForVaultBranchRow, error) {
 	rows, err := q.db.Query(ctx, returnVaultPlansForVaultBranch,

@@ -807,14 +807,8 @@ func (s *VendorRequestService) UpdateItems(ctx context.Context, actor Actor, id 
 		metadata["amount_overrides"] = overrides
 	}
 	tickets.addTo(metadata)
-	// cit-send-vendor FR6.2: vault assignments of removed ATMs go with them.
-	removed, err := q.DeleteVaultAssignmentsOfRemovedAtms(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("drop vault assignments of removed atms for %d: %w", id, err)
-	}
-	if len(removed) > 0 {
-		metadata["vault_assignments_removed"] = removed
-	}
+	// cit-vault-select: vault allocations are per request, not per ATM; an edit
+	// keeps them and Submit re-checks the total against the new order.
 	if err := newAuditWriter(tx).Write(ctx, audit.Entry{
 		ActorID: actor.UserID, Action: "update_items", EntityType: "vendor_request", EntityID: id,
 		Before: map[string]string{"state": req.Status}, After: metadata, IP: actor.IP,

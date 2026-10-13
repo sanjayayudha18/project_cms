@@ -56,9 +56,13 @@ const columns = [
     cell: (info) => info.getValue(),
     enableSorting: false,
   }),
-  columnHelper.accessor("atm_count", {
-    header: "Jumlah ATM",
-    cell: (info) => info.getValue(),
+  columnHelper.display({
+    id: "count",
+    header: "Jumlah",
+    cell: (info) => {
+      const o = info.row.original;
+      return o.role === "vault" ? `${o.vault_count} vault` : `${o.atm_count} ATM`;
+    },
     meta: { numeric: true },
     enableSorting: false,
   }),

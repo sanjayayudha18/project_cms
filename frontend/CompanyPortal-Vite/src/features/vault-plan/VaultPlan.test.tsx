@@ -1,22 +1,24 @@
 /**
- * cit-acm-plan S7: penetapan vault UI. Hooks in ./api are mocked (no live
- * backend); the helpers (formatDenoms, labels) stay real.
+ * cit-vault-select S5: penetapan vault UI (vault rows per request). Hooks in
+ * ./api are mocked (no live backend); the helpers (formatDenoms, labels) and
+ * ./allocation rules stay real.
  */
 
 import { useAuthStore } from "@/lib/auth/store";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestVaultPanel } from "./RequestVaultPanel";
 import { VaultPlanDetail } from "./VaultPlanDetail";
 import { VaultPlanList } from "./VaultPlanList";
-import type { VaultPlanDetail as Plan } from "./api";
+import type { VaultPlanDetail as Plan, VaultAllocationView } from "./api";
 
 const mutate = vi.fn();
 const decide = vi.fn();
 const usePlan = vi.fn();
 const listFilter = vi.fn();
+const review = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -28,68 +30,62 @@ vi.mock("./api", async (importOriginal) => {
       return { isLoading: false, isError: false, data: [] };
     },
     useVaultPlanMutation: () => ({ mutate, isPending: false }),
-    useVaultCandidates: (_p: number, _t: string, urgent: boolean) => ({
+    useVaultCandidates: () => ({
       isLoading: false,
+      isError: false,
       data: [
         {
           vendor_branch_id: 9,
           branch_code: "BJK-01",
           branch_name: "Bijak Bekasi",
+          vendor_id: 1,
           vendor_name: "Bijak",
           region_code: "JKT",
-          category: "CASH",
           tier: 1,
-          saldo_known: true,
-          saldo: { "100000": "900000000" },
-          capacity: { "100000": "100000" },
-          capacity_warning: true,
+          vaults: [
+            {
+              vendor_vault_id: 91,
+              vault_code: "V-BJK-1",
+              category: "CASH",
+              tier: 1,
+              saldo_known: true,
+              saldo: { "100000": "900000000" },
+              capacity: { "100000": "1000000" },
+            },
+            {
+              vendor_vault_id: 92,
+              vault_code: "V-BJK-2",
+              category: "ATM_CASH",
+              tier: 1,
+              saldo_known: true,
+              saldo: { "100000": "900000000" },
+              capacity: { "100000": "5000000" },
+            },
+          ],
         },
-        ...(urgent
-          ? [
-              {
-                vendor_branch_id: 11,
-                branch_code: "SBY-01",
-                branch_name: "Surabaya",
-                vendor_name: "Bijak",
-                region_code: "SBY",
-                category: "CASH",
-                tier: 3,
-                saldo_known: false,
-                saldo: null,
-                capacity: null,
-                capacity_warning: true,
-              },
-            ]
-          : []),
+        {
+          vendor_branch_id: 11,
+          branch_code: "SBY-01",
+          branch_name: "Surabaya",
+          vendor_id: 1,
+          vendor_name: "Bijak",
+          region_code: "SBY",
+          tier: 3,
+          vaults: [
+            {
+              vendor_vault_id: 111,
+              vault_code: "V-SBY-1",
+              category: "CASH",
+              tier: 3,
+              saldo_known: false,
+              saldo: null,
+              capacity: null,
+            },
+          ],
+        },
       ],
     }),
-    useRequestVaultReview: () => ({
-      data: {
-        plans: [
-          {
-            id: 1,
-            acm_area_id: 2,
-            acm_area_name: "Jabo",
-            status: "acm_approved",
-            rejection_reason: null,
-          },
-        ],
-        assignments: [
-          {
-            vault_plan_id: 1,
-            terminal_id: "T001",
-            replenish_branch: { id: 5, code: "BJK-02" },
-            vault_branch: { id: 9, code: "BJK-01", name: "Bijak Bekasi", vendor_name: "Bijak" },
-            tier: 1,
-            is_urgent: false,
-            urgent_reason: null,
-            saldo_snapshot: { "100000": "900000000" },
-            capacity_snapshot: { "100000": "1500000" },
-            capacity_warning: false,
-          },
-        ],
-      },
-    }),
+    useRequestVaultReview: () => review(),
     useRequestVaultDecision: () => ({ mutate: decide, isPending: false }),
   };
 });
@@ -112,12 +108,32 @@ const BRANCH = {
   region_code: "JKT",
 };
 
+function allocation(overrides: Partial<VaultAllocationView> = {}): VaultAllocationView {
+  return {
+    id: 1,
+    vendor_vault_id: 91,
+    vault_code: "V-BJK-1",
+    vault_category: "CASH",
+    branch: { ...BRANCH, id: 9, code: "BJK-01", name: "Bijak Bekasi" },
+    tier: 1,
+    is_urgent: false,
+    urgent_reason: null,
+    amounts: { "100000": "1500000" },
+    saldo_snapshot: { "100000": "900000000" },
+    capacity_snapshot: { "100000": "1000000" },
+    capacity_warning: true,
+    ticket_number: null,
+    ...overrides,
+  };
+}
+
 function plan(overrides: Partial<Plan> = {}): Plan {
   return {
     id: 7,
     vendor_request_id: 42,
-    request_number: "REP-BJK-JKT-20261009-001",
-    replenish_date: "2026-10-09",
+    request_number: "REP-BJK-JKT-20261013-001",
+    replenish_date: "2026-10-13",
+    region_code: "JKT",
     request_status: "vault_assignment",
     vault_rejection_reason: null,
     rejected_by_vendor: false,
@@ -127,14 +143,11 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     submitted_by: null,
     approved_by: null,
     rejection_reason: null,
-    atms: [
-      {
-        terminal_id: "T001",
-        replenish_branch: BRANCH,
-        order: { "100000": "1500000" },
-        assignment: null,
-      },
-    ],
+    buffer_reason: null,
+    atms: [{ terminal_id: "T001", replenish_branch: BRANCH, order: { "100000": "1500000" } }],
+    order_totals: { "100000": "1500000" },
+    allocations: [],
+    vault_tickets: [],
     ...overrides,
   };
 }
@@ -153,68 +166,139 @@ function setRole(id: number, role: string) {
   });
 }
 
+function showPlan(p: Plan) {
+  usePlan.mockReturnValue({ isLoading: false, isError: false, data: p });
+  return render(<VaultPlanDetail />);
+}
+
 beforeEach(() => {
   mutate.mockReset();
   decide.mockReset();
 });
 
-describe("VaultPlanDetail", () => {
-  it("ACM-USER picks a tiered candidate, sees the capacity warning and saves", async () => {
+describe("VaultPlanDetail editor", () => {
+  it("adds and removes vault rows, checks multiples, and a short denom blocks submit", async () => {
     setRole(1, "ACM-USER");
-    usePlan.mockReturnValue({ isLoading: false, isError: false, data: plan() });
-    render(<VaultPlanDetail />);
+    showPlan(plan());
+    const submit = screen.getByRole("button", { name: "Kirim untuk Approval" });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText("Lengkapi setiap baris vault.")).toBeInTheDocument();
 
-    expect(screen.getByText("100K 1.500.000")).toBeInTheDocument();
-    // Submit needs every ATM saved first.
-    expect(screen.getByRole("button", { name: "Kirim untuk Approval" })).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Branch vault baris 1"), "9");
+    await userEvent.selectOptions(screen.getByLabelText("Vault baris 1"), "91");
+    const amount1 = screen.getByLabelText("Nominal 100K baris 1");
+    await userEvent.type(amount1, "1000050");
+    expect(screen.getByText("Harus kelipatan Rp100.000")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Simpan" })).toBeDisabled();
 
-    // FR4.2: the top Tier 1 candidate is pre-selected for an unassigned ATM.
-    expect(screen.getByLabelText("Branch vault untuk T001")).toHaveValue("9");
-    expect(screen.getByText("Kapasitas kurang dari order")).toBeInTheDocument();
+    await userEvent.clear(amount1);
+    await userEvent.type(amount1, "01000000");
+    expect(amount1).toHaveValue("1000000"); // leading zero dropped, matches the server's value
+    expect(screen.getByText("Kurang")).toBeInTheDocument();
+    expect(screen.getByText("Alokasi 100K masih kurang dari order.")).toBeInTheDocument();
+    expect(submit).toBeDisabled();
+
+    // Second row: the vault already used on row 1 is not offered, the only free one is picked.
+    await userEvent.click(screen.getByRole("button", { name: "Tambah Vault" }));
+    await userEvent.selectOptions(screen.getByLabelText("Branch vault baris 2"), "9");
+    expect(screen.getByLabelText("Vault baris 2")).toHaveValue("92");
+    expect(within(screen.getByLabelText("Vault baris 2")).queryByText(/V-BJK-1/)).toBeNull();
+    await userEvent.type(screen.getByLabelText("Nominal 100K baris 2"), "500000");
+    expect(screen.getByText("Sesuai")).toBeInTheDocument();
+    // Saved state differs from the draft, so submit waits for Simpan.
+    expect(screen.getByText("Simpan perubahan sebelum mengirim.")).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "Simpan" }));
+    expect(mutate.mock.calls[0][0]).toEqual({
+      op: "save",
+      id: 7,
+      bufferReason: null,
+      allocations: [
+        {
+          vendor_vault_id: 91,
+          amounts: { "100000": "1000000" },
+          is_urgent: false,
+          urgent_reason: null,
+        },
+        {
+          vendor_vault_id: 92,
+          amounts: { "100000": "500000" },
+          is_urgent: false,
+          urgent_reason: null,
+        },
+      ],
+    });
 
-    expect(mutate).toHaveBeenCalledWith(
-      {
-        op: "save",
-        id: 7,
-        assignments: [
-          { terminal_id: "T001", vault_branch_id: 9, is_urgent: false, urgent_reason: null },
-        ],
-      },
-      expect.anything(),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Hapus baris 2" }));
+    expect(screen.queryByLabelText("Vault baris 2")).not.toBeInTheDocument();
+    expect(screen.getByText("Kurang")).toBeInTheDocument();
   });
 
-  it("urgent unlocks tier 3 and needs a 10-500 char reason before saving", async () => {
+  it("an excess is a buffer: the reason field appears and is required to submit", async () => {
     setRole(1, "ACM-USER");
-    usePlan.mockReturnValue({ isLoading: false, isError: false, data: plan() });
-    render(<VaultPlanDetail />);
+    showPlan(plan({ allocations: [allocation({ amounts: { "100000": "2000000" } })] }));
+    expect(screen.getByLabelText("Vault baris 1")).toHaveValue("91");
+    expect(screen.getByText("Buffer")).toBeInTheDocument();
+    expect(screen.getByText("Kapasitas vault kurang dari alokasi")).toBeInTheDocument();
+    expect(screen.getByText("Isi alasan buffer (10-500 karakter).")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/Alasan buffer/), "antisipasi penarikan gajian");
+    expect(screen.getByText("Simpan perubahan sebelum mengirim.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Simpan" }));
+    expect(mutate.mock.calls[0][0].bufferReason).toBe("antisipasi penarikan gajian");
+  });
+
+  it("a saved, covered plan can be submitted and shows its vault ticket", async () => {
+    setRole(1, "ACM-USER");
+    showPlan(plan({ allocations: [allocation({ ticket_number: "V-BJK-1_20261013_001" })] }));
+    expect(screen.getByText("Tiket V-BJK-1_20261013_001")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Alasan buffer/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Kirim untuk Approval" }));
+    expect(mutate.mock.calls[0][0]).toEqual({ op: "submit", id: 7 });
+  });
+
+  it("urgent unlocks tier 3 and needs a 10-500 char reason; un-urgent drops the tier 3 branch", async () => {
+    setRole(1, "ACM-USER");
+    showPlan(plan());
+    const branch = screen.getByLabelText("Branch vault baris 1");
+    expect(within(branch).queryByText(/SBY-01/)).toBeNull();
 
     await userEvent.click(screen.getByLabelText(/Urgent/));
-    await userEvent.selectOptions(screen.getByLabelText("Branch vault untuk T001"), "11");
+    await userEvent.selectOptions(branch, "11");
+    expect(screen.getByLabelText("Vault baris 1")).toHaveValue("111");
+    await userEvent.type(screen.getByLabelText("Nominal 100K baris 1"), "1500000");
+    expect(screen.getByText("Saldo vault tidak diketahui")).toBeInTheDocument();
     const save = screen.getByRole("button", { name: "Simpan" });
     expect(save).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText("Alasan urgent untuk T001"), "vault lokal kosong");
+    await userEvent.type(screen.getByLabelText("Alasan urgent baris 1"), "vault lokal kosong");
     expect(save).toBeEnabled();
     await userEvent.click(save);
-    expect(mutate.mock.calls[0][0].assignments[0]).toEqual({
-      terminal_id: "T001",
-      vault_branch_id: 11,
+    expect(mutate.mock.calls[0][0].allocations[0]).toEqual({
+      vendor_vault_id: 111,
+      amounts: { "100000": "1500000" },
       is_urgent: true,
       urgent_reason: "vault lokal kosong",
     });
-  });
 
-  it("ACM-SPV approves a submitted plan but not their own submission", async () => {
+    await userEvent.click(screen.getByLabelText(/Urgent/));
+    expect(branch).toHaveValue("");
+  });
+});
+
+describe("VaultPlanDetail decisions", () => {
+  it("ACM-SPV sees the saved vaults read-only and approves, but not their own submission", async () => {
     setRole(2, "ACM-SPV");
-    usePlan.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: plan({ status: "pending_acm_approval", submitted_by: 1 }),
-    });
-    const { unmount } = render(<VaultPlanDetail />);
-    expect(screen.queryByLabelText("Branch vault untuk T001")).not.toBeInTheDocument();
+    const { unmount } = showPlan(
+      plan({
+        status: "pending_acm_approval",
+        submitted_by: 1,
+        allocations: [allocation({ ticket_number: "V-BJK-1_20261013_001" })],
+      }),
+    );
+    expect(screen.queryByLabelText("Vault baris 1")).not.toBeInTheDocument();
+    expect(screen.getByText("V-BJK-1_20261013_001")).toBeInTheDocument();
+    expect(screen.getByText("Peringatan kapasitas")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Setujui" }));
     expect(mutate.mock.calls[0][0]).toEqual({ op: "approve", id: 7 });
     unmount();
@@ -226,24 +310,14 @@ describe("VaultPlanDetail", () => {
 
   it("shows the ATM-SPV rejection reason on a plan sent back to draft", () => {
     setRole(1, "ACM-USER");
-    usePlan.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: plan({ vault_rejection_reason: "vault terlalu jauh" }),
-    });
-    render(<VaultPlanDetail />);
+    showPlan(plan({ vault_rejection_reason: "vault terlalu jauh" }));
     expect(screen.getByText("vault terlalu jauh")).toBeInTheDocument();
   });
 
   // cit-send-vendor FR4.3: a vault vendor's rejection is labelled as such, not as ACM-SPV.
   it("labels a plan sent back by a vault vendor", () => {
     setRole(1, "ACM-USER");
-    usePlan.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: plan({ rejection_reason: "saldo vault tidak cukup", rejected_by_vendor: true }),
-    });
-    render(<VaultPlanDetail />);
+    showPlan(plan({ rejection_reason: "saldo vault tidak cukup", rejected_by_vendor: true }));
     expect(screen.getByText(/Ditolak vendor \(branch vault\)/)).toBeInTheDocument();
     expect(screen.getByText("saldo vault tidak cukup")).toBeInTheDocument();
     expect(screen.queryByText("Ditolak ACM-SPV")).not.toBeInTheDocument();
@@ -260,10 +334,19 @@ describe("VaultPlanList", () => {
 });
 
 describe("RequestVaultPanel", () => {
-  it("lists assignments and lets the checker approve", async () => {
+  beforeEach(() => {
+    review.mockReturnValue({
+      data: plan({
+        status: "acm_approved",
+        allocations: [allocation({ ticket_number: "V-BJK-1_20261013_001" })],
+      }),
+    });
+  });
+
+  it("lists the request's vaults with order coverage and lets the checker approve", async () => {
     render(<RequestVaultPanel requestId={42} canReview />);
-    expect(screen.getByText("100K 1.500.000")).toBeInTheDocument();
-    expect(screen.getByText("100K 900.000.000")).toBeInTheDocument(); // saldo snapshot
+    expect(screen.getByText("V-BJK-1_20261013_001")).toBeInTheDocument();
+    expect(screen.getByText("Sesuai")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Setujui Penetapan" }));
     expect(decide.mock.calls[0][0]).toEqual({ id: 42, approve: true, reason: undefined });
   });
@@ -275,15 +358,15 @@ describe("RequestVaultPanel", () => {
     expect(confirm).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Alasan Penolakan"), "kapasitas kurang");
     await userEvent.click(confirm);
-    expect(decide.mock.calls[0][0]).toEqual({
-      id: 42,
-      approve: false,
-      reason: "kapasitas kurang",
-    });
+    expect(decide.mock.calls[0][0]).toEqual({ id: 42, approve: false, reason: "kapasitas kurang" });
   });
 
-  it("hides actions when review is not open", () => {
-    render(<RequestVaultPanel requestId={42} canReview={false} />);
+  it("hides actions when review is not open, and renders nothing without a plan", () => {
+    const { unmount } = render(<RequestVaultPanel requestId={42} canReview={false} />);
     expect(screen.queryByRole("button", { name: "Setujui Penetapan" })).not.toBeInTheDocument();
+    unmount();
+    review.mockReturnValue({ data: null });
+    const { container } = render(<RequestVaultPanel requestId={42} canReview />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

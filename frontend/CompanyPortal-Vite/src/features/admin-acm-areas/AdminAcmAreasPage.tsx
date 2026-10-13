@@ -20,9 +20,9 @@ const inputClass =
   "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
 
 /**
- * Pengaturan -> Area ACM (cit-acm-plan FR7, ADMIN). Areas group vendor branches
- * (one area per branch) and ACM-USER/ACM-SPV members. Changes apply immediately
- * and are audited.
+ * Pengaturan -> Area ACM (cit-acm-plan FR7, cit-vault-select FR1/FR9.3, ADMIN).
+ * Areas own region codes (one area per region) and ACM-USER/ACM-SPV members.
+ * Changes apply immediately and are audited.
  */
 export function AdminAcmAreasPage() {
   const { toast } = useToast();
@@ -52,8 +52,8 @@ export function AdminAcmAreasPage() {
   const columns: ColumnDef<AcmArea, unknown>[] = [
     { accessorKey: "name", header: "Area" },
     {
-      accessorKey: "branch_count",
-      header: "Cabang",
+      accessorKey: "region_count",
+      header: "Region",
       meta: { align: "right" },
       cell: ({ getValue }) => <span className="tabular-nums">{String(getValue())}</span>,
     },
@@ -91,7 +91,7 @@ export function AdminAcmAreasPage() {
                 run(
                   { op: a.is_active ? "disable" : "enable", id: a.id },
                   a.is_active
-                    ? `Area "${a.name}" dinonaktifkan; cabangnya dilepas`
+                    ? `Area "${a.name}" dinonaktifkan; regionnya dilepas`
                     : `Area "${a.name}" diaktifkan`,
                 )
               }
@@ -111,7 +111,7 @@ export function AdminAcmAreasPage() {
       <PageHeader
         eyebrow="Pengaturan"
         title="Area ACM"
-        description="Kelompok cabang vendor dan anggota tim ACM yang menyusun penetapan vault. Satu cabang hanya boleh di satu area."
+        description="Kode region dan anggota tim ACM yang menyusun penetapan vault. Satu region hanya boleh di satu area."
       />
 
       {warnings.length > 0 && (
@@ -119,14 +119,19 @@ export function AdminAcmAreasPage() {
           <NoticeBanner
             icon={AlertTriangle}
             variant="warning"
-            title={`${warnings.length} cabang belum punya area ACM`}
-            description="Request replenish untuk ATM cabang ini tertahan di tahap penetapan vault sampai cabangnya dimasukkan ke sebuah area."
+            title={`${warnings.length} request menunggu area ACM`}
+            description="Request ini tertahan di tahap penetapan vault karena kode regionnya belum masuk area mana pun, atau request tidak punya kode region (nomor format lama)."
           />
           <ul className="flex flex-col gap-1 text-sm text-[var(--n-700)]">
             {warnings.map((w) => (
-              <li key={w.vendor_branch_id}>
-                {w.vendor_name} · {w.branch_code} {w.branch_name} —{" "}
-                <span className="tabular-nums">{w.request_count}</span> request
+              <li key={w.vendor_request_id}>
+                <span className="font-mono">{w.request_number}</span> — region{" "}
+                {w.region_code ? (
+                  <span className="font-mono">{w.region_code}</span>
+                ) : (
+                  "tidak ada (nomor format lama)"
+                )}{" "}
+                · replenish {w.replenish_date ?? "-"}
               </li>
             ))}
           </ul>

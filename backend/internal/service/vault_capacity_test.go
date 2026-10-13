@@ -3,11 +3,7 @@ package service
 import (
 	"errors"
 	"testing"
-
-	"github.com/cimb-niaga/cms/backend/internal/db"
 )
-
-func ptr[T any](v T) *T { return &v }
 
 func TestVaultTier(t *testing.T) {
 	jkt := "JKT"
@@ -31,44 +27,6 @@ func TestVaultTier(t *testing.T) {
 	}
 }
 
-// Branch 10 = cash branch, 20 = replenish branch of ATM-B (unassigned -> charged to 20).
-func demandFixture() *vaultDemand {
-	return newVaultDemand([]db.ListVaultDemandRow{
-		{VendorRequestID: 1, TerminalID: "A", Denom: 100000, Amount: 300, ReplenishBranchID: ptr(int64(20)), VaultBranchID: ptr(int64(10))},
-		{VendorRequestID: 1, TerminalID: "A", Denom: 50000, Amount: 100, ReplenishBranchID: ptr(int64(20)), VaultBranchID: ptr(int64(10))},
-		{VendorRequestID: 1, TerminalID: "B", Denom: 100000, Amount: 200, ReplenishBranchID: ptr(int64(20))},
-		{VendorRequestID: 2, TerminalID: "A", Denom: 100000, Amount: 50, ReplenishBranchID: ptr(int64(20)), VaultBranchID: ptr(int64(10))},
-	})
-}
-
-func TestVaultDemandCapacity(t *testing.T) {
-	d := demandFixture()
-	saldo := branchSaldo{amounts: denomAmounts{100000: 1000, 50000: 100}}
-
-	// Other ATM looking at branch 10: everything charged to 10 is subtracted (300+50 / 100).
-	capa, ok := d.capacity(saldo, 10, atmKey{1, "B"})
-	if !ok || capa[100000] != 650 || capa[50000] != 0 {
-		t.Fatalf("capacity for B @10 = %v %v, want 650/0", capa, ok)
-	}
-	// ATM A itself (assigned to 10) is not counted against its own capacity.
-	capa, _ = d.capacity(saldo, 10, atmKey{1, "A"})
-	if capa[100000] != 950 || capa[50000] != 100 {
-		t.Fatalf("capacity for A @10 = %v, want 950/100", capa)
-	}
-	// Same terminal on another request is a different order: still charged.
-	if d.needs[atmKey{2, "A"}][100000] != 50 {
-		t.Fatalf("request 2 order lost: %v", d.needs)
-	}
-	// Unassigned B is charged to its replenish branch 20 (FR3.2).
-	capa, _ = d.capacity(branchSaldo{amounts: denomAmounts{100000: 500}}, 20, atmKey{1, "A"})
-	if capa[100000] != 300 {
-		t.Fatalf("capacity @20 = %v, want 500-200=300", capa)
-	}
-	if _, ok := d.capacity(branchSaldo{unknown: true}, 10, atmKey{1, "B"}); ok {
-		t.Fatal("unknown saldo must report ok=false")
-	}
-}
-
 func TestCapacityWarning(t *testing.T) {
 	need := denomAmounts{100000: 200, 50000: 0}
 	cases := []struct {
@@ -86,23 +44,6 @@ func TestCapacityWarning(t *testing.T) {
 	for _, tc := range cases {
 		if got := capacityWarning(tc.capa, tc.known, need); got != tc.want {
 			t.Errorf("%s: warning = %v, want %v", tc.name, got, tc.want)
-		}
-	}
-}
-
-func TestSortCandidates(t *testing.T) {
-	c := []VaultCandidate{
-		{BranchCode: "T2", Tier: 2, SaldoKnown: true, coverage: 999},
-		{BranchCode: "T1-unknown", Tier: 1, SaldoKnown: false},
-		{BranchCode: "T1-small", Tier: 1, SaldoKnown: true, coverage: 10},
-		{BranchCode: "T1-big", Tier: 1, SaldoKnown: true, coverage: 500},
-		{BranchCode: "T3", Tier: 3, SaldoKnown: true, coverage: 9999},
-	}
-	sortCandidates(c)
-	want := []string{"T1-big", "T1-small", "T1-unknown", "T2", "T3"}
-	for i, w := range want {
-		if c[i].BranchCode != w {
-			t.Fatalf("order[%d] = %s, want %s (full %v)", i, c[i].BranchCode, w, c)
 		}
 	}
 }

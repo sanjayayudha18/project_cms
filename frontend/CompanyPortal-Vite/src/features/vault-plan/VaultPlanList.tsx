@@ -44,8 +44,8 @@ const columns: ColumnDef<VaultPlanSummary, unknown>[] = [
   { accessorKey: "replenish_date", header: "Tgl Replenish" },
   { accessorKey: "acm_area_name", header: "Area ACM" },
   {
-    accessorKey: "assigned_count",
-    header: "ATM Ditetapkan",
+    accessorKey: "allocation_count",
+    header: "Vault",
     meta: { align: "right" },
     cell: ({ getValue }) => <span className="tabular-nums">{String(getValue())}</span>,
   },
@@ -55,7 +55,11 @@ const columns: ColumnDef<VaultPlanSummary, unknown>[] = [
     meta: { align: "right" },
     cell: ({ row }) =>
       row.original.warning_count > 0 ? (
-        <Badge variant="warning" icon={AlertTriangle} label={`${row.original.warning_count} ATM`} />
+        <Badge
+          variant="warning"
+          icon={AlertTriangle}
+          label={`${row.original.warning_count} vault`}
+        />
       ) : (
         <span className="tabular-nums">0</span>
       ),
@@ -67,7 +71,7 @@ const columns: ColumnDef<VaultPlanSummary, unknown>[] = [
   },
 ];
 
-/** CIT -> Penetapan Vault (cit-acm-plan FR2): rencana vault per request x area ACM. */
+/** CIT -> Penetapan Vault (cit-vault-select FR4): one vault plan per request, owned by the region's ACM area. */
 export function VaultPlanList() {
   const [filter, setFilter] = useState<VaultPlanFilter>({ status: "draft", from: "", to: "" });
   const query = useVaultPlans(filter);
@@ -77,7 +81,7 @@ export function VaultPlanList() {
       <PageHeader
         eyebrow="CIT"
         title="Penetapan Vault"
-        description="Tetapkan branch vault untuk setiap ATM di request replenish area Anda, lalu kirim untuk approval ACM-SPV."
+        description="Bagi nominal order request replenish ke satu atau lebih vault, lalu kirim untuk approval ACM-SPV."
       />
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex w-fit flex-col gap-1 text-sm font-medium text-[var(--n-700)]">

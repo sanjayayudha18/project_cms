@@ -13,7 +13,7 @@ vi.mock("./api", () => ({
         name: "Jabodetabek",
         is_active: true,
         deleted_at: null,
-        branch_count: 2,
+        region_count: 2,
         member_count: 1,
       },
     ],
@@ -21,11 +21,16 @@ vi.mock("./api", () => ({
   useAcmAreaWarnings: () => ({
     data: [
       {
-        vendor_branch_id: 9,
-        branch_code: "BJK-01",
-        branch_name: "Bijak Bekasi",
-        vendor_name: "Bijak",
-        request_count: 3,
+        vendor_request_id: 41,
+        request_number: "REP-BJK-SBY-20261013-001",
+        region_code: "SBY",
+        replenish_date: "2026-10-13",
+      },
+      {
+        vendor_request_id: 42,
+        request_number: "REP-BJK-20261001-002",
+        region_code: null,
+        replenish_date: "2026-10-01",
       },
     ],
   }),
@@ -35,48 +40,15 @@ vi.mock("./api", () => ({
       id: 1,
       name: "Jabodetabek",
       is_active: true,
-      branches: [
-        {
-          vendor_branch_id: 5,
-          branch_code: "BJK-02",
-          branch_name: "Bijak Jakarta",
-          region_code: "JKT",
-          branch_is_active: true,
-          vendor_name: "Bijak",
-        },
-      ],
+      region_codes: ["JKT", "OLD"],
       members: [],
     },
   }),
-  useAcmBranchOptions: () => ({
+  useAcmRegionOptions: () => ({
     data: [
-      {
-        vendor_branch_id: 5,
-        branch_code: "BJK-02",
-        branch_name: "Bijak Jakarta",
-        region_code: "JKT",
-        vendor_name: "Bijak",
-        acm_area_id: 1,
-        acm_area_name: "Jabodetabek",
-      },
-      {
-        vendor_branch_id: 6,
-        branch_code: "ABA-01",
-        branch_name: "Aba Makassar",
-        region_code: "MKS",
-        vendor_name: "Aba",
-        acm_area_id: 2,
-        acm_area_name: "Makassar",
-      },
-      {
-        vendor_branch_id: 7,
-        branch_code: "ABA-02",
-        branch_name: "Aba Depok",
-        region_code: "JKT",
-        vendor_name: "Aba",
-        acm_area_id: null,
-        acm_area_name: null,
-      },
+      { region_code: "JKT", branch_count: 3, acm_area_id: 1, acm_area_name: "Jabodetabek" },
+      { region_code: "MKS", branch_count: 1, acm_area_id: 2, acm_area_name: "Makassar" },
+      { region_code: "SBY", branch_count: 2, acm_area_id: null, acm_area_name: null },
     ],
   }),
   useAcmEligibleUsers: () => ({
@@ -87,11 +59,12 @@ vi.mock("./api", () => ({
 vi.mock("@/lib/hooks/useToast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 describe("AdminAcmAreasPage", () => {
-  it("shows areas and the branches-without-area warning", () => {
+  it("shows areas and the requests waiting for an area (FR1.4)", () => {
     render(<AdminAcmAreasPage />);
     expect(screen.getByText("Jabodetabek")).toBeTruthy();
-    expect(screen.getByText("1 cabang belum punya area ACM")).toBeTruthy();
-    expect(screen.getByText(/Bijak Bekasi/)).toBeTruthy();
+    expect(screen.getByText("2 request menunggu area ACM")).toBeTruthy();
+    expect(screen.getByText("REP-BJK-SBY-20261013-001")).toBeTruthy();
+    expect(screen.getByText(/tidak ada \(nomor format lama\)/)).toBeTruthy();
   });
 
   it("creates an area with a trimmed name", () => {
@@ -103,18 +76,22 @@ describe("AdminAcmAreasPage", () => {
     expect(mutate).toHaveBeenCalledWith({ op: "create", name: "Makassar" }, expect.anything());
   });
 
-  it("branch held by another area cannot be picked; saving sends the chosen ids", () => {
+  it("region held by another area cannot be picked; saving sends the chosen codes", () => {
     render(<AdminAcmAreasPage />);
     fireEvent.click(screen.getByRole("button", { name: "Kelola" }));
+    expect(screen.queryByRole("button", { name: "Simpan Cabang" })).toBeNull();
 
-    const held = screen.getByRole("checkbox", { name: /Aba Makassar/ }) as HTMLInputElement;
+    const held = screen.getByRole("checkbox", { name: /MKS/ }) as HTMLInputElement;
     expect(held.disabled).toBe(true);
     expect(screen.getByText(/sudah di area Makassar/)).toBeTruthy();
+    // A code of this area no longer used by an active branch stays visible and checked.
+    expect((screen.getByRole("checkbox", { name: /OLD/ }) as HTMLInputElement).checked).toBe(true);
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Aba Depok/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Simpan Cabang" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /SBY/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /OLD/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Simpan Region" }));
     expect(mutate).toHaveBeenCalledWith(
-      { op: "branches", id: 1, vendor_branch_ids: [5, 7] },
+      { op: "regions", id: 1, region_codes: ["JKT", "SBY"] },
       expect.anything(),
     );
   });

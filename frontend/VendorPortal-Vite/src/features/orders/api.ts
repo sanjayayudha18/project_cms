@@ -30,7 +30,21 @@ export interface PartyAtm {
   readonly lokasi: string;
   readonly ticket_number: string;
   readonly denoms: readonly DenomAmount[];
-  readonly counterpart: PartyBranch;
+}
+
+/** A vendor vault as shown to vendors; address = vault's, else its branch's. */
+export interface PartyVaultRef {
+  readonly id: number;
+  readonly code: string;
+  readonly address?: string;
+}
+
+/** One vault of the request with its tiket pemenuhan vault (cit-vault-select FR7). */
+export interface PartyVault {
+  readonly ticket_number: string;
+  readonly vault: PartyVaultRef;
+  readonly branch: PartyBranch;
+  readonly denoms: readonly DenomAmount[];
 }
 
 export interface VendorOrderSummary {
@@ -45,6 +59,7 @@ export interface VendorOrderSummary {
   readonly branch_code: string;
   readonly branch_name: string;
   readonly atm_count: number;
+  readonly vault_count: number;
   readonly totals: readonly DenomAmount[] | null;
   readonly currency: string;
   readonly sent_at: string | null;
@@ -57,7 +72,12 @@ export interface VendorOrderDetail extends VendorOrderSummary {
   readonly content: {
     readonly role: PartyRole;
     readonly branch: PartyBranch;
+    /** Replenish party: its own ATMs; empty for a vault party. */
     readonly atms: readonly PartyAtm[];
+    /** Replenish party: every vault of the request; vault party: its own vaults. */
+    readonly vaults: readonly PartyVault[];
+    /** Vault party: the request's replenish branches (who collects); empty otherwise. */
+    readonly replenish_branches: readonly PartyBranch[];
     readonly totals: readonly DenomAmount[];
     readonly currency: string;
   };

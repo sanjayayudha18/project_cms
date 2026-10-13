@@ -36,6 +36,7 @@ const summary: VendorOrderSummary = {
   branch_code: "GRD-JKT",
   branch_name: "Gardanet Jakarta",
   atm_count: 2,
+  vault_count: 2,
   totals: [{ denom: 100000, amount: 2000000 }],
   currency: "IDR",
   sent_at: "2026-10-08T03:00:00Z",
@@ -47,27 +48,60 @@ const vaultDetail: VendorOrderDetail = {
   ...summary,
   id: 12,
   role: "vault",
-  atm_count: 1,
+  atm_count: 0,
+  vault_count: 1,
   rejection_reason: null,
   content: {
     role: "vault",
     branch: { id: 30, code: "C1", name: "Cash Satu", vendor_id: 4, vendor_name: "Gardanet" },
+    atms: [],
+    vaults: [
+      {
+        ticket_number: "V-C1_20261009_001",
+        vault: { id: 301, code: "V-C1", address: "Jl. Vault 1" },
+        branch: { id: 30, code: "C1", name: "Cash Satu", vendor_id: 4, vendor_name: "Gardanet" },
+        denoms: [{ denom: 100000, amount: 1000000 }],
+      },
+    ],
+    replenish_branches: [
+      { id: 27, code: "GRD-JKT", name: "Gardanet Jakarta", vendor_id: 4, vendor_name: "Gardanet" },
+    ],
+    totals: [{ denom: 100000, amount: 1000000 }],
+    currency: "IDR",
+  },
+};
+
+const replenishDetail: VendorOrderDetail = {
+  ...summary,
+  rejection_reason: null,
+  content: {
+    role: "replenish",
+    branch: {
+      id: 27,
+      code: "GRD-JKT",
+      name: "Gardanet Jakarta",
+      vendor_id: 4,
+      vendor_name: "Gardanet",
+    },
     atms: [
       {
         terminal_id: "T0001",
         lokasi: "Mall A",
         ticket_number: "T0001_100K_20261009_001",
-        denoms: [{ denom: 100000, amount: 1000000 }],
-        counterpart: {
-          id: 27,
-          code: "GRD-JKT",
-          name: "Gardanet Jakarta",
-          vendor_id: 4,
-          vendor_name: "Gardanet",
-        },
+        denoms: [{ denom: 100000, amount: 2000000 }],
       },
     ],
-    totals: [{ denom: 100000, amount: 1000000 }],
+    vaults: [
+      vaultDetail.content.vaults[0] as VendorOrderDetail["content"]["vaults"][number],
+      {
+        ticket_number: "V-D1_20261009_001",
+        vault: { id: 401, code: "V-D1", address: "Jl. Vault 2" },
+        branch: { id: 40, code: "D1", name: "Cash Dua", vendor_id: 5, vendor_name: "Bijak" },
+        denoms: [{ denom: 100000, amount: 1000000 }],
+      },
+    ],
+    replenish_branches: [],
+    totals: [{ denom: 100000, amount: 2000000 }],
     currency: "IDR",
   },
 };
@@ -146,7 +180,7 @@ describe("OrderDetailPage (cit-send-vendor FR3/FR4/FR9.2)", () => {
     postMock.mockReset();
   });
 
-  it("shows a vault party what to prepare and who collects, and accepts", async () => {
+  it("shows a vault party its vault tickets, what to prepare and who collects, and accepts", async () => {
     const user = userEvent.setup();
     getMock.mockResolvedValue({ data: vaultDetail });
     postMock.mockResolvedValue({ data: { ...vaultDetail, status: "accepted", can_decide: false } });
@@ -154,8 +188,11 @@ describe("OrderDetailPage (cit-send-vendor FR3/FR4/FR9.2)", () => {
 
     expect(await screen.findByText("Total uang yang harus disiapkan")).toBeInTheDocument();
     expect(screen.getByText("IDR 1.000.000")).toBeInTheDocument();
-    expect(screen.getByText("Diambil oleh (replenish)")).toBeInTheDocument();
-    expect(screen.queryByText("Tiket")).not.toBeInTheDocument();
+    expect(screen.getByText("V-C1_20261009_001")).toBeInTheDocument();
+    expect(screen.getByText("Jl. Vault 1")).toBeInTheDocument();
+    expect(screen.getByText("Diambil oleh (cabang pengisi)")).toBeInTheDocument();
+    expect(screen.getByText("Gardanet Jakarta")).toBeInTheDocument();
+    expect(screen.queryByText("Terminal")).not.toBeInTheDocument();
     expect(getMock).toHaveBeenCalledWith("/api/v1/vendor/replenish-orders/12");
 
     await user.click(screen.getByRole("button", { name: "Terima" }));
@@ -164,6 +201,19 @@ describe("OrderDetailPage (cit-send-vendor FR3/FR4/FR9.2)", () => {
     );
     expect(await screen.findByText("Diterima")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Terima" })).not.toBeInTheDocument();
+  });
+
+  it("shows a replenish party its ATMs and every vault of the request to collect from", async () => {
+    getMock.mockResolvedValue({ data: replenishDetail });
+    renderAt("/orders/11");
+
+    expect(await screen.findByText("Total order")).toBeInTheDocument();
+    expect(screen.getByText("T0001_100K_20261009_001")).toBeInTheDocument();
+    expect(screen.getByText("Ambil uang di vault (2)")).toBeInTheDocument();
+    expect(screen.getByText("V-D1_20261009_001")).toBeInTheDocument();
+    expect(screen.getByText("Jl. Vault 2")).toBeInTheDocument();
+    expect(screen.getByText("Cash Dua")).toBeInTheDocument();
+    expect(screen.queryByText("Diambil oleh (cabang pengisi)")).not.toBeInTheDocument();
   });
 
   it("requires a 10-character reason to reject", async () => {

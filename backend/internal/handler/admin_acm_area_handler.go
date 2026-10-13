@@ -19,11 +19,13 @@ type AcmAreaAdminServicer interface {
 	Get(ctx context.Context, id int64) (*service.AcmAreaDetail, error)
 	EligibleUsers(ctx context.Context) ([]db.ListAcmEligibleUsersRow, error)
 	BranchOptions(ctx context.Context) ([]db.ListAcmBranchOptionsRow, error)
-	Warnings(ctx context.Context) ([]db.ListUnassignedVaultAssignmentBranchesRow, error)
+	RegionOptions(ctx context.Context) ([]db.ListAcmRegionOptionsRow, error)
+	Warnings(ctx context.Context) ([]db.ListVaultPlanRegionWarningsRow, error)
 	Create(ctx context.Context, actorID int64, actorRole, name, ip string) (db.AcmArea, error)
 	Rename(ctx context.Context, actorID int64, actorRole string, id int64, name, ip string) (db.AcmArea, error)
 	SetActive(ctx context.Context, actorID int64, actorRole string, id int64, active bool, ip string) (db.AcmArea, error)
 	SetBranches(ctx context.Context, actorID int64, actorRole string, id int64, branchIDs []int64, ip string) (*service.AcmAreaDetail, error)
+	SetRegions(ctx context.Context, actorID int64, actorRole string, id int64, regionCodes []string, ip string) (*service.AcmAreaDetail, error)
 	SetMembers(ctx context.Context, actorID int64, actorRole string, id int64, userIDs []int64, ip string) (*service.AcmAreaDetail, error)
 }
 
@@ -47,10 +49,13 @@ func (h *AdminAcmAreaHandler) Routes() chi.Router {
 	r.Get("/warnings", h.Warnings)
 	r.Get("/eligible-users", h.EligibleUsers)
 	r.Get("/branch-options", h.BranchOptions)
+	r.Get("/region-options", h.RegionOptions)
 	r.Get("/{id}", h.Get)
 	r.Put("/{id}", h.Rename)
 	r.Post("/{id}/disable", h.setActive(false))
 	r.Post("/{id}/enable", h.setActive(true))
+	r.Get("/{id}/regions", h.Regions)
+	r.Put("/{id}/regions", h.SetRegions)
 	r.Put("/{id}/branches", h.SetBranches)
 	r.Put("/{id}/members", h.SetMembers)
 	return r
@@ -62,6 +67,7 @@ func acmAreaJSON(a db.AcmArea) map[string]any {
 
 func acmAreaDetailJSON(d *service.AcmAreaDetail) map[string]any {
 	out := acmAreaJSON(d.Area)
+	out["region_codes"] = d.Regions
 	out["branches"] = d.Branches
 	out["members"] = d.Members
 	return out
@@ -82,7 +88,7 @@ func (h *AdminAcmAreaHandler) List(w http.ResponseWriter, r *http.Request) {
 	items := make([]map[string]any, len(rows))
 	for i, a := range rows {
 		items[i] = map[string]any{"id": a.ID, "name": a.Name, "is_active": a.IsActive, "deleted_at": formatTimestamptz(a.DeletedAt),
-			"branch_count": a.BranchCount, "member_count": a.MemberCount}
+			"branch_count": a.BranchCount, "member_count": a.MemberCount, "region_count": a.RegionCount}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"areas": items})
 }
@@ -122,14 +128,30 @@ func (h *AdminAcmAreaHandler) BranchOptions(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"branches": rows})
 }
 
-// Warnings handles GET /warnings -- branches blocking requests for lack of an area (FR7.4).
+// RegionOptions handles GET /region-options -- region picker source (cit-vault-select FR1.1).
+func (h *AdminAcmAreaHandler) RegionOptions(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.svc.RegionOptions(r.Context())
+	if err != nil {
+		writeUnexpectedError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"regions": rows})
+}
+
+// Warnings handles GET /warnings -- requests without a plan: region without
+// an area, or no region code (cit-vault-select FR1.4).
 func (h *AdminAcmAreaHandler) Warnings(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.svc.Warnings(r.Context())
 	if err != nil {
 		writeUnexpectedError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"branches_without_area": rows})
+	items := make([]map[string]any, len(rows))
+	for i, x := range rows {
+		items[i] = map[string]any{"vendor_request_id": x.VendorRequestID, "request_number": x.RequestNumber,
+			"region_code": x.RegionCode, "replenish_date": formatPgDate(x.ReplenishDate)}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"requests_without_area": items})
 }
 
 type acmAreaNameBody struct {
@@ -194,6 +216,46 @@ func (h *AdminAcmAreaHandler) SetBranches(w http.ResponseWriter, r *http.Request
 	h.setLinks(w, r, "vendor_branch_ids", h.svc.SetBranches)
 }
 
+// Regions handles GET /{id}/regions.
+func (h *AdminAcmAreaHandler) Regions(w http.ResponseWriter, r *http.Request) {
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	d, err := h.svc.Get(r.Context(), id)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"region_codes": d.Regions})
+}
+
+// SetRegions handles PUT /{id}/regions {region_codes: []} (replace-all).
+func (h *AdminAcmAreaHandler) SetRegions(w http.ResponseWriter, r *http.Request) {
+	auth, id, ok := h.authAndID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		RegionCodes *[]string `json:"region_codes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
+		return
+	}
+	if body.RegionCodes == nil {
+		writeValidationError(w, "region_codes", "wajib diisi (boleh array kosong)")
+		return
+	}
+	d, err := h.svc.SetRegions(r.Context(), auth.UserID, auth.Role, id, *body.RegionCodes, extractClientIP(r))
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, acmAreaDetailJSON(d))
+}
+
 // SetMembers handles PUT /{id}/members {user_ids: []} (replace-all).
 func (h *AdminAcmAreaHandler) SetMembers(w http.ResponseWriter, r *http.Request) {
 	h.setLinks(w, r, "user_ids", h.svc.SetMembers)
@@ -247,11 +309,14 @@ func (h *AdminAcmAreaHandler) authAndID(w http.ResponseWriter, r *http.Request) 
 func (h *AdminAcmAreaHandler) handleError(w http.ResponseWriter, err error) {
 	var validationErr *service.ValidationError
 	var conflictErr *service.AcmAreaBranchConflictError
+	var regionConflictErr *service.AcmAreaRegionConflictError
 	switch {
 	case errors.As(err, &validationErr):
 		writeValidationError(w, validationErr.Field, validationErr.Message)
 	case errors.As(err, &conflictErr):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "conflict", "message": err.Error(), "conflicts": conflictErr.Conflicts})
+	case errors.As(err, &regionConflictErr):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "conflict", "message": err.Error(), "conflicts": regionConflictErr.Conflicts})
 	case errors.Is(err, service.ErrNotAuthorized):
 		writeForbidden(w, "Anda tidak berhak mengubah area ACM")
 	case errors.Is(err, service.ErrAcmAreaNotFound):

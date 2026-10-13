@@ -17,14 +17,14 @@ import (
 
 // fakeVaultReviewer stands in for service.VaultPlanService on the ATM-SPV review routes.
 type fakeVaultReviewer struct {
-	review     *service.RequestVaultReview
+	review     *service.VaultPlanDetail
 	err        error
 	gotApprove bool
 	gotReason  string
 	gotActor   service.Actor
 }
 
-func (f *fakeVaultReviewer) ForRequest(context.Context, int64) (*service.RequestVaultReview, error) {
+func (f *fakeVaultReviewer) ForRequest(context.Context, int64) (*service.VaultPlanDetail, error) {
 	return f.review, f.err
 }
 
@@ -47,11 +47,11 @@ func mountVaultReviewHandler(t *testing.T, vault *fakeVaultReviewer) (http.Handl
 }
 
 func TestVendorRequestVault_Assignments(t *testing.T) {
-	vault := &fakeVaultReviewer{review: &service.RequestVaultReview{
-		Plans: []db.ListVaultPlansForRequestRow{{ID: 4, AcmAreaID: 2, AcmAreaName: "Area Jakarta", Status: "acm_approved"}},
-		Assignments: []db.ListVaultAssignmentsForRequestRow{
-			{VaultPlanID: 4, TerminalID: "T001", Tier: 1, SaldoSnapshot: []byte(`{"100000":"1500000"}`)},
-			{VaultPlanID: 4, TerminalID: "T002", Tier: 3, IsUrgent: true}, // no snapshot -> null
+	vault := &fakeVaultReviewer{review: &service.VaultPlanDetail{
+		Plan: db.GetVaultPlanRow{ID: 4, AcmAreaID: 2, AcmAreaName: "Area Jakarta", Status: "acm_approved"},
+		Allocations: []service.VaultAllocationView{
+			{VendorVaultID: 21, VaultCode: "V-21", Tier: 1, Saldo: map[string]string{"100000": "1500000"}},
+			{VendorVaultID: 22, VaultCode: "V-22", Tier: 3, IsUrgent: true}, // no snapshot -> null
 		},
 	}}
 	router, ts := mountVaultReviewHandler(t, vault)
@@ -61,7 +61,11 @@ func TestVendorRequestVault_Assignments(t *testing.T) {
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK || !strings.Contains(body, `"acm_area_name":"Area Jakarta"`) ||
 		!strings.Contains(body, `"saldo_snapshot":{"100000":"1500000"}`) || !strings.Contains(body, `"saldo_snapshot":null`) {
-		t.Fatalf("assignments = %d %s", rec.Code, body)
+		t.Fatalf("plan = %d %s", rec.Code, body)
+	}
+	vault.review = nil // request without a live plan
+	if rec := doRequest(router, http.MethodGet, "/api/v1/vendor-requests/1/vault-assignments", viewer, ""); rec.Code != http.StatusOK || rec.Body.String() != "{\"plan\":null}\n" {
+		t.Fatalf("no plan = %d %q", rec.Code, rec.Body.String())
 	}
 	if rec := doRequest(router, http.MethodGet, "/api/v1/vendor-requests/x/vault-assignments", viewer, ""); rec.Code != http.StatusBadRequest {
 		t.Errorf("bad id = %d, want 400", rec.Code)

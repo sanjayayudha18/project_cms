@@ -524,3 +524,29 @@ Required layout (copy from a passing spec like `specs/done/cms-app-foundation/ta
 - `## Task Dependency Graph` — required; a ```json``` block with the `{ "waves": [{ "id": N, "tasks": [...] }] }` object format (see the separate dependency-graph note). Use each task's own id scheme as strings: sub-task specs use `"1.1"`, but flat specs whose checkboxes are numbered `- [ ] 0.`..`- [ ] 11.` use `"0"`,`"1"`,...`"11"`.
 
 Fix is additive/re-leveling only — add the four headings, don't rewrite task content. `## Definition of Done` is an allowed extra section and does not conflict. When authoring a NEW tasks.md, include all four canonical headings up front. Sibling specs authored in the same batch (e.g. `admin-atm-management`, `admin-user-vendor-management`) tend to share the same missing-section defect — fix them together.
+
+---
+
+## Performance Testing & Local Stack Operations
+
+### Running the local stack is a two-compose dance with a shared external network
+The local environment is split across two independent docker-compose projects that share one bridge network:
+1. `backend/docker-compose.yaml` **owns** Redis and the `cms-net` network — start it FIRST (`docker compose up -d` from `backend/`).
+2. `frontend/docker-compose.yml` serves both SPAs — `userportal-vite-fe` on **:3001**, `vendorportal-vite-fe` on **:3002** — and `backend-cit` joins `cms-net` as external.
+
+Postgres is NOT dockerized (external instance). The signal that the backend's external Postgres + Redis connections actually work is `cms-backend` reaching `Up (healthy)` on `:8080/health` — if it's healthy, the DB is reachable. Startup order matters: the network must exist (backend compose up) before the frontend/CIT composes can join it.
+
+### PowerShell + Docker/HTTP measurement gotchas (bit us repeatedly)
+When measuring performance from PowerShell on this Windows host:
+- **Docker writes progress to stderr**, so PowerShell flags a *successful* `docker compose up` as a `NativeCommandError` with exit code 1. Ignore the "error" and verify real state with `docker ps --format ...` instead of trusting the exit code.
+- **`Start-Job` output does not come back cleanly** through this tool's shell — jobs run but `Receive-Job` returns empty. For latency sampling, use a plain **sequential loop** with `Measure-Command` + `Write-Host`, not background jobs.
+- `docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"` is the reliable way to snapshot per-container CPU/memory.
+
+### Perf reality: the cost is architectural, not CPU/memory — point work at `stress-test.txt`
+A live baseline (16-core/15.5GiB host, 2026-10-13) measured idle usage of ~40 MiB RAM total across all four containers (backend ~5-7 MiB, redis ~6-7 MiB, each nginx frontend ~12-15 MiB) with near-zero CPU, and a 300-request burst to `/health` returning p50 7.4ms / p95 9.3ms / p99 11.4ms at 128 req/s. **These numbers prove health at rest/trivial load only — they do NOT indicate production capacity.** The real bottlenecks are architectural and already documented in `stress-test.txt` at the repo root:
+- DSR upload calls an **external Python ETL synchronously** (blocking HTTP up to 25s), close to the server's 30s `WriteTimeout` — the Python service, not Go, is the upload ceiling.
+- The pgx pool is **untuned** (default `max(4, NumCPU)`), single primary — likely first hard limit under 500 users.
+- Rate limiter is **fail-closed** (Redis down → all logins rejected); DSR rate limit is 10/hr/vendor, so "100 concurrent uploads" must come from ≥10 vendors.
+- The read replica pool is read from config but **not wired** — heavy dashboard reads hit primary.
+
+When asked about performance, read `stress-test.txt` first and steer toward a real load tool (k6) against real endpoints rather than re-measuring idle containers. For meaningful pass/fail thresholds you need: prod VM spec, CloudSQL max-connections tier, and typical DSR file row count.

@@ -13,9 +13,10 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
 
-// cit-acm-plan S5 against real Postgres: approve hands the request to ACM
-// (vault_assignment + one plan per area + ACM-USER notification), cancel
-// cascades to plans, FR7.3 branch assignment creates plans late, and laporan
+// cit-acm-plan S5 (revised by cit-vault-select) against real Postgres: approve
+// hands the request to ACM (vault_assignment + one plan for the area of the
+// request's region + ACM-USER notification), cancel cascades to the plan, a
+// region mapping creates plans late (FR1.3), and laporan
 // selesai works from ready and returns to ready (legacy approved is covered
 // by atm_visit_quota_integration_test.go).
 
@@ -53,9 +54,12 @@ func newVaultFlowFixture(t *testing.T) *vaultFlowFixture {
 	// before the harness deletes requests and branches.
 	t.Cleanup(func() {
 		c := context.Background()
+		_, _ = pool.Exec(c, `DELETE FROM vendor_request_vault_tickets WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
+		_, _ = pool.Exec(c, `DELETE FROM vendor_request_vault_allocations WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
 		_, _ = pool.Exec(c, `DELETE FROM vendor_request_vault_plans WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
 		_, _ = pool.Exec(c, `DELETE FROM acm_area_members WHERE user_id = $1`, f.acmUserID)
 		_, _ = pool.Exec(c, `DELETE FROM acm_area_branches WHERE vendor_branch_id = $1`, f.branchID)
+		_, _ = pool.Exec(c, `DELETE FROM acm_area_regions WHERE acm_area_id IN (SELECT id FROM acm_areas WHERE name LIKE 'ITVF-%' AND created_by = $1)`, f.creator.UserID)
 		_, _ = pool.Exec(c, `DELETE FROM acm_areas WHERE name LIKE 'ITVF-%' AND created_by = $1`, f.creator.UserID)
 		_, _ = pool.Exec(c, `DELETE FROM notification_emails WHERE notification_id IN (SELECT id FROM notifications WHERE recipient_user_id = $1)`, f.acmUserID)
 		_, _ = pool.Exec(c, `DELETE FROM notifications WHERE recipient_user_id = $1`, f.acmUserID)
@@ -67,8 +71,11 @@ func newVaultFlowFixture(t *testing.T) *vaultFlowFixture {
 	return f
 }
 
-// area creates an active ACM area holding the fixture branch (optional) with the ACM-USER as member.
-func (f *vaultFlowFixture) area(t *testing.T, withBranch bool) int64 {
+// fixtureRegion is the region_code of the harness branch, so of every fixture request.
+const fixtureRegion = "ITEST"
+
+// area creates an active ACM area holding the fixture region (optional) with the ACM-USER as member.
+func (f *vaultFlowFixture) area(t *testing.T, withRegion bool) int64 {
 	t.Helper()
 	ctx := context.Background()
 	var id int64
@@ -79,9 +86,9 @@ func (f *vaultFlowFixture) area(t *testing.T, withBranch bool) int64 {
 	if _, err := f.pool.Exec(ctx, `INSERT INTO acm_area_members (acm_area_id, user_id, created_by) VALUES ($1, $2, $3)`, id, f.acmUserID, f.creator.UserID); err != nil {
 		t.Fatalf("insert member: %v", err)
 	}
-	if withBranch {
-		if _, err := f.pool.Exec(ctx, `INSERT INTO acm_area_branches (acm_area_id, vendor_branch_id, created_by) VALUES ($1, $2, $3)`, id, f.branchID, f.creator.UserID); err != nil {
-			t.Fatalf("insert area branch: %v", err)
+	if withRegion {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO acm_area_regions (acm_area_id, region_code, created_by) VALUES ($1, $2, $3)`, id, fixtureRegion, f.creator.UserID); err != nil {
+			t.Fatalf("insert area region: %v", err)
 		}
 	}
 	return id
@@ -171,14 +178,17 @@ func TestIntegration_VaultFlow_ApproveCreatesPlanAndCancelCascades(t *testing.T)
 	}
 }
 
-func TestIntegration_VaultFlow_BranchWithoutAreaGetsPlanOnAssignment(t *testing.T) {
+// cit-vault-select FR1.3/FR1.4/FR1.5: a request whose region has no area waits
+// (warning); mapping the region creates its plan; branch links no longer do;
+// moving the region later leaves the existing plan where it is.
+func TestIntegration_VaultFlow_RegionWithoutAreaGetsPlanOnMapping(t *testing.T) {
 	f := newVaultFlowFixture(t)
 	ctx := context.Background()
-	areaID := f.area(t, false) // branch not yet in any area
+	areaID := f.area(t, false) // region not yet in any area
 
 	d := f.approved(t)
 	if got := f.plans(t, d.ID); len(got) != 0 {
-		t.Fatalf("plans = %v, want none while the branch has no area", got)
+		t.Fatalf("plans = %v, want none while the region has no area", got)
 	}
 	acm := NewAcmAreaAdminService(f.pool, f.pool).WithNotifier(notification.NewService(false))
 	warnings, err := acm.Warnings(ctx)
@@ -187,22 +197,39 @@ func TestIntegration_VaultFlow_BranchWithoutAreaGetsPlanOnAssignment(t *testing.
 	}
 	found := false
 	for _, w := range warnings {
-		found = found || w.VendorBranchID == f.branchID
+		found = found || (w.VendorRequestID == d.ID && deref(w.RegionCode) == fixtureRegion)
 	}
 	if !found {
-		t.Fatalf("branch %d missing from FR7.4 warnings %v", f.branchID, warnings)
+		t.Fatalf("request %d missing from FR1.4 warnings %v", d.ID, warnings)
 	}
 
-	// FR7.3: ADMIN assigns the branch -> the waiting request gets its plan.
 	adminID := fetchUserIDs(t, f.pool, 1)[0]
 	if _, err := acm.SetBranches(ctx, adminID, "ADMIN", areaID, []int64{f.branchID}, ""); err != nil {
 		t.Fatalf("SetBranches: %v", err)
 	}
-	if got := f.plans(t, d.ID); got[areaID] != "draft" {
-		t.Fatalf("plans after assignment = %v, want draft for area %d", got, areaID)
+	if got := f.plans(t, d.ID); len(got) != 0 {
+		t.Fatalf("plans after branch link = %v, want none (FR1.5)", got)
+	}
+	if _, err := acm.SetRegions(ctx, adminID, "ADMIN", areaID, []string{fixtureRegion}, ""); err != nil {
+		t.Fatalf("SetRegions: %v", err)
+	}
+	if got := f.plans(t, d.ID); len(got) != 1 || got[areaID] != "draft" {
+		t.Fatalf("plans after region mapping = %v, want one draft for area %d", got, areaID)
 	}
 	if n := f.notificationCount(t); n != 1 {
 		t.Fatalf("ACM-USER notifications = %d, want 1", n)
+	}
+
+	// Moving the region to another area does not move or duplicate the plan.
+	other := f.area(t, false)
+	if _, err := acm.SetRegions(ctx, adminID, "ADMIN", areaID, []string{}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := acm.SetRegions(ctx, adminID, "ADMIN", other, []string{fixtureRegion}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.plans(t, d.ID); len(got) != 1 || got[areaID] != "draft" {
+		t.Fatalf("plans after region move = %v, want still one draft for area %d", got, areaID)
 	}
 }
 

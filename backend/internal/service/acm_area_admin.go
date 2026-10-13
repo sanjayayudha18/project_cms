@@ -35,6 +35,15 @@ func (e *AcmAreaBranchConflictError) Error() string {
 	return fmt.Sprintf("%d cabang sudah terdaftar di area ACM lain", len(e.Conflicts))
 }
 
+// AcmAreaRegionConflictError: some requested regions already belong to another area (cit-vault-select FR1.1) -> 409.
+type AcmAreaRegionConflictError struct {
+	Conflicts []db.ListRegionsInOtherAcmAreasRow
+}
+
+func (e *AcmAreaRegionConflictError) Error() string {
+	return fmt.Sprintf("%d region sudah terdaftar di area ACM lain", len(e.Conflicts))
+}
+
 // AcmAreaPool is the primary pool: mutation transactions + read-after-write
 // (*pgxpool.Pool satisfies it).
 type AcmAreaPool interface {
@@ -42,9 +51,10 @@ type AcmAreaPool interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-// AcmAreaDetail is an area with its branch and member links.
+// AcmAreaDetail is an area with its region, branch and member links.
 type AcmAreaDetail struct {
 	Area     db.AcmArea
+	Regions  []string
 	Branches []db.ListAcmAreaBranchesRow
 	Members  []db.ListAcmAreaMembersRow
 }
@@ -92,15 +102,25 @@ func (s *AcmAreaAdminService) BranchOptions(ctx context.Context) ([]db.ListAcmBr
 	return s.read.ListAcmBranchOptions(ctx)
 }
 
-// Warnings lists replenish branches with requests stuck in vault_assignment for lack of an area (FR7.4).
-func (s *AcmAreaAdminService) Warnings(ctx context.Context) ([]db.ListUnassignedVaultAssignmentBranchesRow, error) {
-	return s.read.ListUnassignedVaultAssignmentBranches(ctx)
+// RegionOptions lists region codes of active vendor branches with their current area (picker source, FR1.1).
+func (s *AcmAreaAdminService) RegionOptions(ctx context.Context) ([]db.ListAcmRegionOptionsRow, error) {
+	return s.read.ListAcmRegionOptions(ctx)
+}
+
+// Warnings lists requests stuck in vault_assignment without a plan: region
+// without an active area, or no region code (cit-vault-select FR1.4).
+func (s *AcmAreaAdminService) Warnings(ctx context.Context) ([]db.ListVaultPlanRegionWarningsRow, error) {
+	return s.read.ListVaultPlanRegionWarnings(ctx)
 }
 
 func loadAcmAreaDetail(ctx context.Context, q *db.Queries, id int64) (*AcmAreaDetail, error) {
 	area, err := getAcmArea(ctx, q, id)
 	if err != nil {
 		return nil, err
+	}
+	regions, err := q.ListAcmAreaRegions(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("loading acm area regions: %w", err)
 	}
 	branches, err := q.ListAcmAreaBranches(ctx, id)
 	if err != nil {
@@ -110,7 +130,7 @@ func loadAcmAreaDetail(ctx context.Context, q *db.Queries, id int64) (*AcmAreaDe
 	if err != nil {
 		return nil, fmt.Errorf("loading acm area members: %w", err)
 	}
-	return &AcmAreaDetail{Area: area, Branches: branches, Members: members}, nil
+	return &AcmAreaDetail{Area: area, Regions: regions, Branches: branches, Members: members}, nil
 }
 
 func validateAcmAreaName(name string) (string, error) {
@@ -180,8 +200,9 @@ func (s *AcmAreaAdminService) Rename(ctx context.Context, actorID int64, actorRo
 	return out, err
 }
 
-// SetActive enables/disables an area. Disabling releases its branches (they
-// can then join another area); members stay. Existing vault plans are untouched (FR7.3).
+// SetActive enables/disables an area. Disabling releases its regions and
+// branches (they can then join another area); members stay. Existing vault
+// plans are untouched (FR1.3).
 func (s *AcmAreaAdminService) SetActive(ctx context.Context, actorID int64, actorRole string, id int64, active bool, ip string) (db.AcmArea, error) {
 	var out db.AcmArea
 	err := s.inTx(ctx, actorRole, func(q *db.Queries, _ *audit.Writer) (audit.Entry, error) {
@@ -193,6 +214,7 @@ func (s *AcmAreaAdminService) SetActive(ctx context.Context, actorID int64, acto
 			return audit.Entry{}, ErrAcmAreaStatusUnchanged
 		}
 		released := []int64{}
+		releasedRegions := []string{}
 		if !active {
 			branches, err := q.ListAcmAreaBranches(ctx, id)
 			if err != nil {
@@ -204,6 +226,12 @@ func (s *AcmAreaAdminService) SetActive(ctx context.Context, actorID int64, acto
 			if err := q.ClearAcmAreaBranches(ctx, id); err != nil {
 				return audit.Entry{}, fmt.Errorf("releasing acm area branches: %w", err)
 			}
+			if releasedRegions, err = q.ListAcmAreaRegions(ctx, id); err != nil {
+				return audit.Entry{}, fmt.Errorf("loading acm area regions: %w", err)
+			}
+			if err := q.ClearAcmAreaRegions(ctx, id); err != nil {
+				return audit.Entry{}, fmt.Errorf("releasing acm area regions: %w", err)
+			}
 		}
 		if out, err = q.SetAcmAreaActive(ctx, db.SetAcmAreaActiveParams{ID: id, IsActive: active}); err != nil {
 			return audit.Entry{}, mapAcmAreaNameErr(err)
@@ -213,18 +241,75 @@ func (s *AcmAreaAdminService) SetActive(ctx context.Context, actorID int64, acto
 			action = "acm_area_deactivated"
 		}
 		return audit.Entry{ActorID: actorID, Action: action, EntityType: "acm_area", EntityID: id,
-			Before: map[string]any{"is_active": before.IsActive, "released_vendor_branch_ids": released},
+			Before: map[string]any{"is_active": before.IsActive, "released_vendor_branch_ids": released, "released_region_codes": releasedRegions},
 			After:  map[string]any{"is_active": out.IsActive}, IP: ip}, nil
 	})
 	return out, err
 }
 
-// SetBranches replaces the area's branch list (FR7.1/7.2) and, FR7.3, creates
-// the missing vault plans for requests already waiting in vault_assignment.
-// Returns the updated detail read from the primary.
+// SetRegions replaces the area's region list (cit-vault-select FR1.1/FR1.2)
+// and, FR1.3, creates the missing vault plans for requests already waiting in
+// vault_assignment. Returns the updated detail read from the primary.
+func (s *AcmAreaAdminService) SetRegions(ctx context.Context, actorID int64, actorRole string, id int64, regionCodes []string, ip string) (*AcmAreaDetail, error) {
+	codes, err := uniqueRegionCodes(regionCodes)
+	if err != nil {
+		return nil, err
+	}
+	return s.thenLoad(ctx, id, s.inTx(ctx, actorRole, func(q *db.Queries, aw *audit.Writer) (audit.Entry, error) {
+		if err := requireActiveAcmArea(ctx, q, id); err != nil {
+			return audit.Entry{}, err
+		}
+		conflicts, err := q.ListRegionsInOtherAcmAreas(ctx, db.ListRegionsInOtherAcmAreasParams{RegionCodes: codes, AcmAreaID: id})
+		if err != nil {
+			return audit.Entry{}, fmt.Errorf("checking region conflicts: %w", err)
+		}
+		if len(conflicts) > 0 {
+			return audit.Entry{}, &AcmAreaRegionConflictError{Conflicts: conflicts}
+		}
+		before, err := q.ListAcmAreaRegions(ctx, id)
+		if err != nil {
+			return audit.Entry{}, fmt.Errorf("loading acm area regions: %w", err)
+		}
+		if err := q.ClearAcmAreaRegions(ctx, id); err != nil {
+			return audit.Entry{}, fmt.Errorf("clearing acm area regions: %w", err)
+		}
+		for _, c := range codes {
+			if err := q.AddAcmAreaRegion(ctx, db.AddAcmAreaRegionParams{AcmAreaID: id, RegionCode: c, CreatedBy: actorID}); err != nil {
+				if isUniqueViolation(err) { // raced with another area's mapping
+					return audit.Entry{}, &AcmAreaRegionConflictError{}
+				}
+				return audit.Entry{}, fmt.Errorf("adding acm area region: %w", err)
+			}
+		}
+		if err := createVaultPlans(ctx, q, aw, s.notifier, Actor{UserID: actorID, Role: actorRole, IP: ip}, nil); err != nil {
+			return audit.Entry{}, err
+		}
+		return audit.Entry{ActorID: actorID, Action: "acm_area_regions_set", EntityType: "acm_area", EntityID: id,
+			Before: map[string]any{"region_codes": before}, After: map[string]any{"region_codes": codes}, IP: ip}, nil
+	}))
+}
+
+// uniqueRegionCodes trims, upper-cases, de-duplicates and sorts the codes and
+// checks the vendor_branches.region_code format (FR1.1); never nil.
+func uniqueRegionCodes(in []string) ([]string, error) {
+	out := make([]string, 0, len(in))
+	for _, c := range in {
+		c = strings.ToUpper(strings.TrimSpace(c))
+		if !branchRegionCodeRe.MatchString(c) {
+			return nil, &ValidationError{Field: "region_codes", Message: fmt.Sprintf("kode region %q harus 2-10 huruf/angka", c)}
+		}
+		out = append(out, c)
+	}
+	slices.Sort(out)
+	return slices.Compact(out), nil
+}
+
+// SetBranches replaces the area's branch list (cit-acm-plan FR7.1/7.2). Since
+// cit-vault-select, plans follow the request's region (FR1.5): branch links no
+// longer create plans. Returns the updated detail read from the primary.
 func (s *AcmAreaAdminService) SetBranches(ctx context.Context, actorID int64, actorRole string, id int64, branchIDs []int64, ip string) (*AcmAreaDetail, error) {
 	ids := uniqueIDs(branchIDs)
-	return s.thenLoad(ctx, id, s.inTx(ctx, actorRole, func(q *db.Queries, aw *audit.Writer) (audit.Entry, error) {
+	return s.thenLoad(ctx, id, s.inTx(ctx, actorRole, func(q *db.Queries, _ *audit.Writer) (audit.Entry, error) {
 		if err := requireActiveAcmArea(ctx, q, id); err != nil {
 			return audit.Entry{}, err
 		}
@@ -256,9 +341,6 @@ func (s *AcmAreaAdminService) SetBranches(ctx context.Context, actorID int64, ac
 				}
 				return audit.Entry{}, fmt.Errorf("adding acm area branch: %w", err)
 			}
-		}
-		if err := createVaultPlans(ctx, q, aw, s.notifier, Actor{UserID: actorID, Role: actorRole, IP: ip}, nil); err != nil {
-			return audit.Entry{}, err
 		}
 		prev := make([]int64, len(before))
 		for i, b := range before {

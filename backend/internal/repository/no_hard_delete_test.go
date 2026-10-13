@@ -53,11 +53,14 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	// is_active/deleted_at -- locations.region_id references it.
 	// vendor_request_vendor_parties/_events (cit-send-vendor, migration 029):
 	// keputusan vendor = bukti; pihak yang hilang -> withdrawn, events append-only.
+	// vendor_request_vault_tickets (cit-vault-select, migration 030): nomor tiket
+	// tidak pernah dipakai ulang; vault yang hilang -> nonaktif.
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
 		"regions", "dsr_location_vault_maps",
 		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
+		"vendor_request_vault_tickets",
 	}
 
 	for _, f := range files {
@@ -87,6 +90,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
 		"regions", "dsr_location_vault_maps",
 		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
+		"vendor_request_vault_tickets",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

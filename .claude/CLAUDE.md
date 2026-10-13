@@ -389,3 +389,4 @@ Both run on the **same VM**. Their windows **partly overlap**: the Python schedu
 *   New feature artifacts: `.claude/sdlc/<feature>/` (Sec 4a).
 *   Detail moved out of this file (read on demand): `.claude/docs/` — `requirements.md` (URS), `data-map.md` (table/column notes), `decisions.md` (decision log), `deployment.md` (GCP). Keep this file to always-on rules; put long history there.
 *   Path-scoped rules (auto-loaded by path): `.claude/rules/` — `frontend-ui.md` for `frontend/**`.
+*   Tech-debt backlog (architecture review 2026-10-12, read on demand): `.claude/FE_debt.md` (FE-xx) and `.claude/BE_debt.md` (BE-xx). Update an item's Status (`open` → `in-progress` → `done <sha>`) when you work on it.

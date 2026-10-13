@@ -24,6 +24,7 @@ INSERT INTO public.acm_area_regions (acm_area_id, region_code, created_by)
 SELECT DISTINCT a.id, vb.region_code::text, a.created_by
 FROM public.acm_areas a
 JOIN public.vendor_branches vb ON vb.is_active AND vb.region_code IS NOT NULL
+     AND vb.region_code::text NOT LIKE 'IT%'  -- ITEST/ITOTHER = integration-test leftovers
 WHERE lower(a.name) = 'area acm dev' AND a.is_active
 ON CONFLICT DO NOTHING;  -- region already in another area stays there
 

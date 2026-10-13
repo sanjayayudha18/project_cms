@@ -13,6 +13,7 @@ import {
   type DraftRow,
   REASON_MAX,
   REASON_MIN,
+  areaLabel,
   coverageOf,
   denomLabel,
   emptyRow,
@@ -136,7 +137,7 @@ function PlanEditor({ plan }: { plan: VaultPlanDetailType }) {
       <PageHeader
         eyebrow="CIT · Penetapan Vault"
         title={plan.request_number}
-        description={`Area ${plan.acm_area_name} · Region ${plan.region_code ?? "-"} · Tanggal replenish ${plan.replenish_date ?? "-"}`}
+        description={`${areaLabel(plan.acm_area_name)} · Region ${plan.region_code ?? "-"} · Tanggal replenish ${plan.replenish_date ?? "-"}`}
         actions={<PlanStatusBadge status={plan.status} />}
       />
       <Link to="/cit/vault-plans" className="text-sm text-[var(--red-600)] hover:underline">

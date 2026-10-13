@@ -50,6 +50,11 @@ export function reasonValid(reason: string): boolean {
   return n >= REASON_MIN && n <= REASON_MAX;
 }
 
+/** "Area <name>", without doubling when the name already starts with "Area". */
+export function areaLabel(name: string): string {
+  return /^area\b/i.test(name.trim()) ? name : `Area ${name}`;
+}
+
 export function denomLabel(denom: string): string {
   return `${Number(denom) / 1000}K`;
 }

@@ -2250,9 +2250,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1791815169.8014681,
-    "seen": 1791862685.605936,
-    "ast_hash": "2af53d746248f626166d115449161607",
+    "mtime": 1791881943.7661645,
+    "seen": 1791881994.283395,
+    "ast_hash": "e03ab1e51c941bb3b12de4374e29eb89",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -2262,9 +2262,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1791873234.487064,
-    "seen": 1791874355.0591464,
-    "ast_hash": "69e76b68666495d446b0fda4de721217",
+    "mtime": 1791881845.2952704,
+    "seen": 1791881994.2834218,
+    "ast_hash": "5c244f79b97c5b7694c2ffd976d6c960",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -5802,9 +5802,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1791529160.8421261,
-    "seen": 1791536411.4221153,
-    "ast_hash": "8710e4babd0c02c4dc573cceec3a3468",
+    "mtime": 1791882580.841277,
+    "seen": 1791882623.4269757,
+    "ast_hash": "5af0adcd23670dd4a6b1bbe87c99adff",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -6594,15 +6594,15 @@
     "semantic_hash": ""
   },
   ".claude/docs/data-map.md": {
-    "mtime": 1791528223.5997114,
-    "seen": 1791528271.4433355,
-    "ast_hash": "94d5bae0c3eb186904bf3d288124ee1b",
+    "mtime": 1791881895.9671092,
+    "seen": 1791881994.2833996,
+    "ast_hash": "8366a5102cbe88743e7ec762069e5f7a",
     "semantic_hash": ""
   },
   ".claude/docs/decisions.md": {
-    "mtime": 1791528223.5997114,
-    "seen": 1791528271.4433365,
-    "ast_hash": "e362505ebe5fe8eca68f57cd17f5e71b",
+    "mtime": 1791881927.5663373,
+    "seen": 1791881994.2834008,
+    "ast_hash": "24e6ef211c7605f0bd62c282aa56f8f1",
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
@@ -7398,9 +7398,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vault-plan/VaultPlan.test.tsx": {
-    "mtime": 1791878459.8810022,
-    "seen": 1791878592.3002963,
-    "ast_hash": "b09883fa985da75cd85108b84ca1b08b",
+    "mtime": 1791881622.5497558,
+    "seen": 1791881994.2831101,
+    "ast_hash": "cf9d630b0b760125d14acbc652f95916",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vault-plan/VaultPlanDetail.tsx": {
@@ -7860,9 +7860,9 @@
     "semantic_hash": ""
   },
   "backend/scripts/dev/seed_acm_users.sql": {
-    "mtime": 1791860799.7612808,
-    "seen": 1791862685.6051893,
-    "ast_hash": "419f8166ea35aea0b6341046a16871b7",
+    "mtime": 1791882556.8988028,
+    "seen": 1791882623.4261603,
+    "ast_hash": "a4e1e4c4c5add129fefef084209e0267",
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
@@ -7902,9 +7902,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/cit-vault-select/plan.md": {
-    "mtime": 1791881151.594711,
-    "seen": 1791881189.5123703,
-    "ast_hash": "1502b16172ce5c03bd3d9def05b98f9f",
+    "mtime": 1791881952.578179,
+    "seen": 1791881994.2834506,
+    "ast_hash": "e88886e0ac9c6497187d4ca2a32426d6",
     "semantic_hash": ""
   },
   ".claude/sdlc/cit-vault-select/spec.md": {
@@ -7992,15 +7992,27 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vault-plan/AllocationRows.tsx": {
-    "mtime": 1791878489.3845344,
-    "seen": 1791878592.3002932,
-    "ast_hash": "095325d204ccaa317771f62c4c220921",
+    "mtime": 1791881621.7047613,
+    "seen": 1791881994.283107,
+    "ast_hash": "737c9f6a26e61cec00dcc4125ea2dbd0",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vault-plan/allocation.ts": {
     "mtime": 1791878459.8763459,
     "seen": 1791878592.3003,
     "ast_hash": "0bccd01ace8cdea75a32ed294828f6ee",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/cit-vault-select/review.md": {
+    "mtime": 1791882580.8400714,
+    "seen": 1791882623.4270449,
+    "ast_hash": "319df22f1aec5346df521e76c8f8fc23",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/cit-vault-select/tests.md": {
+    "mtime": 1791882590.5172255,
+    "seen": 1791882623.4270475,
+    "ast_hash": "330e71dd79e54d0780a8af27ec7e0c79",
     "semantic_hash": ""
   }
 }

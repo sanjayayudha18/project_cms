@@ -4,7 +4,7 @@ import { useToast } from "@/lib/hooks/useToast";
 import { useState } from "react";
 import { AllocationTable, CoverageSummary } from "./AllocationRows";
 import { PlanStatusBadge } from "./VaultPlanList";
-import { coverageOf, rowsFromPlan } from "./allocation";
+import { areaLabel, coverageOf, rowsFromPlan } from "./allocation";
 import { useRequestVaultDecision, useRequestVaultReview } from "./api";
 
 const REASON_MAX = 500;
@@ -74,7 +74,7 @@ export function RequestVaultPanel({ requestId, canReview }: RequestVaultPanelPro
       </div>
 
       <p className="flex items-center gap-2 text-sm text-[var(--n-700)]">
-        Area {plan.acm_area_name} <PlanStatusBadge status={plan.status} />
+        {areaLabel(plan.acm_area_name)} <PlanStatusBadge status={plan.status} />
       </p>
 
       {plan.allocations.length > 0 && (

@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestVaultPanel } from "./RequestVaultPanel";
 import { VaultPlanDetail } from "./VaultPlanDetail";
 import { VaultPlanList } from "./VaultPlanList";
+import { areaLabel } from "./allocation";
 import type { VaultPlanDetail as Plan, VaultAllocationView } from "./api";
 
 const mutate = vi.fn();
@@ -368,5 +369,14 @@ describe("RequestVaultPanel", () => {
     review.mockReturnValue({ data: null });
     const { container } = render(<RequestVaultPanel requestId={42} canReview />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("areaLabel", () => {
+  it("does not double the Area prefix", () => {
+    expect(areaLabel("Jabo")).toBe("Area Jabo");
+    expect(areaLabel("Area ACM Dev")).toBe("Area ACM Dev");
+    expect(areaLabel("area timur")).toBe("area timur");
+    expect(areaLabel("Areal Barat")).toBe("Area Areal Barat");
   });
 });

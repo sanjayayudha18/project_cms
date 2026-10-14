@@ -1,6 +1,6 @@
 # Spec: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c)
 
-Author: Claude, dari `intent.md` (accepted 2026-10-14). Status: **draft 2026-10-14** — menunggu PO accept.
+Author: Claude, dari `intent.md` (accepted 2026-10-14). Status: **accepted 2026-10-14** (PO: *"accept"*, termasuk K1–K5).
 Stage: 2 Design. Stage berikut: `plan.md`.
 
 ## ⚠ Flagged (Sec 4 #7)
@@ -112,8 +112,11 @@ Vendor submit / SPV approve / reject: `audit_logs` dalam tx yang sama (before/af
 - **K4** Tidak ada backfill historis.
 - **K5** Layar + export maks 31 hari per query.
 
-## Belum dicek (DB dev mati 2026-10-14)
-- Rentang tanggal + jumlah `itm_replenish` dan overlap terminal/tanggal dengan tiket dev — dicek di awal `plan.md`; tanpa overlap, uji manual butuh file ITM uji.
+## Data dev (dicek 2026-10-14)
+- `itm_replenish`: 1.489 baris, 1.214 terminal, hanya **2026-08-18 s.d. 2026-08-21**; semua terminal ada di `atms`.
+- **79 pasang (terminal, tanggal) terisi > 1 kali sehari** → aturan "terdekat ke jadwal" (FR3.3) + tie-break `replenish_time` memang dibutuhkan; sisanya jadi `no_order`.
+- Tiket aktif: 177 (jadwal 2026-09-11 s.d. 2026-10-14) — **0 yang punya ITM dalam ±4 hari**. Uji klasifikasi + uji manual butuh **file ITM uji** (format CSV ETL `itm/replenish`) untuk tanggal tiket uji; disiapkan di `plan.md`.
+- Tabel `holidays` belum ada. Belum ada request `vendor_accepted` (REP-ABA-MDN-20261014-001 masih `sent_to_vendor`).
 
 ## Out of scope
 Engine forecast; pemenuhan dana / pengambilan vault + klasifikasi tiket pemenuhan vault; refund per ID, order vs transaksi, transaksi tarik/setor, user log; export XLSX/PDF; exclusion ATM bermasalah (2.4); laporan DSR telat (2.3); invoice/escrow. Status `processing`/`failed` tetap tidak dipakai (Q8).

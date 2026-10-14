@@ -16,6 +16,7 @@ paths:
     *   Primary `oklch(54% 0.233 27)` · Maroon Bar `oklch(40% 0.155 26)` · Maroon Deep `oklch(30% 0.11 25)` · Surface `oklch(99.5% 0.003 40)` · Text `oklch(25% 0.02 28)`
 
 **Rules:**
+*   **Skill**: before writing or changing any UI code (components, pages, layout, styling), invoke the `ui-ux-pro-max` skill. The brand palette, themes and rules in this file **override** any palette/style/font the skill suggests.
 *   Font: one family in multiple weights (hierarchy via scale + weight, not two competing fonts). Use `tabular-nums` for all money/metrics tables.
 *   **Accessibility**: never encode status with color alone — always pair red/green with a label or icon (color-blind users). Deep red on white is safe for bold text/buttons only; do NOT use it for small thin text (insufficient contrast).
 *   Red is an accent, not wallpaper (internal). Don't scatter it everywhere — it works because it's rare.

@@ -2,7 +2,12 @@
 
 > **Re-sequenced 2026-10-08 (user):** Phase 2.2 dipecah. 2.2a = rencana CIT tim ACM (`../cit-acm-plan/`), 2.2b = kirim CIT approved ke vendor, **2.2c = intent ini**. Keputusan Q1–Q14 di bawah tetap berlaku; dikerjakan setelah 2.2a/2.2b.
 
-Author: user (product owner), ditulis bersama Claude. Status: **draft 2026-10-08** — open questions dijawab user 2026-10-08 (tanya-jawab satu per satu); menunggu PO accept.
+> **Refresh 2026-10-14 (setelah 2.2b `cit-send-vendor` + vault v3 `cit-vault-select` selesai):** alur order sekarang
+> `approved → vault_assignment → vault_review → sent_to_vendor → vendor_accepted → completion_pending → completed`
+> (laporan selesai hanya dari `vendor_accepted`, legacy `approved`/`ready`; reject laporan → kembali ke `vendor_accepted`).
+> Q2 dan Q6 diperbarui di bawah (Q2b, Q6d). Tiket pemenuhan vault (`vendor_request_vault_tickets`) **tidak** diklasifikasi di 2.2c.
+
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-14** (PO: *"accept"*) — draft 2026-10-08, refresh 2026-10-14; open questions dijawab user (tanya-jawab satu per satu).
 Stage: 1 Plan. Stage berikut: `spec.md`.
 Menyentuh Sec 4 #7: **uang (nominal realisasi vs order)** + **skema baru** (tabel hasil klasifikasi, `holidays`, laporan realisasi vendor) + **alur approval** (laporan vendor) → wajib AI-DLC penuh.
 
@@ -32,7 +37,8 @@ Kondisi sekarang (dicek di kode, 2026-10-08):
   (status `completed/in-transit/scheduled/delayed/pending-vendor`, data hardcoded).
 
 ## Proposed outcome
-1. **Vendor Request yang `approved` = instruksi pengisian.** Tidak ada tabel `replenishment_instructions` dan tidak ada
+1. **Vendor Request yang `vendor_accepted` = instruksi pengisian** (semua pihak vendor sudah terima; legacy `approved`/`ready`
+   yang belum lewat alur vendor tetap ikut; request ditolak/dibatalkan tidak diklasifikasi). Tidak ada tabel `replenishment_instructions` dan tidak ada
    state machine kedua; 2.2 menambah **tabel hasil klasifikasi** di atas Vendor Request / tiket.
 2. **Klasifikasi harian otomatis** per tiket (request, ATM): tanggal realisasi dari **`itm_replenish`** dibandingkan dengan
    **`replenish_date` tiket**, dalam **hari kerja** (lewati Sabtu/Minggu + tabel `holidays`):
@@ -42,7 +48,9 @@ Kondisi sekarang (dicek di kode, 2026-10-08):
 3. **Nominal**: realisasi ITM per denom vs order per denom; **selisih persis > 0** (tanpa toleransi) → report "amount ≠ order".
 4. **Vendor melapor via VendorPortal** (ganti mock): tanggal + nominal per denom per ATM. Laporan ini **menggantikan input
    ATM-USER** pada alur laporan selesai yang ada: vendor submit → **ATM-SPV / BRANCH-ATM-SPV** approve/tolak →
-   kuota kunjungan terpotong seperti sekarang (alur `approved → completion_pending → completed` tetap, maker pindah ke vendor).
+   kuota kunjungan terpotong seperti sekarang (alur `vendor_accepted → completion_pending → completed` tetap, maker pindah ke vendor).
+   Pelapor = **pihak `replenish`** request itu (user cabang replenish atau vendor-wide vendor tersebut, scope sama dengan
+   VendorPortal Orders 2.2b); pihak `vault` tidak melapor.
 5. **ITM menang**: bila laporan vendor beda dengan ITM (tanggal/nominal), klasifikasi resmi tetap dari ITM; baris ditandai
    "beda dengan laporan vendor" dan muncul di report.
 6. **Tabel `holidays`**: dikelola **ADMIN saja**, **langsung berlaku + `audit_logs` dalam tx yang sama** (deviasi GR#3
@@ -81,6 +89,8 @@ Kondisi sekarang (dicek di kode, 2026-10-08):
 5. Q5 — Klasifikasi **harian otomatis** (setelah ETL ITM).
 6. Q6 — Vendor lapor **tanggal + nominal via VendorPortal**; Q6b — **menggantikan input ATM-USER**, internal approve,
    kuota terpotong seperti sekarang; Q6c — **ITM menang**, selisih ditandai.
+   Q6d (2026-10-14) — pelapor = **pihak replenish saja**; vault tidak melapor (pengambilan dana vault tetap di luar, Q10).
+   Q2b (2026-10-14) — instruksi dihitung dari **`vendor_accepted`** (bukan `approved`).
 7. Q13 — Approver laporan vendor = **ATM-SPV / BRANCH-ATM-SPV**.
 8. Q7 — Vendor **melihat klasifikasi miliknya sendiri**.
 9. Q8 — Status `processing` / `failed` **dibiarkan tidak dipakai**.

@@ -16,7 +16,6 @@ import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-pla
 import { eodMonitoringRoute } from "./routes/eod-monitoring";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { dsrDashboardRoute } from "./routes/forecasting/dsr-dashboard";
-import { dsrUploadRoute } from "./routes/forecasting/dsr-upload";
 import { forecastRoute } from "./routes/forecasting/forecast";
 import { forecastingRoute } from "./routes/forecasting/index";
 import { indexRoute } from "./routes/index";
@@ -67,7 +66,6 @@ const routeTree = rootRoute.addChildren([
     forecastingRoute,
     forecastRoute,
     dmaaForecastRoute,
-    dsrUploadRoute,
     dsrDashboardRoute,
     invoiceRoute,
     invoiceListRoute,

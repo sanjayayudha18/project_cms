@@ -25,7 +25,21 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 ## Outstanding
 - **Manual browser check (user, Golden Rule #10)**: lewat image Docker kedua portal, buka DevTools → Network/Console: header terkirim, **tidak ada pelanggaran CSP** di console (login, dashboard, EOD Monitoring dialog + drawer retry — animasi tetap jalan, VendorPortal font Plus Jakarta Sans/IBM Plex Mono termuat, preview upload gambar `blob:`), navigasi router normal sesudah bump.
 - T-A1 sebagai job CI `frontend-image` menunggu E1.
-- T-A3 (`pnpm audit --prod --audit-level high` = 0) menunggu A3 (hapus `xlsx`).
+- T-A3 lokal sudah 0 (lihat slice A3); sebagai job CI menunggu E1.
+
+## Slice A3 — FE-02 hapus Unggah DSR + `xlsx` (2026-10-15, belum commit)
+| Command | Result |
+|---|---|
+| grep pemakai `features/forecasting` / `xlsx` / `dsr-upload` di `CP/src` (sebelum hapus) | hanya `routes/forecasting/dsr-upload.tsx`, registrasinya di `main.tsx`, menu yang di-comment di `navigation.ts`, dan **kartu "Unggah DSR" di `routes/forecasting/index.tsx`** (tidak disebut di plan; ikut dihapus agar tidak jadi link mati). `xlsx` di `RetryDrawer.test.tsx` hanya string nama file. |
+| `pnpm remove xlsx` → `pnpm why xlsx` | kosong |
+| T-A2: `grep -r "forecasting/dsr-upload" dist` + cari `xlsx`/SheetJS di `dist/assets/*.js` sesudah build | tidak ada hit (route tidak terdaftar). Belum ada test unit route tree: `main.tsx` langsung me-mount app saat di-import. |
+| `pnpm audit --prod` (CP) | `No known vulnerabilities found` |
+| `pnpm --dir frontend/CompanyPortal-Vite run build` / `lint` / `test` | built / clean (465 files) / 123 files, 1001 tests (2 file test DSR ikut terhapus) |
+
+- Dihapus: `routes/forecasting/dsr-upload.tsx`, seluruh `features/forecasting/` (`DSRUploadForm`, `DSRPreviewTable`, `UploadHistory`, `useDSRHistory`, `dsr-parser`, `dsr-validation` + 2 test), import + registrasi `dsrUploadRoute` di `main.tsx`, menu `dsr-upload` yang di-comment, kartu "Unggah DSR" di halaman `/forecasting`, dependency `xlsx`. `navigation.test.ts` memakai id `dsr-upload` sebagai fixture saja, tidak diubah.
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: halaman `/forecasting` (Peramalan) tampil tanpa kartu Unggah DSR, `/forecasting/dsr-upload` jatuh ke not-found, menu sidebar Peramalan normal.
 
 ## Batch FE-07 / FE-08 / FE-10 / FE-11 (2026-10-15, belum commit)
 | Command | Result |

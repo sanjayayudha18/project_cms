@@ -162,16 +162,6 @@ export const NAV_CONFIG: NavItem[] = [
   },
 
   // Forecasting
-  /*
-  {
-    id: "dsr-upload",
-    label: "Unggah DSR",
-    icon: Upload,
-    href: "/forecasting/dsr-upload",
-    roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"],
-    group: "forecasting",
-  },
-  */
   {
     id: "dsr-dashboard",
     label: "DSR Dashboard",

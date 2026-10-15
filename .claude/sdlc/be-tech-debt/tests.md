@@ -309,3 +309,84 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 ### Outstanding (E1, E2, E5)
 - GCP: buat metric `http_request_latency` + `http_5xx`, alert p95 > 3 s + kanal notifikasi; pastikan log container ter-parse JSON ke `jsonPayload` (user).
 - Keputusan: LB/uptime check memakai `/ready`; Docker `HEALTHCHECK` tetap `/health` atau pindah (user).
+
+## Fase D — runner migrasi / BE-03 (run 2026-10-15, belum di-commit)
+
+| Perubahan | File |
+|---|---|
+| D1: runner `status` / `up` / `baseline --through NNN`, flag `-dir` (default `migrations`), `DATABASE_URL`; `pg_advisory_lock(hashtext('cms.schema_migrations'))` di koneksi runner; `CREATE TABLE IF NOT EXISTS schema_migrations` (kolom sesuai spec); hanya `^\d{3}_.*\.sql$` level atas, urut nama, SHA-256; checksum beda → exit ≠ 0 sebelum apa pun jalan; `psql -v ON_ERROR_STOP=1 -X -q -f` per file, env `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` dari `pgx.ParseConfig` (password tidak di argv/log); `status`/`up` cek `psql` di PATH | `backend/cmd/migrate/main.go`, `runner.go` |
+| D1: test | `backend/cmd/migrate/runner_test.go` (unit), `runner_integration_test.go` (`//go:build integration`) |
+| D1: ambang coverage paket baru `cmd/migrate 81` | `backend/coverage-thresholds.txt` |
+| D3: `go-integration` + `python` → `go run ./cmd/migrate up` (job `python` dapat `setup-go`); env `PG*` dihapus dari kedua job (hanya dipakai skrip lama); `scripts/apply-migrations.sh` dihapus. Tidak ada job `e2e` (B5 ditunda) | `.github/workflows/ci.yml` |
+| D3: Sec 2a perintah migrasi, Sec 3 Core `schema_migrations`, Sec 12 "Migration runner" | `.claude/CLAUDE.md` |
+| D3: langkah migrasi saat deploy (host operator, di luar 07:00–20:00, `status` → `up` → `status`) | `.claude/docs/deployment.md` |
+
+| Test | Covers |
+|---|---|
+| `TestUpAppliesAllThenIsNoop` | T-D1: `up` di DB kosong menerapkan 3 file (termasuk `CREATE INDEX CONCURRENTLY` → bukti tidak dibungkus transaksi, seperti `006`); baris `baseline=false`, `applied_by=current_user`; `up` kedua = no-op (seed tetap 1 baris); `run(... status)` lewat CLI → `3 applied, 0 pending` |
+| `TestChecksumMismatchStopsBeforeRunningAnything` | T-D1: file applied diubah + file baru pending → `up` error `checksum mismatch … 001_a.sql`, file baru **tidak** jalan; `status` exit ≠ 0 + `MISMATCH` |
+| `TestBaselineMarksWithoutRunningSQL` | T-D1: `baseline --through 2` atas file `SELECT 1/0` → 2 baris `baseline=true`, SQL tidak jalan; `up` sesudahnya hanya menjalankan `003` |
+| `TestLowerNumberAddedLaterIsApplied` | T-D1 / FR-D2: `002` yang muncul setelah `001`+`003` applied ikut diterapkan (kasus `022`) |
+| `TestFailureStopsAndIsNotRecorded` | FR-D2: `002` gagal → error menyebut file, stderr psql diteruskan, `002` tidak tercatat, `003` tidak jalan |
+| `TestConcurrentUpAppliesOnce` | T-D1: dua goroutine `up` paralel (file pertama `pg_sleep(1)`) → keduanya sukses, satu `2 applied` satu `0 applied`, tabel seed 1 baris, 2 baris `schema_migrations` |
+| `TestSSLModeRoundTrip`, `TestPsqlEnvCarriesConnectionAndOverridesInherited`, `TestReadMigrationsFiltersAndSorts`, `TestRunRejectsBadArgs`, `TestRunParseErrorDoesNotLeakPassword` (unit) | mapping `sslmode` ×6 sama dengan pgconn; `PG*` menimpa env warisan; filter `NNN_*.sql` (tanpa `archives/`, `02_`, `.bak`); argumen salah → usage; error parse URL tanpa password |
+
+| Command | Result |
+|---|---|
+| `go build ./... && go vet ./... && go vet -tags integration ./...` (backend) | OK |
+| `go test -count=1 ./...` (backend) | OK (`-race` butuh cgo, jalan di CI) |
+| `go test -tags integration -count=1 -cover -v ./cmd/migrate` (DB dev `localhost`, DB sementara `cms_migrate_test_*` via `CREATE DATABASE`, di-`DROP … WITH (FORCE)`) | 11 PASS, 0 SKIP, coverage 81.8%; sesudahnya `pg_database LIKE 'cms_migrate_%'` = 0 |
+| Paritas CI: DB sementara kosong → `go run ./cmd/migrate up` atas `backend/migrations/` asli → `status` → `DROP` | `29 applied` (001–031 tanpa 022/024), `status` semua `ok`, `29 applied, 0 pending`, exit 0 |
+| `go test -tags integration -count=1 -cover ./...` (backend, DB dev) | OK, 0 SKIP, 0 FAIL; `check-coverage.sh` semua `ok` (cmd/migrate 81.8, approval 88.6, audit 86.7, auth 90.1, handler 80.7, notification 83.9, repository 86.9, rolemgmt 93.5, service 82.4) — tidak ada yang turun |
+| `golangci-lint run --build-tags integration ./...` (backend) | 0 issues (G204 `exec` + G304 `ReadFile` `//nolint:gosec` dengan alasan; `Fprintf` ke tabwriter/stdout `_, _ =`) |
+| T-D2 pra-cek dev (read-only, `BEGIN READ ONLY` … `ROLLBACK`) | `cms`, PG 18.3; `schema_migrations` belum ada; objek 029 (`vendor_request_vendor_parties`), 030 (`acm_area_regions`, `vendor_request_vault_allocations`/`_amounts`, `vendor_request_vault_tickets`, `vendor_request_vault_plans_live_uq`, kolom `buffer_reason`) dan 031 (`holidays` + `holidays_active_date_uq`, `vendor_request_realizations`/`_amounts`, `replenish_classifications`/`_amounts` + `_open_idx`) ada → baseline yang benar `--through 031` (plan menulis 029, usang) |
+| T-D2 baseline dev (izin user 2026-10-15: "ya, jalankan baseline --through 031 di dev lalu status") `go run ./cmd/migrate baseline --through 031` → `status` | `29 baselined`, exit 0; `status` exit 0: `29 applied, 0 pending`, semua `ok`, `baseline=true`, tanpa 022/024 (output di bawah) |
+| T-D3 | CI berubah, dibuktikan oleh run GitHub setelah user push (lokal: paritas di atas) |
+
+### Output `status` dev setelah baseline (T-D2, 2026-10-15)
+
+```text
+VERSION                                   STATE    CHECKSUM  BASELINE
+001_baseline_schema.sql                   applied  ok        true
+002_baseline_seed.sql                     applied  ok        true
+003_master_data.sql                       applied  ok        true
+004_vendor_packages_soft_disable.sql      applied  ok        true
+005_master_data_import_batches.sql        applied  ok        true
+006_audit_logs_read_indexes.sql           applied  ok        true
+007_branch_coverage_areas.sql             applied  ok        true
+008_vendor_vault_types.sql                applied  ok        true
+009_vendor_package_prices.sql             applied  ok        true
+010_vendor_package_prices_data.sql        applied  ok        true
+011_rename_vendor_packages_branch.sql     applied  ok        true
+012_drop_vendor_package_price_addons.sql  applied  ok        true
+013_vendor_branches_category.sql          applied  ok        true
+014_vendor_branches_category_seed.sql     applied  ok        true
+015_vendor_packages_branch_tiering.sql    applied  ok        true
+016_vendor_packages_branch_pricing.sql    applied  ok        true
+017_vendor_package_code_split.sql         applied  ok        true
+018_regions_soft_delete.sql               applied  ok        true
+019_import_jobs.sql                       applied  ok        true
+020_import_jobs_current_uq_uploads.sql    applied  ok        true
+021_atm_visit_quota.sql                   applied  ok        true
+023_atm_assignment_vendor_source.sql      applied  ok        true
+025_notifications.sql                     applied  ok        true
+026_replenish_ticket_region.sql           applied  ok        true
+027_acm_vault_assignment.sql              applied  ok        true
+028_dsr_flow_comment.sql                  applied  ok        true
+029_vendor_request_send.sql               applied  ok        true
+030_vault_allocation.sql                  applied  ok        true
+031_replenish_realization.sql             applied  ok        true
+29 applied, 0 pending
+```
+
+### Deviasi / catatan (Fase D)
+- Baseline dev `--through 031`, bukan `029` (plan/spec usang: 030 diterapkan 2026-10-13, 031 2026-10-14; diverifikasi read-only di atas).
+- `status` juga gagal (exit ≠ 0) bila ada `MISMATCH`, supaya urutan deploy `status` → `up` berhenti di langkah 1. Versi tercatat yang filenya tidak ada lagi ditampilkan `no file` (tidak error).
+- `status` bukan read-only: membuat `schema_migrations` bila belum ada (`CREATE TABLE IF NOT EXISTS`). Karena itu `status` di dev tidak dijalankan sebelum izin user; pra-cek memakai SELECT di atas.
+- Hanya host pertama dari `DATABASE_URL` diteruskan ke psql (multi-host tidak didukung, komentar `ponytail:` di `psqlEnv`). `sslrootcert` dsb. tidak diterjemahkan; operator meng-export `PGSSLROOTCERT` (ditulis di `deployment.md`).
+- `backend/internal/handler/integration_test.go` `runMigrations` tidak diubah: ia no-op bila `roles` sudah ada (CI sudah `migrate up` sebelum test), dan di DB kosong hanya menjalankan 001+002 lewat `pool.Exec`. Runner tidak bisa di-import (paket `main`); kalau gap ini mau ditutup, test bisa memanggil `go run ./cmd/migrate up` / binary via `exec`, atau logika runner dipindah ke paket yang bisa di-import — keputusan terpisah.
+- `.claude/sdlc/ci-jenkins/` (on hold) masih menyebut `apply-migrations.sh` di intent/spec; diperbarui saat ci-jenkins dilanjutkan (Jenkins memakai `go run ./cmd/migrate up`).
+
+### Outstanding (Fase D)
+- Run GitHub Actions setelah push (T-D3).
+- Deploy pertama dengan runner (staging/prod = DB kosong → `up`, atau baseline bila sudah dimigrasi manual).

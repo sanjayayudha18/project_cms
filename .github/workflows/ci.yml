@@ -48,11 +48,6 @@ jobs:
           --health-cmd "pg_isready -U cms -d cms"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      PGHOST: localhost
-      PGPORT: "5432"
-      PGUSER: cms
-      PGPASSWORD: cms-ci-only
-      PGDATABASE: cms
       DATABASE_URL: postgres://cms:cms-ci-only@localhost:5432/cms?sslmode=disable
     defaults:
       run:
@@ -62,8 +57,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.work
-      - name: Apply migrations
-        run: bash scripts/apply-migrations.sh
+      - name: Apply migrations (tracked in schema_migrations)
+        run: go run ./cmd/migrate up
       - name: Integration tests (no skips allowed)
         run: |
           set -o pipefail
@@ -105,20 +100,18 @@ jobs:
           --health-cmd "pg_isready -U cms -d cms"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      PGHOST: localhost
-      PGPORT: "5432"
-      PGUSER: cms
-      PGPASSWORD: cms-ci-only
-      PGDATABASE: cms
       DATABASE_URL: postgres://cms:cms-ci-only@localhost:5432/cms?sslmode=disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - name: Apply migrations
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+      - name: Apply migrations (tracked in schema_migrations)
         working-directory: backend
-        run: bash scripts/apply-migrations.sh
+        run: go run ./cmd/migrate up
       - name: Install requirements
         run: |
           for r in backend_python/*/requirements.txt backend_python/itm/*/requirements.txt; do pip install -r "$r"; done

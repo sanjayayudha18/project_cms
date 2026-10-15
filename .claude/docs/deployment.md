@@ -29,6 +29,16 @@
 **Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
 
+**Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
+*   **Where**: the operator host (not the API image): needs Go (or a prebuilt `migrate` binary), `psql` on `PATH`, network access to the Cloud SQL **primary**, and the release's `backend/migrations/` checked out at the same git SHA as the image being deployed. `DATABASE_URL` = primary, from Secret Manager (export it in the shell; never put it on the command line). For `sslmode=verify-ca|verify-full` also export `PGSSLROOTCERT` (psql gets the connection via `PG*` env; the password never appears in argv or logs).
+*   **When**: outside office hours **07:00–20:00 WIB** (Sec 14), and before the new API image starts. Migrations are written to stay compatible with the previous image (expand first), so rollback = previous image, no down migrations.
+*   **Order** (from `backend/`):
+    1. `go run ./cmd/migrate status`: every applied row `ok`, pending = exactly the files this release adds. `MISMATCH` (an applied file was edited) or an unexpected pending file → **stop**, do not run `up`.
+    2. `go run ./cmd/migrate up`: applies pending files in order, one `psql -v ON_ERROR_STOP=1 -X -q -f` per file, under an advisory lock (a second run waits). On failure it stops at that file (exit ≠ 0, psql error printed) and records nothing for it: fix forward, then run `up` again.
+    3. `go run ./cmd/migrate status`: `0 pending`; keep the output in the deploy log.
+*   **New environment** (staging/prod first time): empty database → `up` builds everything from `001`. An environment that was migrated by hand before the runner existed → `baseline --through NNN` once (NNN = last file verified present), then `status`; dev was baselined this way (CLAUDE.md Sec 12).
+*   Long data migrations (backfills) still follow Sec 14: never inside 07:00–20:00.
+
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 
 **Python EOD host prerequisite (import_jobs, R2a)**: the VM/container running `backend_python` (ETL scripts + `eod_retry_scheduler` + `service_dsr_etl`) MUST run with `TZ=Asia/Jakarta`. DMAA `file_date` is derived from file mtime in the host timezone; a different TZ makes the DMAA late check misfire. Verify at VM/container setup.

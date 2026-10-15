@@ -12,7 +12,7 @@ WORKDIR /src/backend
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/api ./cmd/api
 
 # Stage 2: Run
-FROM alpine:3.20
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata \
     && addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app

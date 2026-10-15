@@ -15,6 +15,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
     && touch /var/run/nginx.pid && chown appuser:appgroup /var/run/nginx.pid
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 USER appuser
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \

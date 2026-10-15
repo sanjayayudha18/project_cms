@@ -108,19 +108,6 @@ export function RetryConfirmationDialog({ file, onClose }: RetryConfirmationDial
           </Button>
         </div>
       </div>
-
-      <style>
-        {`
-          @keyframes eod-dialog-enter {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-          }
-          @keyframes eod-dialog-backdrop-enter {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-      </style>
     </div>
   );
 }

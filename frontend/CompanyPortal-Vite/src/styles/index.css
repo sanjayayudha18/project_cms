@@ -576,3 +576,41 @@ p {
     transition: none;
   }
 }
+
+/* EOD monitoring dialog/drawer animations (kept out of inline <style> for CSP style-src 'self') */
+@keyframes eod-dialog-enter {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes eod-dialog-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes eod-drawer-enter {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes eod-drawer-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

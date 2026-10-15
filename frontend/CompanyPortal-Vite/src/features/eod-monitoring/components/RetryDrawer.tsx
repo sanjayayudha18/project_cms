@@ -188,19 +188,6 @@ export function RetryDrawer({ file, onClose, onRetryClick }: RetryDrawerProps) {
           )}
         </div>
       </div>
-
-      <style>
-        {`
-          @keyframes eod-drawer-enter {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-          }
-          @keyframes eod-drawer-backdrop-enter {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-      </style>
     </div>
   );
 }

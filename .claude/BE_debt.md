@@ -24,7 +24,7 @@ Sudah baik (jangan dirombak): Go 1.26 + chi v5 + pgx v5 + sqlc pinned, minim dep
 | BE-03 | Migrasi manual tanpa tracking | `psql -f backend/migrations/0NN_*.sql`; tidak ada tabel pencatat → drift dev/staging/prod | Keputusan stack ("no migrate tool") → **butuh approval**. Opsi minimal: tabel `schema_migrations` + runner stdlib; alternatif golang-migrate. | open |
 | BE-04 | Observability belum siap produksi | Tanpa metrics/tracing (NFR p95 ≤ 3 s, 300 user tidak terukur); `middleware.Logger` chi menulis teks, bercampur dengan `slog` JSON (`backend/cmd/api/main.go:104`); `/health` hanya liveness, tidak cek DB/Redis (`main.go:108`) | Logger request berbasis `slog`; endpoint readiness (ping DB + Redis); metrics latency/error (Cloud Monitoring). | open |
 | BE-05 | Dependency Python tidak di-pin + `python-jose` | `backend_python/*/requirements.txt` memakai `>=`, tanpa lockfile; `python-jose` minim maintenance, riwayat CVE algorithm-confusion; layanan Python tanpa Dockerfile | Pin versi (lock), ganti ke PyJWT (perlu approval dependency), Dockerfile untuk `eod_retry_scheduler` + `service_dsr_etl`. | open |
-| BE-06 | Base image runtime EOL | `backend/Dockerfile`: `FROM alpine:3.20` (support berakhir April 2026) | Naik ke Alpine terbaru yang didukung atau distroless (CLAUDE.md Sec 9). Cek juga `backend-cit/Dockerfile`. | open |
+| BE-06 | Base image runtime EOL | `backend/Dockerfile`: `FROM alpine:3.20` (support berakhir April 2026) | Naik ke Alpine terbaru yang didukung atau distroless (CLAUDE.md Sec 9). Cek juga `backend-cit/Dockerfile`. | in-progress (green 2026-10-15, belum commit) |
 
 ## MEDIUM
 
@@ -40,4 +40,4 @@ Sudah baik (jangan dirombak): Go 1.26 + chi v5 + pgx v5 + sqlc pinned, minim dep
 | ID | Item | Bukti | Perbaikan | Status |
 |---|---|---|---|---|
 | BE-11 | `backend-cit` masih kosong tapi dijadwalkan deploy | `backend-cit/internal/*` = 8 file `doc.go` satu baris; rename ke `backend-exq` belum dilakukan | Jangan deploy container-nya sampai `backend-exq` berisi; rename sesuai keputusan 2026-10-08. | open |
-| BE-12 | Vuln di module yang di-require (tidak terjangkau) + file usang ter-track | govulncheck: 4 vuln di module `backend`; `backend_python/dmaa/bak/` ter-track di git | `go get -u` module terkait + `go mod tidy`; hapus `dmaa/bak/`. | open |
+| BE-12 | Vuln di module yang di-require (tidak terjangkau) + file usang ter-track | govulncheck: 4 vuln di module `backend`; `backend_python/dmaa/bak/` ter-track di git | `go get -u` module terkait + `go mod tidy`; hapus `dmaa/bak/`. | x/crypto v0.56.0; GO-2026-5932 (openpgp, tanpa fix, tidak di-import) accepted. in-progress (green 2026-10-15, belum commit) |

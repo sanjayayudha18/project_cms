@@ -1,6 +1,6 @@
 module github.com/cimb-niaga/cms/backend
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.9
 
@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/redis/go-redis/v9 v9.7.3
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.56.0
 	pgregory.net/rapid v1.3.0
 )
 

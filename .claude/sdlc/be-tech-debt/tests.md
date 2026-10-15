@@ -152,7 +152,7 @@ Sudah ada sebelumnya: stale → `ErrMasterDataChangeStale` + entitas tidak berub
 | `golangci-lint` · `go test -race` (unit, container) | 0 issues · ok |
 | `coverage-thresholds.txt` `service` | tetap 81 (paket besar; kenaikan per sub-slice C4.2–C4.4) |
 
-## Fase C — slice C4.2 `service` / vendor_request + completion + kuota (run 2026-10-15)
+## Fase C — slice C4.2 `service` / vendor_request + completion + kuota (run 2026-10-15, committed `f9f66e8`)
 Sudah ada sebelumnya: state machine + `checkActor` (unit + property), four-eyes approve/reject, reject → rejected + 1 audit, cancel (union rule, checker-only setelah approved, idempotent), UpdateItems guard, kuota (decrement, over quota tetap approve + notifikasi, reject + resubmit, reset/cancel, rollback, paralel, terminal tak dikenal), completion transitions/actor (unit).
 
 `internal/service/vendor_request_rules_integration_test.go`:

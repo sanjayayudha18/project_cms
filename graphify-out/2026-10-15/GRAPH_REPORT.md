@@ -1,23 +1,23 @@
 # Graph Report - CMS2  (2026-10-15)
 
 ## Corpus Check
-- 1315 files · ~1,292,440 words
+- 1316 files · ~1,293,433 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 11432 nodes · 26026 edges · 660 communities (589 shown, 71 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 2421 edges (avg confidence: 0.85)
+- 11460 nodes · 26095 edges · 646 communities (578 shown, 68 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 2425 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ddefb12b`
+- Built from commit: `8013dd61`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - eod-monitoring/types.ts
 - atm_portal_handler.go
-- NewVendorBranchAdminService
+- fakeUserAdminRepo
 - DashboardScreen.tsx
 - CompanyPortal-Vite/src/lib/api/client.ts
 - cash-flow/types.ts
@@ -41,7 +41,7 @@
 - NewDmaaForecastService
 - VendorVaultAdminService
 - DsrSummary.tsx
-- mountAdminATMAssignmentHandler
+- mountAdminVendorVaultHandler
 - AuthContext.tsx
 - dsr_upload.go
 - vendor_request_response.go
@@ -53,15 +53,15 @@
 - dependencies
 - ReconciliationScreen.tsx
 - net/http.Handler
-- VendorRequest
+- Queries
 - devDependencies
 - atm-portal/lib/formatters.ts
 - Queries
-- Actor
+- .Create
 - InvoiceFlow.tsx
 - compilerOptions
 - compilerOptions
-- NewWriter
+- Role
 - atm_visit_quota.sql.go
 - rules
 - atm_assignments_admin.sql.go
@@ -75,29 +75,29 @@
 - itm_cashpos_etl.py
 - VisitQuotaCard.tsx
 - vendor_package_admin.go
-- newVendorOrderFixture
-- fakeVendorBranchAdminServicer
+- VendorRequest
+- MasterDataChangeRequest
 - _auth/login.tsx
 - requireRoles
 - contrast.property.test.ts
 - lib/types.ts
-- VendorPicAdminRepository
+- VendorPicAdminService
 - datetime
-- fakeDsrRepository
+- Actor
 - Header.tsx
 - ForecastSummary.tsx
 - branch_atm_test.go
 - grouping.property.test.ts
 - VendorPortal-Vite/src/lib/api/client.ts
 - vendor_package_price_admin.go
-- Queries
+- harness
 - ErrorBoundary
 - atm_admin_test.go
 - SchedulePage.tsx
 - dataFilters.property.test.ts
 - schemas.py
 - useToast.ts
-- AuditLog
+- NewAuditLogReadService
 - ui-strings-language.property.test.ts
 - profileFakeRepo
 - useNotifications.ts
@@ -137,12 +137,12 @@
 - SummaryCard.tsx
 - cn
 - cash-count/index.tsx
-- Region
-- allocation.ts
+- NewWriter
+- AllocationRows.tsx
 - FilterTabs.tsx
 - DataTable.test.tsx
 - invoices/InvoiceDetail.tsx
-- ApprovalRequest
+- .Get
 - RetryResult
 - dsrUploadApi.ts
 - ForecastBrowser.tsx
@@ -274,42 +274,42 @@
 - VendorPicFormDialog.tsx
 - pages.test.tsx
 - tailwind-merge
-- fakeVendorAdminRepo
+- fakeVendorAdminServicer
 - SettingsHubPage.tsx
 - master_data_export.sql.go
 - MasterDataReviewDialog.tsx
 - input-group.jsx
 - vault-plan/api.ts
 - Spec: `import_jobs` — satu registry file ingest (menyatukan `retry_file_tracking`)
-- .List
+- actorFromRequest
 - item.jsx
-- ATMAssignmentAdminService
-- AuthHandler
+- tokenForVendor
+- AcmAreaAdminService
 - master-data-io/api.ts
 - notifications/hooks.ts
 - DsrDetailDialog.tsx
-- Queries
+- ApprovalRequest
 - tokenFor
 - VaultPlan.test.tsx
-- net/http.Request
+- VendorRequestHandler
 - masterdata_export_test.go
 - VendorRequestList.tsx
 - rules.py
 - mountVendorRequestHandler
 - Queries
-- ApprovalStep
+- Queries
 - audit-log/types.ts
 - AtmPortalScreen.tsx
 - Worker
 - VendorRequestDetail.tsx
 - chart.jsx
-- replenish_classifications.sql.go
+- LateCheckTest
 - .claude/CLAUDE.md
 - SchedulerRetryTest
-- newVaultPlanFixture
+- mountCashposHandler
 - admin_approval_handler.go
 - toPgDate
-- eod_retry_scheduler/main.py
+- service_dsr_etl/main.py
 - ForecastBrowser.test.tsx
 - masterdata_approval_integration_test.go
 - VendorRequestDetail.test.tsx
@@ -325,7 +325,7 @@
 - 001_baseline_schema.sql
 - navigation-menu.jsx
 - importEnv
-- NewVendorRequestService
+- jakartaCalendarDate
 - VaultPlanDetail.tsx
 - .actorAndID
 - Dialog.tsx
@@ -337,12 +337,12 @@
 - Plan & Task List: Master Data (vendor, vault, PIC, ATM, kelolaan)
 - ValidationError
 - ConfirmActionDialog.tsx
-- MasterDataChangeRequest
+- DsrLocationMapAdminService
 - UR New Template v0.3 - E2E Cash Management System v.4 - Phase 1.docx-20260918115415.md
 - mountAdminVendorBranchHandler
 - Urutan kerja
 - sideEffects
-- NewRepository
+- setupQuotaFixture
 - adminCtx
 - @testing-library/user-event
 - @types/node
@@ -351,27 +351,27 @@
 - VendorPackagePriceFormDialog.tsx
 - Urutan kerja
 - Spec: Kuota kunjungan replenish per ATM + laporan selesai Vendor Request
-- BuildChain
+- audit_log_read.go
 - 3. Rencana Implementasi (setelah keputusan di atas dikonfirmasi)
 - Queries
 - holiday_admin.go
 - BranchesPanel.tsx
-- net/http.ResponseWriter
-- github.com/jackc/pgx/v5/pgtype.Numeric
+- net/http.Request
+- _FakeSettings
 - Spec: Modul notifikasi (in-app + email SMTP) — Phase 0.3
-- VendorPicAdminService
+- .withParty
 - Slices (urutan kerja; satu commit untuk semua karena kontrak harus rilis bersamaan)
 - CashposProfileTable.tsx
 - FilterBar.tsx
-- NewLocalProvider
+- NewMasterDataImportBatchRepository
 - 003_master_data.sql
 - replenish-ticket — Review (stage 5)
 - Review — master data (Fase 0–6)
 - Tests — master data
-- jakartaCalendarDate
+- .Apply
 - FSD v1.0 Alignment — Session Summary (2026-10-01)
 - invoice/index.tsx
-- main
+- formatTimestamptz
 - Entry
 - Spec: Nilai uang di API sebagai string desimal, bukan `float64` (QC F7)
 - Feature Flow — Upload DSR Harian & Rekap Keterlambatan
@@ -383,7 +383,7 @@
 - Feature Flow — Rekonsiliasi Invoice Vendor FLM
 - Feature Flow — Validasi Realisasi Replenishment & Report
 - Feature Flow — Cash Count Selektif Mesin
-- detector.py
+- compute_checksum
 - Urutan kerja
 - public.master_data_import_batches
 - Plan: Kelolaan Cabang â†’ Vault/PIC/Paket per-Cabang (Vendor Detail)
@@ -399,7 +399,7 @@
 - NewOrchestrator
 - crown-vendor-detail — sumber artifact
 - Plan: Harga Paket per Vendor FLM (desain ulang tabel paket)
-- Service
+- VendorAdminService
 - pendingApprovalMessage
 - T5.3 Session Expiry Real-Time Test
 - 019_import_jobs.sql
@@ -430,8 +430,8 @@
 - serveNotification
 - Spec: Forecast Browser — ringkasan vendor × region + penanda "sudah di-request"
 - forecast-browser-summary — Review (stage 5)
-- GetDsrUploadByIDForVendorRow
-- writeValidationError
+- audit_log_handler.go
+- AdminAcmAreaHandler
 - 3\. Architecture, Modules & Data Map
 - Development Progress — CMS2 Cash Management System
 - Performance Test Results — 2026-10-13
@@ -440,14 +440,14 @@
 - vendor_party.go
 - Bug Fix Log
 - Tests: Forecast Browser — ringkasan vendor × region
-- newTestRateLimiter
-- TestAdminGuardQueries
+- .Get
+- NewMasterDataChangeRepository
 - cit-acm-plan — Review (stage 5)
 - Intent: Forecast Browser — ringkasan ATM yang perlu replenish (tanpa pilih vendor/region satu per satu)
-- uploadedCSV
+- AdminMasterDataImportHandler
 - cit-vault-select v3 — Review (stage 5)
 - Feature Flow — Siklus Lengkap Order ATM (Forecast → Approval → CIT Pickup → Realisasi)
-- .vendorContext
+- net/http.ResponseWriter
 - import-export-jobs — Review (stage 5)
 - stubAtmPortalService
 - response.go
@@ -460,7 +460,7 @@
 - Settings
 - Tests: Pemenuhan vault ACM — bagi nominal request ke vault + tiket pemenuhan vault (v3)
 - Data Map — detailed notes
-- validateSourceAtApply
+- applyAssignmentCreate
 - Intent: Nomor tiket replenish per ATM
 - public.vendor_request_vault_allocations
 - timezone.py
@@ -468,7 +468,7 @@
 - vendorSide.ts
 - Functional requirements
 - RealizationsPage.tsx
-- DsrService
+- NewDsrService
 - atm_portal.go
 - Slices (urutan kerja)
 - Spec: Pilihan sumber paket pada Kelolaan ATM (paket khusus cabang vs paket vendor-wide)
@@ -481,7 +481,7 @@
 - Tests: Modul notifikasi (in-app + email SMTP) — Phase 0.3
 - Intent: Penyimpanan dokumen (`documents`) — Phase 0.4
 - Tests: Pilihan sumber paket pada Kelolaan ATM
-- atm_portal_filter_property_test.go
+- .List
 - Intent: Modul notifikasi (in-app + email SMTP) — Phase 0.3
 - Spec: IP client tepercaya / anti-spoof `X-Forwarded-For` (QC F13)
 - Slices
@@ -497,33 +497,33 @@
 - cit-send-vendor — Review (stage 5)
 - Tests: Penetapan branch vault per ATM oleh ACM (Phase 2.2a)
 - RealizationPanel.tsx
-- newVaultFlowFixture
+- PersistDetectedFilesTest
 - notification (Phase 0.3) — Review (stage 5)
-- NewSetInitialPasswordService
-- AdminVendorPicHandler
-- mountExportHandler
 - NewChangePasswordService
+- AdminMasterDataExportHandler
+- RequestVaultPanel.tsx
+- TrustedRealIP
 - Realization.test.tsx
 - Tests: Nomor tiket replenish per ATM + nomor request per region
-- acmAreaHarness
+- NewRepository
 - Intent: Nilai uang di API sebagai string desimal, bukan `float64` (QC F7)
 - public.dsr_daily_rows
-- .List
+- AdminBranchATMHandler
 - service_dsr_etl/routers/process.py
 - OrderDetailPage.tsx
 - Plan: IP client tepercaya / anti-spoof `X-Forwarded-For` (QC F13)
 - newImportFixture
 - match_fills
-- mountAdminVendorPicHandler
+- admin_vendor_branch_handler.go
 - time.Duration
 - Intent: IP client tidak bisa dipalsukan lewat `X-Forwarded-For` (QC F13)
 - Intent: Kirim Vendor Request `ready` ke vendor + terima/tolak di VendorPortal (Phase 2.2b)
-- ApprovalPolicy
+- NewApprovalPolicyStore
 - mountAuditLogHandler
 - RequireAuth
 - ListVaultTicketsForRequestRow
 - Spec: Perbaikan tech debt backend (BE-01 – BE-12)
-- MasterDataChangeService
+- NewBranchATMRepository
 - Intent: Pemenuhan vault ACM — bagi nominal request ke vault + tiket pemenuhan vault (perubahan Phase 2.2a)
 - Tests / feedback loop: IP client tepercaya (QC F13)
 - Slices (urutan kerja; satu commit per slice, commit hanya saat user bilang "commit")
@@ -540,8 +540,6 @@
 - Plan: Perbaikan tech debt backend (BE-01 – BE-12)
 - Intent: Perbaikan tech debt frontend (FE-01 – FE-12)
 - public.vendor_requests
-- Queries
-- ValidatePasswordStrength
 - 031_replenish_realization.sql
 - TestMasterDataExportRepository_KeysetPagingIsCompleteAndExact
 - apply-migrations.sh
@@ -549,37 +547,25 @@
 - Frontend Tech Debt
 - jsdom
 - Slices (satu concern per slice, tes hijau sebelum lanjut)
-- mountAdminBranchATMHandler
 - Checklist
 - Tests: Perbaikan tech debt backend (BE-01 – BE-12)
 - OrdersPages.test.tsx
 - Review: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c)
-- TestDsrLocationMapApplier_Lifecycle_Integration
 - NewVendorAdminService
 - Tests: Perbaikan tech debt frontend (FE-01 – FE-12)
 - Tests: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c)
 - AdminDsrLocationMapHandler
 - AdminVendorPackagePriceHandler
 - ApprovalHandler
-- ChangePasswordService
-- VendorAdminRepository
-- PasswordExpiry
+- main
 - NewRbacReadRepository
-- get_status
 - CMS2 bug fix
 - CMS2 SDLC driver
 - get_summary
-- get_status
-- IsLocked
-- no_hard_delete_test.go
-- get_audit
-- TestExtractClientIP_BehindTrustedRealIP
-- TestIntegration_HolidayAdmin
 - get_late
 - get_summary
 - get_audit
 - get_late
-- ErrorResponse
 - check-coverage.sh
 - @biomejs/biome
 - vitest
@@ -611,19 +597,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (660 total, 71 thin omitted)
+## Communities (646 total, 68 thin omitted)
 
 ### Community 0 - "eod-monitoring/types.ts"
 Cohesion: 0.06
 Nodes (71): AuditLogSection(), AuditLogSectionProps, FILE_TYPE_OPTIONS, OUTCOME_LABELS, TRIGGER_OPTIONS, EodMonitoringPage(), FileStatusSection(), FileStatusSectionProps (+63 more)
 
 ### Community 1 - "atm_portal_handler.go"
-Cohesion: 0.08
-Nodes (43): formatTimePtr(), chi.Router, NewAtmPortalHandler(), parseIntParam(), parseListATMCashposParams(), parseListATMReplenishParams(), parseListATMsParams(), parseListCashposParams() (+35 more)
+Cohesion: 0.22
+Nodes (21): parseIntParam(), parseListATMCashposParams(), parseListATMReplenishParams(), parseListATMsParams(), parseListCashposParams(), parsePageParam(), queryOrDefault(), toATMProfileResponse() (+13 more)
 
-### Community 2 - "NewVendorBranchAdminService"
-Cohesion: 0.13
-Nodes (19): VendorBranchPayload, VendorBranchUpdatePayload, NewVendorBranchAdminService(), normalizeBranchRegionCode(), TestVendorBranchAdminService_Create_DuplicateCode_Conflict(), TestVendorBranchAdminService_Create_HappyPath_SubmitsCorrectRequest(), TestVendorBranchAdminService_Create_MissingFields_ValidationError(), TestVendorBranchAdminService_Disable_ActivePicsOrPackages_Refused() (+11 more)
+### Community 2 - "fakeUserAdminRepo"
+Cohesion: 0.05
+Nodes (18): fakeUserAdminRepo, CreateUserRequest, TestUserAdminService_List_PassesThroughToRepo(), CountUsersAdminParams, CreateUserAdminParams, CreateUserAdminRow, GetRoleByNameRow, GetUserAdminByIDRow (+10 more)
 
 ### Community 3 - "DashboardScreen.tsx"
 Cohesion: 0.07
@@ -650,8 +636,8 @@ Cohesion: 0.08
 Nodes (34): DmaaForecastFilters(), DmaaForecastFiltersProps, cellValue(), Column, COLUMNS, DmaaForecastTable(), DmaaForecastTableProps, DmaaRow() (+26 more)
 
 ### Community 9 - "newServiceUnderTest"
-Cohesion: 0.05
-Nodes (58): noopBlacklist, stubProvider, printableASCIIRune(), TestProperty_BcryptRoundTrip(), genNonWhitespaceString(), genValidPortalType(), genWhitespaceString(), int64Ptr() (+50 more)
+Cohesion: 0.07
+Nodes (51): noopBlacklist, stubProvider, printableASCIIRune(), TestProperty_BcryptRoundTrip(), genNonWhitespaceString(), genValidPortalType(), genWhitespaceString(), int64Ptr() (+43 more)
 
 ### Community 10 - "AtmProfileScreen.tsx"
 Cohesion: 0.11
@@ -710,28 +696,28 @@ Cohesion: 0.08
 Nodes (35): CountDmaaForecastParams, ListDmaaForecastParams, Queries, chi.Router, NewDmaaForecastHandler(), dmaaGet(), mountDmaaHandler(), TestListDmaaForecast_BadRequestCases() (+27 more)
 
 ### Community 24 - "VendorVaultAdminService"
-Cohesion: 0.14
-Nodes (16): VendorVault, VendorVaultPayload, VendorVaultUpdatePayload, newVendorVault(), NewVendorVaultAdminService(), parseDecimalField(), TestValidateVaultFields(), TestVendorVaultAdminService_Create() (+8 more)
+Cohesion: 0.10
+Nodes (17): ListVendorVaultsAdminParams, ListVendorVaultsAdminRow, VendorVault, VendorVaultPayload, VendorVaultUpdatePayload, NewVendorVaultAdminService(), parseDecimalField(), TestValidateVaultFields() (+9 more)
 
 ### Community 25 - "DsrSummary.tsx"
 Cohesion: 0.14
 Nodes (23): DsrDashboard(), computeDsrTotals(), DsrSummary(), DsrSummaryProps, columnHelper, columns, DsrTable(), DsrTableProps (+15 more)
 
-### Community 26 - "mountAdminATMAssignmentHandler"
-Cohesion: 0.13
-Nodes (26): NewAdminATMAssignmentHandler(), assignmentTokenSvc(), mountAdminATMAssignmentHandler(), mountPackageOptions(), TestAdminATMAssignmentHandler_CoMountedWithATMCrudRouter(), TestAdminATMAssignmentHandler_Create_ErrorMapping(), TestAdminATMAssignmentHandler_Create_Returns202(), TestAdminATMAssignmentHandler_Create_VendorSourcePayloadReachesService() (+18 more)
+### Community 26 - "mountAdminVendorVaultHandler"
+Cohesion: 0.46
+Nodes (7): mountAdminVendorVaultHandler(), TestAdminVendorVaultHandler_Create_ErrorMapping(), TestAdminVendorVaultHandler_Create_Returns202(), TestAdminVendorVaultHandler_Get_NotFound(), TestAdminVendorVaultHandler_List_DecimalStringsInResponse(), TestAdminVendorVaultHandler_Toggle_Returns202(), TestAdminVendorVaultHandler_WrongRole_Forbidden()
 
 ### Community 27 - "AuthContext.tsx"
 Cohesion: 0.16
 Nodes (13): ApiErrorResponse, AuthContext, AuthContextValue, AuthProvider(), initialize(), AuthProviderProps, LoginSuccessResponse, mapUserResponse() (+5 more)
 
 ### Community 28 - "dsr_upload.go"
-Cohesion: 0.17
-Nodes (19): dailyRowErrorsToDto(), dailyRowsToDto(), dateOrNil(), DsrListUploadsParams, DsrSheetDetail, DsrSheetResult, DsrUploadListResult, DsrUploadResult (+11 more)
+Cohesion: 0.11
+Nodes (26): dailyRowErrorsToDto(), dailyRowsToDto(), dateOrNil(), redis.Client, DsrListUploadsParams, DsrService, DsrSheetDetail, DsrSheetResult (+18 more)
 
 ### Community 29 - "vendor_request_response.go"
-Cohesion: 0.09
-Nodes (35): formatDatePtr(), chi.Router, NewAtmVisitQuotaHandler(), parsePositiveID(), toAtmVisitQuotaResponse(), formatTimestamp(), formatTimestampPtr(), toAuditLogResponse() (+27 more)
+Cohesion: 0.10
+Nodes (34): formatDatePtr(), chi.Router, NewAtmVisitQuotaHandler(), parsePositiveID(), toAtmVisitQuotaResponse(), formatTimestamp(), formatTimestampPtr(), toAuditLogResponse() (+26 more)
 
 ### Community 30 - "ForecastView.tsx"
 Cohesion: 0.17
@@ -758,12 +744,12 @@ Cohesion: 0.15
 Nodes (17): filterExceptions(), matchesExceptionType(), matchesSeverity(), columnHelper, columns, data, exceptionTypeOptions, ReconciliationScreen() (+9 more)
 
 ### Community 37 - "net/http.Handler"
-Cohesion: 0.08
-Nodes (44): doRefreshDirect(), newRefreshHandler(), refreshCookie(), TestRefresh_InheritsDeadlineAndCookieMaxAge(), TestRefresh_SessionExpired_401AndClearsCookie(), doLogin(), doLogout(), doRefresh() (+36 more)
+Cohesion: 0.10
+Nodes (42): importRouter(), TestAdminMasterDataImportHandler_Anonymous_401(), TestAdminMasterDataImportHandler_Confirm_202ThenExisting200(), TestAdminMasterDataImportHandler_Confirm_ErrorMapping(), TestAdminMasterDataImportHandler_Confirm_RouteGuard(), TestAdminMasterDataImportHandler_DryRun_Rejections(), TestAdminMasterDataImportHandler_DryRun_ReturnsPreview(), TestAdminMasterDataImportHandler_OversizedBody_413() (+34 more)
 
-### Community 38 - "VendorRequest"
-Cohesion: 0.04
-Nodes (36): Writer, ListAuditLogsByEntityParams, VendorRequest, CountForecastForDateParams, CountVendorRequestsParams, CreateVendorRequestParams, ForecastRowExistsParams, ForecastRowExistsRow (+28 more)
+### Community 38 - "Queries"
+Cohesion: 0.03
+Nodes (37): Queries, ListAuditLogsByEntityParams, Queries, AuditLog, CountForecastForDateParams, CountVendorRequestsParams, CreateVendorRequestParams, ForecastRowExistsParams (+29 more)
 
 ### Community 39 - "devDependencies"
 Cohesion: 0.08
@@ -775,11 +761,11 @@ Nodes (27): AtmCashposTable(), CashposRow(), cellValue(), Column, COLUMNS, MONEY
 
 ### Community 41 - "Queries"
 Cohesion: 0.04
-Nodes (36): AcmArea, ListAcmAreaBranchesRow, ListAcmAreaMembersRow, ListAcmAreasAdminRow, ListAcmBranchOptionsRow, ListAcmEligibleUsersRow, ListAcmRegionOptionsRow, ListBranchesInOtherAcmAreasRow (+28 more)
+Nodes (22): AcmArea, ListAcmAreaBranchesRow, ListAcmAreaMembersRow, ListAcmAreasAdminRow, ListAcmBranchOptionsRow, ListAcmEligibleUsersRow, ListAcmRegionOptionsRow, ListBranchesInOtherAcmAreasRow (+14 more)
 
-### Community 42 - "Actor"
-Cohesion: 0.03
-Nodes (101): pgx.Tx, AtmVisitQuotaView, VendorQuotaResetResult, UserRef, NewAtmVisitQuotaService(), packageLabel(), recordVisit(), resetOne() (+93 more)
+### Community 42 - ".Create"
+Cohesion: 0.05
+Nodes (63): TestVendorPackageAdminService_Update(), acceptItems(), attemptCreateWithNumber(), categoryOrNil(), createWithRetryingNumber(), extractMetadata(), extractState(), fallbackVendorPrefix() (+55 more)
 
 ### Community 43 - "InvoiceFlow.tsx"
 Cohesion: 0.23
@@ -793,9 +779,9 @@ Nodes (20): compilerOptions, allowImportingTsExtensions, lib, module, moduleDete
 Cohesion: 0.10
 Nodes (20): compilerOptions, allowImportingTsExtensions, lib, module, moduleDetection, moduleResolution, noEmit, noFallthroughCasesInSwitch (+12 more)
 
-### Community 46 - "NewWriter"
-Cohesion: 0.06
-Nodes (23): NewWriter(), MenuFeature, Role, CreateRoleParams, ListRolesWithPermissionsRow, Queries, rolesWithPermissionsToResponse(), distinctInt64s() (+15 more)
+### Community 46 - "Role"
+Cohesion: 0.05
+Nodes (16): MenuFeature, Role, CreateRoleParams, ListRolesWithPermissionsRow, Queries, distinctInt64s(), pgx.Tx, CreateRoleRequest (+8 more)
 
 ### Community 47 - "atm_visit_quota.sql.go"
 Cohesion: 0.11
@@ -807,7 +793,7 @@ Nodes (37): useKeyWithClickEvents, useSemanticElements, noUselessFragments, noUn
 
 ### Community 49 - "atm_assignments_admin.sql.go"
 Cohesion: 0.05
-Nodes (21): CheckAssignmentVendorBranchParams, CountATMAssignmentsAdminParams, GetATMAssignmentAdminByIDRow, GetATMPriceGroupRow, ListATMAssignmentsAdminParams, ListATMAssignmentsAdminRow, ListATMPackageOptionsParams, ListATMPackageOptionsRow (+13 more)
+Nodes (22): CheckAssignmentVendorBranchParams, CountATMAssignmentsAdminParams, GetATMAssignmentAdminByIDRow, GetATMPriceGroupRow, ListATMAssignmentsAdminParams, ListATMAssignmentsAdminRow, ListATMPackageOptionsParams, ListATMPackageOptionsRow (+14 more)
 
 ### Community 50 - "dependencies"
 Cohesion: 0.09
@@ -818,8 +804,8 @@ Cohesion: 0.10
 Nodes (21): devDependencies, @biomejs/biome, fast-check, tailwindcss, @tailwindcss/vite, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event (+13 more)
 
 ### Community 52 - "AdminVendorVaultHandler"
-Cohesion: 0.15
-Nodes (12): parseOptionalIDParam(), chi.Router, NewAdminVendorPackageHandler(), packageToResponse(), chi.Router, NewAdminVendorVaultHandler(), vaultToResponse(), AdminVendorPackageHandler (+4 more)
+Cohesion: 0.27
+Nodes (6): chi.Router, NewAdminVendorVaultHandler(), vaultToResponse(), AdminVendorVaultHandler, createVendorVaultRequestBody, VendorVaultAdminServicer
 
 ### Community 53 - "navigation.property.test.ts"
 Cohesion: 0.17
@@ -834,8 +820,8 @@ Cohesion: 0.10
 Nodes (34): compute_checksum(), create_file_record(), extract_file_date(), file_already_processed(), insert_rows_batch(), main(), move_to_backup(), parse_csv_row() (+26 more)
 
 ### Community 56 - "masterdata_import_test.go"
-Cohesion: 0.17
-Nodes (25): NewMasterDataImporter(), dryRun(), hasErr(), TestAssignmentFields_BySource(), TestImport_AssignmentLegacyHeaderStillAccepted(), TestImport_AssignmentOverlapAndReferences(), TestImport_AssignmentSourceIsImmutable(), TestImport_AssignmentTwoModes() (+17 more)
+Cohesion: 0.16
+Nodes (26): NewMasterDataImporter(), dryRun(), hasErr(), TestAssignmentFields_BySource(), TestImport_AssignmentLegacyHeaderStillAccepted(), TestImport_AssignmentOverlapAndReferences(), TestImport_AssignmentSourceIsImmutable(), TestImport_AssignmentTwoModes() (+18 more)
 
 ### Community 57 - "itm_cashpos_etl.py"
 Cohesion: 0.13
@@ -847,15 +833,15 @@ Nodes (21): QuotaSummary(), resetLabel(), VisitQuotaCard(), handleCancelVisit(),
 
 ### Community 59 - "vendor_package_admin.go"
 Cohesion: 0.06
-Nodes (29): CountVendorPackagesAdminParams, GetVendorPackageAdminByIDRow, ListVendorPackagesAdminParams, ListVendorPackagesAdminRow, Queries, fromGetPackageRow(), fromListPackageRow(), VendorPackage (+21 more)
+Nodes (28): CountVendorPackagesAdminParams, GetVendorPackageAdminByIDRow, ListVendorPackagesAdminParams, ListVendorPackagesAdminRow, Queries, VendorPackageAdminRepository, fromGetPackageRow(), fromListPackageRow() (+20 more)
 
-### Community 60 - "newVendorOrderFixture"
-Cohesion: 0.20
-Nodes (20): TestIntegration_ReplenishmentRead(), NewReplenishmentReadService(), newVendorOrderFixture(), realizationRows(), TestIntegration_VendorOrder_AcceptAll(), TestIntegration_VendorOrder_CancelSkipsWithdrawnParty(), TestIntegration_VendorOrder_CompletionGateAndCancel(), TestIntegration_VendorOrder_Realization() (+12 more)
+### Community 60 - "VendorRequest"
+Cohesion: 0.08
+Nodes (32): Writer, VendorRequest, createVaultPlans(), resetVaultPlansForReapproval(), DenomAmount, RequestVendorParties, VendorActor, VendorOrderDetail (+24 more)
 
-### Community 61 - "fakeVendorBranchAdminServicer"
-Cohesion: 0.10
-Nodes (11): CountVendorBranchesAdminParams, GetVendorBranchAdminByIDRow, ListVendorBranchesAdminParams, ListVendorBranchesAdminRow, Queries, CreateVendorBranchAdminParams, CreateVendorBranchAdminRow, UpdateVendorBranchAdminParams (+3 more)
+### Community 61 - "MasterDataChangeRequest"
+Cohesion: 0.03
+Nodes (42): CountMasterDataChangeRequestsParams, CreateMasterDataChangeRequestParams, FindOpenMasterDataImportBatchRow, ListMasterDataChangeRequestsParams, Queries, MasterDataChangeRequest, CountVendorBranchesAdminParams, GetVendorBranchAdminByIDRow (+34 more)
 
 ### Community 62 - "_auth/login.tsx"
 Cohesion: 0.17
@@ -873,17 +859,17 @@ Nodes (14): ALL_PAIRS, ColorPair, computeContrastFromOklch(), contrastRatio(), L
 Cohesion: 0.14
 Nodes (13): AuthState, AuthUser, BalanceStatus, DbRole, DsrRecord, EvidenceFile, HandoverEvidence, Invoice (+5 more)
 
-### Community 66 - "VendorPicAdminRepository"
-Cohesion: 0.06
-Nodes (14): CountVendorPicsAdminParams, GetVendorPicAdminByIDRow, ListVendorPicsAdminParams, ListVendorPicsAdminRow, Queries, VendorPicAdminRepository, NewVendorPicAdminRepository(), VendorPic (+6 more)
+### Community 66 - "VendorPicAdminService"
+Cohesion: 0.05
+Nodes (24): CountVendorPicsAdminParams, GetVendorPicAdminByIDRow, ListVendorPicsAdminParams, ListVendorPicsAdminRow, Queries, nilIfEmpty(), VendorPic, VendorPicUpdatePayload (+16 more)
 
 ### Community 67 - "datetime"
-Cohesion: 0.06
-Nodes (40): Settings for the EOD Retry Scheduler service (env-driven, RETRY_ prefix).…, GET /audit (task 14.6)., GET /late (task 14.4)., post, Request, POST /process/{file_type} -- generic manual ETL trigger for dmaa, itm_cashpos,…, trigger_process(), POST /retry/{file_id} -- manual retry (task 14.3). (+32 more)
+Cohesion: 0.05
+Nodes (52): Settings for the EOD Retry Scheduler service (env-driven, RETRY_ prefix).…, FastAPI app factory + lifespan for the EOD Retry Scheduler (dmaa, itm_cashpos,…, get_audit(), date, get, Request, GET /audit (task 14.6)., GET /health -- no auth required (task 14.1). (+44 more)
 
-### Community 68 - "fakeDsrRepository"
+### Community 68 - "Actor"
 Cohesion: 0.08
-Nodes (12): CountDsrUploadsByVendorParams, GetVendorByIDRow, ListDsrDailyRowErrorsRow, ListDsrDailyRowsRow, ListDsrRencanaIsiRowErrorsRow, ListDsrRencanaIsiRowsRow, ListDsrUploadsByVendorParams, ListDsrUploadsByVendorRow (+4 more)
+Nodes (23): RequestAtmStatus, Actor, AuditEntry, BrowseForecastParams, BrowseForecastResult, ForecastSummaryResult, ListVendorRequestParams, ListVendorRequestResult (+15 more)
 
 ### Community 69 - "Header.tsx"
 Cohesion: 0.23
@@ -906,12 +892,12 @@ Cohesion: 0.26
 Nodes (10): api, apiClient(), ApiError, ApiResponse, createApiError(), executeRequest(), handleUnauthorized(), injectAuthHeader() (+2 more)
 
 ### Community 74 - "vendor_package_price_admin.go"
-Cohesion: 0.05
-Nodes (38): CountVendorPackagePricesAdminParams, GetVendorKindForPackagePriceRow, GetVendorPackagePriceAdminByIDRow, ListVendorPackagePricesAdminParams, ListVendorPackagePricesAdminRow, Queries, NewVendorPackagePriceAdminRepository(), applyPriceChange() (+30 more)
+Cohesion: 0.06
+Nodes (29): CountVendorPackagePricesAdminParams, GetVendorKindForPackagePriceRow, ListVendorPackagePricesAdminParams, Queries, applyPriceChange(), pgx.Tx, pricePayload(), TestIntegration_VendorPackagePriceApplier() (+21 more)
 
-### Community 75 - "Queries"
-Cohesion: 0.12
-Nodes (10): FindOpenMasterDataImportBatchRow, Queries, CreateMasterDataImportBatchParams, FindOpenMasterDataImportBatchParams, FindPendingMasterDataChangeRequestParams, FindPendingMasterDataChangeRequestRow, MarkMasterDataChangeRequestApplyFailedParams, MarkMasterDataChangeRequestStaleParams (+2 more)
+### Community 75 - "harness"
+Cohesion: 0.11
+Nodes (31): TestHasPermission_DecisionComesOnlyFromMapping(), NewPermissionEvaluator(), RequirePermission(), writeJSONError(), assertInt64Set(), assertPersistedPermissions(), harness(), queryRowScan() (+23 more)
 
 ### Community 76 - "ErrorBoundary"
 Cohesion: 0.18
@@ -937,9 +923,9 @@ Nodes (13): APIResponse, AuditLogItem, FileStatusItem, LateDetectionItem, Manual
 Cohesion: 0.25
 Nodes (8): Toast, ToastActions, ToastOptions, ToastState, ToastStore, ToastType, useToast(), useToastStore
 
-### Community 82 - "AuditLog"
-Cohesion: 0.07
-Nodes (33): Queries, Queries, AuditLog, AuditLogFilter, NewAuditLogRepository(), TestAuditLogRepository(), timestamptzFromPtr(), clampAuditLogPage() (+25 more)
+### Community 82 - "NewAuditLogReadService"
+Cohesion: 0.17
+Nodes (14): AuditLogFilter, NewAuditLogRepository(), TestAuditLogRepository(), timestamptzFromPtr(), NewAuditLogReadService(), sampleAuditLogRow(), TestAuditLogReadService_GetByID_BeforeAfterPreservedAsJSON(), TestAuditLogReadService_GetByID_NotFound() (+6 more)
 
 ### Community 83 - "ui-strings-language.property.test.ts"
 Cohesion: 0.22
@@ -947,7 +933,7 @@ Nodes (4): FEATURES_DIR, FORBIDDEN_ENGLISH_PHRASES, FORBIDDEN_STANDALONE_LABELS,
 
 ### Community 84 - "profileFakeRepo"
 Cohesion: 0.07
-Nodes (18): CountATMsWithCashPosParams, CountCashposByTerminalParams, CountItmCashposParams, CountReplenishByTerminalParams, GetATMByTerminalIDRow, GetATMSummaryRow, ListATMsWithCashPosParams, ListATMsWithCashPosRow (+10 more)
+Nodes (16): CountATMsWithCashPosParams, CountCashposByTerminalParams, CountItmCashposParams, CountReplenishByTerminalParams, GetATMByTerminalIDRow, GetATMSummaryRow, ListATMsWithCashPosParams, ListATMsWithCashPosRow (+8 more)
 
 ### Community 85 - "useNotifications.ts"
 Cohesion: 0.17
@@ -958,8 +944,8 @@ Cohesion: 0.22
 Nodes (7): ACCEPTED_TYPES, fileNameArb, FileValidationResult, invalidSizeArb, invalidTypeArb, validSizeArb, validTypeArb
 
 ### Community 87 - "Queries"
-Cohesion: 0.03
-Nodes (94): DBTX, Queries, pgx.Tx, ListVaultCandidateVaultsRow, GetVaultPlanRow, ListVaultPlansForRequestRow, ListVaultPlansRow, Queries (+86 more)
+Cohesion: 0.05
+Nodes (75): Queries, pgx.Tx, ListVaultCandidateVaultsRow, GetVaultPlanRow, ListVaultPlansForRequestRow, allocatedByVault(), allocationTotals(), allocErr() (+67 more)
 
 ### Community 88 - "scripts"
 Cohesion: 0.25
@@ -975,7 +961,7 @@ Nodes (3): mockFetch, ORDER_LIST, redirectSearchSchema
 
 ### Community 91 - "context.Context"
 Cohesion: 0.02
-Nodes (55): branchChildCounterAdapter, fakeUserAdminRepo, mockUserRepository, stubRateLimiter, stubUserRepo, CountATMsAdminParams, ListLocationsForSelectRow, Queries (+47 more)
+Nodes (40): branchChildCounterAdapter, mockUserRepository, stubRateLimiter, stubUserRepo, CountATMsAdminParams, ListATMsAdminParams, ListATMsAdminRow, ListLocationsForSelectRow (+32 more)
 
 ### Community 93 - "no-hardcoded-colors.property.test.ts"
 Cohesion: 0.33
@@ -1038,8 +1024,8 @@ Cohesion: 0.09
 Nodes (49): approveVendorRequest(), approveVendorRequestCompletion(), buildListQuery(), cancelVendorRequest(), createVendorRequest(), fetchForecastSummary(), fetchVendorOptions(), fetchVendorRequest() (+41 more)
 
 ### Community 109 - "AdminVendorsPage.tsx"
-Cohesion: 0.13
-Nodes (18): AdminVendorsPage(), confirmPendingAction(), SKELETON_ROW_KEYS, STATUS_OPTIONS, VendorFilterBar(), VendorFilterBarProps, ACTIVE_VENDOR, disableMutate (+10 more)
+Cohesion: 0.11
+Nodes (21): listVendors(), toQueryString(), AdminVendorsPage(), confirmPendingAction(), SKELETON_ROW_KEYS, STATUS_OPTIONS, VendorFilterBar(), VendorFilterBarProps (+13 more)
 
 ### Community 110 - "CompanyPortal-Vite/src/components/ui/Badge.tsx"
 Cohesion: 0.40
@@ -1081,25 +1067,25 @@ Nodes (3): formatValue(), SummaryCard(), SummaryCardProps
 Cohesion: 0.06
 Nodes (53): AccordionContent, AccordionItem, AccordionTrigger, Avatar, AvatarFallback, AvatarImage, Card, CardContent (+45 more)
 
-### Community 123 - "Region"
+### Community 123 - "NewWriter"
 Cohesion: 0.06
-Nodes (25): Region, CountRegionsAdminParams, CreateRegionAdminParams, GetRegionAdminByIDRow, ListRegionsAdminParams, ListRegionsAdminRow, Queries, pgx.Tx (+17 more)
+Nodes (29): NewWriter(), Region, CountRegionsAdminParams, CreateRegionAdminParams, GetRegionAdminByIDRow, ListRegionsAdminParams, ListRegionsAdminRow, Queries (+21 more)
 
-### Community 124 - "allocation.ts"
-Cohesion: 0.19
-Nodes (19): amountError(), capacityIssue(), DenomCoverage, denomLabel(), DraftRow, filledAmounts(), REASON_MAX, REASON_MIN (+11 more)
+### Community 124 - "AllocationRows.tsx"
+Cohesion: 0.18
+Nodes (16): capacityIssue(), DenomCoverage, DraftRow, AllocationRowEditor(), AllocationTable(), CoverageSummary(), RowEditorProps, signed() (+8 more)
 
 ### Community 126 - "DataTable.test.tsx"
 Cohesion: 0.50
 Nodes (3): testColumns, testData, TestRow
 
-### Community 128 - "ApprovalRequest"
-Cohesion: 0.13
-Nodes (6): InboxItem, ApprovalRequest, fakeApprovalOrchestrator, fakeApprovalReader, canApproveOnce, fakeMasterDataOrchestrator
+### Community 128 - ".Get"
+Cohesion: 0.11
+Nodes (21): validateDateBound(), pgx.Tx, AtmVisitQuotaView, VendorQuotaResetResult, UserRef, NewAtmVisitQuotaService(), packageLabel(), recordVisit() (+13 more)
 
 ### Community 129 - "RetryResult"
-Cohesion: 0.05
-Nodes (33): _demo(), _FakeSettings, Any, Path, ETL subprocess invocation for retry attempts (task 9.1). Generic over whichever…, Invokes ETL scripts via subprocess for retry attempts., Return the ETL script path for a given file type., Run the ETL script for the given file type and capture the result. extra_args… (+25 more)
+Cohesion: 0.10
+Nodes (16): _demo(), _FakeSettings, Any, Path, ETL subprocess invocation for retry attempts (task 9.1). Generic over whichever…, Invokes ETL scripts via subprocess for retry attempts., Return the ETL script path for a given file type., Run the ETL script for the given file type and capture the result. extra_args… (+8 more)
 
 ### Community 130 - "dsrUploadApi.ts"
 Cohesion: 0.10
@@ -1114,8 +1100,8 @@ Cohesion: 0.06
 Nodes (31): Backend QC — Daftar Perbaikan, ⏸ Ditunda — item kompleks (keputusan user 2026-10-09: selesaikan yang simple dulu), F10 — Fungsi kompleks (gocyclo > 20), F11 — CI (perlu keputusan user), F12 — CVE dari govulncheck  ⚠️ security, F13 — Spoofing IP client  ⚠️ auth (Sec 4 #7), F14 — `go.work` di-gitignore vs Dockerfile, F15 — `.dockerignore` root + dokumen compose basi (+23 more)
 
 ### Community 133 - "atm_admin.go"
-Cohesion: 0.10
-Nodes (20): ListATMsAdminParams, ListATMsAdminRow, atmFromGetRow(), atmFromListRow(), decimalStrings(), ATM, CreateATMRequest, LocationOption (+12 more)
+Cohesion: 0.11
+Nodes (18): atmFromGetRow(), atmFromListRow(), decimalStrings(), ATM, CreateATMRequest, LocationOption, UpdateATMRequest, parseNonNegativeDecimal() (+10 more)
 
 ### Community 142 - "github.com/cimb-niaga/cms/pkg"
 Cohesion: 0.67
@@ -1150,8 +1136,8 @@ Cohesion: 0.04
 Nodes (47): Architecture Decisions, Auth `initialize()` must not call `logout()` on failure, Code Style Preferences, Common Pitfalls, Cross-portal cookie leakage: guard role in both `initialize` and `refreshToken`, DB constraint evolution for dev/prod split: add a new enum value, don't relax existing ones, Docker build cache: always use `--no-cache` after frontend navigation/route changes, Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b` (+39 more)
 
 ### Community 152 - "MasterDataApprovalService"
-Cohesion: 0.19
-Nodes (12): pgx.Tx, NewMasterDataApprovalService(), statesEqual(), Applier, ApplierRegistry, MasterDataApprovalAuditWriter, MasterDataApprovalOrchestrator, MasterDataApprovalPool (+4 more)
+Cohesion: 0.17
+Nodes (13): approveChange(), testHelpers, TestDsrLocationMapApplier_Lifecycle_Integration(), NewMasterDataApprovalService(), Applier, ApplierRegistry, MasterDataApprovalAuditWriter, MasterDataApprovalOrchestrator (+5 more)
 
 ### Community 153 - "PackagePricesPanel.tsx"
 Cohesion: 0.08
@@ -1167,7 +1153,7 @@ Nodes (25): classify(), _insert_no_order(), _itm_amounts(), _managing_branches()
 
 ### Community 158 - "admin-vendors/hooks.ts"
 Cohesion: 0.05
-Nodes (89): appendCommonParams(), createVendor(), createVendorBranch(), createVendorPackage(), createVendorPackagePrice(), createVendorPic(), createVendorVault(), disableVendor() (+81 more)
+Nodes (91): appendCommonParams(), createVendor(), createVendorBranch(), createVendorPackage(), createVendorPackagePrice(), createVendorPic(), createVendorVault(), disableVendor() (+83 more)
 
 ### Community 159 - "DsrUploadDialog.tsx"
 Cohesion: 0.33
@@ -1190,24 +1176,24 @@ Cohesion: 0.07
 Nodes (36): SheetContent, SheetDescription, SheetFooter(), SheetHeader(), SheetOverlay, SheetTitle, sheetVariants, Sidebar (+28 more)
 
 ### Community 178 - "import_jobs.py"
-Cohesion: 0.14
-Nodes (33): _audit(), check_transition(), complete(), current(), detect(), fail(), IllegalTransitionError, JobInProgressError (+25 more)
+Cohesion: 0.12
+Nodes (34): _audit(), check_transition(), complete(), current(), detect(), fail(), IllegalTransitionError, JobInProgressError (+26 more)
 
 ### Community 179 - "useRbacQueries.ts"
 Cohesion: 0.12
-Nodes (28): createDelegation(), createLeave(), CreateLeaveResponse, createPolicy(), getDelegations(), getUserHierarchy(), revokeDelegation(), SetHierarchyResponse (+20 more)
+Nodes (25): createDelegation(), createLeave(), CreateLeaveResponse, createPolicy(), getUserHierarchy(), revokeDelegation(), SetHierarchyResponse, updatePolicy() (+17 more)
 
 ### Community 180 - "user_admin_test.go"
-Cohesion: 0.08
-Nodes (47): ConflictError, ReferenceError, UserAdminRepo, UserAdminService, changesImmutable(), conflictFieldFromPgError(), AuditWriter, CreateUserRequest (+39 more)
+Cohesion: 0.10
+Nodes (41): ConflictError, ReferenceError, UserAdminRepo, UserAdminService, changesImmutable(), conflictFieldFromPgError(), AuditWriter, UpdateUserRequest (+33 more)
 
 ### Community 181 - "NewATMAssignmentAdminService"
-Cohesion: 0.20
-Nodes (19): NewATMAssignmentAdminService(), date(), ATMAssignmentUpdatePayload, TestATMAssignmentAdminService_Create(), TestATMAssignmentAdminService_Update_ExcludesOwnRowFromOverlap(), TestATMAssignmentAdminService_UpdateAndToggle(), TestATMAssignmentAdminService_Validate(), TestATMAssignmentAdminService_Validate_PassesOpenEndAsNil() (+11 more)
+Cohesion: 0.08
+Nodes (35): dateToStringPtr(), ATMAssignment, ATMAssignmentUpdatePayload, newATMAssignment(), NewATMAssignmentAdminService(), date(), ATMAssignmentUpdatePayload, TestATMAssignmentAdminService_Create() (+27 more)
 
 ### Community 182 - "RbacDelegationsPage.tsx"
-Cohesion: 0.15
-Nodes (17): FormField(), FormFieldProps, rbacInputClass, CreateDelegationForm(), RbacDelegationsPage(), toRfc3339(), RFC-3339, StatusMessage() (+9 more)
+Cohesion: 0.12
+Nodes (21): getDelegations(), FormField(), FormFieldProps, rbacInputClass, CreateDelegationForm(), RbacDelegationsPage(), toRfc3339(), RFC-3339 (+13 more)
 
 ### Community 183 - "field.jsx"
 Cohesion: 0.11
@@ -1215,15 +1201,15 @@ Nodes (21): Field(), FieldContent(), FieldDescription(), FieldError(), FieldGrou
 
 ### Community 184 - "admin-atms/hooks.ts"
 Cohesion: 0.05
-Nodes (63): ATMAssignment, ATMAssignmentSource, ATMPackageOption, createATM(), createATMAssignment(), CreateATMAssignmentPayload, disableATM(), enableATM() (+55 more)
+Nodes (60): ATMAssignment, ATMAssignmentSource, ATMPackageOption, createATM(), createATMAssignment(), CreateATMAssignmentPayload, disableATM(), enableATM() (+52 more)
 
 ### Community 185 - "rbac-settings/index.ts"
 Cohesion: 0.14
-Nodes (19): getLeaves(), CreateLeaveForm(), RbacLeavesPage(), toRfc3339(), RFC-3339, ROLE_ICON, RoleBadge(), RoleBadgeProps (+11 more)
+Nodes (18): getLeaves(), CreateLeaveForm(), RbacLeavesPage(), toRfc3339(), RFC-3339, ROLE_ICON, RoleBadge(), RoleBadgeProps (+10 more)
 
 ### Community 199 - "testing.T"
-Cohesion: 0.03
-Nodes (127): TestEndToEnd_ThreeLevelHierarchyWithDelegationOnLeave(), TestRepository_CreateDelegation_NonOverlappingSucceeds(), TestRepository_CreateDelegation_OverlapRejected(), TestRepository_ListInboxForApprover(), TestRepository_RevokeDelegation(), NewRepository(), TestWriter_Write(), TestWriter_Write_NilBeforeAfter() (+119 more)
+Cohesion: 0.04
+Nodes (100): TestWriter_Write(), TestWriter_Write_NilBeforeAfter(), mountAdminRegionHandler(), regionName(), TestAdminRegionHandler_Create_CodeConflict_409(), TestAdminRegionHandler_Create_Created201(), TestAdminRegionHandler_Create_Forbidden_403(), TestAdminRegionHandler_Create_MalformedBody_400() (+92 more)
 
 ### Community 200 - "AdminATMsPage.tsx"
 Cohesion: 0.08
@@ -1238,8 +1224,8 @@ Cohesion: 0.13
 Nodes (19): AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter(), AlertDialogHeader(), AlertDialogOverlay, AlertDialogTitle (+11 more)
 
 ### Community 203 - "VendorDetailPage.tsx"
-Cohesion: 0.07
-Nodes (25): InfoTab(), PROFILE_FIELDS, vendor, TOP_TABS, TopTab, VendorDetailPage(), toDefaultValues(), VendorFormDialog() (+17 more)
+Cohesion: 0.08
+Nodes (23): InfoTab(), PROFILE_FIELDS, vendor, TOP_TABS, TopTab, VendorDetailPage(), toDefaultValues(), VendorFormDialog() (+15 more)
 
 ### Community 204 - "mountRbacListHandler"
 Cohesion: 0.24
@@ -1286,8 +1272,8 @@ Cohesion: 0.14
 Nodes (13): Before Removing, Consolidation Phase, Consolidation Strategies, Detection Phase, Identify Duplicates, Manual Checks, Refactor Clean Command, Removal Phase (+5 more)
 
 ### Community 215 - ".withFilter"
-Cohesion: 0.18
-Nodes (13): dateCell(), exportFilter(), chi.Router, VendorOrderHandler, int64Cell(), intCell(), NewReplenishmentHandler(), parseReplenishmentFilter() (+5 more)
+Cohesion: 0.19
+Nodes (12): dateCell(), exportFilter(), chi.Router, VendorOrderHandler, int64Cell(), intCell(), NewReplenishmentHandler(), parseReplenishmentFilter() (+4 more)
 
 ### Community 216 - "Orchestrate Command"
 Cohesion: 0.15
@@ -1350,8 +1336,8 @@ Cohesion: 0.18
 Nodes (10): Coverage Improvement Plan, Coverage Report Analysis, Coverage Targets, [Function/Component Name], Low Coverage Files, Summary, Test Coverage Command, Test Generation (+2 more)
 
 ### Community 231 - "doRequest"
-Cohesion: 0.05
-Nodes (128): AdminStore, mountAdminApprovalHandler(), TestAdminApprovalHandler_AdminRole_SetHierarchy_HappyPath(), TestAdminApprovalHandler_CreateDelegation_BadRequest(), TestAdminApprovalHandler_CreateDelegation_HappyPath(), TestAdminApprovalHandler_CreateDelegation_OverlapConflict(), TestAdminApprovalHandler_CreateLeave_BadRequest(), TestAdminApprovalHandler_CreateLeave_HappyPath() (+120 more)
+Cohesion: 0.04
+Nodes (155): AdminStore, mountAdminApprovalHandler(), TestAdminApprovalHandler_AdminRole_SetHierarchy_HappyPath(), TestAdminApprovalHandler_CreateDelegation_BadRequest(), TestAdminApprovalHandler_CreateDelegation_HappyPath(), TestAdminApprovalHandler_CreateDelegation_OverlapConflict(), TestAdminApprovalHandler_CreateLeave_BadRequest(), TestAdminApprovalHandler_CreateLeave_HappyPath() (+147 more)
 
 ### Community 232 - "Spec: vendor upload DSR (Daily / SALDO HARIAN ATM + Rencana Isi)"
 Cohesion: 0.20
@@ -1478,16 +1464,16 @@ Cohesion: 0.50
 Nodes (3): Behavior Notes, Instinct Status Command, Your Task
 
 ### Community 263 - "NewAtmPortalService"
-Cohesion: 0.21
-Nodes (15): mustNumeric(), sampleCashposRow(), TestListCashpos_CountError(), TestListCashpos_Empty(), TestListCashpos_ForwardsFilters(), TestListCashpos_MapsAllFieldsAndDecimalStrings(), TestListCashpos_RepoError(), TestListCashpos_Validation() (+7 more)
+Cohesion: 0.10
+Nodes (31): mustNumeric(), sampleCashposRow(), TestListCashpos_CountError(), TestListCashpos_Empty(), TestListCashpos_ForwardsFilters(), TestListCashpos_MapsAllFieldsAndDecimalStrings(), TestListCashpos_RepoError(), TestListCashpos_Validation() (+23 more)
 
 ### Community 269 - "NewTokenService"
-Cohesion: 0.06
-Nodes (56): AccessTokenClaims, mockBlacklist, mockTokenBlacklist, RedisTokenBlacklist, RefreshTokenClaims, TokenBlacklist, TokenConfig, main() (+48 more)
+Cohesion: 0.05
+Nodes (60): AccessTokenClaims, mockBlacklist, mockTokenBlacklist, RedisTokenBlacklist, RefreshTokenClaims, TokenBlacklist, TokenConfig, main() (+52 more)
 
 ### Community 273 - "masterdata_import_confirm.go"
-Cohesion: 0.22
-Nodes (19): assignmentFields(), atmFields(), ATMAssignmentUpdatePayload, optInt64(), picFields(), rowRejection(), stageCreate(), stageRow() (+11 more)
+Cohesion: 0.14
+Nodes (25): assignmentFields(), atmFields(), ATMAssignmentUpdatePayload, ImportConfirmResult, MasterDataImporter, optInt64(), picFields(), rowRejection() (+17 more)
 
 ### Community 274 - "CompanyPortal-Vite/src/components/ui/DataTable.tsx"
 Cohesion: 0.27
@@ -1529,9 +1515,9 @@ Nodes (9): toDefaultValues(), VendorPicFormDialog(), onSubmit(), toPayload(), Ve
 Cohesion: 0.12
 Nodes (9): delegationsResponse, leavesResponse, mockUseDelegations, mockUseLeaves, mockUsePolicies, mockUseUserHierarchy, policiesResponse, usersResponse (+1 more)
 
-### Community 290 - "fakeVendorAdminRepo"
-Cohesion: 0.10
-Nodes (9): CountVendorsAdminParams, ListVendorsAdminParams, ListVendorsAdminRow, Queries, CreateVendorAdminParams, CreateVendorAdminRow, UpdateVendorAdminParams, UpdateVendorAdminRow (+1 more)
+### Community 290 - "fakeVendorAdminServicer"
+Cohesion: 0.07
+Nodes (14): CountVendorsAdminParams, ListVendorsAdminParams, ListVendorsAdminRow, Queries, CreateVendorRequest, DisableVendorResult, UpdateVendorRequest, CreateVendorAdminParams (+6 more)
 
 ### Community 293 - "SettingsHubPage.tsx"
 Cohesion: 0.16
@@ -1550,28 +1536,28 @@ Cohesion: 0.21
 Nodes (10): InputGroup(), InputGroupAddon(), inputGroupAddonVariants, InputGroupButton(), inputGroupButtonVariants, InputGroupInput(), InputGroupText(), InputGroupTextarea() (+2 more)
 
 ### Community 297 - "vault-plan/api.ts"
-Cohesion: 0.13
-Nodes (19): AllocationInput, KEY, PLAN_STATUS_LABELS, send(), TIER_LABELS, useVaultPlanMutation(), useVaultPlans(), VaultBranchRef (+11 more)
+Cohesion: 0.15
+Nodes (17): AllocationInput, KEY, PLAN_STATUS_LABELS, send(), useVaultPlanMutation(), useVaultPlans(), VaultBranchRef, VaultPlanAtm (+9 more)
 
 ### Community 298 - "Spec: `import_jobs` — satu registry file ingest (menyatukan `retry_file_tracking`)"
 Cohesion: 0.13
 Nodes (14): Acceptance (tiap baris → test di `tests.md`), API surface, Data model — migrasi `019_import_jobs.sql` (additive, forward-only), Flagged concerns (sisa), Functional — adopsi retry scheduler (Python), Functional — audit, Functional — registry & idempotensi, Komponen (+6 more)
 
-### Community 301 - ".List"
-Cohesion: 0.23
-Nodes (8): chi.Router, NewNotificationHandler(), parseBoundedInt(), parseOptionalBool(), NotificationHandler, notificationListResponse, notificationResponse, NotificationStore
+### Community 301 - "actorFromRequest"
+Cohesion: 0.13
+Nodes (15): chi.Router, holidayID(), NewAdminHolidayHandler(), chi.Router, NewNotificationHandler(), parseBoundedInt(), parseOptionalBool(), actorFromRequest() (+7 more)
 
 ### Community 304 - "item.jsx"
 Cohesion: 0.18
 Nodes (12): Item(), ItemActions(), ItemContent(), ItemDescription(), ItemFooter(), ItemGroup(), ItemHeader(), ItemMedia() (+4 more)
 
-### Community 305 - "ATMAssignmentAdminService"
-Cohesion: 0.20
-Nodes (10): dateToStringPtr(), ATMAssignment, ATMAssignmentUpdatePayload, newATMAssignment(), normalizeSource(), TestNormalizeSource(), ATMAssignmentAdminRepo, ATMAssignmentAdminService (+2 more)
+### Community 305 - "tokenForVendor"
+Cohesion: 0.15
+Nodes (22): TestAdminHolidayHandler(), TestAdminHolidayHandler_Import(), NewDsrUploadHandler(), mountDsrUploadHandler(), TestDsrConfirm_OtherVendorStagedFile_Forbidden(), TestDsrConfirm_OwnStagedFile_PassesGuard(), TestDsrUpload_NonVendorCaller_Forbidden(), tokenForVendor() (+14 more)
 
-### Community 306 - "AuthHandler"
-Cohesion: 0.23
-Nodes (9): clearRefreshCookie(), chi.Router, NewAuthHandler(), setRefreshCookie(), AuthHandler, changePasswordRequest, ChangePasswordService, loginRequest (+1 more)
+### Community 306 - "AcmAreaAdminService"
+Cohesion: 0.25
+Nodes (13): AcmArea, getAcmArea(), AcmAreaDetail, isAcmAreaAdmin(), loadAcmAreaDetail(), mapAcmAreaNameErr(), NewAcmAreaAdminService(), requireActiveAcmArea() (+5 more)
 
 ### Community 307 - "master-data-io/api.ts"
 Cohesion: 0.13
@@ -1581,25 +1567,25 @@ Nodes (20): confirmImport(), download(), downloadExport(), downloadTemplate(), d
 Cohesion: 0.14
 Nodes (21): fetchNotifications(), fetchUnreadCount(), markAllNotificationsRead(), markNotificationRead(), NotificationItem, NotificationListResponse, notificationKeys, RECENT_PAGE_SIZE (+13 more)
 
-### Community 310 - "Queries"
-Cohesion: 0.09
-Nodes (15): Queries, CreateApprovalDelegationParams, CreateApprovalRequestParams, CreateApprovalStepParams, CreateUserLeaveParams, FindActiveDelegateParams, FindActiveLeaveParams, FindApprovalPolicyParams (+7 more)
+### Community 310 - "ApprovalRequest"
+Cohesion: 0.03
+Nodes (35): fakeStore, docKey(), InboxItem, CreateApprovalPolicyParams, ListUserHierarchyRow, Queries, UpdateApprovalPolicyParams, UpdateUserHierarchyRow (+27 more)
 
 ### Community 311 - "tokenFor"
 Cohesion: 0.13
 Nodes (36): mountApprovalHandler(), TestApprovalHandler_Approve_HappyPath(), TestApprovalHandler_Approve_InvalidID(), TestApprovalHandler_Approve_NotAuthorized(), TestApprovalHandler_Get_HappyPath(), TestApprovalHandler_Get_InvalidID(), TestApprovalHandler_Get_NotFound(), TestApprovalHandler_HandleError_DefaultInternalError() (+28 more)
 
 ### Community 312 - "VaultPlan.test.tsx"
-Cohesion: 0.13
-Nodes (13): areaLabel(), coverageOf(), useRequestVaultDecision(), useRequestVaultReview(), VaultPlanDetail, RequestVaultPanel(), RequestVaultPanelProps, BRANCH (+5 more)
+Cohesion: 0.14
+Nodes (9): useVaultPlan(), VaultPlanDetail, BRANCH, decide, listFilter, mutate, review, usePlan (+1 more)
 
-### Community 313 - "net/http.Request"
-Cohesion: 0.08
-Nodes (26): chi.Router, VendorOrderHandler, vendorActorFromRequest(), actorFromRequest(), chi.Router, VendorRequestHandler, parseBoolFlag(), parseVendorRequestID() (+18 more)
+### Community 313 - "VendorRequestHandler"
+Cohesion: 0.09
+Nodes (20): chi.Router, VendorRequestHandler, parseBoolFlag(), parseVendorRequestID(), splitNonEmpty(), toItemInputs(), toDetailResponse(), VendorRequestHandler (+12 more)
 
 ### Community 314 - "masterdata_export_test.go"
-Cohesion: 0.11
-Nodes (26): CSVSafe(), exportPage(), R, MasterDataExportHeader(), NewMasterDataExporter(), export(), newTestExporter(), TestCSVSafe() (+18 more)
+Cohesion: 0.14
+Nodes (23): CSVSafe(), exportPage(), R, MasterDataExportHeader(), NewMasterDataExporter(), export(), newTestExporter(), TestCSVSafe() (+15 more)
 
 ### Community 315 - "VendorRequestList.tsx"
 Cohesion: 0.12
@@ -1610,16 +1596,16 @@ Cohesion: 0.17
 Nodes (15): add_workdays(), classify_offset(), demo(), is_vendor_mismatch(), is_workday(), date, Pure classification rules (.claude/sdlc/replenishment-realisasi/spec.md…, A submitted vendor report disagrees with ITM: filled vs not, another date, or… (+7 more)
 
 ### Community 318 - "mountVendorRequestHandler"
-Cohesion: 0.14
-Nodes (43): TestVendorRequestHandler_UpdateItemsAndRevise(), mountAtmVisitQuota(), TestAtmVisitQuotaHandler_ErrorMapping(), TestAtmVisitQuotaHandler_RoleGates(), TestVendorRequestHandler_CompletionRoutes(), NewVendorRequestHandler(), mountVendorRequestHandler(), TestVendorRequestHandler_Approve_SelfApprovalForbidden() (+35 more)
+Cohesion: 0.15
+Nodes (42): TestVendorRequestHandler_UpdateItemsAndRevise(), mountAtmVisitQuota(), TestAtmVisitQuotaHandler_ErrorMapping(), TestAtmVisitQuotaHandler_RoleGates(), TestVendorRequestHandler_CompletionRoutes(), NewVendorRequestHandler(), mountVendorRequestHandler(), TestVendorRequestHandler_Approve_SelfApprovalForbidden() (+34 more)
 
 ### Community 319 - "Queries"
 Cohesion: 0.12
 Nodes (8): Queries, FindUserByEmailRow, FindUserByIDRow, FindUserByUsernameRow, GetUserProfileRow, LockAccountParams, SetInitialPasswordParams, SetPasswordParams
 
-### Community 320 - "ApprovalStep"
-Cohesion: 0.15
-Nodes (3): fakeStore, docKey(), ApprovalStep
+### Community 320 - "Queries"
+Cohesion: 0.13
+Nodes (8): Queries, IsAcmAreaMemberParams, ListAcmAreaMemberIDsByRoleParams, ListVaultPlanAtmsRow, LockVaultPlanRow, SetVaultPlanStatusParams, SetVendorRequestStatusOnlyParams, SetVendorRequestVaultReviewParams
 
 ### Community 321 - "audit-log/types.ts"
 Cohesion: 0.06
@@ -1641,37 +1627,37 @@ Nodes (18): ApproveCompletionModal(), ApproveCompletionModalProps, atmsGoingOver
 Cohesion: 0.31
 Nodes (9): ChartContainer, ChartContext, ChartLegendContent, ChartStyle(), ChartTooltipContent, getPayloadConfigFromPayload(), normalizeLegacyChartColor(), THEMES (+1 more)
 
-### Community 326 - "replenish_classifications.sql.go"
-Cohesion: 0.17
-Nodes (10): Queries, CountReplenishClassificationsParams, ListReplenishClassificationsParams, ReplenishClassificationAmount, ReportReplenishTripsParams, ReportReplenishTripsRow, SummarizeReplenishClassificationsParams, SummarizeReplenishClassificationsRow (+2 more)
+### Community 326 - "LateCheckTest"
+Cohesion: 0.12
+Nodes (9): is_source_done(), Check if the SLA deadline passed without completion (Requirement 2)., True when import_jobs has a completed row for source+date, or the legacy table…, IsSourceDoneTest, LateCheckTest, date, skipUnless, A13 per source, against the real legacy tables; every write is rolled back. (+1 more)
 
 ### Community 327 - ".claude/CLAUDE.md"
 Cohesion: 0.12
 Nodes (10): GCP Deployment (0 -> Deployed), Business Rules & Requirements (URS v0.3 Phase 1), UI/UX & Brand (frontends only), AI-Native SDLC, Artifact chain (fill in order; commit each before starting the next), Artifact templates (what each file is for), Current features, How to start a new feature (+2 more)
 
-### Community 329 - "newVaultPlanFixture"
-Cohesion: 0.24
-Nodes (8): TestIntegration_VaultPlan_Guards(), vaultPlanFixture, line(), newVaultPlanFixture(), TestIntegration_VaultPlan_CapacityAndTicketsAcrossRequests(), TestIntegration_VaultPlan_FullFlow(), vaultPlanFixture, VaultPlanService
+### Community 329 - "mountCashposHandler"
+Cohesion: 0.19
+Nodes (17): mountCashposHandler(), TestListCashpos_BadPage(), TestListCashpos_Defaults(), TestListCashpos_Empty(), TestListCashpos_InternalError(), TestListCashpos_QueryForwarding(), TestListCashpos_SuccessAllFields(), TestListCashpos_ValidationError() (+9 more)
 
 ### Community 330 - "admin_approval_handler.go"
-Cohesion: 0.11
-Nodes (23): chi.Router, NewAdminApprovalHandler(), parseRange(), toDelegationResponse(), chi.Router, NewRbacListHandler(), toLeaveResponse(), toPolicyResponse() (+15 more)
+Cohesion: 0.10
+Nodes (24): chi.Router, NewAdminApprovalHandler(), parseOptionalIDParam(), parseRange(), toDelegationResponse(), chi.Router, NewRbacListHandler(), toLeaveResponse() (+16 more)
 
 ### Community 331 - "toPgDate"
-Cohesion: 0.08
-Nodes (51): ListForecastForDateParams, ListForecastForDateRow, TestIntegration_VendorWideAssignment(), pgx.Tx, seedVendorWide(), TestIntegration_VendorWideAssignment_Applier(), TestIntegration_VendorWideAssignment_ForecastCountSummaryAndVendorResolver(), pgx.Rows (+43 more)
+Cohesion: 0.16
+Nodes (27): TestIntegration_VendorWideAssignment(), pgx.Tx, seedVendorWide(), TestIntegration_VendorWideAssignment_Applier(), TestIntegration_VendorWideAssignment_ForecastCountSummaryAndVendorResolver(), pgx.Tx, linkAtmVendorPackage(), seedForecastATM() (+19 more)
 
-### Community 332 - "eod_retry_scheduler/main.py"
-Cohesion: 0.09
-Nodes (30): create_app(), lifespan(), FastAPI, Settings, FastAPI app factory + lifespan for the EOD Retry Scheduler (dmaa, itm_cashpos,…, health(), get, Request (+22 more)
+### Community 332 - "service_dsr_etl/main.py"
+Cohesion: 0.06
+Nodes (39): create_app(), lifespan(), FastAPI, Settings, health(), get, Request, Response (+31 more)
 
 ### Community 333 - "ForecastBrowser.test.tsx"
 Cohesion: 0.18
 Nodes (13): makeResponse(), makeRow(), mockApiGet, mockPagedDataset(), mockRows(), mockSingleResponse(), mockStaticEndpoints(), mockToast (+5 more)
 
 ### Community 334 - "masterdata_approval_integration_test.go"
-Cohesion: 0.19
-Nodes (31): approveAssignment(), approveATM(), assignmentFixture(), dbtx(), testHelpers, harness(), jsonOrNil(), mustJSON() (+23 more)
+Cohesion: 0.17
+Nodes (32): approveAssignment(), approveATM(), assignmentFixture(), dbtx(), testHelpers, harness(), jsonOrNil(), mustJSON() (+24 more)
 
 ### Community 335 - "VendorRequestDetail.test.tsx"
 Cohesion: 0.10
@@ -1686,8 +1672,8 @@ Cohesion: 0.25
 Nodes (7): Breadcrumb, BreadcrumbEllipsis(), BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator()
 
 ### Community 338 - "RoleMgmtHandler"
-Cohesion: 0.25
-Nodes (8): catalogEntryToResponse(), chi.Router, NewRoleMgmtHandler(), roleToResponse(), createRoleRequestBody, RoleMgmtHandler, RoleMgmtServicer, updateRolePermissionsRequestBody
+Cohesion: 0.22
+Nodes (9): catalogEntryToResponse(), chi.Router, NewRoleMgmtHandler(), rolesWithPermissionsToResponse(), roleToResponse(), createRoleRequestBody, RoleMgmtHandler, RoleMgmtServicer (+1 more)
 
 ### Community 339 - "Functional requirements"
 Cohesion: 0.10
@@ -1722,19 +1708,19 @@ Cohesion: 0.29
 Nodes (7): NavigationMenu, NavigationMenuContent, NavigationMenuIndicator, NavigationMenuList, NavigationMenuTrigger, navigationMenuTriggerStyle, NavigationMenuViewport
 
 ### Community 347 - "importEnv"
-Cohesion: 0.12
-Nodes (20): assignmentSourceCell(), boolCol(), cleanCell(), cleanRecord(), expandLegacy(), ImportResult, MasterDataImporter, headerMatches() (+12 more)
+Cohesion: 0.11
+Nodes (20): assignmentSourceCell(), authorizeMasterDataAdmin(), boolCol(), cleanCell(), cleanRecord(), expandLegacy(), ImportResult, MasterDataImporter (+12 more)
 
-### Community 348 - "NewVendorRequestService"
-Cohesion: 0.22
-Nodes (25): countAuditEntries(), fetchUserIDs(), TestIntegration_Cancel_AlreadyCanceledRejectsWithoutDuplicateAudit(), TestIntegration_Cancel_ApprovedIdempotency(), TestIntegration_Cancel_ApprovedIsCheckerOnly(), TestIntegration_Cancel_ApprovedPreservesRowsAndSingleAudit(), TestIntegration_Cancel_AuthorizationUnionRule(), TestIntegration_Cancel_SoftCancelPreservesRowAndAudits() (+17 more)
+### Community 348 - "jakartaCalendarDate"
+Cohesion: 0.06
+Nodes (71): TestIntegration_ReplenishmentRead(), NewReplenishmentReadService(), VendorRequestDetail, VendorRequestService, newVaultFlowFixture(), TestIntegration_VaultFlow_ApproveCreatesPlanAndCancelCascades(), TestIntegration_VaultFlow_CompletionFromReadyReturnsToReady(), TestIntegration_VaultFlow_RegionWithoutAreaGetsPlanOnMapping() (+63 more)
 
 ### Community 349 - "VaultPlanDetail.tsx"
-Cohesion: 0.27
-Nodes (14): rows(), emptyRow(), reasonValid(), rowProblems(), rowsFromPlan(), sameInput(), toInput(), useVaultCandidates() (+6 more)
+Cohesion: 0.26
+Nodes (18): rows(), amountError(), coverageOf(), denomLabel(), emptyRow(), filledAmounts(), REASON_MAX, REASON_MIN (+10 more)
 
 ### Community 350 - ".actorAndID"
-Cohesion: 0.27
+Cohesion: 0.29
 Nodes (7): formatPgDate(), chi.Router, NewVaultPlanHandler(), parseDateParam(), vaultPlanJSON(), VaultPlanHandler, VaultPlanServicer
 
 ### Community 352 - "Shadcn UI"
@@ -1753,9 +1739,9 @@ Nodes (4): Cara paling cepat melihatnya, Catatan, Hierarki Pengguna — CROWN (R
 Cohesion: 0.11
 Nodes (17): Catatan implementasi, Fase 0 — Persiapan, Fase 1 — Migration `backend/migrations/003_master_data.sql`, Fase 2 — Maker-checker generik (jalur kritis), Fase 3 — CRUD backend entitas baru (mutasi via Fase 2, baca langsung), Fase 4 — Retrofit CRUD lama ke maker-checker, Fase 5 — Import / Export CSV, Fase 6 — Frontend CompanyPortal-Vite (+9 more)
 
-### Community 360 - "MasterDataChangeRequest"
-Cohesion: 0.09
-Nodes (14): ListMasterDataChangeRequestsParams, MasterDataChangeRequest, DsrLocationMapPayload, DsrLocationMapUpdatePayload, NewDsrLocationMapAdminService(), TestDsrLocationMapAdminService_Create(), TestDsrLocationMapAdminService_OtherVendorIDIsNotFound(), TestDsrLocationMapAdminService_UpdateDisabledAndEnableConflict() (+6 more)
+### Community 360 - "DsrLocationMapAdminService"
+Cohesion: 0.06
+Nodes (17): GetDsrLocationMapAdminByIDRow, ListDsrLocationMapsAdminParams, ListDsrLocationMapsAdminRow, ListUnmappedDsrLocationsRow, Queries, DsrLocationMapPayload, DsrLocationMapUpdatePayload, CreateDsrLocationMapParams (+9 more)
 
 ### Community 362 - "UR New Template v0.3 - E2E Cash Management System v.4 - Phase 1.docx-20260918115415.md"
 Cohesion: 0.11
@@ -1763,19 +1749,19 @@ Nodes (17): Appendix, Approval Page:, As-is Business Process, ATM Cash Forecasti
 
 ### Community 363 - "mountAdminVendorBranchHandler"
 Cohesion: 0.15
-Nodes (21): TestAdminMasterDataUpdate_Returns202And400(), TestAdminVendorBranchHandler_UpdateAndEnableErrors(), mountAdminVendorBranchHandler(), TestAdminVendorBranchHandler_Create_HappyPath_Returns202WithChangeRequest(), TestAdminVendorBranchHandler_Create_ServiceConflict_MapsTo409(), TestAdminVendorBranchHandler_Create_ValidationError_MapsTo400(), TestAdminVendorBranchHandler_Disable_HappyPath_Returns202(), TestAdminVendorBranchHandler_Disable_PendingConflict_MapsTo409() (+13 more)
+Nodes (20): TestAdminMasterDataUpdate_Returns202And400(), TestAdminVendorBranchHandler_UpdateAndEnableErrors(), mountAdminVendorBranchHandler(), TestAdminVendorBranchHandler_Create_HappyPath_Returns202WithChangeRequest(), TestAdminVendorBranchHandler_Create_ServiceConflict_MapsTo409(), TestAdminVendorBranchHandler_Create_ValidationError_MapsTo400(), TestAdminVendorBranchHandler_Disable_HappyPath_Returns202(), TestAdminVendorBranchHandler_Disable_PendingConflict_MapsTo409() (+12 more)
 
 ### Community 364 - "Urutan kerja"
 Cohesion: 0.12
 Nodes (16): B1 — SQL `backend/queries/notifications.sql` → `sqlc generate` (v1.31.1, perbaiki `UserLeafe` → `UserLeave`), B2 — Paket `backend/internal/notification/` (baru), B3 — Handler `backend/internal/handler/notification_handler.go` (baru), B4 — Pemakai pertama `internal/service/vendor_request_completion.go`, B5 — Wiring `backend/cmd/api/main.go` + `backend/.env.example`, Catatan implementasi (2026-10-07), D — Docs, F1 — CompanyPortal (+8 more)
 
-### Community 366 - "NewRepository"
-Cohesion: 0.06
-Nodes (15): NewRepository(), pgx.Row, pgx.Rows, TestRepository_WriteReadTopology(), pgx.Row, pgx.Rows, pgx.Row, pgx.Rows (+7 more)
+### Community 366 - "setupQuotaFixture"
+Cohesion: 0.05
+Nodes (40): pgx.Row, pgx.Rows, TestRepository_WriteReadTopology(), pgx.Row, pgx.Rows, pgx.Row, pgx.Rows, pgx.Rows (+32 more)
 
 ### Community 367 - "adminCtx"
-Cohesion: 0.29
-Nodes (14): NewMasterDataChangeService(), adminCtx(), ctxWithRole(), TestMasterDataChangeService_Submit_ServiceLayerRBAC(), TestMasterDataChangeService_Submit_ApprovalFailureReleasesPendingSlot(), TestMasterDataChangeService_Submit_Create(), TestMasterDataChangeService_Submit_Create_RejectsEntityID(), TestMasterDataChangeService_Submit_Create_SkipsPendingCheck() (+6 more)
+Cohesion: 0.15
+Nodes (21): marshalOrNilJSON(), NewMasterDataChangeService(), adminCtx(), ctxWithRole(), TestMasterDataChangeService_Submit_ServiceLayerRBAC(), TestMasterDataChangeService_Submit_ApprovalFailureReleasesPendingSlot(), TestMasterDataChangeService_Submit_Create(), TestMasterDataChangeService_Submit_Create_RejectsEntityID() (+13 more)
 
 ### Community 370 - "Plan & Task List: User Session Lifetime (absolut 1 jam, parameterized)"
 Cohesion: 0.13
@@ -1793,9 +1779,9 @@ Nodes (14): Alternatif tidak diambil, B1 — SQL (`backend/queries/vendor_reques
 Cohesion: 0.13
 Nodes (14): Acceptance criteria, Data model (migrasi baru `021_atm_visit_quota.sql`; nama tabel diajukan ke CLAUDE.md Sec 3, grup ATM), Definisi, FR1 — State machine Vendor Request: laporan selesai, FR2 — Sisa kunjungan per ATM, FR3 — Log kunjungan + pembatalan, FR4 — Reset kuota, FR5 — API (flat JSON, pola handler ATM tetangga) (+6 more)
 
-### Community 385 - "BuildChain"
-Cohesion: 0.22
-Nodes (8): ApproverInfo, ChainRepository, errNotFound, fakeChainRepository, BuildChain(), int32p(), int64p(), TestBuildChain()
+### Community 385 - "audit_log_read.go"
+Cohesion: 0.23
+Nodes (13): clampAuditLogPage(), clampAuditLogPageSize(), AuditLogDetail, AuditLogListItem, ListAuditLogsParams, ListAuditLogsResult, TestClampAuditLogPage(), TestClampAuditLogPageSize() (+5 more)
 
 ### Community 386 - "3. Rencana Implementasi (setelah keputusan di atas dikonfirmasi)"
 Cohesion: 0.14
@@ -1806,28 +1792,28 @@ Cohesion: 0.21
 Nodes (7): Queries, CountHolidaysAdminParams, CreateHolidayParams, ListHolidaysAdminParams, SetHolidayActiveParams, UpdateHolidayNameParams, Holiday
 
 ### Community 388 - "holiday_admin.go"
-Cohesion: 0.20
-Nodes (13): authorizeHolidayAdmin(), HolidayImportResult, HolidayList, HolidayView, holidayView(), loadHoliday(), NewHolidayAdminService(), parseHolidayCSV() (+5 more)
+Cohesion: 0.14
+Nodes (17): authorizeHolidayAdmin(), HolidayImportResult, HolidayList, HolidayView, holidayView(), ptrInt32(), TestIntegration_HolidayAdmin(), loadHoliday() (+9 more)
 
 ### Community 389 - "BranchesPanel.tsx"
 Cohesion: 0.07
 Nodes (45): BranchesPanel(), BranchesPanelProps, DsrLocationMapsPanel(), Editing, MapDialog(), mutate, money(), PackagesPanel() (+37 more)
 
-### Community 390 - "net/http.ResponseWriter"
-Cohesion: 0.10
-Nodes (20): parsePathID(), assignmentToResponse(), chi.Router, regionToResponse(), changeRequestAcceptedResponse(), chi.Router, parseApprovalRequestID(), toApprovalRequestResponse() (+12 more)
+### Community 390 - "net/http.Request"
+Cohesion: 0.12
+Nodes (17): parsePathID(), assignmentToResponse(), chi.Router, regionToResponse(), changeRequestAcceptedResponse(), chi.Router, chi.Router, extractClientIP() (+9 more)
 
-### Community 391 - "github.com/jackc/pgx/v5/pgtype.Numeric"
-Cohesion: 0.22
-Nodes (10): ListVendorVaultsAdminRow, CreateATMAdminParams, CreateATMAdminRow, CreateVendorVaultAdminParams, CreateVendorVaultAdminRow, UpdateATMAdminParams, UpdateATMAdminRow, UpdateVendorVaultAdminParams (+2 more)
+### Community 391 - "_FakeSettings"
+Cohesion: 0.16
+Nodes (7): _FakeSettings, _PastSlaSettings, Path, time, UUID, Create a scan_runs entry recording this scan's outcome., Create a late_detections record. Idempotent per (file_type, processing_date).
 
 ### Community 392 - "Spec: Modul notifikasi (in-app + email SMTP) — Phase 0.3"
 Cohesion: 0.12
 Nodes (16): Acceptance criteria, Config (ATM-only → dibaca di `cmd/api/main.go` seperti `DSR_*`, bukan `pkg/config` yang dipakai bersama backend-cit), Data model (migrasi baru `025_notifications.sql`), Definisi, FR1 Kirim (API Go internal, dipanggil fitur lain), FR2 Pengirim email (goroutine di `cmd/api`), FR3 Retensi, FR4 HTTP API — `/api/v1/notifications` (RequireAuth, semua role termasuk `VENDOR-USER`) (+8 more)
 
-### Community 393 - "VendorPicAdminService"
-Cohesion: 0.16
-Nodes (12): nilIfEmpty(), VendorPicUpdatePayload, NewVendorPicAdminService(), TestVendorPicAdminService_Create(), TestVendorPicAdminService_UpdateAndToggle_Scoping(), TestVendorPicAdminService_Validate(), TestVendorPicAdminService_Warnings(), trimOptional() (+4 more)
+### Community 393 - ".withParty"
+Cohesion: 0.27
+Nodes (5): chi.Router, VendorOrderHandler, vendorActorFromRequest(), realizationBody, VendorOrderServicer
 
 ### Community 394 - "Slices (urutan kerja; satu commit untuk semua karena kontrak harus rilis bersamaan)"
 Cohesion: 0.14
@@ -1841,9 +1827,9 @@ Nodes (17): AtmCashposTableProps, CashposProfileTable(), CashposProfileTableProp
 Cohesion: 0.20
 Nodes (11): BRAND_OPTIONS, ChipGroup(), ChipGroupProps, DEPLOYMENT_TYPE_OPTIONS, FilterBar(), FilterBarProps, MACHINE_TYPE_OPTIONS, STATUS_OPTIONS (+3 more)
 
-### Community 397 - "NewLocalProvider"
-Cohesion: 0.26
-Nodes (9): LocalProvider, NewLocalProvider(), hashPassword(), TestLocalProvider_Authenticate_NilPasswordHash(), TestLocalProvider_Authenticate_RepoError(), TestLocalProvider_Authenticate_UserNotFound(), TestLocalProvider_Authenticate_ValidPassword(), TestLocalProvider_Authenticate_WrongPassword() (+1 more)
+### Community 397 - "NewMasterDataImportBatchRepository"
+Cohesion: 0.24
+Nodes (6): findOpenBatch(), NewMasterDataImportBatchRepository(), ImportBatch, BatchRowError, ImportBatchPool, MasterDataImportBatchRepository
 
 ### Community 398 - "003_master_data.sql"
 Cohesion: 0.22
@@ -1861,17 +1847,17 @@ Nodes (4): Diperiksa, tanpa masalah, Review — master data (Fase 0–6), Risiko
 Cohesion: 0.40
 Nodes (4): Backend (`cd backend`), Belum diuji, Frontend (`cd frontend/CompanyPortal-Vite`), Tests — master data
 
-### Community 402 - "jakartaCalendarDate"
-Cohesion: 0.27
-Nodes (11): validateCategoryDateConsistency(), validateReplenishDate(), TestAcceptItems(), TestValidateCategoryDateConsistency(), TestValidateReplenishDate(), jakartaCalendarDate(), VendorRequestDetail, seedDmaaRows() (+3 more)
+### Community 402 - ".Apply"
+Cohesion: 0.22
+Nodes (7): atmMoney(), pgx.Tx, pgx.Tx, numericFromDecimalPtr(), vaultNumerics(), ATMApplier, VendorVaultApplier
 
 ### Community 403 - "FSD v1.0 Alignment — Session Summary (2026-10-01)"
 Cohesion: 0.25
 Nodes (8): 1. Decisions taken (FSD replaces URS), 2. Files changed, 3. Proposed schema (NOT approved, NOT migrated), 4. Open questions (for BA / product owner), 5. Not yet handled from the FSD, 5a. Answered 2026-10-05 (blockers for PKS + Limit CIS), 6. Suggested next steps, FSD v1.0 Alignment — Session Summary (2026-10-01)
 
-### Community 405 - "main"
-Cohesion: 0.06
-Nodes (47): getenvDefault(), loadNotificationConfig(), main(), chi.Router, masterDataChangeToResponse(), NewAdminMasterDataChangeHandler(), getRegionRowToResponse(), chi.Router (+39 more)
+### Community 405 - "formatTimestamptz"
+Cohesion: 0.08
+Nodes (33): getRegionRowToResponse(), chi.Router, listRegionRowToResponse(), NewAdminRegionHandler(), parseRegionPageParams(), parseRegionStatusParam(), createUserRowToResponse(), formatTimestamptz() (+25 more)
 
 ### Community 407 - "Entry"
 Cohesion: 0.24
@@ -1917,9 +1903,9 @@ Nodes (4): Catatan / open questions, Daftar report, Feature Flow — Validasi Re
 Cohesion: 0.40
 Nodes (4): Aturan, Catatan / open questions, Feature Flow — Cash Count Selektif Mesin, Flow
 
-### Community 418 - "detector.py"
-Cohesion: 0.05
-Nodes (32): DetectedFile, _FakeSettings, FileDetector, LateDetector, _PastSlaSettings, Any, date, Path (+24 more)
+### Community 418 - "compute_checksum"
+Cohesion: 0.12
+Nodes (13): DetectedFile, date, True if file_type is late for the given processing_date., Mark a late_detections record resolved when the file achieves completed status., Find files in the not_processed directory for a given file type., Find files remaining in the input directory after the ETL window closed., Record newly detected files in import_jobs as `failed` (FR12). Idempotent per…, compute_checksum() (+5 more)
 
 ### Community 419 - "Urutan kerja"
 Cohesion: 0.11
@@ -1950,24 +1936,24 @@ Cohesion: 0.41
 Nodes (11): NewService(), equalInts(), TestSend_DedupesUsersAndEmails(), TestSend_EmailFalseWritesNoOutbox(), TestSend_InsertErrorPropagates(), TestSend_NoRecipientsIsNotAnError(), TestSend_SkipsUnusedRecipientQueries(), TestSend_SMTPDisabledWritesSkipped() (+3 more)
 
 ### Community 435 - "github.com/jackc/pgx/v5/pgtype.Timestamptz"
-Cohesion: 0.07
-Nodes (60): GetDsrUploadByChecksumRow, DmaaAtmForecast, Holiday, VendorRequestItem, VendorRequestTicket, GetVendorOrderRow, ListVendorRealizationsForRequestRow, summary() (+52 more)
+Cohesion: 0.03
+Nodes (102): ListReplenishByTerminalRow, GetDsrUploadByChecksumRow, GetDsrUploadByIDForVendorRow, DmaaAtmForecast, Holiday, ItmCashpo, VendorRequestItem, VendorRequestTicket (+94 more)
 
 ### Community 436 - "dsr_upload_handler.go"
-Cohesion: 0.26
-Nodes (13): toDsrSheetResponse(), toDsrUploadListResponse(), toDsrUploadResponse(), confirmRequest, dsrDailyRowResponse, dsrRencanaIsiRowResponse, dsrRowErrorResponse, dsrSheetDetailResponse (+5 more)
+Cohesion: 0.25
+Nodes (14): toDsrSheetDetailResponse(), toDsrSheetResponse(), toDsrUploadListResponse(), toDsrUploadResponse(), confirmRequest, dsrDailyRowResponse, dsrRencanaIsiRowResponse, dsrRowErrorResponse (+6 more)
 
 ### Community 437 - "_protected.hydration.test.tsx"
 Cohesion: 0.19
 Nodes (6): authRoute, loginRoute, ATM_USER, invalidateMock, queryClient, rootRoute
 
 ### Community 438 - "UserRepository"
-Cohesion: 0.20
-Nodes (11): DeactivateUserService, AuditWriter, NewDeactivateUserService(), TestDeactivateUserService_Deactivate_AuditWriteFails_PropagatesError(), TestDeactivateUserService_Deactivate_TargetNotFound(), TestDeactivateUserService_Deactivate_UserWithAuditHistory_IsSoftDeleted(), TestDeactivateUserService_Deactivate_UserWithoutAuditHistory_StillSoftDeleted(), TestDeactivateUserService_Deactivate_WritesAuditWithoutSecrets() (+3 more)
+Cohesion: 0.06
+Nodes (38): DeactivateUserService, LocalProvider, LoginRequest, LoginResponse, AuditWriter, NewDeactivateUserService(), TestDeactivateUserService_Deactivate_AuditWriteFails_PropagatesError(), TestDeactivateUserService_Deactivate_TargetNotFound() (+30 more)
 
 ### Community 440 - "NewOrchestrator"
-Cohesion: 0.16
-Nodes (18): AuditWriter, AvailabilityRepository, Orchestrator, RequestStore, ResolveEffectiveApprover(), TestResolveEffectiveApprover(), AuditWriter, NewOrchestrator() (+10 more)
+Cohesion: 0.09
+Nodes (27): ApproverInfo, AuditWriter, AvailabilityRepository, ChainRepository, errNotFound, fakeChainRepository, Orchestrator, RequestStore (+19 more)
 
 ### Community 441 - "crown-vendor-detail — sumber artifact"
 Cohesion: 0.50
@@ -1977,9 +1963,9 @@ Nodes (3): Cara menjalankan, crown-vendor-detail — sumber artifact, Isi
 Cohesion: 0.12
 Nodes (15): 010_vendor_package_prices_data.sql — ditulis, belum dijalankan, Aturan lookup harga, Belum dikerjakan, Belum terjawab — memblokir kalkulator, bukan skema, Dampak ke CLAUDE.md — SUDAH dikerjakan, Ditemukan saat mengerjakan layar ini: dua frontend lain jadi stale akibat migrasi 010, Keputusan (product owner, 2026-09-22), Langkah berikutnya (status per 2026-09-22, setelah 010 ditulis) (+7 more)
 
-### Community 443 - "Service"
-Cohesion: 0.33
-Nodes (7): LoginRequest, LoginResponse, Service, UserProfile, NewService(), Provider, RateLimiter
+### Community 443 - "VendorAdminService"
+Cohesion: 0.26
+Nodes (8): validateVendor(), isValidEmail(), normalizeNPWP(), TestNormalizeNPWP(), valueOrEmpty(), VendorAdminRepo, VendorAdminService, VendorAdminSubmitter
 
 ### Community 444 - "pendingApprovalMessage"
 Cohesion: 0.09
@@ -2030,8 +2016,8 @@ Cohesion: 0.22
 Nodes (8): Affected users and systems, Constraints, Intent: Kuota kunjungan replenish per ATM (sisa kunjungan dari paket), Out of scope, Problem, Proposed outcome, Resolved decisions (tanya-jawab satu per satu dengan user, 2026-09-30), Untuk diputuskan di spec (teknis, bukan keputusan bisnis)
 
 ### Community 460 - ".Apply"
-Cohesion: 0.12
-Nodes (18): TestDigitsOrFallback(), TestMapPriceAndPackageDBError(), TestVendorPackagePriceApplier_RejectsBadChanges(), pgx.Tx, mapPackageDBError(), digitsOrFallback(), pgx.Tx, mapPriceDBError() (+10 more)
+Cohesion: 0.17
+Nodes (14): TestDigitsOrFallback(), TestMapPriceAndPackageDBError(), TestVendorPackagePriceApplier_RejectsBadChanges(), pgx.Tx, mapPackageDBError(), digitsOrFallback(), pgx.Tx, mapPriceDBError() (+6 more)
 
 ### Community 461 - "Intent: `import_jobs` / `export_jobs` + helper idempotensi file"
 Cohesion: 0.22
@@ -2053,13 +2039,13 @@ Nodes (12): Acceptance criteria, Data model, Definisi, FR1 — Endpoint ringkasa
 Cohesion: 0.22
 Nodes (8): Bugs / correctness pass, Coverage, Definition of Done (CLAUDE.md Sec 11), forecast-browser-summary — Review (stage 5), Gates, Important, Nit / minor (not fixed, noted), Security pass
 
-### Community 488 - "GetDsrUploadByIDForVendorRow"
-Cohesion: 0.24
-Nodes (4): GetDsrUploadByIDForVendorParams, GetDsrUploadByIDForVendorRow, mustNumeric(), detailFakeDsrRepo
+### Community 488 - "audit_log_handler.go"
+Cohesion: 0.36
+Nodes (10): optionalStringParam(), parseAuditLogDate(), parseListAuditLogsParams(), parseOptionalInt64Param(), toAuditLogDetailResponse(), toAuditLogListResponse(), toAuditLogListRow(), auditLogDetailResponse (+2 more)
 
-### Community 489 - "writeValidationError"
-Cohesion: 0.10
-Nodes (17): acmAreaDetailJSON(), acmAreaJSON(), chi.Router, NewAdminAcmAreaHandler(), chi.Router, holidayID(), NewAdminHolidayHandler(), writeValidationError() (+9 more)
+### Community 489 - "AdminAcmAreaHandler"
+Cohesion: 0.22
+Nodes (8): acmAreaDetailJSON(), acmAreaJSON(), chi.Router, NewAdminAcmAreaHandler(), AcmAreaAdminServicer, acmAreaNameBody, AdminAcmAreaHandler, AuthContext
 
 ### Community 490 - "3\. Architecture, Modules & Data Map"
 Cohesion: 0.33
@@ -2074,16 +2060,16 @@ Cohesion: 0.11
 Nodes (17): Containers under test, Environment, Findings, Hal lucu yang kita temukan, Hasilnya: tokonya sehat dan santai, How to reproduce, Idle resource usage (`docker stats`, no load), Kesimpulan satu kalimat (+9 more)
 
 ### Community 493 - "notification.go"
-Cohesion: 0.33
-Nodes (10): Message, Querier, Recipients, normalizeEmail(), optional(), resolveUsers(), validate(), overQuotaNotification() (+2 more)
+Cohesion: 0.12
+Nodes (21): Message, Querier, Recipients, normalizeEmail(), optional(), resolveUsers(), validate(), notifyRealizationDecision() (+13 more)
 
 ### Community 494 - "time.Time"
-Cohesion: 0.04
-Nodes (62): fakeAvailabilityRepository, Repository, ListUserHierarchyRow, UpdateUserHierarchyRow, ApprovalDelegation, UserLeave, civilDate(), RealizationRowInput (+54 more)
+Cohesion: 0.07
+Nodes (31): fakeAvailabilityRepository, Repository, civilDate(), RealizationRowInput, day(), dayPtr(), TestValidateRealization(), validateRealization() (+23 more)
 
 ### Community 495 - "vendor_party.go"
-Cohesion: 0.17
-Nodes (26): ListRequestPartyVaultRowsRow, addDenom(), auditParties(), buildPartyContents(), DenomAmount, newPartyContent(), newPartyKeys(), reapprovedSinceSent() (+18 more)
+Cohesion: 0.15
+Nodes (28): ListRequestPartyVaultRowsRow, deref(), T, addDenom(), auditParties(), buildPartyContents(), DenomAmount, newPartyContent() (+20 more)
 
 ### Community 496 - "Bug Fix Log"
 Cohesion: 0.06
@@ -2093,13 +2079,13 @@ Nodes (33): 2026-09-30 — Halaman bisa di-scroll ke area kosong (forecast-brows
 Cohesion: 0.33
 Nodes (5): Catatan, Manual check (OUTSTANDING — user), Perintah & hasil (2026-09-30), Tests: Forecast Browser — ringkasan vendor × region, Traceability test → spec
 
-### Community 498 - "newTestRateLimiter"
-Cohesion: 0.32
-Nodes (12): miniredis.Miniredis, RateLimiter, isRateLimitError(), newTestRateLimiter(), TestRateLimiter_AllowsBeforeUsernameLimit(), TestRateLimiter_AllowsUpToIPLimit(), TestRateLimiter_AllowsUpToUsernameLimit(), TestRateLimiter_BlocksAt21stIPAttempt() (+4 more)
+### Community 498 - ".Get"
+Cohesion: 0.42
+Nodes (5): chi.Router, masterDataChangeToResponse(), NewAdminMasterDataChangeHandler(), AdminMasterDataChangeHandler, MasterDataChangeReader
 
-### Community 499 - "TestAdminGuardQueries"
-Cohesion: 0.06
-Nodes (21): TestAdminGuardQueries(), TestAdminRepositories_ReadTopology(), NewDsrLocationMapAdminRepository(), NewMasterDataChangeRepository(), findOpenBatch(), NewMasterDataImportBatchRepository(), pgx.Tx, integrationTx() (+13 more)
+### Community 499 - "NewMasterDataChangeRepository"
+Cohesion: 0.11
+Nodes (13): NewMasterDataChangeRepository(), TestMasterDataChangeRepository(), pgx.Tx, integrationTx(), TestMasterDataImportBatchRepository(), NewVendorBranchAdminRepository(), TestVendorBranchAdminRepository(), TestIntegration_AdminReads() (+5 more)
 
 ### Community 500 - "cit-acm-plan — Review (stage 5)"
 Cohesion: 0.25
@@ -2109,9 +2095,9 @@ Nodes (7): Bugs / correctness pass, Checks run (2026-10-08, after fixes), cit-ac
 Cohesion: 0.22
 Nodes (8): Affected users and systems, Constraints, Intent: Forecast Browser — ringkasan ATM yang perlu replenish (tanpa pilih vendor/region satu per satu), Open questions — dijawab user 2026-09-30, Out of scope, Problem, Proposed outcome, Resolved decisions (tanya-jawab dengan user, 2026-09-30)
 
-### Community 503 - "uploadedCSV"
-Cohesion: 0.10
-Nodes (16): chi.Router, NewAdminMasterDataExportHandler(), chi.Router, AdminMasterDataImportHandler, NewAdminMasterDataImportHandler(), uploadedCSV(), writeImportError(), AdminMasterDataImportHandler (+8 more)
+### Community 503 - "AdminMasterDataImportHandler"
+Cohesion: 0.21
+Nodes (7): chi.Router, AdminMasterDataImportHandler, NewAdminMasterDataImportHandler(), AdminMasterDataImportHandler, importRateLimiter, MasterDataImportServicer, redis.Cmdable
 
 ### Community 504 - "cit-vault-select v3 — Review (stage 5)"
 Cohesion: 0.40
@@ -2121,17 +2107,17 @@ Nodes (4): Checked, no finding, cit-vault-select v3 — Review (stage 5), Import
 Cohesion: 0.25
 Nodes (7): Aturan non-negosiasi, Catatan / open questions, Feature Flow — Siklus Lengkap Order ATM (Forecast → Approval → CIT Pickup → Realisasi), Flow: end-to-end, Order amount (diputuskan 2026-10-08), Pemetaan status (business vs processing), Timeline H0
 
-### Community 506 - ".vendorContext"
-Cohesion: 0.33
-Nodes (4): chi.Router, parseFileID(), toDsrSheetDetailResponse(), DsrUploadHandler
+### Community 506 - "net/http.ResponseWriter"
+Cohesion: 0.07
+Nodes (27): uploadedCSV(), writeImportError(), chi.Router, chi.Router, clearRefreshCookie(), chi.Router, setRefreshCookie(), chi.Router (+19 more)
 
 ### Community 507 - "import-export-jobs — Review (stage 5)"
 Cohesion: 0.29
 Nodes (6): Accepted / not done, Deferred (D, decided 2026-09-29), Fixed after decision A (2026-09-29), Fixed (T8.2), import-export-jobs — Review (stage 5), Open
 
 ### Community 508 - "stubAtmPortalService"
-Cohesion: 0.10
-Nodes (28): AtmPortalService, ListCashposParams, ListCashposResult, numericToDecimalString(), rowToCashposRow(), pgTimeToStringPtr(), computeReplenishmentStatus(), AtmPortalService (+20 more)
+Cohesion: 0.11
+Nodes (25): toListATMCashposResponse(), toListCashposResponse(), AtmPortalService, ListCashposParams, ListCashposResult, numericToDecimalString(), rowToCashposRow(), computeReplenishmentStatus() (+17 more)
 
 ### Community 509 - "response.go"
 Cohesion: 0.28
@@ -2154,12 +2140,12 @@ Cohesion: 0.20
 Nodes (17): public.acm_area_branches, public.acm_area_members, public.acm_areas, public.dsr_location_vault_maps, public.vendor_request_vault_assignments, public.vendor_request_vault_plans, public, public.set_updated_at (+9 more)
 
 ### Community 515 - "AdminATMHandler"
-Cohesion: 0.31
-Nodes (7): atmToResponse(), chi.Router, NewAdminATMHandler(), AdminATMHandler, ATMAdminServicer, createATMAdminRequestBody, updateATMAdminRequestBody
+Cohesion: 0.13
+Nodes (14): atmToResponse(), chi.Router, NewAdminATMHandler(), chi.Router, NewAdminVendorPicHandler(), picToResponse(), formatTimePtr(), toListATMsResponse() (+6 more)
 
 ### Community 516 - "Settings"
-Cohesion: 0.09
-Nodes (19): BaseSettings, field_validator, Path, time, Settings, main(), Uvicorn entrypoint. Run: python -m eod_retry_scheduler.run, parse_trusted_proxies() (+11 more)
+Cohesion: 0.08
+Nodes (20): BaseSettings, field_validator, Path, time, Settings, main(), Uvicorn entrypoint. Run: python -m eod_retry_scheduler.run, parse_trusted_proxies() (+12 more)
 
 ### Community 517 - "Tests: Pemenuhan vault ACM — bagi nominal request ke vault + tiket pemenuhan vault (v3)"
 Cohesion: 0.40
@@ -2169,9 +2155,9 @@ Nodes (4): Catatan, Commands (run 2026-10-13), Test → requirement, Tests: Peme
 Cohesion: 0.13
 Nodes (12): ACM vault assignment (migration 027, + comment 028), ATM assignment package source (migration 023), ATM visit quota (migration 021), Data Map — detailed notes, Master data — per-table notes, Notifications (migration 025), Replenish realization (migration 031), Replenish ticket + request region (migration 026) (+4 more)
 
-### Community 519 - "validateSourceAtApply"
-Cohesion: 0.19
-Nodes (14): assignmentAsOf(), checkVendorSource(), ATMAssignmentUpdatePayload, TestAssignmentAsOf(), validateSourceAtApply(), applyAssignmentCreate(), applyAssignmentUpdate(), applyAutoAssignment() (+6 more)
+### Community 519 - "applyAssignmentCreate"
+Cohesion: 0.36
+Nodes (8): applyAssignmentCreate(), applyAssignmentUpdate(), applyAutoAssignment(), assignmentDates(), ATMAssignmentUpdatePayload, pgx.Tx, mapAssignmentDBError(), ATMAssignmentApplier
 
 ### Community 521 - "Intent: Nomor tiket replenish per ATM"
 Cohesion: 0.17
@@ -2201,13 +2187,13 @@ Nodes (17): API (flat JSON) — perubahan, Data model — migrasi `030` v3 (meng
 Cohesion: 0.21
 Nodes (9): BadgeVariant, CLASS_LABEL, ClassFilter, columnHelper, columns, FILTERS, rangeProblem(), RealizationsPage() (+1 more)
 
-### Community 528 - "DsrService"
-Cohesion: 0.12
-Nodes (17): redis.Client, DsrService, NewDsrService(), TestDsrService_CheckUploadRate(), TestDsrService_ListUploads(), TestDsrService_ResolveVendor(), TestDsrService_SheetDetailIsVendorScoped(), TestDsrService_ValidateUpload() (+9 more)
+### Community 528 - "NewDsrService"
+Cohesion: 0.26
+Nodes (10): NewDsrService(), TestDsrService_CheckUploadRate(), TestDsrService_ListUploads(), TestDsrService_ResolveVendor(), TestDsrService_SheetDetailIsVendorScoped(), TestDsrService_ValidateUpload(), int32Ptr(), TestConfirmUpload_PropagatesCommitFailure() (+2 more)
 
 ### Community 529 - "atm_portal.go"
-Cohesion: 0.18
-Nodes (13): dateToTimePtr(), AtmPortalService, ListATMsParams, ListATMsResult, ValidationError, TestRowToAtmWithCashPos_MoneyAsDecimalString(), rowToAtmWithCashPos(), drawFilterParams() (+5 more)
+Cohesion: 0.21
+Nodes (12): dateToTimePtr(), AtmPortalService, ListATMsParams, ListATMsResult, ValidationError, pgTimeToStringPtr(), TestRowToAtmWithCashPos_MoneyAsDecimalString(), rowToAtmWithCashPos() (+4 more)
 
 ### Community 530 - "Slices (urutan kerja)"
 Cohesion: 0.13
@@ -2235,7 +2221,7 @@ Nodes (8): atm-visit-quota — Review (stage 5), Bugs / correctness pass, Covera
 
 ### Community 537 - "SchedulerService"
 Cohesion: 0.05
-Nodes (35): manual_retry(), post, Request, Response, AuditService, date, UUID, Append-only audit log writer (task 10.1). No update/delete methods are exposed… (+27 more)
+Nodes (42): AuditService, date, UUID, Append-only audit log writer (task 10.1). No update/delete methods are exposed…, Writes retry_audit_logs entries. Append-only: no update/delete methods., FileDetector, LateDetector, Any (+34 more)
 
 ### Community 538 - "Tests: Modul notifikasi (in-app + email SMTP) — Phase 0.3"
 Cohesion: 0.40
@@ -2249,9 +2235,9 @@ Nodes (8): Affected users and systems, Constraints, Intent: Penyimpanan dokumen 
 Cohesion: 0.40
 Nodes (4): Outstanding / tidak diuji otomatis, Perintah & hasil (2026-10-07), Tests: Pilihan sumber paket pada Kelolaan ATM, Traceability test → spec
 
-### Community 541 - "atm_portal_filter_property_test.go"
-Cohesion: 0.26
-Nodes (11): containsFold(), pgx.Tx, insertTestATMWithLifecycle(), nullableDecimalOrderOK(), nullableTimeOrderOK(), sortedPairOK(), stringOrderOK(), strOrNil() (+3 more)
+### Community 541 - ".List"
+Cohesion: 0.42
+Nodes (5): chi.Router, NewAdminVendorPackageHandler(), packageToResponse(), AdminVendorPackageHandler, VendorPackageAdminServicer
 
 ### Community 542 - "Intent: Modul notifikasi (in-app + email SMTP) — Phase 0.3"
 Cohesion: 0.22
@@ -2287,7 +2273,7 @@ Nodes (3): ensureBranchHasNoActiveChildren(), pgx.Tx, VendorBranchApplier
 
 ### Community 553 - "New"
 Cohesion: 0.12
-Nodes (20): New(), activeUserIDs(), countFor(), pgx.Tx, integrationTx(), TestIntegration_PurgeDeletesOnlyOldRows(), TestIntegration_RepositoryScopesToOwner(), TestIntegration_SendExpandsVendorUsersAndPICs() (+12 more)
+Nodes (19): New(), activeUserIDs(), countFor(), pgx.Tx, integrationTx(), TestIntegration_PurgeDeletesOnlyOldRows(), TestIntegration_RepositoryScopesToOwner(), TestIntegration_SendExpandsVendorUsersAndPICs() (+11 more)
 
 ### Community 554 - "Intent: Penetapan branch vault (penyedia uang) per ATM oleh tim ACM (Phase 2.2a)"
 Cohesion: 0.25
@@ -2305,29 +2291,29 @@ Nodes (5): Commands (run 2026-10-08), Keputusan yang mengubah spec, Not covered 
 Cohesion: 0.29
 Nodes (7): draftErrors(), errorMessage(), initialDraft(), RealizationForm(), shiftDays(), todayWib(), toInput()
 
-### Community 559 - "newVaultFlowFixture"
-Cohesion: 0.36
-Nodes (7): VendorRequestDetail, VendorRequestService, newVaultFlowFixture(), TestIntegration_VaultFlow_ApproveCreatesPlanAndCancelCascades(), TestIntegration_VaultFlow_CompletionFromReadyReturnsToReady(), TestIntegration_VaultFlow_RegionWithoutAreaGetsPlanOnMapping(), vaultFlowFixture
+### Community 559 - "PersistDetectedFilesTest"
+Cohesion: 0.28
+Nodes (4): PersistDetectedFilesTest, Path, skipUnless, _Settings
 
 ### Community 560 - "notification (Phase 0.3) — Review (stage 5)"
 Cohesion: 0.25
 Nodes (7): Bugs / correctness pass, Checks run (2026-10-07, after R1–R3), CLAUDE.md compliance (Sec 11 DoD), Important, Nit / minor, notification (Phase 0.3) — Review (stage 5), Security pass
 
-### Community 561 - "NewSetInitialPasswordService"
-Cohesion: 0.31
-Nodes (9): SetInitialPasswordService, AuditWriter, NewSetInitialPasswordService(), TestSetInitialPasswordService_AuditWriteFails_PropagatesError(), TestSetInitialPasswordService_HappyPath(), TestSetInitialPasswordService_NoOldPasswordRequired(), TestSetInitialPasswordService_TargetLDAP_Rejected(), TestSetInitialPasswordService_TargetNotFound() (+1 more)
+### Community 561 - "NewChangePasswordService"
+Cohesion: 0.09
+Nodes (28): AuditWriter, ChangePasswordService, SetInitialPasswordService, ChangePasswordRequest, NewChangePasswordService(), localUserWithPassword(), TestChangePasswordService_AuditWriteFails_PropagatesError(), TestChangePasswordService_HappyPath() (+20 more)
 
-### Community 562 - "AdminVendorPicHandler"
-Cohesion: 0.31
-Nodes (5): chi.Router, NewAdminVendorPicHandler(), picToResponse(), AdminVendorPicHandler, VendorPicAdminServicer
+### Community 562 - "AdminMasterDataExportHandler"
+Cohesion: 0.36
+Nodes (5): chi.Router, NewAdminMasterDataExportHandler(), AdminMasterDataExportHandler, countingWriter, MasterDataExportServicer
 
-### Community 563 - "mountExportHandler"
-Cohesion: 0.38
-Nodes (9): mountExportHandler(), TestAdminMasterDataExportHandler_Anonymous_401(), TestAdminMasterDataExportHandler_EveryEntityRouteAndStatusPassThrough(), TestAdminMasterDataExportHandler_FailureBeforeFirstByte_JSON500(), TestAdminMasterDataExportHandler_FailureMidStream_AbortsConnection(), TestAdminMasterDataExportHandler_RejectsBeforeStreaming(), TestAdminMasterDataExportHandler_StreamsCSVWithDownloadHeaders(), TestAdminMasterDataExportHandler_Template_IsBOMPlusExportHeaderOnly() (+1 more)
+### Community 563 - "RequestVaultPanel.tsx"
+Cohesion: 0.43
+Nodes (5): areaLabel(), useRequestVaultDecision(), useRequestVaultReview(), RequestVaultPanel(), RequestVaultPanelProps
 
-### Community 564 - "NewChangePasswordService"
-Cohesion: 0.47
-Nodes (9): NewChangePasswordService(), localUserWithPassword(), TestChangePasswordService_AuditWriteFails_PropagatesError(), TestChangePasswordService_HappyPath(), TestChangePasswordService_LDAPAccount_Rejected(), TestChangePasswordService_NewEqualsOld_Rejected(), TestChangePasswordService_UserNotFound_GenericError(), TestChangePasswordService_WeakNewPassword_Rejected() (+1 more)
+### Community 564 - "TrustedRealIP"
+Cohesion: 0.43
+Nodes (5): net/netip.Addr, clientFromXFF(), parseRemoteAddr(), TestTrustedRealIP(), TrustedRealIP()
 
 ### Community 565 - "Realization.test.tsx"
 Cohesion: 0.22
@@ -2337,16 +2323,16 @@ Nodes (9): PartyAtm, OrderDetailPage(), AtmDraft, renderAt(), ATM, getMock, orde
 Cohesion: 0.40
 Nodes (4): Commands (all run 2026-10-08), Not covered by automated tests, Test → requirement, Tests: Nomor tiket replenish per ATM + nomor request per region
 
-### Community 567 - "acmAreaHarness"
+### Community 567 - "NewRepository"
 Cohesion: 0.53
-Nodes (8): acmAreaHarness(), countAudit(), pgx.Tx, seedAcmUser(), seedRow(), TestAcmAreaAdmin_AuditFailureRollsBack_Integration(), TestAcmAreaAdmin_Lifecycle_Integration(), TestAcmAreaAdmin_Regions_Integration()
+Nodes (5): TestRepository_CreateDelegation_NonOverlappingSucceeds(), TestRepository_CreateDelegation_OverlapRejected(), TestRepository_ListInboxForApprover(), TestRepository_RevokeDelegation(), NewRepository()
 
 ### Community 568 - "Intent: Nilai uang di API sebagai string desimal, bukan `float64` (QC F7)"
 Cohesion: 0.25
 Nodes (7): Affected users and systems, Constraints, Intent: Nilai uang di API sebagai string desimal, bukan `float64` (QC F7), Jawaban PO (2026-10-12), Open questions (untuk PO / spec), Problem, Proposed outcome
 
-### Community 575 - ".List"
-Cohesion: 0.39
+### Community 575 - "AdminBranchATMHandler"
+Cohesion: 0.53
 Nodes (4): chi.Router, NewAdminBranchATMHandler(), AdminBranchATMHandler, BranchATMServicer
 
 ### Community 576 - "service_dsr_etl/routers/process.py"
@@ -2362,20 +2348,20 @@ Cohesion: 0.17
 Nodes (11): Bukti selesai, Di luar plan, Plan: IP client tepercaya / anti-spoof `X-Forwarded-For` (QC F13), Risiko, S1 — Config `TRUSTED_PROXIES` (FR1, S2, S4), S2 — Middleware `TrustedRealIP` (FR2, S1, S3), S3 — `extractClientIP` (FR3), S4 — Wiring (FR2, FR4) (+3 more)
 
 ### Community 579 - "newImportFixture"
-Cohesion: 0.25
+Cohesion: 0.23
 Nodes (11): newImportFixture(), TestMasterDataImportConfirm_InvalidFileStagesNothing_NoChangesIsAnError_Integration(), TestMasterDataImportConfirm_OneBadRowRollsBackTheWholeBatch_Integration(), TestMasterDataImportConfirm_OneBatchOneApproval_IdempotentPerFile_AppliedAtomically_Integration(), TestMasterDataImportConfirm_RejectRejectsWholeBatch_AndFileMayBeReuploaded_Integration(), TestMasterDataImportConfirm_RequiresMakerIdentity_Integration(), ImportConfirmResult, MasterDataImporter (+3 more)
 
 ### Community 580 - "match_fills"
 Cohesion: 0.49
 Nodes (6): Fill, match_fills(), One itm_replenish row (a physical fill reported by the ATM)., ticket id -> its fill. Nearest to the schedule first (tie: earlier date, then…, Ticket, MatchTest
 
-### Community 581 - "mountAdminVendorPicHandler"
-Cohesion: 0.46
-Nodes (7): mountAdminVendorPicHandler(), TestAdminVendorPicHandler_Create_ErrorMapping(), TestAdminVendorPicHandler_Create_Returns202(), TestAdminVendorPicHandler_Get_NotFound(), TestAdminVendorPicHandler_List_IncludesWarnings(), TestAdminVendorPicHandler_Toggle_Returns202(), TestAdminVendorPicHandler_WrongRole_Forbidden()
+### Community 581 - "admin_vendor_branch_handler.go"
+Cohesion: 0.50
+Nodes (4): NewAdminVendorBranchHandler(), createVendorBranchRequestBody, updateVendorBranchRequestBody, VendorBranchAdminServicer
 
 ### Community 582 - "time.Duration"
-Cohesion: 0.08
-Nodes (31): SMTPMailer, orDefault(), TestSMTPMailer_DefaultTimeouts(), Config, net/netip.Addr, net/netip.Prefix, time.Duration, noopBlacklist (+23 more)
+Cohesion: 0.09
+Nodes (27): SMTPMailer, orDefault(), TestSMTPMailer_DefaultTimeouts(), Config, net/netip.Prefix, time.Duration, noopBlacklist, vendorRequestNoopBlacklist (+19 more)
 
 ### Community 583 - "Intent: IP client tidak bisa dipalsukan lewat `X-Forwarded-For` (QC F13)"
 Cohesion: 0.25
@@ -2385,17 +2371,17 @@ Nodes (7): Affected users and systems, Constraints, Intent: IP client tidak bisa
 Cohesion: 0.17
 Nodes (11): Affected users and systems, Constraints, Data yang dilihat vendor (Q7), Intent: Kirim Vendor Request `ready` ke vendor + terima/tolak di VendorPortal (Phase 2.2b), Notifikasi (Q8) — via `internal/notification` (in-app + email), Open questions (untuk spec, bukan intent), Out of scope, Problem — kata user (2026-10-09) (+3 more)
 
-### Community 585 - "ApprovalPolicy"
-Cohesion: 0.16
-Nodes (9): CreateApprovalPolicyParams, UpdateApprovalPolicyParams, ApprovalPolicy, NewApprovalPolicyStore(), numericParam(), TestApprovalPolicyStore_CreateGetUpdate(), TestApprovalPolicyStore_Get_NotFound(), fakeApprovalPolicyWriter (+1 more)
+### Community 585 - "NewApprovalPolicyStore"
+Cohesion: 0.47
+Nodes (4): NewApprovalPolicyStore(), numericParam(), TestApprovalPolicyStore_CreateGetUpdate(), TestApprovalPolicyStore_Get_NotFound()
 
 ### Community 586 - "mountAuditLogHandler"
-Cohesion: 0.33
-Nodes (11): mountAuditLogHandler(), sampleListItem(), TestAuditLogGetByID_NonIntegerID(), TestAuditLogGetByID_NotFound(), TestAuditLogGetByID_SuccessIncludesBeforeAfter(), TestAuditLogList_BadRequestCases(), TestAuditLogList_DateFromAfterDateTo_ValidationErrorMapsTo400(), TestAuditLogList_DefaultsWhenAbsent() (+3 more)
+Cohesion: 0.20
+Nodes (17): NewAuditLogHandler(), mountAuditLogHandlerWithAuth(), TestAuditLogHandler_AdminRole_Allowed(), TestAuditLogHandler_NonAdminRole_Forbidden(), TestAuditLogHandler_NoToken_Unauthorized(), mountAuditLogHandler(), sampleListItem(), TestAuditLogGetByID_NonIntegerID() (+9 more)
 
 ### Community 587 - "RequireAuth"
-Cohesion: 0.07
-Nodes (58): TestAdminAcmAreaHandler(), mountDsrLocationMapHandler(), TestAdminDsrLocationMapHandler(), TestAdminHolidayHandler(), TestAdminHolidayHandler_Import(), importRouter(), TestAdminMasterDataImportHandler_Anonymous_401(), TestAdminMasterDataImportHandler_Confirm_202ThenExisting200() (+50 more)
+Cohesion: 0.10
+Nodes (43): TestAdminAcmAreaHandler(), NewAdminATMAssignmentHandler(), assignmentTokenSvc(), mountAdminATMAssignmentHandler(), mountPackageOptions(), TestAdminATMAssignmentHandler_CoMountedWithATMCrudRouter(), TestAdminATMAssignmentHandler_Create_ErrorMapping(), TestAdminATMAssignmentHandler_Create_Returns202() (+35 more)
 
 ### Community 588 - "ListVaultTicketsForRequestRow"
 Cohesion: 0.27
@@ -2404,10 +2390,6 @@ Nodes (5): ListVaultTicketsForRequestRow, Queries, IssueVaultTicketParams, LockV
 ### Community 589 - "Spec: Perbaikan tech debt backend (BE-01 – BE-12)"
 Cohesion: 0.22
 Nodes (9): API, Baseline (2026-10-12), Data model, Di luar scope, Flag Sec 4 #7, Keputusan spec (minta konfirmasi PO), Non-functional requirements, Spec: Perbaikan tech debt backend (BE-01 – BE-12) (+1 more)
-
-### Community 590 - "MasterDataChangeService"
-Cohesion: 0.11
-Nodes (18): authorizeMasterDataMaker(), marshalOrNilJSON(), validateMasterDataOp(), ImportConfirmResult, MasterDataImporter, io.Reader, fakeImportServicer, collectedChange (+10 more)
 
 ### Community 591 - "Intent: Pemenuhan vault ACM — bagi nominal request ke vault + tiket pemenuhan vault (perubahan Phase 2.2a)"
 Cohesion: 0.20
@@ -2465,14 +2447,6 @@ Nodes (6): Alternatif yang tidak diambil, Bukti selesai (per slice dan di akhir)
 Cohesion: 0.29
 Nodes (7): Affected users and systems, Constraints, Intent: Perbaikan tech debt frontend (FE-01 – FE-12), Jawaban PO (2026-10-12), Open questions (untuk PO / spec), Problem, Proposed outcome
 
-### Community 610 - "Queries"
-Cohesion: 0.24
-Nodes (4): Queries, InsertVendorRealizationAmountParams, ListRequestTicketOrdersRow, UpsertVendorRealizationParams
-
-### Community 611 - "ValidatePasswordStrength"
-Cohesion: 0.28
-Nodes (5): SetInitialPasswordRequest, fakeSetInitialPasswordService, TestValidatePasswordStrength(), TestValidatePasswordStrength_LengthBoundaries(), ValidatePasswordStrength()
-
 ### Community 612 - "031_replenish_realization.sql"
 Cohesion: 0.15
 Nodes (16): public.holidays, public.replenish_classification_amounts, public.replenish_classifications, public.vendor_request_realization_amounts, public.vendor_request_realizations, public, public.set_updated_at, public.users (+8 more)
@@ -2493,17 +2467,13 @@ Nodes (5): Baseline saat review, Frontend Tech Debt, HIGH, LOW, MEDIUM
 Cohesion: 0.12
 Nodes (15): Alternatif yang tidak diambil, Plan: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c), Risks, S1 — Migrasi 031 + query + sqlc — ✅ DONE 2026-10-14 (mig 031 applied to dev), S2 — Logika murni Go (unit test, tanpa DB) — ✅ DONE 2026-10-14 (`validateRealization`, 16 kasus; reuse `validateCompletionResults`), S3 — Hari Libur admin (FR1) — ✅ DONE 2026-10-14, S4 — Laporan realisasi vendor (FR2) — ✅ DONE 2026-10-14, S5 — Job klasifikasi Python (FR3) — ✅ DONE 2026-10-14 (+7 more)
 
-### Community 621 - "mountAdminBranchATMHandler"
-Cohesion: 0.42
-Nodes (8): mountAdminBranchATMHandler(), TestAdminBranchATMHandler_List_BadPageSize(), TestAdminBranchATMHandler_List_BadPathID(), TestAdminBranchATMHandler_List_BranchNotFound(), TestAdminBranchATMHandler_List_EmptyResult(), TestAdminBranchATMHandler_List_NoToken_Unauthorized(), TestAdminBranchATMHandler_List_WithRows(), TestAdminBranchATMHandler_List_WrongRole_Forbidden()
-
 ### Community 622 - "Checklist"
 Cohesion: 0.15
 Nodes (12): 1. Queries — `backend/queries/<entity>_admin.sql`, 2. Repository — read-only, 3. Service — validate, then `Submit`, 4. Applier — mechanical write only, 5. Wire up — `backend/cmd/api/main.go`, 6. Handler — flat JSON, 202, 7. Tests (CLAUDE.md §8), 8. Frontend — `frontend/CompanyPortal-Vite` (+4 more)
 
 ### Community 624 - "Tests: Perbaikan tech debt backend (BE-01 – BE-12)"
-Cohesion: 0.17
-Nodes (11): Baseline coverage (unit + integration) — FR-C1, Catatan, Commands (run 2026-10-15), Deviasi dari plan (Fase B), Fase B — CI (run lokal 2026-10-15; run GitHub menunggu push user), Fase C — Coverage, slice C1 (run 2026-10-15), Outstanding, Outstanding (Fase B) (+3 more)
+Cohesion: 0.15
+Nodes (12): Baseline coverage (unit + integration) — FR-C1, Catatan, Commands (run 2026-10-15), Deviasi dari plan (Fase B), Fase B — CI (run lokal 2026-10-15; run GitHub menunggu push user), Fase C — Coverage, slice C1 (run 2026-10-15), Fase C — slice C2 `rolemgmt` (run 2026-10-15, committed `8013dd6`), Outstanding (+4 more)
 
 ### Community 625 - "OrdersPages.test.tsx"
 Cohesion: 0.29
@@ -2513,13 +2483,9 @@ Nodes (7): VendorOrderDetail, VendorOrderSummary, getMock, postMock, replenishDe
 Cohesion: 0.29
 Nodes (6): Definition of Done (CLAUDE.md Sec 11), Gates, Important, Nits, Perbaikan (2026-10-14, belum di-commit), Review: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c)
 
-### Community 627 - "TestDsrLocationMapApplier_Lifecycle_Integration"
-Cohesion: 0.50
-Nodes (3): approveChange(), testHelpers, TestDsrLocationMapApplier_Lifecycle_Integration()
-
 ### Community 628 - "NewVendorAdminService"
-Cohesion: 0.10
-Nodes (36): GetVendorAdminByIDRow, CreateVendorRequest, DisableVendorResult, UpdateVendorRequest, NewVendorAdminService(), normalizeNPWP(), activeVendor(), disabledVendor() (+28 more)
+Cohesion: 0.19
+Nodes (26): GetVendorAdminByIDRow, NewVendorAdminService(), activeVendor(), disabledVendor(), TestVendorAdminService_Count_PassesThroughToRepo(), TestVendorAdminService_Create_CodeConflict_StagesNothing(), TestVendorAdminService_Create_InvalidNPWP_StagesNothing(), TestVendorAdminService_Create_StagesLegalNameAndNormalizedNPWP() (+18 more)
 
 ### Community 629 - "Tests: Perbaikan tech debt frontend (FE-01 – FE-12)"
 Cohesion: 0.29
@@ -2530,7 +2496,7 @@ Cohesion: 0.33
 Nodes (5): Catatan / gap, Commands (run 2026-10-14), Test → requirement, Tests: Replenishment — realisasi pengisian ATM vs order (Phase 2.2c), Uji ITM di dev (S9 — langkah untuk user)
 
 ### Community 631 - "AdminDsrLocationMapHandler"
-Cohesion: 0.36
+Cohesion: 0.29
 Nodes (4): chi.Router, NewAdminDsrLocationMapHandler(), AdminDsrLocationMapHandler, DsrLocationMapAdminServicer
 
 ### Community 632 - "AdminVendorPackagePriceHandler"
@@ -2538,24 +2504,16 @@ Cohesion: 0.42
 Nodes (5): chi.Router, NewAdminVendorPackagePriceHandler(), packagePriceToResponse(), AdminVendorPackagePriceHandler, VendorPackagePriceAdminServicer
 
 ### Community 633 - "ApprovalHandler"
-Cohesion: 0.14
-Nodes (13): chi.Router, ApprovalHandler, NewApprovalHandler(), toInboxResponse(), ApprovalHandler, ApprovalHandler, ApprovalOrchestrator, ApprovalReader (+5 more)
+Cohesion: 0.13
+Nodes (15): chi.Router, ApprovalHandler, NewApprovalHandler(), parseApprovalRequestID(), toApprovalRequestResponse(), toInboxResponse(), ApprovalHandler, ApprovalHandler (+7 more)
 
-### Community 634 - "ChangePasswordService"
-Cohesion: 0.36
-Nodes (5): AuditWriter, ChangePasswordService, ChangePasswordRequest, isLocalAuthSource(), fakeChangePasswordService
-
-### Community 636 - "PasswordExpiry"
-Cohesion: 0.38
-Nodes (5): InPasswordWarningWindow(), PasswordExpiry(), TestInPasswordWarningWindow(), TestPasswordExpiry(), TestPasswordExpiry_NilChangedAt_NotEvaluated()
+### Community 635 - "main"
+Cohesion: 0.06
+Nodes (29): getenvDefault(), loadNotificationConfig(), main(), DBTX, TestAdminGuardQueries(), TestAdminRepositories_ReadTopology(), TestAuthRepository_PropagatesDBErrors(), NewATMAdminRepository() (+21 more)
 
 ### Community 637 - "NewRbacReadRepository"
 Cohesion: 0.53
 Nodes (5): NewRbacReadRepository(), TestRbacReadRepository_ListApprovalPolicies_ExactMoney(), TestRbacReadRepository_ListDelegations_OnlyActive(), TestRbacReadRepository_ListLeaves(), TestRbacReadRepository_ListUserHierarchy()
-
-### Community 638 - "get_status"
-Cohesion: 0.50
-Nodes (5): get_status(), get_status_history(), date, get, Request
 
 ### Community 639 - "CMS2 bug fix"
 Cohesion: 0.25
@@ -2568,22 +2526,6 @@ Nodes (7): CMS2 SDLC driver, Don't, Gates — never self-approve, Stage notes, S
 ### Community 641 - "get_summary"
 Cohesion: 0.50
 Nodes (4): get_summary(), date, get, Request
-
-### Community 642 - "get_status"
-Cohesion: 0.50
-Nodes (5): get_status(), get_status_history(), date, get, Request
-
-### Community 643 - "IsLocked"
-Cohesion: 0.50
-Nodes (3): IsLocked(), ptrTime(), TestIsLocked()
-
-### Community 644 - "no_hard_delete_test.go"
-Cohesion: 0.83
-Nodes (3): stripSQLLineComments(), TestNoHardDeletePattern_ActuallyFires(), TestQueries_NoHardDelete()
-
-### Community 645 - "get_audit"
-Cohesion: 0.50
-Nodes (4): get_audit(), date, get, Request
 
 ### Community 648 - "get_late"
 Cohesion: 0.50
@@ -2602,24 +2544,24 @@ Cohesion: 0.50
 Nodes (4): get_late(), date, get, Request
 
 ## Knowledge Gaps
-- **2446 isolated node(s):** `$schema`, `.opencode/opencode.md`, `.opencode/plugins`, `ToolArgs`, `ToolInput` (+2441 more)
+- **2447 isolated node(s):** `$schema`, `.opencode/opencode.md`, `.opencode/plugins`, `ToolArgs`, `ToolInput` (+2442 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **71 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **68 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `VendorPackageCreatePayload` connect `vendor_package_admin.go` to `admin-vendors/hooks.ts`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+  _High betweenness centrality (0.093) - this node is a cross-community bridge._
 - **Why does `VendorPackageContentPayload` connect `admin-vendors/hooks.ts` to `vendor_package_admin.go`?**
-  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+  _High betweenness centrality (0.093) - this node is a cross-community bridge._
 - **Why does `validatePackageGrain()` connect `vendor_package_admin.go` to `time.Time`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
+  _High betweenness centrality (0.016) - this node is a cross-community bridge._
 - **Are the 257 inferred relationships involving `doRequest()` (e.g. with `TestAdminAcmAreaHandler()` and `TestAdminApprovalHandler_AdminRole_SetHierarchy_HappyPath()`) actually correct?**
   _`doRequest()` has 257 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `$schema`, `.opencode/opencode.md`, `.opencode/plugins` to the rest of the system?**
-  _2446 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2447 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `eod-monitoring/types.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.057967313585291114 - nodes in this community are weakly interconnected._
-- **Should `atm_portal_handler.go` be split into smaller, more focused modules?**
-  _Cohesion score 0.08116883116883117 - nodes in this community are weakly interconnected._
+- **Should `fakeUserAdminRepo` be split into smaller, more focused modules?**
+  _Cohesion score 0.05325140809011777 - nodes in this community are weakly interconnected._

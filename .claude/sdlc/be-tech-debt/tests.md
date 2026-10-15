@@ -110,3 +110,28 @@ Prioritas plan sudah punya test integration sebelum slice ini: grant/revoke full
 | `coverage-thresholds.txt` `rolemgmt` | 85 → **93** |
 
 Sisa tidak tercakup (≈6,5%): error `db.CreateRole` non-unik, `tx.Commit` gagal, error dari `ReplaceRolePermissions`/`distinctInt64s` repo, dan cabang 500 middleware — butuh fake `pgx.Tx` penuh; tidak sebanding.
+
+## Fase C — slice C3 `approval` (run 2026-10-15, committed `993540b`)
+Sebelum slice: happy path naik L2→L3, maker approve (hanya cek `err != nil`), reject oleh orang asing, double submit, error submit. C3 menambah `internal/approval/orchestrator_rules_test.go` (unit, fake yang sudah ada + 5 hook injeksi error di `fakeStore`):
+
+| Test | Covers (prioritas plan) |
+|---|---|
+| `TestOrchestrator_MakerCannotActOnOwnRequest` (4 subtest) | maker ≠ checker untuk approve **dan** reject, termasuk approver cuti yang mendelegasikan ke maker; step + request tetap pending, tidak ada audit |
+| `TestOrchestrator_OnlyCurrentStepApproverMayAct` | actor = approver efektif step **saat ini**: L3 tidak bisa lompat saat L2 pending (approve/reject → `ErrNotAuthorized`); approver L2 tidak bisa bertindak di step L3 |
+| `TestOrchestrator_DelegateActsWhileApproverOnLeave` | delegasi/cuti: approver yang cuti ditolak, delegate menyetujui; `acted_by` = delegate, `acted_at` = jam orkestrator, `assigned_approver` tetap; audit actor = delegate |
+| `TestOrchestrator_ApproverOnLeaveWithoutDelegateBlocksStep` | cuti tanpa delegate → semua aktor ditolak, step tetap pending |
+| `TestOrchestrator_PolicyLevelDecidesChainLength` | policy berjenjang: level 2 → satu step, approve langsung `approved` + `final_approve` |
+| `TestOrchestrator_RejectAtLastLevelAfterEarlierApproval` | reject di L3 setelah L2 approve → `rejected`; reject kedua → `ErrRequestNotPending`; urutan audit |
+| `TestOrchestrator_ApproveRejectErrorBranches` (9) + `TestOrchestrator_FinalApproveAuditFailureIsReturned` | error availability/update step/audit/list steps/update request dibungkus dan dikembalikan |
+
+| Command | Result |
+|---|---|
+| `go test ./internal/approval/` (unit) | ok |
+| `go test -tags integration -cover ./internal/approval/` (DB dev) | ok, 0 SKIP, **81,3% → 88,6%** (`Approve`/`Reject` 100%) |
+| `go test -race` (container) · `golangci-lint` | ok · 0 issues |
+| `coverage-thresholds.txt` `approval` | 81 → **88** |
+
+Sisa tidak tercakup: cabang error DB di `repository.go` (not-found/scan error) — dicakup sebagian oleh integration test yang ada.
+
+### Temuan produk (STOP, belum diperbaiki — keputusan user)
+`ResolveEffectiveApprover` (`internal/approval/effective_approver.go`) mengembalikan error **polos** (tidak dibungkus `ErrNotAuthorized`) untuk dua kasus: (a) approver efektif = maker (mis. approver cuti mendelegasikan ke maker), (b) approver cuti tanpa delegate. `ApprovalHandler.handleError` (`internal/handler/approval_handler.go`) jatuh ke `default` → **HTTP 500 "Terjadi kesalahan internal"**. Persetujuan tetap **ditolak** (fail-closed, tidak ada celah keamanan), tetapi user mendapat 500, bukan 403/409 yang bisa ditindaklanjuti. Test C3 sengaja hanya mengecek "ditolak + tidak berubah", tidak mengunci kode 500.

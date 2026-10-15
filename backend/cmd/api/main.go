@@ -24,6 +24,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/config"
+	"github.com/cimb-niaga/cms/pkg/health"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
 
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
@@ -103,7 +104,7 @@ func main() {
 	// prod behind Nginx = every user shares Nginx's IP for the login rate limit.
 	slog.Info("trusted proxies configured", "count", len(cfg.TrustedProxies))
 	r.Use(custommw.TrustedRealIP(cfg.TrustedProxies))
-	r.Use(middleware.Logger)
+	r.Use(custommw.RequestLogger(slog.Default())) // BE-04: JSON slog, msg "http_request"
 	r.Use(middleware.Recoverer)
 	// BE-08: cancel the request context after 30 s (504 if nothing was written)
 	// and cap bodies at 1 MiB except the uploads that set their own cap.
@@ -116,6 +117,17 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Readiness (BE-04): pings primary, replica (when separate) and Redis; 503
+	// when any fails. Public like /health; error details only in the log.
+	readyChecks := map[string]func(context.Context) error{
+		"db":    dbPool.Ping,
+		"redis": func(ctx context.Context) error { return redisClient.Ping(ctx).Err() },
+	}
+	if dbReadPool != dbPool {
+		readyChecks["db_replica"] = dbReadPool.Ping
+	}
+	r.Get("/ready", health.Ready(2*time.Second, readyChecks))
 
 	// Initialize auth dependencies
 	tokenBlacklist := pkgauth.NewRedisTokenBlacklist(redisClient)

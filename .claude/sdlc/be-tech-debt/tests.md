@@ -272,3 +272,40 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 ### Outstanding (E3, E4)
 - Uji manual browser: upload DSR > 1 MiB dan import master-data > 1 MiB di UI (user, Golden Rule #10).
 - Nilai `pool_max_conns` per env diterapkan di Secret Manager/`.env` VM sesudah `SHOW max_connections` di Cloud SQL (user).
+
+## Fase E — slice E1 + E2 + E5 / BE-04 (run 2026-10-15, belum commit)
+
+| Perubahan | File |
+|---|---|
+| E1: `RequestLogger(logger)` — chi `NewWrapResponseWriter`, `RoutePattern()` (kosong → `unmatched`), `slog.LogAttrs` msg `http_request` (method, route, path, status, duration_ms, bytes, request_id, remote_ip tanpa port); 5xx ERROR / 4xx WARN / lainnya INFO; `/health` + `/ready` 2xx dilewati; header/query/body tidak pernah dicatat | `pkg/middleware/request_logger.go` (+ test) |
+| E1: `middleware.Logger` → `custommw.RequestLogger(slog.Default())` di posisi yang sama: `RequestID` → `TrustedRealIP` → `RequestLogger` → `Recoverer` → `Timeout` → `BodyLimit` (cit: tanpa `TrustedRealIP`, seperti sebelumnya) | `backend/cmd/api/main.go`, `backend-cit/cmd/api/main.go` |
+| E1: `github.com/go-chi/chi/v5 v5.3.0` masuk `pkg/go.mod` (versi sama dengan `backend`; bukan dependency baru di stack) | `pkg/go.mod`, `pkg/go.sum` |
+| E2: `health.Ready(timeout, checks)` — cek paralel, status per nama, 200/503, error di-`slog.Warn` saja | `pkg/health/ready.go` (+ test) |
+| E2: `GET /ready` publik (2 s): backend `db`, `db_replica` (hanya bila `dbReadPool != dbPool`), `redis`; cit `db`, `redis` | kedua `main.go` |
+| E5: filter, metric distribusi `duration_ms` label `route`, counter `status>=500`, contoh alert p95 > 3 s | `.claude/docs/deployment.md` ("Request logs, `/ready` and log-based metrics") |
+
+| Test | Covers |
+|---|---|
+| `TestRequestLogger` (pkg, 6 kasus) | T-E1: 2xx INFO + route pattern `/api/v1/items/{id}` + bytes; 4xx WARN; panic → Recoverer 500 ERROR tercatat; route tak dikenal → `unmatched`; `/health` 2xx tidak dicatat; `/ready` 503 tetap dicatat; tiap kasus: header `Authorization` + query `token=` tidak muncul di log, `request_id` terisi, `duration_ms` numerik, `remote_ip` tanpa port |
+| `TestReady` (pkg, 4 kasus) | T-E2: semua ok → 200; satu gagal → 503 + `fail`, pesan error (berisi password DSN) tidak bocor ke body; check menggantung → dipotong timeout → 503; tanpa check → 200 |
+
+| Command | Result |
+|---|---|
+| `go build ./... && go vet ./...` (pkg, backend, backend-cit) | OK |
+| `go test ./...` ×3 | OK (`-race` tidak bisa lokal: butuh cgo; jalan di CI). Coverage pkg: `middleware` 89.1%, `health` 100% |
+| `go test -tags integration -count=1 -cover ./...` (backend, DB dev `localhost`) | OK, 0 SKIP, 0 FAIL; `scripts/check-coverage.sh` semua `ok` (approval 88.6, audit 86.7, auth 90.1, handler 80.7, notification 83.9, repository 86.9, rolemgmt 93.5, service 82.4) |
+| `golangci-lint run --build-tags integration ./...` ×3 | 0 issues |
+| `backend` lokal (`cms-redis` dinyalakan sementara lalu dimatikan lagi) | T-E2: `curl /ready` → 200 `{"checks":{"db":"ok","redis":"ok"},"status":"ok"}`; Redis dimatikan → 503 `redis:"fail"` + log `readiness check failed` (EOF) + `http_request` ERROR route `/ready`. T-E1: request `GET /api/v1/approvals/?token=zzz` + `Authorization: Bearer eyJfake` → baris `http_request` WARN 401 route `/api/v1/approvals`; `grep -c 'eyJ\|zzz'` log = 0 |
+| `backend-cit` lokal (Redis mati) | T-E2: `curl /ready` → 503 `{"db":"ok","redis":"fail"}` |
+| T-E5 | docs saja (`deployment.md`); pembuatan metric + alert di GCP = user |
+
+### Catatan (E1, E2, E5)
+- `RoutePattern()` untuk `r.Post("/")` di dalam `r.Route("/api/v1/items")` adalah `/api/v1/items` (chi memangkas `/` akhir) — label metric jadi tanpa slash akhir.
+- Log memakai `context.Background()`: context request bisa sudah dibatalkan oleh `Timeout`/client pergi, baris log tetap harus tertulis.
+- `remote_ip` = `r.RemoteAddr` sesudah `TrustedRealIP` (backend), port dibuang lewat `parseRemoteAddr` yang sudah ada.
+- Docker `HEALTHCHECK` **tidak** diubah (tetap `/health`); pindah ke `/ready` perlu keputusan user (restart container tiap DB/Redis bermasalah).
+- slog menulis `level`, bukan `severity` → di Cloud Logging severity `DEFAULT`; dicatat di `deployment.md`, tidak diubah (di luar E1).
+
+### Outstanding (E1, E2, E5)
+- GCP: buat metric `http_request_latency` + `http_5xx`, alert p95 > 3 s + kanal notifikasi; pastikan log container ter-parse JSON ke `jsonPayload` (user).
+- Keputusan: LB/uptime check memakai `/ready`; Docker `HEALTHCHECK` tetap `/health` atau pindah (user).

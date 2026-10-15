@@ -31,8 +31,8 @@ Sudah baik (jangan dirombak): React 19 + Vite 6 + TS strict (`noUncheckedIndexed
 
 | ID | Item | Bukti | Perbaikan | Status |
 |---|---|---|---|---|
-| FE-07 | Error boundary tidak terpasang di router CompanyPortal | `ErrorBoundary` hanya di `features/dashboard/DashboardScreen.tsx`; router tanpa `defaultErrorComponent` → error render = layar putih | `createRouter({ routeTree, defaultErrorComponent })`. VendorPortal sudah ada di `app/AppShell.tsx`. | done 2026-10-15 (belum commit) |
-| FE-08 | Upload/download master-data melewati API client | `frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts:79,104` memakai `fetch` sendiri → tidak ikut refresh 401 | Tambah dukungan `FormData`/blob di `lib/api/client.ts` lalu pakai di sini. | done 2026-10-15 (belum commit) — `ApiResponse.headers`, `responseType: "blob"`, FormData; `parseApiError` kini juga membawa `errors` ke `details` |
+| FE-07 | Error boundary tidak terpasang di router CompanyPortal | `ErrorBoundary` hanya di `features/dashboard/DashboardScreen.tsx`; router tanpa `defaultErrorComponent` → error render = layar putih | `createRouter({ routeTree, defaultErrorComponent })`. VendorPortal sudah ada di `app/AppShell.tsx`. | done e498519 |
+| FE-08 | Upload/download master-data melewati API client | `frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts:79,104` memakai `fetch` sendiri → tidak ikut refresh 401 | Tambah dukungan `FormData`/blob di `lib/api/client.ts` lalu pakai di sini. | done e498519 — `ApiResponse.headers`, `responseType: "blob"`, FormData; `parseApiError` kini juga membawa `errors` ke `details` |
 | FE-09 | Pola auth berbeda antar portal + UI/util terduplikasi | Company: Zustand `lib/auth/store.ts`; Vendor: React Context `features/auth/AuthContext.tsx`; `components/ui` dobel | Samakan saat salah satu disentuh; shared package hanya bila duplikasi mulai merepotkan. | open |
 | FE-10 | Sisa kode mati / tumpang-tindih | 4 file `*.backup` di `src/` (`routes/_auth.tsx.backup`, `routes/_auth/login.tsx.backup`, `styles/index.css.backup`, `styles/tokens.css.backup`); `lib/api/stubs` + `VITE_API_MODE` tidak dipakai; folder `forecast` / `forecasting` / `dmaa-forecast` tumpang-tindih padahal forecast engine di-drop 2026-10-08 | Hapus backup + stubs; konsolidasi folder forecast (cek route & menu dulu). | in-progress 2026-10-15 — `*.backup`, `lib/api/stubs`, `VITE_API_MODE`/`apiConfig.mode` dihapus; folder forecast TIDAK dikonsolidasi (lihat tests.md) |
 
@@ -40,6 +40,6 @@ Sudah baik (jangan dirombak): React 19 + Vite 6 + TS strict (`noUncheckedIndexed
 
 | ID | Item | Bukti | Perbaikan | Status |
 |---|---|---|---|---|
-| FE-11 | `.env.local` ikut ke Docker build context | `frontend/CompanyPortal-Vite/.dockerignore` tidak memuat `.env*` (VendorPortal sudah) | Tambah `.env*` ke `.dockerignore`; set `VITE_*` lewat build arg. | done 2026-10-15 (belum commit) |
+| FE-11 | `.env.local` ikut ke Docker build context | `frontend/CompanyPortal-Vite/.dockerignore` tidak memuat `.env*` (VendorPortal sudah) | Tambah `.env*` ke `.dockerignore`; set `VITE_*` lewat build arg. | done e498519 |
 | FE-12 | Komponen mendekati batas 800 baris | `features/vendor-request/VendorRequestDetail.tsx` (734), `VendorRequestCreate.tsx` (598) | Pecah saat disentuh berikutnya. | open |
 | FE-13 | Coverage FE di bawah target 80% | CompanyPortal 2026-10-12: statements 69,85 · branches 70,11 · functions 64,13 · lines 70,64. Threshold Vitest dipasang di baseline oleh `sdlc/fe-tech-debt` (S1) | Naikkan threshold bertahap ke 80% sambil menambah test. | open |

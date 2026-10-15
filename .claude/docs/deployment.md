@@ -54,3 +54,47 @@
 | Prod (2028, VM per backend) | unchanged count (one pool each) | same | same formula | same |
 
 *   Start at 20 per pool and raise only when the dashboard p95 (≤ 3 s) shows pool waits; a pool larger than the DB can serve concurrently only moves the queue into Postgres. Re-compute whenever a new instance (another API replica, a new Python service) starts connecting.
+
+**Request logs, `/ready` and log-based metrics (BE-04, be-tech-debt E1/E2/E5) — metrics and alert are not yet created in GCP (user, outstanding)**
+*   Both Go APIs write one JSON line per request via `pkg/middleware.RequestLogger`: `{"level":"INFO|WARN|ERROR","msg":"http_request","method","route","path","status","duration_ms","bytes","request_id","remote_ip"}`. `route` = chi pattern (`/api/v1/vendor-requests/{id}`, low cardinality, use it as the label); `path` = raw path, only for debugging. Level: 5xx `ERROR`, 4xx `WARN`, else `INFO`. Headers, query strings and bodies are never logged. 2xx `/health` + `/ready` are not logged.
+*   `GET /ready` (public, like `/health`): pings `db`, `db_replica` (only when `DATABASE_REPLICA_URL` is a separate pool) and `redis` (`backend`) / `db` + `redis` (`backend-cit`), 2 s timeout, answers 200 `{"status":"ok","checks":{…:"ok"}}` or 503 with the failing check marked `"fail"`; the error itself only goes to the log (`msg="readiness check failed"`). Docker `HEALTHCHECK` still uses `/health` (liveness) — moving it to `/ready` would restart containers on every DB/Redis blip, so that is a separate decision. Use `/ready` for an LB health check / uptime check.
+*   Precondition: the container's stdout must reach Cloud Logging **parsed as JSON** (Ops Agent / COS logging agent), so fields land in `jsonPayload.*`. Check one entry in Logs Explorer before creating metrics. slog writes `level`, not `severity`, so entries show severity `DEFAULT`; filter on `jsonPayload.level` (or map it in the agent).
+*   Logs Explorer filter: `jsonPayload.msg="http_request"` (add `resource.type="gce_instance"` and the container name as needed).
+*   **Latency metric** (distribution, label `route`), `gcloud logging metrics create http_request_latency --config-from-file=http_request_latency.yaml`:
+
+```yaml
+description: CMS API request latency (ms) per chi route
+filter: jsonPayload.msg="http_request"
+valueExtractor: EXTRACT(jsonPayload.duration_ms)
+labelExtractors:
+  route: EXTRACT(jsonPayload.route)
+  method: EXTRACT(jsonPayload.method)
+metricDescriptor:
+  metricKind: DELTA
+  valueType: DISTRIBUTION
+  unit: ms
+  labels:
+    - key: route
+    - key: method
+bucketOptions:
+  explicitBuckets:
+    bounds: [50, 100, 250, 500, 1000, 2000, 3000, 5000, 10000, 30000]
+```
+
+*   **5xx counter** (label `route`), `gcloud logging metrics create http_5xx --config-from-file=http_5xx.yaml`:
+
+```yaml
+description: CMS API responses with status >= 500
+filter: jsonPayload.msg="http_request" AND jsonPayload.status>=500
+labelExtractors:
+  route: EXTRACT(jsonPayload.route)
+metricDescriptor:
+  metricKind: DELTA
+  valueType: INT64
+  unit: "1"
+  labels:
+    - key: route
+```
+
+*   **Example alert — p95 > 3 s (NFR dashboard ≤ 3 s p95)**: Cloud Monitoring → Alerting → condition on `logging.googleapis.com/user/http_request_latency`, aligner `ALIGN_PERCENTILE_95` over 5 min, group by `metric.label.route`, threshold **> 3000** (ms) for 10 min, notify the app-support channel (email). Narrow `metric.label.route` to the routes the dashboard calls once they are confirmed; start with all routes. The bucket bound at 3000 keeps the p95 estimate exact at the threshold. Companion alert: `http_5xx` rate > 0 for 5 min (or > N/min once a baseline exists).
+*   Outstanding (user): create both metrics + the alert + notification channel in the GCP project; confirm JSON parsing in Cloud Logging; decide whether an LB/uptime check uses `/ready`.

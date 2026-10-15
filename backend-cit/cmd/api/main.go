@@ -16,6 +16,7 @@ import (
 
 	"github.com/cimb-niaga/cms/pkg/auth"
 	"github.com/cimb-niaga/cms/pkg/config"
+	"github.com/cimb-niaga/cms/pkg/health"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -60,7 +61,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Logger)
+	r.Use(custommw.RequestLogger(slog.Default())) // BE-04: JSON slog, msg "http_request"
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(custommw.BodyLimit(1<<20, nil)) // BE-08: no upload endpoints here
@@ -70,6 +71,12 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Readiness (BE-04): pings the DB and Redis; 503 when any fails.
+	r.Get("/ready", health.Ready(2*time.Second, map[string]func(context.Context) error{
+		"db":    dbPool.Ping,
+		"redis": func(ctx context.Context) error { return redisClient.Ping(ctx).Err() },
+	}))
 
 	// Protected route group (placeholder for future CIT endpoints)
 	r.Group(func(r chi.Router) {

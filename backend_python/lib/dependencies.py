@@ -5,8 +5,8 @@ from __future__ import annotations
 import hmac
 import logging
 
+import jwt
 from fastapi import HTTPException, Request
-from jose import JWTError, jwt
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,10 @@ def _authenticate(request: Request) -> tuple[str, str | None]:
     try:
         payload = jwt.decode(
             token, settings.auth_secret, algorithms=["HS256"],
-            options={"verify_aud": False, "require_exp": True},
+            # Go never sets aud; HS256 only, so alg=none/HS512/RS256 tokens are refused
+            options={"verify_aud": False, "require": ["exp"]},
         )
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     # Go refresh tokens carry `id` but no `role`; only access tokens may call this API.
     if not payload.get("role") or token_identity(payload) == "unknown":
@@ -84,7 +85,7 @@ def extract_user_id(auth_result: str) -> str:
 
 if __name__ == "__main__":
     # Smoke check: JWT round-trip and identity extraction (no HTTP involved).
-    secret = "test_secret"
+    secret = "test_secret_at_least_32_bytes_long"
     token = jwt.encode({"sub": "user@company.co.id"}, secret, algorithm="HS256")
     payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
     assert extract_user_id(token_identity(payload)) == "user@company.co.id"

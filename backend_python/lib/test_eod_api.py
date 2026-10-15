@@ -12,6 +12,9 @@ Run from backend_python/:  python -m unittest lib.test_eod_api -v
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -19,7 +22,7 @@ import unittest
 from datetime import date
 
 import asyncpg
-from jose import jwt
+import jwt
 
 from eod_retry_scheduler import config as retry_config
 from eod_retry_scheduler.main import create_app as create_retry_app
@@ -31,18 +34,30 @@ from service_dsr_etl.main import create_app as create_dsr_app
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 DAY = date(2099, 1, 1)
-SECRET = "test-secret"
+SECRET = "test-secret-at-least-32-bytes-long"  # PyJWT warns below 32 bytes for HS256
 CLIENT_IP = "10.9.8.7"
 
 
-def access_token(role: str | None = "ADMIN", uid: int = 1, exp: bool = True, secret: str = SECRET) -> str:
+def access_token(role: str | None = "ADMIN", uid: int = 1, exp: bool = True, secret: str = SECRET,
+                 ttl: int = 300, alg: str = "HS256") -> str:
     """Shape of pkg/auth AccessTokenClaims (numeric `id`, no `sub`); role=None mimics a refresh token."""
     claims: dict = {"id": uid, "username": "t"}
     if role is not None:
         claims["role"] = role
     if exp:
-        claims["exp"] = int(time.time()) + 300
-    return jwt.encode(claims, secret, algorithm="HS256")
+        claims["exp"] = int(time.time()) + ttl
+    return jwt.encode(claims, secret, algorithm=alg)
+
+
+def forged_token(alg: str) -> str:
+    """ADMIN claims under a hand-built header: alg=none (empty signature) or an HMAC-SHA256 signature
+    with the shared secret under another alg (algorithm confusion, e.g. RS256)."""
+    def b64(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    claims = {"id": 1, "username": "t", "role": "ADMIN", "exp": int(time.time()) + 300}
+    signing_input = f"{b64(json.dumps({'alg': alg, 'typ': 'JWT'}).encode())}.{b64(json.dumps(claims).encode())}"
+    sig = b"" if alg == "none" else hmac.new(SECRET.encode(), signing_input.encode(), hashlib.sha256).digest()
+    return f"{signing_input}.{b64(sig)}"
 
 # (name, app factory, config module, a source owned by that service, hash char)
 SERVICES = (
@@ -219,7 +234,14 @@ class EodApiTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual((await call(app, method, path, query, token=access_token("VENDOR")))[0], 403, path)
                     self.assertEqual((await call(app, method, path, query, token=access_token(None)))[0], 401, path)
                     self.assertEqual((await call(app, method, path, query, token=access_token(exp=False)))[0], 401, path)
-                    self.assertEqual((await call(app, method, path, query, token=access_token(secret="wrong")))[0], 401, path)
+                    for label, bad in (
+                        ("wrong secret", access_token(secret="wrong-secret-also-at-least-32-bytes")),
+                        ("expired", access_token(ttl=-60)),
+                        ("HS512", access_token(alg="HS512")),
+                        ("alg none", forged_token("none")),
+                        ("RS256 header", forged_token("RS256")),
+                    ):
+                        self.assertEqual((await call(app, method, path, query, token=bad))[0], 401, f"{path} {label}")
                 self.assertEqual((await call(app, "GET", "/summary", q, token=access_token("ADMIN")))[0], 200)
                 self.assertEqual((await call(app, "GET", "/summary", q, token=access_token("APPACCESS")))[0], 200)
                 # the VENDOR attempts above must not have touched the job

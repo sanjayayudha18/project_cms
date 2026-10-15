@@ -121,10 +121,17 @@ jobs:
         run: bash scripts/apply-migrations.sh
       - name: Install requirements
         run: |
-          for r in backend_python/*/requirements.txt; do pip install -r "$r"; done
+          for r in backend_python/*/requirements.txt backend_python/itm/*/requirements.txt; do pip install -r "$r"; done
       - name: unittest (dsr, itm/cashpos, replenish_classify, lib incl. import_jobs + eod_api; no skips allowed)
         working-directory: backend_python
         run: |
           set -o pipefail
           python -m unittest discover -v 2>&1 | tee test.log
           if grep -q "skipped=" test.log; then echo "::error::python tests skipped"; exit 1; fi
+
+  python-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: docker build (backend_python EOD image)
+        run: docker build -t cms-eod:ci backend_python

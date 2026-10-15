@@ -205,3 +205,34 @@ Impor CSV master-data yang berisi baris **toggle** (hanya `is_active` berubah �
 
 ### Status Fase C
 Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semua ≥ 80%), ambang anti-turun aktif di CI. Test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) tercakup. Temuan #2 diperbaiki di `1f2e8a3` (helper bersama `marshalPayloadJSON`).
+
+## Fase F — Python EOD / BE-05 (run 2026-10-15, belum di-commit)
+
+| Perubahan | File |
+|---|---|
+| F1: semua requirements `>=` → `==` (versi terpasang, plan baris 27); baru `dmaa/requirements.txt`, `itm/cashpos/requirements.txt` | `backend_python/{dsr,itm/replenish,eod_retry_scheduler,service_dsr_etl,dmaa,itm/cashpos}/requirements.txt` |
+| F2: `python-jose[cryptography]` → `PyJWT==2.15.1` (diinstal dengan izin user); `jwt.decode(..., algorithms=["HS256"], options={"verify_aud": False, "require": ["exp"]})`, `jwt.InvalidTokenError`. Klaim/role yang dicek tidak berubah (`role` wajib, identitas `sub`/`id`, `EOD_ROLES`) | `lib/dependencies.py`, `lib/test_eod_api.py`, requirements kedua service |
+| F3: `python:3.14-slim`, satu `pip install --no-cache-dir` untuk 6 requirements (konflik versi = build gagal), user non-root 10001, `TZ=Asia/Jakarta`, `WORKDIR /app`, HEALTHCHECK `urllib` ke `HEALTHCHECK_PORT` (8091; DSR override 8090), ENV path script ETL relatif ke `backend_python/` (default config relatif ke root repo → salah di container) | `backend_python/Dockerfile`, `backend_python/.dockerignore` |
+| CI: job `python-image` (`docker build`); loop install job `python` ikut `backend_python/itm/*/requirements.txt` | `.github/workflows/ci.yml` |
+
+| Test | Covers |
+|---|---|
+| `test_jwt_role_gate_and_token_hardening` (diperluas, 2 service × 5 route) | T-F2: secret salah, kedaluwarsa (`exp` −60 s), HS512 (secret benar), `alg none` (tanpa signature), header RS256 dengan signature HMAC secret (algorithm confusion) → 401; tanpa `exp`, tanpa `role` → 401; VENDOR → 403; ADMIN/APPACCESS → 200 |
+| Mutasi: `algorithms=["HS256","HS512"]` | test di atas gagal (`200 != 401 : /status HS512`) → dipulihkan |
+
+| Command | Result |
+|---|---|
+| `py -3 -m unittest lib.test_eod_api -v` (DB dev, `localhost`) | 9 OK |
+| `py -3 -m unittest discover` (DB dev) | T-F1: **77 OK, 0 skip** |
+| `py -3 -m lib.dependencies` | demo OK |
+| `docker build -t cms-eod:local backend_python` (Docker 29.8.2) | OK; di image: uid 10001, `date` = WIB, semua import + PyJWT 2.15.1, tanpa `python-jose`, tanpa `.env`/test |
+| `docker run` (DB dev, `FTP_DATA` kosong di-mount) default + override `python -m service_dsr_etl.run`, `HEALTHCHECK_PORT=8090` | T-F3: keduanya `healthy`, `/health` 200; path script ETL ada |
+
+### Catatan (Fase F)
+- `/health` mengembalikan 503 bila `FTP_DATA` (induk direktori input) tidak ada → deploy wajib me-mount `/app/FTP_DATA` (atau set `*_FTP_DATA_ROOT`).
+- PyJWT memvalidasi `iat` di masa depan (python-jose tidak); Go dan Python satu VM sehingga clock skew diabaikan. PyJWT memberi warning bila secret HS256 < 32 byte; `JWT_SECRET` prod harus ≥ 32 byte.
+- CI direncanakan pindah ke Jenkins (`.claude/sdlc/ci-jenkins/`, on hold); job `python-image` ditambahkan di `ci.yml` sesuai plan dan perlu dipindahkan bersama job lain.
+
+### Outstanding (Fase F)
+- Run GitHub Actions (`python`, `python-image`) setelah user push.
+- Wiring deploy image Python (registry, compose/VM) — di luar plan.

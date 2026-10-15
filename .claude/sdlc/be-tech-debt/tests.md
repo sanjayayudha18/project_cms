@@ -273,7 +273,7 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 - Uji manual browser: upload DSR > 1 MiB dan import master-data > 1 MiB di UI (user, Golden Rule #10).
 - Nilai `pool_max_conns` per env diterapkan di Secret Manager/`.env` VM sesudah `SHOW max_connections` di Cloud SQL (user).
 
-## Fase E — slice E1 + E2 + E5 / BE-04 (run 2026-10-15, belum commit)
+## Fase E — slice E1 + E2 + E5 / BE-04 (run 2026-10-15, committed `180d9f8`)
 
 | Perubahan | File |
 |---|---|

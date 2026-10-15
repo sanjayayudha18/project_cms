@@ -237,7 +237,7 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 - Run GitHub Actions (`python`, `python-image`) setelah user push.
 - Wiring deploy image Python (registry, compose/VM) — di luar plan.
 
-## Fase E — slice E3 + E4 / BE-08, BE-09 (run 2026-10-15, belum di-commit)
+## Fase E — slice E3 + E4 / BE-08, BE-09 (run 2026-10-15, committed `9f54d5a`; timeout 30 s diterima user apa adanya)
 
 | Perubahan | File |
 |---|---|
@@ -272,4 +272,3 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 ### Outstanding (E3, E4)
 - Uji manual browser: upload DSR > 1 MiB dan import master-data > 1 MiB di UI (user, Golden Rule #10).
 - Nilai `pool_max_conns` per env diterapkan di Secret Manager/`.env` VM sesudah `SHOW max_connections` di Cloud SQL (user).
-- Commit menunggu "commit" dari user.

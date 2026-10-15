@@ -135,3 +135,19 @@ Sisa tidak tercakup: cabang error DB di `repository.go` (not-found/scan error) �
 
 ### Temuan produk — **DIPERBAIKI `448e870`** (2026-10-15, bugfix: (a) → 403 `ErrNotAuthorized`, (b) → 409 `ErrApproverOnLeaveNoDelegate`; test C3 dikencangkan ke sentinel, lihat `.claude/bugfixes.md`)
 `ResolveEffectiveApprover` (`internal/approval/effective_approver.go`) mengembalikan error **polos** (tidak dibungkus `ErrNotAuthorized`) untuk dua kasus: (a) approver efektif = maker (mis. approver cuti mendelegasikan ke maker), (b) approver cuti tanpa delegate. `ApprovalHandler.handleError` (`internal/handler/approval_handler.go`) jatuh ke `default` → **HTTP 500 "Terjadi kesalahan internal"**. Persetujuan tetap **ditolak** (fail-closed, tidak ada celah keamanan), tetapi user mendapat 500, bukan 403/409 yang bisa ditindaklanjuti. Test C3 sengaja hanya mengecek "ditolak + tidak berubah", tidak mengunci kode 500.
+
+## Fase C — slice C4.1 `service` / `masterdata_approval` (run 2026-10-15, committed `82ae252`)
+Sudah ada sebelumnya: stale → `ErrMasterDataChangeStale` + entitas tidak berubah, unchanged → applied, applier hilang → approved-not-applied, batch satu baris gagal → seluruh batch rollback, reject batch, RetryApply (+ RBAC, kedua kali `NotRetryable`); handler stale → 409 (`admin_atm_assignment_handler_test.go`).
+
+| Test baru | File | Covers |
+|---|---|---|
+| `TestMasterDataApprovalService_StaleChange_NotRetryable_NoAppliedAudit_Integration` | `masterdata_approval_rules_integration_test.go` | stale bersifat final: `RetryApply` → `ErrMasterDataNotRetryable`, edit bersamaan tetap, 0 audit `master_data_applied` |
+| `TestMasterDataApprovalService_EntityGoneAtApply_ApprovedNotApplied_Integration` | idem | entitas hilang saat apply → error bukan stale, status `approved` + `error` tercatat (bisa di-retry), tidak ada tulisan |
+| `TestMasterDataApprovalService_OrchestratorRefusal_LeavesChangePending_Integration` | idem | penolakan rantai approval (`ErrNotAuthorized`, maker ≠ checker) diteruskan; change tetap `pending`, tidak ada apply/reject |
+| `TestStatesEqual` (7) | `masterdata_states_equal_test.go` (unit) | urutan field tidak berpengaruh; nilai/flag berubah → beda; field hilang di snapshot → beda; snapshot rusak / current tak bisa di-marshal → error |
+
+| Command | Result |
+|---|---|
+| `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 81,6% → 81,7%; `Approve` 100%, `applyOne` 75% → 81,2%, `statesEqual` 66,7% → 88,9% |
+| `golangci-lint` · `go test -race` (unit, container) | 0 issues · ok |
+| `coverage-thresholds.txt` `service` | tetap 81 (paket besar; kenaikan per sub-slice C4.2–C4.4) |

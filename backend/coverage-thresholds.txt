@@ -7,5 +7,5 @@ github.com/cimb-niaga/cms/backend/internal/auth 90
 github.com/cimb-niaga/cms/backend/internal/handler 80
 github.com/cimb-niaga/cms/backend/internal/notification 83
 github.com/cimb-niaga/cms/backend/internal/repository 86
-github.com/cimb-niaga/cms/backend/internal/rolemgmt 85
+github.com/cimb-niaga/cms/backend/internal/rolemgmt 93
 github.com/cimb-niaga/cms/backend/internal/service 81

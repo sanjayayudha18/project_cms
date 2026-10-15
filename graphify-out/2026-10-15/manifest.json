@@ -36,9 +36,9 @@
     "semantic_hash": "82d6233f201596051331a58620326b46"
   },
   "backend-cit/cmd/api/main.go": {
-    "mtime": 1792058017.620546,
-    "seen": 1792058296.5647388,
-    "ast_hash": "1cd24588a6511fd636e660e5556c3fce",
+    "mtime": 1792062571.0385215,
+    "seen": 1792062851.9018464,
+    "ast_hash": "e9218adf1d642687400401fa976ff95b",
     "semantic_hash": ""
   },
   "backend-cit/go.mod": {
@@ -96,9 +96,9 @@
     "semantic_hash": "ddb82e74080cd0e2054eb4dc6f230ff2"
   },
   "backend/cmd/api/main.go": {
-    "mtime": 1792058017.620546,
-    "seen": 1792058296.5647573,
-    "ast_hash": "9cb18ef75728a37e781a98ceed1ecd1e",
+    "mtime": 1792062571.0385215,
+    "seen": 1792062851.9018624,
+    "ast_hash": "ab91a2ef9049f4bbe9f77145bf15e868",
     "semantic_hash": ""
   },
   "backend/cmd/hashpw/main.go": {
@@ -2034,9 +2034,9 @@
     "semantic_hash": ""
   },
   "pkg/go.mod": {
-    "mtime": 1791531383.8391623,
-    "seen": 1791536411.4221041,
-    "ast_hash": "a8a8450d7749b455be961bf60eb88a33",
+    "mtime": 1792062512.5952213,
+    "seen": 1792062851.9030385,
+    "ast_hash": "3a47e89bc093a404d055ec864e63168e",
     "semantic_hash": ""
   },
   "pkg/middleware/rate_limiter.go": {
@@ -5610,9 +5610,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792061444.1366434,
-    "seen": 1792061486.1211305,
-    "ast_hash": "a865df292cfb0378436901e26dcf6e2f",
+    "mtime": 1792062811.5101562,
+    "seen": 1792062851.903063,
+    "ast_hash": "3646a4169a2d9717544e91db362b59bb",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -6414,9 +6414,9 @@
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
-    "mtime": 1792058059.7474587,
-    "seen": 1792058296.5662801,
-    "ast_hash": "139e1c12c3ad514cd433fb8bd2613a1e",
+    "mtime": 1792062780.648176,
+    "seen": 1792062851.9030666,
+    "ast_hash": "f63979b0ec6f24a849b334175d04a43a",
     "semantic_hash": ""
   },
   ".claude/docs/requirements.md": {
@@ -7674,15 +7674,15 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792058512.7146268,
-    "seen": 1792061486.1211262,
-    "ast_hash": "3b1f913e88f964983d1cb0b34a3eb10d",
+    "mtime": 1792062811.5101562,
+    "seen": 1792062851.903059,
+    "ast_hash": "6eed57045a12544bd04e3072a4a4b1af",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
-    "mtime": 1792061444.1366434,
-    "seen": 1792061486.121128,
-    "ast_hash": "a2614035eb7917d5f39ade23c4b3bc3e",
+    "mtime": 1792062407.5204856,
+    "seen": 1792062851.9030612,
+    "ast_hash": "cc513d9ae048acc21aa7b953ca651948",
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/intent.md": {
@@ -8076,15 +8076,15 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/tests.md": {
-    "mtime": 1792058513.1743236,
-    "seen": 1792061486.1211689,
-    "ast_hash": "e8c0ee0c05ace3cbb1e9484ef7a38328",
+    "mtime": 1792062811.5101562,
+    "seen": 1792062851.9031,
+    "ast_hash": "5ac6c0af64f6ddf76601f0c108e5f7e8",
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
-    "mtime": 1792061444.1366434,
-    "seen": 1792061486.1211987,
-    "ast_hash": "8db8cdd3e09a72e37ca0908cdd83b6f8",
+    "mtime": 1792062041.5523248,
+    "seen": 1792062851.903129,
+    "ast_hash": "a61334124bb07a8645a0cd58ccee8141",
     "semantic_hash": ""
   },
   "backend/scripts/apply-migrations.sh": {
@@ -8253,6 +8253,30 @@
     "mtime": 1792061307.3602543,
     "seen": 1792061486.1213653,
     "ast_hash": "6d8101cc3e98c1969b8848e893b0981f",
+    "semantic_hash": ""
+  },
+  "pkg/health/ready.go": {
+    "mtime": 1792062506.1891437,
+    "seen": 1792062851.9030397,
+    "ast_hash": "de0efa80735fe1aba2dc66c8c7002bb2",
+    "semantic_hash": ""
+  },
+  "pkg/health/ready_test.go": {
+    "mtime": 1792062506.9981418,
+    "seen": 1792062851.903041,
+    "ast_hash": "04676e8ea36c301298e3ef3c058d49ff",
+    "semantic_hash": ""
+  },
+  "pkg/middleware/request_logger.go": {
+    "mtime": 1792062723.7146811,
+    "seen": 1792062851.9030533,
+    "ast_hash": "9bd21f67f36c9f7dc6efa3f61694f17a",
+    "semantic_hash": ""
+  },
+  "pkg/middleware/request_logger_test.go": {
+    "mtime": 1792062723.7166853,
+    "seen": 1792062851.9030542,
+    "ast_hash": "387c8a1662f0b0cef0efaa9f0ae04959",
     "semantic_hash": ""
   }
 }

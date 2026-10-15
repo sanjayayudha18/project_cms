@@ -2094,9 +2094,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1791973206.2451816,
-    "seen": 1791973276.6069407,
-    "ast_hash": "88d0b8ce40e3c8c80ce766e487896651",
+    "mtime": 1792067070.109568,
+    "seen": 1792067166.1069214,
+    "ast_hash": "8acf720bc72c6b3d2c28f48392d4cf6a",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -5610,9 +5610,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792062811.5101562,
-    "seen": 1792062851.903063,
-    "ast_hash": "3646a4169a2d9717544e91db362b59bb",
+    "mtime": 1792067087.905311,
+    "seen": 1792067166.106925,
+    "ast_hash": "538a16e0d2070a3b1b080eb84af62029",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -6414,9 +6414,9 @@
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
-    "mtime": 1792062780.648176,
-    "seen": 1792062851.9030666,
-    "ast_hash": "f63979b0ec6f24a849b334175d04a43a",
+    "mtime": 1792067040.7390664,
+    "seen": 1792067166.1069283,
+    "ast_hash": "5eec666e039631fdb037ade391ea8df8",
     "semantic_hash": ""
   },
   ".claude/docs/requirements.md": {
@@ -7674,9 +7674,9 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792062811.5101562,
-    "seen": 1792062851.903059,
-    "ast_hash": "6eed57045a12544bd04e3072a4a4b1af",
+    "mtime": 1792067087.905311,
+    "seen": 1792067166.1069205,
+    "ast_hash": "a78cab73cbf6c4bf20102c410036c31f",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
@@ -8076,9 +8076,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/tests.md": {
-    "mtime": 1792062811.5101562,
-    "seen": 1792062851.9031,
-    "ast_hash": "5ac6c0af64f6ddf76601f0c108e5f7e8",
+    "mtime": 1792067122.4301064,
+    "seen": 1792067166.106966,
+    "ast_hash": "eabd78c3ceeaf3a3302506c313fc3aac",
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
@@ -8087,16 +8087,10 @@
     "ast_hash": "a61334124bb07a8645a0cd58ccee8141",
     "semantic_hash": ""
   },
-  "backend/scripts/apply-migrations.sh": {
-    "mtime": 1792039418.666059,
-    "seen": 1792041654.334034,
-    "ast_hash": "679da76653899a1fb0165ff82a8591e9",
-    "semantic_hash": ""
-  },
   ".github/workflows/ci.yml": {
-    "mtime": 1792056327.8268993,
-    "seen": 1792056573.0531754,
-    "ast_hash": "d70e0a3229c1680e7a80ca39eb65ff2c",
+    "mtime": 1792067007.4835088,
+    "seen": 1792067166.107053,
+    "ast_hash": "bc5965018fe4893c8fdad9751aeff7c6",
     "semantic_hash": ""
   },
   "backend/scripts/check-coverage.sh": {
@@ -8106,9 +8100,9 @@
     "semantic_hash": ""
   },
   "backend/coverage-thresholds.txt": {
-    "mtime": 1792045119.5204859,
-    "seen": 1792048957.9153357,
-    "ast_hash": "d02e4de83ebc4037b4d2890306cee301",
+    "mtime": 1792066954.6772127,
+    "seen": 1792067166.107139,
+    "ast_hash": "e50c2e0e102214f590a09569e81cdf10",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/service_test.go": {
@@ -8277,6 +8271,30 @@
     "mtime": 1792062723.7166853,
     "seen": 1792062851.9030542,
     "ast_hash": "387c8a1662f0b0cef0efaa9f0ae04959",
+    "semantic_hash": ""
+  },
+  "backend/cmd/migrate/main.go": {
+    "mtime": 1792066702.3184512,
+    "seen": 1792067166.1056247,
+    "ast_hash": "840c57b176cbecb971330997164dad94",
+    "semantic_hash": ""
+  },
+  "backend/cmd/migrate/runner.go": {
+    "mtime": 1792066882.7158737,
+    "seen": 1792067166.1056263,
+    "ast_hash": "67fa7e783ce0c9a89e2d352f4de542c5",
+    "semantic_hash": ""
+  },
+  "backend/cmd/migrate/runner_integration_test.go": {
+    "mtime": 1792066804.4988616,
+    "seen": 1792067166.1056273,
+    "ast_hash": "444a6d9ae048516b06eab356a6a54981",
+    "semantic_hash": ""
+  },
+  "backend/cmd/migrate/runner_test.go": {
+    "mtime": 1792066746.5159385,
+    "seen": 1792067166.1056287,
+    "ast_hash": "306a360e10a55280973af5df032462e5",
     "semantic_hash": ""
   }
 }

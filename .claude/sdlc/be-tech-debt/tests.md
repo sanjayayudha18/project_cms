@@ -182,3 +182,26 @@ Sudah ada sebelumnya: validasi alokasi (duplikat, vault/denom tak dikenal, urgen
 | `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 82,0% → **82,2%**; `planFor` 76,9 → 84,6%, `planTx` 81 → 85,7%, `Approve` 72,2 → 77,8%, `ReviewRequest` 72,9 → 81,2%, `scope` 80 → 90%, `decide` 80,5 → 82,9% |
 | `golangci-lint` | 0 issues |
 | `coverage-thresholds.txt` `service` | tetap 82 |
+
+## Fase C — slice C4.4 `service` / sisanya: money + import CSV (run 2026-10-15, committed `56d0a8f`; failing import test diserahkan ke sesi perbaikan)
+Pemilihan berdasarkan prioritas FR-C3 dari daftar fungsi < 70%: **money math** (harga paket, desimal ke DB) dan **maker-checker impor CSV** (baris update/toggle). Sisa fungsi < 70% kebanyakan cabang error DB atau read/list tanpa aturan bisnis.
+
+| Test baru | File | Covers |
+|---|---|---|
+| `TestValidatePriceContent_BasePrice` (14) | `masterdata_money_test.go` (unit) | harga = desimal ≥ 0, maks 18 digit bulat + 2 desimal, di-trim; ditolak: negatif, 3 desimal, 19 digit, pemisah ribuan, eksponen, teks, titik di akhir; kosong = warisi |
+| `TestValidatePriceContent_OptionalFields` | idem | SLA note kosong → nil, di-trim; tanggal akhir `YYYY-MM-DD` (salah format → error, kosong → nil) |
+| `TestNumericFromDecimalPtr` (5) | idem | desimal → `numeric` **persis** (dicek via `big.Rat`), nil/kosong → NULL, sampah → error (tidak pernah nol diam-diam) |
+| `TestTierMaxInt32` | idem | tier terbuka tetap nil |
+| `TestMasterDataImportConfirm_UpdateAndToggleRows_EffectOnlyAfterApproval_Integration` | `masterdata_import_update_toggle_integration_test.go` | **GAGAL — menemukan bug produk (lihat Temuan #2); belum di-commit, diserahkan ke sesi perbaikan** |
+
+| Command | Result |
+|---|---|
+| `go test -tags integration -cover -skip UpdateAndToggleRows… ./internal/service/` (DB dev) | ok, 0 SKIP; paket 82,2% → **82,3%**; `validatePriceContent` 68,4 → 100%, `numericFromDecimalPtr` → 100%, `tierMaxInt32` 50 → 100% |
+| `golangci-lint` | 0 issues |
+| `coverage-thresholds.txt` `service` | tetap 82 |
+
+### Temuan produk #2 (STOP, belum diperbaiki — keputusan user)
+Impor CSV master-data yang berisi baris **toggle** (hanya `is_active` berubah → enable/disable) gagal saat **Confirm**: `ERROR: null value in column "payload" of relation "master_data_change_requests" violates not-null constraint (23502)` → HTTP 500. Penyebab: `MasterDataImporter.Confirm` (`internal/service/masterdata_import_confirm.go`, loop `params[n] = …`) memakai `marshalOrNilJSON(c.req.Payload)` tanpa fallback `{}`; jalur biasa `MasterDataChangeService.Submit` (`masterdata_change.go:144`) sudah punya fallback itu untuk op enable/disable. Berlaku untuk semua entitas yang bisa di-toggle lewat CSV (vendors, branches, vaults, PIC, ATM, kelolaan). `TestImport_StageToggle` memakai fake sehingga tidak menangkapnya. Test integration di atas adalah failing test untuk perbaikan.
+
+### Status Fase C
+Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semua ≥ 80%), ambang anti-turun aktif di CI. Test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) tercakup. Terbuka: perbaikan Temuan #2.

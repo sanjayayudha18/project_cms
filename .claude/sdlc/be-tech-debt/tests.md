@@ -1,6 +1,6 @@
 # Tests: Perbaikan tech debt backend (BE-01 – BE-12)
 
-Status: **partial — Fase A (A1, A2, A3) green 2026-10-15** (Stage 4). Input: `spec.md` (FR-A1–A3), `plan.md` Fase A (accepted 2026-10-15). Belum di-commit. Fase B–G belum dikerjakan (plan masih draft untuk fase itu).
+Status: **partial — Fase A (A1, A2, A3) green 2026-10-15** (Stage 4). Input: `spec.md` (FR-A1–A3), `plan.md` Fase A (accepted 2026-10-15). Committed `fb3b6fd` (A1, A2) + `9a5af6d` (A3). Fase B–G belum dikerjakan (plan masih draft untuk fase itu).
 
 ## Commands (run 2026-10-15)
 | Command | Result |

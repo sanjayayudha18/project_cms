@@ -1,6 +1,6 @@
 # Tests: Perbaikan tech debt frontend (FE-01 – FE-12)
 
-Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Input: `spec.md` (FR-A1, FR-A3), `plan.md` (A1, A2, A4). Belum di-commit. Slice lain (A3, A5, B–F) belum dikerjakan.
+Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Input: `spec.md` (FR-A1, FR-A3), `plan.md` (A1, A2, A4). Committed `fb3b6fd`. Slice lain (A3, A5, B–F) belum dikerjakan.
 
 ## Commands (run 2026-10-15)
 | Command | Result |

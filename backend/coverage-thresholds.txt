@@ -1,0 +1,11 @@
+# Minimum statement coverage per package (unit + integration, `go test -tags integration -cover`).
+# Checked by scripts/check-coverage.sh in CI job go-integration. Values = measured baseline
+# 2026-10-15 rounded down; only ever raise them. internal/db is sqlc-generated (no tests).
+github.com/cimb-niaga/cms/backend/internal/approval 81
+github.com/cimb-niaga/cms/backend/internal/audit 86
+github.com/cimb-niaga/cms/backend/internal/auth 90
+github.com/cimb-niaga/cms/backend/internal/handler 80
+github.com/cimb-niaga/cms/backend/internal/notification 83
+github.com/cimb-niaga/cms/backend/internal/repository 86
+github.com/cimb-niaga/cms/backend/internal/rolemgmt 85
+github.com/cimb-niaga/cms/backend/internal/service 81

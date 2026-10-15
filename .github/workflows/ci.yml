@@ -67,10 +67,12 @@ jobs:
       - name: Integration tests (no skips allowed)
         run: |
           set -o pipefail
-          go test -tags integration -race -count=1 -v ./... | tee test.log
+          go test -tags integration -race -count=1 -cover -v ./... | tee test.log
           if grep -q -- "--- SKIP" test.log; then
             echo "::error::integration tests skipped"; grep -- "--- SKIP" test.log; exit 1
           fi
+      - name: Coverage not below backend/coverage-thresholds.txt
+        run: bash scripts/check-coverage.sh test.log
 
   sqlc:
     runs-on: ubuntu-latest

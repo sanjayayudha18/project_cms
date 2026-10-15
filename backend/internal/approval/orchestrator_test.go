@@ -25,8 +25,11 @@ type fakeStore struct {
 	policies       map[string]int32
 
 	// error injection for exercising orchestrator error-handling branches
-	forceFindRequestErr error
-	forceCreateStepErr  error
+	forceFindRequestErr   error
+	forceCreateStepErr    error
+	forceListStepsErr     error
+	forceUpdateStepErr    error
+	forceUpdateRequestErr error
 }
 
 func newFakeStore(policies map[string]int32) *fakeStore {
@@ -88,6 +91,9 @@ func (f *fakeStore) GetRequest(_ context.Context, id int64) (db.ApprovalRequest,
 }
 
 func (f *fakeStore) UpdateRequestStatus(_ context.Context, id int64, status string) (db.ApprovalRequest, error) {
+	if f.forceUpdateRequestErr != nil {
+		return db.ApprovalRequest{}, f.forceUpdateRequestErr
+	}
 	req, ok := f.requests[id]
 	if !ok {
 		return db.ApprovalRequest{}, fmt.Errorf("request %d not found", id)
@@ -115,6 +121,9 @@ func (f *fakeStore) CreateStep(_ context.Context, requestID int64, stepLevel int
 }
 
 func (f *fakeStore) ListSteps(_ context.Context, requestID int64) ([]db.ApprovalStep, error) {
+	if f.forceListStepsErr != nil {
+		return nil, f.forceListStepsErr
+	}
 	var out []db.ApprovalStep
 	for _, id := range f.stepsByRequest[requestID] {
 		out = append(out, f.steps[id])
@@ -135,6 +144,9 @@ func (f *fakeStore) FindPendingStep(_ context.Context, requestID int64) (*db.App
 }
 
 func (f *fakeStore) UpdateStepStatus(_ context.Context, id int64, status string, actedByID int64, actedAt time.Time) (db.ApprovalStep, error) {
+	if f.forceUpdateStepErr != nil {
+		return db.ApprovalStep{}, f.forceUpdateStepErr
+	}
 	s, ok := f.steps[id]
 	if !ok {
 		return db.ApprovalStep{}, fmt.Errorf("step %d not found", id)

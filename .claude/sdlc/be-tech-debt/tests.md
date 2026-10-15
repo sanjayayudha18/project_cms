@@ -65,3 +65,28 @@ Status: **partial — Fase A (A1, A2, A3) green 2026-10-15** (Stage 4). Input: `
 - **T-B3 negatif**: ubah satu `queries/*.sql` tanpa generate di branch uji → job `sqlc` harus gagal (belum dijalankan; dilakukan setelah workflow aktif di GitHub).
 - **B5 (job `e2e`) ditunda**: FE E3 (`frontend/CompanyPortal-Vite/e2e/`) belum ada. Secrets `E2E_*` belum diperlukan.
 - Branch protection (wajib lulus CI) di GitHub = user.
+
+## Fase C — Coverage, slice C1 (run 2026-10-15)
+| Command | Result |
+|---|---|
+| `go test -tags integration -count=1 -p 1 -cover ./internal/...` ke DB dev | lihat tabel baseline |
+| Ulang cara CI: `CREATE DATABASE cms_ci` → `apply-migrations.sh` → container `golang:1.26.9` `go test -tags integration -race -count=1 -cover -v ./...` → `DROP DATABASE cms_ci` | exit 0, 0 SKIP, angka **sama persis** dengan run di dev |
+| `scripts/check-coverage.sh <log>` (ambang asli) | 8 paket ok, exit 0 |
+| `scripts/check-coverage.sh <log> <ambang uji: service 99 + paket fiktif>` | `FAIL … service 81.6% < 99%` + `MISSING … nosuch`, exit 1 |
+
+### Baseline coverage (unit + integration) — FR-C1
+| Paket `internal/*` | 2026-10-12 (unit saja) | 2026-10-15 | Ambang |
+|---|---|---|---|
+| `service` | 44,6% | 81,6% | 81 |
+| `approval` | 54,2% | 81,3% | 81 |
+| `rolemgmt` | 35,8% | 85,4% | 85 |
+| `repository` | 15,4% | 86,9% | 86 |
+| `handler` | — | 80,7% | 80 |
+| `auth` | — | 90,1% | 90 |
+| `audit` | — | 86,7% | 86 |
+| `notification` | — | 83,9% | 83 |
+| `db` | — | 0% (sqlc, tanpa test) | — |
+
+- **S5 tidak terpicu**: `service` 81,6% ≥ 65%, tidak perlu AI-DLC `be-coverage-service`.
+- Target FR-C3 (≥ 80% `service`, `approval`, `rolemgmt`) **sudah tercapai** secara angka. C2–C4 tetap ada untuk test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) dan menaikkan ambang.
+- CI: `go-integration` kini `-cover` + step `bash scripts/check-coverage.sh test.log`. Committed `ddefb12`; bukti GitHub menunggu push.

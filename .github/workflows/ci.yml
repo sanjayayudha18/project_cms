@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev1]
+  pull_request:
+    branches: [main, dev1]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: go (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, backend-cit, pkg]
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.0
+          working-directory: ${{ matrix.module }}
+          args: --build-tags integration
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: go test -race ./...
+
+  go-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18 # same major as dev (18.3)
+        env:
+          POSTGRES_DB: cms
+          POSTGRES_USER: cms
+          POSTGRES_PASSWORD: cms-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cms -d cms"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: cms
+      PGPASSWORD: cms-ci-only
+      PGDATABASE: cms
+      DATABASE_URL: postgres://cms:cms-ci-only@localhost:5432/cms?sslmode=disable
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+      - name: Apply migrations
+        run: bash scripts/apply-migrations.sh
+      - name: Integration tests (no skips allowed)
+        run: |
+          set -o pipefail
+          go test -tags integration -race -count=1 -v ./... | tee test.log
+          if grep -q -- "--- SKIP" test.log; then
+            echo "::error::integration tests skipped"; grep -- "--- SKIP" test.log; exit 1
+          fi
+
+  sqlc:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.work
+      - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+      - run: sqlc generate
+      # Known v1.31.1 inflector quirk (CLAUDE.md Sec 2a): user_leaves -> UserLeafe.
+      - run: sed -i 's/UserLeafe/UserLeave/g' internal/db/*.go
+      - name: Generated code matches queries/migrations
+        run: git diff --exit-code -- internal/db
+
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: cms
+          POSTGRES_USER: cms
+          POSTGRES_PASSWORD: cms-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cms -d cms"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: cms
+      PGPASSWORD: cms-ci-only
+      PGDATABASE: cms
+      DATABASE_URL: postgres://cms:cms-ci-only@localhost:5432/cms?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Apply migrations
+        working-directory: backend
+        run: bash scripts/apply-migrations.sh
+      - name: Install requirements
+        run: |
+          for r in backend_python/*/requirements.txt; do pip install -r "$r"; done
+      - name: unittest (dsr, itm/cashpos, replenish_classify, lib incl. import_jobs + eod_api; no skips allowed)
+        working-directory: backend_python
+        run: |
+          set -o pipefail
+          python -m unittest discover -v 2>&1 | tee test.log
+          if grep -q "skipped=" test.log; then echo "::error::python tests skipped"; exit 1; fi

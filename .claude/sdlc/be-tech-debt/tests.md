@@ -151,3 +151,20 @@ Sudah ada sebelumnya: stale → `ErrMasterDataChangeStale` + entitas tidak berub
 | `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 81,6% → 81,7%; `Approve` 100%, `applyOne` 75% → 81,2%, `statesEqual` 66,7% → 88,9% |
 | `golangci-lint` · `go test -race` (unit, container) | 0 issues · ok |
 | `coverage-thresholds.txt` `service` | tetap 81 (paket besar; kenaikan per sub-slice C4.2–C4.4) |
+
+## Fase C — slice C4.2 `service` / vendor_request + completion + kuota (run 2026-10-15)
+Sudah ada sebelumnya: state machine + `checkActor` (unit + property), four-eyes approve/reject, reject → rejected + 1 audit, cancel (union rule, checker-only setelah approved, idempotent), UpdateItems guard, kuota (decrement, over quota tetap approve + notifikasi, reject + resubmit, reset/cancel, rollback, paralel, terminal tak dikenal), completion transitions/actor (unit).
+
+`internal/service/vendor_request_rules_integration_test.go`:
+
+| Test | Covers |
+|---|---|
+| `TestIntegration_VendorRequestTransition_Guards` (5) | `ErrNotFound` untuk submit/approve/reject; **state guard sebelum actor guard** (approve draft oleh creator → `ErrInvalidTransition`, bukan `ErrSelfApproval`; 0 audit); hanya creator yang submit (`ErrNotCreator`); submit tanpa item → `ErrEmptyItems`; role non-checker approve → `ErrNotChecker` (RBAC di service); status tidak berubah |
+| `TestIntegration_Completion_Guards` (4) | request tak ada → `ErrNotFound`; request dibatalkan tidak bisa dilaporkan; `VENDOR-USER` di jalur internal → `ErrNotAuthorized`; alasan reject > 500 → `ValidationError` |
+| `TestIntegration_VisitQuota_ServiceRBACAndEdges` (4) | **RBAC di service**: `ATM-USER`/`VENDOR-USER`/kosong tidak bisa `ResetATM`/`ResetVendor`/`CancelVisit` (`ErrNotChecker`); reset ATM tak dikenal → `ErrAtmNotFound`; cancel visit tak ada / alasan > 500; ATM tanpa kuota diketahui → kunjungan tercatat `quota_known=false`, tidak ada baris kuota, bisa dibatalkan tanpa menyentuh counter |
+
+| Command | Result |
+|---|---|
+| `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 81,7% → **82,0%**; `transition` 72,7 → 81,8%, `runCompletionTx` 77,4 → 87,1%, `ResetATM` 76,9 → 92,3%, `CancelVisit` 74,1 → 85,2% |
+| `golangci-lint` | 0 issues |
+| `coverage-thresholds.txt` `service` | 81 → **82** |

@@ -7788,9 +7788,9 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792044642.513396,
-    "seen": 1792044688.7230518,
-    "ast_hash": "1a76f43316de99c264b216a7cc8536d6",
+    "mtime": 1792048918.0558558,
+    "seen": 1792048957.915125,
+    "ast_hash": "b7366dacf7dd11f6bb23c07eea270e63",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
@@ -8190,9 +8190,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/tests.md": {
-    "mtime": 1792044643.1349678,
-    "seen": 1792044688.7230945,
-    "ast_hash": "bc54c0d0e5416f4521ec85d6bb3947a2",
+    "mtime": 1792045120.5584548,
+    "seen": 1792048957.915169,
+    "ast_hash": "e12243b2fda61079b36aec05a5f4dbe4",
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
@@ -8220,9 +8220,9 @@
     "semantic_hash": ""
   },
   "backend/coverage-thresholds.txt": {
-    "mtime": 1792042952.6325283,
-    "seen": 1792043245.6885264,
-    "ast_hash": "48effe6815316671d9b678e5981da134",
+    "mtime": 1792045119.5204859,
+    "seen": 1792048957.9153357,
+    "ast_hash": "d02e4de83ebc4037b4d2890306cee301",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/service_test.go": {
@@ -8247,6 +8247,12 @@
     "mtime": 1792044435.448082,
     "seen": 1792044688.7221694,
     "ast_hash": "0caea4c51702c61f53c7fe6db36279ee",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_request_rules_integration_test.go": {
+    "mtime": 1792045036.71215,
+    "seen": 1792048957.9142745,
+    "ast_hash": "98af50a69643aa6d6d594b1de9a0e70c",
     "semantic_hash": ""
   }
 }

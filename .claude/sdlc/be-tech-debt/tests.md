@@ -206,7 +206,7 @@ Impor CSV master-data yang berisi baris **toggle** (hanya `is_active` berubah �
 ### Status Fase C
 Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semua ≥ 80%), ambang anti-turun aktif di CI. Test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) tercakup. Temuan #2 diperbaiki di `1f2e8a3` (helper bersama `marshalPayloadJSON`).
 
-## Fase F — Python EOD / BE-05 (run 2026-10-15, belum di-commit)
+## Fase F — Python EOD / BE-05 (run 2026-10-15, committed `c34a038`)
 
 | Perubahan | File |
 |---|---|

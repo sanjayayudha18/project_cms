@@ -200,8 +200,8 @@ Pemilihan berdasarkan prioritas FR-C3 dari daftar fungsi < 70%: **money math** (
 | `golangci-lint` | 0 issues |
 | `coverage-thresholds.txt` `service` | tetap 82 |
 
-### Temuan produk #2 (STOP, belum diperbaiki — keputusan user)
+### Temuan produk #2 (diperbaiki `1f2e8a3`, bugfixes.md 2026-10-15)
 Impor CSV master-data yang berisi baris **toggle** (hanya `is_active` berubah → enable/disable) gagal saat **Confirm**: `ERROR: null value in column "payload" of relation "master_data_change_requests" violates not-null constraint (23502)` → HTTP 500. Penyebab: `MasterDataImporter.Confirm` (`internal/service/masterdata_import_confirm.go`, loop `params[n] = …`) memakai `marshalOrNilJSON(c.req.Payload)` tanpa fallback `{}`; jalur biasa `MasterDataChangeService.Submit` (`masterdata_change.go:144`) sudah punya fallback itu untuk op enable/disable. Berlaku untuk semua entitas yang bisa di-toggle lewat CSV (vendors, branches, vaults, PIC, ATM, kelolaan). `TestImport_StageToggle` memakai fake sehingga tidak menangkapnya. Test integration di atas adalah failing test untuk perbaikan.
 
 ### Status Fase C
-Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semua ≥ 80%), ambang anti-turun aktif di CI. Test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) tercakup. Terbuka: perbaikan Temuan #2.
+Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semua ≥ 80%), ambang anti-turun aktif di CI. Test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) tercakup. Temuan #2 diperbaiki di `1f2e8a3` (helper bersama `marshalPayloadJSON`).

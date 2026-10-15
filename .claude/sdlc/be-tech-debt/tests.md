@@ -90,3 +90,23 @@ Status: **partial — Fase A (A1, A2, A3) green 2026-10-15** (Stage 4). Input: `
 - **S5 tidak terpicu**: `service` 81,6% ≥ 65%, tidak perlu AI-DLC `be-coverage-service`.
 - Target FR-C3 (≥ 80% `service`, `approval`, `rolemgmt`) **sudah tercapai** secara angka. C2–C4 tetap ada untuk test prioritas (maker ≠ checker, RBAC service, money math, applier stale/409, audit-in-tx rollback) dan menaikkan ambang.
 - CI: `go-integration` kini `-cover` + step `bash scripts/check-coverage.sh test.log`. Committed `ddefb12`; bukti GitHub menunggu push.
+
+## Fase C — slice C2 `rolemgmt` (run 2026-10-15, committed `8013dd6`)
+Prioritas plan sudah punya test integration sebelum slice ini: grant/revoke full-set (`TestUpdateRolePermissions_FullSetReplace`), audit di tx yang sama + rollback saat audit gagal (`TestCreateRole_AuditFailureRollsBack`, `TestUpdateRolePermissions_AuditFailureRollsBack`), re-check `APPACCESS`/`ADMIN` (`*_AuthorizationMatrix`). C2 menutup sisa celah (jalur error + race nama):
+
+| Test baru | File | Covers |
+|---|---|---|
+| `TestPermissionService_DependencyErrorsArePropagated` (6 kasus) | `service_test.go` (unit, fake `Repo`/`Pool`) | error repo/`Begin` dibungkus (`errors.Is`), tidak ada tx dibuka bila pre-check gagal |
+| `TestPermissionService_UnauthorizedActorNeverTouchesRepoOrTx` | `service_test.go` | re-check peran di service terjadi sebelum repo/tx disentuh (`""`, `ATM-USER`, `VENDOR-USER`, `ADMINX`) |
+| `TestIsUniqueViolation` (5 kasus) | `service_test.go` | deteksi `23505`, termasuk error terbungkus |
+| `TestCreateRole_ConcurrentDuplicateCaughtByUniqueConstraint` | `service_integration_test.go` | pre-check nama terlewat (create bersamaan) → constraint unik DB → `ErrRoleNameConflict` (409), tetap 1 baris |
+
+| Command | Result |
+|---|---|
+| `go test ./internal/rolemgmt/` (unit) | ok |
+| `go test -tags integration -cover ./internal/rolemgmt/` (DB dev) | ok, 0 SKIP, **85,4% → 93,5%** |
+| `go test -race ./internal/rolemgmt/` (container) | ok |
+| `golangci-lint run --build-tags integration ./internal/rolemgmt/...` | 0 issues |
+| `coverage-thresholds.txt` `rolemgmt` | 85 → **93** |
+
+Sisa tidak tercakup (≈6,5%): error `db.CreateRole` non-unik, `tx.Commit` gagal, error dari `ReplaceRolePermissions`/`distinctInt64s` repo, dan cabang 500 middleware — butuh fake `pgx.Tx` penuh; tidak sebanding.

@@ -2196,9 +2196,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1792041613.0684466,
-    "seen": 1792041654.334801,
-    "ast_hash": "9a52202e796a83e7329a37965b5cd041",
+    "mtime": 1792042275.6357608,
+    "seen": 1792042317.454777,
+    "ast_hash": "0111ebca77965bf5becab405ecb0bbeb",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -5724,9 +5724,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792041613.5363083,
-    "seen": 1792041654.3347783,
-    "ast_hash": "49fa695ceacb12c73479ffc1c7396cee",
+    "mtime": 1792042274.8272555,
+    "seen": 1792042317.4547546,
+    "ast_hash": "1f84077b85d0ec26ee94728354b68f9d",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -7788,9 +7788,9 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792041612.6073933,
-    "seen": 1792041654.334774,
-    "ast_hash": "0673ff5da1c7694b05c19719a6a17eb6",
+    "mtime": 1792042276.10747,
+    "seen": 1792042317.45475,
+    "ast_hash": "45ebd1b2708dcce43008b93e68845651",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
@@ -7806,9 +7806,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/plan.md": {
-    "mtime": 1792039339.6253145,
-    "seen": 1792041654.3348148,
-    "ast_hash": "ab7bd0f7438de6d5e3073cc905fba324",
+    "mtime": 1792041823.6866925,
+    "seen": 1792042317.454792,
+    "ast_hash": "fc334718abea55e509ee44250242e643",
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/spec.md": {
@@ -8190,9 +8190,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/tests.md": {
-    "mtime": 1792041611.7815826,
-    "seen": 1792041654.334817,
-    "ast_hash": "246115820d6aa00f1070003b8623cf2c",
+    "mtime": 1792042276.5629427,
+    "seen": 1792042317.4547942,
+    "ast_hash": "d93321fd0f11fcf7b65e9a252911f277",
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
@@ -8208,9 +8208,21 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792039957.9090083,
-    "seen": 1792041654.3348978,
-    "ast_hash": "608ea261efd24d1ba928f7b25cb7e9b4",
+    "mtime": 1792042054.1544583,
+    "seen": 1792042317.4548788,
+    "ast_hash": "786a489977da5a794c8b53c5f0ef10bc",
+    "semantic_hash": ""
+  },
+  "backend/scripts/check-coverage.sh": {
+    "mtime": 1792042048.4059808,
+    "seen": 1792042317.453976,
+    "ast_hash": "ea1e88cc8995bdc7ad423b8840d30a49",
+    "semantic_hash": ""
+  },
+  "backend/coverage-thresholds.txt": {
+    "mtime": 1792042047.5183809,
+    "seen": 1792042317.4549632,
+    "ast_hash": "b949e5f448dbf80d4e2e9b735b90326f",
     "semantic_hash": ""
   }
 }

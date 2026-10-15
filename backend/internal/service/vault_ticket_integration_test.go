@@ -36,12 +36,17 @@ func TestIntegration_ApplyVaultTickets(t *testing.T) {
 	t.Cleanup(func() { _ = tx.Rollback(ctx) })
 	q := db.New(tx)
 
-	var req1, req2 int64
-	// Requests without vault tickets: a real dev request with tickets would see them deactivated by sync.
-	if err := tx.QueryRow(ctx, `SELECT min(id), max(id) FROM vendor_requests vr
-		WHERE NOT EXISTS (SELECT 1 FROM vendor_request_vault_tickets t WHERE t.vendor_request_id = vr.id)`).Scan(&req1, &req2); err != nil || req1 == req2 {
-		t.Skipf("need two vendor_requests in dev (err=%v)", err)
+	// Two fresh requests (rolled back with tx): no existing tickets, and the test runs on a freshly migrated DB too.
+	newReq := func() int64 {
+		t.Helper()
+		var id int64
+		if err := tx.QueryRow(ctx, `INSERT INTO vendor_requests (request_number, forecast_date, created_by, status)
+			SELECT 'IVT-' || gen_random_uuid(), DATE '2099-01-01', min(id), 'draft' FROM users RETURNING id`).Scan(&id); err != nil {
+			t.Fatalf("seed vendor_request: %v", err)
+		}
+		return id
 	}
+	req1, req2 := newReq(), newReq()
 	var v1, v2 int64
 	var code1, code2 string
 	if err := tx.QueryRow(ctx, `SELECT a.id, a.vault_code, b.id, b.vault_code FROM

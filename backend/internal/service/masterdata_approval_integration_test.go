@@ -1274,15 +1274,10 @@ func TestATMAssignmentApplier_AutoPeriod_HandsOverRunningPeriod_Integration(t *t
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var atmID, pkgID int64
-	err = tx.QueryRow(ctx, `SELECT a.id FROM atms a WHERE a.deleted_at IS NULL
-		AND NOT EXISTS (SELECT 1 FROM atm_vendor_packages p WHERE p.atm_id = a.id) ORDER BY a.id LIMIT 1`).Scan(&atmID)
-	if err != nil {
-		t.Skipf("no ATM without kelolaan available: %v", err)
-	}
-	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch ORDER BY id LIMIT 1`).Scan(&pkgID); err != nil {
-		t.Skipf("no vendor package available: %v", err)
-	}
+	// Own fixtures (rolled back with tx) so the test runs on a freshly migrated DB too.
+	marker := "AUTOP-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	atmID := seedForecastATM(t, tx, marker, seedForecastRegionAndLocation(t, tx, marker))
+	pkgID := seedForecastVendorPackage(t, tx, marker, "Vendor "+marker)
 
 	now := time.Date(2026, 9, 25, 20, 0, 0, 0, time.UTC) // 2026-09-26 03:00 WIB
 	if _, err := tx.Exec(ctx, `INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, effective_start_date)
@@ -1322,11 +1317,7 @@ func TestATMAssignmentApplier_AutoPeriod_HandsOverRunningPeriod_Integration(t *t
 	}
 
 	// Second handover the same day: the period that began today is disabled.
-	var pkg2 int64
-	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch WHERE id <> $1 ORDER BY id LIMIT 1`, pkgID).Scan(&pkg2); err != nil {
-		t.Skipf("need a second vendor package: %v", err)
-	}
-	payload.VendorPackageID = pkg2
+	payload.VendorPackageID = seedForecastVendorPackage(t, tx, marker+"-2", "Vendor "+marker+"-2")
 	if _, _, err := applyAutoAssignment(ctx, db.New(tx), payload, now); err != nil {
 		t.Fatalf("second applyAutoAssignment: %v", err)
 	}

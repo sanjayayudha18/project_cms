@@ -80,6 +80,9 @@ func (f *fakeForecastRepo) ListActiveVendorRequestTickets(context.Context, strin
 func (f *fakeForecastRepo) ListRequestVisitInfo(context.Context, int64) ([]db.ListRequestVisitInfoRow, error) {
 	return nil, nil
 }
+func (f *fakeForecastRepo) ListVendorRealizationsForRequest(context.Context, int64) ([]db.ListVendorRealizationsForRequestRow, error) {
+	return nil, nil
+}
 func (f *fakeForecastRepo) ListAuditLogsByEntity(context.Context, db.ListAuditLogsByEntityParams) ([]db.AuditLog, error) {
 	return nil, nil
 }

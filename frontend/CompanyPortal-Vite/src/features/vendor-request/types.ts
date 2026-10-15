@@ -226,6 +226,9 @@ export interface RequestAtmStatus {
   visit_quota_total: number | null;
   /** This request's visit for the ATM went over quota. */
   is_over_quota: boolean;
+  /** replenishment-realisasi FR2: vendor's report; null / [] before a report or for a failed ATM. */
+  realized_date: string | null;
+  realized_amounts: { denom: number; amount: number }[];
 }
 
 export interface CompletionResultInput {

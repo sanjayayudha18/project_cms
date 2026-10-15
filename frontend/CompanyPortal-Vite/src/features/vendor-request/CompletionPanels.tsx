@@ -8,7 +8,9 @@
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { formatAtmDate } from "@/features/atm-portal/lib/formatters";
 import { visitSisa } from "@/features/atm-portal/visitQuota";
+import { formatIDRFull } from "@/lib/utils/formatters";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CompletionResult, CompletionResultInput, RequestAtmStatus } from "./types";
@@ -45,6 +47,12 @@ export function CompletionAtmTable({ atms }: { atms: RequestAtmStatus[] }) {
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">ATM ID</th>
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">No. Tiket</th>
               <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">Hasil</th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
+                Tanggal Realisasi
+              </th>
+              <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">
+                Nominal Laporan
+              </th>
               <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">
                 Sisa Kunjungan
               </th>
@@ -58,6 +66,18 @@ export function CompletionAtmTable({ atms }: { atms: RequestAtmStatus[] }) {
                 <td className="px-3 py-2 font-mono">{atm.ticket_number || "-"}</td>
                 <td className="px-3 py-2">
                   <ResultBadge result={atm.completion_result} />
+                </td>
+                <td className="px-3 py-2">
+                  {atm.realized_date ? formatAtmDate(new Date(atm.realized_date)) : "-"}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">
+                  {(atm.realized_amounts ?? []).length === 0
+                    ? "-"
+                    : atm.realized_amounts.map((a) => (
+                        <span key={a.denom} className="block">
+                          {a.denom / 1000}K: {formatIDRFull(a.amount)}
+                        </span>
+                      ))}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <SisaCell atm={atm} />

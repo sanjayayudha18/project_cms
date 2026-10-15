@@ -89,7 +89,7 @@ func hasErr(res *ImportResult, row int, field string) bool {
 const vendorHeader = "id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active\n"
 
 // Round trip (plan Validate Fase 5): what the exporter writes, the importer
-// accepts as "no change" -- through BOM, csvSafe apostrophes and quoting.
+// accepts as "no change" -- through BOM, CSVSafe apostrophes and quoting.
 func TestImport_RoundTripOfExportIsAllUnchanged(t *testing.T) {
 	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportATMs, ExportATMAssignments} {
 		var buf bytes.Buffer

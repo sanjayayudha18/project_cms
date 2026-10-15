@@ -72,6 +72,17 @@ Plan/spec: `.claude/sdlc/cit-vault-select/` (v3). Migration `030_vault_allocatio
 *   **Capacity** (computed, not stored): vault saldo on the date (DSR `saldo_akhir` via `dsr_location_vault_maps`, unknown ≠ 0) − Σ allocations to that vault of other live plans of `vault_flow` requests on the same date. Warning only, never a block.
 *   `vendor_request_vault_assignments` (027) and `acm_area_branches` are no longer written or read for new plans; kept (table comment), drop in a later cleanup.
 
+## Replenish realization (migration 031)
+
+Plan/spec: `.claude/sdlc/replenishment-realisasi/` (Phase 2.2c). Migration `031_replenish_realization.sql` applied to dev DB 2026-10-14. Money = `bigint` whole IDR.
+
+*   `holidays` — `holiday_date`, `name` (1–100, CHECK), `is_active`/`deleted_at` (CHECK `is_active = (deleted_at IS NULL)`), `created_by`. Partial UNIQUE `holidays_active_date_uq (holiday_date) WHERE is_active` — one active row per date; an old inactive row for the same date may exist (API addresses rows by `id`). Workday = Mon–Fri not in the active set. Empty after migration; ADMIN fills it (`/api/v1/admin/holidays`, immediate + audit in tx). Soft-disable only.
+*   `vendor_request_realizations` — the vendor's realisation report, one per replenish ticket (UNIQUE `ticket_id`), + `vendor_request_id`, `realized_date` (NULL = failed), `submitted_by`/`submitted_at`. Resubmit after reject overwrites (history in `audit_logs`).
+*   `vendor_request_realization_amounts` — (`realization_id`, `denom`) PK, ON DELETE CASCADE; `amount` ≥ 0 and a multiple of `denom` (CHECK).
+*   `replenish_classifications` — written only by the Python job `backend_python/replenish_classify/`. One row per active replenish ticket (UNIQUE `ticket_id`) or, for `no_order`, per unmatched `itm_replenish` row (UNIQUE `itm_replenish_id`, FK `ON DELETE SET NULL` so an ITM re-upload never fails). `classification` `pending|on_schedule|early|late|not_done|no_order|void`; `workday_offset` −2..2; `is_final` ⇔ not `pending` ⇔ `finalized_at` set (CHECK) — final rows are never recomputed. Flags `has_amount_diff`, `vendor_mismatch`, `vendor_report_late` (+ `late_notified_at`). `report_date` = generated `COALESCE(scheduled_date, realized_date)` (screen/report filter). The `updated_at` trigger has no `WHEN` clause (a whole-row compare can't see the generated column).
+*   `replenish_classification_amounts` — (`classification_id`, `denom`) PK: `order_amount`, `itm_amount`, `vendor_amount` (NULL = no vendor report), `diff` generated `itm − order`. Inputs + delta stored → reproducible (Sec 6). The ITM ETL only fills 50K/100K, so 10K/20K orders always show a diff (accepted, FR3.6).
+*   No change to `itm_replenish`, `vendor_requests` statuses or `vendor_request_tickets`. All new tables are in `no_hard_delete_test.go`'s guard list.
+
 ## ATM assignment package source (migration 023)
 
 Plan/spec: `.claude/sdlc/atm-package-source/`. Migration `023_atm_assignment_vendor_source.sql`, applied to dev DB 2026-10-07.
@@ -113,7 +124,7 @@ Source: FSD "DSR End To End Cash Management" v1.0 field tables (Master Vendor, M
 
 ### B. New tables
 
-**1. `holidays`** (Core) — non-working dates; working day = Mon–Fri and not in this table. Used by cash count date generation, "3 working days before month end", and replenishment holiday-adjusted classification (URS).
+**1. `holidays`** (Core) — **migrated 2026-10-14 in `031`** (see [Replenish realization](#replenish-realization-migration-031); final shape differs: `created_by`, partial unique on active rows). Non-working dates; working day = Mon–Fri and not in this table. Used by cash count date generation, "3 working days before month end", and replenishment holiday-adjusted classification (URS).
 `id bigint pk · holiday_date date NOT NULL UNIQUE · name text NOT NULL · is_active boolean NOT NULL DEFAULT true · deleted_at timestamptz · created_at · updated_at`. Soft-disable only.
 
 **2. `cash_count_category_params`** (ATM) — H/M/L ranges + onsite frequency. Effective-dated like `vendor_package_prices` ("disable" closes `effective_end_date`); maker-checker + audit.
@@ -148,4 +159,4 @@ Source: FSD "DSR End To End Cash Management" v1.0 field tables (Master Vendor, M
 - **A4** PKS Amber threshold = **9 months**, kept as a constant/config (FSD also says 8 — BA may still change it).
 - **A5** Coverage: average daily balance **≤** limit → Covered; > limit → Not Covered; no limit set → "Limit belum diisi".
 - **A6** Monitoring Limit CIS is **deferred** until daily escrow balance ingest (SIBS/Corebanking → `escrow_batch_rows`) exists. The first feature = PKS + Limit CIS input only.
-- Still open (tables B): everything for cash count, holidays (sections B/D questions 2, 4, 5).
+- Still open (tables B): everything for cash count (sections B/D questions 2, 4, 5). `holidays` was resolved by 2.2c (migration 031).

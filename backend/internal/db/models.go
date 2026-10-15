@@ -350,6 +350,17 @@ type DsrUpload struct {
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Holiday struct {
+	ID          int64              `json:"id"`
+	HolidayDate pgtype.Date        `json:"holiday_date"`
+	Name        string             `json:"name"`
+	IsActive    bool               `json:"is_active"`
+	CreatedBy   int64              `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
 // One row per ingested file. Idempotent per (source, file_hash); a different hash for a completed (source, processing_date) becomes version+1 and supersedes the old row on completion. Status machine: see .claude/sdlc/import-export-jobs/spec.md FR10.
 type ImportJob struct {
 	ID int64 `json:"id"`
@@ -596,6 +607,40 @@ type Region struct {
 	IsActive  bool               `json:"is_active"`
 	// Soft-disable timestamp (set with is_active=false). Never hard-delete: locations.region_id references this table.
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Klasifikasi realisasi vs order per tiket replenish (atau no_order per baris ITM). Ditulis job Python replenish_classify; final tidak dihitung ulang.
+type ReplenishClassification struct {
+	ID               int64              `json:"id"`
+	TicketID         *int64             `json:"ticket_id"`
+	ItmReplenishID   *int64             `json:"itm_replenish_id"`
+	TerminalID       string             `json:"terminal_id"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	ScheduledDate    pgtype.Date        `json:"scheduled_date"`
+	RealizedDate     pgtype.Date        `json:"realized_date"`
+	RealizedTime     pgtype.Time        `json:"realized_time"`
+	ReportDate       pgtype.Date        `json:"report_date"`
+	WorkdayOffset    *int16             `json:"workday_offset"`
+	Classification   string             `json:"classification"`
+	IsFinal          bool               `json:"is_final"`
+	HasAmountDiff    bool               `json:"has_amount_diff"`
+	VendorMismatch   bool               `json:"vendor_mismatch"`
+	VendorReportLate bool               `json:"vendor_report_late"`
+	LateNotifiedAt   pgtype.Timestamptz `json:"late_notified_at"`
+	ClassifiedAt     pgtype.Timestamptz `json:"classified_at"`
+	FinalizedAt      pgtype.Timestamptz `json:"finalized_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReplenishClassificationAmount struct {
+	ClassificationID int64  `json:"classification_id"`
+	Denom            int32  `json:"denom"`
+	OrderAmount      int64  `json:"order_amount"`
+	ItmAmount        int64  `json:"itm_amount"`
+	VendorAmount     *int64 `json:"vendor_amount"`
+	Diff             *int64 `json:"diff"`
 }
 
 type RetryAuditLog struct {
@@ -872,6 +917,23 @@ type VendorRequestNumberSeq struct {
 	SeqDate    pgtype.Date `json:"seq_date"`
 	LastSeq    int32       `json:"last_seq"`
 	RegionCode *string     `json:"region_code"`
+}
+
+type VendorRequestRealization struct {
+	ID              int64              `json:"id"`
+	TicketID        int64              `json:"ticket_id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	RealizedDate    pgtype.Date        `json:"realized_date"`
+	SubmittedBy     int64              `json:"submitted_by"`
+	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestRealizationAmount struct {
+	RealizationID int64 `json:"realization_id"`
+	Denom         int32 `json:"denom"`
+	Amount        int64 `json:"amount"`
 }
 
 // Tiket replenish: satu aktif per (request, ATM) = satu jalan. NNN global per (terminal_id, replenish_date), tidak dipakai ulang.

@@ -609,6 +609,8 @@ func (h *VendorRequestHandler) handleError(w http.ResponseWriter, err error) {
 		writeValidationError(w, "rejection_reason", "wajib diisi")
 	case errors.Is(err, service.ErrCompletionReasonEmpty):
 		writeValidationError(w, "reason", "wajib diisi")
+	case errors.Is(err, service.ErrCompletionByVendor):
+		writeError(w, http.StatusConflict, "completion_by_vendor", "Laporan realisasi request ini diisi oleh vendor di VendorPortal")
 	case errors.Is(err, service.ErrCancelReasonEmpty):
 		writeValidationError(w, "cancellation_reason", "wajib diisi")
 	case errors.Is(err, service.ErrNumberGeneration):

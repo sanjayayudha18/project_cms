@@ -111,6 +111,11 @@ func cleanupVendorParties(ctx context.Context, pool *pgxpool.Pool, vendorID int6
 	_, _ = pool.Exec(ctx, `DELETE FROM notifications WHERE id IN (`+requestNotes+`)`, vendorID)
 	_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_vendor_party_events WHERE party_id IN (`+parties+`)`, vendorID)
 	_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_vendor_parties WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
+	// replenishment-realisasi (031): reports reference tickets + requests (amounts cascade).
+	const realizationNotes = `SELECT id FROM notifications WHERE entity_type = 'vendor_request' AND type LIKE 'vendor_request.realization_%' AND entity_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`
+	_, _ = pool.Exec(ctx, `DELETE FROM notification_emails WHERE notification_id IN (`+realizationNotes+`)`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM notifications WHERE id IN (`+realizationNotes+`)`, vendorID)
+	_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_realizations WHERE vendor_request_id IN (SELECT id FROM vendor_requests WHERE vendor_id = $1)`, vendorID)
 }
 
 // REP-<prefix>-<region_code>-<YYYYMMDD>-<seq> (replenish-ticket FR10).

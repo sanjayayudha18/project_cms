@@ -7,7 +7,7 @@ the batch-shaped ETLs here.
 """
 from __future__ import annotations
 
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
 from pydantic import Field, field_validator
@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     etl_dmaa_script: Path = Path("backend_python/dmaa/dmaa_etl.py")
     etl_itm_cashpos_script: Path = Path("backend_python/itm/cashpos/itm_cashpos_etl.py")
     etl_itm_replenish_script: Path = Path("backend_python/itm/replenish/itm_replenish_etl.py")
+
+    # Replenishment realisasi classification (replenishment-realisasi FR3.9): fills/tickets from this
+    # date on; empty = the job does not run (no historical backfill, K4).
+    replenish_classify_start_date: date | None = None
+    # Late-report emails go to the outbox as pending only when the Go worker has SMTP (else skipped).
+    notify_email_enabled: bool = False
 
     # Service
     service_version: str = "1.0.0"

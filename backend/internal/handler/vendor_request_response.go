@@ -218,6 +218,9 @@ type requestAtmStatusResp struct {
 	VisitRemaining   *int32  `json:"visit_remaining"`
 	VisitQuotaTotal  *int32  `json:"visit_quota_total"`
 	IsOverQuota      bool    `json:"is_over_quota"`
+	// replenishment-realisasi FR2: vendor report (null / [] before a report or for a failed ATM).
+	RealizedDate    *string               `json:"realized_date"`
+	RealizedAmounts []service.DenomAmount `json:"realized_amounts"`
 }
 
 func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailResponse {
@@ -264,7 +267,15 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 func toRequestAtmStatusResp(in []service.RequestAtmStatus) []requestAtmStatusResp {
 	out := make([]requestAtmStatusResp, len(in))
 	for i, a := range in {
-		out[i] = requestAtmStatusResp(a)
+		amounts := a.RealizedAmounts
+		if amounts == nil {
+			amounts = []service.DenomAmount{}
+		}
+		out[i] = requestAtmStatusResp{
+			TerminalID: a.TerminalID, TicketNumber: a.TicketNumber, CompletionResult: a.CompletionResult,
+			VisitRemaining: a.VisitRemaining, VisitQuotaTotal: a.VisitQuotaTotal, IsOverQuota: a.IsOverQuota,
+			RealizedDate: formatDatePtr(a.RealizedDate), RealizedAmounts: amounts,
+		}
 	}
 	return out
 }

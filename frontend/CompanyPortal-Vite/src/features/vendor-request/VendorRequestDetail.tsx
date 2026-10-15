@@ -186,13 +186,14 @@ export function VendorRequestDetail() {
     ((isCreator || (isChecker && !isCreator)) &&
       (data.status === "draft" || data.status === "pending_approval")) ||
     (isChecker && CHECKER_CANCEL_STATUSES.includes(data.status));
-  // atm-visit-quota FR1: maker reports a request as replenished -- from
-  // vendor_accepted (cit-send-vendor FR6.3), or ready / approved (legacy); a
-  // checker other than the reporter approves/rejects that report.
+  // atm-visit-quota FR1: maker reports a legacy request (ready / approved, never
+  // sent to a vendor) as replenished; a checker other than the reporter
+  // approves/rejects that report. A vendor_accepted request is reported by its
+  // replenish vendor in VendorPortal (replenishment-realisasi FR2.5; the API
+  // answers 409 completion_by_vendor to an internal report).
   const canReportCompletion =
-    (data.status === "vendor_accepted" || data.status === "ready" || data.status === "approved") &&
-    isMaker &&
-    !data.is_canceled;
+    (data.status === "ready" || data.status === "approved") && isMaker && !data.is_canceled;
+  const awaitsVendorReport = data.status === "vendor_accepted" && !data.is_canceled;
   const canVendorReturn =
     data.status === "vendor_rejected" && isChecker && !isCreator && !data.is_canceled;
   const isReporter =
@@ -482,6 +483,13 @@ export function VendorRequestDetail() {
       )}
 
       <VendorPartiesPanel requestId={data.id} />
+
+      {awaitsVendorReport && (
+        <p className="rounded-[var(--radius-md)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--info-fg)]">
+          Menunggu laporan realisasi dari vendor replenish (diisi di VendorPortal). Setelah masuk,
+          ATM-SPV menyetujui atau menolak laporan di halaman ini.
+        </p>
+      )}
 
       {showCompletionTable && <CompletionAtmTable atms={data.atms} />}
 

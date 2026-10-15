@@ -7,8 +7,10 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
@@ -445,8 +447,12 @@ func TestIntegration_VendorOrder_CompletionGateAndCancel(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.svc.SubmitCompletion(ctx, f.creator, f.reqID, results); err != nil {
-		t.Fatalf("completion after vendor_accepted: %v", err)
+	// replenishment-realisasi FR2.5: the vendor reports a vendor_sent request, not ATM-USER.
+	if _, err := f.svc.SubmitCompletion(ctx, f.creator, f.reqID, results); !errors.Is(err, ErrCompletionByVendor) {
+		t.Fatalf("internal completion on a vendor request: want ErrCompletionByVendor, got %v", err)
+	}
+	if _, err := f.orders.SubmitRealization(ctx, f.wideUser, f.party(t, f.branchID, partyRoleReplenish), realizationRows(t, f.pool, f.reqID, nil)); err != nil {
+		t.Fatalf("vendor realization after vendor_accepted: %v", err)
 	}
 	if _, err := f.svc.RejectCompletion(ctx, f.checker, f.reqID, "foto kurang"); err != nil {
 		t.Fatalf("reject completion: %v", err)
@@ -475,6 +481,185 @@ func TestIntegration_VendorOrder_CompletionGateAndCancel(t *testing.T) {
 	d, err := f.orders.Get(ctx, f.cash2User, f.party(t, f.cash2, partyRoleVault))
 	if err != nil || !d.IsCanceled || d.CanDecide || d.Status != "accepted" {
 		t.Fatalf("vendor view after cancel = %+v %v, want canceled, no action, party status kept", d, err)
+	}
+}
+
+// realizationRows builds a vendor report for every active ticket of the request: success, dated the
+// schedule (or today if the schedule is still ahead, K1), amounts = order. ATMs in failed get no
+// date/amounts.
+func realizationRows(t *testing.T, pool *pgxpool.Pool, reqID int64, failed map[string]bool) []RealizationRowInput {
+	t.Helper()
+	rows, err := pool.Query(context.Background(), `
+		SELECT o.terminal_id, LEAST(o.replenish_date, (now() AT TIME ZONE 'Asia/Jakarta')::date), o.denom, o.order_amount
+		FROM (SELECT t.terminal_id, t.replenish_date, i.denom, SUM(i.amount_replenish)::bigint AS order_amount
+		      FROM vendor_request_tickets t
+		      JOIN vendor_requests vr ON vr.request_number = t.request_number
+		      JOIN vendor_request_items i ON i.vendor_request_id = vr.id AND i.terminal_id = t.terminal_id
+		      WHERE vr.id = $1 AND t.is_active
+		      GROUP BY t.terminal_id, t.replenish_date, i.denom) o
+		ORDER BY o.terminal_id`, reqID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	byTerminal := map[string]*RealizationRowInput{}
+	var order []string
+	for rows.Next() {
+		var term string
+		var d time.Time
+		var denom int32
+		var amount int64
+		if err := rows.Scan(&term, &d, &denom, &amount); err != nil {
+			t.Fatal(err)
+		}
+		r, ok := byTerminal[term]
+		if !ok {
+			r = &RealizationRowInput{TerminalID: term, Result: completionSuccess}
+			if failed[term] {
+				r.Result = completionFailed
+			} else {
+				r.RealizedDate, r.Amounts = &d, map[int32]int64{}
+			}
+			byTerminal[term] = r
+			order = append(order, term)
+		}
+		if r.Amounts != nil {
+			r.Amounts[denom] = amount
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	out := make([]RealizationRowInput, len(order))
+	for i, term := range order {
+		out[i] = *byTerminal[term]
+	}
+	return out
+}
+
+// replenishment-realisasi FR2: vendor realisasi report -> SPV reject -> resubmit -> approve.
+func TestIntegration_VendorOrder_Realization(t *testing.T) {
+	f := newVendorOrderFixture(t)
+	ctx := context.Background()
+	// Approve records visits; drop them before the fixture deletes the request and ATMs (LIFO).
+	t.Cleanup(func() {
+		c := context.Background()
+		atms := `SELECT id FROM atms WHERE terminal_id = ANY($1)`
+		_, _ = f.pool.Exec(c, `DELETE FROM atm_visits WHERE vendor_request_id = $1`, f.reqID)
+		_, _ = f.pool.Exec(c, `DELETE FROM atm_visit_quotas WHERE atm_id IN (`+atms+`)`, []string{f.terminal, f.terminal2})
+	})
+	replenish1 := f.party(t, f.branchID, partyRoleReplenish)
+	if _, err := f.orders.SubmitRealization(ctx, f.wideUser, replenish1, realizationRows(t, f.pool, f.reqID, nil)); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("report before vendor_accepted: want ErrInvalidTransition, got %v", err)
+	}
+	for _, p := range []int64{replenish1, f.party(t, f.replenish2(t), partyRoleReplenish), f.party(t, f.cash1, partyRoleVault)} {
+		if _, err := f.orders.Accept(ctx, f.wideUser, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cash2Vault := f.party(t, f.cash2, partyRoleVault)
+	if _, err := f.orders.Accept(ctx, f.cash2User, cash2Vault); err != nil {
+		t.Fatal(err)
+	}
+	rows := realizationRows(t, f.pool, f.reqID, nil)
+
+	// vault party never reports; out-of-scope party is 404; a branch-pinned user cannot cover a
+	// two-branch request; a typo is a ValidationError.
+	if _, err := f.orders.SubmitRealization(ctx, f.cash2User, cash2Vault, rows); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("vault party report: want ErrInvalidTransition, got %v", err)
+	}
+	if _, err := f.orders.SubmitRealization(ctx, f.cash2User, replenish1, rows); !errors.Is(err, ErrVendorOrderNotFound) {
+		t.Fatalf("out of scope report: want ErrVendorOrderNotFound, got %v", err)
+	}
+	var ve *ValidationError
+	if _, err := f.orders.SubmitRealization(ctx, f.branchUser, replenish1, rows); !errors.As(err, &ve) {
+		t.Fatalf("branch user on a two-branch request: want ValidationError, got %v", err)
+	}
+	// review R1: a vendor-wide user of another vendor holding a replenish party of the same request
+	// may not report the ATMs vendor 1 manages; a withdrawn party may not report at all.
+	if f.vendor2 == f.vendorID {
+		t.Fatal("fixture: cash2 must belong to another vendor")
+	}
+	other := f.vendorUser(t, f.vendor2, nil)
+	var otherParty int64
+	if err := f.pool.QueryRow(ctx, `INSERT INTO vendor_request_vendor_parties
+		(vendor_request_id, vendor_branch_id, role, status, content, decided_by, decided_at)
+		SELECT vendor_request_id, $2, 'replenish', 'accepted', content, $3, now() FROM vendor_request_vendor_parties WHERE id = $1
+		RETURNING id`, replenish1, f.cash2, other.UserID).Scan(&otherParty); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.orders.SubmitRealization(ctx, other, otherParty, rows); !errors.As(err, &ve) {
+		t.Fatalf("other vendor's user on a request it does not fully manage: want ValidationError, got %v", err)
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE vendor_request_vendor_parties SET status = 'withdrawn', decided_by = NULL, decided_at = NULL
+		WHERE id = $1`, otherParty); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.orders.SubmitRealization(ctx, other, otherParty, rows); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("withdrawn party report: want ErrInvalidTransition, got %v", err)
+	}
+	if _, err := f.orders.SubmitRealization(ctx, f.wideUser, replenish1, rows[:1]); !errors.As(err, &ve) {
+		t.Fatalf("missing ATM: want ValidationError, got %v", err)
+	}
+
+	d, err := f.orders.SubmitRealization(ctx, f.wideUser, replenish1, rows)
+	if err != nil {
+		t.Fatalf("report: %v", err)
+	}
+	if d.RequestStatus != "completion_pending" || d.CanReport || len(d.Realizations) != len(rows) {
+		t.Fatalf("after report = status %s can_report %v realizations %d", d.RequestStatus, d.CanReport, len(d.Realizations))
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_requests WHERE id = $1 AND completion_submitted_by = $2`, f.reqID, f.wideUser.UserID); n != 1 {
+		t.Fatal("maker of the report is not the vendor user")
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM audit_logs WHERE entity_type = 'vendor_request' AND entity_id = $1
+		AND action = 'submit_completion' AND actor_id = $2`, f.reqID, f.wideUser.UserID); n != 1 {
+		t.Fatal("report not audited")
+	}
+
+	// reject -> vendor notified, back to vendor_accepted; resubmit with one ATM failed drops its amounts.
+	if _, err := f.svc.RejectCompletion(ctx, f.checker, f.reqID, "nominal salah"); err != nil {
+		t.Fatalf("reject report: %v", err)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM notifications WHERE recipient_user_id = $1 AND type = 'vendor_order.realization_rejected'`, f.wideUser.UserID); n != 1 {
+		t.Fatalf("vendor reject notifications = %d, want 1", n)
+	}
+	failedTerm := rows[0].TerminalID
+	if _, err := f.orders.SubmitRealization(ctx, f.wideUser, replenish1, realizationRows(t, f.pool, f.reqID, map[string]bool{failedTerm: true})); err != nil {
+		t.Fatalf("resubmit: %v", err)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_realizations r JOIN vendor_request_tickets t ON t.id = r.ticket_id
+		WHERE r.vendor_request_id = $1 AND t.terminal_id = $2 AND r.realized_date IS NULL
+		AND NOT EXISTS (SELECT 1 FROM vendor_request_realization_amounts a WHERE a.realization_id = r.id)`, f.reqID, failedTerm); n != 1 {
+		t.Fatal("failed ATM still carries a date or amounts after resubmit")
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_realizations WHERE vendor_request_id = $1`, f.reqID); n != len(rows) {
+		t.Fatalf("realizations = %d, want one per ATM (%d)", n, len(rows))
+	}
+
+	if _, _, err := f.svc.ApproveCompletion(ctx, f.checker, f.reqID); err != nil {
+		t.Fatalf("approve report: %v", err)
+	}
+	if s := f.requestStatus(t, f.reqID); s != "completed" {
+		t.Fatalf("after approve = %s, want completed", s)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM atm_visits WHERE vendor_request_id = $1 AND cancelled_at IS NULL`, f.reqID); n != len(rows)-1 {
+		t.Fatalf("visits = %d, want %d (failed ATM not counted)", n, len(rows)-1)
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM notifications WHERE recipient_user_id = $1 AND type = 'vendor_order.realization_approved'`, f.wideUser.UserID); n != 1 {
+		t.Fatalf("vendor approve notifications = %d, want 1", n)
+	}
+	detail, err := f.svc.Get(ctx, f.reqID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range detail.Atms {
+		if a.TerminalID == failedTerm && (a.RealizedDate != nil || len(a.RealizedAmounts) != 0) {
+			t.Fatalf("failed ATM on internal detail = %+v", a)
+		}
+		if a.TerminalID != failedTerm && (a.RealizedDate == nil || len(a.RealizedAmounts) == 0) {
+			t.Fatalf("reported ATM missing realisasi on internal detail = %+v", a)
+		}
 	}
 }
 

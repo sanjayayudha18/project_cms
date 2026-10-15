@@ -40,14 +40,14 @@ tiket nonaktif / request dibatalkan ──► void
 2.2 Boleh dari `vendor_accepted` (atau legacy `approved`/`ready`). Isi per ATM (tiket aktif): hasil `success|failed`; bila `success`: tanggal realisasi + nominal per denom yang ada di order ATM itu (bulat ≥ 0, kelipatan denom, minimal satu > 0). `failed`: tanpa tanggal/nominal.
 2.3 Semua ATM request wajib diisi dalam satu submit → `completion_pending`; `vendor_request_tickets.result` diisi seperti sekarang. Resubmit setelah reject menimpa laporan sebelumnya (riwayat di `audit_logs`).
 2.4 Checker = ATM-SPV / BRANCH-ATM-SPV lewat endpoint approve/reject yang ada (tidak berubah): approve → `completed` + kuota terpotong per ATM `success` (idempoten); reject (alasan 1–500) → `vendor_accepted`, vendor melapor ulang.
-2.5 `POST /api/v1/vendor-requests/{id}/completion` (input ATM-USER) **ditutup** → 409 `completion_by_vendor`; form di CompanyPortal diganti tampilan laporan vendor. Request yang sudah `completion_pending`/`completed` saat rilis tidak disentuh; request terbuka langsung dilapor vendor (keputusan transisi 2026-10-14).
+2.5 `POST /api/v1/vendor-requests/{id}/complete` (input ATM-USER) **ditutup** → 409 `completion_by_vendor` untuk request yang lewat alur vendor (`vendor_sent`); form di CompanyPortal diganti tampilan laporan vendor. Request lama tanpa party vendor (`vendor_sent = false`, legacy `approved`/`ready`) **tetap dilapor ATM-USER** (keputusan S4 2026-10-14 — vendor tidak punya akses ke request itu). Request yang sudah `completion_pending`/`completed` saat rilis tidak disentuh.
 2.6 Laporan vendor tidak mengubah klasifikasi resmi (Q6c): ITM menang; beda ditandai (FR3.6).
 2.7 Tanpa batas waktu melapor (keputusan 2026-10-14); telat ditandai (FR3.7).
 2.8 Notifikasi (Go, `notification.Send` dalam tx): vendor submit → ATM-SPV/BRANCH-ATM-SPV aktif; approve/reject → user vendor pelapor.
 
 ### FR3 — Klasifikasi harian (Q3, Q5, Q11, keputusan runtime + matching 2026-10-14)
 3.1 Runtime **Python EOD**: modul baru `backend_python/replenish_classify/`, dijalankan `eod_retry_scheduler` setelah file `itm_replenish` sukses, juga manual `python -m replenish_classify.run [--date YYYY-MM-DD]`. Idempoten: menghitung ulang semua baris **belum final**; baris final tidak disentuh.
-3.2 Yang diklasifikasi: tiket replenish **aktif** dari request `vendor_accepted`, `completion_pending`, `completed` (+ legacy `approved`/`ready`). Tiket yang kemudian nonaktif atau request `rejected`/`cancelled`/`vendor_rejected` → baris belum final jadi `void` (K2).
+3.2 Yang diklasifikasi: tiket replenish **aktif** dari request `vendor_accepted`, `completion_pending`, `completed` (+ legacy `approved`/`ready`). Tiket yang kemudian nonaktif atau request batal → baris belum final jadi `void` (K2). Request di luar status instruksi (`rejected`/`vendor_rejected`, bisa kembali setelah revisi) tetap `pending` selama jendela terbuka, lalu `void` saat jendela tertutup (keputusan PO review R3 2026-10-14). Laporan vendor yang masuk setelah baris final hanya memperbarui kolom vendor (`vendor_amount`, `vendor_mismatch`); kelas tetap (review R4).
 3.3 Pencocokan: `itm_replenish.terminal_id = tiket.terminal_id`, `replenish_date` dalam ±2 hari kerja dari `tiket.replenish_date`. Lebih dari satu baris → **terdekat ke jadwal** (seri → tanggal lebih awal, lalu `replenish_time` lebih awal). Satu baris ITM hanya untuk satu tiket (tiket dengan jadwal terdekat menang; seri → nomor tiket lebih kecil).
 3.4 Offset = jumlah hari kerja dari jadwal ke realisasi (negatif = maju). 0 → `on_schedule`; −1..−2 → `early`; +1..+2 → `late`; tidak ada pengisian dalam jendela → `not_done`.
 3.5 Final saat jendela tertutup (hari ini > jadwal + 2 hari kerja). Sebelum itu `pending` dengan hasil sementara (boleh berubah).
@@ -75,7 +75,7 @@ tiket nonaktif / request dibatalkan ──► void
 Vendor submit / SPV approve / reject: `audit_logs` dalam tx yang sama (before/after status + laporan). Holidays: FR1.4. Export: FR6.3. Job: FR3.10.
 
 ## Non-functional
-- Uang `numeric(20,0)` (IDR penuh); Python `Decimal`.
+- Uang `bigint` IDR penuh (integer, Sec 6; pola 030 — diubah dari `numeric(20,0)` saat S1 2026-10-14); Python `Decimal` → int.
 - List/report/dashboard/VendorPortal baca replica; tulis primary; read-after-write di alur yang sama pakai primary.
 - Job ringan: hanya baris belum final + ITM baru; jendela EOD 05:00–09:00.
 - Dashboard ≤ 3 s p95. Tidak ada dependency baru.
@@ -85,15 +85,15 @@ Vendor submit / SPV approve / reject: `audit_logs` dalam tx yang sama (before/af
 |---|---|---|---|
 | POST | `/api/v1/vendor/replenish-orders/{id}/realization` | VENDOR-USER (pihak replenish) | FR2.2–2.3 |
 | GET | `/api/v1/vendor/replenish-realizations` | VENDOR-USER | FR5.2 |
-| POST | `/api/v1/vendor-requests/{id}/completion` | — | ditutup → 409 (FR2.5) |
-| POST | `/api/v1/vendor-requests/{id}/completion/approve`, `/reject` | ATM-SPV, BRANCH-ATM-SPV | tidak berubah |
+| POST | `/api/v1/vendor-requests/{id}/complete` | ATM-USER (legacy saja) | `vendor_sent` → 409 `completion_by_vendor` (FR2.5) |
+| POST | `/api/v1/vendor-requests/{id}/complete/approve`, `/reject` | ATM-SPV, BRANCH-ATM-SPV | tidak berubah |
 | GET | `/api/v1/replenishment/classifications` | FR4.3 | FR4.1 |
 | GET | `/api/v1/replenishment/summary` | FR4.3 | FR4.2 |
 | GET | `/api/v1/replenishment/reports/amount-mismatch` (`?format=csv`) | FR4.3 | FR6.1 |
 | GET | `/api/v1/replenishment/reports/trips` (`?format=csv`) | FR4.3 | FR6.2 |
 | GET, POST | `/api/v1/admin/holidays` | ADMIN | FR1.2 |
-| PUT | `/api/v1/admin/holidays/{date}` | ADMIN | ubah nama |
-| POST | `/api/v1/admin/holidays/{date}/disable`, `/enable` | ADMIN | |
+| PUT | `/api/v1/admin/holidays/{id}` | ADMIN | ubah nama (`{id}`: satu tanggal bisa punya baris nonaktif lama — S3) |
+| POST | `/api/v1/admin/holidays/{id}/disable`, `/enable` | ADMIN | |
 | POST | `/api/v1/admin/holidays/import` | ADMIN | FR1.3, multipart CSV |
 
 ## Data model (migrasi `031_replenish_realization.sql`)

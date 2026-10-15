@@ -229,8 +229,8 @@ func TestCSVSafe(t *testing.T) {
 		{"-", "'-"},
 	}
 	for _, tt := range tests {
-		if got := csvSafe(tt.in); got != tt.want {
-			t.Errorf("csvSafe(%q) = %q, want %q", tt.in, got, tt.want)
+		if got := CSVSafe(tt.in); got != tt.want {
+			t.Errorf("CSVSafe(%q) = %q, want %q", tt.in, got, tt.want)
 		}
 	}
 }

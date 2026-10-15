@@ -16,6 +16,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Building2,
+  CalendarDays,
   CalendarOff,
   FileSpreadsheet,
   GitBranch,
@@ -130,6 +131,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Kelola region dan status aktifnya.",
     href: "/settings/admin/regions",
     icon: MapIcon,
+    category: "master",
+  },
+  {
+    id: "admin-holidays",
+    title: "Hari Libur",
+    description: "Kalender libur untuk hitung hari kerja realisasi pengisian ATM.",
+    href: "/settings/admin/holidays",
+    icon: CalendarDays,
     category: "master",
   },
   {

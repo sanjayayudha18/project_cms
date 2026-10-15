@@ -1,219 +1,332 @@
-import { createColumnHelper } from "@tanstack/react-table";
-import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Search, Truck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Download, RefreshCw, Search } from "lucide-react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import type { BadgeVariant } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { DataTable } from "@/components/ui/DataTable";
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
-import schedulesData from "@/data/replenishment-schedules.json";
-import { CitSummary } from "@/features/cit/CitSummary";
-import { useCitData } from "@/features/cit/useCitData";
+import { PageNumbers } from "@/components/ui/PageNumbers";
+import { formatAtmDate } from "@/features/atm-portal/lib/formatters";
+import { getTodayWib } from "@/features/eod-monitoring/utils";
+import { useVendorOptions } from "@/features/vendor-request/hooks";
 import { useToast } from "@/lib/hooks/useToast";
 import { formatIDRFull } from "@/lib/utils/formatters";
-import { filterSchedules, sortByStatusPriority } from "./replenishment.utils";
-import type { ReplenishmentSchedule } from "./types";
+import {
+  CLASSIFICATION_LABELS,
+  type Classification,
+  type ClassificationView,
+  type ReportKind,
+  downloadReport,
+  rangeError,
+  useClassifications,
+} from "./api";
 
-const schedules = schedulesData as ReplenishmentSchedule[];
-
-const STATUS_CONFIG: Record<
-  ReplenishmentSchedule["status"],
-  { label: string; variant: BadgeVariant; icon: typeof Truck }
-> = {
-  "in-transit": { label: "Dalam perjalanan", variant: "info", icon: Truck },
-  completed: { label: "Selesai", variant: "success", icon: CheckCircle2 },
-  delayed: { label: "Terlambat", variant: "warning", icon: AlertTriangle },
-  "pending-vendor": { label: "Menunggu vendor", variant: "warning", icon: Clock },
-  scheduled: { label: "Terjadwal", variant: "neutral", icon: Clock },
+export const CLASS_VARIANT: Record<Classification, BadgeVariant> = {
+  on_schedule: "success",
+  early: "info",
+  late: "warning",
+  not_done: "danger",
+  no_order: "danger",
+  pending: "neutral",
+  void: "neutral",
 };
 
-const columnHelper = createColumnHelper<ReplenishmentSchedule>();
+const inputClass =
+  "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]";
+const labelClass = "text-xs font-medium uppercase tracking-wider text-[var(--n-600)]";
 
-const baseColumns = [
-  columnHelper.accessor("id", {
-    header: "Jadwal",
-    cell: (info) => (
-      <div>
-        <span className="font-semibold text-[var(--n-900)]">{info.getValue()}</span>
-        <span className="block text-xs text-[var(--n-500)]">{info.row.original.routeCode}</span>
-      </div>
-    ),
-  }),
-  columnHelper.accessor("region", {
-    header: "Wilayah",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("vendor", {
-    header: "Vendor",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.display({
-    id: "window",
-    header: "Jendela waktu",
-    cell: ({ row }) => `${row.original.windowStart}\u2013${row.original.windowEnd}`,
-  }),
-  columnHelper.accessor("machineCount", {
-    header: "Mesin",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("status", {
-    header: "Status",
-    cell: (info) => {
-      const cfg = STATUS_CONFIG[info.getValue()];
-      return <Badge variant={cfg.variant} icon={cfg.icon} label={cfg.label} />;
-    },
-  }),
-  columnHelper.accessor("cashValue", {
-    header: "Nilai kas",
-    cell: (info) => formatIDRFull(info.getValue()),
-    meta: { align: "right" },
-  }),
-];
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
-function buktiColumn(evidenceByVendor: Map<string, string | null>) {
-  return columnHelper.display({
-    id: "bukti",
-    header: "Bukti",
-    cell: ({ row }) => {
-      const url = evidenceByVendor.get(row.original.vendor);
-      if (!url) {
-        return <span className="text-[var(--n-400)]">&mdash;</span>;
-      }
-      return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 text-sm text-[var(--red-600)] hover:text-[var(--red-700)] underline"
-          aria-label="Lihat bukti CIT (buka di tab baru)"
-        >
-          Lihat
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
-      );
-    },
-  });
+function date(iso: string | null): string {
+  return iso ? formatAtmDate(new Date(iso)) : "—";
+}
+
+function total(row: ClassificationView, key: "order_amount" | "itm_amount" | "diff"): number {
+  return row.amounts.reduce((s, a) => s + a[key], 0);
+}
+
+function offsetLabel(row: ClassificationView): string {
+  const n = row.workday_offset;
+  if (n === null || n === 0) return "";
+  return n < 0 ? ` (${-n} hari kerja lebih awal)` : ` (${n} hari kerja terlambat)`;
 }
 
 /**
- * Replenishment schedules screen.
- * Displays filterable table of cash replenishment schedules with region/vendor filters.
+ * Realisasi pengisian vs order (replenishment-realisasi FR4.1, FR6): one row per tiket replenish
+ * (or per ITM fill without an order), classified daily by the EOD job against itm_replenish.
  */
 export function ReplenishmentScreen() {
   const { toast } = useToast();
-  const { data: citOrders = [] } = useCitData();
-  const [regionFilter, setRegionFilter] = useState<string | null>(null);
-  const [vendorFilter, setVendorFilter] = useState<string | null>(null);
+  const today = getTodayWib();
+  const [dateFrom, setDateFrom] = useState(addDays(today, -6));
+  const [dateTo, setDateTo] = useState(today);
+  const [vendorId, setVendorId] = useState<string | null>(null);
+  const [regionCode, setRegionCode] = useState<string | null>(null);
+  const [classification, setClassification] = useState<string | null>(null);
+  const [onlyDiff, setOnlyDiff] = useState(false);
+  const [page, setPage] = useState(1);
+  const [downloading, setDownloading] = useState<ReportKind | null>(null);
 
-  const evidenceByVendor = useMemo(() => {
-    const map = new Map<string, string | null>();
-    for (const order of [...citOrders].sort((a, b) =>
-      a.scheduledDate.localeCompare(b.scheduledDate),
-    )) {
-      if (order.evidenceUrl) map.set(order.vendorName, order.evidenceUrl);
+  const options = useVendorOptions();
+  const filter = {
+    dateFrom,
+    dateTo,
+    vendorId: vendorId === null ? null : Number(vendorId),
+    regionCode,
+    classification: classification as Classification | null,
+    onlyDiff,
+  };
+  const rangeMsg = rangeError(dateFrom, dateTo);
+  const list = useClassifications({ ...filter, page });
+  const rows = list.data?.items ?? [];
+  const pages = Math.max(1, Math.ceil((list.data?.total ?? 0) / (list.data?.page_size ?? 20)));
+
+  function changed<T>(set: (v: T) => void) {
+    return (v: T) => {
+      set(v);
+      setPage(1);
+    };
+  }
+
+  async function download(kind: ReportKind) {
+    setDownloading(kind);
+    try {
+      await downloadReport(kind, filter);
+    } catch (e) {
+      toast({ type: "error", message: e instanceof Error ? e.message : "Gagal mengunduh laporan" });
+    } finally {
+      setDownloading(null);
     }
-    return map;
-  }, [citOrders]);
-
-  const columns = useMemo(
-    () => [...baseColumns, buktiColumn(evidenceByVendor)],
-    [evidenceByVendor],
-  );
-
-  const regions = useMemo(
-    () =>
-      Array.from(new Set(schedules.map((s) => s.region)))
-        .sort()
-        .map((r) => ({ value: r, label: r })),
-    [],
-  );
-
-  const vendors = useMemo(
-    () =>
-      Array.from(new Set(schedules.map((s) => s.vendor)))
-        .sort()
-        .map((v) => ({ value: v, label: v })),
-    [],
-  );
-
-  const todayLabel = useMemo(() => {
-    const d = new Date();
-    return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-  }, []);
-
-  const filteredData = useMemo(() => {
-    const filtered = filterSchedules(
-      schedules,
-      regionFilter ?? "All regions",
-      vendorFilter ?? "All vendors",
-    );
-    return sortByStatusPriority(filtered);
-  }, [regionFilter, vendorFilter]);
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Operasi kas"
-        title="Jadwal pengisian ulang"
-        description="Pantau rute CIT harian, penugasan vendor, dan kepatuhan jadwal di seluruh wilayah."
+        title="Realisasi pengisian"
+        description="Pengisian ATM menurut ITM dibandingkan dengan jadwal dan nominal order, dalam hari kerja."
         actions={
           <>
-            <Button variant="secondary">Impor rencana</Button>
             <Button
-              variant="primary"
-              onClick={() => toast({ type: "success", message: "Jadwal berhasil dibuat" })}
+              variant="secondary"
+              disabled={rangeMsg !== null || downloading !== null}
+              onClick={() => download("amount-mismatch")}
             >
-              Jadwal baru
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Selisih nominal (CSV)
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={rangeMsg !== null || downloading !== null}
+              onClick={() => download("trips")}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Trip per ATM (CSV)
             </Button>
           </>
         }
       />
 
-      <CitSummary data={citOrders} />
-
-      {/* Filter toolbar */}
       <div className="flex flex-wrap items-end gap-4">
-        <FilterSelect
-          label="Tanggal"
-          options={[{ value: todayLabel, label: todayLabel }]}
-          value={todayLabel}
-          onChange={() => {}}
-          placeholder={todayLabel}
-        />
-        <FilterSelect
-          label="Wilayah"
-          options={regions}
-          value={regionFilter}
-          onChange={setRegionFilter}
-          placeholder="Semua wilayah"
-        />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="rp-from" className={labelClass}>
+            Dari tanggal
+          </label>
+          <input
+            id="rp-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => changed(setDateFrom)(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="rp-to" className={labelClass}>
+            Sampai tanggal
+          </label>
+          <input
+            id="rp-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => changed(setDateTo)(e.target.value)}
+            className={inputClass}
+          />
+        </div>
         <FilterSelect
           label="Vendor"
-          options={vendors}
-          value={vendorFilter}
-          onChange={setVendorFilter}
+          options={(options.data?.vendors ?? []).map((v) => ({
+            value: String(v.id),
+            label: v.name,
+          }))}
+          value={vendorId}
+          onChange={changed(setVendorId)}
           placeholder="Semua vendor"
         />
-        <span className="text-sm text-[var(--n-500)] self-end pb-3">
-          {filteredData.length} jadwal
-        </span>
+        <FilterSelect
+          label="Region"
+          options={(options.data?.regions ?? []).map((r) => ({ value: r, label: r }))}
+          value={regionCode}
+          onChange={changed(setRegionCode)}
+          placeholder="Semua region"
+        />
+        <FilterSelect
+          label="Klasifikasi"
+          options={Object.entries(CLASSIFICATION_LABELS).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+          value={classification}
+          onChange={changed(setClassification)}
+          placeholder="Semua klasifikasi"
+        />
+        <label className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--n-700)]">
+          <input
+            type="checkbox"
+            checked={onlyDiff}
+            onChange={(e) => changed(setOnlyDiff)(e.target.checked)}
+            className="h-4 w-4 accent-[var(--red-500)]"
+          />
+          Hanya yang nominalnya selisih
+        </label>
+      </div>
+      {rangeMsg && (
+        <p role="alert" className="text-sm text-[var(--danger-fg)]">
+          {rangeMsg}
+        </p>
+      )}
+
+      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
+        <table className="w-full min-w-[1080px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-[var(--n-200)] bg-[var(--n-50)] text-[var(--n-600)]">
+              <th className="px-3 py-2 text-left font-medium">Jadwal</th>
+              <th className="px-3 py-2 text-left font-medium">Tiket / Request</th>
+              <th className="px-3 py-2 text-left font-medium">ATM</th>
+              <th className="px-3 py-2 text-left font-medium">Vendor / Cabang</th>
+              <th className="px-3 py-2 text-left font-medium">Klasifikasi</th>
+              <th className="px-3 py-2 text-left font-medium">Realisasi ITM</th>
+              <th className="px-3 py-2 text-right font-medium">Order</th>
+              <th className="px-3 py-2 text-right font-medium">ITM</th>
+              <th className="px-3 py-2 text-right font-medium">Selisih</th>
+              <th className="px-3 py-2 text-left font-medium">Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.isLoading && (
+              <tr>
+                <td colSpan={10} className="px-3 py-8 text-center text-[var(--n-500)]">
+                  Memuat data...
+                </td>
+              </tr>
+            )}
+            {list.isError && (
+              <tr>
+                <td colSpan={10} className="px-3 py-8 text-center">
+                  <span className="text-[var(--danger-fg)]">Gagal memuat data. </span>
+                  <Button variant="secondary" onClick={() => list.refetch()}>
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Coba lagi
+                  </Button>
+                </td>
+              </tr>
+            )}
+            {!list.isLoading && !list.isError && rows.length === 0 && (
+              <tr>
+                <td colSpan={10} className="px-3 py-12 text-center">
+                  <Search
+                    className="mx-auto mb-2 h-10 w-10 text-[var(--n-300)]"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[var(--n-600)]">
+                    Belum ada data realisasi untuk filter ini.
+                  </span>
+                </td>
+              </tr>
+            )}
+            {rows.map((row) => {
+              const diff = total(row, "diff");
+              return (
+                <tr key={row.id} className="border-b border-[var(--n-100)] last:border-0">
+                  <td className="px-3 py-2">{date(row.scheduled_date)}</td>
+                  <td className="px-3 py-2">
+                    <span className="block font-mono text-xs">{row.ticket_number ?? "—"}</span>
+                    {row.request_id !== null && (
+                      <Link
+                        to="/replenishment/vendor-requests/$id"
+                        params={{ id: String(row.request_id) }}
+                        className="text-xs font-medium text-[var(--red-600)] hover:underline"
+                      >
+                        {row.request_number}
+                      </Link>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 font-mono">{row.terminal_id}</td>
+                  <td className="px-3 py-2">
+                    <span className="block">{row.vendor_name ?? "—"}</span>
+                    <span className="text-xs text-[var(--n-500)]">
+                      {row.branch_code ?? ""} {row.region_code ? `· ${row.region_code}` : ""}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge
+                      variant={CLASS_VARIANT[row.classification]}
+                      label={CLASSIFICATION_LABELS[row.classification] + offsetLabel(row)}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    {date(row.realized_date)}
+                    {row.realized_time && (
+                      <span className="block text-xs text-[var(--n-500)]">
+                        {row.realized_time.slice(0, 5)} WIB
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {formatIDRFull(total(row, "order_amount"))}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {formatIDRFull(total(row, "itm_amount"))}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right tabular-nums ${diff !== 0 ? "font-semibold text-[var(--danger-fg)]" : ""}`}
+                  >
+                    {diff > 0 ? "+" : ""}
+                    {formatIDRFull(diff)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {row.vendor_mismatch && (
+                        <Badge variant="warning" label="Beda laporan vendor" />
+                      )}
+                      {row.vendor_report_late && (
+                        <Badge variant="danger" label="Laporan vendor telat" />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Data table or empty state */}
-      {filteredData.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Search className="h-12 w-12 text-[var(--n-300)] mb-3" aria-hidden="true" />
-          <h3 className="text-base font-semibold text-[var(--n-800)] mb-1">
-            Tidak ada jadwal ditemukan
-          </h3>
-          <p className="text-sm text-[var(--n-500)]">Coba nomor rute, vendor, atau wilayah lain.</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-          <DataTable data={filteredData} columns={columns} />
-        </div>
+      {pages > 1 && (
+        <nav aria-label="Halaman" className="flex flex-wrap items-center justify-end gap-2">
+          <span className="mr-auto text-sm text-[var(--n-500)]">{list.data?.total ?? 0} baris</span>
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Sebelumnya
+          </Button>
+          <PageNumbers current={page} total={pages} onChange={setPage} />
+          <Button variant="secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+            Berikutnya
+          </Button>
+        </nav>
       )}
     </div>
   );

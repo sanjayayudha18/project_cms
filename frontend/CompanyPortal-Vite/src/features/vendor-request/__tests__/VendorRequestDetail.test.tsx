@@ -572,7 +572,7 @@ describe("VendorRequestDetail — kirim ke vendor (cit-send-vendor S8)", () => {
     expect(vendorReturnSpy).toHaveBeenCalledWith({ id: 42, reason: "kurangi ATM" });
   });
 
-  it("laporan selesai only once every vendor accepted", () => {
+  it("a vendor request is reported by the vendor, not by ATM-USER (replenishment-realisasi FR2.5)", () => {
     setUser(1, "ATM-USER");
     mockDetail({ status: "sent_to_vendor" });
     const { unmount } = renderWithProviders();
@@ -580,6 +580,15 @@ describe("VendorRequestDetail — kirim ke vendor (cit-send-vendor S8)", () => {
     unmount();
 
     mockDetail({ status: "vendor_accepted" });
+    const second = renderWithProviders();
+    expect(screen.queryByRole("button", { name: /Laporkan Selesai/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Menunggu laporan realisasi dari vendor replenish/),
+    ).toBeInTheDocument();
+    second.unmount();
+
+    // legacy request (never sent to a vendor): ATM-USER still reports it.
+    mockDetail({ status: "approved" });
     renderWithProviders();
     expect(screen.getByRole("button", { name: /Laporkan Selesai/ })).toBeInTheDocument();
   });

@@ -55,12 +55,16 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	// keputusan vendor = bukti; pihak yang hilang -> withdrawn, events append-only.
 	// vendor_request_vault_tickets (cit-vault-select, migration 030): nomor tiket
 	// tidak pernah dipakai ulang; vault yang hilang -> nonaktif.
+	// holidays (replenishment-realisasi, migration 031): soft-disable via is_active/deleted_at.
+	// vendor_request_realizations: resubmit menimpa (upsert); replenish_classifications: tiket
+	// nonaktif -> void. Baris anak *_amounts boleh replace-all (bukan bukti sendiri).
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
 		"regions", "dsr_location_vault_maps",
 		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
 		"vendor_request_vault_tickets",
+		"holidays", "vendor_request_realizations", "replenish_classifications",
 	}
 
 	for _, f := range files {
@@ -91,6 +95,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 		"regions", "dsr_location_vault_maps",
 		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
 		"vendor_request_vault_tickets",
+		"holidays", "vendor_request_realizations", "replenish_classifications",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

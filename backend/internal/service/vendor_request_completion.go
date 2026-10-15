@@ -21,13 +21,19 @@ import (
 // against the order's creator, while here the checker must differ from the
 // report's maker, and approve writes visits in the same tx (plan D2).
 
-// completionMakerRoles: who may report a request as replenished (intent #4:
-// internal ATM-USER, not the vendor). Mirrors handler.vendorRequestMakerRoles.
+// completionMakerRoles: who may report a legacy request (never sent to a
+// vendor) as replenished. Mirrors handler.vendorRequestMakerRoles. A request
+// that went through the vendor flow (vendor_sent) is reported by its
+// replenish vendor instead (replenishment-realisasi FR2, decision 2026-10-14).
 var completionMakerRoles = []string{"ADMIN", "ATM-USER", "BRANCH-ATM-USER"}
 
 // ErrCompletionReasonEmpty: reject-report reason missing (body field "reason",
 // distinct from the order's ErrRejectReasonEmpty / "rejection_reason").
 var ErrCompletionReasonEmpty = errors.New("completion rejection reason is required")
+
+// ErrCompletionByVendor: an internal laporan selesai on a request the vendor
+// reports itself (replenishment-realisasi FR2.5) -> 409 completion_by_vendor.
+var ErrCompletionByVendor = errors.New("completion is reported by the vendor")
 
 const (
 	completionSuccess = "success"
@@ -43,7 +49,11 @@ type CompletionResultInput struct {
 func checkCompletionActor(actor Actor, req db.VendorRequest, a action) error {
 	switch a {
 	case actionSubmitCompletion:
-		if !roleIn(actor.Role, completionMakerRoles) {
+		if req.VendorSent {
+			if actor.Role != vendorUserRole {
+				return ErrCompletionByVendor
+			}
+		} else if !roleIn(actor.Role, completionMakerRoles) {
 			return ErrNotAuthorized
 		}
 	case actionApproveCompletion, actionRejectCompletion:
@@ -88,7 +98,14 @@ func validateCompletionResults(terminals []string, results []CompletionResultInp
 // returns the extra audit "after" fields.
 func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id int64, a action,
 	apply func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error)) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	return runCompletionTx(ctx, s.pool, actor, id, a, apply)
+}
+
+// runCompletionTx is completionTx without the service, so the VendorPortal
+// realisasi report (VendorOrderService) runs the same state machine.
+func runCompletionTx(ctx context.Context, pool VendorRequestPool, actor Actor, id int64, a action,
+	apply func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error)) error {
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
@@ -137,7 +154,12 @@ func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id
 
 // SubmitCompletion: approved -> completion_pending with per-ATM results.
 // A resubmission after rejection overwrites the previous results (FR1.1).
+// Internal path only: a vendor reports through VendorOrderService.SubmitRealization
+// (scope-checked), never here.
 func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor, id int64, results []CompletionResultInput) (*VendorRequestDetail, error) {
+	if actor.Role == vendorUserRole {
+		return nil, ErrNotAuthorized
+	}
 	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		terminals, err := q.ListDistinctRequestTerminals(ctx, id)
 		if err != nil {
@@ -203,6 +225,9 @@ func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Acto
 				return nil, fmt.Errorf("notify over quota for %d: %w", id, err)
 			}
 		}
+		if err := notifyRealizationDecision(ctx, q, s.notifier, req, ""); err != nil {
+			return nil, err
+		}
 		if _, err := q.UpdateVendorRequestCompletion(ctx, db.UpdateVendorRequestCompletionParams{
 			Status: newStatus, ActorID: actor.UserID, ID: id,
 		}); err != nil {
@@ -230,11 +255,14 @@ func (s *VendorRequestService) RejectCompletion(ctx context.Context, actor Actor
 	if len(trimmed) > 500 {
 		return nil, &ValidationError{Field: "reason", Message: "maksimal 500 karakter"}
 	}
-	err := s.completionTx(ctx, actor, id, actionRejectCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
+	err := s.completionTx(ctx, actor, id, actionRejectCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		if _, err := q.UpdateVendorRequestCompletion(ctx, db.UpdateVendorRequestCompletionParams{
 			Status: newStatus, ActorID: actor.UserID, Reason: &trimmed, ID: id,
 		}); err != nil {
 			return nil, fmt.Errorf("update vendor request %d: %w", id, err)
+		}
+		if err := notifyRealizationDecision(ctx, q, s.notifier, req, trimmed); err != nil {
+			return nil, err
 		}
 		return map[string]any{"reason": trimmed}, nil
 	})
@@ -267,6 +295,16 @@ func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64,
 		if t, ok := byTerminal[r.TerminalID]; ok {
 			out[i].TicketNumber = t.TicketNumber
 			out[i].CompletionResult = t.Result
+		}
+	}
+	reports, err := s.read.ListVendorRealizationsForRequest(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list realizations of %d: %w", id, err)
+	}
+	views := realizationViews(reports)
+	for i := range out {
+		if v, ok := views[out[i].TerminalID]; ok {
+			out[i].RealizedDate, out[i].RealizedAmounts = v.RealizedDate, v.Amounts
 		}
 	}
 	return out, nil

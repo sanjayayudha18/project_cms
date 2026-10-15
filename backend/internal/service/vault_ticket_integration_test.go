@@ -37,7 +37,9 @@ func TestIntegration_ApplyVaultTickets(t *testing.T) {
 	q := db.New(tx)
 
 	var req1, req2 int64
-	if err := tx.QueryRow(ctx, `SELECT min(id), max(id) FROM vendor_requests`).Scan(&req1, &req2); err != nil || req1 == req2 {
+	// Requests without vault tickets: a real dev request with tickets would see them deactivated by sync.
+	if err := tx.QueryRow(ctx, `SELECT min(id), max(id) FROM vendor_requests vr
+		WHERE NOT EXISTS (SELECT 1 FROM vendor_request_vault_tickets t WHERE t.vendor_request_id = vr.id)`).Scan(&req1, &req2); err != nil || req1 == req2 {
 		t.Skipf("need two vendor_requests in dev (err=%v)", err)
 	}
 	var v1, v2 int64

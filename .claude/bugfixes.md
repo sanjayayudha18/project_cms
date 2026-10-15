@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-14 — `TestIntegration_ApplyVaultTickets` gagal karena request dev asli
+- **Symptom**: `go test -tags integration ./...` merah: tes tiket vault memilih `max(id)` dari `vendor_requests` = request dev asli `REP-ABA-MDN-20261014-001` yang sudah punya tiket pemenuhan vault, sehingga sync ikut menonaktifkan `VLT_ABACUS_004_20261014_001` dan audit tidak sesuai harapan.
+- **Root cause**: tes mengasumsikan dua request mana pun belum punya tiket vault; asumsi patah begitu ada request dev yang lewat alur vault v3. Data tidak berubah (tes berjalan dalam tx yang di-rollback).
+- **Fix** (test saja): `backend/internal/service/vault_ticket_integration_test.go` memilih `min/max(id)` hanya dari request tanpa `vendor_request_vault_tickets`.
+- **Tests**: full `go test -tags integration -p 1 ./...` hijau. Manual browser verification: tidak relevan.
+- **Commit**: belum (ikut commit 2.2c; user minta commit setelah semua task selesai)
+
+---
+
 ## 2026-10-12 — QC F10 sisa: 4 fungsi cyclo 21–25
 - **Symptom**: gocyclo > 20 (target F10, di bawah ambang lint 30): `VaultPlanService.ReviewRequest` 25, `syncVendorParties` 24, `UserAdminService.Update` 22, `ATMAssignmentApplier.Apply` 21.
 - **Root cause**: cabang-cabang (notifikasi review, refresh/kirim party, cek immutable/unik/error user, create/update kelolaan) ditulis inline di satu fungsi.

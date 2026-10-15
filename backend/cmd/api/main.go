@@ -457,6 +457,13 @@ func main() {
 		WithVendorSide(vendorOrderService, vendorRequestService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-orders", handler.NewVendorOrderHandler(vendorOrderService).Routes())
+	// replenishment-realisasi FR4-FR6: classifications written by the Python job; reads on the replica.
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-realizations", handler.NewVendorOrderHandler(vendorOrderService).RealizationRoutes())
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/replenishment",
+		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbPool, dbReadPool)).Routes())
+	// Hari libur (FR1): ADMIN only (route + service), immediate apply + audit in the same tx (GR#3 deviation).
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/admin/holidays",
+		handler.NewAdminHolidayHandler(service.NewHolidayAdminService(dbPool, dbReadPool)).Routes())
 
 	// Kuota kunjungan replenish per ATM (.claude/sdlc/atm-visit-quota): read
 	// for viewers, reset/cancel-visit for checkers (re-checked in service).

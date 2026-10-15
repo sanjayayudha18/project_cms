@@ -25,6 +25,8 @@ type VendorOrderServicer interface {
 	Get(ctx context.Context, va service.VendorActor, partyID int64) (*service.VendorOrderDetail, error)
 	Accept(ctx context.Context, va service.VendorActor, partyID int64) (*service.VendorOrderDetail, error)
 	Reject(ctx context.Context, va service.VendorActor, partyID int64, reason string) (*service.VendorOrderDetail, error)
+	SubmitRealization(ctx context.Context, va service.VendorActor, partyID int64, rows []service.RealizationRowInput) (*service.VendorOrderDetail, error)
+	ListRealizations(ctx context.Context, va service.VendorActor, f service.ReplenishmentFilter) (*service.ClassificationList, error)
 }
 
 var vendorPartyStatuses = map[string]bool{"": true, "pending": true, "accepted": true, "rejected": true, "withdrawn": true}
@@ -44,6 +46,7 @@ func (h *VendorOrderHandler) Routes() chi.Router {
 	r.Get("/{id}", h.Get)
 	r.Post("/{id}/accept", h.Accept)
 	r.Post("/{id}/reject", h.Reject)
+	r.Post("/{id}/realization", h.SubmitRealization)
 	return r
 }
 
@@ -120,6 +123,52 @@ func (h *VendorOrderHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	}
 	h.withParty(w, r, func(va service.VendorActor, id int64) (*service.VendorOrderDetail, error) {
 		return h.svc.Reject(r.Context(), va, id, body.Reason)
+	})
+}
+
+// realizationBody is POST /{id}/realization (replenishment-realisasi FR2.2):
+// amounts keyed by denom as a string ("100000": 200000000), realized_date YYYY-MM-DD.
+type realizationBody struct {
+	Realizations []struct {
+		TerminalID   string           `json:"terminal_id"`
+		Result       string           `json:"result"`
+		RealizedDate *string          `json:"realized_date"`
+		Amounts      map[string]int64 `json:"amounts"`
+	} `json:"realizations"`
+}
+
+// SubmitRealization handles POST /{id}/realization (replenish party only).
+func (h *VendorOrderHandler) SubmitRealization(w http.ResponseWriter, r *http.Request) {
+	var body realizationBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "body tidak valid")
+		return
+	}
+	rows := make([]service.RealizationRowInput, len(body.Realizations))
+	for i, in := range body.Realizations {
+		rows[i] = service.RealizationRowInput{TerminalID: in.TerminalID, Result: in.Result}
+		if in.RealizedDate != nil {
+			d, err := time.Parse("2006-01-02", *in.RealizedDate)
+			if err != nil {
+				writeValidationError(w, "realized_date", "format tanggal YYYY-MM-DD")
+				return
+			}
+			rows[i].RealizedDate = &d
+		}
+		if len(in.Amounts) > 0 {
+			rows[i].Amounts = make(map[int32]int64, len(in.Amounts))
+			for k, v := range in.Amounts {
+				denom, err := strconv.ParseInt(k, 10, 32)
+				if err != nil || denom <= 0 {
+					writeValidationError(w, "amounts", "pecahan tidak valid")
+					return
+				}
+				rows[i].Amounts[int32(denom)] = v
+			}
+		}
+	}
+	h.withParty(w, r, func(va service.VendorActor, id int64) (*service.VendorOrderDetail, error) {
+		return h.svc.SubmitRealization(r.Context(), va, id, rows)
 	})
 }
 

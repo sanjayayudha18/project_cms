@@ -16,6 +16,7 @@ import { notificationsRoute } from "@/routes/notifications";
 import { ordersRoute } from "@/routes/orders";
 import { orderDetailRoute } from "@/routes/orders.$id";
 import { evidenceRoute } from "@/routes/orders.$id.evidence";
+import { realizationsRoute } from "@/routes/realizations";
 import { reconciliationRoute } from "@/routes/reconciliation";
 import { scheduleRoute } from "@/routes/schedule";
 
@@ -28,6 +29,7 @@ const routeTree = rootRoute.addChildren([
       ordersRoute,
       orderDetailRoute,
       evidenceRoute,
+      realizationsRoute,
       invoicesRoute,
       scheduleRoute,
       dsrRoute,

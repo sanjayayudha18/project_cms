@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { RealizationPanel } from "@/features/orders/RealizationPanel";
 import type {
   DenomAmount,
   PartyAtm,
@@ -120,6 +121,10 @@ function OrderDetail({ order }: { readonly order: VendorOrderDetail }) {
       {isVault && <CollectorList branches={content.replenish_branches} />}
 
       {order.can_decide && <DecisionPanel partyID={order.id} />}
+
+      {!isVault && order.status === "accepted" && !order.is_canceled && (
+        <RealizationPanel order={order} />
+      )}
     </>
   );
 }

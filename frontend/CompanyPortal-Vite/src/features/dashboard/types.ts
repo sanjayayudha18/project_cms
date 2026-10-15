@@ -34,28 +34,6 @@ export interface AttentionItem {
   time: string;
 }
 
-// ─── ReplenishmentSummary Types ───────────────────────────────────────────────
-
-export type ReplenishmentStatus =
-  | "completed"
-  | "in-transit"
-  | "scheduled"
-  | "delayed"
-  | "pending-vendor";
-
-export interface ReplenishmentSchedule {
-  id: string;
-  routeCode: string;
-  region: string;
-  vendor: string;
-  windowStart: string;
-  windowEnd: string;
-  machineCount: number;
-  completionCount: number;
-  status: ReplenishmentStatus;
-  cashValue: number;
-}
-
 // ─── Legacy Types (retained for MetricCard property test) ────────────────────
 
 export interface DashboardMetrics {
@@ -76,5 +54,3 @@ export interface ActivityEvent {
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
 export type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
-
-export type ProgressBarStatus = "in-transit" | "completed" | "delayed";

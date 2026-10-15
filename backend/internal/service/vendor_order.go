@@ -86,6 +86,10 @@ type VendorOrderDetail struct {
 	VendorOrderSummary
 	RejectionReason *string      `json:"rejection_reason"`
 	Content         PartyContent `json:"content"`
+	// replenishment-realisasi FR5.1 (replenish party only): the vendor's realisasi report.
+	Realizations              []RealizationView `json:"realizations"`
+	CanReport                 bool              `json:"can_report"`
+	CompletionRejectionReason *string           `json:"completion_rejection_reason"`
 }
 
 type VendorOrderFilter struct {
@@ -175,12 +179,16 @@ func (s *VendorOrderService) Get(ctx context.Context, va VendorActor, partyID in
 	if err := json.Unmarshal(row.Content, &c); err != nil {
 		return nil, fmt.Errorf("decode party %d content: %w", row.ID, err)
 	}
-	return &VendorOrderDetail{
+	d := &VendorOrderDetail{
 		VendorOrderSummary: summary(row.ID, row.Role, row.Status, row.RequestNumber, row.ReplenishDate, row.RequestStatus,
 			row.IsCanceled, row.VendorBranchID, row.BranchCode, row.BranchName, row.SentAt, row.DecidedAt, c),
 		RejectionReason: row.RejectionReason,
 		Content:         c,
-	}, nil
+	}
+	if err := loadRealization(ctx, q, d, row.VendorRequestID); err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 func (s *VendorOrderService) getScoped(ctx context.Context, q *db.Queries, sc vendorScope, partyID int64) (db.GetVendorOrderRow, error) {

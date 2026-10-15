@@ -11,6 +11,45 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
+// ─── Mock replenishment summary API (ReplenishmentSummary, FR4.2) ────────────
+
+vi.mock("@/features/replenishment/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/replenishment/api")>();
+  return {
+    ...actual,
+    useReplenishmentSummary: () => ({
+      isLoading: false,
+      isError: false,
+      data: {
+        currency: "IDR",
+        instructions: [
+          {
+            date: new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" }),
+            terminals: 12,
+            order_amount: 1500000000,
+          },
+        ],
+        by_class: [
+          {
+            classification: "late",
+            total: 4,
+            amount_diff: 2,
+            vendor_mismatch: 0,
+            vendor_report_late: 1,
+          },
+          {
+            classification: "on_schedule",
+            total: 30,
+            amount_diff: 1,
+            vendor_mismatch: 0,
+            vendor_report_late: 0,
+          },
+        ],
+      },
+    }),
+  };
+});
+
 // ─── Mock useAuthStore ────────────────────────────────────────────────────────
 
 const mockUseAuthStore = vi.fn();
@@ -23,6 +62,7 @@ vi.mock("@/lib/auth/store", () => ({
 
 import { DashboardScreen } from "../DashboardScreen";
 import { MetricStrip } from "../MetricStrip";
+import { ReplenishmentSummary } from "../ReplenishmentSummary";
 
 // ─── Test Data ────────────────────────────────────────────────────────────────
 
@@ -146,5 +186,19 @@ describe("DashboardScreen Error State", () => {
     expect(screen.getByRole("button")).toBeInTheDocument();
 
     consoleSpy.mockRestore();
+  });
+});
+
+describe("ReplenishmentSummary", () => {
+  it("shows today's instructions and the 7-day classification counts with labels", () => {
+    render(<ReplenishmentSummary />);
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText("IDR 1.500.000.000")).toBeInTheDocument();
+    expect(screen.getByText("Mundur")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("30")).toBeInTheDocument();
+    expect(screen.getByText(/tiket dengan selisih nominal/)).toHaveTextContent(
+      "3 tiket dengan selisih nominal",
+    );
   });
 });

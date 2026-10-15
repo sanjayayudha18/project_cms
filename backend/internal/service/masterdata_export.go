@@ -182,15 +182,15 @@ func WriteExportTemplate(w io.Writer, entity string) error {
 }
 
 // plainNumberRe matches a bare number/phone ("+62 812-345", "-6.2", "(021) 555"),
-// which csvSafe leaves alone even though it starts with + or -.
+// which CSVSafe leaves alone even though it starts with + or -.
 var plainNumberRe = regexp.MustCompile(`^[+-]?[0-9][0-9 ().-]*$`)
 
-// csvSafe defuses spreadsheet formula injection: a text cell starting with
+// CSVSafe defuses spreadsheet formula injection: a text cell starting with
 // = @ TAB CR (or + / - when it is not a plain number or phone) gets a leading
 // apostrophe, so opening an export in Excel cannot execute a formula that an
 // admin typed into a vendor name or address. The importer (T5.3) strips one
 // leading apostrophe that precedes such a character.
-func csvSafe(s string) string {
+func CSVSafe(s string) string {
 	if s == "" {
 		return s
 	}
@@ -266,7 +266,7 @@ func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w
 		for _, row := range rows {
 			safe := make([]string, len(row))
 			for i, cell := range row {
-				safe[i] = csvSafe(cell)
+				safe[i] = CSVSafe(cell)
 			}
 			if err := cw.Write(safe); err != nil {
 				return total, err

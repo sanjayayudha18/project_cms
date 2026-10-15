@@ -186,6 +186,9 @@ type RequestAtmStatus struct {
 	VisitRemaining   *int32
 	VisitQuotaTotal  *int32
 	IsOverQuota      bool
+	// replenishment-realisasi FR2: the vendor's report (nil/empty before a report or for a failed ATM).
+	RealizedDate    *time.Time
+	RealizedAmounts []DenomAmount
 }
 
 // VendorRequestSummary is one row of the list response (Req 9.4). CIT-2
@@ -387,6 +390,8 @@ type VendorRequestRepository interface {
 	// atm-visit-quota + replenish-ticket: detail per-ATM ticket + status.
 	ListActiveVendorRequestTickets(ctx context.Context, requestNumber string) ([]db.ListActiveVendorRequestTicketsRow, error)
 	ListRequestVisitInfo(ctx context.Context, id int64) ([]db.ListRequestVisitInfoRow, error)
+	// replenishment-realisasi FR2: vendor realisasi per ATM on the detail screen.
+	ListVendorRealizationsForRequest(ctx context.Context, vendorRequestID int64) ([]db.ListVendorRealizationsForRequestRow, error)
 }
 
 // VendorRequestPool is the *pgxpool.Pool surface the service needs: db.DBTX

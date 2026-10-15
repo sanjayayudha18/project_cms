@@ -242,13 +242,13 @@ export const NAV_CONFIG: NavItem[] = [
   },
   */
   {
+    // replenishment-realisasi FR1: the calendar the realisasi job counts workdays with; ADMIN only (Q14).
     id: "holiday-calendar",
     label: "Kalender Libur",
     icon: Calendar,
-    href: "/forecasting/holiday-calendar",
-    roles: ["ATM-USER", "ATM-SPV"],
+    href: "/settings/admin/holidays",
+    roles: ["ADMIN"],
     group: "forecasting",
-    disabled: true,
   },
 
   // Invoice

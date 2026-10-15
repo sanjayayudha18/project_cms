@@ -21,6 +21,23 @@ type fakeVendorOrderServicer struct {
 	lastVA service.VendorActor
 	filter service.VendorOrderFilter
 	reason string
+	rows   []service.RealizationRowInput
+	// realFilter: last ListRealizations filter
+	realFilter service.ReplenishmentFilter
+}
+
+func (f *fakeVendorOrderServicer) ListRealizations(_ context.Context, va service.VendorActor, flt service.ReplenishmentFilter) (*service.ClassificationList, error) {
+	f.lastVA = va
+	f.realFilter = flt
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &service.ClassificationList{Items: []service.ClassificationView{}, Page: 1, PageSize: 20}, nil
+}
+
+func (f *fakeVendorOrderServicer) SubmitRealization(_ context.Context, va service.VendorActor, _ int64, rows []service.RealizationRowInput) (*service.VendorOrderDetail, error) {
+	f.rows = rows
+	return f.detail(va)
 }
 
 func (f *fakeVendorOrderServicer) detail(va service.VendorActor) (*service.VendorOrderDetail, error) {
@@ -98,6 +115,42 @@ func TestVendorOrderHandler(t *testing.T) {
 			}
 			if tc.wantCode == http.StatusOK && (fake.lastVA.UserID != 9 || fake.lastVA.ClaimVendorID == nil || *fake.lastVA.ClaimVendorID != 42) {
 				t.Errorf("service got actor %+v, want user 9 with vendor claim 42", fake.lastVA)
+			}
+		})
+	}
+}
+
+func TestVendorOrderHandler_Realization(t *testing.T) {
+	const path = "/o/7/realization"
+	cases := []struct {
+		name, body string
+		svcErr     error
+		wantCode   int
+	}{
+		{"ok", `{"realizations":[{"terminal_id":"A1","result":"success","realized_date":"2026-10-14","amounts":{"100000":200000000}},{"terminal_id":"A2","result":"failed"}]}`, nil, http.StatusOK},
+		{"bad body", `{`, nil, http.StatusBadRequest},
+		{"bad date", `{"realizations":[{"terminal_id":"A1","result":"success","realized_date":"14-10-2026"}]}`, nil, http.StatusUnprocessableEntity},
+		{"bad denom key", `{"realizations":[{"terminal_id":"A1","result":"success","realized_date":"2026-10-14","amounts":{"x":1}}]}`, nil, http.StatusUnprocessableEntity},
+		{"service validation", `{"realizations":[]}`, &service.ValidationError{Field: "realizations", Message: "x"}, http.StatusUnprocessableEntity},
+		{"wrong state 409", `{"realizations":[]}`, service.ErrInvalidTransition, http.StatusConflict},
+		{"out of scope 404", `{"realizations":[]}`, service.ErrVendorOrderNotFound, http.StatusNotFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := testTokenService()
+			fake := &fakeVendorOrderServicer{err: tc.svcErr}
+			r := chi.NewRouter()
+			r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake).Routes())
+			rec := doRequest(r, http.MethodPost, path, tokenForVendor(t, ts, 9, 42), tc.body)
+			if rec.Code != tc.wantCode {
+				t.Fatalf("code = %d, want %d: %s", rec.Code, tc.wantCode, rec.Body.String())
+			}
+			if tc.name != "ok" {
+				return
+			}
+			if len(fake.rows) != 2 || fake.rows[0].RealizedDate == nil || fake.rows[0].RealizedDate.Format("2006-01-02") != "2026-10-14" ||
+				fake.rows[0].Amounts[100000] != 200000000 || fake.rows[1].RealizedDate != nil || fake.rows[1].Amounts != nil {
+				t.Fatalf("rows = %+v", fake.rows)
 			}
 		})
 	}

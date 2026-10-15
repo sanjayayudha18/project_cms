@@ -153,7 +153,7 @@ func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity 
 
 	params := make([]db.CreateMasterDataChangeRequestParams, len(collector.reqs))
 	for n, c := range collector.reqs {
-		payload, err := marshalOrNilJSON(c.req.Payload)
+		payload, err := marshalPayloadJSON(c.req.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("marshal payload (row %d): %w", c.row, err)
 		}

@@ -137,15 +137,9 @@ func (s *MasterDataChangeService) Submit(ctx context.Context, makerID int64, req
 		}
 	}
 
-	payload, err := marshalOrNilJSON(req.Payload)
+	payload, err := marshalPayloadJSON(req.Payload)
 	if err != nil {
 		return db.MasterDataChangeRequest{}, fmt.Errorf("marshal payload: %w", err)
-	}
-	if payload == nil {
-		// payload is NOT NULL in the DB; disable/enable ops carry no field
-		// changes (Before holds the pre-toggle snapshot instead), so there is
-		// nothing to marshal -- use an empty object rather than a NULL.
-		payload = []byte("{}")
 	}
 	before, err := marshalOrNilJSON(req.Before)
 	if err != nil {
@@ -237,6 +231,17 @@ func validateMasterDataOp(op string, entityID *int64) error {
 		return &ValidationError{Field: "op", Message: "must be one of create, update, disable, enable"}
 	}
 	return nil
+}
+
+// marshalPayloadJSON marshals a change payload for the NOT NULL
+// master_data_change_requests.payload column. Disable/enable ops carry no field
+// changes (Before holds the pre-toggle snapshot instead), so a nil payload
+// becomes an empty object rather than a NULL. Used by Submit and import Confirm.
+func marshalPayloadJSON(v any) ([]byte, error) {
+	if v == nil {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(v)
 }
 
 func marshalOrNilJSON(v any) ([]byte, error) {

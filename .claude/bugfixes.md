@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-15 — Import CSV master data: baris toggle aktif → payload NULL → HTTP 500
+- **Symptom**: confirm import CSV master data yang berisi baris toggle (hanya `is_active` berubah → op enable/disable) gagal `null value in column "payload" of relation "master_data_change_requests" violates not-null constraint (23502)` → **500**. Berlaku untuk semua entity yang bisa di-toggle lewat CSV (vendor, cabang vendor, vault, PIC, ATM, kelolaan ATM). Temuan be-tech-debt C4.4 (`.claude/sdlc/be-tech-debt/tests.md`, "Temuan produk #2").
+- **Root cause**: `MasterDataImporter.Confirm` (`masterdata_import_confirm.go`) memakai `marshalOrNilJSON(c.req.Payload)` → NULL untuk enable/disable (tanpa payload). `MasterDataChangeService.Submit` sudah punya fallback `{}` inline, tapi jalur import tidak ikut. Maker-checker master data (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Fix**: helper bersama `marshalPayloadJSON` di `backend/internal/service/masterdata_change.go` (nil → `{}`), dipakai `Submit` **dan** import `Confirm`, jadi kedua jalur tidak bisa beda lagi. Fallback inline di `Submit` dihapus.
+- **Tests**: `TestMasterDataImportConfirm_UpdateAndToggleRows_EffectOnlyAfterApproval_Integration` (`masterdata_import_update_toggle_integration_test.go`, merah dulu → hijau). `go test ./...` hijau, `go test -tags integration ./internal/service/` hijau, `golangci-lint run --build-tags integration ./...` 0. Manual browser verification (import CSV dengan baris toggle): outstanding.
+- **Commit**: belum (menunggu "commit")
+
+---
+
 ## 2026-10-15 — Approval: approver cuti tanpa delegate / delegasi ke maker → HTTP 500
 - **Symptom**: approve/reject `/api/v1/approvals/{id}` membalas **500 "Terjadi kesalahan internal"** bila (a) approver cuti dan mendelegasikan ke maker, atau (b) approver cuti tanpa delegate aktif. Aksi tetap ditolak (fail-closed), tapi pesannya salah. Temuan be-tech-debt C3 (`.claude/sdlc/be-tech-debt/tests.md`, "Temuan produk").
 - **Root cause**: `ResolveEffectiveApprover` mengembalikan error polos tanpa sentinel, jadi `ApprovalHandler.handleError` jatuh ke `default`. Satu-satunya pemanggil = `Orchestrator.Approve/Reject`, jadi perbaikan di fungsi ini menutup semua jalur. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.

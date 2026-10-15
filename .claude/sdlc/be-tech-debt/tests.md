@@ -310,7 +310,7 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 - GCP: buat metric `http_request_latency` + `http_5xx`, alert p95 > 3 s + kanal notifikasi; pastikan log container ter-parse JSON ke `jsonPayload` (user).
 - Keputusan: LB/uptime check memakai `/ready`; Docker `HEALTHCHECK` tetap `/health` atau pindah (user).
 
-## Fase D — runner migrasi / BE-03 (run 2026-10-15, belum di-commit)
+## Fase D — runner migrasi / BE-03 (run 2026-10-15, committed `88a3139`)
 
 | Perubahan | File |
 |---|---|

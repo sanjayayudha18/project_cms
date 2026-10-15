@@ -21,7 +21,7 @@ interface ErrorBoundaryState {
 
 // ─── Default Fallback ─────────────────────────────────────────────────────────
 
-function DefaultErrorFallback({ resetErrorBoundary }: ErrorFallbackProps) {
+export function DefaultErrorFallback({ resetErrorBoundary }: ErrorFallbackProps) {
   return (
     <div
       role="alert"

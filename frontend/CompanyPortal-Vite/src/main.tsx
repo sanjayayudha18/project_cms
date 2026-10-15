@@ -1,6 +1,7 @@
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { DefaultErrorFallback } from "./components/feedback";
 import { rootRoute } from "./routes/__root";
 import { authRoute } from "./routes/_auth";
 import { protectedRoute } from "./routes/_protected";
@@ -96,7 +97,16 @@ const routeTree = rootRoute.addChildren([
 
 // ─── Router Instance ──────────────────────────────────────────────────────────
 
-const router = createRouter({ routeTree });
+// Render errors in any route show the fallback instead of a blank screen (FE-07).
+const router = createRouter({
+  routeTree,
+  defaultErrorComponent: ({ error }) => (
+    <DefaultErrorFallback
+      error={error as Error}
+      resetErrorBoundary={() => window.location.reload()}
+    />
+  ),
+});
 
 // Register the router for type safety
 declare module "@tanstack/react-router" {

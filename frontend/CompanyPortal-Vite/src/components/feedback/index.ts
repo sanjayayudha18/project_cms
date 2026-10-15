@@ -1,4 +1,4 @@
-export { ErrorBoundary } from "./ErrorBoundary";
+export { DefaultErrorFallback, ErrorBoundary } from "./ErrorBoundary";
 export type { ErrorBoundaryProps, ErrorFallbackProps } from "./ErrorBoundary";
 
 export { NetworkError } from "./NetworkError";

@@ -1,12 +1,11 @@
 /**
  * CSV export / template / import client for master data
  * (backend admin_master_data_{export,import}_handler.go, mounted at
- * /api/v1/admin/master-data). The shared `api` client is JSON-only, so files
- * go through fetch directly with the same Bearer token.
+ * /api/v1/admin/master-data). Goes through the shared `api` client so a 401
+ * triggers the single-flight token refresh like every other call.
  */
 
-import { apiConfig } from "@/lib/api/config";
-import { useAuthStore } from "@/lib/auth/store";
+import { type ApiError, api } from "@/lib/api";
 
 export const IO_ENTITIES = [
   { id: "vendors", label: "Vendor" },
@@ -61,28 +60,23 @@ export class ImportApiError extends Error {
 
 const BASE = "/admin/master-data";
 
-function authHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().accessToken;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function toError(res: Response): Promise<ImportApiError> {
-  try {
-    const body = (await res.json()) as { message?: string; errors?: ImportRowError[] };
-    return new ImportApiError(body.message ?? res.statusText, res.status, body.errors ?? []);
-  } catch {
-    return new ImportApiError(res.statusText || "Permintaan gagal", res.status);
-  }
+/** Re-wraps the shared client's ApiError so callers keep ImportApiError + row errors. */
+function toImportError(err: unknown): unknown {
+  const e = err as Partial<ApiError> | null;
+  if (typeof e?.status !== "number") return err;
+  const rows = Array.isArray(e.details) ? (e.details as ImportRowError[]) : [];
+  return new ImportApiError(e.message || "Permintaan gagal", e.status, rows);
 }
 
 async function download(path: string, fallbackName: string): Promise<void> {
-  const res = await fetch(`${apiConfig.baseURL}${path}`, {
-    headers: authHeaders(),
-    credentials: "include",
-  });
-  if (!res.ok) throw await toError(res);
+  let res: Awaited<ReturnType<typeof api.get<Blob>>>;
+  try {
+    res = await api.get<Blob>(path, { responseType: "blob" });
+  } catch (err) {
+    throw toImportError(err);
+  }
   const match = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
-  const url = URL.createObjectURL(await res.blob());
+  const url = URL.createObjectURL(res.data);
   const a = document.createElement("a");
   a.href = url;
   a.download = match?.[1] ?? fallbackName;
@@ -101,14 +95,11 @@ export function downloadTemplate(entity: IoEntity): Promise<void> {
 async function upload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${apiConfig.baseURL}${path}`, {
-    method: "POST",
-    headers: authHeaders(),
-    credentials: "include",
-    body: form,
-  });
-  if (!res.ok) throw await toError(res);
-  return (await res.json()) as T;
+  try {
+    return (await api.post<T>(path, form)).data;
+  } catch (err) {
+    throw toImportError(err);
+  }
 }
 
 export function dryRunImport(entity: IoEntity, file: File): Promise<ImportPreview> {

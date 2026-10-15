@@ -1,18 +1,8 @@
 // ─── API Client Configuration ─────────────────────────────────────────────────
 // Resolves environment variables at build time via Vite's import.meta.env
 
-export type ApiMode = "stub" | "real";
-
 export interface ApiClientConfig {
-  mode: ApiMode;
   baseURL: string;
-  stubLatency: { min: number; max: number };
-}
-
-function resolveMode(): ApiMode {
-  const raw = import.meta.env.VITE_API_MODE;
-  if (raw === "real") return "real";
-  return "stub";
 }
 
 function resolveBaseURL(): string {
@@ -21,10 +11,5 @@ function resolveBaseURL(): string {
 }
 
 export const apiConfig: ApiClientConfig = {
-  mode: resolveMode(),
   baseURL: resolveBaseURL(),
-  stubLatency: {
-    min: 200,
-    max: 800,
-  },
 };

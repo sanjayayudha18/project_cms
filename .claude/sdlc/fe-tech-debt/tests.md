@@ -26,3 +26,16 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 - **Manual browser check (user, Golden Rule #10)**: lewat image Docker kedua portal, buka DevTools → Network/Console: header terkirim, **tidak ada pelanggaran CSP** di console (login, dashboard, EOD Monitoring dialog + drawer retry — animasi tetap jalan, VendorPortal font Plus Jakarta Sans/IBM Plex Mono termuat, preview upload gambar `blob:`), navigasi router normal sesudah bump.
 - T-A1 sebagai job CI `frontend-image` menunggu E1.
 - T-A3 (`pnpm audit --prod --audit-level high` = 0) menunggu A3 (hapus `xlsx`).
+
+## Batch FE-07 / FE-08 / FE-10 / FE-11 (2026-10-15, belum commit)
+| Command | Result |
+|---|---|
+| `pnpm --dir frontend/CompanyPortal-Vite run build` / `lint` / `test` | built / clean (476 files) / 125 files, 1043 tests |
+
+- FE-07: `main.tsx` `createRouter({ routeTree, defaultErrorComponent })` memakai `DefaultErrorFallback` (kini diekspor dari `components/feedback`). Tidak ada unit test render-error router; diverifikasi lewat build/typecheck.
+- FE-08: `lib/api/client.ts` mendukung `FormData` (tanpa `Content-Type` JSON) dan `responseType: "blob"`, `ApiResponse.headers`; `features/master-data-io/api.ts` memakai `api.get/post` sehingga ikut refresh 401. Test baru di `client.test.ts` (FormData tanpa Content-Type, blob + headers, 401 refresh + retry FormData). `admin-holidays/api.ts:74` masih `fetch` sendiri dengan pola sama — di luar batch, kandidat berikutnya.
+- FE-10: hapus 4 `*.backup`, `lib/api/stubs/` (+ bagian Property 17 di `api.property.test.ts`), `apiConfig.mode/stubLatency`/`ApiMode` (`.env.local` `VITE_API_MODE=real` gitignored, tidak lagi dibaca). **Folder `forecast` / `forecasting` / `dmaa-forecast` tidak disentuh**: ketiganya masih dipakai route aktif (`routes/forecasting/*`; `dsr-upload` memakai `features/forecasting/components`, `dsr-dashboard` memakai `features/dsr`) dan menu Sidebar. Konsolidasi butuh keputusan produk (route `/forecasting/forecast` & `/forecasting/dmaa-forecast` masih dipakai atau tidak).
+- FE-11: `.env` + `.env.*` ditambah ke `CompanyPortal-Vite/.dockerignore`.
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: Master Data I/O (export/template download, dry-run + confirm import, 401 → refresh tidak logout), dan tampilan fallback saat render error route.

@@ -1,6 +1,6 @@
 # Plan: Perbaikan tech debt backend (BE-01 – BE-12)
 
-Status: **draft 2026-10-12**, Fase A (A1–A3) **accepted 2026-10-15** (user: "Fase A plan be-tech-debt (A1, A2, A3) diterima"); fase B–G masih menunggu engineer menerima plan. Stage: 3 Build.
+Status: **draft 2026-10-12**, Fase A (A1–A3) **accepted 2026-10-15** (user: "Fase A plan be-tech-debt (A1, A2, A3) diterima"), Fase B (B1–B6, B5 ditunda) **accepted 2026-10-15** (user: "Saya terima Fase B plan BE (B1–B6, B5 ditunda). Boleh buat dan hapus DB cms_ci di Postgres dev."); fase C–G masih menunggu engineer menerima plan. Stage: 3 Build.
 Sumber: `spec.md` (accepted 2026-10-12, S1–S8 sesuai usulan), `intent.md` (accepted 2026-10-12).
 Singkatan path: `BE/` = `backend/`, `PY/` = `backend_python/`, `CI` = `.github/workflows/ci.yml`.
 

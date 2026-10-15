@@ -12,7 +12,7 @@
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
 | 6 | Memorystore Redis | Cache/sessions |
 | 7 | Artifact Registry | Docker images |
-| 8 | Cloud Build | CI: build -> test -> scan -> push |
+| 8 | Cloud Build | CD: build images -> push Artifact Registry (git SHA tag) -> deploy. CI (lint/test/scan/E2E) runs in GitHub Actions `.github/workflows/ci.yml` |
 | 9 | Secret Manager | Secrets (JWT, LDAP, SMTP, DB) |
 | 10 | Cloud DNS | Domains (internal + vendor) |
 | 11 | Cloud Armor | WAF (esp. vendor portal) |
@@ -26,7 +26,7 @@
 *   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
 *   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
 
-**Pipeline**: Cloud Build -> lint + go test + vite build (x2) -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.

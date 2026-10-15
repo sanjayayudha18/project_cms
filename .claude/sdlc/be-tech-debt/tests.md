@@ -236,3 +236,40 @@ Target FR-C3 tercapai: `service` 82,3%, `approval` 88,6%, `rolemgmt` 93,5% (semu
 ### Outstanding (Fase F)
 - Run GitHub Actions (`python`, `python-image`) setelah user push.
 - Wiring deploy image Python (registry, compose/VM) — di luar plan.
+
+## Fase E — slice E3 + E4 / BE-08, BE-09 (run 2026-10-15, belum di-commit)
+
+| Perubahan | File |
+|---|---|
+| E3: `BodyLimit(max, exempt)` membungkus `http.MaxBytesReader` (exempt `nil` = semua dibatasi) | `pkg/middleware/body_limit.go` (+ test) |
+| E3: `JSONBodyLimit` = 1 MiB + `IsBodyLimitExempt`: `POST /api/v1/dsr/uploads` (exact; `/confirm` JSON tetap dibatasi) dan prefix `POST /api/v1/admin/master-data/import/` | `backend/internal/handler/body_limit.go` (+ test) |
+| E3: urutan `RequestID` → `TrustedRealIP` → `middleware.Logger` → `Recoverer` → `middleware.Timeout(30s)` → `BodyLimit` | `backend/cmd/api/main.go` |
+| E3: `Timeout(30s)` + `BodyLimit(1<<20, nil)` | `backend-cit/cmd/api/main.go` |
+| E4: `?pool_max_conns=20` di contoh `DATABASE_URL` + komentar replica; usulan per env + rumus | `backend/.env.example`, `.claude/docs/deployment.md` ("Ukuran pool DB") |
+| E4: `slog.Info("db pool", "pool", "primary"\|"replica", "max_conns", …)` | `backend/cmd/api/main.go` |
+
+| Test | Covers |
+|---|---|
+| `TestBodyLimit` (pkg, 4 kasus) | T-E3: tepat di batas terbaca penuh; batas + 1 → `*http.MaxBytesError`; path exempt tidak dibatasi; exempt `nil` membatasi semua |
+| `TestIsBodyLimitExempt` (7 kasus) | T-E3: hanya DSR upload + master-data import yang dikecualikan; `dsr/uploads/confirm`, `GET dsr/uploads`, holiday import, roles PUT tidak |
+| `TestBodyLimit_Router` | T-E3: `PUT /api/v1/admin/roles/7/permissions` body JSON 1 MiB + 1 → 400; tepat 1 MiB → 200; upload DSR 2 MiB → lolos batas, sampai dry-run (502 ETL stand-in tak terjangkau) |
+
+| Command | Result |
+|---|---|
+| `go build ./... && go vet ./...` (pkg, backend, backend-cit) | OK |
+| `go test ./...` ×3 | OK (`-race` tidak bisa lokal: butuh cgo; jalan di CI) |
+| `go test -tags integration -cover ./...` (backend, DB dev `localhost`) | OK; approval 88.6, audit 86.7, auth 90.1, handler 80.7, notification 83.9, repository 86.9, rolemgmt 93.5, service 82.4 — semua ≥ `coverage-thresholds.txt` |
+| `golangci-lint run --build-tags integration ./...` ×3 | 0 issues |
+| Start `backend/cmd/api` lokal (`pool_max_conns=20`, replica = primary) | T-E4: log `{"msg":"db pool","pool":"primary","max_conns":20}` + `{"msg":"db pool","pool":"replica","max_conns":20}` (start berhenti setelahnya karena Redis lokal mati — tidak terkait) |
+
+### Deviasi / catatan (E3, E4)
+- **`RequestLogger` belum ada** (E1 belum dikerjakan): urutan dipertahankan dengan chi `middleware.Logger` di posisinya; Timeout + BodyLimit disisipkan setelah `Recoverer`. Saat E1, `middleware.Logger` diganti di tempat yang sama.
+- **Grep endpoint multipart**: hanya tiga handler membaca multipart — DSR upload (10 MiB, exempt), master-data import (5 MiB, exempt), dan holiday import `POST /api/v1/admin/holidays/import`. Holiday import **tidak** ditambahkan ke pengecualian: handler-nya sendiri membatasi seluruh body 1 MiB (`holidayImportMaxBytes`), jadi batas global tidak mengubah perilakunya. Laporan realisasi vendor dan VendorPortal lain = JSON. Tidak ada endpoint upload yang hilang dari plan.
+- **`json.Decoder` berhenti setelah nilai JSON pertama**: padding setelah objek JSON tidak pernah dibaca sehingga tidak memicu batas (server juga tidak membacanya). Test menaruh padding di dalam nilai JSON.
+- **Long-running vs Timeout 30 s** (dilaporkan ke user, tidak diputuskan sendiri): `http.Server.WriteTimeout` sudah 30 s di kedua backend, jadi plafon waktu tidak berubah; yang baru adalah context dibatalkan (query DB berhenti) + 504 bila belum ada byte terkirim. Terdampak: DSR upload (`POST /api/v1/dsr/uploads`: baca 10 MiB + dry-run ke `service_dsr_etl` dengan client 30 s → total bisa > 30 s, NFR ≤ 30 s/dok), export CSV master-data (streaming, `ErrAbortHandler` bila putus di tengah), export di `replenishment_handler.go` (≤ 31 hari). Tidak ada SSE/streaming lain. `ReadTimeout` 10 s untuk upload 10 MiB di koneksi lambat juga sudah ada sebelumnya.
+- `backend-cit` tidak diberi log pool (di luar tugas; modul akan di-rename ke `backend-exq`).
+
+### Outstanding (E3, E4)
+- Uji manual browser: upload DSR > 1 MiB dan import master-data > 1 MiB di UI (user, Golden Rule #10).
+- Nilai `pool_max_conns` per env diterapkan di Secret Manager/`.env` VM sesudah `SHOW max_connections` di Cloud SQL (user).
+- Commit menunggu "commit" dari user.

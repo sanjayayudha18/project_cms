@@ -56,6 +56,7 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("connected to PostgreSQL")
+	slog.Info("db pool", "pool", "primary", "max_conns", dbPool.Config().MaxConns)
 
 	// Read-replica pool for list/report/viewer reads (CLAUDE.md Sec 6). Writes,
 	// read-after-write and authorization checks stay on dbPool. When
@@ -75,6 +76,7 @@ func main() {
 		}
 		dbReadPool = replicaPool
 		slog.Info("connected to PostgreSQL read replica")
+		slog.Info("db pool", "pool", "replica", "max_conns", dbReadPool.Config().MaxConns)
 	} else {
 		slog.Warn("DATABASE_REPLICA_URL not set; master-data export reads from the primary")
 	}
@@ -103,6 +105,10 @@ func main() {
 	r.Use(custommw.TrustedRealIP(cfg.TrustedProxies))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	// BE-08: cancel the request context after 30 s (504 if nothing was written)
+	// and cap bodies at 1 MiB except the uploads that set their own cap.
+	r.Use(middleware.Timeout(30 * time.Second))
+	r.Use(custommw.BodyLimit(handler.JSONBodyLimit, handler.IsBodyLimitExempt))
 
 	// Health check endpoint
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

@@ -41,3 +41,16 @@
 *   Close port 8080 from outside the VM (firewall / don't publish it) so every request goes through Nginx (defense in depth; the narrow CIDR already stops spoofing from direct callers).
 *   When a GCP Load Balancer / Cloud Armor (#11) is added in front of Nginx: append the LB address ranges to `TRUSTED_PROXIES`; no code change.
 *   `backend-cit` reads the variable but does not use it yet. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
+
+**Ukuran pool DB (BE-09, be-tech-debt E4) — usulan, belum diterapkan di GCP**: the pool size is set per URL with `?pool_max_conns=N` on `DATABASE_URL` / `DATABASE_REPLICA_URL` (pgx; without it pgx uses `max(4, NumCPU)`, i.e. 4 on a small VM — too low for 300 concurrent users). Each API prints `db pool pool=primary|replica max_conns=N` at start.
+*   Formula per Cloud SQL instance: `pool_max_conns = (max_connections − cadangan) / jumlah instance` that connect with a Go pool. `max_connections` = `SHOW max_connections;` on that instance (Cloud SQL derives it from the tier's memory unless the flag is set). `cadangan` = `superuser_reserved_connections` (3) + Python EOD (`eod_retry_scheduler` + `service_dsr_etl` + ETL scripts, ~10) + ops/psql/migrations (~5) ≈ **20**.
+*   Primary and replica are separate instances: compute each with its own `max_connections`. Only `backend` uses the replica pool; `backend-cit` uses the primary only.
+
+| Env | Instances on primary | Example `max_connections` | `pool_max_conns` primary | `pool_max_conns` replica |
+| --- | --- | --- | --- | --- |
+| Local dev | 1 (`backend`) | 100 (Postgres default) | 20 (`.env.example`) | — (replica unset = primary) |
+| Staging | 2 (`backend` + `backend-cit`) | 100 | (100 − 20) / 2 = **40** (start at 20) | 20 |
+| Prod (1 VM today) | 2 (`backend` + `backend-cit`) | read from the chosen tier | (max − 20) / 2, cap 50 | (max_replica − 10) / 1, cap 50 |
+| Prod (2028, VM per backend) | unchanged count (one pool each) | same | same formula | same |
+
+*   Start at 20 per pool and raise only when the dashboard p95 (≤ 3 s) shows pool waits; a pool larger than the DB can serve concurrently only moves the queue into Postgres. Re-compute whenever a new instance (another API replica, a new Python service) starts connecting.

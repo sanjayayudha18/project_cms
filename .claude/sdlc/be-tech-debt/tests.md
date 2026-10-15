@@ -168,3 +168,17 @@ Sudah ada sebelumnya: state machine + `checkActor` (unit + property), four-eyes 
 | `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 81,7% → **82,0%**; `transition` 72,7 → 81,8%, `runCompletionTx` 77,4 → 87,1%, `ResetATM` 76,9 → 92,3%, `CancelVisit` 74,1 → 85,2% |
 | `golangci-lint` | 0 issues |
 | `coverage-thresholds.txt` `service` | 81 → **82** |
+
+## Fase C — slice C4.3 `service` / vault plan + vendor order (run 2026-10-15, committed `fb92794`)
+Sudah ada sebelumnya: validasi alokasi (duplikat, vault/denom tak dikenal, urgent/buffer reason), submit kosong, reject draft, maker reject/approve sendiri, reviewer = pembuat/penyetuju plan, non-member Get, ADMIN save, alur penuh + tiket; vendor order scope/no-leak (branch/vendor lain → 404, internal user / klaim basi → 403), alasan pendek, keputusan kedua, keputusan setelah request pindah status, vault/replenish reject, return-edit-resend, realisasi.
+
+| Test baru | File | Covers |
+|---|---|---|
+| `TestIntegration_VaultPlan_RoleScopeAndStateGuards` (8) | `vault_plan_rbac_integration_test.go` | plan tak ada → `ErrVaultPlanNotFound`; **role salah per langkah** (ACM-SPV save/submit, ACM-USER approve/reject, ADMIN dan ATM-SPV approve → `ErrNotAuthorized`); **non-member area** tidak bisa save/submit/approve/reject (404, tanpa bocor), status request tetap; approve draft → `ErrInvalidTransition`; review sebelum ACM approve → `ErrInvalidTransition`; review oleh ACM-SPV → `ErrNotChecker`, request tak ada → `ErrNotFound`, alasan kosong / > 500; request dibatalkan tidak bisa direview |
+| `TestIntegration_VendorOrder_DecisionGuards` (3) | `vendor_order_rules_integration_test.go` | alasan reject > 500 → `ValidationError`; role vendor tanpa baris users → `ErrNotAuthorized`; accept/reject pada request dibatalkan → `ErrInvalidTransition`, party tetap `pending` |
+
+| Command | Result |
+|---|---|
+| `go test -tags integration -cover ./internal/service/` (DB dev) | ok, 0 SKIP; paket 82,0% → **82,2%**; `planFor` 76,9 → 84,6%, `planTx` 81 → 85,7%, `Approve` 72,2 → 77,8%, `ReviewRequest` 72,9 → 81,2%, `scope` 80 → 90%, `decide` 80,5 → 82,9% |
+| `golangci-lint` | 0 issues |
+| `coverage-thresholds.txt` `service` | tetap 82 |

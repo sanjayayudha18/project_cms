@@ -54,7 +54,7 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: Master Data I/O (export/template download, dry-run + confirm import, 401 → refresh tidak logout), dan tampilan fallback saat render error route.
 
-## Slice D1 + D2 — FE-05 layar mock (2026-10-15, belum commit)
+## Slice D1 + D2 — FE-05 layar mock (2026-10-15, `d25ae2b`)
 **Deviasi dari plan (keputusan user 2026-10-15):** `/replenishment` ("Jadwal CIT") dan widget `ReplenishmentSummary` **tidak** dihapus / tidak diberi banner. Sejak 2.2c keduanya memakai API sungguhan (`/api/v1/replenishment/classifications|summary`), jadi bukan layar mock lagi.
 
 | Command | Result |
@@ -67,7 +67,7 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 - CP: route tree dipindah dari `main.tsx` ke `src/routeTree.ts` (supaya bisa di-test tanpa mount); hapus file route `cit.tsx`, `forecasting/dsr-dashboard.tsx`, `invoice/list.tsx`, `invoice/reconciliation.tsx` + menu (termasuk blok `cit` yang di-comment); kartu Rekonsiliasi di hub `/invoice` jadi `disabled`. Hub `/forecasting` tidak punya tautan ke route yang dihapus (tidak diubah). Komponen baru `features/dashboard/SampleDataBanner.tsx` (memakai `NoticeBanner` info).
 - VP: route tree juga ke `src/routeTree.ts`; hapus `routes/invoices.tsx`, `schedule.tsx`, `orders.$id.evidence.tsx`, `ROUTES.INVOICES/SCHEDULE/EVIDENCE` + nav; `routerTestUtils`, `routeMapping`, `routeGuard` (deep link kini `/orders/<id>`), `integration` (cek menu tanpa Invoices/Schedule) diperbarui; komentar `/orders/123/evidence` → `/orders/123`.
 
-## Slice C1 + C2 — FE-04 code splitting + artwork (2026-10-15, belum commit)
+## Slice C1 + C2 — FE-04 code splitting + artwork (2026-10-15, `d25ae2b`)
 | Command | Result |
 |---|---|
 | T-C1 `pnpm --dir frontend/CompanyPortal-Vite run build` (→ `node scripts/check-bundle.mjs`) | entry 143,1 KB · `/login` 159,8 KB · `/` 156,1 KB · **initial JS (gabungan) 172,6 KB gzip**, budget 300 KB (baseline 502,6 KB) |

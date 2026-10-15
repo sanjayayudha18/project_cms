@@ -133,5 +133,5 @@ Sebelum slice: happy path naik L2→L3, maker approve (hanya cek `err != nil`), 
 
 Sisa tidak tercakup: cabang error DB di `repository.go` (not-found/scan error) — dicakup sebagian oleh integration test yang ada.
 
-### Temuan produk (STOP, belum diperbaiki — keputusan user)
+### Temuan produk — **DIPERBAIKI `448e870`** (2026-10-15, bugfix: (a) → 403 `ErrNotAuthorized`, (b) → 409 `ErrApproverOnLeaveNoDelegate`; test C3 dikencangkan ke sentinel, lihat `.claude/bugfixes.md`)
 `ResolveEffectiveApprover` (`internal/approval/effective_approver.go`) mengembalikan error **polos** (tidak dibungkus `ErrNotAuthorized`) untuk dua kasus: (a) approver efektif = maker (mis. approver cuti mendelegasikan ke maker), (b) approver cuti tanpa delegate. `ApprovalHandler.handleError` (`internal/handler/approval_handler.go`) jatuh ke `default` → **HTTP 500 "Terjadi kesalahan internal"**. Persetujuan tetap **ditolak** (fail-closed, tidak ada celah keamanan), tetapi user mendapat 500, bukan 403/409 yang bisa ditindaklanjuti. Test C3 sengaja hanya mengecek "ditolak + tidak berubah", tidak mengunci kode 500.

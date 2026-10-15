@@ -20,7 +20,7 @@ Template:
 - **Root cause**: `ResolveEffectiveApprover` mengembalikan error polos tanpa sentinel, jadi `ApprovalHandler.handleError` jatuh ke `default`. Satu-satunya pemanggil = `Orchestrator.Approve/Reject`, jadi perbaikan di fungsi ini menutup semua jalur. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
 - **Fix**: `backend/internal/approval/errors.go` sentinel baru `ErrApproverOnLeaveNoDelegate`; `effective_approver.go` membungkus (a) dengan `ErrNotAuthorized` → 403, (b) dengan `ErrApproverOnLeaveNoDelegate`; `backend/internal/handler/approval_handler.go` memetakan (b) → **409** "Approver sedang cuti dan tidak memiliki delegasi aktif" (keputusan user).
 - **Tests**: `TestOrchestrator_MakerCannotActOnOwnRequest` + `TestOrchestrator_ApproverOnLeaveWithoutDelegateBlocksStep` dikencangkan ke `errors.Is` sentinel (merah dulu), `TestApprovalHandler_Approve_ApproverOnLeaveNoDelegate` (409) baru. `go test ./...` hijau, `golangci-lint run --build-tags integration ./...` 0. Manual browser verification: outstanding.
-- **Commit**: belum
+- **Commit**: `448e870`
 
 ---
 

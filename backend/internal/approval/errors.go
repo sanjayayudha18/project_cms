@@ -15,6 +15,9 @@ var (
 	// ErrDelegationOverlap: the delegation range overlaps an existing one for
 	// the same from_user_id (approval_delegations_no_overlap, migration 025).
 	ErrDelegationOverlap = errors.New("delegation range overlaps an existing delegation for this user")
+	// ErrApproverOnLeaveNoDelegate: the step's approver is on leave and has no
+	// active delegate, so nobody can act on the step until one is set.
+	ErrApproverOnLeaveNoDelegate = errors.New("approver is on leave and has no active delegate")
 )
 
 // ErrChainIncomplete means the maker's supervisor chain ends before reaching an

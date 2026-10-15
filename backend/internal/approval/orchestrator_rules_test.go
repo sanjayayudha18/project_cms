@@ -65,8 +65,8 @@ func TestOrchestrator_MakerCannotActOnOwnRequest(t *testing.T) {
 				orch := NewOrchestrator(store, chain, tt.availability, auditW, nil)
 				reqID := submitInvoice(t, orch, 9100)
 
-				if err := act(orch, reqID); err == nil {
-					t.Fatalf("%s by maker = nil error, want refusal", name)
+				if err := act(orch, reqID); !errors.Is(err, ErrNotAuthorized) {
+					t.Fatalf("%s by maker: err = %v, want ErrNotAuthorized", name, err)
 				}
 				if got := stepStatuses(t, store, reqID); got[2] != "pending" || got[3] != "pending" {
 					t.Fatalf("steps after refused %s = %v, want all pending", name, got)
@@ -148,8 +148,8 @@ func TestOrchestrator_ApproverOnLeaveWithoutDelegateBlocksStep(t *testing.T) {
 	reqID := submitInvoice(t, orch, 9103)
 
 	for _, actor := range []int64{20, 30, 1} {
-		if _, err := orch.Approve(context.Background(), reqID, actor, "ip"); err == nil {
-			t.Fatalf("approve by %d with L2 approver on leave and no delegate = nil error, want refusal", actor)
+		if _, err := orch.Approve(context.Background(), reqID, actor, "ip"); !errors.Is(err, ErrApproverOnLeaveNoDelegate) {
+			t.Fatalf("approve by %d with L2 approver on leave and no delegate: err = %v, want ErrApproverOnLeaveNoDelegate", actor, err)
 		}
 	}
 	if got := stepStatuses(t, store, reqID); got[2] != "pending" {

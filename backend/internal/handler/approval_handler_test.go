@@ -183,6 +183,17 @@ func TestApprovalHandler_Approve_NotAuthorized(t *testing.T) {
 	}
 }
 
+func TestApprovalHandler_Approve_ApproverOnLeaveNoDelegate(t *testing.T) {
+	orch := &fakeApprovalOrchestrator{approveErr: approval.ErrApproverOnLeaveNoDelegate}
+	router, ts := mountApprovalHandler(orch, &fakeApprovalReader{})
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/approvals/1/approve", tokenFor(t, ts, 5), "")
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusConflict, rec.Body.String())
+	}
+}
+
 func TestApprovalHandler_Reject_HappyPath(t *testing.T) {
 	orch := &fakeApprovalOrchestrator{
 		rejectResult: db.ApprovalRequest{ID: 1, Status: "rejected"},

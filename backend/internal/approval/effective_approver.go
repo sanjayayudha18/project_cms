@@ -31,13 +31,13 @@ func ResolveEffectiveApprover(ctx context.Context, repo AvailabilityRepository, 
 			return 0, fmt.Errorf("find delegate for user %d: %w", approverID, err)
 		}
 		if delegate == nil {
-			return 0, fmt.Errorf("approver %d is on leave and has no active delegate", approverID)
+			return 0, fmt.Errorf("approver %d: %w", approverID, ErrApproverOnLeaveNoDelegate)
 		}
 		effective = *delegate
 	}
 
 	if effective == makerID {
-		return 0, fmt.Errorf("resolved approver %d is the maker: maker cannot approve their own request", effective)
+		return 0, fmt.Errorf("resolved approver %d is the maker: maker cannot approve their own request: %w", effective, ErrNotAuthorized)
 	}
 
 	return effective, nil

@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-15 — Approval: approver cuti tanpa delegate / delegasi ke maker → HTTP 500
+- **Symptom**: approve/reject `/api/v1/approvals/{id}` membalas **500 "Terjadi kesalahan internal"** bila (a) approver cuti dan mendelegasikan ke maker, atau (b) approver cuti tanpa delegate aktif. Aksi tetap ditolak (fail-closed), tapi pesannya salah. Temuan be-tech-debt C3 (`.claude/sdlc/be-tech-debt/tests.md`, "Temuan produk").
+- **Root cause**: `ResolveEffectiveApprover` mengembalikan error polos tanpa sentinel, jadi `ApprovalHandler.handleError` jatuh ke `default`. Satu-satunya pemanggil = `Orchestrator.Approve/Reject`, jadi perbaikan di fungsi ini menutup semua jalur. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Fix**: `backend/internal/approval/errors.go` sentinel baru `ErrApproverOnLeaveNoDelegate`; `effective_approver.go` membungkus (a) dengan `ErrNotAuthorized` → 403, (b) dengan `ErrApproverOnLeaveNoDelegate`; `backend/internal/handler/approval_handler.go` memetakan (b) → **409** "Approver sedang cuti dan tidak memiliki delegasi aktif" (keputusan user).
+- **Tests**: `TestOrchestrator_MakerCannotActOnOwnRequest` + `TestOrchestrator_ApproverOnLeaveWithoutDelegateBlocksStep` dikencangkan ke `errors.Is` sentinel (merah dulu), `TestApprovalHandler_Approve_ApproverOnLeaveNoDelegate` (409) baru. `go test ./...` hijau, `golangci-lint run --build-tags integration ./...` 0. Manual browser verification: outstanding.
+- **Commit**: belum
+
+---
+
 ## 2026-10-14 — `TestIntegration_ApplyVaultTickets` gagal karena request dev asli
 - **Symptom**: `go test -tags integration ./...` merah: tes tiket vault memilih `max(id)` dari `vendor_requests` = request dev asli `REP-ABA-MDN-20261014-001` yang sudah punya tiket pemenuhan vault, sehingga sync ikut menonaktifkan `VLT_ABACUS_004_20261014_001` dan audit tidak sesuai harapan.
 - **Root cause**: tes mengasumsikan dua request mana pun belum punya tiket vault; asumsi patah begitu ada request dev yang lewat alur vault v3. Data tidak berubah (tes berjalan dalam tx yang di-rollback).

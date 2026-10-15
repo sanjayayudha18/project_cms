@@ -89,3 +89,106 @@ describe("FileUpload", () => {
     vi.restoreAllMocks();
   });
 });
+
+// ─── fe-coverage C4: drop, queue limits, removal, keyboard, external errors ──
+
+describe("FileUpload (C4 paths)", () => {
+  const zone = () => screen.getByLabelText("Klik atau seret file untuk mengunggah");
+
+  it("accepts a valid dropped file and appends it to the current list", () => {
+    const onFilesChange = vi.fn();
+    const existing = createFile("a.pdf", 10, "application/pdf");
+    render(<FileUpload {...defaultProps} files={[existing]} onFilesChange={onFilesChange} />);
+    const dropped = createFile("b.png", 10, "image/png");
+
+    fireEvent.dragOver(zone());
+    fireEvent.dragLeave(zone());
+    fireEvent.drop(zone(), { dataTransfer: { files: [dropped] } });
+
+    expect(onFilesChange).toHaveBeenCalledWith([existing, dropped]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("an empty drop does nothing", () => {
+    const onFilesChange = vi.fn();
+    render(<FileUpload {...defaultProps} onFilesChange={onFilesChange} />);
+
+    fireEvent.drop(zone(), { dataTransfer: { files: [] } });
+
+    expect(onFilesChange).not.toHaveBeenCalled();
+  });
+
+  it("a full queue rejects every new file", () => {
+    const onFilesChange = vi.fn();
+    const full = [createFile("a.pdf", 10, "application/pdf")];
+    render(
+      <FileUpload {...defaultProps} maxFiles={1} files={full} onFilesChange={onFilesChange} />,
+    );
+
+    fireEvent.drop(zone(), {
+      dataTransfer: { files: [createFile("b.pdf", 10, "application/pdf")] },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Maksimal 1 file per pengiriman");
+    expect(onFilesChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the valid files of a mixed drop and lists the problems", () => {
+    const onFilesChange = vi.fn();
+    render(<FileUpload {...defaultProps} maxFiles={2} onFilesChange={onFilesChange} />);
+    const ok = createFile("ok.jpg", 10, "image/jpeg");
+
+    fireEvent.drop(zone(), {
+      dataTransfer: {
+        files: [
+          ok,
+          createFile("x.exe", 10, "application/x-msdownload"),
+          createFile("c.pdf", 10, "application/pdf"),
+        ],
+      },
+    });
+
+    expect(onFilesChange).toHaveBeenCalledWith([ok]);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Maksimal 2 file per pengiriman");
+    expect(alert).toHaveTextContent("File x.exe tidak didukung");
+  });
+
+  it("removing a file clears earlier validation errors", async () => {
+    const onFilesChange = vi.fn();
+    const files = [
+      createFile("a.pdf", 10, "application/pdf"),
+      createFile("b.pdf", 10, "application/pdf"),
+    ];
+    render(
+      <FileUpload {...defaultProps} maxFiles={2} files={files} onFilesChange={onFilesChange} />,
+    );
+    fireEvent.drop(zone(), {
+      dataTransfer: { files: [createFile("c.pdf", 10, "application/pdf")] },
+    });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Hapus file a.pdf" }));
+
+    expect(onFilesChange).toHaveBeenCalledWith([files[1]]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("Enter or Space on the drop zone opens the file picker", () => {
+    render(<FileUpload {...defaultProps} />);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const click = vi.spyOn(input, "click").mockImplementation(() => {});
+
+    fireEvent.keyDown(zone(), { key: "Enter" });
+    fireEvent.keyDown(zone(), { key: " " });
+    fireEvent.keyDown(zone(), { key: "a" });
+
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows errors passed in by the parent (e.g. from the server)", () => {
+    render(<FileUpload {...defaultProps} errors={["Server menolak file"]} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Server menolak file");
+  });
+});

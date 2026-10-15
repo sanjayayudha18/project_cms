@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
 
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 import type { EnrichedDsrRecord } from "./types";
 
@@ -33,22 +33,22 @@ const columns = [
   }),
   columnHelper.accessor("beginningBalance", {
     header: "Saldo Awal",
-    cell: (info) => formatIDR(info.getValue()),
+    cell: (info) => formatThousands(info.getValue()),
     meta: { align: "right" },
   }),
   columnHelper.accessor("cashIn", {
     header: "Kas Masuk",
-    cell: (info) => formatIDR(info.getValue()),
+    cell: (info) => formatThousands(info.getValue()),
     meta: { align: "right" },
   }),
   columnHelper.accessor("cashOut", {
     header: "Kas Keluar",
-    cell: (info) => formatIDR(info.getValue()),
+    cell: (info) => formatThousands(info.getValue()),
     meta: { align: "right" },
   }),
   columnHelper.accessor("endingBalance", {
     header: "Saldo Akhir",
-    cell: (info) => formatIDR(info.getValue()),
+    cell: (info) => formatThousands(info.getValue()),
     meta: { align: "right" },
   }),
   columnHelper.accessor("status", {

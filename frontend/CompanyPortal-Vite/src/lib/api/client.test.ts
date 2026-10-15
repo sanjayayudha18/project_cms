@@ -249,3 +249,36 @@ describe("API Client - FormData and blob (FE-08)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("API Client - remaining branches (fe-coverage C1)", () => {
+  it("sends PUT and PATCH with JSON bodies", async () => {
+    mockFetch.mockImplementation(async () => jsonResponse({ ok: true }));
+
+    await api.put("/items/1", { a: 1 });
+    await api.patch("/items/1", { b: 2 });
+
+    const methods = mockFetch.mock.calls.map(([, init]) => init?.method);
+    expect(methods).toEqual(["PUT", "PATCH"]);
+    expect(mockFetch.mock.calls[1]?.[1]?.body).toBe('{"b":2}');
+  });
+
+  it("uses `errors` as details when the error body has no `details`", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ message: "Validasi gagal", errors: { amount: "wajib" } }, 422),
+    );
+
+    await expect(api.post("/x", {})).rejects.toEqual({
+      status: 422,
+      message: "Validasi gagal",
+      details: { amount: "wajib" },
+    });
+  });
+
+  it("falls back to statusText when the error body is not JSON", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response("<html>bad gateway</html>", { status: 502, statusText: "Bad Gateway" }),
+    );
+
+    await expect(api.get("/x")).rejects.toEqual({ status: 502, message: "Bad Gateway" });
+  });
+});

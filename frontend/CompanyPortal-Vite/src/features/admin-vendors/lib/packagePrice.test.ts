@@ -4,7 +4,7 @@ import {
   activePriceRange,
   classLabel,
   compareDecimalStrings,
-  formatIDR,
+  formatDecimalIDR,
   levelLabel,
   machineLabel,
   periodLabel,
@@ -85,33 +85,33 @@ describe("priceStatus", () => {
   });
 });
 
-describe("formatIDR", () => {
+describe("formatDecimalIDR", () => {
   it("groups a whole-number integer part with dot separators", () => {
-    expect(formatIDR("2003100.00")).toBe("IDR 2.003.100,00");
+    expect(formatDecimalIDR("2003100.00")).toBe("IDR 2.003.100,00");
   });
 
   it("preserves the decimal part unchanged", () => {
-    expect(formatIDR("1000000.50")).toBe("IDR 1.000.000,50");
+    expect(formatDecimalIDR("1000000.50")).toBe("IDR 1.000.000,50");
   });
 
   it("preserves every digit from the input (no float rounding)", () => {
     const input = "123456789.99";
-    const output = formatIDR(input);
+    const output = formatDecimalIDR(input);
     const digitsIn = input.replace(/[.,]/g, "");
     const digitsOut = output.replace(/^IDR\s*/, "").replace(/[.,]/g, "");
     expect(digitsOut).toBe(digitsIn);
   });
 
   it("handles a value with no decimal part", () => {
-    expect(formatIDR("500")).toBe("IDR 500");
+    expect(formatDecimalIDR("500")).toBe("IDR 500");
   });
 
   it("handles small integer parts without inserting a separator", () => {
-    expect(formatIDR("999.00")).toBe("IDR 999,00");
+    expect(formatDecimalIDR("999.00")).toBe("IDR 999,00");
   });
 
   it("handles a negative amount", () => {
-    expect(formatIDR("-1000000.00")).toBe("IDR -1.000.000,00");
+    expect(formatDecimalIDR("-1000000.00")).toBe("IDR -1.000.000,00");
   });
 });
 

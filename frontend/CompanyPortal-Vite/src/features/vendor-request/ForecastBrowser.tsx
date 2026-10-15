@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { useNavigate } from "@tanstack/react-router";
 import type { OnChangeFn, RowSelectionState, SortingState } from "@tanstack/react-table";
 import { X } from "lucide-react";
@@ -356,7 +356,7 @@ export function ForecastBrowser() {
               <span>
                 Total:{" "}
                 <span className="font-semibold tabular-nums text-[var(--n-900)]">
-                  Rp {formatIDR(selectedTotal)}
+                  Rp {formatThousands(selectedTotal)}
                 </span>
               </span>
             </div>

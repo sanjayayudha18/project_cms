@@ -17,7 +17,7 @@
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Trash2 } from "lucide-react";
@@ -64,7 +64,7 @@ const itemSchema = z.object({
     .number({ invalid_type_error: "Wajib berupa angka" })
     .int("Harus bilangan bulat")
     .min(AMOUNT_MIN, `Minimal ${AMOUNT_MIN}`)
-    .max(AMOUNT_MAX, `Maksimal ${formatIDR(AMOUNT_MAX)}`),
+    .max(AMOUNT_MAX, `Maksimal ${formatThousands(AMOUNT_MAX)}`),
   // Manual_Request-only (CIT-2 Req 3, Q4): editable inputs in manual mode,
   // read-only display in DMAA mode, sent only when is_manual.
   brand: z.string().optional(),
@@ -506,7 +506,9 @@ export function VendorRequestCreate() {
                     )}
                   </td>
                 ) : (
-                  <td className="px-3 py-2 text-right tabular-nums">{formatIDR(field.denom)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {formatThousands(field.denom)}
+                  </td>
                 )}
 
                 <td className="px-3 py-2 text-right">
@@ -559,7 +561,7 @@ export function VendorRequestCreate() {
         <div className="text-sm text-[var(--n-700)]">
           <span className="font-semibold text-[var(--n-900)]">{fields.length}</span> item — Total:{" "}
           <span className="font-semibold tabular-nums text-[var(--n-900)]">
-            Rp {formatIDR(total)}
+            Rp {formatThousands(total)}
           </span>
         </div>
         <div className="flex gap-3">

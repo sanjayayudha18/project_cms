@@ -8,6 +8,7 @@
     "build": "tsc -b tsconfig.app.json && vite build && node scripts/check-bundle.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write ."

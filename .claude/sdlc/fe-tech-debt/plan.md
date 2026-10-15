@@ -120,6 +120,7 @@ Singkatan path: `CP/` = `frontend/CompanyPortal-Vite/`, `VP/` = `frontend/Vendor
 - VP: `pnpm add -D @vitest/coverage-v8@^4.1.10` (disetujui S4). Ukur baseline VP.
 - Kedua `vite.config.ts`: `test.coverage = { provider: "v8", include: ["src/**"], thresholds: { statements, branches, functions, lines } }`. Nilainya = baseline dibulatkan ke bawah (CP 69/70/64/70; VP hasil ukur).
 - Bukti: T-E1 (`vitest run --coverage` lulus di CI).
+- **Update 2026-10-15:** bagian `vite.config.ts` (threshold) pindah ke `sdlc/fe-coverage` C0 dan sudah terpasang. E2 tinggal menjalankan `pnpm run test:coverage` di CI. Catatan: `pnpm test -- --coverage` (pnpm 11) **tidak** menjalankan coverage.
 
 **E3 — E2E Playwright di CompanyPortal (FR-E3, S3, S4)**
 - `CP/playwright.config.ts`: `testDir: "e2e"`, base URL dari env `E2E_COMPANY_URL` (default `http://localhost:5173`) dan `E2E_VENDOR_URL` (default `http://localhost:5174`), chromium saja.

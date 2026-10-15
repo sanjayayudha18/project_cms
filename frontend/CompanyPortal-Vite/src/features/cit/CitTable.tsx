@@ -3,7 +3,7 @@ import { Calendar, CheckCircle, ExternalLink, Truck, XCircle } from "lucide-reac
 
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 import type { CitStatus, EnrichedCitOrder } from "./types";
 
@@ -42,7 +42,7 @@ const columns: ColumnDef<EnrichedCitOrder, unknown>[] = [
     accessorKey: "amount",
     header: "Jumlah (IDR)",
     meta: { align: "right" },
-    cell: ({ getValue }) => formatIDR(getValue() as number),
+    cell: ({ getValue }) => formatThousands(getValue() as number),
   },
   {
     accessorKey: "status",

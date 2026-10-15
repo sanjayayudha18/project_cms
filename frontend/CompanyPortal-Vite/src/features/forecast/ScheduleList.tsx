@@ -1,7 +1,7 @@
 import { Calendar, Truck } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 import type { ScheduleEntry } from "./types";
 
@@ -184,7 +184,9 @@ export function ScheduleList() {
                         <span>
                           {entry.atmId} — {entry.location}
                         </span>
-                        <span className="tabular-nums font-medium">{formatIDR(entry.amount)}</span>
+                        <span className="tabular-nums font-medium">
+                          {formatThousands(entry.amount)}
+                        </span>
                       </li>
                     ))}
                   </ul>

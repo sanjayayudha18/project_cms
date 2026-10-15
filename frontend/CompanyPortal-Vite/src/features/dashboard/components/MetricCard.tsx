@@ -1,4 +1,4 @@
-import { formatIDR } from "@/lib/utils/format";
+import { formatRp } from "@/lib/utils/format";
 import type { LucideIcon } from "lucide-react";
 
 // ─── MetricCard ───────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export function MetricCard({
   accent = "brand",
   hint,
 }: MetricCardProps) {
-  const formattedValue = formatAsIDR ? formatIDR(value) : value.toLocaleString("id-ID");
+  const formattedValue = formatAsIDR ? formatRp(value) : value.toLocaleString("id-ID");
   const accentStyle = ACCENT_STYLES[accent];
 
   return (

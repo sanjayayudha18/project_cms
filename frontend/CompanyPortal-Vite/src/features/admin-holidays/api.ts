@@ -6,8 +6,6 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
-import { apiConfig } from "@/lib/api/config";
-import { useAuthStore } from "@/lib/auth/store";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface Holiday {
@@ -66,20 +64,15 @@ export function useSetHolidayActive() {
   );
 }
 
-/** Multipart upload (field "file"); api.post sends JSON, so this one uses fetch directly. */
+/** Multipart upload (field "file") through the API client, so a 401 refreshes and retries. */
 export async function importHolidays(file: File): Promise<HolidayImportResult> {
   const form = new FormData();
   form.append("file", file);
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${apiConfig.baseURL}${BASE}/import`, {
-    method: "POST",
-    body: form,
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: "include",
-  });
-  const body = (await res.json().catch(() => ({}))) as HolidayImportResult & { message?: string };
-  if (!res.ok) throw new Error(body.message ?? "Impor gagal");
-  return body;
+  try {
+    return (await api.post<HolidayImportResult>(`${BASE}/import`, form)).data;
+  } catch (err) {
+    throw new Error((err as Partial<ApiError> | null)?.message || "Impor gagal");
+  }
 }
 
 export function useImportHolidays() {

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { formatAtmDate, formatAtmDateTime } from "@/features/atm-portal/lib/formatters";
 import { useAuthStore } from "@/lib/auth/store";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
@@ -201,7 +201,7 @@ export function VendorRequestList() {
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{row.item_count}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
-                    {formatIDR(row.total_amount)}
+                    {formatThousands(row.total_amount)}
                   </td>
                   <td className="px-3 py-2">{row.created_by.full_name}</td>
                   <td className="px-3 py-2">{formatAtmDateTime(new Date(row.created_at))}</td>

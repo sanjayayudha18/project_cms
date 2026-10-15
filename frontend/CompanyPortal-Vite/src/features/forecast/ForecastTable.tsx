@@ -3,7 +3,7 @@ import { AlertCircle, AlertTriangle, Minus } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 import type { EnrichedForecastRecord } from "./types";
 
@@ -26,25 +26,25 @@ const columns: ColumnDef<EnrichedForecastRecord, unknown>[] = [
     accessorKey: "currentBalance",
     header: "Saldo Saat Ini",
     meta: { align: "right" },
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
   },
   {
     accessorKey: "predictedUsageH1",
     header: "Prediksi H+1",
     meta: { align: "right" },
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
   },
   {
     accessorKey: "predictedUsageH2",
     header: "Prediksi H+2",
     meta: { align: "right" },
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
   },
   {
     accessorKey: "recommendedReplenishment",
     header: "Rekomendasi Pengisian",
     meta: { align: "right" },
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
   },
   {
     accessorKey: "priority",

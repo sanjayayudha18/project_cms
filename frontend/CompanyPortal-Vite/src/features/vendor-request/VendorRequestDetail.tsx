@@ -11,7 +11,7 @@ import { formatAtmDateTime } from "@/features/atm-portal/lib/formatters";
 import { RequestVaultPanel } from "@/features/vault-plan/RequestVaultPanel";
 import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { Link, useParams } from "@tanstack/react-router";
 import { AlertCircle, Ban, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
@@ -359,7 +359,7 @@ export function VendorRequestDetail() {
               <tr key={item.id} className="border-[var(--n-100)] border-b last:border-0">
                 <td className="px-3 py-2">{item.terminal_id}</td>
                 <td className="px-3 py-2 font-mono">{item.ticket_number || "-"}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatIDR(item.denom)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatThousands(item.denom)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">
                   {editingItems ? (
                     <input
@@ -370,7 +370,7 @@ export function VendorRequestDetail() {
                       className="w-36 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
                     />
                   ) : (
-                    formatIDR(item.amount_replenish)
+                    formatThousands(item.amount_replenish)
                   )}
                 </td>
               </tr>
@@ -383,7 +383,7 @@ export function VendorRequestDetail() {
         <div className="text-sm text-[var(--n-700)]">
           <span className="font-semibold text-[var(--n-900)]">{items.length}</span> item — Total:{" "}
           <span className="font-semibold tabular-nums text-[var(--n-900)]">
-            Rp {formatIDR(data.total_amount)}
+            Rp {formatThousands(data.total_amount)}
           </span>
         </div>
 

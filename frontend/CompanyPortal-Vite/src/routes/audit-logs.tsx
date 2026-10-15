@@ -1,6 +1,5 @@
-import { AuditLogPage } from "@/features/audit-log";
 import { AUDIT_LOG_SEARCH_SCHEMA } from "@/features/audit-log/useAuditLogUrlState";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute, requireRoles } from "./_protected";
 
 export const auditLogsRoute = createRoute({
@@ -8,5 +7,5 @@ export const auditLogsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   validateSearch: AUDIT_LOG_SEARCH_SCHEMA,
   beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
-  component: AuditLogPage,
+  component: lazyRouteComponent(() => import("@/features/audit-log"), "AuditLogPage"),
 });

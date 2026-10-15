@@ -10,6 +10,8 @@ export default defineConfig({
       "@": resolve(__dirname, "./src"),
     },
   },
+  // dist/.vite/manifest.json feeds scripts/check-bundle.mjs (FE-04 initial-load budget).
+  build: { manifest: true },
   server: {
     proxy: {
       // EOD monitoring is the Python eod_retry_scheduler (:8091), not the Go API; it must

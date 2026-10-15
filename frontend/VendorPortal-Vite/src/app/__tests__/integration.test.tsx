@@ -4,10 +4,8 @@ import { AuthProvider } from "@/features/auth/AuthContext";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { AuthLayout, ProtectedLayout } from "@/features/auth/ProtectedRoute";
 import { DsrPage } from "@/features/dsr/DsrPage";
-import { InvoicesPage } from "@/features/invoices/InvoicesPage";
 import { NotificationsPage } from "@/features/notifications/NotificationsPage";
 import { OrdersPage } from "@/features/orders/OrdersPage";
-import { SchedulePage } from "@/features/schedule/SchedulePage";
 import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -148,16 +146,6 @@ function renderApp(initialPath = "/") {
     getParentRoute: () => shellRoute,
     component: OrdersPage,
   });
-  const invoicesRoute = createRoute({
-    path: "/invoices",
-    getParentRoute: () => shellRoute,
-    component: InvoicesPage,
-  });
-  const scheduleRoute = createRoute({
-    path: "/schedule",
-    getParentRoute: () => shellRoute,
-    component: SchedulePage,
-  });
   const dsrRoute = createRoute({
     path: "/dsr",
     getParentRoute: () => shellRoute,
@@ -180,13 +168,7 @@ function renderApp(initialPath = "/") {
   const routeTree = rootRoute.addChildren([
     authRoute.addChildren([loginRoute]),
     protectedRoute.addChildren([
-      shellRoute.addChildren([
-        ordersRoute,
-        invoicesRoute,
-        scheduleRoute,
-        dsrRoute,
-        notificationsRoute,
-      ]),
+      shellRoute.addChildren([ordersRoute, dsrRoute, notificationsRoute]),
     ]),
     indexRoute,
   ]);
@@ -290,19 +272,9 @@ describe("Navigation between screens", () => {
       expect(screen.getByRole("heading", { name: /cit orders/i })).toBeInTheDocument();
     });
 
-    // Navigate to Invoices
-    const invoicesLink = screen.getByRole("link", { name: /invoices/i });
-    await user.click(invoicesLink);
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /invoices/i })).toBeInTheDocument();
-    });
-
-    // Navigate to Replenishment Schedule
-    const scheduleLink = screen.getByRole("link", { name: /replenishment schedule/i });
-    await user.click(scheduleLink);
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /replenishment schedule/i })).toBeInTheDocument();
-    });
+    // FE-05: mock screens (Invoices, Replenishment Schedule) are no longer in the sidebar
+    expect(screen.queryByRole("link", { name: /invoices/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /replenishment schedule/i })).not.toBeInTheDocument();
 
     // Navigate to DSR Monitor
     const dsrLink = screen.getByRole("link", { name: /dsr/i });

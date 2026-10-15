@@ -36,9 +36,6 @@ const redirectSearchSchema = z.object({
 export interface TestPages {
   readonly login: () => ReactNode;
   readonly orders: () => ReactNode;
-  readonly evidence: () => ReactNode;
-  readonly invoices: () => ReactNode;
-  readonly schedule: () => ReactNode;
   readonly dsr: () => ReactNode;
   readonly notifications: () => ReactNode;
 }
@@ -46,9 +43,6 @@ export interface TestPages {
 const defaultPages: TestPages = {
   login: () => <span data-testid="page-login">login</span>,
   orders: () => <span data-testid="page-orders">orders</span>,
-  evidence: () => <span data-testid="page-evidence">evidence</span>,
-  invoices: () => <span data-testid="page-invoices">invoices</span>,
-  schedule: () => <span data-testid="page-schedule">schedule</span>,
   dsr: () => <span data-testid="page-dsr">dsr</span>,
   notifications: () => <span data-testid="page-notifications">notifications</span>,
 };
@@ -102,21 +96,6 @@ export function buildTestRouter(initialPath: string, pagesOverride?: Partial<Tes
     getParentRoute: () => shellRoute,
     component: pages.orders,
   });
-  const evidenceRoute = createRoute({
-    path: "/orders/$id/evidence",
-    getParentRoute: () => shellRoute,
-    component: pages.evidence,
-  });
-  const invoicesRoute = createRoute({
-    path: "/invoices",
-    getParentRoute: () => shellRoute,
-    component: pages.invoices,
-  });
-  const scheduleRoute = createRoute({
-    path: "/schedule",
-    getParentRoute: () => shellRoute,
-    component: pages.schedule,
-  });
   const dsrRoute = createRoute({
     path: "/dsr",
     getParentRoute: () => shellRoute,
@@ -161,14 +140,7 @@ export function buildTestRouter(initialPath: string, pagesOverride?: Partial<Tes
   const routeTree = rootRoute.addChildren([
     authRoute.addChildren([loginRoute]),
     protectedRoute.addChildren([
-      shellRoute.addChildren([
-        ordersRoute,
-        evidenceRoute,
-        invoicesRoute,
-        scheduleRoute,
-        dsrRoute,
-        notificationsRoute,
-      ]),
+      shellRoute.addChildren([ordersRoute, dsrRoute, notificationsRoute]),
     ]),
     indexRoute,
     dashboardRoute,

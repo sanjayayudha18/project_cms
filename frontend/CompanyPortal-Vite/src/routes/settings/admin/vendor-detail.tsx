@@ -1,12 +1,18 @@
 import { Forbidden } from "@/components/pages/Forbidden";
-import { VendorDetailPage } from "@/features/admin-vendors";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute, requireRoles } from "../../_protected";
+
+// Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
+const VendorDetailPage = lazyRouteComponent(
+  () => import("@/features/admin-vendors"),
+  "VendorDetailPage",
+);
 
 export const adminVendorDetailRoute = createRoute({
   path: "/settings/admin/vendors/$vendorId",
   getParentRoute: () => protectedRoute,
   beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
+  loader: () => VendorDetailPage.preload?.(),
   component: AdminVendorDetailRouteComponent,
 });
 

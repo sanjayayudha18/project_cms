@@ -53,3 +53,30 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: Master Data I/O (export/template download, dry-run + confirm import, 401 → refresh tidak logout), dan tampilan fallback saat render error route.
+
+## Slice D1 + D2 — FE-05 layar mock (2026-10-15, belum commit)
+**Deviasi dari plan (keputusan user 2026-10-15):** `/replenishment` ("Jadwal CIT") dan widget `ReplenishmentSummary` **tidak** dihapus / tidak diberi banner. Sejak 2.2c keduanya memakai API sungguhan (`/api/v1/replenishment/classifications|summary`), jadi bukan layar mock lagi.
+
+| Command | Result |
+|---|---|
+| grep pemakai path/route sebelum hapus (CP + VP) | hanya `main.tsx`, `navigation.ts` / `constants.ts`, kartu Rekonsiliasi di hub `/invoice`, dan test router VP. `features/replenishment` ternyata berbasis API → STOP, user memutuskan tetap. |
+| T-D1 CP `src/routeTree.test.ts` | `/cit`, `/forecasting/dsr-dashboard`, `/invoice/list`, `/invoice/reconciliation` tidak terdaftar di route tree dan tidak ada di `NAV_CONFIG`; `/replenishment` tetap terdaftar |
+| T-D1 VP `src/routeTree.test.ts` + `routeMapping.property.test.tsx` | `/invoices`, `/schedule`, `/orders/$id/evidence` tidak terdaftar dan tidak di `NAV_ITEMS`; URL langsung `/invoices`, `/schedule` → NotFound (property test), `/orders/abc/evidence` jatuh ke `/orders/$id` (sisa segmen → not-found) |
+| T-D2 `features/dashboard/__tests__/Dashboard.test.tsx` | `role="note"` "Data contoh / Belum terhubung ke sistem." ada di `MetricStrip` dan `AttentionPanel`; tidak ada di `ReplenishmentSummary` (API) |
+
+- CP: route tree dipindah dari `main.tsx` ke `src/routeTree.ts` (supaya bisa di-test tanpa mount); hapus file route `cit.tsx`, `forecasting/dsr-dashboard.tsx`, `invoice/list.tsx`, `invoice/reconciliation.tsx` + menu (termasuk blok `cit` yang di-comment); kartu Rekonsiliasi di hub `/invoice` jadi `disabled`. Hub `/forecasting` tidak punya tautan ke route yang dihapus (tidak diubah). Komponen baru `features/dashboard/SampleDataBanner.tsx` (memakai `NoticeBanner` info).
+- VP: route tree juga ke `src/routeTree.ts`; hapus `routes/invoices.tsx`, `schedule.tsx`, `orders.$id.evidence.tsx`, `ROUTES.INVOICES/SCHEDULE/EVIDENCE` + nav; `routerTestUtils`, `routeMapping`, `routeGuard` (deep link kini `/orders/<id>`), `integration` (cek menu tanpa Invoices/Schedule) diperbarui; komentar `/orders/123/evidence` → `/orders/123`.
+
+## Slice C1 + C2 — FE-04 code splitting + artwork (2026-10-15, belum commit)
+| Command | Result |
+|---|---|
+| T-C1 `pnpm --dir frontend/CompanyPortal-Vite run build` (→ `node scripts/check-bundle.mjs`) | entry 143,1 KB · `/login` 159,8 KB · `/` 156,1 KB · **initial JS (gabungan) 172,6 KB gzip**, budget 300 KB (baseline 502,6 KB) |
+| C2 Pillow 12.3 (`py -3`, sudah terpasang, tidak ada unduhan) WebP q85 method 6 | `crown-login-artwork.webp` **100.476 B** (98,1 KB), 1149×1369 = sama dengan PNG (1.985.321 B); PNG dihapus |
+| `pnpm --dir frontend/CompanyPortal-Vite run build` / `lint` / `test` | built + budget lulus / clean (465 files) / 124 files, 1013 tests |
+| `pnpm --dir frontend/VendorPortal-Vite run build` / `lint` / `test` | built / clean (100 files) / 20 files, 145 tests |
+
+- C1: 32 file route CP (33 route) memakai `lazyRouteComponent`. Route dengan wrapper `forbidden` (settings/*, eod-monitoring, cit/vault-plans) tetap memegang wrapper di file route; halaman di dalamnya lazy dan di-preload lewat `loader` agar wrapper tidak suspend. Guard (`beforeLoad`) tidak diubah. Hub inline kecil (`/cash-count`, `/forecasting`, `/invoice`) tidak di-lazy. Import `*_SEARCH_SCHEMA` dari barrel fitur (`atm-portal`, `dmaa-forecast`, `vendor-request`) dipindah ke file `use*UrlState` agar barrel tidak ikut ke entry. `vite.config.ts` `build.manifest: true`.
+- C2: `nginx.conf` CP: `webp` ditambah ke `location` aset statis (cache 1y sama seperti PNG sebelumnya).
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: menu sidebar CP/VP tanpa layar mock; URL langsung ke route yang dihapus → halaman not-found; banner "Data contoh" di Dashboard (MetricStrip + Perlu Perhatian); navigasi antar route lazy (termasuk settings/admin dengan peran tanpa akses → Forbidden) tanpa layar kosong; artwork login WebP tampil sama.

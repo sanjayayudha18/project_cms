@@ -108,7 +108,7 @@ export function AuthLayout() {
       const rawRedirect = params.get("redirect");
       const isSafe = rawRedirect?.startsWith("/") && !rawRedirect.startsWith("//");
       // Navigate via href so an arbitrary preserved path (possibly with dynamic
-      // segments, e.g. /orders/123/evidence) resolves; fall back to /orders default.
+      // segments, e.g. /orders/123) resolves; fall back to /orders default.
       const target = isSafe && rawRedirect ? rawRedirect : "/orders";
       void navigate({ href: target, replace: true });
     }

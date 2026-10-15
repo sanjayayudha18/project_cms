@@ -1,12 +1,15 @@
 import { Forbidden } from "@/components/pages/Forbidden";
-import { RbacUsersPage } from "@/features/rbac-settings";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute, requireRoles } from "../../_protected";
+
+// Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
+const RbacUsersPage = lazyRouteComponent(() => import("@/features/rbac-settings"), "RbacUsersPage");
 
 export const rbacUsersRoute = createRoute({
   path: "/settings/rbac/users",
   getParentRoute: () => protectedRoute,
   beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM", "APPACCESS"]),
+  loader: () => RbacUsersPage.preload?.(),
   component: RbacUsersRouteComponent,
 });
 

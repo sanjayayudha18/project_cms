@@ -1,6 +1,5 @@
-import { VendorRequestCreate } from "@/features/vendor-request";
 import { useAuthStore } from "@/lib/auth/store";
-import { createRoute, redirect } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent, redirect } from "@tanstack/react-router";
 import { protectedRoute } from "../../_protected";
 
 // Req 12.10: non-maker roles redirect to the dashboard. Not using
@@ -18,5 +17,5 @@ export const vendorRequestNewRoute = createRoute({
       throw redirect({ to: "/" });
     }
   },
-  component: VendorRequestCreate,
+  component: lazyRouteComponent(() => import("@/features/vendor-request"), "VendorRequestCreate"),
 });

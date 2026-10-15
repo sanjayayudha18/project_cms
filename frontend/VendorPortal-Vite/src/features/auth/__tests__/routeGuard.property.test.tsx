@@ -170,18 +170,8 @@ function buildRouter(initialPath: string) {
     getParentRoute: () => shellRoute,
     component: ProtectedProbe,
   });
-  const evidenceRoute = createRoute({
-    path: "/orders/$id/evidence",
-    getParentRoute: () => shellRoute,
-    component: ProtectedProbe,
-  });
-  const invoicesRoute = createRoute({
-    path: "/invoices",
-    getParentRoute: () => shellRoute,
-    component: ProtectedProbe,
-  });
-  const scheduleRoute = createRoute({
-    path: "/schedule",
+  const orderDetailRoute = createRoute({
+    path: "/orders/$id",
     getParentRoute: () => shellRoute,
     component: ProtectedProbe,
   });
@@ -207,14 +197,7 @@ function buildRouter(initialPath: string) {
   const routeTree = rootRoute.addChildren([
     authRoute.addChildren([loginRoute]),
     protectedRoute.addChildren([
-      shellRoute.addChildren([
-        ordersRoute,
-        evidenceRoute,
-        invoicesRoute,
-        scheduleRoute,
-        dsrRoute,
-        notificationsRoute,
-      ]),
+      shellRoute.addChildren([ordersRoute, orderDetailRoute, dsrRoute, notificationsRoute]),
     ]),
     indexRoute,
   ]);
@@ -227,13 +210,11 @@ function buildRouter(initialPath: string) {
 
 const protectedPathArb = fc.oneof(
   fc.constant("/orders"),
-  fc.constant("/invoices"),
-  fc.constant("/schedule"),
   fc.constant("/dsr"),
   fc.constant("/notifications"),
   fc
     .array(fc.constantFrom("a", "b", "c", "1", "2", "3", "-"), { minLength: 1, maxLength: 8 })
-    .map((chars) => `/orders/${chars.join("")}/evidence`),
+    .map((chars) => `/orders/${chars.join("")}`),
 );
 
 // Optional query string appended to a protected path. Keys are unique (a subset of

@@ -6,8 +6,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  FileText,
-  GitCompare,
   Landmark,
   LayoutDashboard,
   Monitor,
@@ -125,16 +123,6 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ACM-USER", "ACM-SPV"],
     group: "cit",
   },
-  /*
-  {
-    id: "cit",
-    label: "CIT Tracker",
-    icon: Truck,
-    href: "/cit",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "general",
-  },
-  */
   // Monitoring
   {
     id: "atm-portal",
@@ -162,14 +150,6 @@ export const NAV_CONFIG: NavItem[] = [
   },
 
   // Forecasting
-  {
-    id: "dsr-dashboard",
-    label: "DSR Dashboard",
-    icon: BarChart3,
-    href: "/forecasting/dsr-dashboard",
-    roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
-    group: "forecasting",
-  },
   // Manually hidden from sidebar — route still exists, just not listed in nav.
   // {
   //   id: "forecast",
@@ -243,14 +223,6 @@ export const NAV_CONFIG: NavItem[] = [
 
   // Invoice
   {
-    id: "invoice-list",
-    label: "Daftar Invoice",
-    icon: FileText,
-    href: "/invoice/list",
-    roles: ["BRANCH-USER", "BRANCH-SPV", "VENDOR-USER"],
-    group: "invoice",
-  },
-  {
     id: "invoice-upload",
     label: "Unggah Invoice",
     icon: Receipt,
@@ -258,15 +230,6 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["VENDOR-USER", "BRANCH-USER"],
     group: "invoice",
     disabled: true,
-  },
-  {
-    id: "reconciliation",
-    label: "Rekonsiliasi",
-    icon: GitCompare,
-    href: "/invoice/reconciliation",
-    roles: ["BRANCH-USER", "BRANCH-SPV"],
-    group: "invoice",
-    disabled: false,
   },
   /*
   {

@@ -24,7 +24,7 @@ const INVOICE_CARDS: ModuleCardProps[] = [
     description: "Pengecekan otomatis item baris CIT/CPC terhadap data sistem.",
     href: "/invoice/reconciliation",
     icon: GitCompare,
-    disabled: false,
+    disabled: true,
   },
   {
     id: "charge-calc",

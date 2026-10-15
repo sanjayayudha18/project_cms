@@ -60,6 +60,7 @@ vi.mock("@/lib/auth/store", () => ({
 
 // ─── Import after mocks ──────────────────────────────────────────────────────
 
+import { AttentionPanel } from "../AttentionPanel";
 import { DashboardScreen } from "../DashboardScreen";
 import { MetricStrip } from "../MetricStrip";
 import { ReplenishmentSummary } from "../ReplenishmentSummary";
@@ -200,5 +201,23 @@ describe("ReplenishmentSummary", () => {
     expect(screen.getByText(/tiket dengan selisih nominal/)).toHaveTextContent(
       "3 tiket dengan selisih nominal",
     );
+  });
+});
+
+// T-D2 (FE-05): widgets still on static JSON carry a "Data contoh" note; API-backed ones don't.
+describe("sample-data banner", () => {
+  it.each([
+    ["MetricStrip", MetricStrip],
+    ["AttentionPanel", AttentionPanel],
+  ])("%s shows the sample-data note", (_name, Widget) => {
+    render(<Widget />);
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent("Data contoh");
+    expect(note).toHaveTextContent("Belum terhubung ke sistem.");
+  });
+
+  it("ReplenishmentSummary (API-backed) has no sample-data note", () => {
+    render(<ReplenishmentSummary />);
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });

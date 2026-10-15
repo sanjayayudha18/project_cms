@@ -8,7 +8,7 @@ export const authRoute = createRoute({
   component: AuthLayout,
 });
 
-const ARTWORK_SRC = "/assets/crown-login-artwork.png";
+const ARTWORK_SRC = "/assets/crown-login-artwork.webp";
 const ARTWORK_ALT =
   "Ilustrasi operasional kas: mesin ATM, kendaraan cash-in-transit, kontainer uang, lembaran uang, dan diagram rute pengiriman";
 

@@ -6,7 +6,7 @@
 | # | Product | Role |
 | ---| ---| --- |
 | 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend, currently ONE VM running both `backend/` (ATM, port 8080) and `backend-cit/` (CIT, port 8081) as separate containers — see split-VM plan below |
+| 2 | Compute Engine | Backend, currently ONE VM running `backend/` (port 8080) only; `backend-cit/` (8081) is not deployed until it is renamed to `backend-exq` and has content (decision 2026-10-08) — see split-VM plan below |
 | 3 | CloudSQL Postgres | Primary (write) |
 | 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
@@ -19,14 +19,14 @@
 | 12 | Cloud Logging | Structured logs |
 | 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
 
-**Current state (now): ONE Compute Engine VM runs both backends** as separate Docker containers (`backend` on 8080, `backend-cit` on 8081) — see root `docker-compose.yml` (Sec 9). Fine for now: CIT is still a skeleton with no real endpoints, low load.
+**Current state (now): ONE Compute Engine VM runs `backend` only** (Docker container on 8080) — see `backend/docker-compose.yaml` (Sec 9). `backend-cit` (8081) is **not deployed**: it holds only empty `doc.go` files (CIT functions are built in `backend/`, decision 2026-10-08) and is planned to be renamed to `backend-exq` (export + dashboard monitoring queries). It enters the deploy only once `backend-exq` has real content. The module stays in `go.work` and CI keeps building/testing it.
 
-**Planned (2028): split into two separate Compute Engine VMs**, one per backend. This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so moving CIT to its own VM later requires **no code change** — just deploy the existing `cms-backend-cit` image to a new VM and repoint its `.env`. When that split happens:
+**Planned (2028): split into two separate Compute Engine VMs**, one per backend (once `backend-exq` is deployed). This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so deploying the second backend to its own VM later requires **no code change** — just deploy its image to a new VM and repoint its `.env`. When that split happens:
 *   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
 *   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
 *   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
 
-**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-cit/Dockerfile`, separately) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, one VM per backend from 2028).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-cit/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
@@ -59,9 +59,9 @@
 | Env | Instances on primary | Example `max_connections` | `pool_max_conns` primary | `pool_max_conns` replica |
 | --- | --- | --- | --- | --- |
 | Local dev | 1 (`backend`) | 100 (Postgres default) | 20 (`.env.example`) | — (replica unset = primary) |
-| Staging | 2 (`backend` + `backend-cit`) | 100 | (100 − 20) / 2 = **40** (start at 20) | 20 |
-| Prod (1 VM today) | 2 (`backend` + `backend-cit`) | read from the chosen tier | (max − 20) / 2, cap 50 | (max_replica − 10) / 1, cap 50 |
-| Prod (2028, VM per backend) | unchanged count (one pool each) | same | same formula | same |
+| Staging | 1 (`backend`) | 100 | (100 − 20) / 1 = **80** (start at 20) | 20 |
+| Prod (1 VM today) | 1 (`backend`) | read from the chosen tier | (max − 20) / 1, cap 50 | (max_replica − 10) / 1, cap 50 |
+| Prod (after `backend-exq` is deployed, e.g. 2028 VM per backend) | 2 (`backend` + `backend-exq`) | same | (max − 20) / 2, cap 50 | (max_replica − 10) / 2, cap 50 |
 
 *   Start at 20 per pool and raise only when the dashboard p95 (≤ 3 s) shows pool waits; a pool larger than the DB can serve concurrently only moves the queue into Postgres. Re-compute whenever a new instance (another API replica, a new Python service) starts connecting.
 

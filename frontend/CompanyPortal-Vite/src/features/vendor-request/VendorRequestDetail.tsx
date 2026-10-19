@@ -1,72 +1,25 @@
 /**
  * Vendor Request detail page (Req 14): header (nulls omitted), items table
  * + total, status badge, and state×role×creator-gated actions mirroring the
- * backend's checkActor (vendor_request.go) — including its union cancel
- * rule (creator OR non-creator checker may cancel a pending request).
+ * backend's checkActor (vendor_request.go). Gates + handlers live in
+ * useVendorRequestActions; buttons and modals in VendorRequestActions.
  */
 
-import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { formatAtmDateTime } from "@/features/atm-portal/lib/formatters";
 import { RequestVaultPanel } from "@/features/vault-plan/RequestVaultPanel";
 import { useAuthStore } from "@/lib/auth/store";
-import { useToast } from "@/lib/hooks/useToast";
 import { formatThousands } from "@/lib/utils/formatCurrency";
 import { Link, useParams } from "@tanstack/react-router";
-import { AlertCircle, Ban, CheckCircle2, XCircle } from "lucide-react";
-import { useState } from "react";
-import {
-  ApproveCompletionModal,
-  CompletionAtmTable,
-  ReportCompletionModal,
-  toCompletionPayload,
-} from "./CompletionPanels";
+import { AlertCircle } from "lucide-react";
+import { CompletionAtmTable } from "./CompletionPanels";
 import { StatusBadge } from "./StatusBadge";
 import { VendorPartiesPanel } from "./VendorPartiesPanel";
-import {
-  getVendorRequestErrorMessage,
-  useApproveVendorRequest,
-  useApproveVendorRequestCompletion,
-  useCancelVendorRequest,
-  useRejectVendorRequest,
-  useRejectVendorRequestCompletion,
-  useReviseVendorRequest,
-  useSubmitVendorRequest,
-  useSubmitVendorRequestCompletion,
-  useUpdateVendorRequestItems,
-  useVendorRequest,
-} from "./hooks";
-import type {
-  CompletionResult,
-  VendorRequestDetail as VendorRequestDetailType,
-  VendorRequestItem,
-} from "./types";
-import { useVendorReturn } from "./vendorSide";
+import { VendorRequestActionBar, VendorRequestModals } from "./VendorRequestActions";
+import { DetailFields, DetailSkeleton, NotFoundState } from "./VendorRequestDetailParts";
+import { useVendorRequest } from "./hooks";
+import type { VendorRequestDetail as VendorRequestDetailType } from "./types";
+import { getRequestPermissions, useVendorRequestActions } from "./useVendorRequestActions";
 
-const MAKER_ROLES = ["ADMIN", "ATM-USER", "BRANCH-ATM-USER"];
-const CHECKER_ROLES = ["ADMIN", "ATM-SPV", "BRANCH-ATM-SPV"];
-const ERROR_TOAST_MS = 5000;
-const OVER_QUOTA_TOAST_MS = 8000;
-// atm-visit-quota: the per-ATM completion/kuota table is shown once a request
-// can be (or has been) reported as replenished.
-const COMPLETION_STATUSES = [
-  "approved",
-  "ready",
-  "vendor_accepted",
-  "completion_pending",
-  "completed",
-];
-// cit-acm-plan FR5.5: after approval, cancel is checker-only in every post-approve state.
-const CHECKER_CANCEL_STATUSES = [
-  "approved",
-  "vault_assignment",
-  "vault_review",
-  "ready",
-  // cit-send-vendor FR6.4
-  "sent_to_vendor",
-  "vendor_accepted",
-  "vendor_rejected",
-];
 // cit-acm-plan FR5: the Penetapan Vault panel (renders nothing for legacy, non-vault requests).
 const VAULT_PANEL_STATUSES = [
   "vault_assignment",
@@ -78,66 +31,11 @@ const VAULT_PANEL_STATUSES = [
   "completion_pending",
   "completed",
 ];
-const REJECTION_REASON_MAX = 500;
-const AMOUNT_MIN = 1;
 
 export function VendorRequestDetail() {
   const routeParams = useParams({ strict: false }) as { id?: string };
   const id = routeParams.id ? Number(routeParams.id) : null;
-  const user = useAuthStore((s) => s.user);
-  const { toast, dismiss } = useToast();
   const { data, isLoading, isError, error } = useVendorRequest(id);
-
-  const [editingItems, setEditingItems] = useState<VendorRequestItem[] | null>(null);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-  // atm-visit-quota: laporan selesai dialogs.
-  const [completeOpen, setCompleteOpen] = useState(false);
-  const [completeResults, setCompleteResults] = useState<Record<string, CompletionResult>>({});
-  const [approveCompletionOpen, setApproveCompletionOpen] = useState(false);
-  const [rejectCompletionOpen, setRejectCompletionOpen] = useState(false);
-  const [rejectCompletionReason, setRejectCompletionReason] = useState("");
-  // cit-send-vendor FR6.1: "Kembalikan ke pembuat" after a replenish branch rejects.
-  const [vendorReturnOpen, setVendorReturnOpen] = useState(false);
-  const [vendorReturnReason, setVendorReturnReason] = useState("");
-
-  const updateItemsMutation = useUpdateVendorRequestItems();
-  const submitMutation = useSubmitVendorRequest();
-  const approveMutation = useApproveVendorRequest();
-  const rejectMutation = useRejectVendorRequest();
-  const reviseMutation = useReviseVendorRequest();
-  const cancelMutation = useCancelVendorRequest();
-  const submitCompletionMutation = useSubmitVendorRequestCompletion();
-  const approveCompletionMutation = useApproveVendorRequestCompletion();
-  const rejectCompletionMutation = useRejectVendorRequestCompletion();
-  const vendorReturnMutation = useVendorReturn();
-
-  const isBusy =
-    updateItemsMutation.isPending ||
-    submitMutation.isPending ||
-    approveMutation.isPending ||
-    rejectMutation.isPending ||
-    reviseMutation.isPending ||
-    cancelMutation.isPending ||
-    submitCompletionMutation.isPending ||
-    approveCompletionMutation.isPending ||
-    rejectCompletionMutation.isPending ||
-    vendorReturnMutation.isPending;
-
-  function showErrorToast(message: string): void {
-    const toastId = toast({ type: "error", message });
-    setTimeout(() => dismiss(toastId), ERROR_TOAST_MS);
-  }
-
-  async function runAction(action: () => Promise<unknown>): Promise<void> {
-    try {
-      await action();
-    } catch (err) {
-      showErrorToast(getVendorRequestErrorMessage(err));
-    }
-  }
 
   if (id === null || Number.isNaN(id)) {
     return <NotFoundState />;
@@ -167,157 +65,14 @@ export function VendorRequestDetail() {
 
   if (!data) return <NotFoundState />;
 
-  const role = user?.role;
-  const isCreator = user !== null && user !== undefined && data.created_by.id === user.id;
-  const isMaker = role ? MAKER_ROLES.includes(role) : false;
-  const isChecker = role ? CHECKER_ROLES.includes(role) : false;
+  return <VendorRequestBody data={data} />;
+}
 
-  const canEditItems = data.status === "draft" && isCreator && isMaker;
-  const canSubmit = data.status === "draft" && isCreator && isMaker;
-  const canApproveReject = data.status === "pending_approval" && isChecker && !isCreator;
-  const canRevise = data.status === "rejected" && isCreator && isMaker;
-  // CIT-2 (Task 13.3, Req 5.3): union rule for draft/pending_approval —
-  // creator OR a non-creator checker may cancel. replenishment-request-
-  // enhancements (Req 3.1, 3.7) adds a second, stricter arm: an approved
-  // request is cancelable too, but Checker-only (no four-eyes here — direct
-  // cancellation, not an approve/reject pair — so a Checker who is also the
-  // creator is still allowed on this arm, mirroring the backend's checkActor).
-  const canCancel =
-    ((isCreator || (isChecker && !isCreator)) &&
-      (data.status === "draft" || data.status === "pending_approval")) ||
-    (isChecker && CHECKER_CANCEL_STATUSES.includes(data.status));
-  // atm-visit-quota FR1: maker reports a legacy request (ready / approved, never
-  // sent to a vendor) as replenished; a checker other than the reporter
-  // approves/rejects that report. A vendor_accepted request is reported by its
-  // replenish vendor in VendorPortal (replenishment-realisasi FR2.5; the API
-  // answers 409 completion_by_vendor to an internal report).
-  const canReportCompletion =
-    (data.status === "ready" || data.status === "approved") && isMaker && !data.is_canceled;
-  const awaitsVendorReport = data.status === "vendor_accepted" && !data.is_canceled;
-  const canVendorReturn =
-    data.status === "vendor_rejected" && isChecker && !isCreator && !data.is_canceled;
-  const isReporter =
-    user !== null && user !== undefined && data.completion_submitted_by?.id === user.id;
-  const canReviewCompletion = data.status === "completion_pending" && isChecker && !isReporter;
-  const showCompletionTable = COMPLETION_STATUSES.includes(data.status) && data.atms.length > 0;
-
-  function startEditItems(): void {
-    if (!data) return;
-    setEditingItems(data.items.map((it) => ({ ...it })));
-  }
-
-  function updateEditedAmount(itemId: number, value: number): void {
-    setEditingItems((cur) =>
-      cur ? cur.map((it) => (it.id === itemId ? { ...it, amount_replenish: value } : it)) : cur,
-    );
-  }
-
-  async function saveEditedItems(): Promise<void> {
-    if (!editingItems || !data) return;
-    await runAction(async () => {
-      await updateItemsMutation.mutateAsync({
-        id: data.id,
-        items: editingItems.map((it) => ({
-          terminal_id: it.terminal_id,
-          periode_pred: it.periode_pred,
-          denom: it.denom,
-          amount_replenish: it.amount_replenish,
-        })),
-      });
-      setEditingItems(null);
-    });
-  }
-
-  async function handleReject(): Promise<void> {
-    if (!data) return;
-    const reason = rejectReason.trim();
-    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
-    await runAction(async () => {
-      await rejectMutation.mutateAsync({ id: data.id, reason });
-      setRejectOpen(false);
-      setRejectReason("");
-    });
-  }
-
-  async function handleVendorReturn(): Promise<void> {
-    if (!data) return;
-    const reason = vendorReturnReason.trim();
-    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
-    await runAction(async () => {
-      await vendorReturnMutation.mutateAsync({ id: data.id, reason });
-      setVendorReturnOpen(false);
-      setVendorReturnReason("");
-    });
-  }
-
-  // replenishment-request-enhancements (Req 3.2, 3.3): same 1-500
-  // non-whitespace bound as reject, required before the mutation fires.
-  async function handleCancel(): Promise<void> {
-    if (!data) return;
-    const reason = cancelReason.trim();
-    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
-    await runAction(async () => {
-      await cancelMutation.mutateAsync({ id: data.id, reason });
-      setCancelOpen(false);
-      setCancelReason("");
-    });
-  }
-
-  async function handleSubmitCompletion(): Promise<void> {
-    if (!data) return;
-    await runAction(async () => {
-      await submitCompletionMutation.mutateAsync({
-        id: data.id,
-        results: toCompletionPayload(data.atms, completeResults),
-      });
-      setCompleteOpen(false);
-      setCompleteResults({});
-    });
-  }
-
-  async function handleApproveCompletion(): Promise<void> {
-    if (!data) return;
-    await runAction(async () => {
-      const result = await approveCompletionMutation.mutateAsync(data.id);
-      setApproveCompletionOpen(false);
-      const over = result.over_quota_terminals ?? [];
-      if (over.length > 0) {
-        const toastId = toast({
-          type: "warning",
-          message: `Laporan disetujui. ${over.length} ATM melebihi kuota kunjungan: ${over.join(", ")}`,
-        });
-        setTimeout(() => dismiss(toastId), OVER_QUOTA_TOAST_MS);
-      }
-    });
-  }
-
-  async function handleRejectCompletion(): Promise<void> {
-    if (!data) return;
-    const reason = rejectCompletionReason.trim();
-    if (reason.length < 1 || reason.length > REJECTION_REASON_MAX) return;
-    await runAction(async () => {
-      await rejectCompletionMutation.mutateAsync({ id: data.id, reason });
-      setRejectCompletionOpen(false);
-      setRejectCompletionReason("");
-    });
-  }
-
-  const editValid =
-    editingItems?.every(
-      (it) => Number.isInteger(it.amount_replenish) && it.amount_replenish >= AMOUNT_MIN,
-    ) ?? false;
-  const rejectValid =
-    rejectReason.trim().length >= 1 && rejectReason.trim().length <= REJECTION_REASON_MAX;
-  const cancelValid =
-    cancelReason.trim().length >= 1 && cancelReason.trim().length <= REJECTION_REASON_MAX;
-  const vendorReturnValid =
-    vendorReturnReason.trim().length >= 1 &&
-    vendorReturnReason.trim().length <= REJECTION_REASON_MAX;
-  const rejectCompletionValid =
-    rejectCompletionReason.trim().length >= 1 &&
-    rejectCompletionReason.trim().length <= REJECTION_REASON_MAX;
-
-  const items = editingItems ?? data.items;
+function VendorRequestBody({ data }: { data: VendorRequestDetailType }) {
+  const user = useAuthStore((s) => s.user);
+  const a = useVendorRequestActions(data);
+  const perms = getRequestPermissions(data, user);
+  const items = a.editingItems ?? data.items;
 
   return (
     <div className="flex flex-col gap-6">
@@ -361,12 +116,12 @@ export function VendorRequestDetail() {
                 <td className="px-3 py-2 font-mono">{item.ticket_number || "-"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatThousands(item.denom)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">
-                  {editingItems ? (
+                  {a.editingItems ? (
                     <input
                       type="number"
                       aria-label={`Amount replenish untuk ${item.terminal_id}`}
                       value={item.amount_replenish}
-                      onChange={(e) => updateEditedAmount(item.id, Number(e.target.value))}
+                      onChange={(e) => a.updateEditedAmount(item.id, Number(e.target.value))}
                       className="w-36 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
                     />
                   ) : (
@@ -388,355 +143,29 @@ export function VendorRequestDetail() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {editingItems ? (
-            <>
-              <Button variant="secondary" disabled={isBusy} onClick={() => setEditingItems(null)}>
-                Batal
-              </Button>
-              <Button disabled={isBusy || !editValid} onClick={saveEditedItems}>
-                {updateItemsMutation.isPending ? "Menyimpan..." : "Simpan Item"}
-              </Button>
-            </>
-          ) : (
-            <>
-              {canEditItems && (
-                <Button variant="secondary" disabled={isBusy} onClick={startEditItems}>
-                  Edit Item
-                </Button>
-              )}
-              {canSubmit && (
-                <Button
-                  disabled={isBusy}
-                  onClick={() => runAction(() => submitMutation.mutateAsync(data.id))}
-                >
-                  {submitMutation.isPending ? "Mengirim..." : "Kirim untuk Approval"}
-                </Button>
-              )}
-              {canApproveReject && (
-                <>
-                  <Button variant="danger" disabled={isBusy} onClick={() => setRejectOpen(true)}>
-                    <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                    Tolak
-                  </Button>
-                  <Button
-                    disabled={isBusy}
-                    onClick={() => runAction(() => approveMutation.mutateAsync(data.id))}
-                  >
-                    {approveMutation.isPending ? "Menyetujui..." : "Setujui"}
-                  </Button>
-                </>
-              )}
-              {canRevise && (
-                <Button
-                  disabled={isBusy}
-                  onClick={() => runAction(() => reviseMutation.mutateAsync(data.id))}
-                >
-                  {reviseMutation.isPending ? "Merevisi..." : "Revisi"}
-                </Button>
-              )}
-              {canVendorReturn && (
-                <Button
-                  variant="secondary"
-                  disabled={isBusy}
-                  onClick={() => setVendorReturnOpen(true)}
-                >
-                  Kembalikan ke Pembuat
-                </Button>
-              )}
-              {canCancel && (
-                <Button variant="danger" disabled={isBusy} onClick={() => setCancelOpen(true)}>
-                  <Ban className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Batalkan
-                </Button>
-              )}
-              {canReportCompletion && (
-                <Button disabled={isBusy} onClick={() => setCompleteOpen(true)}>
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Laporkan Selesai
-                </Button>
-              )}
-              {canReviewCompletion && (
-                <>
-                  <Button
-                    variant="danger"
-                    disabled={isBusy}
-                    onClick={() => setRejectCompletionOpen(true)}
-                  >
-                    <XCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                    Tolak Laporan
-                  </Button>
-                  <Button disabled={isBusy} onClick={() => setApproveCompletionOpen(true)}>
-                    Setujui Laporan
-                  </Button>
-                </>
-              )}
-            </>
-          )}
+          <VendorRequestActionBar a={a} perms={perms} />
         </div>
       </div>
 
       {VAULT_PANEL_STATUSES.includes(data.status) && (
         <RequestVaultPanel
           requestId={data.id}
-          canReview={data.status === "vault_review" && isChecker && !data.is_canceled}
+          canReview={data.status === "vault_review" && perms.isChecker && !data.is_canceled}
         />
       )}
 
       <VendorPartiesPanel requestId={data.id} />
 
-      {awaitsVendorReport && (
+      {perms.awaitsVendorReport && (
         <p className="rounded-[var(--radius-md)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--info-fg)]">
           Menunggu laporan realisasi dari vendor replenish (diisi di VendorPortal). Setelah masuk,
           ATM-SPV menyetujui atau menolak laporan di halaman ini.
         </p>
       )}
 
-      {showCompletionTable && <CompletionAtmTable atms={data.atms} />}
+      {perms.showCompletionTable && <CompletionAtmTable atms={data.atms} />}
 
-      {completeOpen && (
-        <ReportCompletionModal
-          atms={data.atms}
-          results={completeResults}
-          onResultChange={(terminalId, result) =>
-            setCompleteResults((cur) => ({ ...cur, [terminalId]: result }))
-          }
-          busy={submitCompletionMutation.isPending}
-          onConfirm={handleSubmitCompletion}
-          onDismiss={() => {
-            setCompleteOpen(false);
-            setCompleteResults({});
-          }}
-        />
-      )}
-
-      {approveCompletionOpen && (
-        <ApproveCompletionModal
-          atms={data.atms}
-          busy={approveCompletionMutation.isPending}
-          onConfirm={handleApproveCompletion}
-          onDismiss={() => setApproveCompletionOpen(false)}
-        />
-      )}
-
-      {rejectCompletionOpen && (
-        <ReasonModal
-          title="Tolak Laporan Selesai"
-          reasonLabel="Alasan Penolakan Laporan"
-          confirmLabel="Tolak Laporan"
-          busyLabel="Menolak..."
-          reason={rejectCompletionReason}
-          onReasonChange={setRejectCompletionReason}
-          valid={rejectCompletionValid}
-          busy={rejectCompletionMutation.isPending}
-          onConfirm={handleRejectCompletion}
-          onDismiss={() => {
-            setRejectCompletionOpen(false);
-            setRejectCompletionReason("");
-          }}
-        />
-      )}
-
-      {rejectOpen && (
-        <ReasonModal
-          title="Tolak Vendor Request"
-          reasonLabel="Alasan Penolakan"
-          confirmLabel="Tolak Request"
-          busyLabel="Menolak..."
-          reason={rejectReason}
-          onReasonChange={setRejectReason}
-          valid={rejectValid}
-          busy={rejectMutation.isPending}
-          onConfirm={handleReject}
-          onDismiss={() => {
-            setRejectOpen(false);
-            setRejectReason("");
-          }}
-        />
-      )}
-
-      {vendorReturnOpen && (
-        <ReasonModal
-          title="Kembalikan ke Pembuat"
-          reasonLabel="Alasan (dibaca pembuat request)"
-          confirmLabel="Kembalikan"
-          busyLabel="Mengembalikan..."
-          reason={vendorReturnReason}
-          onReasonChange={setVendorReturnReason}
-          valid={vendorReturnValid}
-          busy={vendorReturnMutation.isPending}
-          onConfirm={handleVendorReturn}
-          onDismiss={() => {
-            setVendorReturnOpen(false);
-            setVendorReturnReason("");
-          }}
-        />
-      )}
-
-      {cancelOpen && (
-        <ReasonModal
-          title="Batalkan Vendor Request"
-          reasonLabel="Alasan Pembatalan"
-          confirmLabel="Batalkan Request"
-          busyLabel="Membatalkan..."
-          reason={cancelReason}
-          onReasonChange={setCancelReason}
-          valid={cancelValid}
-          busy={cancelMutation.isPending}
-          onConfirm={handleCancel}
-          onDismiss={() => {
-            setCancelOpen(false);
-            setCancelReason("");
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  planned: "Planned",
-  emergency: "Emergency",
-  additional: "Additional",
-};
-
-function DetailFields({ detail }: { detail: VendorRequestDetailType }) {
-  const alwaysShown: Array<[string, string]> = [
-    ["Tanggal Forecast", detail.forecast_date],
-    ["Tanggal Replenish", detail.replenish_date ?? "-"],
-    ["Kategori", detail.request_category ? (CATEGORY_LABELS[detail.request_category] ?? "-") : "-"],
-  ];
-  const fields: Array<[string, string | null]> = [
-    ["Dibuat Oleh", detail.created_by.full_name],
-    ["Dibuat Pada", formatAtmDateTime(new Date(detail.created_at))],
-    detail.submitted_at ? ["Dikirim Pada", formatAtmDateTime(new Date(detail.submitted_at))] : null,
-    detail.approved_by ? ["Disetujui Oleh", detail.approved_by.full_name] : null,
-    detail.approved_at ? ["Disetujui Pada", formatAtmDateTime(new Date(detail.approved_at))] : null,
-    detail.rejected_by ? ["Ditolak Oleh", detail.rejected_by.full_name] : null,
-    detail.rejected_at ? ["Ditolak Pada", formatAtmDateTime(new Date(detail.rejected_at))] : null,
-    detail.rejection_reason ? ["Alasan Penolakan", detail.rejection_reason] : null,
-    // replenishment-request-enhancements (Req 3.11 Opsi B): populated from
-    // the response now that migration 038 persists it on vendor_requests.
-    detail.cancellation_reason ? ["Alasan Pembatalan", detail.cancellation_reason] : null,
-    // atm-visit-quota: laporan selesai replenish.
-    detail.completion_submitted_by
-      ? ["Dilaporkan Selesai Oleh", detail.completion_submitted_by.full_name]
-      : null,
-    detail.completion_submitted_at
-      ? ["Dilaporkan Pada", formatAtmDateTime(new Date(detail.completion_submitted_at))]
-      : null,
-    detail.completion_approved_by
-      ? ["Laporan Disetujui Oleh", detail.completion_approved_by.full_name]
-      : null,
-    detail.completion_rejection_reason
-      ? ["Alasan Penolakan Laporan", detail.completion_rejection_reason]
-      : null,
-    detail.notes ? ["Catatan", detail.notes] : null,
-  ].filter((f): f is [string, string] => f !== null);
-  const allFields = [...alwaysShown, ...fields];
-
-  return (
-    <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-0)] p-4 sm:grid-cols-3">
-      {allFields.map(([label, value]) => (
-        <div key={label} className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
-            {label}
-          </span>
-          <span className="text-sm text-[var(--n-800)]">{value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-interface ReasonModalProps {
-  title: string;
-  reasonLabel: string;
-  confirmLabel: string;
-  busyLabel: string;
-  reason: string;
-  onReasonChange: (value: string) => void;
-  valid: boolean;
-  busy: boolean;
-  onConfirm: () => void;
-  onDismiss: () => void;
-}
-
-/**
- * Shared 1-500-non-whitespace-char reason modal for both Reject (Req 2.3,
- * 2.4) and Cancel (Req 3.2, 3.3) — same shape, different copy, so one
- * component instead of two near-identical ones (was RejectModal).
- */
-export function ReasonModal({
-  title,
-  reasonLabel,
-  confirmLabel,
-  busyLabel,
-  reason,
-  onReasonChange,
-  valid,
-  busy,
-  onConfirm,
-  onDismiss,
-}: ReasonModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-[var(--radius-lg)] bg-[var(--n-0)] p-6 shadow-[var(--shadow-md)]">
-        <h2 className="text-lg font-semibold text-[var(--n-900)]">{title}</h2>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="reason-modal-input" className="text-sm text-[var(--n-700)]">
-            {reasonLabel}
-          </label>
-          <textarea
-            id="reason-modal-input"
-            value={reason}
-            onChange={(e) => onReasonChange(e.target.value.slice(0, REJECTION_REASON_MAX))}
-            maxLength={REJECTION_REASON_MAX}
-            rows={4}
-            // biome-ignore lint/a11y/noAutofocus: modal opens on explicit user action; focusing the only input is the expected behavior
-            autoFocus
-            className="rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 py-2 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          />
-          <span className="text-xs text-[var(--n-500)]">
-            {reason.trim().length}/{REJECTION_REASON_MAX}
-          </span>
-        </div>
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" disabled={busy} onClick={onDismiss}>
-            Batal
-          </Button>
-          <Button variant="danger" disabled={busy || !valid} onClick={onConfirm}>
-            {busy ? busyLabel : confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailSkeleton() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="h-24 animate-pulse rounded-[var(--radius-lg)] bg-[var(--n-100)]" />
-      <div className="h-48 animate-pulse rounded-[var(--radius-lg)] bg-[var(--n-100)]" />
-    </div>
-  );
-}
-
-function NotFoundState() {
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader eyebrow="Replenishment" title="Vendor Request Tidak Ditemukan" />
-      <div className="rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] p-8 text-center">
-        <p className="text-sm text-[var(--n-700)]">
-          Vendor request yang Anda cari tidak ditemukan atau telah dihapus.
-        </p>
-        <Link
-          to="/replenishment/vendor-requests"
-          className="mt-4 inline-block text-sm font-medium text-[var(--red-600)] hover:underline"
-        >
-          Kembali ke Daftar Vendor Request
-        </Link>
-      </div>
+      <VendorRequestModals a={a} data={data} />
     </div>
   );
 }

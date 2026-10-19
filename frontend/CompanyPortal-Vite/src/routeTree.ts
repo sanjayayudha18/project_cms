@@ -11,7 +11,6 @@ import { cashFlowRoute } from "./routes/cash-flow";
 import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
 import { eodMonitoringRoute } from "./routes/eod-monitoring";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
-import { forecastRoute } from "./routes/forecasting/forecast";
 import { forecastingRoute } from "./routes/forecasting/index";
 import { indexRoute } from "./routes/index";
 import { invoiceRoute } from "./routes/invoice/index";
@@ -55,7 +54,6 @@ export const routeTree = rootRoute.addChildren([
     vendorRequestListRoute,
     vendorRequestDetailRoute,
     forecastingRoute,
-    forecastRoute,
     dmaaForecastRoute,
     invoiceRoute,
     cashCountRoute,

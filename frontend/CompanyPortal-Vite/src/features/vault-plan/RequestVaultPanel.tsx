@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/Button";
-import { ReasonModal } from "@/features/vendor-request/VendorRequestDetail";
+import { ReasonModal } from "@/features/vendor-request/VendorRequestDetailParts";
 import { useToast } from "@/lib/hooks/useToast";
 import { useState } from "react";
 import { AllocationTable, CoverageSummary } from "./AllocationRows";

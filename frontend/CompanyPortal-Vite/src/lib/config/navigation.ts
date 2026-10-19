@@ -149,16 +149,6 @@ export const NAV_CONFIG: NavItem[] = [
     group: "monitoring",
   },
 
-  // Forecasting
-  // Manually hidden from sidebar — route still exists, just not listed in nav.
-  // {
-  //   id: "forecast",
-  //   label: "Forecasting",
-  //   icon: TrendingUp,
-  //   href: "/forecasting/forecast",
-  //   roles: ["ATM-USER", "ATM-SPV"],
-  //   group: "forecasting",
-  // },
   {
     id: "dmaa-forecast",
     label: "DMAA Forecast",

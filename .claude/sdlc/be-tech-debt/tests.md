@@ -390,3 +390,48 @@ VERSION                                   STATE    CHECKSUM  BASELINE
 ### Outstanding (Fase D)
 - Run GitHub Actions setelah push (T-D3).
 - Deploy pertama dengan runner (staging/prod = DB kosong → `up`, atau baseline bila sudah dimigrasi manual).
+
+## Fase G — slice G1 / BE-07 (run 2026-10-19, not committed)
+
+| File | Sebelum | Sesudah |
+|---|---|---|
+| `service/vendor_request_actions.go` | 1204 | 502 |
+| `service/vendor_request_queries.go` (baru) | — | 349 |
+| `service/vendor_request_create.go` (baru) | — | 382 |
+| `service/masterdata_import.go` | 862 | 526 |
+| `service/masterdata_import_csv.go` (baru) | — | 157 |
+| `service/masterdata_import_validate.go` (baru) | — | 195 |
+
+- Hanya blok dipindah (package `service` sama; import dirapikan `gopls imports`, lalu `gofmt`). Tanpa ubah signature, route, response, atau test.
+- `go build ./... && go vet ./... && go test ./...` hijau; `golangci-lint run --build-tags integration ./...` = 0 issues; `gofmt -l` bersih.
+- `go test -list . ./internal/service ./internal/handler` sebelum vs sesudah: identik (597 test).
+- Integration `go test -tags integration ./internal/service` dengan `DATABASE_URL` localhost: ok (45 s).
+- Tidak dikerjakan: file test > 800 baris (`masterdata_approval_integration_test.go` 1328, `handler/vendor_request_handler_test.go` 857) — keputusan user: tidak dipecah.
+
+## Fase G — slice G2 / BE-11 (run 2026-10-19, not committed; docs only)
+
+| Perubahan | File |
+|---|---|
+| Tabel produk #2, "Current state", "Pipeline" (CD hanya `backend/Dockerfile`), tabel ukuran pool (1 instance `backend` hari ini; 2 setelah `backend-exq` di-deploy); rencana split VM 2028 dipertahankan | `.claude/docs/deployment.md` |
+| Sec 10 "Today" + Sec 12 "Backend topology": hanya `backend` yang di-deploy | `.claude/CLAUDE.md` |
+| Rujukan root `docker-compose.yml` (tidak ada) → `backend/docker-compose.yaml` | `.claude/docs/deployment.md` |
+
+| Test | Result |
+|---|---|
+| T-G2: `grep -rn "docker-compose\.yml" .claude/docs .claude/CLAUDE.md` + `grep -n "backend-cit" .claude/docs/deployment.md` | tidak ada lagi rujukan root compose; sisa `backend-cit` di `deployment.md` hanya sebagai "tidak di-deploy sampai `backend-exq`" / catatan `TRUSTED_PROXIES` / pool |
+| `ci.yml`, Dockerfile, kode `backend-cit/` | tidak diubah |
+
+### Catatan (G2)
+- Rujukan lama tetap ada di salinan usang `.kiro/steering/*` dan `.opencode/opencode.md` (bukan sumber kebenaran, tidak disentuh).
+- Module `backend-cit` tetap di `go.work` dan CI tetap membangun/mengujinya (FR-B1). Image `backend-cit` belum non-root/HEALTHCHECK (lihat Catatan Fase A) → selesaikan saat rename ke `backend-exq`.
+
+## Fase G — slice G3 / BE-10 (run 2026-10-19, not committed; docs only)
+
+| Perubahan | File |
+|---|---|
+| BE-10 Status `open` → `deferred (be-tech-debt Q8)`, catatan "mulai dari modul baru berikutnya" | `.claude/BE_debt.md` |
+
+| Test | Result |
+|---|---|
+| T-G3: `grep -n "BE-10" .claude/BE_debt.md` | Status = `deferred (be-tech-debt Q8, ...)`, kolom lain tidak berubah |
+| Kode, spec OpenAPI, dependency | tidak ada (FR-G3 docs only) |

@@ -80,3 +80,29 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: menu sidebar CP/VP tanpa layar mock; URL langsung ke route yang dihapus → halaman not-found; banner "Data contoh" di Dashboard (MetricStrip + Perlu Perhatian); navigasi antar route lazy (termasuk settings/admin dengan peran tanpa akses → Forbidden) tanpa layar kosong; artwork login WebP tampil sama.
+
+## F1 — sisa FE-10 (2026-10-19, belum commit)
+| Command | Result |
+|---|---|
+| CP `pnpm run test:coverage` | 156 files, 1385 tests, threshold lulus (84,26 / 80,19 / 80,9 / 85,5) |
+| CP `pnpm run lint` / `build` | clean (490 files) / built, bundle budget: initial JS 172,5 KB gzip (budget 300) |
+| VP `pnpm run test:coverage` / `lint` / `build` | 27 files, 234 tests, 93/84/91/94 / clean (104 files) / built |
+
+- Dihapus (CP): `features/forecast/` (+ test), `routes/forecasting/forecast.tsx`, import + registrasi `forecastRoute` di `routeTree.ts` (bukan `main.tsx`), blok menu `forecast` ter-comment di `navigation.ts`. Satu-satunya pemakai `@/features/forecast` adalah route itu. Favicon `index.html` → `/favicon.svg` (file ada di `public/`). Tidak ada util yatim (`ForecastTable`/`ScheduleList` hanya dipakai folder itu).
+- Dihapus (VP): `src/App.tsx`, `App.css`, `src/index.css` (tak ada pemakai; `main.tsx` memakai `styles/index.css`).
+- Catatan: sekali `login.test.tsx` timeout 5 s saat coverage CP dan VP jalan paralel; lulus saat dijalankan sendiri (flaky akibat beban, bukan perubahan ini).
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: menu Forecasting tanpa entri "Forecasting"; `/forecasting/forecast` → not-found; favicon CP tampil.
+
+## F2 — FE-12 pecah `VendorRequestDetail.tsx` (2026-10-19, belum commit)
+| Command | Result |
+|---|---|
+| CP `pnpm run test:coverage` | 156 files, 1385 tests green (test lama tak diubah), threshold lulus (all files 84,79 / 80,64 / 81,12 / 85,94) |
+| CP `pnpm run lint` / `build` | clean (493 files) / built (tsc -b + bundle budget 172,5 KB gzip) |
+
+- Baris: `VendorRequestDetail.tsx` 742 → 171; baru `VendorRequestDetailParts.tsx` 160 (DetailFields, ReasonModal, DetailSkeleton, NotFoundState), `VendorRequestActions.tsx` 184 (bar tombol + modal), `useVendorRequestActions.ts` 317 (state, mutation, handler, gate izin).
+- Import `ReasonModal` di `VaultPlanDetail`, `RequestVaultPanel`, `VisitQuotaCard` dipindah ke `VendorRequestDetailParts`. Perilaku/API/tampilan tak berubah. Body dipisah (`VendorRequestBody`) agar hook dipanggil hanya saat data sudah ada.
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: halaman Vendor Request Detail (draft/edit item, kirim, setujui/tolak, batalkan, kembalikan ke pembuat, laporan selesai + approve/reject; modal alasan di Vault Plan dan kartu kuota ATM).

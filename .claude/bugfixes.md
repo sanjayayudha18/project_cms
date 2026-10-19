@@ -20,7 +20,7 @@ Template:
 - **Root cause**: placeholder tertinggal — `useState<string | undefined>("2024-01-15")` di `features/dsr/DsrPage.tsx`.
 - **Fix**: `frontend/VendorPortal-Vite/src/features/dsr/DsrPage.tsx` — tanggal awal = hari ini Asia/Jakarta (`toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" })`, sama dengan `orders/RealizationPanel.tsx` `todayWib()` / `realizations/RealizationsPage.tsx`), lazy initializer. Default dipilih user (hari ini WIB, bukan tanpa filter).
 - **Tests**: baru di `features/dsr/__tests__/DsrPage.test.tsx` "opens filtered on today's date in Asia/Jakarta, not UTC" (fake `Date` 2026-10-15T20:00Z → harus `2026-10-16`; RED sebelum fix: `2024-01-15`). VP `pnpm run test:coverage` 25 file / 215 test hijau (DsrPage.tsx 96% baris), `pnpm lint` + `pnpm build` hijau. Manual browser verification: **outstanding** (buka DSR Monitor → filter = tanggal hari ini WIB).
-- **Commit**: <sha>
+- **Commit**: acd15c9 (test: 1aadb47)
 
 ---
 

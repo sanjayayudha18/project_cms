@@ -107,7 +107,7 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: halaman Vendor Request Detail (draft/edit item, kirim, setujui/tolak, batalkan, kembalikan ke pembuat, laporan selesai + approve/reject; modal alasan di Vault Plan dan kartu kuota ATM).
 
-## F2b — FE-12 pecah `VendorRequestCreate.tsx` (2026-10-19, belum commit)
+## F2b — FE-12 pecah `VendorRequestCreate.tsx` (2026-10-19, 36abcf8)
 | Command | Result |
 |---|---|
 | CP `pnpm run test` / `test:coverage` | 156 files, 1385 tests green (test lama tak diubah), threshold lulus (all files 84,82 / 80,74 / 81,13 / 85,98) |

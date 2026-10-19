@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-19 — VendorPortal: DSR Monitor terbuka dengan filter tanggal 2024-01-15
+- **Symptom**: vendor yang membuka DSR Monitor melihat filter tanggal `2024-01-15` dan "Tidak ada data DSR" sampai tanggal diganti atau "Tampilkan Semua" ditekan. Ditemukan di `fe-coverage` C4 (Temuan #3).
+- **Root cause**: placeholder tertinggal — `useState<string | undefined>("2024-01-15")` di `features/dsr/DsrPage.tsx`.
+- **Fix**: `frontend/VendorPortal-Vite/src/features/dsr/DsrPage.tsx` — tanggal awal = hari ini Asia/Jakarta (`toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" })`, sama dengan `orders/RealizationPanel.tsx` `todayWib()` / `realizations/RealizationsPage.tsx`), lazy initializer. Default dipilih user (hari ini WIB, bukan tanpa filter).
+- **Tests**: baru di `features/dsr/__tests__/DsrPage.test.tsx` "opens filtered on today's date in Asia/Jakarta, not UTC" (fake `Date` 2026-10-15T20:00Z → harus `2026-10-16`; RED sebelum fix: `2024-01-15`). VP `pnpm run test:coverage` 25 file / 215 test hijau (DsrPage.tsx 96% baris), `pnpm lint` + `pnpm build` hijau. Manual browser verification: **outstanding** (buka DSR Monitor → filter = tanggal hari ini WIB).
+- **Commit**: <sha>
+
+---
+
 ## 2026-10-15 — CompanyPortal: import CSV hari libur tidak ikut refresh token 401
 - **Symptom**: upload CSV di halaman Hari Libur gagal ("Impor gagal") bila access token sudah kedaluwarsa, padahal sesi (refresh token) masih sah; request lain di halaman yang sama berhasil karena di-refresh otomatis. Ditemukan saat menulis test `fe-coverage` C2. Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
 - **Root cause**: `importHolidays` (`features/admin-holidays/api.ts`) memanggil `fetch` sendiri dengan token dari `useAuthStore`, jadi melewati `lib/api/client.ts`; 401 tidak pernah sampai ke `handleUnauthorized` (single-flight refresh + retry). Komentarnya ("api.post sends JSON") sudah usang sejak FE-08 menambah dukungan FormData.

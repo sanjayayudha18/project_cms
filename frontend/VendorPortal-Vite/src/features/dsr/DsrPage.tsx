@@ -46,7 +46,9 @@ const columns: ColumnDef<DsrUploadListItem, unknown>[] = [
 ] as ColumnDef<DsrUploadListItem, unknown>[];
 
 export function DsrPage() {
-  const [selectedDate, setSelectedDate] = useState<string | undefined>("2024-01-15");
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(() =>
+    new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" }),
+  );
   const [sorting, setSorting] = useState<SortingState>([{ id: "report_date", desc: true }]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<DsrUploadListItem | null>(null);

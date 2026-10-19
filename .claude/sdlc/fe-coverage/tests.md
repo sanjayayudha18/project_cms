@@ -140,7 +140,7 @@ VP statements/lines sudah ≥ 80 %. Sisa gap branches VP terutama layar prototip
 **⚠ Temuan (tidak diperbaiki di slice ini, sengaja tidak dikunci oleh test):**
 1. **CP `vendor-request/vendorSide.ts` path ganda `/api/v1`.** `BASE = "/api/v1/vendor-requests"`, padahal API client sudah menambah `apiConfig.baseURL` (`/api/v1`). Akibatnya panel pihak vendor (`GET /{id}/vendor-parties`) dan aksi ATM-SPV "kembalikan ke vendor" (`POST /{id}/vendor-return`) memanggil `/api/v1/api/v1/vendor-requests/...` → 404 (backend: `vendor_request_handler.go:79-80`). Kandidat bugfix prioritas tinggi (fitur cit-send-vendor).
 2. **CP `replenishment/api.ts` `downloadReport` memakai `fetch` langsung** + token dari store → unduh laporan CSV realisasi tidak ikut refresh 401 (pola sama dengan bug impor hari libur yang sudah diperbaiki 2026-10-15).
-3. **VP `features/dsr/DsrPage.tsx` tanggal awal di-hardcode `"2024-01-15"`.** Vendor yang membuka DSR Monitor melihat filter tanggal 2024 (hampir pasti kosong) sampai tanggal diganti. Kandidat bugfix kecil (default ke hari ini WIB atau tanpa filter — keputusan PO).
+3. **VP `features/dsr/DsrPage.tsx` tanggal awal di-hardcode `"2024-01-15"`.** Vendor yang membuka DSR Monitor melihat filter tanggal 2024 (hampir pasti kosong) sampai tanggal diganti. Kandidat bugfix kecil (default ke hari ini WIB atau tanpa filter — keputusan PO). **✅ Diperbaiki 2026-10-19** (default = hari ini WIB, keputusan user; test di `DsrPage.test.tsx`; lihat `bugfixes.md`).
 
 ## C5
 Belum dimulai.

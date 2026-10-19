@@ -40,8 +40,8 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/data/**",
       ],
-      // Floor after fe-coverage C4 (2026-10-15). Raise after each slice; never lower.
-      thresholds: { statements: 78, branches: 73, functions: 74, lines: 79 },
+      // Floor after fe-coverage C5 (2026-10-19): FE-13 target (80 %) reached. Never lower.
+      thresholds: { statements: 84, branches: 80, functions: 80, lines: 85 },
     },
   },
 });

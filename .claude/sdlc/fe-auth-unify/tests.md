@@ -1,6 +1,6 @@
 # Tests: Pola auth & util frontend antar portal (FE-09, opsi (b))
 
-Status: **green 2026-10-15** (U1–U3 built, uncommitted). Stage: 4 Test. Stage berikut: `review.md`.
+Status: **green 2026-10-15** (U1–U3 built, committed `1aadb47`). Stage: 4 Test. Stage berikut: `review.md`.
 Sumber: `plan.md` (accepted 2026-10-15; P1 di-rename ke **`formatDecimalIDR`**, bukan `formatDecimalThousands`, lihat Deviasi).
 
 ## Hasil otomatis

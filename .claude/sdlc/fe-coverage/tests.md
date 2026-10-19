@@ -1,6 +1,6 @@
 # Tests: Coverage frontend naik ke 80% (FE-13)
 
-Status: **partial — C0–C4 green 2026-10-15** (uncommitted). Stage: 4 Test (per slice). C5 belum dimulai.
+Status: **green — C0–C4 committed `1aadb47`; C5 green 2026-10-19 (uncommitted). Target ≥ 80 % tercapai di kedua portal.** Stage: 4 Test. Stage berikut: `review.md`.
 Sumber: `plan.md` (accepted 2026-10-15).
 
 ## C0 — Config + threshold baseline
@@ -142,5 +142,36 @@ VP statements/lines sudah ≥ 80 %. Sisa gap branches VP terutama layar prototip
 2. **CP `replenishment/api.ts` `downloadReport` memakai `fetch` langsung** + token dari store → unduh laporan CSV realisasi tidak ikut refresh 401 (pola sama dengan bug impor hari libur yang sudah diperbaiki 2026-10-15).
 3. **VP `features/dsr/DsrPage.tsx` tanggal awal di-hardcode `"2024-01-15"`.** Vendor yang membuka DSR Monitor melihat filter tanggal 2024 (hampir pasti kosong) sampai tanggal diganti. Kandidat bugfix kecil (default ke hari ini WIB atau tanpa filter — keputusan PO). **✅ Diperbaiki 2026-10-19** (default = hari ini WIB, keputusan user; test di `DsrPage.test.tsx`; lihat `bugfixes.md`).
 
-## C5
-Belum dimulai.
+## C5 — Sisa sampai ≥ 80 % (CP + VP) — 2026-10-19
+
+**Test baru / diperluas**
+| File test | Menutup |
+|---|---|
+| VP `features/evidence/__tests__/Evidence.test.tsx` (baru, 11) | prototipe bukti serah terima: `useEvidence` (cari per order, null, idle), halaman (loading, bukti ada: gambar vs PDF, penerima, catatan; form bila belum ada), form (wajib file/waktu/penerima, waktu tidak di masa depan & ≤ 72 jam, catatan ≤ 500, payload, sukses, error, pending) |
+| VP `features/invoices/__tests__/PrototypeScreens.test.tsx` (baru, 8) | prototipe jadwal + invoice: hook filter per vendor / idle tanpa vendor, jadwal dikelompokkan per tanggal + prioritas + total harian + filter rentang, invoice: ringkasan total & approved, hitungan status, expand/collapse baris, varians "—" bila cocok |
+| CP `eod-monitoring/hooks/useEodQueries.test.tsx` (baru, 13) | unwrap envelope (error / data null → error), endpoint + query (dicocokkan tanpa prefix, lihat temuan #1), history idle, filter audit, retry → refresh semua query EOD, retry ditolak tidak refresh, `getErrorMessage` |
+| CP `eod-monitoring/components/EodMonitoringPage.test.tsx` (baru, 7) | halaman EOD dengan semua section asli: ringkasan, status file (WIB), keterlambatan (SLA, Resolved/Late), log audit (WIB detik, outcome null = Berlangsung, durasi), polling 60 s on/off, tanggal proses, filter audit, loading/error+retry/kosong tiap section, retry manual: drawer → konfirmasi → toast sukses/gagal, Escape/backdrop menutup, tidak bisa ditutup saat proses |
+| CP `lib/utils/formatters.test.ts` (baru, 33) | `formatIDRAbbreviated` (T/B/M/biasa, negatif), `formatIDRFull`, `formatDifference` (tanda ± + kelas, bukan warna saja), `getGreeting` batas jam, `formatFullDate`, `progressPercent`, `formatBadgeCount`, `getInitials` |
+| CP `components/layout/Sidebar.test.tsx` (+5) | tanpa user tidak ada item, panah atas/bawah (wrap) + Enter/Spasi membuka, item aktif `aria-current`, hover/focus style (bukan untuk item aktif), mode collapsed: tooltip label |
+| CP `admin-vendors/__tests__/VaultPicFormDialogs.test.tsx` (baru, 9) | form vault (create: cabang dari konteks, opsional → `null`, mata uang upper-case, kapasitas string desimal; edit: kode terkunci; validasi; 422/409/error lain) + form PIC (vendor-wide vs cabang, payload, edit, email tidak valid tidak terkirim, 422 → field, error lain → toast) |
+| CP `admin-vendors/__tests__/PicsPanel.test.tsx` (baru, 9) + `VaultsPanel.test.tsx` (baru, 6) | daftar PIC/vault: "—" untuk kosong, badge penerima notifikasi, label status, warning server, pengajuan baru per scope (vendor-wide / cabang), baris pending terkunci, nonaktif/aktif → konfirmasi → toast, form create/edit, loading/error/kosong |
+| CP `rbac-settings/__tests__/api.test.ts` (baru, 3) | path hierarki/delegasi/cuti/policy; set hierarki hanya kirim `supervisor_id` + `approval_level` |
+| CP `vendor-request/__tests__/VendorRequestListFilters.test.tsx` (baru, 8) | filter status (ke halaman 1), tanggal forecast, ukuran halaman, pencarian debounce, paging, klik baris → detail, link "Lihat Detail" tidak navigasi ganda, tombol "Vendor Request Baru" hanya untuk maker, loading/error+retry/kosong |
+| CP `atm-portal/__tests__/useAtmPortalUrlState.test.tsx` (baru, 5) | ganti mode (sama = tidak apa-apa; ke cashpos/kembali = halaman 1 + sort default mode itu), `setParams`, pencarian debounce |
+
+**Angka** → threshold = floor; **target FE-13 (≥ 80 % keempat metrik) tercapai di kedua portal**:
+
+| Portal | Statements | Branches | Functions | Lines | Threshold (sebelum → sesudah) |
+|---|---|---|---|---|---|
+| CompanyPortal | 84,05 % | 80,08 % | 80,54 % | 85,28 % | 78/73/74/79 → **84/80/80/85** |
+| VendorPortal | 93,12 % | 84,12 % | 90,71 % | 93,97 % | 81/73/77/82 → **93/84/90/93** |
+
+Catatan: branches CP baru 80,08 % (margin 4 cabang). Test baru di fitur yang di-cover menaikkan angka; kode baru tanpa test bisa langsung memerahkan gate — itu disengaja.
+
+**Bukti:** `pnpm run test:coverage` exit 0 (CP 155 file / 1394 test, VP 27 file / 234 test); `pnpm lint` (CP 496, VP 107 file) + `pnpm build` hijau di kedua portal.
+
+**⚠ Temuan C5 (tidak diperbaiki, sengaja tidak dikunci oleh test, perlu keputusan user):**
+1. **CP EOD Monitoring kemungkinan selalu gagal memuat (path ganda).** `eod-monitoring/hooks/useEodQueries.ts` memanggil `api.get("/api/eod/...")` lewat API client CP, yang sudah menambah `apiConfig.baseURL` (`/api/v1`). Request menjadi `/api/v1/api/eod/summary...`, padahal proxy Vite dan `nginx.conf` hanya me-route `/api/eod/*` ke `eod_retry_scheduler` (:8091); `/api/v1/...` masuk ke Go API → 404. Sejak import awal (`b10f23f`). Sama polanya dengan temuan C4 #1 (`vendorSide.ts`). Belum dicek di browser.
+2. **C4 #1 masih terbuka:** `vendor-request/vendorSide.ts` `BASE = "/api/v1/vendor-requests"` (panel pihak vendor + vendor-return → 404). Perbaikan sempat dimulai 2026-10-15 lalu dihentikan user sebelum ada perubahan file.
+3. Kecil: `admin-vendors/components/VaultsPanel.tsx` menampilkan "Kapasitas Maks" sebagai string mentah tanpa mata uang (Sec 13: mata uang wajib eksplisit).
+4. Info: item menu `disabled` ("Soon") di Sidebar tidak bisa muncul karena semua item disabled di `lib/config/navigation.ts` dikomentari; cabang kode itu mati untuk konfigurasi sekarang.

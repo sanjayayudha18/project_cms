@@ -391,7 +391,7 @@ VERSION                                   STATE    CHECKSUM  BASELINE
 - Run GitHub Actions setelah push (T-D3).
 - Deploy pertama dengan runner (staging/prod = DB kosong → `up`, atau baseline bila sudah dimigrasi manual).
 
-## Fase G — slice G1 / BE-07 (run 2026-10-19, not committed)
+## Fase G — slice G1 / BE-07 (run 2026-10-19, `b007b64`)
 
 | File | Sebelum | Sesudah |
 |---|---|---|
@@ -408,7 +408,7 @@ VERSION                                   STATE    CHECKSUM  BASELINE
 - Integration `go test -tags integration ./internal/service` dengan `DATABASE_URL` localhost: ok (45 s).
 - Tidak dikerjakan: file test > 800 baris (`masterdata_approval_integration_test.go` 1328, `handler/vendor_request_handler_test.go` 857) — keputusan user: tidak dipecah.
 
-## Fase G — slice G2 / BE-11 (run 2026-10-19, not committed; docs only)
+## Fase G — slice G2 / BE-11 (run 2026-10-19, `b007b64`; docs only)
 
 | Perubahan | File |
 |---|---|
@@ -425,7 +425,7 @@ VERSION                                   STATE    CHECKSUM  BASELINE
 - Rujukan lama tetap ada di salinan usang `.kiro/steering/*` dan `.opencode/opencode.md` (bukan sumber kebenaran, tidak disentuh).
 - Module `backend-cit` tetap di `go.work` dan CI tetap membangun/mengujinya (FR-B1). Image `backend-cit` belum non-root/HEALTHCHECK (lihat Catatan Fase A) → selesaikan saat rename ke `backend-exq`.
 
-## Fase G — slice G3 / BE-10 (run 2026-10-19, not committed; docs only)
+## Fase G — slice G3 / BE-10 (run 2026-10-19, `b007b64`; docs only)
 
 | Perubahan | File |
 |---|---|

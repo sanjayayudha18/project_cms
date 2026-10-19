@@ -81,7 +81,7 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: menu sidebar CP/VP tanpa layar mock; URL langsung ke route yang dihapus → halaman not-found; banner "Data contoh" di Dashboard (MetricStrip + Perlu Perhatian); navigasi antar route lazy (termasuk settings/admin dengan peran tanpa akses → Forbidden) tanpa layar kosong; artwork login WebP tampil sama.
 
-## F1 — sisa FE-10 (2026-10-19, belum commit)
+## F1 — sisa FE-10 (2026-10-19, `b007b64`)
 | Command | Result |
 |---|---|
 | CP `pnpm run test:coverage` | 156 files, 1385 tests, threshold lulus (84,26 / 80,19 / 80,9 / 85,5) |
@@ -95,7 +95,7 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: menu Forecasting tanpa entri "Forecasting"; `/forecasting/forecast` → not-found; favicon CP tampil.
 
-## F2 — FE-12 pecah `VendorRequestDetail.tsx` (2026-10-19, belum commit)
+## F2 — FE-12 pecah `VendorRequestDetail.tsx` (2026-10-19, `b007b64`)
 | Command | Result |
 |---|---|
 | CP `pnpm run test:coverage` | 156 files, 1385 tests green (test lama tak diubah), threshold lulus (all files 84,79 / 80,64 / 81,12 / 85,94) |

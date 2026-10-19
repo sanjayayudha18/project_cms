@@ -1,0 +1,929 @@
+openapi: 3.0.3
+info:
+  title: CROWN CMS — ATM backend API
+  version: v1
+  description: |
+    Contract of the ATM backend (`backend/`), flat JSON (CLAUDE.md Sec 3/5).
+    Pilot scope (sdlc/openapi-contract): `/vendor-requests` + `/vendor/replenish-orders`.
+    Validated by `backend/internal/handler/openapi_contract_test.go`; documents the
+    current wire shape, never changes it. Money in these endpoints is whole IDR as
+    an int64 JSON integer, except the vault plan, which sends decimal strings.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /vendor-requests/forecast:
+    get:
+      operationId: browseForecast
+      tags: [vendor-request]
+      parameters:
+        - { name: forecast_date, in: query, schema: { type: string, format: date } }
+        - { name: atm_id, in: query, schema: { type: string } }
+        - { name: brand, in: query, schema: { type: string } }
+        - { name: flm_vendor, in: query, schema: { type: string } }
+        - { name: flm_vendor_region, in: query, schema: { type: string } }
+        - { name: unassigned, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - { name: no_region, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ForecastResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/forecast/summary:
+    get:
+      operationId: forecastSummary
+      tags: [vendor-request]
+      parameters:
+        - { name: forecast_date, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ForecastSummaryResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/vendors:
+    get:
+      operationId: listVendorOptions
+      tags: [vendor-request]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorOptionsResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests:
+    get:
+      operationId: listVendorRequests
+      tags: [vendor-request]
+      parameters:
+        - { name: status, in: query, description: comma-separated statuses, schema: { type: string } }
+        - { name: forecast_date, in: query, schema: { type: string, format: date } }
+        - { name: created_by, in: query, schema: { type: integer, format: int64 } }
+        - { name: request_number, in: query, schema: { type: string } }
+        - { name: include_canceled, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorRequestListResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: createVendorRequest
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreateVendorRequestPayload' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/VendorRequestDetail' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/{id}:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    get:
+      operationId: getVendorRequest
+      tags: [vendor-request]
+      responses: &detailResponses
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorRequestDetail' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/{id}/items:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    put:
+      operationId: updateVendorRequestItems
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateItemsPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/submit:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: submitVendorRequest
+      tags: [vendor-request]
+      responses: *detailResponses
+
+  /vendor-requests/{id}/approve:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: approveVendorRequest
+      tags: [vendor-request]
+      responses: *detailResponses
+
+  /vendor-requests/{id}/reject:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: rejectVendorRequest
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RejectVendorRequestPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/revise:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: reviseVendorRequest
+      tags: [vendor-request]
+      responses: *detailResponses
+
+  /vendor-requests/{id}/cancel:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: cancelVendorRequest
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CancelVendorRequestPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/complete:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: submitCompletion
+      tags: [vendor-request]
+      description: Legacy requests (vendor_sent=false) only; a sent request answers 409 completion_by_vendor.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CompletionPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/complete/approve:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: approveCompletion
+      tags: [vendor-request]
+      responses: *detailResponses
+
+  /vendor-requests/{id}/complete/reject:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: rejectCompletion
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReasonPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/audit-log:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    get:
+      operationId: vendorRequestAuditLog
+      tags: [vendor-request]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuditLogResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/{id}/vault-assignments:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    get:
+      operationId: vendorRequestVaultAssignments
+      tags: [vendor-request]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VaultAssignmentsResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/{id}/vault-approve:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: vaultApprove
+      tags: [vendor-request]
+      responses: *detailResponses
+
+  /vendor-requests/{id}/vault-reject:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: vaultReject
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VaultRejectPayload' } } }
+      responses: *detailResponses
+
+  /vendor-requests/{id}/vendor-parties:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    get:
+      operationId: vendorRequestVendorParties
+      tags: [vendor-request]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RequestVendorParties' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor-requests/{id}/vendor-return:
+    parameters: [{ $ref: '#/components/parameters/VendorRequestID' }]
+    post:
+      operationId: vendorReturn
+      tags: [vendor-request]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RejectVendorRequestPayload' } } }
+      responses: *detailResponses
+
+  /vendor/replenish-orders:
+    get:
+      operationId: listVendorOrders
+      tags: [vendor-order]
+      description: VENDOR-USER only, scoped to the caller's vendor (+ branch).
+      parameters:
+        - { name: party_status, in: query, schema: { type: string, enum: [pending, accepted, rejected, withdrawn] } }
+        - { name: request_status, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorOrderList' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor/replenish-orders/{id}:
+    parameters: [{ $ref: '#/components/parameters/PartyID' }]
+    get:
+      operationId: getVendorOrder
+      tags: [vendor-order]
+      responses: &orderResponses
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorOrderDetail' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /vendor/replenish-orders/{id}/accept:
+    parameters: [{ $ref: '#/components/parameters/PartyID' }]
+    post:
+      operationId: acceptVendorOrder
+      tags: [vendor-order]
+      responses: *orderResponses
+
+  /vendor/replenish-orders/{id}/reject:
+    parameters: [{ $ref: '#/components/parameters/PartyID' }]
+    post:
+      operationId: rejectVendorOrder
+      tags: [vendor-order]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReasonPayload' } } }
+      responses: *orderResponses
+
+  /vendor/replenish-orders/{id}/realization:
+    parameters: [{ $ref: '#/components/parameters/PartyID' }]
+    post:
+      operationId: submitVendorRealization
+      tags: [vendor-order]
+      description: Replenish party only; every ATM of the request at once.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RealizationPayload' } } }
+      responses: *orderResponses
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 1000000 } }
+    PageSize: { name: page_size, in: query, schema: { type: integer } }
+    VendorRequestID: { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+    PartyID: { name: id, in: path, required: true, description: vendor party id (not the request id), schema: { type: integer, format: int64, minimum: 1 } }
+
+  responses:
+    BadRequest: { description: 'Malformed id, query or body', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Unauthorized: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Forbidden: { description: Role or four-eyes rule denies the action, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    NotFound: { description: Not found or outside the caller's scope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Conflict: { description: Status does not allow the action, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Unprocessable: { description: Field validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    InternalError: { description: Unexpected error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  schemas:
+    # -- shared ---------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+        details: { type: array, items: { $ref: '#/components/schemas/FieldError' } }
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+    UserRef:
+      type: object
+      additionalProperties: false
+      required: [id, full_name]
+      properties:
+        id: { type: integer, format: int64 }
+        full_name: { type: string }
+    NullableUserRef:
+      nullable: true
+      allOf: [{ $ref: '#/components/schemas/UserRef' }]
+    Pagination:
+      type: object
+      additionalProperties: false
+      required: [page, page_size, total_count, total_pages]
+      properties:
+        page: { type: integer }
+        page_size: { type: integer }
+        total_count: { type: integer, format: int64 }
+        total_pages: { type: integer }
+    DenomAmount:
+      type: object
+      additionalProperties: false
+      required: [denom, amount]
+      properties:
+        denom: { type: integer, format: int32 }
+        amount: { type: integer, format: int64, description: whole IDR }
+    AmountMap:
+      type: object
+      description: denom (as string) -> amount, decimal string IDR
+      nullable: true
+      additionalProperties: { type: string }
+
+    # -- forecast -------------------------------------------------------------
+    ForecastRow:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, periode_pred, denom, amount_replenish, amount_refund, dmaa_file_id, lokasi_atm, brand,
+        flm_vendor, flm_vendor_region, priority_class, paket, escrow, is_requested, visit_remaining, visit_quota_total]
+      properties:
+        terminal_id: { type: string }
+        periode_pred: { type: string, format: date }
+        denom: { type: integer, format: int32 }
+        amount_replenish: { type: integer, format: int64 }
+        amount_refund: { type: integer, format: int64 }
+        dmaa_file_id: { type: integer, format: int64 }
+        lokasi_atm: { type: string }
+        brand: { type: string }
+        flm_vendor: { type: string }
+        flm_vendor_region: { type: string }
+        priority_class: { type: string }
+        paket: { type: string }
+        escrow: { type: string, nullable: true, description: decimal string IDR }
+        is_requested: { type: boolean }
+        visit_remaining: { type: integer, format: int32, nullable: true }
+        visit_quota_total: { type: integer, format: int32, nullable: true }
+    ForecastResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ForecastRow' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    ForecastSummaryTotals:
+      type: object
+      additionalProperties: false
+      required: [atm_count, requested_atm_count, unrequested_atm_count, unassigned_atm_count, amount_replenish, unrequested_amount_replenish]
+      properties:
+        atm_count: { type: integer, format: int64 }
+        requested_atm_count: { type: integer, format: int64 }
+        unrequested_atm_count: { type: integer, format: int64 }
+        unassigned_atm_count: { type: integer, format: int64 }
+        amount_replenish: { type: integer, format: int64 }
+        unrequested_amount_replenish: { type: integer, format: int64 }
+    ForecastSummaryGroup:
+      type: object
+      additionalProperties: false
+      required: [vendor_id, flm_vendor, flm_vendor_region, atm_count, requested_atm_count, unrequested_atm_count, amount_replenish, unrequested_amount_replenish]
+      properties:
+        vendor_id: { type: integer, format: int64, description: 0 = no active vendor }
+        flm_vendor: { type: string }
+        flm_vendor_region: { type: string }
+        atm_count: { type: integer, format: int64 }
+        requested_atm_count: { type: integer, format: int64 }
+        unrequested_atm_count: { type: integer, format: int64 }
+        amount_replenish: { type: integer, format: int64 }
+        unrequested_amount_replenish: { type: integer, format: int64 }
+    ForecastSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [forecast_date, totals, groups]
+      properties:
+        forecast_date: { type: string, format: date }
+        totals: { $ref: '#/components/schemas/ForecastSummaryTotals' }
+        groups: { type: array, items: { $ref: '#/components/schemas/ForecastSummaryGroup' } }
+    VendorOption:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+    VendorOptionsResponse:
+      type: object
+      additionalProperties: false
+      required: [vendors, regions]
+      properties:
+        vendors: { type: array, items: { $ref: '#/components/schemas/VendorOption' } }
+        regions: { type: array, items: { type: string } }
+
+    # -- vendor request -------------------------------------------------------
+    VendorRequestItem:
+      type: object
+      additionalProperties: false
+      required: [id, terminal_id, periode_pred, denom, amount_replenish, amount_refund, ticket_number]
+      properties:
+        id: { type: integer, format: int64 }
+        terminal_id: { type: string }
+        periode_pred: { type: string, format: date }
+        denom: { type: integer, format: int32 }
+        amount_replenish: { type: integer, format: int64 }
+        amount_refund: { type: integer, format: int64 }
+        ticket_number: { type: string }
+    RequestAtmStatus:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, ticket_number, completion_result, visit_remaining, visit_quota_total, is_over_quota, realized_date, realized_amounts]
+      properties:
+        terminal_id: { type: string }
+        ticket_number: { type: string }
+        completion_result: { type: string, nullable: true, enum: [success, failed, null] }
+        visit_remaining: { type: integer, format: int32, nullable: true }
+        visit_quota_total: { type: integer, format: int32, nullable: true }
+        is_over_quota: { type: boolean }
+        realized_date: { type: string, format: date, nullable: true }
+        realized_amounts: { type: array, items: { $ref: '#/components/schemas/DenomAmount' } }
+    VendorRequestDetail:
+      type: object
+      additionalProperties: false
+      required: [id, request_number, forecast_date, status, notes, created_by, approved_by, rejected_by, rejection_reason,
+        created_at, updated_at, submitted_at, approved_at, rejected_at, items, total_amount, replenish_date, request_category,
+        is_canceled, is_manual, cancellation_reason, region_code, completion_submitted_by, completion_submitted_at,
+        completion_approved_by, completion_approved_at, completion_rejected_by, completion_rejected_at,
+        completion_rejection_reason, atms]
+      properties:
+        id: { type: integer, format: int64 }
+        request_number: { type: string }
+        forecast_date: { type: string, format: date }
+        status: { type: string }
+        notes: { type: string }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        approved_by: { $ref: '#/components/schemas/NullableUserRef' }
+        rejected_by: { $ref: '#/components/schemas/NullableUserRef' }
+        rejection_reason: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        approved_at: { type: string, format: date-time, nullable: true }
+        rejected_at: { type: string, format: date-time, nullable: true }
+        items: { type: array, items: { $ref: '#/components/schemas/VendorRequestItem' } }
+        total_amount: { type: integer, format: int64 }
+        replenish_date: { type: string, format: date, nullable: true }
+        request_category: { type: string, nullable: true, enum: [planned, emergency, additional, null] }
+        is_canceled: { type: boolean }
+        is_manual: { type: boolean }
+        cancellation_reason: { type: string, nullable: true }
+        region_code: { type: string, nullable: true }
+        completion_submitted_by: { $ref: '#/components/schemas/NullableUserRef' }
+        completion_submitted_at: { type: string, format: date-time, nullable: true }
+        completion_approved_by: { $ref: '#/components/schemas/NullableUserRef' }
+        completion_approved_at: { type: string, format: date-time, nullable: true }
+        completion_rejected_by: { $ref: '#/components/schemas/NullableUserRef' }
+        completion_rejected_at: { type: string, format: date-time, nullable: true }
+        completion_rejection_reason: { type: string, nullable: true }
+        atms: { type: array, items: { $ref: '#/components/schemas/RequestAtmStatus' } }
+        over_quota_terminals:
+          type: array
+          items: { type: string }
+          description: Only on POST /{id}/complete/approve, omitted when empty.
+    VendorRequestSummary:
+      type: object
+      additionalProperties: false
+      required: [id, request_number, forecast_date, status, notes, item_count, total_amount, created_by, approved_by,
+        created_at, submitted_at, approved_at, rejected_at, replenish_date, request_category, is_canceled, is_manual, cancellation_reason]
+      properties:
+        id: { type: integer, format: int64 }
+        request_number: { type: string }
+        forecast_date: { type: string, format: date }
+        status: { type: string }
+        notes: { type: string }
+        item_count: { type: integer, format: int64 }
+        total_amount: { type: integer, format: int64 }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        approved_by: { $ref: '#/components/schemas/NullableUserRef' }
+        created_at: { type: string, format: date-time }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        approved_at: { type: string, format: date-time, nullable: true }
+        rejected_at: { type: string, format: date-time, nullable: true }
+        replenish_date: { type: string, format: date, nullable: true }
+        request_category: { type: string, nullable: true, enum: [planned, emergency, additional, null] }
+        is_canceled: { type: boolean }
+        is_manual: { type: boolean }
+        cancellation_reason: { type: string, nullable: true }
+    VendorRequestListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/VendorRequestSummary' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    AuditLogEntry:
+      type: object
+      additionalProperties: false
+      required: [id, entity_type, entity_id, action, performed_by, performed_at, previous_state, new_state, metadata]
+      properties:
+        id: { type: integer, format: int64 }
+        entity_type: { type: string }
+        entity_id: { type: integer, format: int64 }
+        action: { type: string }
+        performed_by: { type: integer, format: int64 }
+        performed_at: { type: string, format: date-time }
+        previous_state: { type: string, nullable: true }
+        new_state: { type: string, nullable: true }
+        metadata: { type: object, nullable: true, additionalProperties: true }
+    AuditLogResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/AuditLogEntry' } }
+
+    # -- request bodies (unknown fields are ignored by the decoder) ------------
+    VendorRequestItemInput:
+      type: object
+      required: [terminal_id, denom, amount_replenish]
+      properties:
+        terminal_id: { type: string }
+        periode_pred: { type: string, format: date, description: required unless is_manual }
+        denom: { type: integer, format: int32 }
+        amount_replenish: { type: integer, format: int64 }
+        brand: { type: string, description: manual requests only }
+        lokasi_atm: { type: string, description: manual requests only }
+    CreateVendorRequestPayload:
+      type: object
+      required: [replenish_date, request_category, items]
+      properties:
+        forecast_date: { type: string, format: date, description: required unless is_manual }
+        replenish_date: { type: string, format: date }
+        request_category: { type: string, enum: [planned, emergency, additional] }
+        is_manual: { type: boolean }
+        vendor_id: { type: integer, format: int64 }
+        notes: { type: string }
+        items: { type: array, items: { $ref: '#/components/schemas/VendorRequestItemInput' } }
+    UpdateItemsPayload:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VendorRequestItemInput' } }
+    RejectVendorRequestPayload:
+      type: object
+      required: [rejection_reason]
+      properties:
+        rejection_reason: { type: string }
+    CancelVendorRequestPayload:
+      type: object
+      required: [cancellation_reason]
+      properties:
+        cancellation_reason: { type: string }
+    CompletionResultInput:
+      type: object
+      required: [terminal_id, result]
+      properties:
+        terminal_id: { type: string }
+        result: { type: string, enum: [success, failed] }
+    CompletionPayload:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: '#/components/schemas/CompletionResultInput' } }
+    ReasonPayload:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string }
+    VaultRejectPayload:
+      type: object
+      required: [vault_rejection_reason]
+      properties:
+        vault_rejection_reason: { type: string }
+    RealizationRowInput:
+      type: object
+      required: [terminal_id, result]
+      properties:
+        terminal_id: { type: string }
+        result: { type: string, enum: [success, failed] }
+        realized_date: { type: string, format: date, nullable: true }
+        amounts:
+          type: object
+          description: denom (as string) -> whole IDR
+          additionalProperties: { type: integer, format: int64 }
+    RealizationPayload:
+      type: object
+      required: [realizations]
+      properties:
+        realizations: { type: array, items: { $ref: '#/components/schemas/RealizationRowInput' } }
+
+    # -- vault plan (same shape as GET /vault-plans/{id}) ----------------------
+    VaultAssignmentsResponse:
+      type: object
+      additionalProperties: false
+      required: [plan]
+      properties:
+        plan:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/VaultPlan' }]
+    VaultBranchRef:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, vendor_id, vendor_name, region_code]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        vendor_id: { type: integer, format: int64 }
+        vendor_name: { type: string }
+        region_code: { type: string, nullable: true }
+    VaultPlanAtm:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, replenish_branch, order]
+      properties:
+        terminal_id: { type: string }
+        replenish_branch: { $ref: '#/components/schemas/VaultBranchRef' }
+        order: { $ref: '#/components/schemas/AmountMap' }
+    VaultAllocation:
+      type: object
+      additionalProperties: false
+      required: [id, vendor_vault_id, vault_code, vault_category, branch, tier, is_urgent, urgent_reason, amounts,
+        saldo_snapshot, capacity_snapshot, capacity_warning, ticket_number]
+      properties:
+        id: { type: integer, format: int64 }
+        vendor_vault_id: { type: integer, format: int64 }
+        vault_code: { type: string }
+        vault_category: { type: string }
+        branch: { $ref: '#/components/schemas/VaultBranchRef' }
+        tier: { type: integer, format: int32 }
+        is_urgent: { type: boolean }
+        urgent_reason: { type: string, nullable: true }
+        amounts: { $ref: '#/components/schemas/AmountMap' }
+        saldo_snapshot: { $ref: '#/components/schemas/AmountMap' }
+        capacity_snapshot: { $ref: '#/components/schemas/AmountMap' }
+        capacity_warning: { type: boolean }
+        ticket_number: { type: string, nullable: true }
+    VaultTicket:
+      type: object
+      additionalProperties: false
+      required: [ticket_number, vendor_vault_id, vault_code, is_active, created_at, deactivated_at]
+      properties:
+        ticket_number: { type: string }
+        vendor_vault_id: { type: integer, format: int64 }
+        vault_code: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time, nullable: true }
+        deactivated_at: { type: string, format: date-time, nullable: true }
+    VaultPlan:
+      type: object
+      additionalProperties: false
+      required: [id, vendor_request_id, request_number, replenish_date, region_code, request_status, vault_rejection_reason,
+        acm_area_id, acm_area_name, status, submitted_by, submitted_at, approved_by, approved_at, rejected_by, rejected_at,
+        rejection_reason, rejected_by_vendor, buffer_reason, atms, order_totals, allocations, vault_tickets]
+      properties:
+        id: { type: integer, format: int64 }
+        vendor_request_id: { type: integer, format: int64 }
+        request_number: { type: string }
+        replenish_date: { type: string, format: date, nullable: true }
+        region_code: { type: string, nullable: true }
+        request_status: { type: string }
+        vault_rejection_reason: { type: string, nullable: true }
+        acm_area_id: { type: integer, format: int64 }
+        acm_area_name: { type: string }
+        status: { type: string }
+        submitted_by: { type: integer, format: int64, nullable: true }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        approved_by: { type: integer, format: int64, nullable: true }
+        approved_at: { type: string, format: date-time, nullable: true }
+        rejected_by: { type: integer, format: int64, nullable: true }
+        rejected_at: { type: string, format: date-time, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+        rejected_by_vendor: { type: boolean }
+        buffer_reason: { type: string, nullable: true }
+        atms: { type: array, nullable: true, items: { $ref: '#/components/schemas/VaultPlanAtm' } }
+        order_totals: { $ref: '#/components/schemas/AmountMap' }
+        allocations: { type: array, items: { $ref: '#/components/schemas/VaultAllocation' } }
+        vault_tickets: { type: array, items: { $ref: '#/components/schemas/VaultTicket' } }
+
+    # -- vendor parties (internal "Status Vendor" panel) ------------------------
+    RequestVendorParty:
+      type: object
+      additionalProperties: false
+      required: [id, role, status, branch_id, branch_code, branch_name, vendor_id, vendor_name, sent_at, decided_at, decided_by_name, rejection_reason]
+      properties:
+        id: { type: integer, format: int64 }
+        role: { type: string, enum: [replenish, vault] }
+        status: { type: string, enum: [pending, accepted, rejected, withdrawn] }
+        branch_id: { type: integer, format: int64 }
+        branch_code: { type: string }
+        branch_name: { type: string }
+        vendor_id: { type: integer, format: int64 }
+        vendor_name: { type: string }
+        sent_at: { type: string, format: date-time, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decided_by_name: { type: string, nullable: true }
+        rejection_reason: { type: string, nullable: true }
+    RequestVendorPartyEvent:
+      type: object
+      additionalProperties: false
+      required: [id, party_id, event, reason, actor_name, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        party_id: { type: integer, format: int64 }
+        event: { type: string }
+        reason: { type: string, nullable: true }
+        actor_name: { type: string }
+        created_at: { type: string, format: date-time, nullable: true }
+    RequestVendorParties:
+      type: object
+      additionalProperties: false
+      required: [parties, events]
+      properties:
+        parties: { type: array, items: { $ref: '#/components/schemas/RequestVendorParty' } }
+        events: { type: array, items: { $ref: '#/components/schemas/RequestVendorPartyEvent' } }
+
+    # -- vendor orders (VendorPortal) -----------------------------------------
+    PartyBranch:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, vendor_id, vendor_name]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        vendor_id: { type: integer, format: int64 }
+        vendor_name: { type: string }
+        address: { type: string, description: omitted when empty }
+    PartyAtm:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, lokasi, ticket_number, denoms]
+      properties:
+        terminal_id: { type: string }
+        lokasi: { type: string }
+        ticket_number: { type: string }
+        denoms: { type: array, nullable: true, items: { $ref: '#/components/schemas/DenomAmount' } }
+    PartyVaultRef:
+      type: object
+      additionalProperties: false
+      required: [id, code]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        address: { type: string, description: omitted when empty }
+    PartyVault:
+      type: object
+      additionalProperties: false
+      required: [ticket_number, vault, branch, denoms]
+      properties:
+        ticket_number: { type: string }
+        vault: { $ref: '#/components/schemas/PartyVaultRef' }
+        branch: { $ref: '#/components/schemas/PartyBranch' }
+        denoms: { type: array, nullable: true, items: { $ref: '#/components/schemas/DenomAmount' } }
+    PartyContent:
+      type: object
+      additionalProperties: false
+      description: Snapshot stored on the party; arrays can be null in snapshots written before a field existed.
+      required: [role, branch, atms, vaults, replenish_branches, totals, currency]
+      properties:
+        role: { type: string }
+        branch: { $ref: '#/components/schemas/PartyBranch' }
+        atms: { type: array, nullable: true, items: { $ref: '#/components/schemas/PartyAtm' } }
+        vaults: { type: array, nullable: true, items: { $ref: '#/components/schemas/PartyVault' } }
+        replenish_branches: { type: array, nullable: true, items: { $ref: '#/components/schemas/PartyBranch' } }
+        totals: { type: array, nullable: true, items: { $ref: '#/components/schemas/DenomAmount' } }
+        currency: { type: string }
+    RealizationView:
+      type: object
+      additionalProperties: false
+      required: [terminal_id, ticket_number, result, realized_date, amounts, submitted_at, submitted_by_name]
+      properties:
+        terminal_id: { type: string }
+        ticket_number: { type: string }
+        result: { type: string, nullable: true }
+        realized_date: { type: string, format: date-time, nullable: true, description: date at 00:00 UTC (encoded from time.Time) }
+        amounts: { type: array, items: { $ref: '#/components/schemas/DenomAmount' } }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        submitted_by_name: { type: string }
+    VendorOrderSummary:
+      type: object
+      additionalProperties: false
+      required: [id, role, status, request_number, replenish_date, request_status, is_canceled, branch_id, branch_code,
+        branch_name, atm_count, vault_count, totals, currency, sent_at, decided_at, can_decide]
+      properties:
+        id: { type: integer, format: int64, description: party id }
+        role: { type: string, enum: [replenish, vault] }
+        status: { type: string, enum: [pending, accepted, rejected, withdrawn] }
+        request_number: { type: string }
+        replenish_date: { type: string, format: date-time, nullable: true, description: date at 00:00 UTC (encoded from time.Time) }
+        request_status: { type: string }
+        is_canceled: { type: boolean }
+        branch_id: { type: integer, format: int64 }
+        branch_code: { type: string }
+        branch_name: { type: string }
+        atm_count: { type: integer }
+        vault_count: { type: integer }
+        totals: { type: array, nullable: true, items: { $ref: '#/components/schemas/DenomAmount' } }
+        currency: { type: string }
+        sent_at: { type: string, format: date-time, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        can_decide: { type: boolean }
+    VendorOrderList:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VendorOrderSummary' } }
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        page_size: { type: integer }
+    VendorOrderDetail:
+      type: object
+      additionalProperties: false
+      description: VendorOrderSummary fields (flattened, Go embeds the struct) + detail.
+      required: [id, role, status, request_number, replenish_date, request_status, is_canceled, branch_id, branch_code,
+        branch_name, atm_count, vault_count, totals, currency, sent_at, decided_at, can_decide,
+        rejection_reason, content, realizations, can_report, completion_rejection_reason]
+      properties:
+        id: { type: integer, format: int64, description: party id }
+        role: { type: string, enum: [replenish, vault] }
+        status: { type: string, enum: [pending, accepted, rejected, withdrawn] }
+        request_number: { type: string }
+        replenish_date: { type: string, format: date-time, nullable: true, description: date at 00:00 UTC (encoded from time.Time) }
+        request_status: { type: string }
+        is_canceled: { type: boolean }
+        branch_id: { type: integer, format: int64 }
+        branch_code: { type: string }
+        branch_name: { type: string }
+        atm_count: { type: integer }
+        vault_count: { type: integer }
+        totals: { type: array, nullable: true, items: { $ref: '#/components/schemas/DenomAmount' } }
+        currency: { type: string }
+        sent_at: { type: string, format: date-time, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        can_decide: { type: boolean }
+        rejection_reason: { type: string, nullable: true }
+        content: { $ref: '#/components/schemas/PartyContent' }
+        realizations: { type: array, nullable: true, items: { $ref: '#/components/schemas/RealizationView' } }
+        can_report: { type: boolean }
+        completion_rejection_reason: { type: string, nullable: true }

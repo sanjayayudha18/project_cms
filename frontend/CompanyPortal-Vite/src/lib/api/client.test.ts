@@ -282,3 +282,18 @@ describe("API Client - remaining branches (fe-coverage C1)", () => {
     await expect(api.get("/x")).rejects.toEqual({ status: 502, message: "Bad Gateway" });
   });
 });
+
+describe("API Client - baseURL override (bugfix 2026-10-19)", () => {
+  it("uses apiConfig.baseURL by default, and the override when given (token still sent)", async () => {
+    useAuthStore.setState({ accessToken: "tok" });
+    mockFetch.mockImplementation(async () => jsonResponse({ ok: true }));
+
+    await api.get("/items");
+    await api.get("/api/eod/summary", { baseURL: "" });
+
+    const [[defaultUrl], [overrideUrl, init]] = mockFetch.mock.calls as [string, RequestInit][];
+    expect(defaultUrl).toBe("/api/v1/items");
+    expect(overrideUrl).toBe("/api/eod/summary");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+  });
+});

@@ -11,6 +11,10 @@ import type {
 } from "../types";
 
 /** Unwraps an ApiEnvelope, throwing on `status: "error"` instead of asserting `data` is non-null. */
+// /api/eod/* is routed by the Vite proxy / nginx to the Python eod_retry_scheduler, outside
+// /api/v1: skip the client baseURL (auth header + 401 refresh still apply).
+const EOD_REQUEST = { baseURL: "" } as const;
+
 function unwrap<T>(envelope: ApiEnvelope<T>): T {
   if (envelope.status === "error" || envelope.data === null) {
     throw new Error(envelope.error ?? "Unknown error");
@@ -38,6 +42,7 @@ export function useEodSummary(processingDate: string, refetchInterval: number | 
     queryFn: async () => {
       const res = await api.get<ApiEnvelope<EodSummary>>(
         `/api/eod/summary?processing_date=${processingDate}`,
+        EOD_REQUEST,
       );
       return unwrap(res.data);
     },
@@ -51,6 +56,7 @@ export function useEodStatus(processingDate: string, refetchInterval: number | f
     queryFn: async () => {
       const res = await api.get<ApiEnvelope<FileStatusResponse>>(
         `/api/eod/status?processing_date=${processingDate}`,
+        EOD_REQUEST,
       );
       return unwrap(res.data);
     },
@@ -64,6 +70,7 @@ export function useFileHistory(fileId: string | null) {
     queryFn: async () => {
       const res = await api.get<ApiEnvelope<FileHistoryResponse>>(
         `/api/eod/status/${fileId}/history`,
+        EOD_REQUEST,
       );
       return unwrap(res.data);
     },
@@ -77,6 +84,7 @@ export function useEodLate(processingDate: string, refetchInterval: number | fal
     queryFn: async () => {
       const res = await api.get<ApiEnvelope<LateDetectionItem[]>>(
         `/api/eod/late?processing_date=${processingDate}`,
+        EOD_REQUEST,
       );
       return unwrap(res.data);
     },
@@ -97,7 +105,10 @@ export function useEodAudit(
       if (fileType) params.set("file_type", fileType);
       if (trigger) params.set("trigger", trigger);
 
-      const res = await api.get<ApiEnvelope<AuditLogEntry[]>>(`/api/eod/audit?${params}`);
+      const res = await api.get<ApiEnvelope<AuditLogEntry[]>>(
+        `/api/eod/audit?${params}`,
+        EOD_REQUEST,
+      );
       return unwrap(res.data);
     },
     refetchInterval,
@@ -109,7 +120,11 @@ export function useRetryFile() {
 
   return useMutation({
     mutationFn: async (fileId: string) => {
-      const res = await api.post<ApiEnvelope<ManualRetryResponse>>(`/api/eod/retry/${fileId}`);
+      const res = await api.post<ApiEnvelope<ManualRetryResponse>>(
+        `/api/eod/retry/${fileId}`,
+        undefined,
+        EOD_REQUEST,
+      );
       return unwrap(res.data);
     },
     onSuccess: () => {

@@ -16,6 +16,11 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   /** Skip auth header injection (e.g., for login/refresh endpoints) */
   skipAuth?: boolean;
+  /**
+   * Overrides apiConfig.baseURL for services outside /api/v1 (e.g. "" for the EOD scheduler
+   * behind /api/eod/*). Auth header + 401 refresh still apply.
+   */
+  baseURL?: string;
 }
 
 export interface ApiError {
@@ -74,7 +79,7 @@ async function handleUnauthorized(config: RequestConfig): Promise<Response | nul
 // ─── Core Fetch Execution ─────────────────────────────────────────────────────
 
 async function executeRequest(config: RequestConfig, isRetry = false): Promise<Response> {
-  const url = `${apiConfig.baseURL}${config.path}`;
+  const url = `${config.baseURL ?? apiConfig.baseURL}${config.path}`;
 
   const isForm = config.body instanceof FormData;
   // FormData: let the browser set the multipart Content-Type + boundary

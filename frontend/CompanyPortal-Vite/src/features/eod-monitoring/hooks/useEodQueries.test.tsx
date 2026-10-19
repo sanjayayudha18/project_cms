@@ -1,8 +1,6 @@
 /**
  * fe-coverage C5: EOD monitoring queries (Python eod_retry_scheduler via /api/eod/*).
- * Paths are matched on the endpoint + query only, not the prefix: the hooks pass
- * "/api/eod/..." to the shared client, which also prepends apiConfig.baseURL — a possible
- * double prefix reported in fe-coverage/tests.md C5, not locked in here.
+ * The URL on the wire (/api/eod/*, no /api/v1 prefix) is asserted in eodUrls.test.tsx.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -86,7 +84,7 @@ describe("EOD queries", () => {
     const { result } = setup(hook);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(client.get).toHaveBeenCalledWith(endsWith(suffix));
+    expect(client.get).toHaveBeenCalledWith(endsWith(suffix), { baseURL: "" });
     expect(result.current.data).toEqual({ value: 1 });
   });
 
@@ -126,7 +124,9 @@ describe("manual retry", () => {
       returned = await result.current.mutateAsync("f-1");
     });
 
-    expect(client.post).toHaveBeenCalledWith(endsWith("/eod/retry/f-1"));
+    expect(client.post).toHaveBeenCalledWith(endsWith("/eod/retry/f-1"), undefined, {
+      baseURL: "",
+    });
     expect(returned).toEqual({ file_id: "f-1", status: "processing" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: eodKeys.all });
   });

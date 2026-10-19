@@ -41,7 +41,8 @@ export interface VendorPartiesResponse {
   events: VendorPartyEvent[];
 }
 
-const BASE = "/api/v1/vendor-requests";
+// Relative to apiConfig.baseURL ("/api/v1"), same as api.ts — the client adds the prefix.
+const BASE = "/vendor-requests";
 
 export async function fetchVendorParties(id: number): Promise<VendorPartiesResponse> {
   const { data } = await api.get<VendorPartiesResponse>(`${BASE}/${id}/vendor-parties`);

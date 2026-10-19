@@ -3,7 +3,7 @@
 Stage: 4 Test — **slice 1 green 2026-10-19** (BE spec + test kontrak Go). Slice 2 (tipe CompanyPortal) dan slice 3 (CLAUDE.md DoD) belum dibangun.
 Dasar: [`plan.md`](./plan.md) (accepted 2026-10-19), [`spec.md`](./spec.md) T1–T7.
 
-## Slice 1 — run 2026-10-19 (uncommitted)
+## Slice 1 — run 2026-10-19 (committed `d1e7082`)
 
 | Perintah (dari `backend/`) | Hasil |
 |---|---|

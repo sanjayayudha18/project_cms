@@ -12,6 +12,10 @@
  * control is no longer manual-only — every create, DMAA-backed or manual
  * alike, requires picking one before submit (Req 1.1/1.2), and it drives
  * Replenish_Date identically on both paths (Req 1.3-1.5).
+ *
+ * Split (FE-12): schema/payload helpers live in vendorRequestCreateForm.ts,
+ * header inputs in VendorRequestCreateFields.tsx, the item table in
+ * VendorRequestCreateItemsTable.tsx; this file owns state and submit flow.
  */
 
 import { Button } from "@/components/ui/Button";
@@ -20,10 +24,10 @@ import { useToast } from "@/lib/hooks/useToast";
 import { formatThousands } from "@/lib/utils/formatCurrency";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
+import { VendorRequestCreateFields } from "./VendorRequestCreateFields";
+import { VendorRequestCreateItemsTable } from "./VendorRequestCreateItemsTable";
 import { useCreateVendorRequest, useSubmitVendorRequest, useVendorOptions } from "./hooks";
 import { jakartaCalendarDateISO } from "./lib/nextBusinessDay";
 import { usePendingVendorRequestSelection } from "./selectionStore";
@@ -32,90 +36,9 @@ import type {
   VendorRequestCategory,
   VendorRequestDetail,
 } from "./types";
+import { type FormValues, errorMessage, formSchema, toPayload } from "./vendorRequestCreateForm";
 
-const AMOUNT_MIN = 1;
-const AMOUNT_MAX = 999_999_999;
 const ERROR_TOAST_MS = 5000;
-
-const CATEGORY_OPTIONS: { value: VendorRequestCategory; label: string }[] = [
-  { value: "planned", label: "Planned — replenish H+1" },
-  { value: "emergency", label: "Emergency — replenish H+0" },
-  { value: "additional", label: "Additional — pilih tanggal sendiri" },
-];
-
-/** Plain hyphen, never an em-dash, for an empty/null context column (Req 2.2). */
-function displayOrDash(value: string | undefined): string {
-  return value ? value : "-";
-}
-
-const itemSchema = z.object({
-  terminal_id: z.string().min(1, "Wajib diisi").max(64, "Maksimal 64 karakter"),
-  // DMAA-only fields: present (read-only) for a Forecast-Browser-sourced
-  // row, absent for a manually added one. Never rendered as inputs.
-  periode_pred: z.string().optional(),
-  flm_vendor: z.string().optional(),
-  flm_vendor_region: z.string().optional(),
-  denom: z
-    .number({ invalid_type_error: "Wajib berupa angka" })
-    .int("Harus bilangan bulat")
-    .positive("Harus lebih besar dari 0"),
-  amount_refund: z.number().optional(),
-  amount_replenish: z
-    .number({ invalid_type_error: "Wajib berupa angka" })
-    .int("Harus bilangan bulat")
-    .min(AMOUNT_MIN, `Minimal ${AMOUNT_MIN}`)
-    .max(AMOUNT_MAX, `Maksimal ${formatThousands(AMOUNT_MAX)}`),
-  // Manual_Request-only (CIT-2 Req 3, Q4): editable inputs in manual mode,
-  // read-only display in DMAA mode, sent only when is_manual.
-  brand: z.string().optional(),
-  lokasi_atm: z.string().optional(),
-});
-
-const formSchema = z.object({
-  notes: z.string().max(500, "Maksimal 500 karakter").optional(),
-  items: z.array(itemSchema).min(1, "Minimal 1 item diperlukan"),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-interface ToPayloadOptions {
-  isManual: boolean;
-  forecastDate: string;
-  replenishDate: string;
-  category: VendorRequestCategory;
-  vendorId: number;
-}
-
-function toPayload(values: FormValues, opts: ToPayloadOptions): CreateVendorRequestPayload {
-  return {
-    forecast_date: opts.isManual ? undefined : opts.forecastDate,
-    replenish_date: opts.replenishDate,
-    // Req 1.9: required for EVERY create now, not just manual — callers only
-    // reach here once canSubmit has confirmed opts.category is non-empty.
-    request_category: opts.category,
-    is_manual: opts.isManual,
-    vendor_id: opts.vendorId,
-    notes: values.notes,
-    items: values.items.map((it) => ({
-      terminal_id: it.terminal_id,
-      periode_pred: opts.isManual ? undefined : it.periode_pred,
-      denom: it.denom,
-      amount_replenish: it.amount_replenish,
-      brand: opts.isManual && it.brand ? it.brand : undefined,
-      lokasi_atm: opts.isManual && it.lokasi_atm ? it.lokasi_atm : undefined,
-    })),
-  };
-}
-
-function emptyManualItem() {
-  return {
-    terminal_id: "",
-    denom: 0,
-    amount_replenish: 0,
-    brand: "",
-    lokasi_atm: "",
-  };
-}
 
 export function VendorRequestCreate() {
   const navigate = useNavigate();
@@ -288,274 +211,29 @@ export function VendorRequestCreate() {
         }
       />
 
-      {!isManual && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
-            Tanggal Forecast
-          </span>
-          <span className="text-sm text-[var(--n-800)]">{pending.forecastDate}</span>
-        </div>
-      )}
+      <VendorRequestCreateFields
+        isManual={isManual}
+        forecastDate={pending?.forecastDate ?? ""}
+        category={category}
+        categoryError={categoryError}
+        onCategoryChange={handleCategoryChange}
+        manualVendorId={manualVendorId}
+        onManualVendorChange={setManualVendorId}
+        vendors={vendorOptionsQuery.data?.vendors ?? []}
+        replenishDate={replenishDate}
+        replenishDateError={replenishDateError}
+        todayISO={todayISO}
+        onReplenishDateChange={setReplenishDate}
+        form={form}
+      />
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="request-category"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            Kategori Request <span className="text-[var(--red-600)]">*</span>
-          </label>
-          <select
-            id="request-category"
-            value={category}
-            onChange={(e) => handleCategoryChange(e.target.value as VendorRequestCategory | "")}
-            className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-          >
-            <option value="" disabled>
-              Pilih Kategori
-            </option>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {categoryError && (
-            <span className="text-xs text-[var(--danger-fg)]">{categoryError}</span>
-          )}
-        </div>
-
-        {isManual && (
-          <div className="flex flex-col gap-1">
-            <label
-              htmlFor="manual-vendor"
-              className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-            >
-              Vendor <span className="text-[var(--red-600)]">*</span>
-            </label>
-            <select
-              id="manual-vendor"
-              value={manualVendorId ?? ""}
-              onChange={(e) => setManualVendorId(e.target.value ? Number(e.target.value) : null)}
-              className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-            >
-              <option value="" disabled>
-                Pilih Vendor
-              </option>
-              {(vendorOptionsQuery.data?.vendors ?? []).map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="replenish-date"
-            className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-          >
-            Tanggal Replenish <span className="text-[var(--red-600)]">*</span>
-          </label>
-          {category === "additional" ? (
-            <input
-              id="replenish-date"
-              type="date"
-              value={replenishDate}
-              min={todayISO}
-              onChange={(e) => setReplenishDate(e.target.value)}
-              className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-            />
-          ) : (
-            // Planned/Emergency (both paths, Req 1.3/1.4) and the
-            // not-yet-chosen "" state (Req 1.2) are auto-set/locked.
-            <input
-              id="replenish-date"
-              type="date"
-              value={replenishDate}
-              disabled
-              className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-100)] px-3 text-sm text-[var(--n-600)] outline-none"
-            />
-          )}
-          {replenishDateError && (
-            <span className="text-xs text-[var(--danger-fg)]">{replenishDateError}</span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor="vendor-request-notes"
-          className="text-xs font-medium uppercase tracking-wider text-[var(--n-600)]"
-        >
-          Catatan (opsional)
-        </label>
-        <textarea
-          id="vendor-request-notes"
-          {...form.register("notes")}
-          maxLength={500}
-          rows={3}
-          className="rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 py-2 text-sm text-[var(--n-800)] outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-        />
-        {form.formState.errors.notes && (
-          <span className="text-xs text-[var(--danger-fg)]">
-            {form.formState.errors.notes.message}
-          </span>
-        )}
-      </div>
-
-      <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--n-200)]">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
-          <thead>
-            <tr className="border-[var(--n-200)] border-b bg-[var(--n-50)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">ATM ID</th>
-              {!isManual && (
-                <>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">Brand</th>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
-                    FLM Vendor
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
-                    FLM Vendor Region
-                  </th>
-                </>
-              )}
-              {isManual && (
-                <>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
-                    Brand (opsional)
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-[var(--n-600)]">
-                    Lokasi ATM (opsional)
-                  </th>
-                </>
-              )}
-              <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">Denominasi</th>
-              <th className="px-3 py-2 text-right font-medium text-[var(--n-600)]">
-                Amount Replenish
-              </th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((field, index) => (
-              <tr key={field.id} className="border-[var(--n-100)] border-b last:border-0">
-                {isManual ? (
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      aria-label={`ATM ID baris ${index + 1}`}
-                      {...form.register(`items.${index}.terminal_id`)}
-                      className="w-32 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-sm outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                    />
-                    {form.formState.errors.items?.[index]?.terminal_id && (
-                      <div className="mt-1 text-xs text-[var(--danger-fg)]">
-                        {form.formState.errors.items[index]?.terminal_id?.message}
-                      </div>
-                    )}
-                  </td>
-                ) : (
-                  <td className="px-3 py-2">{field.terminal_id}</td>
-                )}
-
-                {!isManual && (
-                  <>
-                    <td className="px-3 py-2 text-[var(--n-700)]">{displayOrDash(field.brand)}</td>
-                    <td className="px-3 py-2 text-[var(--n-700)]">
-                      {displayOrDash(field.flm_vendor)}
-                    </td>
-                    <td className="px-3 py-2 text-[var(--n-700)]">
-                      {displayOrDash(field.flm_vendor_region)}
-                    </td>
-                  </>
-                )}
-                {isManual && (
-                  <>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        aria-label={`Brand baris ${index + 1}`}
-                        {...form.register(`items.${index}.brand`)}
-                        className="w-32 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-sm outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        aria-label={`Lokasi ATM baris ${index + 1}`}
-                        {...form.register(`items.${index}.lokasi_atm`)}
-                        className="w-36 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-sm outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                      />
-                    </td>
-                  </>
-                )}
-
-                {isManual ? (
-                  <td className="px-3 py-2 text-right">
-                    <input
-                      type="number"
-                      aria-label={`Denominasi baris ${index + 1}`}
-                      {...form.register(`items.${index}.denom`, { valueAsNumber: true })}
-                      className="w-28 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                    />
-                    {form.formState.errors.items?.[index]?.denom && (
-                      <div className="mt-1 text-xs text-[var(--danger-fg)]">
-                        {form.formState.errors.items[index]?.denom?.message}
-                      </div>
-                    )}
-                  </td>
-                ) : (
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {formatThousands(field.denom)}
-                  </td>
-                )}
-
-                <td className="px-3 py-2 text-right">
-                  <input
-                    type="number"
-                    aria-label={`Amount replenish untuk ${field.terminal_id || `baris ${index + 1}`}`}
-                    {...form.register(`items.${index}.amount_replenish`, { valueAsNumber: true })}
-                    className="w-36 rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:border-[var(--red-400)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                  />
-                  {form.formState.errors.items?.[index]?.amount_replenish && (
-                    <div className="mt-1 text-xs text-[var(--danger-fg)]">
-                      {form.formState.errors.items[index]?.amount_replenish?.message}
-                    </div>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => remove(index)}
-                    aria-label={`Hapus baris ${field.terminal_id || index + 1}`}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[var(--radius-md)] text-[var(--n-500)] outline-none hover:bg-[var(--n-100)] hover:text-[var(--danger-fg)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {form.formState.errors.items?.root && (
-        <span className="text-xs text-[var(--danger-fg)]">
-          {form.formState.errors.items.root.message}
-        </span>
-      )}
-
-      {isManual && (
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => append(emptyManualItem())}
-          className="self-start"
-        >
-          <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Tambah Baris
-        </Button>
-      )}
+      <VendorRequestCreateItemsTable
+        isManual={isManual}
+        form={form}
+        fields={fields}
+        onRemove={remove}
+        onAppend={append}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-50)] px-4 py-3">
         <div className="text-sm text-[var(--n-700)]">
@@ -584,17 +262,4 @@ export function VendorRequestCreate() {
       </div>
     </div>
   );
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof (error as { message: unknown }).message === "string"
-  ) {
-    return (error as { message: string }).message;
-  }
-  return "Terjadi kesalahan yang tidak diketahui";
 }

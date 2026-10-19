@@ -2040,9 +2040,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1792067369.2410128,
-    "seen": 1792072116.0965002,
-    "ast_hash": "e4daa289b0d54c8dfd1fad93f6d8aa61",
+    "mtime": 1792394327.0898192,
+    "seen": 1792401162.600976,
+    "ast_hash": "0c9c9d2c95ffcda99c31f87df3967a94",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -2052,9 +2052,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1792385696.9561985,
-    "seen": 1792386979.9177828,
-    "ast_hash": "534ad8157de6c0c0cfafa8a6e3eae2fc",
+    "mtime": 1792400403.6415226,
+    "seen": 1792401162.6010003,
+    "ast_hash": "795d1b22dfbd1fc1580c6dd4a5480b29",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -3384,9 +3384,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_request_actions.go": {
-    "mtime": 1791875784.2530327,
-    "seen": 1791876624.8885336,
-    "ast_hash": "1f163f4c35e93c5b3090d626243c2552",
+    "mtime": 1792389622.2446966,
+    "seen": 1792389789.360019,
+    "ast_hash": "9bf86346c81dba69624912627cfcc721",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_request_cancel_integration_test.go": {
@@ -3516,9 +3516,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/VendorRequestCreate.tsx": {
-    "mtime": 1792071368.311369,
-    "seen": 1792072116.0962424,
-    "ast_hash": "3c01d5aa4cd71a8dc8112f71900c0b67",
+    "mtime": 1792400961.0800822,
+    "seen": 1792401162.600703,
+    "ast_hash": "aeef359d54ce9c847b015a6172db11df",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/VendorRequestDetail.tsx": {
@@ -5280,9 +5280,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import.go": {
-    "mtime": 1791800068.6946654,
-    "seen": 1791800270.463803,
-    "ast_hash": "5526a7ae90b2a570bc9a67b5f21f842c",
+    "mtime": 1792389642.9473624,
+    "seen": 1792389789.359958,
+    "ast_hash": "e0ae03c8cc87ec6aa072cf9d38ebd836",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_confirm.go": {
@@ -5556,9 +5556,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792389127.2765498,
-    "seen": 1792389171.5734773,
-    "ast_hash": "950b1515bd29584d5c1f466dedd39c9b",
+    "mtime": 1792401109.4409301,
+    "seen": 1792401162.600979,
+    "ast_hash": "7b3073ad5700b6fa91a92925a8b13260",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -6360,9 +6360,9 @@
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
-    "mtime": 1792067040.7390664,
-    "seen": 1792067166.1069283,
-    "ast_hash": "5eec666e039631fdb037ade391ea8df8",
+    "mtime": 1792394307.6804926,
+    "seen": 1792401162.600982,
+    "ast_hash": "90b5acc17fdd34597c0f88424a81e69e",
     "semantic_hash": ""
   },
   ".claude/docs/requirements.md": {
@@ -7620,15 +7620,15 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792068272.5691316,
-    "seen": 1792072116.0964994,
-    "ast_hash": "8834f3454ba6bd44eb55de38a2202add",
+    "mtime": 1792400388.81921,
+    "seen": 1792401162.600975,
+    "ast_hash": "bfdad95482be941638909294afe74b9b",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
-    "mtime": 1792389126.483427,
-    "seen": 1792389171.5734751,
-    "ast_hash": "53a79b6c4c20bc0383878528dc3f818f",
+    "mtime": 1792401099.4083672,
+    "seen": 1792401162.600977,
+    "ast_hash": "ecd7871a5e455bc05aeb719589dd2c32",
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/intent.md": {
@@ -8022,15 +8022,15 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/tests.md": {
-    "mtime": 1792068272.5691316,
-    "seen": 1792072116.0965412,
-    "ast_hash": "90674381a66e8a06770e07db334627a2",
+    "mtime": 1792400388.8209484,
+    "seen": 1792401162.6010158,
+    "ast_hash": "8d6c4d058f8e464e71c3da16a231a391",
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
-    "mtime": 1792389127.8072646,
-    "seen": 1792389171.5735567,
-    "ast_hash": "67bbdf8127830942323bc04873f35106",
+    "mtime": 1792401099.1103432,
+    "seen": 1792401162.6010535,
+    "ast_hash": "693f3a40ca11a2f24ba11b69ed71a6dd",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
@@ -8547,6 +8547,48 @@
     "mtime": 1792388945.6864076,
     "seen": 1792389171.5732055,
     "ast_hash": "3e9ad72d57797001de2de06febd84cc2",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_import_csv.go": {
+    "mtime": 1792389642.945085,
+    "seen": 1792389789.3599625,
+    "ast_hash": "a1625944d74342de735b11bcc4add2fb",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_import_validate.go": {
+    "mtime": 1792389628.168085,
+    "seen": 1792389789.3599684,
+    "ast_hash": "39bfb6b8b7a83bac1cf7f59f678f5f7d",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_request_create.go": {
+    "mtime": 1792389642.9462197,
+    "seen": 1792389789.3600252,
+    "ast_hash": "291b5c181876f2693b520384e588e75b",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_request_queries.go": {
+    "mtime": 1792389642.9462197,
+    "seen": 1792389789.3600326,
+    "ast_hash": "f79e39adbe86ba386e9b50be7c715920",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/vendor-request/VendorRequestCreateFields.tsx": {
+    "mtime": 1792401026.148476,
+    "seen": 1792401162.600705,
+    "ast_hash": "c6f683c7605b5a7997de2d5b9317b35c",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/vendor-request/VendorRequestCreateItemsTable.tsx": {
+    "mtime": 1792400892.0042968,
+    "seen": 1792401162.6007063,
+    "ast_hash": "5e96921d6845bc62e0e483d624ffe60b",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/vendor-request/vendorRequestCreateForm.ts": {
+    "mtime": 1792400906.31831,
+    "seen": 1792401162.600729,
+    "ast_hash": "5c243563de1b3b6191ce6f386e2a7ba4",
     "semantic_hash": ""
   }
 }

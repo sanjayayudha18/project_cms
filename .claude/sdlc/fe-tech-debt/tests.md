@@ -106,3 +106,14 @@ Status: **partial — Fase A slice A1, A2, A4 green 2026-10-15** (Stage 4). Inpu
 
 ### Outstanding
 - **Manual browser check (user, Golden Rule #10)**: halaman Vendor Request Detail (draft/edit item, kirim, setujui/tolak, batalkan, kembalikan ke pembuat, laporan selesai + approve/reject; modal alasan di Vault Plan dan kartu kuota ATM).
+
+## F2b — FE-12 pecah `VendorRequestCreate.tsx` (2026-10-19, belum commit)
+| Command | Result |
+|---|---|
+| CP `pnpm run test` / `test:coverage` | 156 files, 1385 tests green (test lama tak diubah), threshold lulus (all files 84,82 / 80,74 / 81,13 / 85,98) |
+| CP `pnpm run lint` / `tsc --noEmit` / `build` | clean (496 files) / clean / built (initial JS 172,5 KB gzip) |
+
+- Baris: `VendorRequestCreate.tsx` 600 → 265 (state, form, handler simpan/kirim, empty state, footer); baru `vendorRequestCreateForm.ts` 101 (schema, `toPayload`, helper), `VendorRequestCreateFields.tsx` 153 (kategori, vendor, tanggal, catatan), `VendorRequestCreateItemsTable.tsx` 175 (tabel item + Tambah Baris). Path import `VendorRequestCreate` tidak berubah.
+
+### Outstanding
+- **Manual browser check (user, Golden Rule #10)**: halaman Buat Vendor Request, jalur DMAA (dari Forecast Browser) dan jalur manual: pilih kategori → tanggal replenish, pilih vendor, tambah/hapus baris, validasi, simpan draft, kirim untuk approval.

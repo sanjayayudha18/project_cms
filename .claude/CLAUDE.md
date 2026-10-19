@@ -45,6 +45,7 @@ Rules:
 | Backend | Go + Chi (v5) |
 | DB pool | pgx v5 / pgxpool — primary + replica pools created in `backend/cmd/api/main.go` (no shared `pkg/database`) |
 | SQL codegen | sqlc **v1.31.1** (pinned) — `backend/sqlc.yaml`, queries in `backend/queries/` |
+| API contract | OpenAPI 3.0.3, hand-written — `backend/api/openapi.yaml` (pilot: `/vendor-requests*`, `/vendor/replenish-orders*`); kin-openapi **v0.151.0** (Go tests only), openapi-typescript **7.13.0** (CompanyPortal devDependency) |
 | EOD / ETL | Python — FastAPI + pandas + psycopg (`backend_python/`, Sec 14) |
 | Frontend | React + Vite, served via Nginx |
 | Database | PostgreSQL (external, NON-dockerized) — primary + read replica |
@@ -72,6 +73,10 @@ cd backend && govulncheck ./...      # go install golang.org/x/vuln/cmd/govulnch
 
 # sqlc (after editing backend/queries/*.sql)
 cd backend && sqlc generate          # MUST be v1.31.1 — see note below
+
+# OpenAPI contract (after editing backend/api/openapi.yaml or a handler it covers)
+cd backend && go test ./internal/handler -run OpenAPI      # spec valid + routes == spec + responses match
+pnpm --dir frontend/CompanyPortal-Vite run gen:api         # regenerate src/lib/api/schema.d.ts (commit it; a vitest fails when stale)
 
 # Frontends (pnpm; same scripts in both apps)
 pnpm --dir frontend/CompanyPortal-Vite run dev|build|test|lint     # dev :5173
@@ -305,6 +310,7 @@ LOG_LEVEL=info
 - [ ] Tests passing incl. auth/RBAC/money cases
 - [ ] No secrets/config hardcoded; .env.example updated
 - [ ] Response shape per Sec 5 (`pkg/response` envelope in `backend-cit`; flat JSON matching neighbours in ATM `backend`)
+- [ ] New/changed endpoint in a module already in `backend/api/openapi.yaml` is in the spec and passes the contract test (`-run OpenAPI`) + `gen:api`; a new module starts with its spec
 - [ ] Builds cleanly in Docker
 
 * * *

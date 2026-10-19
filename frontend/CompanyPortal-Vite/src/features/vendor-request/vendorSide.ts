@@ -5,41 +5,18 @@
  */
 
 import { type ApiError, api } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { vendorRequestKeys } from "./hooks";
 import type { VendorRequestDetail } from "./types";
 
-export type VendorPartyRole = "replenish" | "vault";
-export type VendorPartyStatus = "pending" | "accepted" | "rejected" | "withdrawn";
+type S = components["schemas"];
 
-export interface VendorParty {
-  id: number;
-  role: VendorPartyRole;
-  status: VendorPartyStatus;
-  branch_id: number;
-  branch_code: string;
-  branch_name: string;
-  vendor_id: number;
-  vendor_name: string;
-  sent_at: string | null;
-  decided_at: string | null;
-  decided_by_name: string | null;
-  rejection_reason: string | null;
-}
-
-export interface VendorPartyEvent {
-  id: number;
-  party_id: number;
-  event: "sent" | "resent" | "accepted" | "rejected" | "withdrawn" | "cancelled";
-  reason: string | null;
-  actor_name: string;
-  created_at: string | null;
-}
-
-export interface VendorPartiesResponse {
-  parties: VendorParty[];
-  events: VendorPartyEvent[];
-}
+export type VendorParty = S["RequestVendorParty"];
+export type VendorPartyRole = VendorParty["role"];
+export type VendorPartyStatus = VendorParty["status"];
+export type VendorPartyEvent = S["RequestVendorPartyEvent"];
+export type VendorPartiesResponse = S["RequestVendorParties"];
 
 // Relative to apiConfig.baseURL ("/api/v1"), same as api.ts — the client adds the prefix.
 const BASE = "/vendor-requests";

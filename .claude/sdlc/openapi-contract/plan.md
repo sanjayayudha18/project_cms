@@ -34,6 +34,8 @@ Gate: `git status` tidak lagi menunjukkan `VendorRequestCreate*.tsx` / `vendorRe
 | 2.4 | `src/features/vendor-request/types.ts` | Interface yang mencerminkan wire (mis. `VendorRequestDetail`, `VendorRequestSummary`, `ForecastRow`, `AuditLogEntry`, payload create/reject/cancel) → `export type X = components["schemas"]["X"]`. Nama export tetap. Tipe UI-only (`FetchAllForecastResult`, params, konstanta) tetap manual. Bila alias membuat tsc gagal di pemanggil = drift nyata → dicatat di `tests.md`, diperbaiki di sisi FE hanya bila spec (yang sudah lulus T3) benar. |
 | 2.5 | `src/features/vendor-request/vendorSide.ts` | Tipe vendor parties / vault assignments → alias yang sama. |
 
+**Built 2026-10-19:** 2.1–2.5 sesuai rencana; tambahan: `biome.json` ignore `src/lib/api/schema.d.ts` (2.2), spec `backend/api/openapi.yaml` dapat schema enum `VendorRequestStatus` + enum `event` supaya alias tidak melebar ke `string`; nama vendor-side di spec = `RequestVendorParty*`, nama export FE tetap.
+
 Bukti: `pnpm --dir frontend/CompanyPortal-Vite run build|test|lint`, `test:coverage` gate tidak turun.
 
 ## Slice 3 — DoD + dokumentasi (S6)
@@ -42,6 +44,8 @@ Bukti: `pnpm --dir frontend/CompanyPortal-Vite run build|test|lint`, `test:cover
 | 3.1 | `.claude/CLAUDE.md` | Sec 2 baris "API contract"; Sec 2a perintah `gen:api` + `go test ./internal/handler -run OpenAPI`; Sec 11 butir DoD (teks FR8). Ditunjukkan sebagai diff ke user sebelum disimpan. |
 | 3.2 | `.claude/BE_debt.md` BE-10, `sdlc/README.md`, `development-progress.md` | Status. |
 | 3.3 | `graphify update .` | Setelah kode berubah. |
+
+**Built 2026-10-19:** 3.1 sesuai diff yang diterima user (teks Sec 11 dalam bahasa Inggris, + versi pin di Sec 2, + perintah Go test di Sec 2a); 3.2 status; 3.3 tidak perlu (docs saja).
 
 ## Risiko
 - **Spec salah tapi lolos** karena fixture fake tidak mengisi field nullable → T3 tidak pernah melihat bentuk aslinya. Mitigasi: fixture per operasi mengisi semua field (dua varian: null + terisi) untuk tipe utama.

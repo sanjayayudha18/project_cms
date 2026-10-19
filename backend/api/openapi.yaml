@@ -506,6 +506,11 @@ components:
         is_over_quota: { type: boolean }
         realized_date: { type: string, format: date, nullable: true }
         realized_amounts: { type: array, items: { $ref: '#/components/schemas/DenomAmount' } }
+    VendorRequestStatus:
+      type: string
+      description: vendor_requests_status_chk (migration 029)
+      enum: [draft, pending_approval, approved, rejected, processing, completed, failed, cancelled,
+        completion_pending, vault_assignment, vault_review, ready, sent_to_vendor, vendor_accepted, vendor_rejected]
     VendorRequestDetail:
       type: object
       additionalProperties: false
@@ -518,7 +523,7 @@ components:
         id: { type: integer, format: int64 }
         request_number: { type: string }
         forecast_date: { type: string, format: date }
-        status: { type: string }
+        status: { $ref: '#/components/schemas/VendorRequestStatus' }
         notes: { type: string }
         created_by: { $ref: '#/components/schemas/UserRef' }
         approved_by: { $ref: '#/components/schemas/NullableUserRef' }
@@ -558,7 +563,7 @@ components:
         id: { type: integer, format: int64 }
         request_number: { type: string }
         forecast_date: { type: string, format: date }
-        status: { type: string }
+        status: { $ref: '#/components/schemas/VendorRequestStatus' }
         notes: { type: string }
         item_count: { type: integer, format: int64 }
         total_amount: { type: integer, format: int64 }
@@ -790,7 +795,7 @@ components:
       properties:
         id: { type: integer, format: int64 }
         party_id: { type: integer, format: int64 }
-        event: { type: string }
+        event: { type: string, enum: [sent, resent, accepted, rejected, withdrawn, cancelled] }
         reason: { type: string, nullable: true }
         actor_name: { type: string }
         created_at: { type: string, format: date-time, nullable: true }

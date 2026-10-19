@@ -1,6 +1,6 @@
 # Tests: Kontrak OpenAPI BE ↔ FE (BE-10)
 
-Stage: 4 Test — **slice 1 green 2026-10-19** (BE spec + test kontrak Go). Slice 2 (tipe CompanyPortal) dan slice 3 (CLAUDE.md DoD) belum dibangun.
+Stage: 4 Test — **slice 1 green 2026-10-19** (BE spec + test kontrak Go), **slice 2 green 2026-10-19** (tipe CompanyPortal). **slice 3 done 2026-10-19** (CLAUDE.md Sec 2/2a/11, diff diterima user).
 Dasar: [`plan.md`](./plan.md) (accepted 2026-10-19), [`spec.md`](./spec.md) T1–T7.
 
 ## Slice 1 — run 2026-10-19 (committed `d1e7082`)
@@ -24,7 +24,8 @@ RED → GREEN: run pertama gagal di T1 (`response "BadRequest": extra sibling fi
 | T2 `TestOpenAPIContract_RouteCoverage` | `chi.Walk` (handler dengan vault + vendor side) == operasi spec, per prefix | FR4 |
 | T3 `TestOpenAPIContract_Responses` | 26 operasi: sukses (fixture lengkap + minimal/null), error per operasi, semua kelas `handleError` lewat `/submit`, 401/403 middleware per prefix; `IncludeResponseStatus` → status tak terdokumentasi gagal | FR1, FR2, FR5 |
 | T4 `TestOpenAPIContract_RejectsDrift` | field tambahan, uang sebagai string, field hilang, tanggal sebagai timestamp, status 418 → semua ditolak | FR2 |
-| T5 / T6 | slice 2 — belum | FR6, FR7 |
+| T5 `src/lib/api/schema.test.ts` | `openapiTS` + `astToString` dari YAML == isi `schema.d.ts` (normalisasi CRLF); RED dibuktikan dengan baris tambahan di `schema.d.ts` → gagal "schema.d.ts is stale" | FR6 |
+| T6 `tsc -b tsconfig.app.json` (dalam `build`) | tipe wire `features/vendor-request/types.ts` + `vendorSide.ts` = alias `components["schemas"]`; pemanggil lulus typecheck | FR7 |
 | T7 | baris tabel di atas | NFR1–4 |
 | Manual | alur Vendor Request (CP) + Orders (VP) di browser — **outstanding (user)**; slice 1 tidak mengubah perilaku runtime | GR#10 |
 
@@ -41,5 +42,30 @@ RED → GREEN: run pertama gagal di T1 (`response "BadRequest": extra sibling fi
 | F7 | `PartyContent` di-decode dari snapshot JSON lama; array yang belum ada saat snapshot ditulis keluar `null` → didokumentasikan `nullable`. | `service.PartyContent` |
 | F8 | `handleError` vendor request dipakai semua operasi → spec mendokumentasikan himpunan error yang sama (400/401/403/404/409/422/500) di setiap operasi, termasuk GET. | `vendor_request_handler.go:581` |
 
-## Slice 2 / 3
-Belum dijalankan. Gate slice 2: sisa FE-12 (`VendorRequestCreate*.tsx`, `vendorRequestCreateForm.ts`) ter-commit.
+## Slice 2 — run 2026-10-19 (belum di-commit)
+
+Gate terpenuhi: `git status` bersih, sisa FE-12 sudah ter-commit (`b007b64`/`36abcf8`).
+
+| Perintah (dari `frontend/CompanyPortal-Vite`) | Hasil |
+|---|---|
+| `pnpm add -D --save-exact openapi-typescript@7.13.0` | devDependency di-pin; lockfile +33 paket (redocly/openapi-core dkk.), sisanya hanya varian peer `supports-color` |
+| `pnpm run gen:api` | `src/lib/api/schema.d.ts` 1.9k baris |
+| `pnpm exec vitest run src/lib/api/schema.test.ts` | PASS (T5); RED dicek: baris tambahan → FAIL, `gen:api` → PASS |
+| `pnpm run build` | PASS (tsc app + vite + bundle budget 172,5 KB / 300 KB) |
+| `pnpm run test:coverage` | 157 file / 1386 test PASS; all files 84,82 % stmt / 80,74 % branch — ambang tidak turun |
+| `pnpm run lint` | PASS setelah `schema.d.ts` di-ignore di `biome.json` (file generated, format biome ≠ output generator) |
+| `tsc -p tsconfig.test.json` | 122 error **sebelum dan sesudah** (identik per file; dibandingkan dengan `types.ts`/`vendorSide.ts` HEAD) — utang lama, tidak di-gate CI, bukan dari slice ini |
+| `go test ./internal/handler/ -run OpenAPI` (backend) | PASS setelah enum ditambah ke spec |
+
+Perubahan spec di slice 2 (lebih ketat, T3 tetap hijau): schema `VendorRequestStatus` (enum 15 nilai = `vendor_requests_status_chk` migrasi 029) dipakai `VendorRequestDetail.status`/`VendorRequestSummary.status`; `RequestVendorPartyEvent.event` enum 6 nilai (CHECK migrasi 029). Tanpa ini alias akan melebarkan union FE menjadi `string`.
+
+Drift FE ↔ spec yang terlihat saat alias (typecheck tetap lulus, tidak ada kode FE diubah):
+
+| # | Temuan | Arah |
+|---|---|---|
+| F9 | `AuditLogEntry.metadata` bisa `null` (spec) — tipe manual lama bilang selalu object | FE kini dipaksa menangani null |
+| F10 | `CreateVendorRequestPayload.request_category` wajib (spec, sesuai validasi BE); `vendor_id` opsional (spec) — tipe manual lama kebalikannya | FE sudah selalu mengirim keduanya; tipe kini mengikuti BE |
+| F11 | Nama berbeda: `PaginationMeta`=`Pagination`, `VendorParty*`=`RequestVendorParty*`, `ForecastSummaryCounts` = `ForecastSummaryTotals` tanpa `unassigned_atm_count` | nama export FE dipertahankan sebagai alias |
+
+## Slice 3 — 2026-10-19 (belum di-commit)
+CLAUDE.md: Sec 2 baris "API contract", Sec 2a perintah `go test ./internal/handler -run OpenAPI` + `gen:api`, Sec 11 butir DoD kontrak (FR8, teks Inggris). Diff ditunjukkan dan diterima user (*"Diff CLAUDE.md slice 3 diterima, simpan dan update status docs."*). Docs saja, tanpa perubahan kode/test.

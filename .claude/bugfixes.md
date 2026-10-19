@@ -20,7 +20,7 @@ Template:
 - **Root cause**: `eod-monitoring/hooks/useEodQueries.ts` menulis path lengkap `/api/eod/...`, tetapi API client CP selalu menambah `apiConfig.baseURL` (`/api/v1`). Client tidak punya cara untuk layanan di luar `/api/v1`.
 - **Fix**: `frontend/CompanyPortal-Vite/src/lib/api/client.ts` — opsi baru `RequestConfig.baseURL` (override `apiConfig.baseURL`; header Bearer + refresh 401 tetap berlaku; tanpa opsi = perilaku lama, request JSON lain tidak berubah). `eod-monitoring/hooks/useEodQueries.ts` — semua 6 panggilan memakai `{ baseURL: "" }` (`EOD_REQUEST`), retry `api.post(path, undefined, EOD_REQUEST)`.
 - **Tests**: `eod-monitoring/hooks/eodUrls.test.tsx` (baru, client asli + `fetch` di-stub): summary, history, audit, retry → URL persis `/api/eod/...` + `Authorization: Bearer` (RED sebelum fix: `Received: "/api/v1/api/eod/summary?..."`; GREEN sesudah). `lib/api/client.test.ts` +1 (default `/api/v1/items`, override `""` → `/api/eod/summary`, token tetap). `useEodQueries.test.tsx` disesuaikan karena signature panggilan bertambah argumen opsi (bukan perubahan perilaku yang diuji). CP `pnpm run test:coverage` 157 file / 1401 test (84,23/80,09/80,84/85,48, di atas threshold), `pnpm lint`, `pnpm build` hijau. Manual browser verification: **outstanding** (buka EOD Monitoring sebagai ADMIN dengan `eod_retry_scheduler` jalan + `RETRY_AUTH_MODE=jwt`: data tampil, retry manual jalan).
-- **Commit**: <sha>
+- **Commit**: `486a950`
 
 ---
 
@@ -29,7 +29,7 @@ Template:
 - **Root cause**: `vendor-request/vendorSide.ts` `BASE = "/api/v1/vendor-requests"`, padahal API client sudah menambah `apiConfig.baseURL`. Fitur lain (mis. `vendor-request/api.ts`) memakai path relatif `/vendor-requests`.
 - **Fix**: `frontend/CompanyPortal-Vite/src/features/vendor-request/vendorSide.ts` — `BASE = "/vendor-requests"`.
 - **Tests**: `vendor-request/__tests__/vendorSide.test.tsx` (baru, client asli + `fetch` di-stub): `useVendorParties` → `/api/v1/vendor-requests/5/vendor-parties` + Bearer, `useVendorReturn` → `POST /api/v1/vendor-requests/5/vendor-return` body `{ rejection_reason }` + refresh `["vendor-requests"]` (RED sebelum fix: `/api/v1/api/v1/...`; GREEN sesudah). Root cause dicek di semua caller kedua portal: CP — grep `"/api/v1` / `"/api/eod` di `src`: hanya `vendorSide.ts` + `useEodQueries.ts` yang lewat API client dengan prefix sendiri (`lib/auth/store.ts` dan `replenishment/api.ts` `downloadReport` memakai `fetch` langsung, jadi prefix di sana benar). VP — API client tidak punya `baseURL`; semua pemanggil (`dsr`, `notifications`, `orders`, realisasi) mengirim path lengkap `/api/v1/...` dan memang benar. Manual browser verification: **outstanding** (Vendor Request alur vendor: panel pihak vendor tampil, ATM-SPV bisa kembalikan request yang ditolak vendor).
-- **Commit**: <sha>
+- **Commit**: `486a950`
 
 ---
 

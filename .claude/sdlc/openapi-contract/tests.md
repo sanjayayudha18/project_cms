@@ -42,7 +42,7 @@ RED → GREEN: run pertama gagal di T1 (`response "BadRequest": extra sibling fi
 | F7 | `PartyContent` di-decode dari snapshot JSON lama; array yang belum ada saat snapshot ditulis keluar `null` → didokumentasikan `nullable`. | `service.PartyContent` |
 | F8 | `handleError` vendor request dipakai semua operasi → spec mendokumentasikan himpunan error yang sama (400/401/403/404/409/422/500) di setiap operasi, termasuk GET. | `vendor_request_handler.go:581` |
 
-## Slice 2 — run 2026-10-19 (belum di-commit)
+## Slice 2 — run 2026-10-19 (committed `062b0d9`)
 
 Gate terpenuhi: `git status` bersih, sisa FE-12 sudah ter-commit (`b007b64`/`36abcf8`).
 
@@ -67,5 +67,5 @@ Drift FE ↔ spec yang terlihat saat alias (typecheck tetap lulus, tidak ada kod
 | F10 | `CreateVendorRequestPayload.request_category` wajib (spec, sesuai validasi BE); `vendor_id` opsional (spec) — tipe manual lama kebalikannya | FE sudah selalu mengirim keduanya; tipe kini mengikuti BE |
 | F11 | Nama berbeda: `PaginationMeta`=`Pagination`, `VendorParty*`=`RequestVendorParty*`, `ForecastSummaryCounts` = `ForecastSummaryTotals` tanpa `unassigned_atm_count` | nama export FE dipertahankan sebagai alias |
 
-## Slice 3 — 2026-10-19 (belum di-commit)
+## Slice 3 — 2026-10-19 (committed `062b0d9`)
 CLAUDE.md: Sec 2 baris "API contract", Sec 2a perintah `go test ./internal/handler -run OpenAPI` + `gen:api`, Sec 11 butir DoD kontrak (FR8, teks Inggris). Diff ditunjukkan dan diterima user (*"Diff CLAUDE.md slice 3 diterima, simpan dan update status docs."*). Docs saja, tanpa perubahan kode/test.

@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "backend/go.mod": {
-    "mtime": 1792402567.5000277,
-    "seen": 1792402707.848335,
-    "ast_hash": "cdd54fc67f13d8c5a9ec081e86e6122a",
+    "mtime": 1792403411.2088592,
+    "seen": 1792404728.8023028,
+    "ast_hash": "36133450187a41f166489ec3b420b1cc",
     "semantic_hash": ""
   },
   "backend/internal/auth/local_provider.go": {
@@ -342,15 +342,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/biome.json": {
-    "mtime": 1792074775.8579426,
-    "seen": 1792074917.0067532,
-    "ast_hash": "570f3e454e641cad7ce034426b36b8ce",
+    "mtime": 1792404647.1130028,
+    "seen": 1792404728.8028703,
+    "ast_hash": "176c64686cf1bf7c1a3d1653c246da9d",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/package.json": {
-    "mtime": 1792071572.770888,
-    "seen": 1792072116.0958455,
-    "ast_hash": "9166c8c6a0b0aaf5edba293785c7405e",
+    "mtime": 1792404375.247715,
+    "seen": 1792404728.8028717,
+    "ast_hash": "97bc58da4850e9c13bc90beeaa64eb04",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/__tests__/import-alias-compliance.property.test.ts": {
@@ -2040,9 +2040,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1792394327.0898192,
-    "seen": 1792401162.600976,
-    "ast_hash": "0c9c9d2c95ffcda99c31f87df3967a94",
+    "mtime": 1792404981.2035353,
+    "seen": 1792405356.365615,
+    "ast_hash": "8bad7733a4d45b27eae62fe88d02e35d",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -2052,9 +2052,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1792401887.067693,
-    "seen": 1792402707.8496115,
-    "ast_hash": "e6fbc67a7058d94683f3ac6caa00bad3",
+    "mtime": 1792405312.3077626,
+    "seen": 1792405356.3656409,
+    "ast_hash": "5e71f23c3fafb69e89e51ac31d4b79d1",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -3594,9 +3594,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/types.ts": {
-    "mtime": 1791968820.1400592,
-    "seen": 1791971307.4395063,
-    "ast_hash": "9af5a15828b28fc73eb83fe951ab21ff",
+    "mtime": 1792404561.309376,
+    "seen": 1792404728.8033166,
+    "ast_hash": "5435ecb03ff7bd283d1a1cc8f1d88561",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/useVendorRequestListUrlState.test.ts": {
@@ -5556,9 +5556,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792401109.4409301,
-    "seen": 1792401162.600979,
-    "ast_hash": "7b3073ad5700b6fa91a92925a8b13260",
+    "mtime": 1792405312.3077626,
+    "seen": 1792405356.365618,
+    "ast_hash": "64486c15c672865f6e6dff82430d7194",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -7296,9 +7296,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/vendorSide.ts": {
-    "mtime": 1792385161.9704888,
-    "seen": 1792385508.5213845,
-    "ast_hash": "a881f9cbca94af554e9f77284b50c870",
+    "mtime": 1792404561.3355017,
+    "seen": 1792404728.8033216,
+    "ast_hash": "4e392dad55d48fe9591b5010030807ae",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/features/orders/OrderDetailPage.tsx": {
@@ -7620,15 +7620,15 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792401887.8669214,
-    "seen": 1792402707.8495843,
-    "ast_hash": "379a1343f5db93e86f899f094a38ff5e",
+    "mtime": 1792405312.3077626,
+    "seen": 1792405356.3656135,
+    "ast_hash": "25a32daed518a3e407dffadde7a5a2fa",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
-    "mtime": 1792401099.4083672,
-    "seen": 1792401162.600977,
-    "ast_hash": "ecd7871a5e455bc05aeb719589dd2c32",
+    "mtime": 1792403861.5511997,
+    "seen": 1792404728.8035731,
+    "ast_hash": "223b77e1332ff78e3196e9dd6d937635",
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/intent.md": {
@@ -8028,9 +8028,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
-    "mtime": 1792401099.1103432,
-    "seen": 1792401162.6010535,
-    "ast_hash": "693f3a40ca11a2f24ba11b69ed71a6dd",
+    "mtime": 1792403884.3988771,
+    "seen": 1792404728.8036487,
+    "ast_hash": "9b2a44ac29b05a56694b81c7c95c675b",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
@@ -8598,9 +8598,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/openapi_contract_test.go": {
-    "mtime": 1792402610.9028983,
-    "seen": 1792402707.8485045,
-    "ast_hash": "5dd57e5378689e805e891e21508b4978",
+    "mtime": 1792405223.9646246,
+    "seen": 1792405356.364505,
+    "ast_hash": "1c54987fa53669fd3445af9630ed4d27",
     "semantic_hash": ""
   },
   ".claude/sdlc/openapi-contract/intent.md": {
@@ -8610,9 +8610,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/openapi-contract/plan.md": {
-    "mtime": 1792401974.4394825,
-    "seen": 1792402707.8496919,
-    "ast_hash": "0e2f22acc5eb88c2ccec8f08839b96a6",
+    "mtime": 1792404981.2155797,
+    "seen": 1792405356.3657234,
+    "ast_hash": "8c3827b764ff205bfb2b1ef0829cc093",
     "semantic_hash": ""
   },
   ".claude/sdlc/openapi-contract/spec.md": {
@@ -8622,9 +8622,33 @@
     "semantic_hash": ""
   },
   "backend/api/openapi.yaml": {
-    "mtime": 1792402585.038375,
-    "seen": 1792402707.8498054,
-    "ast_hash": "758b60a6eee5b7b00f12b8d368b017aa",
+    "mtime": 1792405253.3276062,
+    "seen": 1792405356.3658404,
+    "ast_hash": "424b3612561d66532a4228792b5ce1e7",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/lib/api/schema.d.ts": {
+    "mtime": 1792404486.455063,
+    "seen": 1792404728.8033283,
+    "ast_hash": "733513f6ada14a83efd5025ad2efb13f",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/lib/api/schema.test.ts": {
+    "mtime": 1792404407.3041172,
+    "seen": 1792404728.8033295,
+    "ast_hash": "c584dc0b008c52535019f085d1437f63",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/tests.md": {
+    "mtime": 1792405041.259808,
+    "seen": 1792405356.3657277,
+    "ast_hash": "aa369824a41b288cfa7d83c50e62de19",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/review.md": {
+    "mtime": 1792405310.4960241,
+    "seen": 1792405356.3657246,
+    "ast_hash": "df74f4651a025eba19053ceee29a4726",
     "semantic_hash": ""
   }
 }

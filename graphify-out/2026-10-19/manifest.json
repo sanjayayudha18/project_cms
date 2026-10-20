@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "backend/go.mod": {
-    "mtime": 1792036414.9445481,
-    "seen": 1792036688.150986,
-    "ast_hash": "b15b3302540a14696f7955be7db199ea",
+    "mtime": 1792403411.2088592,
+    "seen": 1792404728.8023028,
+    "ast_hash": "36133450187a41f166489ec3b420b1cc",
     "semantic_hash": ""
   },
   "backend/internal/auth/local_provider.go": {
@@ -342,15 +342,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/biome.json": {
-    "mtime": 1792074775.8579426,
-    "seen": 1792074917.0067532,
-    "ast_hash": "570f3e454e641cad7ce034426b36b8ce",
+    "mtime": 1792404647.1130028,
+    "seen": 1792404728.8028703,
+    "ast_hash": "176c64686cf1bf7c1a3d1653c246da9d",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/package.json": {
-    "mtime": 1792071572.770888,
-    "seen": 1792072116.0958455,
-    "ast_hash": "9166c8c6a0b0aaf5edba293785c7405e",
+    "mtime": 1792404375.247715,
+    "seen": 1792404728.8028717,
+    "ast_hash": "97bc58da4850e9c13bc90beeaa64eb04",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/__tests__/import-alias-compliance.property.test.ts": {
@@ -2052,9 +2052,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1792400403.6415226,
-    "seen": 1792401162.6010003,
-    "ast_hash": "795d1b22dfbd1fc1580c6dd4a5480b29",
+    "mtime": 1792404684.9226866,
+    "seen": 1792404728.8035965,
+    "ast_hash": "cb33ffe4cff2436358d020fed919e8f5",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -3594,9 +3594,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/types.ts": {
-    "mtime": 1791968820.1400592,
-    "seen": 1791971307.4395063,
-    "ast_hash": "9af5a15828b28fc73eb83fe951ab21ff",
+    "mtime": 1792404561.309376,
+    "seen": 1792404728.8033166,
+    "ast_hash": "5435ecb03ff7bd283d1a1cc8f1d88561",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/useVendorRequestListUrlState.test.ts": {
@@ -5556,9 +5556,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792401109.4409301,
-    "seen": 1792401162.600979,
-    "ast_hash": "7b3073ad5700b6fa91a92925a8b13260",
+    "mtime": 1792404684.938264,
+    "seen": 1792404728.8035753,
+    "ast_hash": "464986b846d357be14194c907045f701",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -7296,9 +7296,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/vendor-request/vendorSide.ts": {
-    "mtime": 1792385161.9704888,
-    "seen": 1792385508.5213845,
-    "ast_hash": "a881f9cbca94af554e9f77284b50c870",
+    "mtime": 1792404561.3355017,
+    "seen": 1792404728.8033216,
+    "ast_hash": "4e392dad55d48fe9591b5010030807ae",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/features/orders/OrderDetailPage.tsx": {
@@ -7620,15 +7620,15 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792400388.81921,
-    "seen": 1792401162.600975,
-    "ast_hash": "bfdad95482be941638909294afe74b9b",
+    "mtime": 1792404684.938264,
+    "seen": 1792404728.8035712,
+    "ast_hash": "8ec5e0c89a876bc9337ceb7580d08bb4",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
-    "mtime": 1792401099.4083672,
-    "seen": 1792401162.600977,
-    "ast_hash": "ecd7871a5e455bc05aeb719589dd2c32",
+    "mtime": 1792403861.5511997,
+    "seen": 1792404728.8035731,
+    "ast_hash": "223b77e1332ff78e3196e9dd6d937635",
     "semantic_hash": ""
   },
   ".claude/sdlc/be-tech-debt/intent.md": {
@@ -8028,9 +8028,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/fe-tech-debt/tests.md": {
-    "mtime": 1792401099.1103432,
-    "seen": 1792401162.6010535,
-    "ast_hash": "693f3a40ca11a2f24ba11b69ed71a6dd",
+    "mtime": 1792403884.3988771,
+    "seen": 1792404728.8036487,
+    "ast_hash": "9b2a44ac29b05a56694b81c7c95c675b",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
@@ -8589,6 +8589,60 @@
     "mtime": 1792400906.31831,
     "seen": 1792401162.600729,
     "ast_hash": "5c243563de1b3b6191ce6f386e2a7ba4",
+    "semantic_hash": ""
+  },
+  "backend/api/embed.go": {
+    "mtime": 1792401994.8105216,
+    "seen": 1792402707.8483255,
+    "ast_hash": "7c87343e6fccf203c265e8f071c656ce",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/openapi_contract_test.go": {
+    "mtime": 1792402610.9028983,
+    "seen": 1792402707.8485045,
+    "ast_hash": "5dd57e5378689e805e891e21508b4978",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/intent.md": {
+    "mtime": 1792401668.9592304,
+    "seen": 1792402707.8496907,
+    "ast_hash": "6d917d8ae58ae913a7b5577d8e271608",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/plan.md": {
+    "mtime": 1792404684.938264,
+    "seen": 1792404728.803675,
+    "ast_hash": "e45def392807f415197c0f8327097c58",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/spec.md": {
+    "mtime": 1792401814.916224,
+    "seen": 1792402707.8496926,
+    "ast_hash": "78d2d8f230289c38769858df89944757",
+    "semantic_hash": ""
+  },
+  "backend/api/openapi.yaml": {
+    "mtime": 1792404474.0134575,
+    "seen": 1792404728.803787,
+    "ast_hash": "424b3612561d66532a4228792b5ce1e7",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/lib/api/schema.d.ts": {
+    "mtime": 1792404486.455063,
+    "seen": 1792404728.8033283,
+    "ast_hash": "733513f6ada14a83efd5025ad2efb13f",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/lib/api/schema.test.ts": {
+    "mtime": 1792404407.3041172,
+    "seen": 1792404728.8033295,
+    "ast_hash": "c584dc0b008c52535019f085d1437f63",
+    "semantic_hash": ""
+  },
+  ".claude/sdlc/openapi-contract/tests.md": {
+    "mtime": 1792404684.938264,
+    "seen": 1792404728.8036768,
+    "ast_hash": "d8101788c9c3ed3f7aebdb94bdd0a4d1",
     "semantic_hash": ""
   }
 }

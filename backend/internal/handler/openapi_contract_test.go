@@ -127,10 +127,14 @@ type contractCase struct {
 }
 
 func TestOpenAPIContract_Responses(t *testing.T) {
-	_, router := loadContract(t)
+	doc, router := loadContract(t)
+	covered := map[string]bool{}
 	for _, tc := range contractCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			rec, req := serveContractCase(t, tc)
+			if route, _, err := router.FindRoute(req); err == nil {
+				covered[route.Method+" "+route.Path] = true
+			}
 			if rec.Code != tc.wantStatus {
 				t.Fatalf("status = %d, want %d: %s", rec.Code, tc.wantStatus, rec.Body.String())
 			}
@@ -138,6 +142,14 @@ func TestOpenAPIContract_Responses(t *testing.T) {
 				t.Errorf("response does not match openapi.yaml: %v\nbody: %s", err, rec.Body.String())
 			}
 		})
+	}
+	// Every documented operation needs at least one validated response.
+	for path, item := range doc.Paths.Map() {
+		for method := range item.Operations() {
+			if !covered[method+" "+path] {
+				t.Errorf("no response case for %s %s in contractCases", method, path)
+			}
+		}
 	}
 }
 

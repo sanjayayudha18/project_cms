@@ -12,7 +12,7 @@ import (
 )
 
 // Config holds application configuration loaded from environment variables,
-// shared between the ATM (backend) and CIT (backend-cit) services.
+// shared between the ATM (backend) and CIT (backend-exq) services.
 type Config struct {
 	// JWT
 	JWTSecret          []byte

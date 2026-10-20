@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [backend, backend-cit, pkg]
+        module: [backend, backend-exq, pkg]
     defaults:
       run:
         working-directory: ${{ matrix.module }}

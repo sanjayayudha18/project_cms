@@ -50,7 +50,7 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ## Next Phase
 
-0. **Phase 2.2 split (user 2026-10-08):** 2.2a penetapan branch vault per ATM oleh ACM (`cit-acm-plan/`, next) → 2.2b kirim CIT ke vendor → 2.2c realisasi vs order (`replenishment-realisasi/intent.md`). 2.1 closed (no forecast engine). Also new: 2.4 problem-ATM exclusion. `backend-cit` to be renamed `backend-exq` by the user (export + dashboard queries).
+0. **Phase 2.2 split (user 2026-10-08):** 2.2a penetapan branch vault per ATM oleh ACM (`cit-acm-plan/`, next) → 2.2b kirim CIT ke vendor → 2.2c realisasi vs order (`replenishment-realisasi/intent.md`). 2.1 closed (no forecast engine). Also new: 2.4 problem-ATM exclusion. `backend-cit` renamed to `backend-exq` 2026-10-20 (export + dashboard queries; still not deployed, no content yet).
 1. User: manual browser checks — A17 EOD monitoring (closes Phase 0.2), perbaikan-rbac (ROH paging, pending creates), Forecast Browser, kelolaan ATM paket source, kuota kunjungan, tiket replenish.
 2. Finish `perbaikan-rbac` acceptance: approve/reject/apply-failure states, double-submit + cross-tab conflict (check backend rejects duplicates first), per-entity CRUD tests.
 3. `notification/` (0.3): commit review fixes R1–R3 → code owner merge; user: browser check of bell + VendorPortal page; real SMTP send once relay creds exist. 0.4 + 0.5 deferred.

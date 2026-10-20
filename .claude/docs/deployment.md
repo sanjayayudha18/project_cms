@@ -6,7 +6,7 @@
 | # | Product | Role |
 | ---| ---| --- |
 | 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend, currently ONE VM running `backend/` (port 8080) only; `backend-cit/` (8081) is not deployed until it is renamed to `backend-exq` and has content (decision 2026-10-08) — see split-VM plan below |
+| 2 | Compute Engine | Backend, currently ONE VM running `backend/` (port 8080) only; `backend-exq/` (8081) is not deployed until it has content (decision 2026-10-08) — see split-VM plan below |
 | 3 | CloudSQL Postgres | Primary (write) |
 | 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
@@ -19,14 +19,14 @@
 | 12 | Cloud Logging | Structured logs |
 | 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
 
-**Current state (now): ONE Compute Engine VM runs `backend` only** (Docker container on 8080) — see `backend/docker-compose.yaml` (Sec 9). `backend-cit` (8081) is **not deployed**: it holds only empty `doc.go` files (CIT functions are built in `backend/`, decision 2026-10-08) and is planned to be renamed to `backend-exq` (export + dashboard monitoring queries). It enters the deploy only once `backend-exq` has real content. The module stays in `go.work` and CI keeps building/testing it.
+**Current state (now): ONE Compute Engine VM runs `backend` only** (Docker container on 8080) — see `backend/docker-compose.yaml` (Sec 9). `backend-exq` (8081) is **not deployed**: it holds only empty `doc.go` files (CIT functions are built in `backend/`, decision 2026-10-08) and was renamed from `backend-cit` to `backend-exq` on 2026-10-20 (export + dashboard monitoring queries). It enters the deploy only once `backend-exq` has real content. The module stays in `go.work` and CI keeps building/testing it.
 
 **Planned (2028): split into two separate Compute Engine VMs**, one per backend (once `backend-exq` is deployed). This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so deploying the second backend to its own VM later requires **no code change** — just deploy its image to a new VM and repoint its `.env`. When that split happens:
 *   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
 *   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
 *   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
 
-**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-cit/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-exq/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
@@ -50,11 +50,11 @@
 *   **If left empty in prod**, every user is recorded with Nginx's IP and the per-IP login limit (`RATE_LIMIT_IP`, default 20 / 15 min) is shared by everyone → mass login lockout. An invalid entry stops the service at start.
 *   Close port 8080 from outside the VM (firewall / don't publish it) so every request goes through Nginx (defense in depth; the narrow CIDR already stops spoofing from direct callers).
 *   When a GCP Load Balancer / Cloud Armor (#11) is added in front of Nginx: append the LB address ranges to `TRUSTED_PROXIES`; no code change.
-*   `backend-cit` reads the variable but does not use it yet. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
+*   `backend-exq` reads the variable but does not use it yet. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
 
 **Ukuran pool DB (BE-09, be-tech-debt E4) — usulan, belum diterapkan di GCP**: the pool size is set per URL with `?pool_max_conns=N` on `DATABASE_URL` / `DATABASE_REPLICA_URL` (pgx; without it pgx uses `max(4, NumCPU)`, i.e. 4 on a small VM — too low for 300 concurrent users). Each API prints `db pool pool=primary|replica max_conns=N` at start.
 *   Formula per Cloud SQL instance: `pool_max_conns = (max_connections − cadangan) / jumlah instance` that connect with a Go pool. `max_connections` = `SHOW max_connections;` on that instance (Cloud SQL derives it from the tier's memory unless the flag is set). `cadangan` = `superuser_reserved_connections` (3) + Python EOD (`eod_retry_scheduler` + `service_dsr_etl` + ETL scripts, ~10) + ops/psql/migrations (~5) ≈ **20**.
-*   Primary and replica are separate instances: compute each with its own `max_connections`. Only `backend` uses the replica pool; `backend-cit` uses the primary only.
+*   Primary and replica are separate instances: compute each with its own `max_connections`. Only `backend` uses the replica pool; `backend-exq` uses the primary only.
 
 | Env | Instances on primary | Example `max_connections` | `pool_max_conns` primary | `pool_max_conns` replica |
 | --- | --- | --- | --- | --- |
@@ -67,7 +67,7 @@
 
 **Request logs, `/ready` and log-based metrics (BE-04, be-tech-debt E1/E2/E5) — metrics and alert are not yet created in GCP (user, outstanding)**
 *   Both Go APIs write one JSON line per request via `pkg/middleware.RequestLogger`: `{"level":"INFO|WARN|ERROR","msg":"http_request","method","route","path","status","duration_ms","bytes","request_id","remote_ip"}`. `route` = chi pattern (`/api/v1/vendor-requests/{id}`, low cardinality, use it as the label); `path` = raw path, only for debugging. Level: 5xx `ERROR`, 4xx `WARN`, else `INFO`. Headers, query strings and bodies are never logged. 2xx `/health` + `/ready` are not logged.
-*   `GET /ready` (public, like `/health`): pings `db`, `db_replica` (only when `DATABASE_REPLICA_URL` is a separate pool) and `redis` (`backend`) / `db` + `redis` (`backend-cit`), 2 s timeout, answers 200 `{"status":"ok","checks":{…:"ok"}}` or 503 with the failing check marked `"fail"`; the error itself only goes to the log (`msg="readiness check failed"`). Docker `HEALTHCHECK` still uses `/health` (liveness) — moving it to `/ready` would restart containers on every DB/Redis blip, so that is a separate decision. Use `/ready` for an LB health check / uptime check.
+*   `GET /ready` (public, like `/health`): pings `db`, `db_replica` (only when `DATABASE_REPLICA_URL` is a separate pool) and `redis` (`backend`) / `db` + `redis` (`backend-exq`), 2 s timeout, answers 200 `{"status":"ok","checks":{…:"ok"}}` or 503 with the failing check marked `"fail"`; the error itself only goes to the log (`msg="readiness check failed"`). Docker `HEALTHCHECK` still uses `/health` (liveness) — moving it to `/ready` would restart containers on every DB/Redis blip, so that is a separate decision. Use `/ready` for an LB health check / uptime check.
 *   Precondition: the container's stdout must reach Cloud Logging **parsed as JSON** (Ops Agent / COS logging agent), so fields land in `jsonPayload.*`. Check one entry in Logs Explorer before creating metrics. slog writes `level`, not `severity`, so entries show severity `DEFAULT`; filter on `jsonPayload.level` (or map it in the agent).
 *   Logs Explorer filter: `jsonPayload.msg="http_request"` (add `resource.type="gce_instance"` and the container name as needed).
 *   **Latency metric** (distribution, label `route`), `gcloud logging metrics create http_request_latency --config-from-file=http_request_latency.yaml`:

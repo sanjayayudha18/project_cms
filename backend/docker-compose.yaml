@@ -2,7 +2,7 @@ name: CMS-Backend
 
 # Owns Redis + the `cms-net` network. Run this FIRST:
 #   docker compose up --build
-# backend-cit/docker-compose.yaml joins `cms-net` as external — start it
+# backend-exq/docker-compose.yaml joins `cms-net` as external — start it
 # after this one is up (or at least after `docker compose up -d` here has
 # created the network).
 

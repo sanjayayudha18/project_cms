@@ -1,12 +1,12 @@
 # Backend Tech Debt
 
-Hasil review arsitektur BE (`backend/`, `backend-cit/`, `pkg/`, `backend_python/`) terhadap standar aplikasi modern, 2026-10-12. Satu baris per item; ubah **Status** saat dikerjakan (`open` → `in-progress` → `done <sha>`). Sebelum mengerjakan item, tanya dulu: AI-DLC baru atau cukup `bugfixes.md` (CLAUDE.md Sec 4a rule 0). Item yang menyentuh migrasi/auth/uang selalu full chain (Sec 4 #7).
+Hasil review arsitektur BE (`backend/`, `backend-cit/` (kini `backend-exq/`), `pkg/`, `backend_python/`) terhadap standar aplikasi modern, 2026-10-12. Satu baris per item; ubah **Status** saat dikerjakan (`open` → `in-progress` → `done <sha>`). Sebelum mengerjakan item, tanya dulu: AI-DLC baru atau cukup `bugfixes.md` (CLAUDE.md Sec 4a rule 0). Item yang menyentuh migrasi/auth/uang selalu full chain (Sec 4 #7).
 
 Pasangan: [FE_debt.md](./FE_debt.md). AI-DLC perbaikan: [`sdlc/be-tech-debt/`](./sdlc/be-tech-debt/intent.md). Riwayat QC sebelumnya: `backend_QC_result.md`, `backend_QC_fixes.md` (root repo).
 
 ## Baseline saat review
 
-| | backend | backend-cit | pkg | backend_python |
+| | backend | backend-exq | pkg | backend_python |
 |---|---|---|---|---|
 | Test | lulus | – (belum ada kode) | lulus | 79 lulus, 53 skip (butuh `DATABASE_URL`) |
 | `go vet` / golangci-lint (+gosec, gocyclo) | 0 issue | 0 | 0 | – |
@@ -39,5 +39,5 @@ Sudah baik (jangan dirombak): Go 1.26 + chi v5 + pgx v5 + sqlc pinned, minim dep
 
 | ID | Item | Bukti | Perbaikan | Status |
 |---|---|---|---|---|
-| BE-11 | `backend-cit` masih kosong tapi dijadwalkan deploy | `backend-cit/internal/*` = 8 file `doc.go` satu baris; rename ke `backend-exq` belum dilakukan | Jangan deploy container-nya sampai `backend-exq` berisi; rename sesuai keputusan 2026-10-08. | done b007b64 — G2 built 2026-10-19 (docs only): `deployment.md` + CLAUDE.md Sec 10/12 → satu VM menjalankan `backend` saja; `backend-cit` masuk deploy setelah rename ke `backend-exq` dan berisi. Rename = user. |
+| BE-11 | `backend-cit` masih kosong tapi dijadwalkan deploy | `backend-cit/internal/*` = 8 file `doc.go` satu baris; rename ke `backend-exq` belum dilakukan | Jangan deploy container-nya sampai `backend-exq` berisi; rename sesuai keputusan 2026-10-08. | done b007b64 — G2 built 2026-10-19 (docs only): `deployment.md` + CLAUDE.md Sec 10/12 → satu VM menjalankan `backend` saja; `backend-cit` masuk deploy setelah rename ke `backend-exq` dan berisi. Rename = user. | Rename `backend-cit` → `backend-exq` selesai 2026-10-20 (go.work, CI matrix, Dockerfile/compose, .dockerignore); deploy tetap ditahan sampai ada isi.
 | BE-12 | Vuln di module yang di-require (tidak terjangkau) + file usang ter-track | govulncheck: 4 vuln di module `backend`; `backend_python/dmaa/bak/` ter-track di git | `go get -u` module terkait + `go mod tidy`; hapus `dmaa/bak/`. | x/crypto v0.56.0 → v0.58.0 (2026-10-19, pemeliharaan rutin, done 36abcf8); GO-2026-5932 (openpgp, tanpa fix, tidak di-import) tetap accepted. done fb3b6fd (go) + 9a5af6d (dmaa/bak) |

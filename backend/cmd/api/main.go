@@ -215,7 +215,7 @@ func main() {
 
 	// Create and mount DSR upload handler. ATM-specific env vars are read
 	// directly here (not via pkg/config.Config) since that struct is shared
-	// with backend-cit and these settings are ATM-only.
+	// with backend-exq and these settings are ATM-only.
 	dsrUploadDir := getenvDefault("DSR_UPLOAD_DIR", "FTP_DATA/DSR")
 	dsrRetryBaseURL := getenvDefault("DSR_RETRY_SCHEDULER_BASE_URL", "http://localhost:8090")
 	dsrProcessAuth := os.Getenv("DSR_RETRY_SCHEDULER_AUTH")

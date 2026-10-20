@@ -4,6 +4,6 @@ toolchain go1.26.9
 
 use (
 	./backend
-	./backend-cit
+	./backend-exq
 	./pkg
 )

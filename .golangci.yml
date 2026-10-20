@@ -1,4 +1,4 @@
-# Shared lint config for the Go workspace (backend/, backend-cit/, pkg/).
+# Shared lint config for the Go workspace (backend/, backend-exq/, pkg/).
 # Run per module: cd backend && golangci-lint run --build-tags integration ./...
 version: "2"
 

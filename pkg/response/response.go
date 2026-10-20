@@ -6,7 +6,7 @@ import (
 )
 
 // Envelope is the standard API response wrapper used by services that
-// opt into the shared response format (currently backend-cit; the ATM
+// opt into the shared response format (currently backend-exq; the ATM
 // backend keeps its existing flat JSON shape for frontend compatibility).
 type Envelope struct {
 	Success bool        `json:"success"`

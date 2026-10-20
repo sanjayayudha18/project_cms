@@ -1,4 +1,4 @@
-module github.com/cimb-niaga/cms/backend-cit
+module github.com/cimb-niaga/cms/backend-exq
 
 go 1.25.0
 

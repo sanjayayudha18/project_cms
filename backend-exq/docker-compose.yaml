@@ -7,12 +7,12 @@ name: CMS-Backend-CIT
 #   docker compose up --build
 
 services:
-  backend-cit:
+  backend-exq:
     build:
       context: ..
-      dockerfile: backend-cit/Dockerfile
-    image: cms-backend-cit
-    container_name: cms-backend-cit
+      dockerfile: backend-exq/Dockerfile
+    image: cms-backend-exq
+    container_name: cms-backend-exq
     ports:
       - "8081:8081"
     env_file:

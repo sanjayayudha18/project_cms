@@ -63,9 +63,9 @@ Rules:
 ```bash
 # Go (run per module; go.work links them)
 cd backend && go test ./...          # ATM backend (integration tests skip when DATABASE_URL is empty)
-cd backend-cit && go test ./...
+cd backend-exq && go test ./...
 cd pkg && go test ./...
-cd backend && go run ./cmd/api       # ATM API :8080  (backend-cit: go run ./cmd/api → :8081)
+cd backend && go run ./cmd/api       # ATM API :8080  (backend-exq: go run ./cmd/api → :8081)
 
 # Lint + vuln scan (config: root .golangci.yml; run per module)
 cd backend && golangci-lint run --build-tags integration ./...
@@ -102,21 +102,21 @@ cd backend && go run ./cmd/migrate up       # applies pending files with psql -f
 ## 3\. Architecture, Modules & Data Map
 ### Backend layout — Go workspace, three modules
 
-Repo root is a Go workspace (`go.work`) linking three sibling modules. `pkg/` is shared infra with **no** dependency on either backend; `backend/` and `backend-cit/` each depend on `pkg/` only — never on each other (acyclic, compiler-enforced).
+Repo root is a Go workspace (`go.work`) linking three sibling modules. `pkg/` is shared infra with **no** dependency on either backend; `backend/` and `backend-exq/` each depend on `pkg/` only — never on each other (acyclic, compiler-enforced).
 
 ```plain
 CMS2/
-  go.work                    # links backend/, backend-cit/, pkg/
+  go.work                    # links backend/, backend-exq/, pkg/
   pkg/                       # shared: auth, middleware, config, response
     auth/                    # JWT TokenService, blacklist, Provider/UserRepository interfaces
     middleware/              # RequireAuth, RequireRoles, rate limiter
     config/                  # env config loader, Load(defaultPort)
-    response/                # {success,data} envelope (adopted by backend-cit; NOT by backend — see below)
+    response/                # {success,data} envelope (adopted by backend-exq; NOT by backend — see below)
   backend/                   # ATM backend — own go.mod, port 8080
     cmd/api/main.go          # bootstrap + route registration
     internal/<module>/       # ATM-specific: auth (login service), handler, service, repository
     migrations/              # sole owner of ALL DB migrations (CIT tables included)
-  backend-cit/               # PLANNED RENAME → backend-exq (export + dashboard monitoring queries), decided 2026-10-08, not done yet. CIT logic is NOT built here any more — see Sec 12. Own go.mod, port 8081
+  backend-exq/               # export + dashboard monitoring queries (renamed from backend-cit, 2026-10-20). CIT logic is NOT built here any more — see Sec 12. Own go.mod, port 8081
     cmd/api/main.go          # health check + RequireAuth-protected route group; validates tokens, issues none
     internal/<module>/       # CIT-specific: cit, journal, dsr, reconciliation, integration, handler, service, repository
 ```
@@ -131,7 +131,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 ```
 
 ### Actual code layout (ATM `backend/internal/`)
-Layered, not one package per domain: `handler/` (HTTP) → `service/` (business rules, maker-checker `Submit`, appliers) → `repository/` (read-only repos over sqlc) → `db/` (sqlc-generated, do not hand-edit except the known inflector fix in Sec 2a). Cross-cutting packages: `approval/`, `audit/`, `auth/`, `rolemgmt/`. New ATM code follows this layering; the domain list below is the **logical scope** (what may exist), not a package list. For any Go backend coding (`backend/`, `backend-cit/`, `pkg/`), always invoke the `ecc:golang-patterns` skill first, and `ecc:golang-testing` when writing or fixing Go tests; this file's layering, flat-JSON, maker-checker and testing rules (Sec 8, `//go:build integration` skips without `DATABASE_URL`) win over their generic advice.
+Layered, not one package per domain: `handler/` (HTTP) → `service/` (business rules, maker-checker `Submit`, appliers) → `repository/` (read-only repos over sqlc) → `db/` (sqlc-generated, do not hand-edit except the known inflector fix in Sec 2a). Cross-cutting packages: `approval/`, `audit/`, `auth/`, `rolemgmt/`. New ATM code follows this layering; the domain list below is the **logical scope** (what may exist), not a package list. For any Go backend coding (`backend/`, `backend-exq/`, `pkg/`), always invoke the `ecc:golang-patterns` skill first, and `ecc:golang-testing` when writing or fixing Go tests; this file's layering, flat-JSON, maker-checker and testing rules (Sec 8, `//go:build integration` skips without `DATABASE_URL`) win over their generic advice.
 
 ### Modules / domains (create ONLY these unless told)
 **Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
@@ -142,7 +142,7 @@ Layered, not one package per domain: `handler/` (HTTP) → `service/` (business 
 
 **Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
 
-**CIT**: built in ATM `backend/` (decision 2026-10-08, not `backend-cit`) — first slice = rencana CIT tim ACM (Phase 2.2a, `.claude/sdlc/cit-acm-plan/`). Logical scope: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
+**CIT**: built in ATM `backend/` (decision 2026-10-08, not `backend-exq`) — first slice = rencana CIT tim ACM (Phase 2.2a, `.claude/sdlc/cit-acm-plan/`). Logical scope: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
 
 **Integration**: `internal/corebanking` (escrow **batch file** ingest + parse -> feeds reconciliation)
 ### DB logical groups (canonical table names)
@@ -228,7 +228,7 @@ Every non-trivial feature lives in `.claude/sdlc/<feature>/` and moves through 6
 *   **Audit**: every state change writes `audit_logs` (who, what, before/after, when, ip).
 *   **RBAC**: enforce at middleware AND service layer.
 *   **Idempotency**: all file ingests (DSR/invoice/escrow) idempotent per file hash -> `import_jobs`.
-*   **Consistent response**: `backend-cit` endpoints return the `pkg/response` envelope. Exception: ATM `backend/internal/handler` keeps its existing flat JSON shape for frontend wire compatibility (Sec 3) — match the neighbouring handlers there, don't mix shapes.
+*   **Consistent response**: `backend-exq` endpoints return the `pkg/response` envelope. Exception: ATM `backend/internal/handler` keeps its existing flat JSON shape for frontend wire compatibility (Sec 3) — match the neighbouring handlers there, don't mix shapes.
 
 * * *
 ## 6\. Money, Data Integrity & DB Topology
@@ -288,15 +288,15 @@ LOG_LEVEL=info
 ```
 
 *   Never commit `.env`. Never log secrets/JWTs/LDAP/SMTP creds.
-*   docker-compose (local): one file per backend — `backend/docker-compose.yaml` (backend + redis) and `backend-cit/docker-compose.yaml`, both `context: ..` (repo root). Postgres external. Frontends: `frontend/docker-compose.yml` (each app builds from its own folder).
-*   Backend Dockerfile: multi-stage, distroless/alpine, non-root, HEALTHCHECK on /health. `backend/Dockerfile` and `backend-cit/Dockerfile` both build from repo root (context `.`) to resolve `pkg/` via `go.work`.
+*   docker-compose (local): one file per backend — `backend/docker-compose.yaml` (backend + redis) and `backend-exq/docker-compose.yaml`, both `context: ..` (repo root). Postgres external. Frontends: `frontend/docker-compose.yml` (each app builds from its own folder).
+*   Backend Dockerfile: multi-stage, distroless/alpine, non-root, HEALTHCHECK on /health. `backend/Dockerfile` and `backend-exq/Dockerfile` both build from repo root (context `.`) to resolve `pkg/` via `go.work`.
 *   Frontend Dockerfiles: Vite build -> Nginx serve dist (one image per frontend).
-*   .dockerignore: root `.dockerignore` is an allowlist for the backend builds (`go.work*`, `pkg/`, `backend/`, `backend-cit/`; never `.env`). Docker only reads the one at the context root, so per-folder files under `backend*/` are ignored. Frontends keep their own (node\_modules, dist, .env, .git).
+*   .dockerignore: root `.dockerignore` is an allowlist for the backend builds (`go.work*`, `pkg/`, `backend/`, `backend-exq/`; never `.env`). Docker only reads the one at the context root, so per-folder files under `backend*/` are ignored. Frontends keep their own (node\_modules, dist, .env, .git).
 
 * * *
 ## 10\. GCP Deployment
 > Product map (Compute Engine, CloudSQL primary + replica, GCS, Memorystore, Artifact Registry, Cloud Build, Secret Manager, DNS, Armor, Logging, Monitoring), split-VM plan, pipeline: [docs/deployment.md](./docs/deployment.md).
-*   Today: ONE VM runs `backend` (8080) only; `backend-cit` (8081) is not deployed until it is renamed to `backend-exq` and has content (Sec 12, 2026-10-08). 2028: one VM per backend — zero code change.
+*   Today: ONE VM runs `backend` (8080) only; `backend-exq` (8081) is not deployed until it has content (Sec 12, 2026-10-08). 2028: one VM per backend — zero code change.
 *   Both backends must share the **same** CloudSQL, **same** Redis (JWT blacklist + rate limits) and **same** `JWT_SECRET`; only ATM issues tokens, CIT only validates.
 *   Images tagged by git SHA (never `latest`); keep the previous SHA deployable per service for rollback.
 
@@ -309,7 +309,7 @@ LOG_LEVEL=info
 - [ ] Money as numeric, timestamps timestamptz
 - [ ] Tests passing incl. auth/RBAC/money cases
 - [ ] No secrets/config hardcoded; .env.example updated
-- [ ] Response shape per Sec 5 (`pkg/response` envelope in `backend-cit`; flat JSON matching neighbours in ATM `backend`)
+- [ ] Response shape per Sec 5 (`pkg/response` envelope in `backend-exq`; flat JSON matching neighbours in ATM `backend`)
 - [ ] New/changed endpoint in a module already in `backend/api/openapi.yaml` is in the spec and passes the contract test (`-run OpenAPI`) + `gen:api`; a new module starts with its spec
 - [ ] Builds cleanly in Docker
 
@@ -320,8 +320,8 @@ LOG_LEVEL=info
 *   Frontends: two separate SPAs. Internal = LDAP; Vendor = local creds in CMS.
 *   Email: company SMTP relay.
 *   DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.
-*   **CIT location + `backend-exq` (2026-10-08, user)**: CIT functions are built in ATM `backend/` (flat JSON, same layering). `backend-cit/` will be renamed by the user to `backend-exq` — a backend for data export + dashboard monitoring queries (replica reads). Until the rename lands, the module/port/Docker references below still say `backend-cit`.
-*   Backend topology: `backend/` (ATM) and `backend-cit/` (CIT) are separate Go modules sharing `pkg/` (Sec 3). Only `backend` is deployed today, on ONE Compute Engine VM (`backend-cit` waits for the `backend-exq` rename and content); planned to split into two separate VMs in 2028 (Sec 10) — the module split already makes that a zero-code-change deployment change when it happens.
+*   **CIT location + `backend-exq` (2026-10-08, user)**: CIT functions are built in ATM `backend/` (flat JSON, same layering). `backend-cit/` was renamed to `backend-exq/` (done 2026-10-20) — a backend for data export + dashboard monitoring queries (replica reads).
+*   Backend topology: `backend/` (ATM) and `backend-exq/` (export + dashboard queries) are separate Go modules sharing `pkg/` (Sec 3). Only `backend` is deployed today, on ONE Compute Engine VM (`backend-exq` waits for content); planned to split into two separate VMs in 2028 (Sec 10) — the module split already makes that a zero-code-change deployment change when it happens.
 *   Cash count (vault + selective machine) is confirmed in-scope per URS v0.3 Rev1, and its table names (`cash_count_schedules`, `cash_count_evidences`) were **approved 2026-09-25** into Sec 3; column design (and any extra BA/checklist/e-sign tables) is decided in the Phase 5 spec.
 *   **Master-data maker-checker (D1–D4)** — every create/update/disable/enable on `vendors`, `vendor_branches`, `vendor_vaults`, `vendor_pics`, `vendor_packages_branch`, `vendor_package_prices`, `atms`, `atm_vendor_packages` is staged: `MasterDataChangeService.Submit` → `master_data_change_requests` + `approval_requests` → endpoint returns **202**; the row changes only on final approval, via a per-entity `Applier` registered in `cmd/api/main.go`, in one tx with an audit entry. Stale → not applied; apply failure → 409. RBAC at route group (`ADMIN`/`ADMIN_PARAM`) **and** inside `Submit`. CSV import = one batch, one approval, all-or-nothing (upsert) — **to be replaced by the FSD replace-all + re-upload-rejected-records flow (decided 2026-10-01, not yet built; see docs/requirements.md)**. Bulk format is CSV (stdlib) only for now. **New master-data entities must follow: queries → read-only repo → service `Submit` → `Applier` in `main.go` → handler 202.** Before touching any master-data entity, invoke the `/cms2-master-data` skill (full 9-step checklist).
 *   **`admin/users`** apply immediately (not maker-checker), guarded `APPACCESS`. Local-user create issues a temp password + `must_change_password=true`.

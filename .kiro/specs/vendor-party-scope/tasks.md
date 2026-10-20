@@ -42,10 +42,10 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
   - _Requirements: 1.1, 1.2, 1.3, 2.5, 5.1, 5.2_
   - _Model: Opus, Effort: High — migrasi auth/RBAC + FK baru pada `users` live; pre-check yang salah bisa memblokir deploy atau meloloskan data cabang tak sah._
 
-- [ ] 2. Paket `backend/internal/vendorrole`
-  - [ ] 2.1 `vendorrole.go`: konstanta `User`, `ATMUser`, `VaultUser`; `All`; `IsVendor`; `PartyRoles`; `ForParty` (design "Pemetaan role → peran pihak").
+- [x] 2. Paket `backend/internal/vendorrole`
+  - [x] 2.1 `vendorrole.go`: konstanta `User`, `ATMUser`, `VaultUser`; `All`; `IsVendor`; `PartyRoles`; `ForParty` (design "Pemetaan role → peran pihak").
     - _Requirements: 1.4, 3.2, 7.1_
-  - [ ] 2.2 `vendorrole_test.go`: tabel semua role (termasuk non-vendor → nil/false) dan `ForParty("replenish"|"vault"|"cashcount"|"")`.
+  - [x] 2.2 `vendorrole_test.go`: tabel semua role (termasuk non-vendor → nil/false) dan `ForParty("replenish"|"vault"|"cashcount"|"")`.
     - _Requirements: 3.2, 7.1, 7.3_
   - _Model: Haiku, Effort: Low — pemetaan statis kecil, sepenuhnya ditentukan design._
 

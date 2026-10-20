@@ -35,70 +35,10 @@
     "ast_hash": "82d6233f201596051331a58620326b46",
     "semantic_hash": "82d6233f201596051331a58620326b46"
   },
-  "backend-cit/cmd/api/main.go": {
-    "mtime": 1792062571.0385215,
-    "seen": 1792062851.9018464,
-    "ast_hash": "e9218adf1d642687400401fa976ff95b",
-    "semantic_hash": ""
-  },
-  "backend-cit/go.mod": {
-    "mtime": 1791531383.451646,
-    "seen": 1791536411.4209392,
-    "ast_hash": "7bf38ce180e22f6de7df07cf29aaa2ce",
-    "semantic_hash": ""
-  },
-  "backend-cit/internal/cit/cit.go": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.3182082,
-    "ast_hash": "b3d85d781cce907f36ccd89c929bd27c",
-    "semantic_hash": "b3d85d781cce907f36ccd89c929bd27c"
-  },
-  "backend-cit/internal/dsr/dsr.go": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.3182104,
-    "ast_hash": "8c91f7bf9af9957a99734f4e8986605f",
-    "semantic_hash": "8c91f7bf9af9957a99734f4e8986605f"
-  },
-  "backend-cit/internal/handler/handler.go": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.318212,
-    "ast_hash": "304672b2497216828000e0647df7b6a0",
-    "semantic_hash": "304672b2497216828000e0647df7b6a0"
-  },
-  "backend-cit/internal/integration/integration.go": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.3182137,
-    "ast_hash": "09bebb62f8c3a0b2c15964f3e1aea1cc",
-    "semantic_hash": "09bebb62f8c3a0b2c15964f3e1aea1cc"
-  },
-  "backend-cit/internal/journal/journal.go": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.3182151,
-    "ast_hash": "fdaab2278e8878e0ba09e953ff9ddae5",
-    "semantic_hash": "fdaab2278e8878e0ba09e953ff9ddae5"
-  },
-  "backend-cit/internal/reconciliation/reconciliation.go": {
-    "mtime": 1787831178.9235148,
-    "seen": 1788250289.318217,
-    "ast_hash": "ecc60e12d80044d9cba7966c22bc0b98",
-    "semantic_hash": "ecc60e12d80044d9cba7966c22bc0b98"
-  },
-  "backend-cit/internal/repository/repository.go": {
-    "mtime": 1787831178.9235148,
-    "seen": 1788250289.3182187,
-    "ast_hash": "40307bacfbc595bfb4b1f49f9f6c433a",
-    "semantic_hash": "40307bacfbc595bfb4b1f49f9f6c433a"
-  },
-  "backend-cit/internal/service/service.go": {
-    "mtime": 1787831178.9235148,
-    "seen": 1788250289.3182209,
-    "ast_hash": "ddb82e74080cd0e2054eb4dc6f230ff2",
-    "semantic_hash": "ddb82e74080cd0e2054eb4dc6f230ff2"
-  },
   "backend/cmd/api/main.go": {
-    "mtime": 1792062571.0385215,
-    "seen": 1792062851.9018624,
-    "ast_hash": "ab91a2ef9049f4bbe9f77145bf15e868",
+    "mtime": 1792469620.5370018,
+    "seen": 1792469724.4138656,
+    "ast_hash": "8eb0faf7bcd234e645a49b0e4ab45e03",
     "semantic_hash": ""
   },
   "backend/cmd/hashpw/main.go": {
@@ -1968,9 +1908,9 @@
     "semantic_hash": ""
   },
   "pkg/config/config.go": {
-    "mtime": 1791779758.3963985,
-    "seen": 1791780180.5422568,
-    "ast_hash": "05f7751b19594d3764a61ccaca15a4b6",
+    "mtime": 1792469623.3791595,
+    "seen": 1792469724.415107,
+    "ast_hash": "ac8ca1ca86d7ed4237db3c6c89a7027a",
     "semantic_hash": ""
   },
   "pkg/config/config_test.go": {
@@ -2022,9 +1962,9 @@
     "semantic_hash": "7335c4ee343f27e23560d49901a3eac8"
   },
   "pkg/response/response.go": {
-    "mtime": 1791533059.780993,
-    "seen": 1791536411.4221113,
-    "ast_hash": "031825f8ac2c31671bea8b8fb6641ed8",
+    "mtime": 1792469623.772617,
+    "seen": 1792469724.4151251,
+    "ast_hash": "62479b83f987eee634a4f5517609e523",
     "semantic_hash": ""
   },
   ".claude/settings.json": {
@@ -2040,9 +1980,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1792404981.2035353,
-    "seen": 1792405356.365615,
-    "ast_hash": "8bad7733a4d45b27eae62fe88d02e35d",
+    "mtime": 1792469658.4938743,
+    "seen": 1792469724.4151297,
+    "ast_hash": "2053b70715ddc754c1b639e234359b88",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -2052,9 +1992,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1792405312.3077626,
-    "seen": 1792405356.3656409,
-    "ast_hash": "5e71f23c3fafb69e89e51ac31d4b79d1",
+    "mtime": 1792468951.2166228,
+    "seen": 1792469724.415154,
+    "ast_hash": "1846756bcd8a51cdd8cea2d74b2a5320",
     "semantic_hash": ""
   },
   ".claude/sdlc/vendor-upload-dsr/incidents.md": {
@@ -2489,18 +2429,6 @@
     "ast_hash": "d08e07443b7aca9aaa1423ce149719e8",
     "semantic_hash": ""
   },
-  "backend-cit/docker-compose.yaml": {
-    "mtime": 1787831178.917488,
-    "seen": 1788250289.3189049,
-    "ast_hash": "c0fbb60b5e632af5b5a76b24918f6159",
-    "semantic_hash": ""
-  },
-  "backend-cit/sqlc.yaml": {
-    "mtime": 1787831178.9235148,
-    "seen": 1788250289.3189065,
-    "ast_hash": "fd34be130db1742a9314f0e947fd36d0",
-    "semantic_hash": ""
-  },
   "backend/CLAUDE.md": {
     "mtime": 1791369185.18804,
     "seen": 1791380962.9992745,
@@ -2508,9 +2436,9 @@
     "semantic_hash": ""
   },
   "backend/docker-compose.yaml": {
-    "mtime": 1791369185.1920984,
-    "seen": 1791380962.9992754,
-    "ast_hash": "fb4b942efed0d2700019c6ef49df0551",
+    "mtime": 1792469620.9448926,
+    "seen": 1792469724.4153497,
+    "ast_hash": "b1208d085135f5bee93572c592d62eeb",
     "semantic_hash": ""
   },
   "backend/sqlc.yaml": {
@@ -5556,9 +5484,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1792405312.3077626,
-    "seen": 1792405356.365618,
-    "ast_hash": "64486c15c672865f6e6dff82430d7194",
+    "mtime": 1792469667.9543576,
+    "seen": 1792469724.4151328,
+    "ast_hash": "44c1c1f1873b3184132783f171a7f2d2",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -6354,15 +6282,15 @@
     "semantic_hash": ""
   },
   ".claude/docs/decisions.md": {
-    "mtime": 1791973206.2451816,
-    "seen": 1791973276.606946,
-    "ast_hash": "49f3eafc247bb7ce219c941ca23757a5",
+    "mtime": 1792469675.3747642,
+    "seen": 1792469724.4151347,
+    "ast_hash": "b9eb1239fde5c60b371cb3910ff283b6",
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
-    "mtime": 1792394307.6804926,
-    "seen": 1792401162.600982,
-    "ast_hash": "90b5acc17fdd34597c0f88424a81e69e",
+    "mtime": 1792469659.4330032,
+    "seen": 1792469724.4151359,
+    "ast_hash": "18f9c27e38285a00f41b675c4648105a",
     "semantic_hash": ""
   },
   ".claude/docs/requirements.md": {
@@ -7386,9 +7314,9 @@
     "semantic_hash": ""
   },
   ".golangci.yml": {
-    "mtime": 1791530933.683982,
-    "seen": 1791536411.422207,
-    "ast_hash": "b39aa2e513afd4c0b0ef2486b3a9d012",
+    "mtime": 1792469620.1322472,
+    "seen": 1792469724.4152675,
+    "ast_hash": "e86ccc2c3f60f9823ebffefb48202192",
     "semantic_hash": ""
   },
   "backend_QC_fixes.md": {
@@ -7620,9 +7548,9 @@
     "semantic_hash": ""
   },
   ".claude/BE_debt.md": {
-    "mtime": 1792405312.3077626,
-    "seen": 1792405356.3656135,
-    "ast_hash": "25a32daed518a3e407dffadde7a5a2fa",
+    "mtime": 1792469666.7078683,
+    "seen": 1792469724.4151285,
+    "ast_hash": "62182ffa111879b33698f6fddd7f3fe8",
     "semantic_hash": ""
   },
   ".claude/FE_debt.md": {
@@ -8034,9 +7962,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792067007.4835088,
-    "seen": 1792067166.107053,
-    "ast_hash": "bc5965018fe4893c8fdad9751aeff7c6",
+    "mtime": 1792469619.7302318,
+    "seen": 1792469724.4152665,
+    "ast_hash": "84902732f8076c172cc2faa739636564",
     "semantic_hash": ""
   },
   "backend/scripts/check-coverage.sh": {
@@ -8640,15 +8568,87 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/openapi-contract/tests.md": {
-    "mtime": 1792405041.259808,
-    "seen": 1792405356.3657277,
-    "ast_hash": "aa369824a41b288cfa7d83c50e62de19",
+    "mtime": 1792468951.222182,
+    "seen": 1792469724.4152367,
+    "ast_hash": "3510c6fad1a273665fed3b6adaf51095",
     "semantic_hash": ""
   },
   ".claude/sdlc/openapi-contract/review.md": {
     "mtime": 1792405310.4960241,
     "seen": 1792405356.3657246,
     "ast_hash": "df74f4651a025eba19053ceee29a4726",
+    "semantic_hash": ""
+  },
+  "backend-exq/cmd/api/main.go": {
+    "mtime": 1792062571.0385215,
+    "seen": 1792469724.4138494,
+    "ast_hash": "e9218adf1d642687400401fa976ff95b",
+    "semantic_hash": ""
+  },
+  "backend-exq/go.mod": {
+    "mtime": 1792469622.9722965,
+    "seen": 1792469724.4138515,
+    "ast_hash": "8c79969d8d781e7f91d8c74f70b7c324",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/cit/cit.go": {
+    "mtime": 1787831178.917488,
+    "seen": 1792469724.4138525,
+    "ast_hash": "b3d85d781cce907f36ccd89c929bd27c",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/dsr/dsr.go": {
+    "mtime": 1787831178.917488,
+    "seen": 1792469724.4138541,
+    "ast_hash": "8c91f7bf9af9957a99734f4e8986605f",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/handler/handler.go": {
+    "mtime": 1787831178.917488,
+    "seen": 1792469724.4138556,
+    "ast_hash": "304672b2497216828000e0647df7b6a0",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/integration/integration.go": {
+    "mtime": 1787831178.917488,
+    "seen": 1792469724.4138563,
+    "ast_hash": "09bebb62f8c3a0b2c15964f3e1aea1cc",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/journal/journal.go": {
+    "mtime": 1787831178.917488,
+    "seen": 1792469724.4138572,
+    "ast_hash": "fdaab2278e8878e0ba09e953ff9ddae5",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/reconciliation/reconciliation.go": {
+    "mtime": 1787831178.9235148,
+    "seen": 1792469724.4138587,
+    "ast_hash": "ecc60e12d80044d9cba7966c22bc0b98",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/repository/repository.go": {
+    "mtime": 1787831178.9235148,
+    "seen": 1792469724.4138596,
+    "ast_hash": "40307bacfbc595bfb4b1f49f9f6c433a",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/service/service.go": {
+    "mtime": 1787831178.9235148,
+    "seen": 1792469724.4138606,
+    "ast_hash": "ddb82e74080cd0e2054eb4dc6f230ff2",
+    "semantic_hash": ""
+  },
+  "backend-exq/docker-compose.yaml": {
+    "mtime": 1792469622.157664,
+    "seen": 1792469724.4153442,
+    "ast_hash": "432b23c3eaed917bba15c7f6a7f15959",
+    "semantic_hash": ""
+  },
+  "backend-exq/sqlc.yaml": {
+    "mtime": 1787831178.9235148,
+    "seen": 1792469724.4153454,
+    "ast_hash": "fd34be130db1742a9314f0e947fd36d0",
     "semantic_hash": ""
   }
 }

@@ -710,7 +710,7 @@ type User struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
-	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
+	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (FK users_vendor_branch_owner_fk, migration 032). NULL = vendor-wide or internal/LDAP user.
 	VendorBranchID *int64 `json:"vendor_branch_id"`
 	// Direct supervisor in the reporting line (self-FK, tree). NULL = top of hierarchy or not yet assigned.
 	SupervisorID *int64 `json:"supervisor_id"`
@@ -841,6 +841,8 @@ type VendorPic struct {
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
+	// Peran PIC: replenish (PIC replenish ATM), vault (PIC penyedia uang), cashcount (PIC cash count). Kosong = kontak saja. Ubah lewat layar = langsung + audit (deviasi GR#3, vendor-party-scope).
+	Roles []string `json:"roles"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.

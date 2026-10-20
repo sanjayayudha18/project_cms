@@ -83,6 +83,14 @@ Plan/spec: `.claude/sdlc/replenishment-realisasi/` (Phase 2.2c). Migration `031_
 *   `replenish_classification_amounts` — (`classification_id`, `denom`) PK: `order_amount`, `itm_amount`, `vendor_amount` (NULL = no vendor report), `diff` generated `itm − order`. Inputs + delta stored → reproducible (Sec 6). The ITM ETL only fills 50K/100K, so 10K/20K orders always show a diff (accepted, FR3.6).
 *   No change to `itm_replenish`, `vendor_requests` statuses or `vendor_request_tickets`. All new tables are in `no_hard_delete_test.go`'s guard list.
 
+## Vendor party scope (migration 032)
+
+Spec: `.kiro/specs/vendor-party-scope/` (legacy Kiro, task 1). Migration `032_vendor_party_scope.sql` applied to dev DB 2026-10-20.
+
+*   `roles` — new `VENDOR-ATM-USER` (sees only the replenish party of its branch) and `VENDOR-VAULT-USER` (only the vault party). Their `role_permissions` are copied from `VENDOR-USER` (dev: 3 each). `VENDOR-USER` stays vendor-wide over both parties. Code refers to roles by name, never by id.
+*   `users.vendor_branch_id` — composite FK `users_vendor_branch_owner_fk (vendor_branch_id, vendor_id) → vendor_branches (id, vendor_id)` (target UNIQUE `vendor_branches_id_vendor_uq`), so an account's cabang always belongs to its own vendor. MATCH SIMPLE: checked only when both are set. The old single-column `users_vendor_branch_fk` stays. The migration pre-check also rejected a cabang with `vendor_id` NULL (dev: 0 rows on 2026-10-20).
+*   `vendor_pics.roles text[] NOT NULL DEFAULT {replenish,vault,cashcount}` + CHECK `vendor_pics_roles_chk` (subset of those three). Empty = contact only. Existing rows got all three. Set as a whole set, sorted and unique in the service. A screen edit applies immediately + audit in tx (GR#3 deviation, recorded in CLAUDE.md Sec 12 by task 13). Create/CSV stays maker-checker.
+
 ## ATM assignment package source (migration 023)
 
 Plan/spec: `.claude/sdlc/atm-package-source/`. Migration `023_atm_assignment_vendor_source.sql`, applied to dev DB 2026-10-07.

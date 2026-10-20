@@ -67,5 +67,8 @@ Drift FE ↔ spec yang terlihat saat alias (typecheck tetap lulus, tidak ada kod
 | F10 | `CreateVendorRequestPayload.request_category` wajib (spec, sesuai validasi BE); `vendor_id` opsional (spec) — tipe manual lama kebalikannya | FE sudah selalu mengirim keduanya; tipe kini mengikuti BE |
 | F11 | Nama berbeda: `PaginationMeta`=`Pagination`, `VendorParty*`=`RequestVendorParty*`, `ForecastSummaryCounts` = `ForecastSummaryTotals` tanpa `unassigned_atm_count` | nama export FE dipertahankan sebagai alias |
 
+## Review R1 — 2026-10-19 (committed `a1b78c9`)
+`TestOpenAPIContract_Responses` gagal bila operasi spec tidak punya kasus response (`review.md` R1): hijau 26/26, RED dengan operasi probe. Manual browser check tetap **outstanding (user)**.
+
 ## Slice 3 — 2026-10-19 (committed `062b0d9`)
 CLAUDE.md: Sec 2 baris "API contract", Sec 2a perintah `go test ./internal/handler -run OpenAPI` + `gen:api`, Sec 11 butir DoD kontrak (FR8, teks Inggris). Diff ditunjukkan dan diterima user (*"Diff CLAUDE.md slice 3 diterima, simpan dan update status docs."*). Docs saja, tanpa perubahan kode/test.

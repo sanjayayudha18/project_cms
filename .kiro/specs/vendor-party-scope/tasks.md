@@ -65,13 +65,13 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
   - _Model: Opus, Effort: High — inti RBAC/cakupan data antar vendor; kebocoran = insiden keamanan; banyak cabang kasus (role × cabang × token basi)._
 
 - [ ] 4. Notifikasi pihak per role + peran PIC
-  - [ ] 4.1 `backend/queries/notifications.sql`: `ListActiveUserRecipientsByVendorBranches` → `(branch_id, roles text[])` dengan join `roles`; `ListVendorBranchNotificationPicEmails` → `(branch_id, pic_role)` dengan `pic_role = ANY(p.roles)`. `sqlc generate`.
+  - [x] 4.1 `backend/queries/notifications.sql`: `ListActiveUserRecipientsByVendorBranches` → `(branch_id, roles text[])` dengan join `roles`; `ListVendorBranchNotificationPicEmails` → `(branch_id, pic_role)` dengan `pic_role = ANY(p.roles)`. `sqlc generate`.
     - _Requirements: 7.1, 7.2_
-  - [ ] 4.2 `internal/notification/notification.go`: ganti `VendorBranchIDs` dengan `VendorParties []VendorPartyTarget{BranchID, UserRoles, PicRole}`; dedup tetap. Perbarui `notification_test.go` + `integration_test.go`.
+  - [x] 4.2 `internal/notification/notification.go`: ganti `VendorBranchIDs` dengan `VendorParties []VendorPartyTarget{BranchID, UserRoles, PicRole}`; dedup tetap. Perbarui `notification_test.go` + `integration_test.go`.
     - _Requirements: 7.1, 7.2_
-  - [ ] 4.3 `service/vendor_party.go`: `partyNotice.role`; `notifyParties` kirim `VendorPartyTarget{…, UserRoles: vendorrole.ForParty(role), PicRole: role}`.
+  - [x] 4.3 `service/vendor_party.go`: `partyNotice.role`; `notifyParties` kirim `VendorPartyTarget{…, UserRoles: vendorrole.ForParty(role), PicRole: role}`.
     - _Requirements: 7.1, 7.3_
-  - [ ] 4.4 Integration test (Req 10.1 e): pihak vault Medan → hanya `VENDOR-VAULT-USER` Medan/vendor-wide + `VENDOR-USER` + PIC dengan peran `vault`; PIC `cashcount`-saja tidak menerima; notifikasi realisasi dan internal tidak berubah. Membuktikan Property 5.
+  - [x] 4.4 Integration test (Req 10.1 e): pihak vault Medan → hanya `VENDOR-VAULT-USER` Medan/vendor-wide + `VENDOR-USER` + PIC dengan peran `vault`; PIC `cashcount`-saja tidak menerima; notifikasi realisasi dan internal tidak berubah. Membuktikan Property 5.
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 10.1_
   - _Model: Sonnet, Effort: Medium — perluasan recipient yang sudah ada; risiko terkendali oleh integration test._
 

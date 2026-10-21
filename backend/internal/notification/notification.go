@@ -47,13 +47,21 @@ type Message struct {
 // Recipients is the union of specific users, every active user of a role
 // (expanded at send time), and vendors (their active users in-app + email,
 // plus email-only to vendor_pics flagged is_notification_recipient), and
-// vendor branches (cit-send-vendor FR7.1: same, limited to users/PICs pinned
-// to that branch or vendor-wide).
+// vendor parties (cit-send-vendor FR7.1 + vendor-party-scope Req 7: users/PICs
+// pinned to the party's branch or vendor-wide, limited by role / PIC role).
 type Recipients struct {
-	UserIDs         []int64
-	Roles           []string
-	VendorIDs       []int64
-	VendorBranchIDs []int64
+	UserIDs       []int64
+	Roles         []string
+	VendorIDs     []int64
+	VendorParties []VendorPartyTarget
+}
+
+// VendorPartyTarget is one vendor branch party: users of this branch (or
+// vendor-wide) whose role is in UserRoles, and PICs whose roles contain PicRole.
+type VendorPartyTarget struct {
+	BranchID  int64
+	UserRoles []string
+	PicRole   string
 }
 
 // Querier is the subset of *db.Queries Send needs; pass the caller's
@@ -63,8 +71,8 @@ type Querier interface {
 	ListActiveUserRecipientsByRoles(ctx context.Context, roles []string) ([]db.ListActiveUserRecipientsByRolesRow, error)
 	ListActiveUserRecipientsByVendors(ctx context.Context, vendorIds []int64) ([]db.ListActiveUserRecipientsByVendorsRow, error)
 	ListVendorNotificationPicEmails(ctx context.Context, vendorIds []int64) ([]string, error)
-	ListActiveUserRecipientsByVendorBranches(ctx context.Context, branchIds []int64) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error)
-	ListVendorBranchNotificationPicEmails(ctx context.Context, branchIds []int64) ([]string, error)
+	ListActiveUserRecipientsByVendorBranches(ctx context.Context, arg db.ListActiveUserRecipientsByVendorBranchesParams) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error)
+	ListVendorBranchNotificationPicEmails(ctx context.Context, arg db.ListVendorBranchNotificationPicEmailsParams) ([]string, error)
 	InsertNotification(ctx context.Context, arg db.InsertNotificationParams) (int64, error)
 	InsertNotificationEmail(ctx context.Context, arg db.InsertNotificationEmailParams) error
 }
@@ -101,12 +109,16 @@ func (s *Service) Send(ctx context.Context, q Querier, msg Message, to Recipient
 			return fmt.Errorf("list vendor pic emails: %w", err)
 		}
 	}
-	if msg.Email && len(to.VendorBranchIDs) > 0 {
-		branchPics, err := q.ListVendorBranchNotificationPicEmails(ctx, to.VendorBranchIDs)
-		if err != nil {
-			return fmt.Errorf("list vendor branch pic emails: %w", err)
+	if msg.Email {
+		for _, p := range to.VendorParties {
+			partyPics, err := q.ListVendorBranchNotificationPicEmails(ctx, db.ListVendorBranchNotificationPicEmailsParams{
+				BranchID: p.BranchID, PicRole: p.PicRole,
+			})
+			if err != nil {
+				return fmt.Errorf("list vendor party pic emails: %w", err)
+			}
+			picEmails = append(picEmails, partyPics...)
 		}
-		picEmails = append(picEmails, branchPics...)
 	}
 	if len(users) == 0 && len(picEmails) == 0 {
 		slog.InfoContext(ctx, "notification has no recipients", "type", msg.Type)
@@ -203,10 +215,12 @@ func resolveUsers(ctx context.Context, q Querier, to Recipients) ([]userRecipien
 			add(r.ID, r.Email)
 		}
 	}
-	if len(to.VendorBranchIDs) > 0 {
-		rows, err := q.ListActiveUserRecipientsByVendorBranches(ctx, to.VendorBranchIDs)
+	for _, p := range to.VendorParties {
+		rows, err := q.ListActiveUserRecipientsByVendorBranches(ctx, db.ListActiveUserRecipientsByVendorBranchesParams{
+			BranchID: p.BranchID, Roles: p.UserRoles,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("list recipients by vendor branch: %w", err)
+			return nil, fmt.Errorf("list recipients by vendor party: %w", err)
 		}
 		for _, r := range rows {
 			add(r.ID, r.Email)

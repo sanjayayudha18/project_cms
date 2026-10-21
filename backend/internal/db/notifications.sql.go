@@ -236,20 +236,27 @@ func (q *Queries) ListActiveUserRecipientsByRoles(ctx context.Context, roles []s
 const listActiveUserRecipientsByVendorBranches = `-- name: ListActiveUserRecipientsByVendorBranches :many
 SELECT u.id, u.email
 FROM users u
+JOIN roles r ON r.id = u.role_id
 JOIN vendor_branches b ON b.vendor_id = u.vendor_id
-WHERE b.id = ANY($1::bigint[])
+WHERE b.id = $1::bigint
+  AND r.role = ANY($2::text[])
   AND (u.vendor_branch_id IS NULL OR u.vendor_branch_id = b.id)
   AND u.is_active = true AND u.deleted_at IS NULL
 `
+
+type ListActiveUserRecipientsByVendorBranchesParams struct {
+	BranchID int64    `json:"branch_id"`
+	Roles    []string `json:"roles"`
+}
 
 type ListActiveUserRecipientsByVendorBranchesRow struct {
 	ID    int64  `json:"id"`
 	Email string `json:"email"`
 }
 
-// cit-send-vendor FR7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL).
-func (q *Queries) ListActiveUserRecipientsByVendorBranches(ctx context.Context, branchIds []int64) ([]ListActiveUserRecipientsByVendorBranchesRow, error) {
-	rows, err := q.db.Query(ctx, listActiveUserRecipientsByVendorBranches, branchIds)
+// cit-send-vendor FR7.1 + vendor-party-scope Req 7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL), dengan role yang mengizinkan peran pihak.
+func (q *Queries) ListActiveUserRecipientsByVendorBranches(ctx context.Context, arg ListActiveUserRecipientsByVendorBranchesParams) ([]ListActiveUserRecipientsByVendorBranchesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveUserRecipientsByVendorBranches, arg.BranchID, arg.Roles)
 	if err != nil {
 		return nil, err
 	}
@@ -363,16 +370,22 @@ const listVendorBranchNotificationPicEmails = `-- name: ListVendorBranchNotifica
 SELECT p.email::text AS email
 FROM vendor_pics p
 JOIN vendor_branches b ON b.vendor_id = p.vendor_id
-WHERE b.id = ANY($1::bigint[])
+WHERE b.id = $1::bigint
+  AND $2::text = ANY(p.roles)
   AND (p.vendor_branch_id IS NULL OR p.vendor_branch_id = b.id)
   AND p.is_notification_recipient = true
   AND p.is_active = true AND p.deleted_at IS NULL
   AND COALESCE(btrim(p.email), '') <> ''
 `
 
-// cit-send-vendor S4: PIC (email saja) branch itu atau vendor-wide.
-func (q *Queries) ListVendorBranchNotificationPicEmails(ctx context.Context, branchIds []int64) ([]string, error) {
-	rows, err := q.db.Query(ctx, listVendorBranchNotificationPicEmails, branchIds)
+type ListVendorBranchNotificationPicEmailsParams struct {
+	BranchID int64  `json:"branch_id"`
+	PicRole  string `json:"pic_role"`
+}
+
+// cit-send-vendor S4 + vendor-party-scope Req 7.2/7.3: PIC (email saja) branch itu atau vendor-wide, hanya bila roles PIC memuat peran pihak.
+func (q *Queries) ListVendorBranchNotificationPicEmails(ctx context.Context, arg ListVendorBranchNotificationPicEmailsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVendorBranchNotificationPicEmails, arg.BranchID, arg.PicRole)
 	if err != nil {
 		return nil, err
 	}

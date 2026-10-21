@@ -10,6 +10,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor): one party per (request, vendor
@@ -174,6 +175,7 @@ func sameContent(stored []byte, fresh []byte) bool {
 type partyNotice struct {
 	partyID  int64
 	branchID int64
+	role     string // party role (replenish|vault): decides which vendor roles/PICs are told
 	event    string
 }
 
@@ -207,7 +209,7 @@ func syncVendorParties(ctx context.Context, q *db.Queries, actorID int64, req db
 		}); err != nil {
 			return fmt.Errorf("insert party event: %w", err)
 		}
-		notices = append(notices, partyNotice{partyID: p.ID, branchID: p.VendorBranchID, event: event})
+		notices = append(notices, partyNotice{partyID: p.ID, branchID: p.VendorBranchID, role: p.Role, event: event})
 		return nil
 	}
 
@@ -332,7 +334,9 @@ func notifyParties(ctx context.Context, n Notifier, q *db.Queries, req db.Vendor
 		if err := n.Send(ctx, q, notification.Message{
 			Type: "vendor_order." + nt.event, Title: text[0], Body: fmt.Sprintf(text[1], req.RequestNumber, date),
 			Link: fmt.Sprintf("/orders/%d", id), EntityType: vendorPartyEntity, EntityID: &id, Email: true,
-		}, notification.Recipients{VendorBranchIDs: []int64{nt.branchID}}); err != nil {
+		}, notification.Recipients{VendorParties: []notification.VendorPartyTarget{{
+			BranchID: nt.branchID, UserRoles: vendorrole.ForParty(nt.role), PicRole: nt.role,
+		}}}); err != nil {
 			return fmt.Errorf("notify party %d: %w", id, err)
 		}
 	}
@@ -365,7 +369,7 @@ func cancelVendorParties(ctx context.Context, q *db.Queries, n Notifier, actor A
 		if err := q.InsertVendorPartyEvent(ctx, db.InsertVendorPartyEventParams{PartyID: p.ID, Event: "cancelled", ActorID: actor.UserID}); err != nil {
 			return fmt.Errorf("insert party event: %w", err)
 		}
-		notices = append(notices, partyNotice{partyID: p.ID, branchID: p.VendorBranchID, event: "cancelled"})
+		notices = append(notices, partyNotice{partyID: p.ID, branchID: p.VendorBranchID, role: p.Role, event: "cancelled"})
 	}
 	return notifyParties(ctx, n, q, req, notices)
 }

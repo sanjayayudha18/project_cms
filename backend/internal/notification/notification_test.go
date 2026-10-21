@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -17,6 +18,9 @@ type fakeQuerier struct {
 	pics      []string
 	byBranch  []db.ListActiveUserRecipientsByVendorBranchesRow
 	branchPic []string
+
+	branchUserArgs []db.ListActiveUserRecipientsByVendorBranchesParams
+	branchPicArgs  []db.ListVendorBranchNotificationPicEmailsParams
 
 	calls         []string
 	notifications []db.InsertNotificationParams
@@ -45,13 +49,15 @@ func (f *fakeQuerier) ListVendorNotificationPicEmails(_ context.Context, _ []int
 	return f.pics, nil
 }
 
-func (f *fakeQuerier) ListActiveUserRecipientsByVendorBranches(_ context.Context, _ []int64) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error) {
+func (f *fakeQuerier) ListActiveUserRecipientsByVendorBranches(_ context.Context, arg db.ListActiveUserRecipientsByVendorBranchesParams) ([]db.ListActiveUserRecipientsByVendorBranchesRow, error) {
 	f.calls = append(f.calls, "byBranch")
+	f.branchUserArgs = append(f.branchUserArgs, arg)
 	return f.byBranch, nil
 }
 
-func (f *fakeQuerier) ListVendorBranchNotificationPicEmails(_ context.Context, _ []int64) ([]string, error) {
+func (f *fakeQuerier) ListVendorBranchNotificationPicEmails(_ context.Context, arg db.ListVendorBranchNotificationPicEmailsParams) ([]string, error) {
 	f.calls = append(f.calls, "branchPics")
+	f.branchPicArgs = append(f.branchPicArgs, arg)
 	return f.branchPic, nil
 }
 
@@ -215,6 +221,30 @@ func equalInts(a, b []int64) bool {
 	return true
 }
 
+// vendor-party-scope Req 7: each party target is queried with its own branch,
+// user roles and PIC role.
+func TestSend_VendorPartiesPassScopeToQueries(t *testing.T) {
+	q := &fakeQuerier{}
+	to := Recipients{VendorParties: []VendorPartyTarget{
+		{BranchID: 5, UserRoles: []string{"VENDOR-USER", "VENDOR-VAULT-USER"}, PicRole: "vault"},
+		{BranchID: 6, UserRoles: []string{"VENDOR-USER", "VENDOR-ATM-USER"}, PicRole: "replenish"},
+	}}
+	if err := NewService(true).Send(context.Background(), q, validMsg(), to); err != nil {
+		t.Fatal(err)
+	}
+	wantUsers := []db.ListActiveUserRecipientsByVendorBranchesParams{
+		{BranchID: 5, Roles: []string{"VENDOR-USER", "VENDOR-VAULT-USER"}},
+		{BranchID: 6, Roles: []string{"VENDOR-USER", "VENDOR-ATM-USER"}},
+	}
+	if !reflect.DeepEqual(q.branchUserArgs, wantUsers) {
+		t.Fatalf("user query args = %+v, want %+v", q.branchUserArgs, wantUsers)
+	}
+	wantPics := []db.ListVendorBranchNotificationPicEmailsParams{{BranchID: 5, PicRole: "vault"}, {BranchID: 6, PicRole: "replenish"}}
+	if !reflect.DeepEqual(q.branchPicArgs, wantPics) {
+		t.Fatalf("pic query args = %+v, want %+v", q.branchPicArgs, wantPics)
+	}
+}
+
 // cit-send-vendor FR7.1: branch recipients merge with the others and dedupe
 // like vendor recipients; PIC lookups only run when the message is emailed.
 func TestSend_VendorBranchRecipients(t *testing.T) {
@@ -224,7 +254,7 @@ func TestSend_VendorBranchRecipients(t *testing.T) {
 		branchPic: []string{"pic.branch@vendor.co.id", "BRANCH@vendor.co.id"},
 	}
 	if err := NewService(true).Send(context.Background(), q, validMsg(),
-		Recipients{UserIDs: []int64{30}, VendorBranchIDs: []int64{5}}); err != nil {
+		Recipients{UserIDs: []int64{30}, VendorParties: []VendorPartyTarget{{BranchID: 5, UserRoles: []string{"VENDOR-USER"}, PicRole: "vault"}}}); err != nil {
 		t.Fatal(err)
 	}
 	gotUsers := []int64{}
@@ -241,7 +271,7 @@ func TestSend_VendorBranchRecipients(t *testing.T) {
 	noMail := &fakeQuerier{byBranch: []db.ListActiveUserRecipientsByVendorBranchesRow{{ID: 31, Email: "branch@vendor.co.id"}}}
 	msg := validMsg()
 	msg.Email = false
-	if err := NewService(true).Send(context.Background(), noMail, msg, Recipients{VendorBranchIDs: []int64{5}}); err != nil {
+	if err := NewService(true).Send(context.Background(), noMail, msg, Recipients{VendorParties: []VendorPartyTarget{{BranchID: 5, UserRoles: []string{"VENDOR-USER"}, PicRole: "vault"}}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range noMail.calls {

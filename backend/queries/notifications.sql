@@ -29,20 +29,23 @@ WHERE p.vendor_id = ANY(sqlc.arg('vendor_ids')::bigint[])
   AND COALESCE(btrim(p.email), '') <> '';
 
 -- name: ListActiveUserRecipientsByVendorBranches :many
--- cit-send-vendor FR7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL).
+-- cit-send-vendor FR7.1 + vendor-party-scope Req 7.1: user vendor pemilik branch yang terikat ke branch itu atau vendor-wide (vendor_branch_id NULL), dengan role yang mengizinkan peran pihak.
 SELECT u.id, u.email
 FROM users u
+JOIN roles r ON r.id = u.role_id
 JOIN vendor_branches b ON b.vendor_id = u.vendor_id
-WHERE b.id = ANY(sqlc.arg('branch_ids')::bigint[])
+WHERE b.id = sqlc.arg('branch_id')::bigint
+  AND r.role = ANY(sqlc.arg('roles')::text[])
   AND (u.vendor_branch_id IS NULL OR u.vendor_branch_id = b.id)
   AND u.is_active = true AND u.deleted_at IS NULL;
 
 -- name: ListVendorBranchNotificationPicEmails :many
--- cit-send-vendor S4: PIC (email saja) branch itu atau vendor-wide.
+-- cit-send-vendor S4 + vendor-party-scope Req 7.2/7.3: PIC (email saja) branch itu atau vendor-wide, hanya bila roles PIC memuat peran pihak.
 SELECT p.email::text AS email
 FROM vendor_pics p
 JOIN vendor_branches b ON b.vendor_id = p.vendor_id
-WHERE b.id = ANY(sqlc.arg('branch_ids')::bigint[])
+WHERE b.id = sqlc.arg('branch_id')::bigint
+  AND sqlc.arg('pic_role')::text = ANY(p.roles)
   AND (p.vendor_branch_id IS NULL OR p.vendor_branch_id = b.id)
   AND p.is_notification_recipient = true
   AND p.is_active = true AND p.deleted_at IS NULL

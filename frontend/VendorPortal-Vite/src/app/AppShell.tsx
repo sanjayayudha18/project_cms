@@ -3,8 +3,9 @@ import { useAuth } from "@/features/auth/useAuth";
 import { useUnreadCount } from "@/features/notifications/useNotifications";
 import { NAV_ITEMS, ROUTES } from "@/lib/constants";
 import { truncate } from "@/lib/formatters";
+import { partyScopeLabel } from "@/lib/vendorRoles";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, LogOut, Menu, X } from "lucide-react";
+import { AlertTriangle, Building2, LogOut, Menu, X } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from "react";
 
 // --- Error Boundary ---
@@ -67,7 +68,10 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: unreadCount = 0 } = useUnreadCount();
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.hiddenFromNav);
+  const hideRealizations = user?.role === "VENDOR-VAULT-USER";
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.hiddenFromNav && !(hideRealizations && item.path === ROUTES.REALIZATIONS),
+  );
 
   const closeMobileSidebar = useCallback(() => {
     setMobileOpen(false);
@@ -179,6 +183,18 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
 
         {/* Main Content */}
         <main className="flex-1 ml-16 lg:ml-64 bg-surface p-6 overflow-y-auto">
+          {user && (
+            <p
+              data-testid="scope-line"
+              className="mb-4 flex items-center gap-2 text-sm font-medium text-surface-text"
+            >
+              <Building2 className="size-4 shrink-0" aria-hidden="true" />
+              <span>
+                {user.vendorName ?? "Vendor"} · {user.vendorBranchName ?? "Semua cabang"} ·{" "}
+                {partyScopeLabel(user.role)}
+              </span>
+            </p>
+          )}
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>

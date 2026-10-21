@@ -125,14 +125,14 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
   - _Requirements: 9.1, 9.2_
   - _Model: Haiku, Effort: Low — teks deskripsi + regenerasi tipe._
 
-- [ ] 11. VendorPortal
-  - [ ] 11.1 `src/lib/vendorRoles.ts` (`VENDOR_ROLES`, `isVendorRole`, `partyRolesOf`) + `DbRole` union di `src/lib/types.ts`.
+- [x] 11. VendorPortal
+  - [x] 11.1 `src/lib/vendorRoles.ts` (`VENDOR_ROLES`, `isVendorRole`, `partyRolesOf`) + `DbRole` union di `src/lib/types.ts`.
     - _Requirements: 8.1_
-  - [ ] 11.2 `features/auth/AuthContext.tsx`: kedua guard pakai `isVendorRole`; `AuthUser` + `vendorName`, `vendorBranchId`, `vendorBranchName`.
+  - [x] 11.2 `features/auth/AuthContext.tsx`: kedua guard pakai `isVendorRole`; `AuthUser` + `vendorName`, `vendorBranchId`, `vendorBranchName`.
     - _Requirements: 8.1, 8.3_
-  - [ ] 11.3 Shell: baris cakupan (Req 8.4); nav Realisasi disembunyikan untuk vault; `routes/realizations.tsx` "Tidak tersedia untuk peran Anda" (ikon + teks).
+  - [x] 11.3 Shell: baris cakupan (Req 8.4); nav Realisasi disembunyikan untuk vault; `routes/realizations.tsx` "Tidak tersedia untuk peran Anda" (ikon + teks).
     - _Requirements: 8.4, 8.5, 8.6_
-  - [ ] 11.4 Test Vitest: guard 3 role diterima + role internal ditolak (init + refresh); nav dan halaman Realisasi per role; baris cakupan vendor-wide vs cabang. Threshold VP 93/84/90/93.
+  - [x] 11.4 Test Vitest: guard 3 role diterima + role internal ditolak (init + refresh); nav dan halaman Realisasi per role; baris cakupan vendor-wide vs cabang. Threshold VP 93/84/90/93.
     - _Requirements: 8.1, 8.4, 8.5, 10.2_
   - _Model: Sonnet, Effort: Medium — guard auth portal (kritis tapi sederhana) + UI kecil._
 

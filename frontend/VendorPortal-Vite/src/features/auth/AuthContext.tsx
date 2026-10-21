@@ -1,6 +1,7 @@
 import { configureApiAuth } from "@/lib/api/client";
 import { queryClient } from "@/lib/queryClient";
 import type { AuthState, AuthUser } from "@/lib/types";
+import { isVendorRole } from "@/lib/vendorRoles";
 import {
   type ReactNode,
   createContext,
@@ -49,7 +50,29 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {
+interface MeVendorContext {
+  vendor_name?: string | null;
+  vendor_branch_id?: number | null;
+  vendor_branch_name?: string | null;
+}
+
+// Login/refresh responses carry only the profile; the vendor name + cabang for the scope
+// line (Req 8.3) come from /auth/me. A failure leaves them null — it never rejects the session.
+async function fetchVendorContext(token: string): Promise<MeVendorContext> {
+  try {
+    const response = await fetch(`${AUTH_API_BASE}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    });
+    return response.ok ? ((await response.json()) as MeVendorContext) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function buildUser(data: LoginSuccessResponse): Promise<AuthUser> {
+  const raw = data.user;
+  const me = await fetchVendorContext(data.access_token);
   return {
     id: raw.id,
     username: raw.username,
@@ -58,6 +81,9 @@ function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {
     role: raw.role as AuthUser["role"],
     isKaryawan: raw.is_karyawan,
     vendorId: raw.vendor_id,
+    vendorName: me.vendor_name ?? null,
+    vendorBranchId: me.vendor_branch_id ?? null,
+    vendorBranchName: me.vendor_branch_name ?? null,
   };
 }
 
@@ -118,12 +144,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (cancelled) return;
 
-      // Guard: only accept VENDOR-USER role on the vendor portal.
+      // Guard: only accept the vendor roles on the vendor portal.
       // If a company/internal user's refresh token is present (shared
       // cookie on localhost), reject it so they can't access vendor portal.
-      if (data && data.user.role === "VENDOR-USER") {
+      if (data && isVendorRole(data.user.role)) {
+        const built = await buildUser(data);
+        if (cancelled) return;
         applyToken(data.access_token);
-        setUser(mapUserResponse(data.user));
+        setUser(built);
       }
       setIsAuthLoading(false);
     }
@@ -155,8 +183,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (response.ok) {
           const data = (await response.json()) as LoginSuccessResponse;
+          const built = await buildUser(data);
           applyToken(data.access_token);
-          setUser(mapUserResponse(data.user));
+          setUser(built);
           setError(null);
           setRateLimitRetryAfter(null);
           return;
@@ -264,14 +293,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = (await response.json()) as LoginSuccessResponse;
 
         // Guard: reject non-vendor users on token refresh
-        if (data.user.role !== "VENDOR-USER") {
+        if (!isVendorRole(data.user.role)) {
           applyToken(null);
           setUser(null);
           return false;
         }
 
+        const built = await buildUser(data);
         applyToken(data.access_token);
-        setUser(mapUserResponse(data.user));
+        setUser(built);
         return true;
       } catch {
         applyToken(null);

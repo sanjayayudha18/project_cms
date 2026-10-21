@@ -2,7 +2,7 @@
 
 // ─── Auth Types ───────────────────────────────────────────────────────────────
 
-export type DbRole = "VENDOR-USER";
+export type DbRole = "VENDOR-USER" | "VENDOR-ATM-USER" | "VENDOR-VAULT-USER";
 
 export interface AuthUser {
   readonly id: number;
@@ -12,6 +12,10 @@ export interface AuthUser {
   readonly role: DbRole;
   readonly isKaryawan: boolean;
   readonly vendorId: number | null;
+  // From /auth/me (vendor-party-scope Req 8.3); null when unset or /me unavailable.
+  readonly vendorName: string | null;
+  readonly vendorBranchId: number | null;
+  readonly vendorBranchName: string | null;
 }
 
 export interface AuthState {

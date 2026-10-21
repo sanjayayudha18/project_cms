@@ -4,6 +4,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FilterTabs } from "@/components/ui/FilterTabs";
+import { useAuth } from "@/features/auth/useAuth";
 import {
   type Classification,
   ORDER_PAGE_SIZE,
@@ -13,7 +14,7 @@ import { formatDate } from "@/features/orders/labels";
 import { useRealizations } from "@/features/orders/useOrders";
 import { formatIDR } from "@/lib/formatters";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Lock } from "lucide-react";
 import { useState } from "react";
 
 // replenishment-realisasi FR5.2: this vendor's own fills as CIMB classified them from the ATM's
@@ -124,6 +125,21 @@ const columns = [
     },
   }),
 ] as ColumnDef<VendorClassification, unknown>[];
+
+// Req 8.5: a vault-only account has no replenish parties, so the list is closed to it
+// (the API answers 403). Gate before RealizationsPage so its query never fires.
+export function RealizationsGate() {
+  const { state } = useAuth();
+  if (state.user?.role === "VENDOR-VAULT-USER") {
+    return (
+      <div className="flex items-center gap-3 rounded-md border border-neutral-300 p-4 text-surface-text">
+        <Lock className="size-5 shrink-0" aria-hidden="true" />
+        <p className="text-sm font-medium">Tidak tersedia untuk peran Anda</p>
+      </div>
+    );
+  }
+  return <RealizationsPage />;
+}
 
 export function RealizationsPage() {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });

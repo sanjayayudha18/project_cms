@@ -200,9 +200,45 @@ describe("VendorPicFormDialog", () => {
       phone: null,
       email: null,
       is_notification_recipient: true,
+      roles: ["replenish", "vault", "cashcount"],
     });
     expect(useToastStore.getState().toasts[0]).toMatchObject({ message: PENDING_TOAST });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("create: roles default to all three and the unchecked ones are not sent", async () => {
+    m.createPic.mockResolvedValue(ACCEPTED);
+    const user = userEvent.setup();
+    render(<VendorPicFormDialog open onClose={vi.fn()} vendorId={42} branchId={3} pic={null} />);
+
+    for (const name of ["Pengisian ATM", "Penyedia uang", "Cash count"]) {
+      expect(screen.getByRole("checkbox", { name })).toBeChecked();
+    }
+    set("Nama", "Andi");
+    await user.click(screen.getByRole("checkbox", { name: "Cash count" }));
+    await user.click(screen.getByRole("checkbox", { name: "Penyedia uang" }));
+    await save();
+
+    await waitFor(() => expect(m.createPic).toHaveBeenCalledTimes(1));
+    expect(m.createPic.mock.calls[0]?.[0]).toMatchObject({ roles: ["replenish"] });
+  });
+
+  it("edit: the role checkboxes are hidden (roles change via 'Ubah peran')", async () => {
+    const pic = {
+      id: 6,
+      name: "Sari",
+      position: null,
+      phone: null,
+      email: null,
+      is_notification_recipient: false,
+      roles: ["vault"],
+    };
+    render(
+      <VendorPicFormDialog open onClose={vi.fn()} vendorId={42} branchId={3} pic={pic as never} />,
+    );
+
+    expect(screen.queryByRole("checkbox", { name: "Penyedia uang" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Penerima notifikasi" })).toBeInTheDocument();
   });
 
   it("edits a branch PIC, prefilled", async () => {
@@ -214,6 +250,7 @@ describe("VendorPicFormDialog", () => {
       phone: "0812",
       email: "sari@vendor.co.id",
       is_notification_recipient: false,
+      roles: ["replenish"],
     };
     render(
       <VendorPicFormDialog open onClose={vi.fn()} vendorId={42} branchId={3} pic={pic as never} />,

@@ -20,6 +20,7 @@ import {
   useUpdateUser,
   useUser,
   useUsersList,
+  useVendorOptions,
 } from "../hooks";
 import type { CreateUserPayload, UpdateUserPayload } from "../types";
 
@@ -106,6 +107,16 @@ describe("admin-users hooks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual({ users: [{ id: 1 }], total: 1 });
+  });
+
+  it("useVendorOptions reads /admin/users/vendor-options (APPACCESS-safe lookup)", async () => {
+    const options = { vendors: [{ id: 1, code: "ABC", name: "Abacus" }], branches: [] };
+    client.get.mockResolvedValue({ data: options });
+    const { result } = setup(() => useVendorOptions());
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.get).toHaveBeenCalledWith("/admin/users/vendor-options");
+    expect(result.current.data).toEqual(options);
   });
 
   it("useUser is idle without an id and loads with one", async () => {

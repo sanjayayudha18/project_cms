@@ -89,6 +89,8 @@ export const ROLE_BADGE_VARIANT: Record<string, BadgeVariant> = {
   "BRANCH-ATM-USER": "neutral",
   "BRANCH-ATM-SPV": "neutral",
   "VENDOR-USER": "warning",
+  "VENDOR-ATM-USER": "warning",
+  "VENDOR-VAULT-USER": "warning",
 };
 
 // ─── Role hierarchy helpers ──────────────────────────────────────────────────

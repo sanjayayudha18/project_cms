@@ -189,6 +189,23 @@ describe("admin-vendors queries", () => {
 
 const m = (hook: () => unknown) => hook as () => Mutation;
 
+describe("PIC roles (immediate apply, not maker-checker)", () => {
+  it("PUTs the roles to /pics/{id}/roles and returns the saved set", async () => {
+    client.put.mockResolvedValue({ data: { id: 6, roles: ["vault"] } });
+    const { result } = setup(() => h.useSetPicRoles(V));
+
+    let saved: unknown;
+    await act(async () => {
+      saved = await result.current.mutateAsync({ picId: 6, roles: ["vault"] });
+    });
+
+    expect(client.put).toHaveBeenCalledWith(`/admin/vendors/${V}/pics/6/roles`, {
+      roles: ["vault"],
+    });
+    expect(saved).toEqual({ id: 6, roles: ["vault"] });
+  });
+});
+
 describe("admin-vendors maker-checker submissions", () => {
   it.each<[string, () => Mutation, unknown, [Method, ...unknown[]]]>([
     ["create vendor", m(h.useCreateVendor), P, ["post", "/admin/vendors", P]],

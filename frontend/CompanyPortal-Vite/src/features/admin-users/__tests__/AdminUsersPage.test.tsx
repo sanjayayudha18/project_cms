@@ -14,6 +14,8 @@ const ACTIVE_USER: AdminUser = {
   is_karyawan: true,
   auth_source: "ldap",
   vendor_id: null,
+  vendor_branch_id: null,
+  vendor_branch_name: null,
   is_active: true,
   deleted_at: null,
   supervisor_id: null,
@@ -32,10 +34,7 @@ vi.mock("../hooks", () => ({
   useEnableUser: () => ({ mutate: enableMutate, isPending: false }),
   useCreateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
-
-vi.mock("@/features/admin-vendors/hooks", () => ({
-  useVendorsList: () => ({ data: { vendors: [], page: 1, page_size: 100, total: 0 } }),
+  useVendorOptions: () => ({ data: { vendors: [], branches: [] } }),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {

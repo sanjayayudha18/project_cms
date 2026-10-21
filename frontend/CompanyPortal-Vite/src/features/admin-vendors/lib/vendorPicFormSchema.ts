@@ -19,6 +19,8 @@ export const vendorPicFormSchema = z.object({
       message: "Format email tidak valid",
     }),
   is_notification_recipient: z.boolean(),
+  /** Hanya dipakai saat create; update lewat form tidak mengubah peran (Req 5.7). */
+  roles: z.array(z.string()),
 });
 
 export type VendorPicFormValues = z.infer<typeof vendorPicFormSchema>;

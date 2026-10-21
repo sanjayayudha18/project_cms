@@ -11,6 +11,7 @@ import type {
   AdminUsersListResponse,
   CreateUserPayload,
   UpdateUserPayload,
+  VendorOptionsResponse,
 } from "./types";
 
 const BASE = "/admin/users";
@@ -33,6 +34,12 @@ export async function listUsers(params: AdminUsersListParams): Promise<AdminUser
 
 export async function getUser(id: number): Promise<AdminUser> {
   const { data } = await api.get<AdminUser>(`${BASE}/${id}`);
+  return data;
+}
+
+/** Vendor + cabang aktif untuk form/filter user; guard sama dengan /admin/users (APPACCESS, ADMIN). */
+export async function getVendorOptions(): Promise<VendorOptionsResponse> {
+  const { data } = await api.get<VendorOptionsResponse>(`${BASE}/vendor-options`);
   return data;
 }
 

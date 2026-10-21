@@ -35,6 +35,7 @@ import {
   listVendorPics,
   listVendorVaults,
   listVendors,
+  setVendorPicRoles,
   updateVendor,
   updateVendorBranch,
   updateVendorPackage,
@@ -272,6 +273,17 @@ export function useUpdateVendorPic(vendorId: number) {
     mutationFn: ({ picId, payload }) => updateVendorPic(vendorId, picId, payload),
     onSuccess: invalidate,
   });
+}
+
+/** Immediate-apply: tidak lewat persetujuan, jadi hanya daftar PIC yang di-refresh. */
+export function useSetPicRoles(vendorId: number) {
+  const invalidate = useInvalidateList();
+  return useMutation<{ id: number; roles: string[] }, ApiError, { picId: number; roles: string[] }>(
+    {
+      mutationFn: ({ picId, roles }) => setVendorPicRoles(vendorId, picId, roles),
+      onSuccess: invalidate,
+    },
+  );
 }
 
 export function useDisableVendorPic(vendorId: number) {

@@ -176,6 +176,8 @@ export interface AdminVendorPic {
   phone: string | null;
   email: string | null;
   is_notification_recipient: boolean;
+  /** Peran PIC: replenish | vault | cashcount; kosong = hanya kontak. */
+  roles: string[];
   is_active: boolean;
   deleted_at: string | null;
 }
@@ -209,7 +211,8 @@ export interface VendorPicFormPayload {
   is_notification_recipient: boolean;
 }
 
-export type CreateVendorPicPayload = VendorPicFormPayload;
+/** Hanya create yang membawa peran; update lewat form tidak mengubahnya (Req 5.7). */
+export type CreateVendorPicPayload = VendorPicFormPayload & { roles?: string[] };
 export type UpdateVendorPicPayload = VendorPicFormPayload;
 
 /**

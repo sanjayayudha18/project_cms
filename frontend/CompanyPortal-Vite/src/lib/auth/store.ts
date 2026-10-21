@@ -13,6 +13,9 @@ export type DbRole =
   | "BRANCH-ATM-USER"
   | "BRANCH-ATM-SPV"
   | "VENDOR-USER"
+  /** vendor-party-scope: akun vendor per pihak (hanya VendorPortal). */
+  | "VENDOR-ATM-USER"
+  | "VENDOR-VAULT-USER"
   /** cit-acm-plan: tim ACM (penetapan vault). */
   | "ACM-USER"
   | "ACM-SPV";
@@ -85,6 +88,17 @@ interface ApiErrorResponse {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const VENDOR_ROLES: ReadonlySet<string> = new Set([
+  "VENDOR-USER",
+  "VENDOR-ATM-USER",
+  "VENDOR-VAULT-USER",
+]);
+
+/** Ketiga role vendor hanya boleh masuk VendorPortal (vendor-party-scope Req 8.2). */
+export function isVendorRole(role: string): boolean {
+  return VENDOR_ROLES.has(role);
+}
 
 function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {
   return {
@@ -236,8 +250,8 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
 
         const data = (await response.json()) as LoginSuccessResponse;
 
-        // Guard: reject VENDOR-USER on company portal refresh
-        if (data.user.role === "VENDOR-USER") {
+        // Guard: reject vendor roles on company portal refresh
+        if (isVendorRole(data.user.role)) {
           set({
             user: null,
             accessToken: null,
@@ -293,10 +307,10 @@ export const useAuthStore = create<AuthStore>((set, _get) => ({
         if (response.ok) {
           const data = (await response.json()) as LoginSuccessResponse;
 
-          // Guard: reject VENDOR-USER on the company portal.
+          // Guard: reject vendor roles on the company portal.
           // Prevents cross-portal session leakage when both portals
           // share the same refresh token cookie on localhost.
-          if (data.user.role === "VENDOR-USER") {
+          if (isVendorRole(data.user.role)) {
             set({
               user: null,
               accessToken: null,

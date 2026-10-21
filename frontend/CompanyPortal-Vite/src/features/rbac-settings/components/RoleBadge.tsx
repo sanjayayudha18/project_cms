@@ -30,6 +30,8 @@ const ROLE_ICON: Record<string, LucideIcon> = {
   "BRANCH-ATM-USER": Building2,
   "BRANCH-ATM-SPV": Building2,
   "VENDOR-USER": Truck,
+  "VENDOR-ATM-USER": Truck,
+  "VENDOR-VAULT-USER": Truck,
 };
 
 interface RoleBadgeProps {

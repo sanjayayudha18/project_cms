@@ -69,6 +69,7 @@ vi.mock("../hooks", () => ({
   useUpdateVendorPic: () => noopMutation,
   useDisableVendorPic: () => noopMutation,
   useEnableVendorPic: () => noopMutation,
+  useSetPicRoles: () => noopMutation,
   useVendorPackages: () => ({
     isLoading: false,
     isError: false,

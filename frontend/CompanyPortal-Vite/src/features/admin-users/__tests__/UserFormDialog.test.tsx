@@ -11,11 +11,18 @@ const updateMutateAsync = vi.fn();
 vi.mock("../hooks", () => ({
   useCreateUser: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useUpdateUser: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
-}));
-
-vi.mock("@/features/admin-vendors/hooks", () => ({
-  useVendorsList: () => ({
-    data: { vendors: [{ id: 1, name: "PT Gardanet" }], page: 1, page_size: 100, total: 1 },
+  useVendorOptions: () => ({
+    data: {
+      vendors: [
+        { id: 1, code: "GDN", name: "PT Gardanet" },
+        { id: 2, code: "ABC", name: "PT Abacus" },
+      ],
+      branches: [
+        { id: 10, vendor_id: 1, branch_code: "MDN", branch_name: "Medan", region_code: "R1" },
+        { id: 11, vendor_id: 1, branch_code: "JKT", branch_name: "Jakarta", region_code: "R2" },
+        { id: 20, vendor_id: 2, branch_code: "SBY", branch_name: "Surabaya", region_code: "R3" },
+      ],
+    },
   }),
 }));
 
@@ -28,6 +35,8 @@ const LOCAL_USER: AdminUser = {
   is_karyawan: false,
   auth_source: "local",
   vendor_id: 1,
+  vendor_branch_id: 10,
+  vendor_branch_name: "Medan",
   is_active: true,
   deleted_at: null,
   supervisor_id: null,
@@ -200,6 +209,100 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
 
     expect(await screen.findByText("Username sudah dipakai")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows Cabang only for vendor roles and lists just the chosen vendor's branches", async () => {
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+
+    expect(screen.queryByText("Cabang", { selector: "span" })).not.toBeInTheDocument();
+
+    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
+    await user.selectOptions(control("Auth Source"), "local");
+    expect(control("Cabang")).toBeDisabled();
+
+    await user.selectOptions(control("Vendor"), "1");
+    const optionTexts = Array.from(control("Cabang").querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(optionTexts).toEqual(["Semua cabang", "Medan (MDN)", "Jakarta (JKT)"]);
+  });
+
+  it("clears the chosen branch when the vendor changes", async () => {
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+
+    await user.selectOptions(control("Role"), "VENDOR-VAULT-USER");
+    await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Vendor"), "1");
+    await user.selectOptions(control("Cabang"), "10");
+    expect(control("Cabang")).toHaveValue("10");
+
+    await user.selectOptions(control("Vendor"), "2");
+    expect(control("Cabang")).toHaveValue("");
+  });
+
+  it("sends the chosen branch (vendor_branch_id) when creating a vendor user", async () => {
+    createMutateAsync.mockResolvedValue({ id: 11 });
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+
+    await user.type(control("Nama Pengguna"), "abacus.mdn");
+    await user.type(control("Nama Lengkap"), "Abacus Medan");
+    await user.type(control("Email"), "mdn@abacus.test");
+    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
+    await user.type(control("Employee ID"), "V9");
+    await user.selectOptions(control("Auth Source"), "local");
+    await user.type(control("Password Sementara"), "Temp#12345");
+    await user.selectOptions(control("Vendor"), "1");
+    await user.selectOptions(control("Cabang"), "10");
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      role: "VENDOR-ATM-USER",
+      vendor_id: 1,
+      vendor_branch_id: 10,
+    });
+  });
+
+  it("sends vendor_branch_id null for 'Semua cabang' and for non-vendor users", async () => {
+    createMutateAsync.mockResolvedValue({ id: 12 });
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+
+    await fillCommon(user);
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1));
+    expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ vendor_branch_id: null });
+  });
+
+  it("rejects a vendor role with LDAP auth source before submitting", async () => {
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+
+    await fillCommon(user);
+    await user.selectOptions(control("Role"), "VENDOR-USER");
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    expect(await screen.findByText("Role vendor wajib memakai auth_source local")).toBeVisible();
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps the stored branch when editing a vendor user (payload carries vendor_branch_id)", async () => {
+    updateMutateAsync.mockResolvedValue({ id: 5 });
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={{ ...LOCAL_USER, employee_id: "V-1" }} />);
+
+    expect(control("Cabang")).toHaveValue("10");
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(updateMutateAsync).toHaveBeenCalledTimes(1));
+    const { payload } = updateMutateAsync.mock.calls[0]?.[0] as {
+      payload: Record<string, unknown>;
+    };
+    expect(payload).toMatchObject({ vendor_id: 1, vendor_branch_id: 10 });
   });
 
   it("shows a toast for a non-field server error and keeps the dialog open", async () => {

@@ -136,14 +136,14 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 8.1, 8.4, 8.5, 10.2_
   - _Model: Sonnet, Effort: Medium — guard auth portal (kritis tapi sederhana) + UI kecil._
 
-- [ ] 12. CompanyPortal
-  - [ ] 12.1 `lib/auth/store.ts`: tolak ketiga role vendor (login + refresh); `UserRole` + dua role. `features/rbac-settings` `types.ts` + `RoleBadge.tsx` untuk role baru.
+- [x] 12. CompanyPortal
+  - [x] 12.1 `lib/auth/store.ts`: tolak ketiga role vendor (login + refresh); `UserRole` + dua role. `features/rbac-settings` `types.ts` + `RoleBadge.tsx` untuk role baru.
     - _Requirements: 8.2_
-  - [ ] 12.2 `features/admin-users`: `ROLE_OPTIONS` + label; `userFormSchema` aturan role vendor + `vendor_branch_id`; hook `useVendorOptions`; `UserFormDialog` select Cabang (reset saat vendor berubah); `UsersTable` kolom Cabang; `AdminUsersPage` + `UserFilterBar` pakai `useVendorOptions`. Kartu Manajemen User di `SettingsHubPage` disembunyikan untuk `ADMIN_PARAM` (D8).
+  - [x] 12.2 `features/admin-users`: `ROLE_OPTIONS` + label; `userFormSchema` aturan role vendor + `vendor_branch_id`; hook `useVendorOptions`; `UserFormDialog` select Cabang (reset saat vendor berubah); `UsersTable` kolom Cabang; `AdminUsersPage` + `UserFilterBar` pakai `useVendorOptions`. Kartu Manajemen User di `SettingsHubPage` disembunyikan untuk `ADMIN_PARAM` (D8).
     - _Requirements: 2.8, 2.9, 2.10, 2.11, 2.12, 2.13_
-  - [ ] 12.3 `features/admin-vendors`: kolom Peran di `PicsPanel`; checkbox peran di `VendorPicFormDialog` (create saja); `PicRolesDialog` + `useSetPicRoles` dengan catatan "Langsung berlaku, tanpa persetujuan".
+  - [x] 12.3 `features/admin-vendors`: kolom Peran di `PicsPanel`; checkbox peran di `VendorPicFormDialog` (create saja); `PicRolesDialog` + `useSetPicRoles` dengan catatan "Langsung berlaku, tanpa persetujuan".
     - _Requirements: 5.9_
-  - [ ] 12.4 Test Vitest: guard tolak role vendor; schema + form user (cabang reset, validasi, APPACCESS memuat vendor-options); `PicRolesDialog` + kolom peran. Threshold CP 84/80/80/85.
+  - [x] 12.4 Test Vitest: guard tolak role vendor; schema + form user (cabang reset, validasi, APPACCESS memuat vendor-options); `PicRolesDialog` + kolom peran. Threshold CP 84/80/80/85.
     - _Requirements: 2.8, 2.9, 2.10, 2.11, 5.9, 8.2, 10.2_
   - _Model: Sonnet, Effort: Medium — komponen React mengikuti pola yang ada; guard auth ikut diuji._
 

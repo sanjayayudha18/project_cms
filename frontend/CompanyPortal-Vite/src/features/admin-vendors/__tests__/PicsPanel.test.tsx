@@ -20,6 +20,11 @@ vi.mock("../hooks", () => ({
   useVendorPics: () => m.query,
   useDisableVendorPic: () => ({ mutate: m.disable, isPending: false }),
   useEnableVendorPic: () => ({ mutate: m.enable, isPending: false }),
+  useSetPicRoles: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+vi.mock("../components/PicRolesDialog", () => ({
+  PicRolesDialog: ({ open, pic }: { open: boolean; pic: { name: string } | null }) =>
+    open ? <output data-testid="roles-dialog">{pic?.name}</output> : null,
 }));
 vi.mock("../../master-data/pending", () => ({
   usePendingEntityIds: () => m.pendingIds,
@@ -39,6 +44,7 @@ const ACTIVE = {
   phone: null,
   email: "andi@vendor.co.id",
   is_notification_recipient: true,
+  roles: ["replenish", "vault"],
   is_active: true,
 };
 const INACTIVE = {
@@ -48,6 +54,7 @@ const INACTIVE = {
   phone: "0812",
   email: null,
   is_notification_recipient: false,
+  roles: [] as string[],
   is_active: false,
 };
 
@@ -77,6 +84,30 @@ describe("PicsPanel", () => {
     const sari = within(rowOf("Sari"));
     expect(sari.getAllByText("—").length).toBeGreaterThanOrEqual(2);
     expect(sari.getByText("Nonaktif")).toBeInTheDocument();
+  });
+
+  it("shows each PIC's roles as text, 'Hanya kontak' when it has none (Req 5.9)", () => {
+    render(<PicsPanel vendorId={42} branchId={3} />);
+
+    expect(screen.getByRole("columnheader", { name: "Peran" })).toBeInTheDocument();
+    expect(within(rowOf("Andi")).getByText("Pengisian ATM, Penyedia uang")).toBeInTheDocument();
+    expect(within(rowOf("Sari")).getByText("Hanya kontak")).toBeInTheDocument();
+  });
+
+  it("'Ubah peran' opens the roles dialog for that PIC; disabled when inactive or pending", async () => {
+    const user = userEvent.setup();
+    render(<PicsPanel vendorId={42} branchId={3} />);
+
+    expect(within(rowOf("Sari")).getByRole("button", { name: "Ubah peran" })).toBeDisabled();
+    await user.click(within(rowOf("Andi")).getByRole("button", { name: "Ubah peran" }));
+    expect(screen.getByTestId("roles-dialog")).toHaveTextContent("Andi");
+  });
+
+  it("locks 'Ubah peran' while the PIC has a pending change", () => {
+    m.pendingIds = new Set([1]);
+    render(<PicsPanel vendorId={42} branchId={3} />);
+
+    expect(within(rowOf("Andi")).getByRole("button", { name: "Ubah peran" })).toBeDisabled();
   });
 
   it("shows server warnings (e.g. no notification recipient)", () => {

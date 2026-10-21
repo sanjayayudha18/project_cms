@@ -348,6 +348,14 @@ function canSeeRoleManagementCard(role: string | undefined): boolean {
   return role === "APPACCESS" || role === "ADMIN";
 }
 
+/**
+ * Manajemen Pengguna: backend /api/v1/admin/users hanya APPACCESS + ADMIN
+ * (ADMIN_PARAM dicabut, vendor-party-scope D8); kartu disembunyikan untuk ADMIN_PARAM.
+ */
+function canSeeAdminUsersCard(role: string | undefined): boolean {
+  return role !== "ADMIN_PARAM";
+}
+
 export function SettingsHubPage() {
   const [activeTab, setActiveTab] = useState<SettingsCategory>("access");
   const [query, setQuery] = useState("");
@@ -368,7 +376,9 @@ export function SettingsHubPage() {
   const masterCards = showMaster
     ? MASTER_DATA_CARDS.filter(
         (c) =>
-          matchesQuery(c, normalizedQuery) && (c.id !== "admin-acm-areas" || userRole === "ADMIN"),
+          matchesQuery(c, normalizedQuery) &&
+          (c.id !== "admin-acm-areas" || userRole === "ADMIN") &&
+          (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)),
       )
     : [];
 

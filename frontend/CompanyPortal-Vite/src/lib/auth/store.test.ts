@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AuthUser, type DbRole, SESSION_EXPIRED_REASON, useAuthStore } from "./store";
+import {
+  type AuthUser,
+  type DbRole,
+  SESSION_EXPIRED_REASON,
+  isVendorRole,
+  useAuthStore,
+} from "./store";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -729,5 +735,62 @@ describe("useAuthStore (C1 branches)", () => {
     expect(state.user).toBeNull();
     expect(state.isAuthLoading).toBe(false);
     expect(mockLocation.href).toBe("");
+  });
+
+  // vendor-party-scope Req 8.2: all three vendor roles belong to VendorPortal only.
+  describe.each(["VENDOR-USER", "VENDOR-ATM-USER", "VENDOR-VAULT-USER"] as const)(
+    "vendor role %s on the company portal",
+    (role) => {
+      const payload = { ...vendorPayload, user: { ...vendorPayload.user, role } };
+
+      it("refreshToken rejects the session and redirects", async () => {
+        mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload });
+
+        const ok = await useAuthStore.getState().refreshToken();
+
+        expect(ok).toBe(false);
+        expect(useAuthStore.getState().isAuthenticated).toBe(false);
+        expect(useAuthStore.getState().accessToken).toBeNull();
+        expect(mockLocation.href).toBe(`/login?redirect=${encodeURIComponent("/dashboard?tab=1")}`);
+      });
+
+      it("initialize does not restore the session", async () => {
+        mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload });
+
+        await useAuthStore.getState().initialize();
+
+        const state = useAuthStore.getState();
+        expect(state.isAuthenticated).toBe(false);
+        expect(state.user).toBeNull();
+        expect(state.accessToken).toBeNull();
+        expect(state.isAuthLoading).toBe(false);
+      });
+
+      it("isVendorRole recognises it", () => {
+        expect(isVendorRole(role)).toBe(true);
+      });
+    },
+  );
+
+  it("isVendorRole is false for internal roles", () => {
+    for (const role of ["ADMIN", "ADMIN_PARAM", "APPACCESS", "ATM-USER", "ACM-SPV"]) {
+      expect(isVendorRole(role)).toBe(false);
+    }
+  });
+
+  it("an internal role refresh is still restored", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "t",
+        user: { ...vendorPayload.user, role: "APPACCESS", vendor_id: null, is_karyawan: true },
+      }),
+    });
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().user?.role).toBe("APPACCESS");
   });
 });

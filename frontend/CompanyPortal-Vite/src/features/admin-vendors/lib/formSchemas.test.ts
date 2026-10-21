@@ -113,6 +113,7 @@ describe("vendorPicFormSchema", () => {
     phone: "",
     email: "",
     is_notification_recipient: true,
+    roles: ["replenish"],
   };
 
   it("needs only a name; email is optional but must be valid when given", () => {

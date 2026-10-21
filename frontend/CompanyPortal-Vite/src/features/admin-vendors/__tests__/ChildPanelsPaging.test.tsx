@@ -40,6 +40,7 @@ vi.mock("../hooks", () => ({
   useUpdateVendorPic: () => noopMutation,
   useDisableVendorPic: () => noopMutation,
   useEnableVendorPic: () => noopMutation,
+  useSetPicRoles: () => noopMutation,
 }));
 
 function listResult(key: string, total: number) {

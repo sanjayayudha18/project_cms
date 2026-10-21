@@ -397,6 +397,10 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		}
 	}
 
+	if e.entity == ExportVendorPICs && !creating && strings.TrimSpace(v["roles"]) == "" {
+		v["roles"] = e.cur[id]["roles"] // blank or older file without the column: roles stay as they are
+	}
+
 	e.validateFields(v, creating, add, fromErr)
 	if len(errs) > 0 {
 		return ImportRow{}, errs

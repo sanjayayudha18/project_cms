@@ -101,12 +101,12 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 5.4_
   - _Model: Opus, Effort: High — deviasi GR#3 (immediate-apply) pada master data + interaksi dengan Applier maker-checker; audit-in-tx harus benar._
 
-- [ ] 7. Peran PIC di CSV master data
-  - [ ] 7.1 `masterdata_export.go`: header PIC + `roles`; sel `strings.Join(roles, ";")` atau `none`.
+- [x] 7. Peran PIC di CSV master data
+  - [x] 7.1 `masterdata_export.go`: header PIC + `roles`; sel `strings.Join(roles, ";")` atau `none`.
     - _Requirements: 6.1_
-  - [ ] 7.2 `masterdata_import_csv.go` / `_validate.go` / `_confirm.go`: header lama sebagai legacy (`roles` kosong); `parsePicRoles` (kosong → nil, `none` → `[]`, split `;`, validasi); `picFields` mengisi `Roles`.
+  - [x] 7.2 `masterdata_import_csv.go` / `_validate.go` / `_confirm.go`: header lama sebagai legacy (`roles` kosong); `parsePicRoles` (kosong → nil, `none` → `[]`, split `;`, validasi); `picFields` mengisi `Roles`.
     - _Requirements: 6.2, 6.3, 6.4, 6.5_
-  - [ ] 7.3 Test: `masterdata_import_test.go` (dry-run nilai salah/duplikat, header lama), `masterdata_import_integration_test.go` round-trip ekspor → impor (Property 7), create tanpa peran = ketiga peran, update kosong = tidak berubah.
+  - [x] 7.3 Test: `masterdata_import_test.go` (dry-run nilai salah/duplikat, header lama), `masterdata_import_integration_test.go` round-trip ekspor → impor (Property 7), create tanpa peran = ketiga peran, update kosong = tidak berubah.
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
   - _Model: Sonnet, Effort: Medium — perluasan kolom CSV di pipeline yang sudah ada; aturan kosong/none perlu teliti tapi terbatas._
 

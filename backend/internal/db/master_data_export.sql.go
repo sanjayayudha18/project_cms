@@ -247,7 +247,8 @@ SELECT p.id,
        COALESCE(p.phone, '')::text                  AS phone,
        COALESCE(p.email, '')::text                  AS email,
        p.is_notification_recipient,
-       p.is_active
+       p.is_active,
+       p.roles
 FROM vendor_pics p
 JOIN vendors v ON v.id = p.vendor_id
 LEFT JOIN vendor_branches b ON b.id = p.vendor_branch_id
@@ -266,15 +267,16 @@ type ExportVendorPicsBatchParams struct {
 }
 
 type ExportVendorPicsBatchRow struct {
-	ID                      int64  `json:"id"`
-	VendorCode              string `json:"vendor_code"`
-	BranchCode              string `json:"branch_code"`
-	Name                    string `json:"name"`
-	Position                string `json:"position"`
-	Phone                   string `json:"phone"`
-	Email                   string `json:"email"`
-	IsNotificationRecipient bool   `json:"is_notification_recipient"`
-	IsActive                bool   `json:"is_active"`
+	ID                      int64    `json:"id"`
+	VendorCode              string   `json:"vendor_code"`
+	BranchCode              string   `json:"branch_code"`
+	Name                    string   `json:"name"`
+	Position                string   `json:"position"`
+	Phone                   string   `json:"phone"`
+	Email                   string   `json:"email"`
+	IsNotificationRecipient bool     `json:"is_notification_recipient"`
+	IsActive                bool     `json:"is_active"`
+	Roles                   []string `json:"roles"`
 }
 
 // branch_code is ” for a vendor-wide PIC (vendor_branch_id NULL).
@@ -297,6 +299,7 @@ func (q *Queries) ExportVendorPicsBatch(ctx context.Context, arg ExportVendorPic
 			&i.Email,
 			&i.IsNotificationRecipient,
 			&i.IsActive,
+			&i.Roles,
 		); err != nil {
 			return nil, err
 		}

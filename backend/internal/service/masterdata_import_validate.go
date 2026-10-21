@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -138,6 +139,31 @@ func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(str
 		add("phone", "format telepon tidak valid (6-15 digit, boleh diawali +)")
 	}
 	boolCol(v, "is_notification_recipient", "false", creating, add)
+	roles, err := parsePicRoles(v["roles"])
+	var ve *ValidationError
+	switch {
+	case errors.As(err, &ve):
+		add("roles", ve.Message)
+	case roles != nil:
+		v["roles"] = picRolesCell(*roles) // canonical order, so equal sets compare equal to the export
+	}
+}
+
+// parsePicRoles reads a roles cell: blank = nil (create: all roles, update:
+// unchanged), "none" = empty set, otherwise ";"-separated codes.
+func parsePicRoles(cell string) (*[]string, error) {
+	cell = strings.TrimSpace(cell)
+	switch cell {
+	case "":
+		return nil, nil
+	case picRolesCellNone:
+		return &[]string{}, nil
+	}
+	roles, err := normalizePicRoles(strings.Split(cell, ";"))
+	if err != nil {
+		return nil, err
+	}
+	return &roles, nil
 }
 
 func (e *importEnv) validateATM(v map[string]string, creating bool, add func(string, string), fromErr func(error)) {

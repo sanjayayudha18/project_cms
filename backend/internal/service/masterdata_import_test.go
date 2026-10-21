@@ -39,8 +39,12 @@ func (fakeImportRepo) VendorVaults(context.Context, int64, string, int32) ([]db.
 	return nil, nil
 }
 
-func (fakeImportRepo) VendorPICs(context.Context, int64, string, int32) ([]db.ExportVendorPicsBatchRow, error) {
-	return nil, nil
+func (fakeImportRepo) VendorPICs(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
+	all := []db.ExportVendorPicsBatchRow{
+		{ID: 1, VendorCode: "V1", BranchCode: "B1", Name: "Ani", Roles: []string{"replenish", "vault"}, IsActive: true},
+		{ID: 2, VendorCode: "V1", Name: "Budi", Roles: []string{}, IsActive: true},
+	}
+	return page(all, after, limit, func(r db.ExportVendorPicsBatchRow) int64 { return r.ID }), nil
 }
 
 func (fakeImportRepo) ATMs(_ context.Context, after int64, _ string, limit int32) ([]db.ExportATMsBatchRow, error) {
@@ -91,7 +95,7 @@ const vendorHeader = "id,code,name,legal_name,npwp,contact_email,contact_phone,h
 // Round trip (plan Validate Fase 5): what the exporter writes, the importer
 // accepts as "no change" -- through BOM, CSVSafe apostrophes and quoting.
 func TestImport_RoundTripOfExportIsAllUnchanged(t *testing.T) {
-	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportATMs, ExportATMAssignments} {
+	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportVendorPICs, ExportATMs, ExportATMAssignments} {
 		var buf bytes.Buffer
 		if _, err := newTestExporter(fakeImportRepo{}, 1).Write(adminCtx(7), entity, "all", &buf, nil); err != nil {
 			t.Fatalf("export %s: %v", entity, err)

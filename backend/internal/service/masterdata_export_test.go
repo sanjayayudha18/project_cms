@@ -59,7 +59,7 @@ func (f *fakeExportRepo) VendorVaults(_ context.Context, after int64, status str
 }
 
 func (f *fakeExportRepo) VendorPICs(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
-	return []db.ExportVendorPicsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "", Name: "Budi", Position: "Kepala", Phone: "+62 812", Email: "b@x.id", IsNotificationRecipient: true, IsActive: true}}, f.record(after, status, limit)
+	return []db.ExportVendorPicsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "", Name: "Budi", Position: "Kepala", Phone: "+62 812", Email: "b@x.id", IsNotificationRecipient: true, IsActive: true, Roles: []string{"replenish", "vault"}}}, f.record(after, status, limit)
 }
 
 func (f *fakeExportRepo) ATMs(_ context.Context, after int64, status string, limit int32) ([]db.ExportATMsBatchRow, error) {
@@ -111,7 +111,7 @@ func TestExport_HeaderContract(t *testing.T) {
 		ExportVendors:        {"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
 		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
 		ExportVendorVaults:   {"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
-		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
+		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
 		ExportATMs:           {"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},
 		ExportATMAssignments: {"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
 	}

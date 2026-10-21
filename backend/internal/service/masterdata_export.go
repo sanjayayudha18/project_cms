@@ -8,6 +8,7 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
@@ -70,6 +71,17 @@ func exportPage[R any](rows []R, err error, id func(R) int64, cells func(R) []st
 
 func boolCell(b bool) string { return strconv.FormatBool(b) }
 
+// picRolesCellNone is the roles cell of a PIC with an empty role set.
+const picRolesCellNone = "none"
+
+// picRolesCell is the CSV form of a PIC's roles: codes joined by ";", or "none".
+func picRolesCell(roles []string) string {
+	if len(roles) == 0 {
+		return picRolesCellNone
+	}
+	return strings.Join(roles, ";")
+}
+
 // exportSpecs is the contract with the T5.3 importer and T5.2 templates: the
 // header order is stable and part of the API. Columns use natural keys
 // (vendor_code, branch_code, terminal_id, package_code) so a file round-trips
@@ -112,11 +124,14 @@ var exportSpecs = map[string]exportSpec{
 		},
 	},
 	ExportVendorPICs: {
-		header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
+		header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+		// Older files have no roles column: treated as blank (create = all roles, update = unchanged).
+		legacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"}},
+		legacyFill:    map[string]string{"roles": ""},
 		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 			rows, err := r.VendorPICs(ctx, after, status, limit)
 			return exportPage(rows, err, func(x db.ExportVendorPicsBatchRow) int64 { return x.ID }, func(x db.ExportVendorPicsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.Name, x.Position, x.Phone, x.Email, boolCell(x.IsNotificationRecipient), boolCell(x.IsActive)}
+				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.Name, x.Position, x.Phone, x.Email, boolCell(x.IsNotificationRecipient), boolCell(x.IsActive), picRolesCell(x.Roles)}
 			})
 		},
 	},

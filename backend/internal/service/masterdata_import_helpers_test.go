@@ -28,6 +28,13 @@ func TestImportFieldMappers(t *testing.T) {
 		t.Errorf("vendor-wide PIC = %+v", wide)
 	}
 
+	if pic.Roles != nil {
+		t.Errorf("blank roles cell: Roles = %v, want nil", *pic.Roles)
+	}
+	if r := picFields(map[string]string{"vendor_code": "V1", "name": "Budi", "roles": "none"}, env).Roles; r == nil || len(*r) != 0 {
+		t.Errorf("none roles cell: Roles = %v, want empty non-nil", r)
+	}
+
 	loc, atm := atmFields(map[string]string{"location_id": "5", "machine_type": "CRM", "capacity_amount": "500000000",
 		"low_threshold_amount": "", "blacklisted": "true", "priority_class": "VIP"})
 	if loc != 5 || atm.LocationID != 5 || atm.MachineType != "CRM" || atm.CapacityAmount == nil || *atm.CapacityAmount != "500000000" ||

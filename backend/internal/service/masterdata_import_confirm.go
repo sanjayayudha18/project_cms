@@ -289,7 +289,11 @@ func stageUpdate(ctx context.Context, maker int64, entity string, row ImportRow,
 	case ExportVendorVaults:
 		_, err = s.Vaults.Update(ctx, maker, id, vaultFields(v), ip)
 	case ExportVendorPICs:
-		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, picFields(v, env), ip)
+		p := picFields(v, env)
+		if v["roles"] == env.cur[id]["roles"] {
+			p.Roles = nil // roles not changed by this file: leave them (and any concurrent change) alone
+		}
+		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, p, ip)
 	case ExportATMs:
 		_, u := atmFields(v)
 		_, err = s.ATMs.Update(ctx, maker, id, u, ip)
@@ -359,8 +363,9 @@ func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
 		id := env.branches[v["vendor_code"]+"|"+v["branch_code"]]
 		branch = &id
 	}
+	roles, _ := parsePicRoles(v["roles"]) // already validated in the dry-run
 	return VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
-		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true"}
+		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true", Roles: roles}
 }
 
 func assignmentFields(v map[string]string, env *importEnv) ATMAssignmentUpdatePayload {

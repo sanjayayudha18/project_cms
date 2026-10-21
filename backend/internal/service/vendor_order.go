@@ -15,6 +15,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor) FR4/FR5: the VendorPortal side.
@@ -22,8 +23,8 @@ import (
 // vendor, narrowed to users.vendor_branch_id when set. Scope is read from the
 // primary per call (FR5.2) and applied in SQL; anything outside it is
 // ErrVendorOrderNotFound (404), never 403 (FR5.3).
-
-const vendorUserRole = "VENDOR-USER"
+// vendor-party-scope Req 3: the scope also narrows to the party roles the
+// account's role may see (vendorrole.PartyRoles).
 
 var ErrVendorOrderNotFound = errors.New("vendor order not found")
 
@@ -40,8 +41,9 @@ type VendorActor struct {
 }
 
 type vendorScope struct {
-	vendorID int64
-	branchID *int64
+	vendorID   int64
+	branchID   *int64
+	partyRoles []string // vendorrole.PartyRoles of the account role; never empty
 }
 
 type VendorOrderService struct {
@@ -107,11 +109,13 @@ type VendorOrderList struct {
 	PageSize int                  `json:"page_size"`
 }
 
-// scope resolves the caller's vendor + branch from users (FR5.1/FR5.2). A
-// non-vendor role, a user without vendor, or a claim that no longer matches
-// the row is not authorized.
+// scope resolves the caller's vendor + branch + role from users (FR5.1/FR5.2).
+// A non-vendor role, a user without vendor, or a claim (vendor or role) that
+// no longer matches the row is not authorized: a role changed after login is
+// refused at once, not when the token expires (vendor-party-scope Req 3.8).
 func (s *VendorOrderService) scope(ctx context.Context, q *db.Queries, va VendorActor) (vendorScope, error) {
-	if va.Role != vendorUserRole {
+	partyRoles := vendorrole.PartyRoles(va.Role)
+	if partyRoles == nil {
 		return vendorScope{}, ErrNotAuthorized
 	}
 	row, err := q.GetUserVendorScope(ctx, va.UserID)
@@ -121,10 +125,10 @@ func (s *VendorOrderService) scope(ctx context.Context, q *db.Queries, va Vendor
 	if err != nil {
 		return vendorScope{}, fmt.Errorf("load vendor scope of user %d: %w", va.UserID, err)
 	}
-	if row.VendorID == nil || va.ClaimVendorID == nil || *row.VendorID != *va.ClaimVendorID {
+	if row.Role != va.Role || row.VendorID == nil || va.ClaimVendorID == nil || *row.VendorID != *va.ClaimVendorID {
 		return vendorScope{}, ErrNotAuthorized
 	}
-	return vendorScope{vendorID: *row.VendorID, branchID: row.VendorBranchID}, nil
+	return vendorScope{vendorID: *row.VendorID, branchID: row.VendorBranchID, partyRoles: partyRoles}, nil
 }
 
 func (s *VendorOrderService) List(ctx context.Context, va VendorActor, f VendorOrderFilter) (*VendorOrderList, error) {
@@ -140,14 +144,14 @@ func (s *VendorOrderService) List(ctx context.Context, va VendorActor, f VendorO
 	}
 	from, to := optDate(f.From), optDate(f.To)
 	rows, err := s.read.ListVendorOrders(ctx, db.ListVendorOrdersParams{
-		VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyStatus: f.PartyStatus, RequestStatus: f.RequestStatus,
+		VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyRoles: sc.partyRoles, PartyStatus: f.PartyStatus, RequestStatus: f.RequestStatus,
 		FromDate: from, ToDate: to, PageOffset: int32((f.Page - 1) * f.PageSize), PageLimit: int32(f.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list vendor orders: %w", err)
 	}
 	total, err := s.read.CountVendorOrders(ctx, db.CountVendorOrdersParams{
-		VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyStatus: f.PartyStatus, RequestStatus: f.RequestStatus,
+		VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyRoles: sc.partyRoles, PartyStatus: f.PartyStatus, RequestStatus: f.RequestStatus,
 		FromDate: from, ToDate: to,
 	})
 	if err != nil {
@@ -192,7 +196,7 @@ func (s *VendorOrderService) Get(ctx context.Context, va VendorActor, partyID in
 }
 
 func (s *VendorOrderService) getScoped(ctx context.Context, q *db.Queries, sc vendorScope, partyID int64) (db.GetVendorOrderRow, error) {
-	row, err := q.GetVendorOrder(ctx, db.GetVendorOrderParams{ID: partyID, VendorID: sc.vendorID, VendorBranchID: sc.branchID})
+	row, err := q.GetVendorOrder(ctx, db.GetVendorOrderParams{ID: partyID, VendorID: sc.vendorID, VendorBranchID: sc.branchID, PartyRoles: sc.partyRoles})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return row, ErrVendorOrderNotFound
 	}

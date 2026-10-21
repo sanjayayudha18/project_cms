@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -306,6 +307,9 @@ func (s *VendorOrderService) ListRealizations(ctx context.Context, va VendorActo
 	sc, err := s.scope(ctx, db.New(s.pool), va)
 	if err != nil {
 		return nil, err
+	}
+	if !slices.Contains(sc.partyRoles, partyRoleReplenish) {
+		return nil, ErrNotAuthorized // vendor-party-scope Req 4.2: a vault-only account has no realisasi
 	}
 	f.VendorID, f.VendorBranchID, f.RegionCode = &sc.vendorID, sc.branchID, nil
 	return listClassifications(ctx, s.read, f)

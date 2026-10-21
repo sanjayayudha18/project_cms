@@ -142,15 +142,16 @@ func TestBugCondition_NoOldTableNameReferencesInCode(t *testing.T) {
 	// EOD file-type listing), not as the pre-rename replenishment table.
 	// Paths are relative to repoRoot, forward-slashed.
 	exemptFiles := map[string]bool{
-		"backend/internal/db/atm_portal.sql.go":                                              true,
-		"backend/internal/db/models.go":                                                      true,
-		"backend/internal/handler/atm_portal_handler.go":                                     true,
-		"backend/internal/service/atm_portal_cashpos.go":                                     true,
-		"backend/internal/service/atm_portal_profile.go":                                     true,
-		"backend/queries/atm_portal.sql":                                                     true,
-		"frontend/CompanyPortal-Vite/src/features/atm-portal/components/AtmCashposTable.tsx": true,
-		"frontend/CompanyPortal-Vite/src/features/atm-portal/types.ts":                       true,
-		"frontend/CompanyPortal-Vite/src/features/eod-monitoring/types.ts":                   true,
+		"backend/internal/db/atm_portal.sql.go":                                                         true,
+		"backend/internal/db/models.go":                                                                 true,
+		"backend/internal/handler/atm_portal_handler.go":                                                true,
+		"backend/internal/service/atm_portal_cashpos.go":                                                true,
+		"backend/internal/service/atm_portal_profile.go":                                                true,
+		"backend/queries/atm_portal.sql":                                                                true,
+		"frontend/CompanyPortal-Vite/src/features/atm-portal/components/AtmCashposTable.tsx":            true,
+		"frontend/CompanyPortal-Vite/src/features/atm-portal/types.ts":                                  true,
+		"frontend/CompanyPortal-Vite/src/features/eod-monitoring/types.ts":                              true,
+		"frontend/CompanyPortal-Vite/src/features/eod-monitoring/components/EodMonitoringPage.test.tsx": true, // fixtures use the EOD file_type key
 		// scheduler side of the same itm_cashpos snapshot ingestion feature:
 		// the ETL script itself and the retry scheduler that tracks it as
 		// one of three distinct file types (dmaa, itm_cashpos, itm_replenish).

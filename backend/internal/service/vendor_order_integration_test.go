@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // cit-send-vendor S4 on real Postgres: vendor scope (FR5), no cross-vendor
@@ -45,11 +47,17 @@ func newVendorOrderFixture(t *testing.T) *vendorOrderFixture {
 
 func (f *vendorOrderFixture) vendorUser(t *testing.T, vendorID int64, branch *int64) VendorActor {
 	t.Helper()
+	return f.vendorUserAs(t, vendorrole.User, vendorID, branch)
+}
+
+// vendorUserAs seeds an active local user with a vendor role; the token role matches the row.
+func (f *vendorOrderFixture) vendorUserAs(t *testing.T, role string, vendorID int64, branch *int64) VendorActor {
+	t.Helper()
 	ctx := context.Background()
 	var id int64
 	if err := f.pool.QueryRow(ctx, `INSERT INTO users (role_id, username, full_name, email, is_karyawan, auth_source, password_hash, vendor_id, vendor_branch_id)
-		SELECT id, $1, $1, $1 || '@vendor.test', false, 'local', 'x', $2, $3 FROM roles WHERE role = 'VENDOR-USER' RETURNING id`,
-		"itvnd-"+uuid.NewString()[:8], vendorID, branch).Scan(&id); err != nil {
+		SELECT id, $1, $1, $1 || '@vendor.test', false, 'local', 'x', $2, $3 FROM roles WHERE role = $4 RETURNING id`,
+		"itvnd-"+uuid.NewString()[:8], vendorID, branch, role).Scan(&id); err != nil {
 		t.Fatalf("seed vendor user: %v", err)
 	}
 	t.Cleanup(func() {
@@ -61,7 +69,7 @@ func (f *vendorOrderFixture) vendorUser(t *testing.T, vendorID int64, branch *in
 		_, _ = f.pool.Exec(c, `DELETE FROM users WHERE id = $1`, id)
 	})
 	v := vendorID
-	return VendorActor{Actor: Actor{UserID: id, Role: vendorUserRole}, ClaimVendorID: &v}
+	return VendorActor{Actor: Actor{UserID: id, Role: role}, ClaimVendorID: &v}
 }
 
 // party id of (branch, role) on the fixture request.
@@ -147,6 +155,131 @@ func TestIntegration_VendorOrder_ScopeAndNoLeak(t *testing.T) {
 	stale.ClaimVendorID = &f.vendorID
 	if _, err := f.orders.List(ctx, stale, VendorOrderFilter{}); !errors.Is(err, ErrNotAuthorized) {
 		t.Fatalf("claim mismatch: want ErrNotAuthorized, got %v", err)
+	}
+}
+
+// vendor-party-scope Req 10.1 (a)-(d) + Req 4.1/4.2: one branch ("Medan" = the fixture's
+// replenish branch) is both a replenish and a vault party of the same request. Each vendor
+// role sees only its party roles, a branch-pinned account only its branch, VENDOR-USER is
+// unchanged, and a role changed after the token was issued is refused at once.
+func TestIntegration_VendorOrder_PartyRoleScope(t *testing.T) {
+	f := newVendorOrderFixture(t)
+	ctx := context.Background()
+	mdnReplenish := f.party(t, f.branchID, partyRoleReplenish)
+	otherReplenish := f.party(t, f.replenish2(t), partyRoleReplenish)
+	cash1Vault := f.party(t, f.cash1, partyRoleVault)
+	var mdnVault int64
+	if err := f.pool.QueryRow(ctx, `INSERT INTO vendor_request_vendor_parties (vendor_request_id, vendor_branch_id, role, content)
+		SELECT vendor_request_id, $2, 'vault', content FROM vendor_request_vendor_parties WHERE id = $1 RETURNING id`,
+		cash1Vault, f.branchID).Scan(&mdnVault); err != nil {
+		t.Fatalf("seed Medan vault party: %v", err)
+	}
+
+	atmMdn := f.vendorUserAs(t, vendorrole.ATMUser, f.vendorID, &f.branchID)
+	vaultMdn := f.vendorUserAs(t, vendorrole.VaultUser, f.vendorID, &f.branchID)
+	atmWide := f.vendorUserAs(t, vendorrole.ATMUser, f.vendorID, nil)
+	vaultWide := f.vendorUserAs(t, vendorrole.VaultUser, f.vendorID, nil)
+
+	// Listed ids (fixture vendors are fresh, so every row belongs to this request); Count must agree.
+	listIDs := func(va VendorActor) []int64 {
+		t.Helper()
+		l, err := f.orders.List(ctx, va, VendorOrderFilter{})
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		if l.Total != int64(len(l.Items)) {
+			t.Fatalf("count %d != listed %d", l.Total, len(l.Items))
+		}
+		ids := make([]int64, 0, len(l.Items))
+		for _, it := range l.Items {
+			ids = append(ids, it.ID)
+		}
+		slices.Sort(ids)
+		return ids
+	}
+	sorted := func(ids ...int64) []int64 { slices.Sort(ids); return ids }
+	for _, tc := range []struct {
+		name string
+		va   VendorActor
+		want []int64
+	}{
+		{"(a) vault Medan: Medan vault only", vaultMdn, sorted(mdnVault)},
+		{"(b) ATM Medan: Medan replenish only", atmMdn, sorted(mdnReplenish)},
+		{"ATM vendor-wide: both replenish, no vault", atmWide, sorted(mdnReplenish, otherReplenish)},
+		{"vault vendor-wide: both vaults, no replenish", vaultWide, sorted(mdnVault, cash1Vault)},
+		{"(c) VENDOR-USER Medan: both roles of Medan", f.branchUser, sorted(mdnReplenish, mdnVault)},
+		{"(c) VENDOR-USER vendor-wide: everything", f.wideUser, sorted(mdnReplenish, otherReplenish, cash1Vault, mdnVault)},
+	} {
+		if got := listIDs(tc.va); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: list = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+
+	// Detail and actions outside the scope are 404, never a leak.
+	for _, tc := range []struct {
+		name  string
+		va    VendorActor
+		party int64
+	}{
+		{"(a) vault Medan -> replenish Medan", vaultMdn, mdnReplenish},
+		{"(b) ATM Medan -> replenish other branch", atmMdn, otherReplenish},
+		{"ATM Medan -> vault Medan", atmMdn, mdnVault},
+		{"ATM vendor-wide -> vault", atmWide, cash1Vault},
+		{"vault vendor-wide -> replenish", vaultWide, mdnReplenish},
+	} {
+		if _, err := f.orders.Get(ctx, tc.va, tc.party); !errors.Is(err, ErrVendorOrderNotFound) {
+			t.Errorf("%s Get: want ErrVendorOrderNotFound, got %v", tc.name, err)
+		}
+		if _, err := f.orders.Accept(ctx, tc.va, tc.party); !errors.Is(err, ErrVendorOrderNotFound) {
+			t.Errorf("%s Accept: want ErrVendorOrderNotFound, got %v", tc.name, err)
+		}
+		if _, err := f.orders.Reject(ctx, tc.va, tc.party, "armada tidak tersedia"); !errors.Is(err, ErrVendorOrderNotFound) {
+			t.Errorf("%s Reject: want ErrVendorOrderNotFound, got %v", tc.name, err)
+		}
+	}
+	if d, err := f.orders.Get(ctx, vaultMdn, mdnVault); err != nil || d.Role != partyRoleVault {
+		t.Fatalf("vault Medan own party: %+v, %v", d, err)
+	}
+
+	// Req 4.1/4.2: the vault account cannot report realisasi (404) nor list it (403); ATM + VENDOR-USER can list.
+	if _, err := f.orders.SubmitRealization(ctx, vaultMdn, mdnReplenish, realizationRows(t, f.pool, f.reqID, nil)); !errors.Is(err, ErrVendorOrderNotFound) {
+		t.Fatalf("vault realization: want ErrVendorOrderNotFound, got %v", err)
+	}
+	today := jakartaCalendarDate(0)
+	rf := ReplenishmentFilter{From: today.AddDate(0, 0, -7), To: today}
+	if _, err := f.orders.ListRealizations(ctx, vaultMdn, rf); !errors.Is(err, ErrNotAuthorized) {
+		t.Fatalf("vault realization list: want ErrNotAuthorized, got %v", err)
+	}
+	for _, va := range []VendorActor{atmMdn, f.wideUser} {
+		if _, err := f.orders.ListRealizations(ctx, va, rf); err != nil {
+			t.Fatalf("%s realization list: %v", va.Role, err)
+		}
+	}
+
+	// (d) role changed in the DB after the token was issued: the old token is refused (403) everywhere.
+	if _, err := f.pool.Exec(ctx, `UPDATE users SET role_id = (SELECT id FROM roles WHERE role = $2) WHERE id = $1`,
+		atmMdn.UserID, vendorrole.VaultUser); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.orders.List(ctx, atmMdn, VendorOrderFilter{}); !errors.Is(err, ErrNotAuthorized) {
+		t.Errorf("(d) stale role List: want ErrNotAuthorized, got %v", err)
+	}
+	if _, err := f.orders.Get(ctx, atmMdn, mdnReplenish); !errors.Is(err, ErrNotAuthorized) {
+		t.Errorf("(d) stale role Get: want ErrNotAuthorized, got %v", err)
+	}
+	if _, err := f.orders.Accept(ctx, atmMdn, mdnReplenish); !errors.Is(err, ErrNotAuthorized) {
+		t.Errorf("(d) stale role Accept: want ErrNotAuthorized, got %v", err)
+	}
+	if _, err := f.orders.ListRealizations(ctx, atmMdn, rf); !errors.Is(err, ErrNotAuthorized) {
+		t.Errorf("(d) stale role realization list: want ErrNotAuthorized, got %v", err)
+	}
+	fresh := atmMdn
+	fresh.Role = vendorrole.VaultUser // a new token carries the new role and its scope
+	if got := listIDs(fresh); !slices.Equal(got, sorted(mdnVault)) {
+		t.Errorf("(d) new token: list = %v, want %v", got, sorted(mdnVault))
+	}
+	if n := countRows(t, f.pool, `SELECT count(*) FROM vendor_request_vendor_parties WHERE vendor_request_id = $1 AND status <> 'pending'`, f.reqID); n != 0 {
+		t.Fatalf("refused calls decided %d parties", n)
 	}
 }
 

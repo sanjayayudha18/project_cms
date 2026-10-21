@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/service"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -240,10 +241,11 @@ func dateCell(a, b *time.Time) string {
 	return ""
 }
 
-// RealizationRoutes: GET / on /api/v1/vendor/replenish-realizations (FR5.2), VENDOR-USER only.
+// RealizationRoutes: GET / on /api/v1/vendor/replenish-realizations (FR5.2), vendor roles only;
+// the service refuses VENDOR-VAULT-USER (vendor-party-scope Req 4.2).
 func (h *VendorOrderHandler) RealizationRoutes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles("VENDOR-USER"))
+	r.Use(middleware.RequireRoles(vendorrole.All...))
 	r.Get("/", h.ListRealizations)
 	return r
 }

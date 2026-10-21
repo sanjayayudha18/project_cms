@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-21 — Backend: guard test `TestBugCondition_NoOldTableNameReferencesInCode` merah karena fixture EOD Monitoring
+- **Symptom**: `cd backend && go test -tags integration ./internal/handler` gagal di `rename_itm_cashpos_bug_test.go`: "still reference itm_cashpos: frontend/CompanyPortal-Vite/src/features/eod-monitoring/components/EodMonitoringPage.test.tsx". Memblokir job CI go-integration. Ditemukan saat menjalankan suite integrasi untuk vendor-party-scope task 3; sudah ada di HEAD sejak `d195c38` (fe-coverage C5).
+- **Root cause**: false positive guard. Di test itu `itm_cashpos` adalah key `FileType` EOD (`by_file_type.itm_cashpos`, `file_type: "itm_cashpos"`) — sama dengan `eod-monitoring/types.ts:32` (sudah dikecualikan) dan `FILE_TYPES` di `backend_python/eod_retry_scheduler/config.py`, bukan nama tabel lama sebelum rename. Allowlist `exemptFiles` belum memuat file test baru itu.
+- **Fix**: `backend/internal/handler/rename_itm_cashpos_bug_test.go` — `EodMonitoringPage.test.tsx` ditambahkan ke `exemptFiles` (gofmt merapikan kolom map). Frontend tidak berubah.
+- **Tests**: `go test -tags integration -run TestBugCondition_NoOldTableNameReferencesInCode ./internal/handler` PASS (FAIL sebelum fix); `go test ./internal/handler` dan `go test -tags integration ./internal/handler` hijau; CP `pnpm run test` 157 file / 1386 test hijau. Catatan: path Python di `exemptFiles` (`scheduler/...`) sudah usang — folder aslinya `backend_python/`, yang tidak ikut di-scan guard; tidak diubah di fix ini. Manual browser verification: n/a (hanya test).
+- **Commit**: <sha>
+
+---
+
 ## 2026-10-19 — CompanyPortal: EOD Monitoring memanggil `/api/v1/api/eod/*` (prefix ganda)
 - **Symptom**: semua request halaman EOD Monitoring (ringkasan, status file, riwayat, keterlambatan, log audit, retry manual) dikirim ke `/api/v1/api/eod/...`. Proxy Vite dan `nginx.conf` hanya me-route `/api/eod/*` ke `eod_retry_scheduler` (:8091), jadi request itu jatuh ke Go API → 404. Ditemukan saat menulis test `fe-coverage` C5; ada sejak import awal (`b10f23f`). Auth (Sec 4 #7, API client) di-flag; user memilih dokumentasi bugfix.
 - **Root cause**: `eod-monitoring/hooks/useEodQueries.ts` menulis path lengkap `/api/eod/...`, tetapi API client CP selalu menambah `apiConfig.baseURL` (`/api/v1`). Client tidak punya cara untuk layanan di luar `/api/v1`.

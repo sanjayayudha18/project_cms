@@ -18,15 +18,17 @@ JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE b.vendor_id = $1::bigint
   AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
-  AND ($3::text = '' OR p.status = $3::text)
-  AND ($4::text = '' OR vr.status = $4::text)
-  AND ($5::date IS NULL OR vr.replenish_date >= $5::date)
-  AND ($6::date IS NULL OR vr.replenish_date <= $6::date)
+  AND p.role = ANY($3::text[])
+  AND ($4::text = '' OR p.status = $4::text)
+  AND ($5::text = '' OR vr.status = $5::text)
+  AND ($6::date IS NULL OR vr.replenish_date >= $6::date)
+  AND ($7::date IS NULL OR vr.replenish_date <= $7::date)
 `
 
 type CountVendorOrdersParams struct {
 	VendorID       int64       `json:"vendor_id"`
 	VendorBranchID *int64      `json:"vendor_branch_id"`
+	PartyRoles     []string    `json:"party_roles"`
 	PartyStatus    string      `json:"party_status"`
 	RequestStatus  string      `json:"request_status"`
 	FromDate       pgtype.Date `json:"from_date"`
@@ -37,6 +39,7 @@ func (q *Queries) CountVendorOrders(ctx context.Context, arg CountVendorOrdersPa
 	row := q.db.QueryRow(ctx, countVendorOrders,
 		arg.VendorID,
 		arg.VendorBranchID,
+		arg.PartyRoles,
 		arg.PartyStatus,
 		arg.RequestStatus,
 		arg.FromDate,
@@ -90,23 +93,27 @@ func (q *Queries) DecideVendorParty(ctx context.Context, arg DecideVendorPartyPa
 
 const getUserVendorScope = `-- name: GetUserVendorScope :one
 
-SELECT vendor_id, vendor_branch_id FROM users
-WHERE id = $1 AND is_active AND deleted_at IS NULL
+SELECT u.vendor_id, u.vendor_branch_id, r.role FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.id = $1 AND u.is_active AND u.deleted_at IS NULL
 `
 
 type GetUserVendorScopeRow struct {
 	VendorID       *int64 `json:"vendor_id"`
 	VendorBranchID *int64 `json:"vendor_branch_id"`
+	Role           string `json:"role"`
 }
 
 // ---------------------------------------------------------------------------
-// VendorPortal (FR5): cakupan = vendor dari claim + users.vendor_branch_id (NULL = semua branch vendor).
+// VendorPortal (FR5): cakupan = vendor dari claim + users.vendor_branch_id (NULL = semua branch vendor)
+// + peran pihak yang diizinkan role akun (vendor-party-scope Req 3.2, vendorrole.PartyRoles).
 // ---------------------------------------------------------------------------
-// FR5.2: dibaca dari primary per request, bukan dari JWT.
+// FR5.2: dibaca dari primary per request, bukan dari JWT. vendor-party-scope Req 3.8/3.9: role ikut
+// dibaca di query yang sama, supaya token dengan role lama ditolak tanpa query tambahan.
 func (q *Queries) GetUserVendorScope(ctx context.Context, id int64) (GetUserVendorScopeRow, error) {
 	row := q.db.QueryRow(ctx, getUserVendorScope, id)
 	var i GetUserVendorScopeRow
-	err := row.Scan(&i.VendorID, &i.VendorBranchID)
+	err := row.Scan(&i.VendorID, &i.VendorBranchID, &i.Role)
 	return i, err
 }
 
@@ -120,12 +127,14 @@ JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE p.id = $1::bigint
   AND b.vendor_id = $2::bigint
   AND ($3::bigint IS NULL OR p.vendor_branch_id = $3::bigint)
+  AND p.role = ANY($4::text[])
 `
 
 type GetVendorOrderParams struct {
-	ID             int64  `json:"id"`
-	VendorID       int64  `json:"vendor_id"`
-	VendorBranchID *int64 `json:"vendor_branch_id"`
+	ID             int64    `json:"id"`
+	VendorID       int64    `json:"vendor_id"`
+	VendorBranchID *int64   `json:"vendor_branch_id"`
+	PartyRoles     []string `json:"party_roles"`
 }
 
 type GetVendorOrderRow struct {
@@ -148,7 +157,12 @@ type GetVendorOrderRow struct {
 
 // Satu pihak dalam cakupan; di luar cakupan = no rows -> 404 (FR5.3).
 func (q *Queries) GetVendorOrder(ctx context.Context, arg GetVendorOrderParams) (GetVendorOrderRow, error) {
-	row := q.db.QueryRow(ctx, getVendorOrder, arg.ID, arg.VendorID, arg.VendorBranchID)
+	row := q.db.QueryRow(ctx, getVendorOrder,
+		arg.ID,
+		arg.VendorID,
+		arg.VendorBranchID,
+		arg.PartyRoles,
+	)
 	var i GetVendorOrderRow
 	err := row.Scan(
 		&i.ID,
@@ -391,17 +405,19 @@ JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE b.vendor_id = $1::bigint
   AND ($2::bigint IS NULL OR p.vendor_branch_id = $2::bigint)
-  AND ($3::text = '' OR p.status = $3::text)
-  AND ($4::text = '' OR vr.status = $4::text)
-  AND ($5::date IS NULL OR vr.replenish_date >= $5::date)
-  AND ($6::date IS NULL OR vr.replenish_date <= $6::date)
+  AND p.role = ANY($3::text[])
+  AND ($4::text = '' OR p.status = $4::text)
+  AND ($5::text = '' OR vr.status = $5::text)
+  AND ($6::date IS NULL OR vr.replenish_date >= $6::date)
+  AND ($7::date IS NULL OR vr.replenish_date <= $7::date)
 ORDER BY vr.replenish_date DESC NULLS LAST, p.id DESC
-LIMIT $8::int OFFSET $7::int
+LIMIT $9::int OFFSET $8::int
 `
 
 type ListVendorOrdersParams struct {
 	VendorID       int64       `json:"vendor_id"`
 	VendorBranchID *int64      `json:"vendor_branch_id"`
+	PartyRoles     []string    `json:"party_roles"`
 	PartyStatus    string      `json:"party_status"`
 	RequestStatus  string      `json:"request_status"`
 	FromDate       pgtype.Date `json:"from_date"`
@@ -430,6 +446,7 @@ func (q *Queries) ListVendorOrders(ctx context.Context, arg ListVendorOrdersPara
 	rows, err := q.db.Query(ctx, listVendorOrders,
 		arg.VendorID,
 		arg.VendorBranchID,
+		arg.PartyRoles,
 		arg.PartyStatus,
 		arg.RequestStatus,
 		arg.FromDate,

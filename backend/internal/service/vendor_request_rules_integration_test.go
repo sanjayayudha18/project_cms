@@ -7,6 +7,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // be-tech-debt C4.2: vendor_request transition / completion / kuota guards not
@@ -134,9 +136,11 @@ func TestIntegration_Completion_Guards(t *testing.T) {
 
 	t.Run("vendor user is refused on the internal path", func(t *testing.T) {
 		id := f.approvedRequest(t, term)
-		vendor := Actor{UserID: f.maker.UserID, Role: vendorUserRole}
-		if _, err := f.vr.SubmitCompletion(ctx, vendor, id, results); !errors.Is(err, ErrNotAuthorized) {
-			t.Fatalf("err = %v, want ErrNotAuthorized", err)
+		for _, role := range vendorrole.All { // vendor-party-scope: every vendor role, not only VENDOR-USER
+			vendor := Actor{UserID: f.maker.UserID, Role: role}
+			if _, err := f.vr.SubmitCompletion(ctx, vendor, id, results); !errors.Is(err, ErrNotAuthorized) {
+				t.Fatalf("%s: err = %v, want ErrNotAuthorized", role, err)
+			}
 		}
 		var s string
 		if err := f.tx.QueryRow(ctx, `SELECT status FROM vendor_requests WHERE id = $1`, id).Scan(&s); err != nil || s != "approved" {
@@ -158,7 +162,7 @@ func TestIntegration_VisitQuota_ServiceRBACAndEdges(t *testing.T) {
 
 	t.Run("non-checker roles cannot reset or cancel", func(t *testing.T) {
 		term := f.seedPackageATM(t, "RB", "PAKET 5")
-		for _, role := range []string{"ATM-USER", vendorUserRole, ""} {
+		for _, role := range []string{"ATM-USER", vendorrole.User, ""} {
 			a := Actor{UserID: f.maker.UserID, Role: role}
 			if _, err := f.quota.ResetATM(ctx, a, term); !errors.Is(err, ErrNotChecker) {
 				t.Errorf("ResetATM as %q: err = %v, want ErrNotChecker", role, err)

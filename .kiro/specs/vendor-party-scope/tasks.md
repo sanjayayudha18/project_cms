@@ -49,16 +49,16 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 3.2, 7.1, 7.3_
   - _Model: Haiku, Effort: Low — pemetaan statis kecil, sepenuhnya ditentukan design._
 
-- [ ] 3. Cakupan Orders + Realisasi per role
-  - [ ] 3.1 `backend/queries/vendor_parties.sql`: `GetUserVendorScope` + `r.role`; `ListVendorOrders`, `CountVendorOrders`, `GetVendorOrder` + `p.role = ANY(sqlc.arg('party_roles')::text[])`. `sqlc generate`.
+- [x] 3. Cakupan Orders + Realisasi per role
+  - [x] 3.1 `backend/queries/vendor_parties.sql`: `GetUserVendorScope` + `r.role`; `ListVendorOrders`, `CountVendorOrders`, `GetVendorOrder` + `p.role = ANY(sqlc.arg('party_roles')::text[])`. `sqlc generate`.
     - _Requirements: 3.2, 3.3, 3.9_
-  - [ ] 3.2 `service/vendor_order.go`: hapus `vendorUserRole`; `scope()` pakai `vendorrole.PartyRoles`, tolak role JWT ≠ DB; `vendorScope.partyRoles` diteruskan ke semua query cakupan.
+  - [x] 3.2 `service/vendor_order.go`: hapus `vendorUserRole`; `scope()` pakai `vendorrole.PartyRoles`, tolak role JWT ≠ DB; `vendorScope.partyRoles` diteruskan ke semua query cakupan.
     - _Requirements: 3.1, 3.2, 3.4, 3.6, 3.8_
-  - [ ] 3.3 `service/replenishment_read.go` `ListRealizations`: `VENDOR-VAULT-USER` → `ErrNotAuthorized`.
+  - [x] 3.3 `service/replenishment_read.go` `ListRealizations`: `VENDOR-VAULT-USER` → `ErrNotAuthorized`.
     - _Requirements: 4.2, 4.4_
-  - [ ] 3.4 Handler: `RequireRoles(vendorrole.All...)` di `vendor_order_handler.go` `Routes()` dan `replenishment_handler.go` `RealizationRoutes()`; perbarui `vendor_order_handler_test.go` (role baru lolos route; role internal 403).
+  - [x] 3.4 Handler: `RequireRoles(vendorrole.All...)` di `vendor_order_handler.go` `Routes()` dan `replenishment_handler.go` `RealizationRoutes()`; perbarui `vendor_order_handler_test.go` (role baru lolos route; role internal 403).
     - _Requirements: 3.1_
-  - [ ] 3.5 Integration test `vendor_order_integration_test.go`: satu request dengan pihak replenish + vault Abacus Medan dan replenish cabang lain; kasus Req 10.1 (a)–(d): vault Medan tidak melihat replenish Medan; ATM-user Medan tidak melihat cabang lain; `VENDOR-USER` melihat keduanya (regresi); role diganti setelah token terbit → 403; vault → `POST …/realization` 404 dan daftar realisasi 403. Membuktikan Property 3 (regresi `VENDOR-USER`) dan Property 4 (token basi).
+  - [x] 3.5 Integration test `vendor_order_integration_test.go`: satu request dengan pihak replenish + vault Abacus Medan dan replenish cabang lain; kasus Req 10.1 (a)–(d): vault Medan tidak melihat replenish Medan; ATM-user Medan tidak melihat cabang lain; `VENDOR-USER` melihat keduanya (regresi); role diganti setelah token terbit → 403; vault → `POST …/realization` 404 dan daftar realisasi 403. Membuktikan Property 3 (regresi `VENDOR-USER`) dan Property 4 (token basi).
     - _Requirements: 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 4.3, 10.1_
   - [ ]* 3.6 Property test (rapid): Property 1 + 2 (tanpa kebocoran peran/cabang) atas kombinasi acak role × cabang akun × pihak.
     - _Requirements: 3.2, 10.1_

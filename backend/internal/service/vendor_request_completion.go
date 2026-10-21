@@ -11,6 +11,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Laporan selesai replenish (.claude/sdlc/atm-visit-quota/spec.md FR1):
@@ -50,7 +51,7 @@ func checkCompletionActor(actor Actor, req db.VendorRequest, a action) error {
 	switch a {
 	case actionSubmitCompletion:
 		if req.VendorSent {
-			if actor.Role != vendorUserRole {
+			if !vendorrole.IsVendor(actor.Role) {
 				return ErrCompletionByVendor
 			}
 		} else if !roleIn(actor.Role, completionMakerRoles) {
@@ -157,7 +158,7 @@ func runCompletionTx(ctx context.Context, pool VendorRequestPool, actor Actor, i
 // Internal path only: a vendor reports through VendorOrderService.SubmitRealization
 // (scope-checked), never here.
 func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor, id int64, results []CompletionResultInput) (*VendorRequestDetail, error) {
-	if actor.Role == vendorUserRole {
+	if vendorrole.IsVendor(actor.Role) {
 		return nil, ErrNotAuthorized
 	}
 	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {

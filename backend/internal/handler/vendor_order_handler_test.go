@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/service"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
 )
@@ -228,5 +230,31 @@ func TestVendorRequestHandler_VendorSide(t *testing.T) {
 				t.Errorf("body %s does not contain %s", rec.Body.String(), tc.wantBody)
 			}
 		})
+	}
+}
+
+// vendor-party-scope Req 3.1: all three vendor roles pass both route guards (the
+// service narrows the scope); internal roles stay 403.
+func TestVendorOrderHandler_RouteGuardAllVendorRoles(t *testing.T) {
+	ts := testTokenService()
+	r := chi.NewRouter()
+	h := NewVendorOrderHandler(&fakeVendorOrderServicer{})
+	r.With(custommw.RequireAuth(ts)).Mount("/o", h.Routes())
+	r.With(custommw.RequireAuth(ts)).Mount("/v", h.RealizationRoutes())
+	vid := int64(42)
+	for _, role := range append(slices.Clone(vendorrole.All), "ATM-SPV", "ADMIN") {
+		access, _, err := ts.GenerateTokenPair(&pkgauth.AuthIdentity{UserID: 9, Username: "u", Role: role, VendorID: &vid})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := http.StatusOK
+		if !vendorrole.IsVendor(role) {
+			want = http.StatusForbidden
+		}
+		for _, path := range []string{"/o", "/o/7", "/v"} {
+			if rec := doRequest(r, http.MethodGet, path, access, ""); rec.Code != want {
+				t.Errorf("%s GET %s: code = %d, want %d", role, path, rec.Code, want)
+			}
+		}
 	}
 }

@@ -135,13 +135,16 @@ WHERE p.vendor_request_id = $1
 ORDER BY e.created_at, e.id;
 
 -- ---------------------------------------------------------------------------
--- VendorPortal (FR5): cakupan = vendor dari claim + users.vendor_branch_id (NULL = semua branch vendor).
+-- VendorPortal (FR5): cakupan = vendor dari claim + users.vendor_branch_id (NULL = semua branch vendor)
+-- + peran pihak yang diizinkan role akun (vendor-party-scope Req 3.2, vendorrole.PartyRoles).
 -- ---------------------------------------------------------------------------
 
 -- name: GetUserVendorScope :one
--- FR5.2: dibaca dari primary per request, bukan dari JWT.
-SELECT vendor_id, vendor_branch_id FROM users
-WHERE id = $1 AND is_active AND deleted_at IS NULL;
+-- FR5.2: dibaca dari primary per request, bukan dari JWT. vendor-party-scope Req 3.8/3.9: role ikut
+-- dibaca di query yang sama, supaya token dengan role lama ditolak tanpa query tambahan.
+SELECT u.vendor_id, u.vendor_branch_id, r.role FROM users u
+JOIN roles r ON r.id = u.role_id
+WHERE u.id = $1 AND u.is_active AND u.deleted_at IS NULL;
 
 -- name: ListVendorOrders :many
 SELECT p.id, p.role, p.status, p.content, p.sent_at, p.decided_at,
@@ -152,6 +155,7 @@ JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE b.vendor_id = sqlc.arg('vendor_id')::bigint
   AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR p.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
+  AND p.role = ANY(sqlc.arg('party_roles')::text[])
   AND (sqlc.arg('party_status')::text = '' OR p.status = sqlc.arg('party_status')::text)
   AND (sqlc.arg('request_status')::text = '' OR vr.status = sqlc.arg('request_status')::text)
   AND (sqlc.narg('from_date')::date IS NULL OR vr.replenish_date >= sqlc.narg('from_date')::date)
@@ -166,6 +170,7 @@ JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE b.vendor_id = sqlc.arg('vendor_id')::bigint
   AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR p.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
+  AND p.role = ANY(sqlc.arg('party_roles')::text[])
   AND (sqlc.arg('party_status')::text = '' OR p.status = sqlc.arg('party_status')::text)
   AND (sqlc.arg('request_status')::text = '' OR vr.status = sqlc.arg('request_status')::text)
   AND (sqlc.narg('from_date')::date IS NULL OR vr.replenish_date >= sqlc.narg('from_date')::date)
@@ -181,4 +186,5 @@ JOIN vendor_branches b ON b.id = p.vendor_branch_id
 JOIN vendor_requests vr ON vr.id = p.vendor_request_id
 WHERE p.id = sqlc.arg('id')::bigint
   AND b.vendor_id = sqlc.arg('vendor_id')::bigint
-  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR p.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint);
+  AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR p.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
+  AND p.role = ANY(sqlc.arg('party_roles')::text[]);

@@ -11,12 +11,14 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/service"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor) FR9 / API: VendorPortal replenish
-// orders. Mounted under RequireAuth; every route also RequireRoles
-// VENDOR-USER, and the service re-checks role + scope (FR5.4). The URL id is
+// orders. Mounted under RequireAuth; every route also RequireRoles of the
+// three vendor roles (vendorrole.All, vendor-party-scope Req 3.1), and the
+// service re-checks role + scope (FR5.4). The URL id is
 // a party id, so one URL is exactly one scope check.
 
 // VendorOrderServicer is the slice of service.VendorOrderService behind these routes.
@@ -41,7 +43,7 @@ func NewVendorOrderHandler(svc VendorOrderServicer) *VendorOrderHandler {
 
 func (h *VendorOrderHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles("VENDOR-USER"))
+	r.Use(middleware.RequireRoles(vendorrole.All...))
 	r.Get("/", h.List)
 	r.Get("/{id}", h.Get)
 	r.Post("/{id}/accept", h.Accept)

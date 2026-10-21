@@ -213,5 +213,9 @@ func (r *AuthRepository) GetUserProfile(ctx context.Context, userID int64) (*aut
 		VendorID:      row.VendorID,
 		SupervisorID:  row.SupervisorID,
 		ApprovalLevel: row.ApprovalLevel,
+
+		VendorName:       row.VendorName,
+		VendorBranchID:   row.VendorBranchID,
+		VendorBranchName: row.VendorBranchName,
 	}, nil
 }

@@ -110,7 +110,7 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
   - _Model: Sonnet, Effort: Medium — perluasan kolom CSV di pipeline yang sudah ada; aturan kosong/none perlu teliti tapi terbatas._
 
-- [ ] 8. `/auth/me` + konteks vendor
+- [x] 8. `/auth/me` + konteks vendor
   - `queries/auth.sql` `GetMe` + `vendor_name`, `vendor_branch_id`, `vendor_branch_name`; handler/respons `/me` menambah ketiganya (`null` eksplisit). Test handler `/me` untuk user vendor-wide, berbatas cabang, dan internal.
   - _Requirements: 8.3_
   - _Model: Sonnet, Effort: Low — tambahan field read-only pada respons yang ada._

@@ -204,15 +204,30 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, auth.UserProfile{
-		ID:         user.ID,
-		Username:   user.Username,
-		FullName:   user.FullName,
-		Email:      user.Email,
-		Role:       user.Role,
-		IsKaryawan: user.IsKaryawan,
-		VendorID:   user.VendorID,
+	writeJSON(w, http.StatusOK, meResponse{
+		UserProfile: auth.UserProfile{
+			ID:         user.ID,
+			Username:   user.Username,
+			FullName:   user.FullName,
+			Email:      user.Email,
+			Role:       user.Role,
+			IsKaryawan: user.IsKaryawan,
+			VendorID:   user.VendorID,
+		},
+		VendorName:       user.VendorName,
+		VendorBranchID:   user.VendorBranchID,
+		VendorBranchName: user.VendorBranchName,
 	})
+}
+
+// meResponse is auth.UserProfile plus the vendor context for the VendorPortal
+// scope line (vendor-party-scope Req 8.3). New fields are explicit null when
+// empty (no omitempty); existing fields are unchanged.
+type meResponse struct {
+	auth.UserProfile
+	VendorName       *string `json:"vendor_name"`
+	VendorBranchID   *int64  `json:"vendor_branch_id"`
+	VendorBranchName *string `json:"vendor_branch_name"`
 }
 
 // changePasswordRequest is the expected JSON body for POST /change-password.

@@ -96,6 +96,7 @@ func TestAuthHandler_Me(t *testing.T) {
 		SessionMaxLifetime: time.Hour,
 	}, noopBlacklist{})
 	vendorID := int64(9)
+	vendorName, branchID, branchName := "PT Vendor Satu", int64(5), "Cabang Surabaya"
 	cases := []struct {
 		name     string
 		repo     fakeMeRepo
@@ -104,6 +105,12 @@ func TestAuthHandler_Me(t *testing.T) {
 		wantBody string
 	}{
 		{"profile", fakeMeRepo{user: &pkgauth.UserRecord{ID: 42, Username: "vendor.user", Role: "VENDOR-USER", VendorID: &vendorID}}, tokenFor(t, ts, 42), http.StatusOK, `"vendor_id":9`},
+		{"vendor-wide", fakeMeRepo{user: &pkgauth.UserRecord{ID: 42, Role: "VENDOR-USER", VendorID: &vendorID, VendorName: &vendorName}}, tokenFor(t, ts, 42), http.StatusOK,
+			`"vendor_name":"PT Vendor Satu","vendor_branch_id":null,"vendor_branch_name":null`},
+		{"branch-scoped", fakeMeRepo{user: &pkgauth.UserRecord{ID: 42, Role: "VENDOR-ATM-USER", VendorID: &vendorID, VendorName: &vendorName, VendorBranchID: &branchID, VendorBranchName: &branchName}}, tokenFor(t, ts, 42), http.StatusOK,
+			`"vendor_name":"PT Vendor Satu","vendor_branch_id":5,"vendor_branch_name":"Cabang Surabaya"`},
+		{"internal", fakeMeRepo{user: &pkgauth.UserRecord{ID: 42, Role: "ADMIN"}}, tokenFor(t, ts, 42), http.StatusOK,
+			`"vendor_name":null,"vendor_branch_id":null,"vendor_branch_name":null`},
 		{"deleted user", fakeMeRepo{}, tokenFor(t, ts, 42), http.StatusUnauthorized, ""},
 		{"db down", fakeMeRepo{err: errors.New("db down")}, tokenFor(t, ts, 42), http.StatusServiceUnavailable, ""},
 		{"no token", fakeMeRepo{}, "", http.StatusUnauthorized, ""},

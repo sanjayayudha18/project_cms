@@ -104,7 +104,10 @@ UPDATE users SET is_active = true, deleted_at = NULL WHERE id = $1;
 -- Retrieves user profile for the /me endpoint, excluding soft-deleted users.
 SELECT u.id, u.username, u.full_name, u.email, r.role,
        u.is_karyawan, u.vendor_id,
-       u.supervisor_id, u.approval_level
+       u.supervisor_id, u.approval_level,
+       v.name AS vendor_name, u.vendor_branch_id, vb.branch_name AS vendor_branch_name
 FROM users u
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN vendors v ON v.id = u.vendor_id
+LEFT JOIN vendor_branches vb ON vb.id = u.vendor_branch_id
 WHERE u.id = $1 AND u.deleted_at IS NULL;

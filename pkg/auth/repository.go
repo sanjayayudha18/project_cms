@@ -25,6 +25,11 @@ type UserRecord struct {
 	FailedLoginAttempts int32      // local-password lockout policy only; 0 for LDAP users
 	LockedUntil         *time.Time // nullable — local-password lockout policy only; nil = not locked
 	MustChangePassword  bool       // forces a password change on next login (Auth-Local-Lifecycle)
+
+	// Vendor context for /me only (GetUserProfile); nil elsewhere and for internal users.
+	VendorName       *string
+	VendorBranchID   *int64
+	VendorBranchName *string
 }
 
 // UserRepository abstracts database access for user-related queries

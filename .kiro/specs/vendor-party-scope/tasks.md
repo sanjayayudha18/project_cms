@@ -75,14 +75,14 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 10.1_
   - _Model: Sonnet, Effort: Medium — perluasan recipient yang sudah ada; risiko terkendali oleh integration test._
 
-- [ ] 5. Admin users: role vendor + cabang + vendor-options
-  - [ ] 5.1 `backend/queries/users_admin.sql`: `vendor_branch_id` di list/get/create/update (+ `vendor_branch_name` via `LEFT JOIN`); `VendorBranchBelongsToVendor`; `ListVendorOptionsAdmin`, `ListVendorBranchOptionsAdmin`. `sqlc generate`.
+- [x] 5. Admin users: role vendor + cabang + vendor-options
+  - [x] 5.1 `backend/queries/users_admin.sql`: `vendor_branch_id` di list/get/create/update (+ `vendor_branch_name` via `LEFT JOIN`); `VendorBranchBelongsToVendor`; `ListVendorOptionsAdmin`, `ListVendorBranchOptionsAdmin`. `sqlc generate`.
     - _Requirements: 2.1, 2.4, 2.7_
-  - [ ] 5.2 `internal/auth/user_admin.go`: `VendorBranchID` di request; validasi `vendorFields` (role vendor ⇒ `local` + `vendor_id`; non-vendor ⇒ tanpa cabang; cabang milik vendor aktif); audit before/after memuat field baru.
+  - [x] 5.2 `internal/auth/user_admin.go`: `VendorBranchID` di request; validasi `vendorFields` (role vendor ⇒ `local` + `vendor_id`; non-vendor ⇒ tanpa cabang; cabang milik vendor aktif); audit before/after memuat field baru.
     - _Requirements: 1.4, 2.2, 2.3, 2.4, 2.6_
-  - [ ] 5.3 `handler/admin_user_handler.go`: body/respons `vendor_branch_id` + `vendor_branch_name`; `GET /vendor-options` (didaftarkan sebelum `/{id}`, replica). `cmd/api/main.go`: guard `/api/v1/admin/users` → `RequireRoles("APPACCESS", "ADMIN")` (D8); re-check role yang sama di `UserAdminService.Create`/`Update`. Perbarui komentar handler ("APPACCESS-only") agar sesuai.
+  - [x] 5.3 `handler/admin_user_handler.go`: body/respons `vendor_branch_id` + `vendor_branch_name`; `GET /vendor-options` (didaftarkan sebelum `/{id}`, replica). `cmd/api/main.go`: guard `/api/v1/admin/users` → `RequireRoles("APPACCESS", "ADMIN")` (D8); re-check role yang sama di `UserAdminService.Create`/`Update`. Perbarui komentar handler ("APPACCESS-only") agar sesuai.
     - _Requirements: 2.0, 2.1, 2.7_
-  - [ ] 5.4 Test: unit `user_admin` (matriks role × auth_source × vendor × cabang) + integration (Req 10.1 f: service 400 dan FK DB menolak cabang vendor lain); handler test guard: `APPACCESS`/`ADMIN` lolos, `ADMIN_PARAM` 403 di list/create/update/`set-initial-password`/`vendor-options`.
+  - [x] 5.4 Test: unit `user_admin` (matriks role × auth_source × vendor × cabang) + integration (Req 10.1 f: service 400 dan FK DB menolak cabang vendor lain); handler test guard: `APPACCESS`/`ADMIN` lolos, `ADMIN_PARAM` 403 di list/create/update/`set-initial-password`/`vendor-options`.
     - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 10.1_
   - _Model: Opus, Effort: Medium — provisioning akun (auth) dengan aturan validasi baru; polanya sudah ada, cabang kasusnya terbatas._
 

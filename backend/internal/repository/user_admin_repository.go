@@ -170,3 +170,22 @@ func (r *UserAdminRepository) VendorExists(ctx context.Context, vendorID int64) 
 func (r *UserAdminRepository) SupervisorExists(ctx context.Context, userID int64) (bool, error) {
 	return r.queries.UserAdminExists(ctx, userID)
 }
+
+// VendorBranchBelongsToVendor reports whether branchID is an active branch of
+// vendorID (vendor-party-scope Req 2.4).
+func (r *UserAdminRepository) VendorBranchBelongsToVendor(ctx context.Context, branchID, vendorID int64) (bool, error) {
+	return r.queries.VendorBranchBelongsToVendor(ctx, db.VendorBranchBelongsToVendorParams{BranchID: branchID, VendorID: vendorID})
+}
+
+// ListVendorOptions returns active vendors for the admin user form
+// (vendor-party-scope Req 2.7). Construct this repository on the replica
+// pool for this read.
+func (r *UserAdminRepository) ListVendorOptions(ctx context.Context) ([]db.ListVendorOptionsAdminRow, error) {
+	return r.queries.ListVendorOptionsAdmin(ctx)
+}
+
+// ListVendorBranchOptions returns active branches of active vendors for the
+// admin user form (vendor-party-scope Req 2.7).
+func (r *UserAdminRepository) ListVendorBranchOptions(ctx context.Context) ([]db.ListVendorBranchOptionsAdminRow, error) {
+	return r.queries.ListVendorBranchOptionsAdmin(ctx)
+}

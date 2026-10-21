@@ -163,20 +163,22 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService)
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
-	// APPACCESS/ADMIN/ADMIN_PARAM: set a target user's initial password,
-	// forcing a change on their next login (Auth-Local-Lifecycle Task 6),
+	// APPACCESS/ADMIN (ADMIN_PARAM removed, vendor-party-scope D8): set a
+	// target user's initial password, forcing a change on their next login (Auth-Local-Lifecycle Task 6),
 	// plus the full admin user CRUD (Admin User & Vendor Management spec):
 	// list/get/create/update (UserAdminService) and disable/enable (the
 	// existing DeactivateUserService, previously unwired). ADMIN is the
 	// superuser role and must reach every admin area, matching vendors/atms.
 	setInitialPasswordService := auth.NewSetInitialPasswordService(userRepo, auditWriter)
 	userAdminRepo := repository.NewUserAdminRepository(dbPool)
-	userAdminService := auth.NewUserAdminService(userAdminRepo, auditWriter)
+	// vendor-options lookup reads from the replica (vendor-party-scope Req 2.7).
+	userAdminService := auth.NewUserAdminService(userAdminRepo, repository.NewUserAdminRepository(dbReadPool), auditWriter)
 	deactivateService := auth.NewDeactivateUserService(userRepo, auditWriter)
 	adminUserHandler := handler.NewAdminUserHandler(setInitialPasswordService, userAdminService, deactivateService)
 	r.With(
 		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM"),
+		// vendor-party-scope D8: ADMIN_PARAM removed; re-checked in UserAdminService.
+		custommw.RequireRoles("APPACCESS", "ADMIN"),
 	).Mount("/api/v1/admin/users", adminUserHandler.Routes())
 
 	// (vendor and ATM admin CRUD are wired further down, next to the master-data

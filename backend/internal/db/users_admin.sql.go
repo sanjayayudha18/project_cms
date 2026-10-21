@@ -49,20 +49,28 @@ func (q *Queries) CountUsersAdmin(ctx context.Context, arg CountUsersAdminParams
 }
 
 const createUserAdmin = `-- name: CreateUserAdmin :one
+WITH w AS (
 INSERT INTO users (
     role_id, employee_id, username, full_name, email, is_karyawan,
-    auth_source, password_hash, vendor_id, supervisor_id, approval_level,
-    must_change_password
+    auth_source, password_hash, vendor_id, vendor_branch_id, supervisor_id,
+    approval_level, must_change_password
 ) VALUES (
     $1, $2, $3,
     $4, $5, $6,
     $7, $8, $9,
-    $10, $11,
-    $12
+    $10, $11, $12,
+    $13
 )
-RETURNING id, username, full_name, email, role_id, is_karyawan, auth_source,
-          employee_id, vendor_id, is_active, deleted_at, supervisor_id,
-          approval_level, last_login_at
+    RETURNING id, username, full_name, email, role_id, is_karyawan, auth_source,
+              employee_id, vendor_id, vendor_branch_id, is_active, deleted_at,
+              supervisor_id, approval_level, last_login_at
+)
+SELECT w.id, w.username, w.full_name, w.email, w.role_id, w.is_karyawan,
+       w.auth_source, w.employee_id, w.vendor_id, w.vendor_branch_id,
+       vb.branch_name AS vendor_branch_name, w.is_active, w.deleted_at,
+       w.supervisor_id, w.approval_level, w.last_login_at
+FROM w
+LEFT JOIN vendor_branches vb ON vb.id = w.vendor_branch_id
 `
 
 type CreateUserAdminParams struct {
@@ -75,26 +83,29 @@ type CreateUserAdminParams struct {
 	AuthSource         string  `json:"auth_source"`
 	PasswordHash       *string `json:"password_hash"`
 	VendorID           *int64  `json:"vendor_id"`
+	VendorBranchID     *int64  `json:"vendor_branch_id"`
 	SupervisorID       *int64  `json:"supervisor_id"`
 	ApprovalLevel      *int32  `json:"approval_level"`
 	MustChangePassword bool    `json:"must_change_password"`
 }
 
 type CreateUserAdminRow struct {
-	ID            int64              `json:"id"`
-	Username      string             `json:"username"`
-	FullName      string             `json:"full_name"`
-	Email         string             `json:"email"`
-	RoleID        int64              `json:"role_id"`
-	IsKaryawan    bool               `json:"is_karyawan"`
-	AuthSource    string             `json:"auth_source"`
-	EmployeeID    *string            `json:"employee_id"`
-	VendorID      *int64             `json:"vendor_id"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	SupervisorID  *int64             `json:"supervisor_id"`
-	ApprovalLevel *int32             `json:"approval_level"`
-	LastLoginAt   pgtype.Timestamptz `json:"last_login_at"`
+	ID               int64              `json:"id"`
+	Username         string             `json:"username"`
+	FullName         string             `json:"full_name"`
+	Email            string             `json:"email"`
+	RoleID           int64              `json:"role_id"`
+	IsKaryawan       bool               `json:"is_karyawan"`
+	AuthSource       string             `json:"auth_source"`
+	EmployeeID       *string            `json:"employee_id"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	VendorBranchName *string            `json:"vendor_branch_name"`
+	IsActive         bool               `json:"is_active"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID     *int64             `json:"supervisor_id"`
+	ApprovalLevel    *int32             `json:"approval_level"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
 }
 
 // Single INSERT (Resolved Decision 5): for auth_source=local, password_hash
@@ -102,6 +113,7 @@ type CreateUserAdminRow struct {
 // SetInitialPassword call, so there is one write and one audit entry, and no
 // window where the user row exists without its password. For auth_source=ldap,
 // password_hash is NULL and must_change_password stays false (column default).
+// CTE + LEFT JOIN so vendor_branch_name stays nullable (vendor-party-scope Req 2.1).
 func (q *Queries) CreateUserAdmin(ctx context.Context, arg CreateUserAdminParams) (CreateUserAdminRow, error) {
 	row := q.db.QueryRow(ctx, createUserAdmin,
 		arg.RoleID,
@@ -113,6 +125,7 @@ func (q *Queries) CreateUserAdmin(ctx context.Context, arg CreateUserAdminParams
 		arg.AuthSource,
 		arg.PasswordHash,
 		arg.VendorID,
+		arg.VendorBranchID,
 		arg.SupervisorID,
 		arg.ApprovalLevel,
 		arg.MustChangePassword,
@@ -128,6 +141,8 @@ func (q *Queries) CreateUserAdmin(ctx context.Context, arg CreateUserAdminParams
 		&i.AuthSource,
 		&i.EmployeeID,
 		&i.VendorID,
+		&i.VendorBranchID,
+		&i.VendorBranchName,
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.SupervisorID,
@@ -230,29 +245,33 @@ func (q *Queries) GetRoleByName(ctx context.Context, role string) (GetRoleByName
 
 const getUserAdminByID = `-- name: GetUserAdminByID :one
 SELECT u.id, u.username, u.full_name, u.email, r.role, u.role_id, u.is_karyawan,
-       u.auth_source, u.employee_id, u.vendor_id, u.is_active, u.deleted_at,
+       u.auth_source, u.employee_id, u.vendor_id, u.vendor_branch_id,
+       vb.branch_name AS vendor_branch_name, u.is_active, u.deleted_at,
        u.supervisor_id, u.approval_level, u.last_login_at
 FROM users u
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN vendor_branches vb ON vb.id = u.vendor_branch_id
 WHERE u.id = $1
 `
 
 type GetUserAdminByIDRow struct {
-	ID            int64              `json:"id"`
-	Username      string             `json:"username"`
-	FullName      string             `json:"full_name"`
-	Email         string             `json:"email"`
-	Role          string             `json:"role"`
-	RoleID        int64              `json:"role_id"`
-	IsKaryawan    bool               `json:"is_karyawan"`
-	AuthSource    string             `json:"auth_source"`
-	EmployeeID    *string            `json:"employee_id"`
-	VendorID      *int64             `json:"vendor_id"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	SupervisorID  *int64             `json:"supervisor_id"`
-	ApprovalLevel *int32             `json:"approval_level"`
-	LastLoginAt   pgtype.Timestamptz `json:"last_login_at"`
+	ID               int64              `json:"id"`
+	Username         string             `json:"username"`
+	FullName         string             `json:"full_name"`
+	Email            string             `json:"email"`
+	Role             string             `json:"role"`
+	RoleID           int64              `json:"role_id"`
+	IsKaryawan       bool               `json:"is_karyawan"`
+	AuthSource       string             `json:"auth_source"`
+	EmployeeID       *string            `json:"employee_id"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	VendorBranchName *string            `json:"vendor_branch_name"`
+	IsActive         bool               `json:"is_active"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID     *int64             `json:"supervisor_id"`
+	ApprovalLevel    *int32             `json:"approval_level"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
 }
 
 // Unlike auth.sql's FindUserByID, this INCLUDES soft-deleted rows — the admin
@@ -273,6 +292,8 @@ func (q *Queries) GetUserAdminByID(ctx context.Context, id int64) (GetUserAdminB
 		&i.AuthSource,
 		&i.EmployeeID,
 		&i.VendorID,
+		&i.VendorBranchID,
+		&i.VendorBranchName,
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.SupervisorID,
@@ -315,10 +336,12 @@ func (q *Queries) ListRoles(ctx context.Context) ([]ListRolesRow, error) {
 const listUsersAdmin = `-- name: ListUsersAdmin :many
 
 SELECT u.id, u.username, u.full_name, u.email, r.role, u.is_karyawan,
-       u.auth_source, u.vendor_id, u.is_active, u.deleted_at,
+       u.auth_source, u.vendor_id, u.vendor_branch_id,
+       vb.branch_name AS vendor_branch_name, u.is_active, u.deleted_at,
        u.supervisor_id, u.approval_level, u.last_login_at
 FROM users u
 JOIN roles r ON r.id = u.role_id
+LEFT JOIN vendor_branches vb ON vb.id = u.vendor_branch_id
 WHERE ($1::text IS NULL
         OR u.username ILIKE '%' || $1::text || '%'
         OR u.full_name ILIKE '%' || $1::text || '%'
@@ -344,19 +367,21 @@ type ListUsersAdminParams struct {
 }
 
 type ListUsersAdminRow struct {
-	ID            int64              `json:"id"`
-	Username      string             `json:"username"`
-	FullName      string             `json:"full_name"`
-	Email         string             `json:"email"`
-	Role          string             `json:"role"`
-	IsKaryawan    bool               `json:"is_karyawan"`
-	AuthSource    string             `json:"auth_source"`
-	VendorID      *int64             `json:"vendor_id"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	SupervisorID  *int64             `json:"supervisor_id"`
-	ApprovalLevel *int32             `json:"approval_level"`
-	LastLoginAt   pgtype.Timestamptz `json:"last_login_at"`
+	ID               int64              `json:"id"`
+	Username         string             `json:"username"`
+	FullName         string             `json:"full_name"`
+	Email            string             `json:"email"`
+	Role             string             `json:"role"`
+	IsKaryawan       bool               `json:"is_karyawan"`
+	AuthSource       string             `json:"auth_source"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	VendorBranchName *string            `json:"vendor_branch_name"`
+	IsActive         bool               `json:"is_active"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID     *int64             `json:"supervisor_id"`
+	ApprovalLevel    *int32             `json:"approval_level"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
 }
 
 // Admin User & Vendor Management (Task 2): sqlc queries for the admin user
@@ -392,6 +417,8 @@ func (q *Queries) ListUsersAdmin(ctx context.Context, arg ListUsersAdminParams) 
 			&i.IsKaryawan,
 			&i.AuthSource,
 			&i.VendorID,
+			&i.VendorBranchID,
+			&i.VendorBranchName,
 			&i.IsActive,
 			&i.DeletedAt,
 			&i.SupervisorID,
@@ -408,7 +435,84 @@ func (q *Queries) ListUsersAdmin(ctx context.Context, arg ListUsersAdminParams) 
 	return items, nil
 }
 
+const listVendorBranchOptionsAdmin = `-- name: ListVendorBranchOptionsAdmin :many
+SELECT vb.id, vb.vendor_id, vb.branch_code, vb.branch_name, vb.region_code
+FROM vendor_branches vb
+JOIN vendors v ON v.id = vb.vendor_id
+WHERE vb.is_active AND v.is_active AND v.deleted_at IS NULL
+ORDER BY vb.vendor_id, vb.branch_name, vb.id
+`
+
+type ListVendorBranchOptionsAdminRow struct {
+	ID         int64   `json:"id"`
+	VendorID   int64   `json:"vendor_id"`
+	BranchCode string  `json:"branch_code"`
+	BranchName string  `json:"branch_name"`
+	RegionCode *string `json:"region_code"`
+}
+
+// vendor-party-scope Req 2.7: active branches of active vendors (replica).
+func (q *Queries) ListVendorBranchOptionsAdmin(ctx context.Context) ([]ListVendorBranchOptionsAdminRow, error) {
+	rows, err := q.db.Query(ctx, listVendorBranchOptionsAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListVendorBranchOptionsAdminRow{}
+	for rows.Next() {
+		var i ListVendorBranchOptionsAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.VendorID,
+			&i.BranchCode,
+			&i.BranchName,
+			&i.RegionCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVendorOptionsAdmin = `-- name: ListVendorOptionsAdmin :many
+SELECT id, code, name FROM vendors
+WHERE is_active AND deleted_at IS NULL
+ORDER BY name, id
+`
+
+type ListVendorOptionsAdminRow struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// vendor-party-scope Req 2.7: active vendors for the admin user form (replica).
+func (q *Queries) ListVendorOptionsAdmin(ctx context.Context) ([]ListVendorOptionsAdminRow, error) {
+	rows, err := q.db.Query(ctx, listVendorOptionsAdmin)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListVendorOptionsAdminRow{}
+	for rows.Next() {
+		var i ListVendorOptionsAdminRow
+		if err := rows.Scan(&i.ID, &i.Code, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUserAdmin = `-- name: UpdateUserAdmin :one
+WITH w AS (
 UPDATE users
 SET full_name = $1,
     email = $2,
@@ -416,47 +520,59 @@ SET full_name = $1,
     is_karyawan = $4,
     employee_id = $5,
     vendor_id = $6,
-    supervisor_id = $7,
-    approval_level = $8,
+    vendor_branch_id = $7,
+    supervisor_id = $8,
+    approval_level = $9,
     updated_at = now()
-WHERE id = $9 AND deleted_at IS NULL
-RETURNING id, username, full_name, email, role_id, is_karyawan, auth_source,
-          employee_id, vendor_id, is_active, deleted_at, supervisor_id,
-          approval_level, last_login_at
+WHERE users.id = $10 AND users.deleted_at IS NULL
+    RETURNING id, username, full_name, email, role_id, is_karyawan, auth_source,
+              employee_id, vendor_id, vendor_branch_id, is_active, deleted_at,
+              supervisor_id, approval_level, last_login_at
+)
+SELECT w.id, w.username, w.full_name, w.email, w.role_id, w.is_karyawan,
+       w.auth_source, w.employee_id, w.vendor_id, w.vendor_branch_id,
+       vb.branch_name AS vendor_branch_name, w.is_active, w.deleted_at,
+       w.supervisor_id, w.approval_level, w.last_login_at
+FROM w
+LEFT JOIN vendor_branches vb ON vb.id = w.vendor_branch_id
 `
 
 type UpdateUserAdminParams struct {
-	FullName      string  `json:"full_name"`
-	Email         string  `json:"email"`
-	RoleID        int64   `json:"role_id"`
-	IsKaryawan    bool    `json:"is_karyawan"`
-	EmployeeID    *string `json:"employee_id"`
-	VendorID      *int64  `json:"vendor_id"`
-	SupervisorID  *int64  `json:"supervisor_id"`
-	ApprovalLevel *int32  `json:"approval_level"`
-	ID            int64   `json:"id"`
+	FullName       string  `json:"full_name"`
+	Email          string  `json:"email"`
+	RoleID         int64   `json:"role_id"`
+	IsKaryawan     bool    `json:"is_karyawan"`
+	EmployeeID     *string `json:"employee_id"`
+	VendorID       *int64  `json:"vendor_id"`
+	VendorBranchID *int64  `json:"vendor_branch_id"`
+	SupervisorID   *int64  `json:"supervisor_id"`
+	ApprovalLevel  *int32  `json:"approval_level"`
+	ID             int64   `json:"id"`
 }
 
 type UpdateUserAdminRow struct {
-	ID            int64              `json:"id"`
-	Username      string             `json:"username"`
-	FullName      string             `json:"full_name"`
-	Email         string             `json:"email"`
-	RoleID        int64              `json:"role_id"`
-	IsKaryawan    bool               `json:"is_karyawan"`
-	AuthSource    string             `json:"auth_source"`
-	EmployeeID    *string            `json:"employee_id"`
-	VendorID      *int64             `json:"vendor_id"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	SupervisorID  *int64             `json:"supervisor_id"`
-	ApprovalLevel *int32             `json:"approval_level"`
-	LastLoginAt   pgtype.Timestamptz `json:"last_login_at"`
+	ID               int64              `json:"id"`
+	Username         string             `json:"username"`
+	FullName         string             `json:"full_name"`
+	Email            string             `json:"email"`
+	RoleID           int64              `json:"role_id"`
+	IsKaryawan       bool               `json:"is_karyawan"`
+	AuthSource       string             `json:"auth_source"`
+	EmployeeID       *string            `json:"employee_id"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	VendorBranchName *string            `json:"vendor_branch_name"`
+	IsActive         bool               `json:"is_active"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	SupervisorID     *int64             `json:"supervisor_id"`
+	ApprovalLevel    *int32             `json:"approval_level"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
 }
 
 // Editable fields only (Req 4.1); username/auth_source/password_hash are
 // never touched here. `AND deleted_at IS NULL` makes a soft-disabled target
 // update as 0 rows affected, which the repository maps to "not found" (Req 4.4).
+// CTE + LEFT JOIN so vendor_branch_name stays nullable (vendor-party-scope Req 2.1).
 func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams) (UpdateUserAdminRow, error) {
 	row := q.db.QueryRow(ctx, updateUserAdmin,
 		arg.FullName,
@@ -465,6 +581,7 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 		arg.IsKaryawan,
 		arg.EmployeeID,
 		arg.VendorID,
+		arg.VendorBranchID,
 		arg.SupervisorID,
 		arg.ApprovalLevel,
 		arg.ID,
@@ -480,6 +597,8 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 		&i.AuthSource,
 		&i.EmployeeID,
 		&i.VendorID,
+		&i.VendorBranchID,
+		&i.VendorBranchName,
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.SupervisorID,
@@ -497,6 +616,28 @@ SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exist
 // only an active (non-disabled) user is a valid supervisor.
 func (q *Queries) UserAdminExists(ctx context.Context, id int64) (bool, error) {
 	row := q.db.QueryRow(ctx, userAdminExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const vendorBranchBelongsToVendor = `-- name: VendorBranchBelongsToVendor :one
+SELECT EXISTS(
+    SELECT 1 FROM vendor_branches
+    WHERE id = $1 AND vendor_id = $2 AND is_active
+) AS exists
+`
+
+type VendorBranchBelongsToVendorParams struct {
+	BranchID int64 `json:"branch_id"`
+	VendorID int64 `json:"vendor_id"`
+}
+
+// vendor-party-scope Req 2.4: vendor_branch_id must be an ACTIVE branch of
+// the account's vendor_id. FK users_vendor_branch_owner_fk is the DB backstop
+// for ownership (Req 2.5); it does not check is_active.
+func (q *Queries) VendorBranchBelongsToVendor(ctx context.Context, arg VendorBranchBelongsToVendorParams) (bool, error) {
+	row := q.db.QueryRow(ctx, vendorBranchBelongsToVendor, arg.BranchID, arg.VendorID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err

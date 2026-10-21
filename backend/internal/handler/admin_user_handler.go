@@ -34,8 +34,9 @@ type UserAdminServicer interface {
 	List(ctx context.Context, arg db.ListUsersAdminParams) ([]db.ListUsersAdminRow, error)
 	Count(ctx context.Context, arg db.CountUsersAdminParams) (int64, error)
 	Get(ctx context.Context, id int64) (*db.GetUserAdminByIDRow, error)
-	Create(ctx context.Context, actorID int64, req auth.CreateUserRequest, actorIP string) (db.CreateUserAdminRow, error)
-	Update(ctx context.Context, actorID, id int64, req auth.UpdateUserRequest, actorIP string) (db.UpdateUserAdminRow, error)
+	Create(ctx context.Context, actorID int64, actorRole string, req auth.CreateUserRequest, actorIP string) (db.CreateUserAdminRow, error)
+	Update(ctx context.Context, actorID int64, actorRole string, id int64, req auth.UpdateUserRequest, actorIP string) (db.UpdateUserAdminRow, error)
+	VendorOptions(ctx context.Context) (auth.VendorOptions, error)
 }
 
 // DeactivateService is the subset of auth.DeactivateUserService the handler
@@ -46,10 +47,11 @@ type DeactivateService interface {
 	Reactivate(ctx context.Context, actorID, targetUserID int64, actorIP string) error
 }
 
-// AdminUserHandler handles APPACCESS-only user management endpoints:
-// list/get/create/update/disable/enable plus the existing
-// set-initial-password account-provisioning action.
-// Mount behind RequireAuth + RequireRoles("APPACCESS") — see cmd/api/main.go.
+// AdminUserHandler handles the user management endpoints:
+// list/get/create/update/disable/enable, the vendor-options lookup, plus the
+// existing set-initial-password account-provisioning action.
+// Mount behind RequireAuth + RequireRoles("APPACCESS", "ADMIN") — see
+// cmd/api/main.go (vendor-party-scope D8: ADMIN_PARAM has no access).
 type AdminUserHandler struct {
 	setInitialPasswordSvc SetInitialPasswordService
 	userAdminSvc          UserAdminServicer
@@ -70,6 +72,7 @@ func (h *AdminUserHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.List)
 	r.Post("/", h.Create)
+	r.Get("/vendor-options", h.VendorOptions) // before /{id}
 	r.Get("/{id}", h.Get)
 	r.Put("/{id}", h.Update)
 	r.Post("/{id}/disable", h.Disable)
@@ -155,6 +158,17 @@ func (h *AdminUserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, getUserRowToResponse(*row))
 }
 
+// VendorOptions handles GET /vendor-options (vendor-party-scope Req 2.7):
+// active vendors + active branches for the user form, read from the replica.
+func (h *AdminUserHandler) VendorOptions(w http.ResponseWriter, r *http.Request) {
+	opts, err := h.userAdminSvc.VendorOptions(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"vendors": opts.Vendors, "branches": opts.Branches})
+}
+
 type createUserRequestBody struct {
 	Username          string `json:"username"`
 	FullName          string `json:"full_name"`
@@ -165,6 +179,7 @@ type createUserRequestBody struct {
 	TemporaryPassword string `json:"temporary_password"`
 	EmployeeID        string `json:"employee_id"`
 	VendorID          *int64 `json:"vendor_id"`
+	VendorBranchID    *int64 `json:"vendor_branch_id"`
 	SupervisorID      *int64 `json:"supervisor_id"`
 	ApprovalLevel     *int32 `json:"approval_level"`
 }
@@ -183,11 +198,11 @@ func (h *AdminUserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.userAdminSvc.Create(r.Context(), authCtx.UserID, auth.CreateUserRequest{
+	created, err := h.userAdminSvc.Create(r.Context(), authCtx.UserID, authCtx.Role, auth.CreateUserRequest{
 		Username: body.Username, FullName: body.FullName, Email: body.Email, Role: body.Role,
 		IsKaryawan: body.IsKaryawan, AuthSource: body.AuthSource, TemporaryPassword: body.TemporaryPassword,
-		EmployeeID: body.EmployeeID, VendorID: body.VendorID, SupervisorID: body.SupervisorID,
-		ApprovalLevel: body.ApprovalLevel,
+		EmployeeID: body.EmployeeID, VendorID: body.VendorID, VendorBranchID: body.VendorBranchID,
+		SupervisorID: body.SupervisorID, ApprovalLevel: body.ApprovalLevel,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleUserAdminError(w, err)
@@ -198,16 +213,30 @@ func (h *AdminUserHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateUserRequestBody struct {
-	Username      *string `json:"username"`
-	AuthSource    *string `json:"auth_source"`
-	FullName      string  `json:"full_name"`
-	Email         string  `json:"email"`
-	Role          string  `json:"role"`
-	IsKaryawan    bool    `json:"is_karyawan"`
-	EmployeeID    string  `json:"employee_id"`
-	VendorID      *int64  `json:"vendor_id"`
-	SupervisorID  *int64  `json:"supervisor_id"`
-	ApprovalLevel *int32  `json:"approval_level"`
+	Username   *string `json:"username"`
+	AuthSource *string `json:"auth_source"`
+	FullName   string  `json:"full_name"`
+	Email      string  `json:"email"`
+	Role       string  `json:"role"`
+	IsKaryawan bool    `json:"is_karyawan"`
+	EmployeeID string  `json:"employee_id"`
+	VendorID   *int64  `json:"vendor_id"`
+	// Absent = keep the stored branch, null = vendor-wide (decision A).
+	VendorBranchID optionalInt64 `json:"vendor_branch_id"`
+	SupervisorID   *int64        `json:"supervisor_id"`
+	ApprovalLevel  *int32        `json:"approval_level"`
+}
+
+// optionalInt64 tells an absent JSON field (Set=false) from an explicit null.
+// encoding/json only calls UnmarshalJSON when the key is present, null included.
+type optionalInt64 struct {
+	Set   bool
+	Value *int64
+}
+
+func (o *optionalInt64) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	return json.Unmarshal(b, &o.Value)
 }
 
 // Update handles PUT /{id} (Req 4).
@@ -230,9 +259,10 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.userAdminSvc.Update(r.Context(), authCtx.UserID, id, auth.UpdateUserRequest{
+	updated, err := h.userAdminSvc.Update(r.Context(), authCtx.UserID, authCtx.Role, id, auth.UpdateUserRequest{
 		Username: body.Username, AuthSource: body.AuthSource, FullName: body.FullName, Email: body.Email,
 		Role: body.Role, IsKaryawan: body.IsKaryawan, EmployeeID: body.EmployeeID, VendorID: body.VendorID,
+		VendorBranchID: body.VendorBranchID.Value, VendorBranchIDSet: body.VendorBranchID.Set,
 		SupervisorID: body.SupervisorID, ApprovalLevel: body.ApprovalLevel,
 	}, extractClientIP(r))
 	if err != nil {
@@ -382,6 +412,8 @@ func (h *AdminUserHandler) handleUserAdminError(w http.ResponseWriter, err error
 	var referenceErr *auth.ReferenceError
 
 	switch {
+	case errors.Is(err, auth.ErrActorNotAllowed):
+		writeError(w, http.StatusForbidden, "forbidden", auth.ErrActorNotAllowed.Error())
 	case errors.As(err, &validationErr):
 		writeValidationError(w, validationErr.Field, validationErr.Message)
 	case errors.As(err, &conflictErr):
@@ -454,7 +486,8 @@ func listUserRowToResponse(r db.ListUsersAdminRow) map[string]any {
 	return map[string]any{
 		"id": r.ID, "username": r.Username, "full_name": r.FullName, "email": r.Email,
 		"role": r.Role, "is_karyawan": r.IsKaryawan, "auth_source": r.AuthSource,
-		"vendor_id": r.VendorID, "is_active": r.IsActive, "deleted_at": formatTimestamptz(r.DeletedAt),
+		"vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID, "vendor_branch_name": r.VendorBranchName,
+		"is_active": r.IsActive, "deleted_at": formatTimestamptz(r.DeletedAt),
 		"supervisor_id": r.SupervisorID, "approval_level": r.ApprovalLevel,
 		"last_login_at": formatTimestamptz(r.LastLoginAt),
 	}
@@ -464,7 +497,8 @@ func getUserRowToResponse(r db.GetUserAdminByIDRow) map[string]any {
 	return map[string]any{
 		"id": r.ID, "username": r.Username, "full_name": r.FullName, "email": r.Email,
 		"role": r.Role, "is_karyawan": r.IsKaryawan, "auth_source": r.AuthSource,
-		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "is_active": r.IsActive,
+		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID,
+		"vendor_branch_name": r.VendorBranchName, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt), "supervisor_id": r.SupervisorID,
 		"approval_level": r.ApprovalLevel, "last_login_at": formatTimestamptz(r.LastLoginAt),
 	}
@@ -474,7 +508,8 @@ func createUserRowToResponse(r db.CreateUserAdminRow) map[string]any {
 	return map[string]any{
 		"id": r.ID, "username": r.Username, "full_name": r.FullName, "email": r.Email,
 		"role_id": r.RoleID, "is_karyawan": r.IsKaryawan, "auth_source": r.AuthSource,
-		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "is_active": r.IsActive,
+		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID,
+		"vendor_branch_name": r.VendorBranchName, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt), "supervisor_id": r.SupervisorID,
 		"approval_level": r.ApprovalLevel, "last_login_at": formatTimestamptz(r.LastLoginAt),
 	}
@@ -484,7 +519,8 @@ func updateUserRowToResponse(r db.UpdateUserAdminRow) map[string]any {
 	return map[string]any{
 		"id": r.ID, "username": r.Username, "full_name": r.FullName, "email": r.Email,
 		"role_id": r.RoleID, "is_karyawan": r.IsKaryawan, "auth_source": r.AuthSource,
-		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "is_active": r.IsActive,
+		"employee_id": r.EmployeeID, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID,
+		"vendor_branch_name": r.VendorBranchName, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt), "supervisor_id": r.SupervisorID,
 		"approval_level": r.ApprovalLevel, "last_login_at": formatTimestamptz(r.LastLoginAt),
 	}

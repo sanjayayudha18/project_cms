@@ -13,6 +13,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/auth"
 )
 
@@ -35,7 +36,24 @@ var (
 	// ErrLdapFieldsNotAllowed: vendor_id or temporary_password was supplied
 	// for auth_source=ldap, which is vendor/local-only (Req 3.4).
 	ErrLdapFieldsNotAllowed = errors.New("vendor_id dan temporary_password tidak boleh diisi untuk auth_source ldap")
+	// ErrActorNotAllowed: the actor's role may not create/update users. The
+	// route guard already enforces this; the service re-checks it (Sec 5
+	// RBAC at middleware AND service, vendor-party-scope D8) -> 403.
+	ErrActorNotAllowed = errors.New("anda tidak memiliki akses untuk mengelola pengguna")
 )
+
+// userAdminActorRoles may create/update users (vendor-party-scope D8:
+// ADMIN_PARAM removed). Must match the RequireRoles guard in cmd/api/main.go.
+var userAdminActorRoles = []string{"APPACCESS", "ADMIN"}
+
+func isUserAdminActor(role string) bool {
+	for _, allowed := range userAdminActorRoles {
+		if strings.EqualFold(strings.TrimSpace(role), allowed) {
+			return true
+		}
+	}
+	return false
+}
 
 // ConflictError represents a 409 uniqueness conflict on a specific field
 // (username/email/employee_id, Req 3.5, 4.5).
@@ -77,7 +95,21 @@ type UserAdminRepo interface {
 	FindByEmployeeIDExcludingID(ctx context.Context, employeeID string, excludeID int64) (*int64, error)
 	GetRoleByName(ctx context.Context, role string) (*db.GetRoleByNameRow, error)
 	VendorExists(ctx context.Context, vendorID int64) (bool, error)
+	VendorBranchBelongsToVendor(ctx context.Context, branchID, vendorID int64) (bool, error)
 	SupervisorExists(ctx context.Context, userID int64) (bool, error)
+}
+
+// VendorOptionsReader serves the vendor-options lookup (vendor-party-scope
+// Req 2.7). Backed by a replica-pool *repository.UserAdminRepository.
+type VendorOptionsReader interface {
+	ListVendorOptions(ctx context.Context) ([]db.ListVendorOptionsAdminRow, error)
+	ListVendorBranchOptions(ctx context.Context) ([]db.ListVendorBranchOptionsAdminRow, error)
+}
+
+// VendorOptions is the vendor + branch lookup for the admin user form.
+type VendorOptions struct {
+	Vendors  []db.ListVendorOptionsAdminRow
+	Branches []db.ListVendorBranchOptionsAdminRow
 }
 
 // UserAdminService owns validation, uniqueness/reference resolution, and
@@ -85,13 +117,15 @@ type UserAdminRepo interface {
 // enable are NOT implemented here -- the handler calls the existing
 // DeactivateUserService.Deactivate/Reactivate directly (design.md).
 type UserAdminService struct {
-	repo  UserAdminRepo
-	audit AuditWriter
+	repo    UserAdminRepo
+	options VendorOptionsReader
+	audit   AuditWriter
 }
 
 // NewUserAdminService creates a UserAdminService with the given dependencies.
-func NewUserAdminService(repo UserAdminRepo, auditWriter AuditWriter) *UserAdminService {
-	return &UserAdminService{repo: repo, audit: auditWriter}
+// options should read from the replica (Sec 6); repo stays on the primary.
+func NewUserAdminService(repo UserAdminRepo, options VendorOptionsReader, auditWriter AuditWriter) *UserAdminService {
+	return &UserAdminService{repo: repo, options: options, audit: auditWriter}
 }
 
 // CreateUserRequest holds the data for a POST /api/v1/admin/users request
@@ -106,6 +140,7 @@ type CreateUserRequest struct {
 	TemporaryPassword string // required when AuthSource == "local"
 	EmployeeID        string
 	VendorID          *int64
+	VendorBranchID    *int64 // nil = vendor-wide; vendor roles only
 	SupervisorID      *int64
 	ApprovalLevel     *int32
 }
@@ -115,16 +150,20 @@ type CreateUserRequest struct {
 // change them can be detected and rejected (Req 4.2) -- nil means the field
 // was not sent at all.
 type UpdateUserRequest struct {
-	Username      *string
-	AuthSource    *string
-	FullName      string
-	Email         string
-	Role          string
-	IsKaryawan    bool
-	EmployeeID    string
-	VendorID      *int64
-	SupervisorID  *int64
-	ApprovalLevel *int32
+	Username   *string
+	AuthSource *string
+	FullName   string
+	Email      string
+	Role       string
+	IsKaryawan bool
+	EmployeeID string
+	VendorID   *int64
+	// VendorBranchIDSet=false means the field was absent from the body: keep
+	// the stored branch (decision A). Set with a nil VendorBranchID clears it.
+	VendorBranchID    *int64
+	VendorBranchIDSet bool
+	SupervisorID      *int64
+	ApprovalLevel     *int32
 }
 
 // List returns a page of users matching the given filters (Req 2). Read-
@@ -145,13 +184,30 @@ func (s *UserAdminService) Get(ctx context.Context, id int64) (*db.GetUserAdminB
 	return s.repo.GetByID(ctx, id)
 }
 
+// VendorOptions returns active vendors and their active branches for the
+// admin user form (vendor-party-scope Req 2.7). Read-only, no audit.
+func (s *UserAdminService) VendorOptions(ctx context.Context) (VendorOptions, error) {
+	vendors, err := s.options.ListVendorOptions(ctx)
+	if err != nil {
+		return VendorOptions{}, fmt.Errorf("listing vendor options: %w", err)
+	}
+	branches, err := s.options.ListVendorBranchOptions(ctx)
+	if err != nil {
+		return VendorOptions{}, fmt.Errorf("listing vendor branch options: %w", err)
+	}
+	return VendorOptions{Vendors: vendors, Branches: branches}, nil
+}
+
 // Create validates the request, enforces the auth_source rules (Resolved
 // Decision 5: local sets password_hash + must_change_password=true in the
 // SAME insert, no separate SetInitialPassword call), resolves references,
 // inserts the user, and writes a user_created audit entry (Req 3, 9.1-9.4).
 // The temporary password is NEVER placed in the audit payload -- the
 // created row (db.CreateUserAdminRow) has no password_hash field at all.
-func (s *UserAdminService) Create(ctx context.Context, actorID int64, req CreateUserRequest, actorIP string) (db.CreateUserAdminRow, error) {
+func (s *UserAdminService) Create(ctx context.Context, actorID int64, actorRole string, req CreateUserRequest, actorIP string) (db.CreateUserAdminRow, error) {
+	if !isUserAdminActor(actorRole) {
+		return db.CreateUserAdminRow{}, ErrActorNotAllowed
+	}
 	username := strings.TrimSpace(req.Username)
 	fullName := strings.TrimSpace(req.FullName)
 	email := strings.TrimSpace(req.Email)
@@ -163,6 +219,9 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "username", Message: "wajib diisi"}
 	}
 	if err := validateProfile(fullName, email, role); err != nil {
+		return db.CreateUserAdminRow{}, err
+	}
+	if err := vendorFields(role, authSource, req.VendorID, req.VendorBranchID); err != nil {
 		return db.CreateUserAdminRow{}, err
 	}
 	// Only local users get a hash, and they must change it on first login.
@@ -190,6 +249,9 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 	if err != nil {
 		return db.CreateUserAdminRow{}, err
 	}
+	if err := s.checkVendorBranch(ctx, req.VendorID, req.VendorBranchID); err != nil {
+		return db.CreateUserAdminRow{}, err
+	}
 
 	created, err := s.repo.Create(ctx, db.CreateUserAdminParams{
 		RoleID:             roleID,
@@ -201,6 +263,7 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 		AuthSource:         authSource,
 		PasswordHash:       passwordHash,
 		VendorID:           req.VendorID,
+		VendorBranchID:     req.VendorBranchID,
 		SupervisorID:       req.SupervisorID,
 		ApprovalLevel:      req.ApprovalLevel,
 		MustChangePassword: passwordHash != nil,
@@ -233,7 +296,10 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, req Create
 // references (Req 4, 9.1-9.4). A missing or soft-disabled target id is a
 // 404 (auth.ErrUserNotFound) -- a disabled user must be enabled before it
 // can be edited.
-func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req UpdateUserRequest, actorIP string) (db.UpdateUserAdminRow, error) {
+func (s *UserAdminService) Update(ctx context.Context, actorID int64, actorRole string, id int64, req UpdateUserRequest, actorIP string) (db.UpdateUserAdminRow, error) {
+	if !isUserAdminActor(actorRole) {
+		return db.UpdateUserAdminRow{}, ErrActorNotAllowed
+	}
 	before, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return db.UpdateUserAdminRow{}, fmt.Errorf("loading user: %w", err)
@@ -252,6 +318,13 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 	if err := validateProfile(fullName, email, role); err != nil {
 		return db.UpdateUserAdminRow{}, err
 	}
+	branchID := before.VendorBranchID
+	if req.VendorBranchIDSet {
+		branchID = req.VendorBranchID
+	}
+	if err := vendorFields(role, before.AuthSource, req.VendorID, branchID); err != nil {
+		return db.UpdateUserAdminRow{}, err
+	}
 
 	if req.SupervisorID != nil && *req.SupervisorID == id {
 		return db.UpdateUserAdminRow{}, ErrSelfSupervision
@@ -266,17 +339,25 @@ func (s *UserAdminService) Update(ctx context.Context, actorID, id int64, req Up
 	if err != nil {
 		return db.UpdateUserAdminRow{}, err
 	}
+	// An unchanged (vendor, branch) pair is not re-checked, so a branch that was
+	// disabled later does not block unrelated edits; the FK still guards ownership.
+	if !samePtr(branchID, before.VendorBranchID) || !samePtr(req.VendorID, before.VendorID) {
+		if err := s.checkVendorBranch(ctx, req.VendorID, branchID); err != nil {
+			return db.UpdateUserAdminRow{}, err
+		}
+	}
 
 	updated, err := s.repo.Update(ctx, db.UpdateUserAdminParams{
-		ID:            id,
-		FullName:      fullName,
-		Email:         email,
-		RoleID:        roleID,
-		IsKaryawan:    req.IsKaryawan,
-		EmployeeID:    nilIfEmpty(employeeID),
-		VendorID:      req.VendorID,
-		SupervisorID:  req.SupervisorID,
-		ApprovalLevel: req.ApprovalLevel,
+		ID:             id,
+		FullName:       fullName,
+		Email:          email,
+		RoleID:         roleID,
+		IsKaryawan:     req.IsKaryawan,
+		EmployeeID:     nilIfEmpty(employeeID),
+		VendorID:       req.VendorID,
+		VendorBranchID: branchID,
+		SupervisorID:   req.SupervisorID,
+		ApprovalLevel:  req.ApprovalLevel,
 	})
 	if err != nil {
 		return db.UpdateUserAdminRow{}, mapUserUpdateError(err)
@@ -346,6 +427,51 @@ func validateProfile(fullName, email, role string) error {
 		return &auth.ValidationError{Field: "role", Message: "wajib diisi"}
 	}
 	return nil
+}
+
+// vendorFields enforces the vendor-role rules that need no DB (vendor-party-
+// scope Req 1.4, 2.2, 2.3): a VendorPortal role needs auth_source=local and a
+// vendor_id; any other role must not carry a vendor_branch_id.
+func vendorFields(role, authSource string, vendorID, branchID *int64) error {
+	if !vendorrole.IsVendor(role) {
+		if branchID != nil {
+			return &ReferenceError{Field: "vendor_branch_id", Message: "hanya untuk role vendor"}
+		}
+		return nil
+	}
+	if authSource != "local" {
+		return &auth.ValidationError{Field: "auth_source", Message: "harus local untuk role vendor"}
+	}
+	if vendorID == nil {
+		return &auth.ValidationError{Field: "vendor_id", Message: "wajib diisi untuk role vendor"}
+	}
+	return nil
+}
+
+// checkVendorBranch verifies branchID is an active branch of vendorID (Req
+// 2.4). nil branchID = vendor-wide, always valid.
+func (s *UserAdminService) checkVendorBranch(ctx context.Context, vendorID, branchID *int64) error {
+	if branchID == nil {
+		return nil
+	}
+	if vendorID == nil {
+		return &ReferenceError{Field: "vendor_branch_id", Message: "membutuhkan vendor_id"}
+	}
+	ok, err := s.repo.VendorBranchBelongsToVendor(ctx, *branchID, *vendorID)
+	if err != nil {
+		return fmt.Errorf("checking vendor branch reference: %w", err)
+	}
+	if !ok {
+		return &ReferenceError{Field: "vendor_branch_id", Message: "bukan cabang aktif milik vendor"}
+	}
+	return nil
+}
+
+func samePtr(a, b *int64) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // localCredentials enforces the auth_source rules (Req 3.4, Resolved Decision

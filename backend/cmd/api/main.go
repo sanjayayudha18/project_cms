@@ -343,7 +343,7 @@ func main() {
 	// maker-checker-native flow; list also returns non-blocking warnings.
 	vendorPicAdminRepo := repository.NewVendorPicAdminRepository(dbPool, dbReadPool)
 	vendorPicAdminService := service.NewVendorPicAdminService(vendorPicAdminRepo, masterDataChangeService)
-	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService)
+	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService, service.NewVendorPicRoleService(dbPool))
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same

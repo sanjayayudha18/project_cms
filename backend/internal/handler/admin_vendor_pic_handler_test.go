@@ -22,6 +22,9 @@ type fakeVendorPicAdminServicer struct {
 	warnings   []string
 	getResult  *service.VendorPic
 	createErr  error
+	updateBody *service.VendorPicUpdatePayload
+	rolesErr   error
+	rolesGot   []string
 }
 
 func (f *fakeVendorPicAdminServicer) List(context.Context, db.ListVendorPicsAdminParams) ([]service.VendorPic, error) {
@@ -39,7 +42,8 @@ func (f *fakeVendorPicAdminServicer) Warnings(context.Context, int64) ([]string,
 func (f *fakeVendorPicAdminServicer) Create(context.Context, int64, int64, service.VendorPicUpdatePayload, string) (db.MasterDataChangeRequest, error) {
 	return db.MasterDataChangeRequest{ID: 7, EntityType: "vendor_pic", Op: "create", Status: "pending"}, f.createErr
 }
-func (f *fakeVendorPicAdminServicer) Update(context.Context, int64, int64, int64, service.VendorPicUpdatePayload, string) (db.MasterDataChangeRequest, error) {
+func (f *fakeVendorPicAdminServicer) Update(_ context.Context, _, _, _ int64, req service.VendorPicUpdatePayload, _ string) (db.MasterDataChangeRequest, error) {
+	f.updateBody = &req
 	return db.MasterDataChangeRequest{ID: 8, Status: "pending"}, nil
 }
 func (f *fakeVendorPicAdminServicer) Disable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
@@ -49,7 +53,12 @@ func (f *fakeVendorPicAdminServicer) Enable(context.Context, int64, int64, int64
 	return db.MasterDataChangeRequest{ID: 10, Status: "pending"}, nil
 }
 
-func mountAdminVendorPicHandler(svc VendorPicAdminServicer) (http.Handler, *pkgauth.TokenService) {
+func (f *fakeVendorPicAdminServicer) SetRoles(_ context.Context, _, _, _ int64, roles []string, _ string) ([]string, error) {
+	f.rolesGot = roles
+	return roles, f.rolesErr
+}
+
+func mountAdminVendorPicHandler(svc *fakeVendorPicAdminServicer) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		AccessTokenExpiry:  15 * time.Minute,
@@ -59,7 +68,7 @@ func mountAdminVendorPicHandler(svc VendorPicAdminServicer) (http.Handler, *pkga
 	r.With(
 		custommw.RequireAuth(tokenSvc),
 		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
-	).Mount("/api/v1/admin/vendors/{vendorID}/pics", NewAdminVendorPicHandler(svc).Routes())
+	).Mount("/api/v1/admin/vendors/{vendorID}/pics", NewAdminVendorPicHandler(svc, svc).Routes())
 	return r, tokenSvc
 }
 
@@ -130,5 +139,70 @@ func TestAdminVendorPicHandler_Toggle_Returns202(t *testing.T) {
 		if rec.Code != http.StatusAccepted {
 			t.Errorf("%s: expected 202, got %d", path, rec.Code)
 		}
+	}
+}
+
+func TestAdminVendorPicHandler_SetRoles_Returns200(t *testing.T) {
+	svc := &fakeVendorPicAdminServicer{}
+	router, tokenSvc := mountAdminVendorPicHandler(svc)
+	rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/pics/1/roles", tokenForRole(t, tokenSvc, 1, "ADMIN_PARAM"), `{"roles":["vault"]}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"roles":["vault"]`) {
+		t.Fatalf("expected 200 with roles, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(svc.rolesGot) != 1 || svc.rolesGot[0] != "vault" {
+		t.Errorf("service got roles %v, want [vault]", svc.rolesGot)
+	}
+}
+
+func TestAdminVendorPicHandler_SetRoles_ErrorMapping(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		err  error
+		want int
+	}{
+		{"roles missing", `{}`, nil, http.StatusUnprocessableEntity},
+		{"bad json", `{`, nil, http.StatusBadRequest},
+		{"unknown role", `{"roles":["x"]}`, &service.ValidationError{Field: "roles", Message: "tidak dikenal"}, http.StatusUnprocessableEntity},
+		{"not found", `{"roles":[]}`, service.ErrVendorPicNotFound, http.StatusNotFound},
+		{"forbidden", `{"roles":[]}`, service.ErrMasterDataForbidden, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{rolesErr: tc.err})
+			rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/pics/1/roles", tokenForRole(t, tokenSvc, 1, "ADMIN"), tc.body)
+			if rec.Code != tc.want {
+				t.Errorf("expected %d, got %d: %s", tc.want, rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAdminVendorPicHandler_SetRoles_NonAdminForbidden(t *testing.T) {
+	router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{})
+	rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/pics/1/roles", tokenForRole(t, tokenSvc, 1, "ATM-SPV"), `{"roles":[]}`)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+}
+
+// The form update must not carry roles (Req 5.7), even when the client sends them.
+func TestAdminVendorPicHandler_Update_DropsRoles(t *testing.T) {
+	svc := &fakeVendorPicAdminServicer{}
+	router, tokenSvc := mountAdminVendorPicHandler(svc)
+	rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/pics/1", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"name":"Budi","roles":["vault"]}`)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if svc.updateBody == nil || svc.updateBody.Roles != nil {
+		t.Fatalf("update payload roles = %v, want nil", svc.updateBody)
+	}
+}
+
+func TestAdminVendorPicHandler_Get_IncludesRoles(t *testing.T) {
+	router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{getResult: &service.VendorPic{ID: 1, VendorID: 3, Roles: []string{"replenish"}}})
+	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors/3/pics/1", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"roles":["replenish"]`) {
+		t.Fatalf("expected 200 with roles, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

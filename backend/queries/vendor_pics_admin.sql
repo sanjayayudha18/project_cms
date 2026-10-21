@@ -10,7 +10,7 @@
 -- branch, i.e. vendor_branch_id IS NULL). vendor_branch_id and
 -- vendor_wide_only are mutually exclusive; caller picks one or neither.
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at
+       is_notification_recipient, is_active, deleted_at, roles
 FROM vendor_pics
 WHERE vendor_id = sqlc.arg('vendor_id')
   AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
@@ -40,7 +40,7 @@ WHERE vendor_id = sqlc.arg('vendor_id')
 -- name: GetVendorPicAdminByID :one
 -- Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at
+       is_notification_recipient, is_active, deleted_at, roles
 FROM vendor_pics WHERE id = $1;
 
 -- name: CountActiveVendorPicsByBranch :one
@@ -55,14 +55,15 @@ SELECT COUNT(*) FROM vendor_pics
 WHERE vendor_id = $1 AND is_notification_recipient AND deleted_at IS NULL;
 
 -- name: CreateVendorPicAdmin :one
-INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient)
+INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient, roles)
 VALUES (sqlc.arg('vendor_id'), sqlc.narg('vendor_branch_id'), sqlc.arg('name'), sqlc.narg('position'),
-        sqlc.narg('phone'), sqlc.narg('email'), sqlc.arg('is_notification_recipient'))
+        sqlc.narg('phone'), sqlc.narg('email'), sqlc.arg('is_notification_recipient'), sqlc.arg('roles')::text[])
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at;
+          is_notification_recipient, is_active, deleted_at, roles;
 
 -- name: UpdateVendorPicAdmin :one
--- vendor_id is immutable. `AND deleted_at IS NULL` makes a soft-disabled
+-- vendor_id is immutable; roles is never set here (form update keeps the
+-- PIC's roles, vendor-party-scope Req 5.7). `AND deleted_at IS NULL` makes a soft-disabled
 -- target update 0 rows (mapped to not-found).
 UPDATE vendor_pics
 SET vendor_branch_id = sqlc.narg('vendor_branch_id'),
@@ -74,7 +75,7 @@ SET vendor_branch_id = sqlc.narg('vendor_branch_id'),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND deleted_at IS NULL
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at;
+          is_notification_recipient, is_active, deleted_at, roles;
 
 -- name: DisableVendorPic :exec
 -- Soft-disable only (no_hard_delete_test.go extended in T3.7).
@@ -82,3 +83,17 @@ UPDATE vendor_pics SET is_active = false, deleted_at = now() WHERE id = $1;
 
 -- name: EnableVendorPic :exec
 UPDATE vendor_pics SET is_active = true, deleted_at = NULL WHERE id = $1;
+
+-- name: GetVendorPicRolesForUpdate :one
+-- Row-locks an active PIC of vendor_id before SetVendorPicRoles (immediate
+-- apply + audit in tx, vendor-party-scope Req 5.3-5.5). No row = 404.
+SELECT roles FROM vendor_pics
+WHERE id = sqlc.arg('id') AND vendor_id = sqlc.arg('vendor_id') AND deleted_at IS NULL
+FOR UPDATE;
+
+-- name: SetVendorPicRoles :one
+-- Called from VendorPicRoleService.SetRoles and from VendorPicApplier (update
+-- with roles set, CSV import only).
+UPDATE vendor_pics SET roles = sqlc.arg('roles')::text[], updated_at = now()
+WHERE id = sqlc.arg('id') AND vendor_id = sqlc.arg('vendor_id') AND deleted_at IS NULL
+RETURNING id, roles;

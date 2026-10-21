@@ -86,16 +86,16 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 10.1_
   - _Model: Opus, Effort: Medium — provisioning akun (auth) dengan aturan validasi baru; polanya sudah ada, cabang kasusnya terbatas._
 
-- [ ] 6. Peran PIC: layar (immediate + audit) dan maker-checker create
-  - [ ] 6.1 `backend/queries/vendor_pics_admin.sql`: `roles` di list/get/create; `GetVendorPicRolesForUpdate`; `SetVendorPicRoles`. `UpdateVendorPicAdmin` tidak menyentuh `roles`. `sqlc generate`.
+- [x] 6. Peran PIC: layar (immediate + audit) dan maker-checker create
+  - [x] 6.1 `backend/queries/vendor_pics_admin.sql`: `roles` di list/get/create; `GetVendorPicRolesForUpdate`; `SetVendorPicRoles`. `UpdateVendorPicAdmin` tidak menyentuh `roles`. `sqlc generate`.
     - _Requirements: 5.1, 5.7, 5.8_
-  - [ ] 6.2 `service/vendor_pic_admin.go` + `masterdata_applier_vendor_pic.go`: `Roles *[]string` di `VendorPicPayload` (nil = ketiga peran) dan `VendorPicUpdatePayload` (nil = tidak diubah); Applier update memanggil `SetVendorPicRoles` di tx apply bila terisi.
+  - [x] 6.2 `service/vendor_pic_admin.go` + `masterdata_applier_vendor_pic.go`: `Roles *[]string` di `VendorPicPayload` (nil = ketiga peran) dan `VendorPicUpdatePayload` (nil = tidak diubah); Applier update memanggil `SetVendorPicRoles` di tx apply bila terisi.
     - _Requirements: 5.6, 5.7, 6.3, 6.4_
-  - [ ] 6.3 `service/vendor_pic_roles.go` (baru) `SetRoles`: re-check `ADMIN`/`ADMIN_PARAM`, normalisasi (trim, sort, unique, kode dikenal), tx `FOR UPDATE` → update → `audit.NewWriter(tx)` `vendor_pic_roles_updated` → commit; tanpa perubahan = sukses tanpa audit.
+  - [x] 6.3 `service/vendor_pic_roles.go` (baru) `SetRoles`: re-check `ADMIN`/`ADMIN_PARAM`, normalisasi (trim, sort, unique, kode dikenal), tx `FOR UPDATE` → update → `audit.NewWriter(tx)` `vendor_pic_roles_updated` → commit; tanpa perubahan = sukses tanpa audit.
     - _Requirements: 5.3, 5.4, 5.5_
-  - [ ] 6.4 `handler/admin_vendor_pic_handler.go`: `PUT /{id}/roles`; respons list/detail memuat `roles`.
+  - [x] 6.4 `handler/admin_vendor_pic_handler.go`: `PUT /{id}/roles`; respons list/detail memuat `roles`.
     - _Requirements: 5.3, 5.8_
-  - [ ] 6.5 Integration test: set peran sukses + 1 audit; audit gagal → rollback (Req 10.1 g); peran tak dikenal/duplikat 400; PIC vendor lain/nonaktif 404; non-ADMIN 403; create via maker-checker dengan dan tanpa peran; update form tidak mengubah peran.
+  - [x] 6.5 Integration test: set peran sukses + 1 audit; audit gagal → rollback (Req 10.1 g); peran tak dikenal/duplikat 400; PIC vendor lain/nonaktif 404; non-ADMIN 403; create via maker-checker dengan dan tanpa peran; update form tidak mengubah peran.
     - _Requirements: 5.3, 5.4, 5.5, 5.6, 5.7, 10.1_
   - [ ]* 6.6 Property test: Property 6 (audit-or-nothing peran PIC).
     - _Requirements: 5.4_

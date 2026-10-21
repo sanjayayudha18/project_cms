@@ -23,9 +23,13 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor pic create payload: %w", err)
 		}
+		roles := AllPicRoles()
+		if p.Roles != nil {
+			roles = *p.Roles
+		}
 		created, err := q.CreateVendorPicAdmin(ctx, db.CreateVendorPicAdminParams{
 			VendorID: p.VendorID, VendorBranchID: p.VendorBranchID, Name: p.Name, Position: p.Position,
-			Phone: p.Phone, Email: p.Email, IsNotificationRecipient: p.IsNotificationRecipient,
+			Phone: p.Phone, Email: p.Email, IsNotificationRecipient: p.IsNotificationRecipient, Roles: roles,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor pic: %w", err)
@@ -46,6 +50,13 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor pic: %w", err)
+		}
+		if p.Roles != nil {
+			set, err := q.SetVendorPicRoles(ctx, db.SetVendorPicRolesParams{Roles: *p.Roles, ID: updated.ID, VendorID: updated.VendorID})
+			if err != nil {
+				return 0, nil, fmt.Errorf("set vendor pic roles: %w", err)
+			}
+			updated.Roles = set.Roles
 		}
 		return *change.EntityID, updated, nil
 

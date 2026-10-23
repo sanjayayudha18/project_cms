@@ -64,7 +64,7 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 3.2, 10.1_
   - _Model: Opus, Effort: High — inti RBAC/cakupan data antar vendor; kebocoran = insiden keamanan; banyak cabang kasus (role × cabang × token basi)._
 
-- [ ] 4. Notifikasi pihak per role + peran PIC
+- [x] 4. Notifikasi pihak per role + peran PIC
   - [x] 4.1 `backend/queries/notifications.sql`: `ListActiveUserRecipientsByVendorBranches` → `(branch_id, roles text[])` dengan join `roles`; `ListVendorBranchNotificationPicEmails` → `(branch_id, pic_role)` dengan `pic_role = ANY(p.roles)`. `sqlc generate`.
     - _Requirements: 7.1, 7.2_
   - [x] 4.2 `internal/notification/notification.go`: ganti `VendorBranchIDs` dengan `VendorParties []VendorPartyTarget{BranchID, UserRoles, PicRole}`; dedup tetap. Perbarui `notification_test.go` + `integration_test.go`.
@@ -115,12 +115,12 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
   - _Requirements: 8.3_
   - _Model: Sonnet, Effort: Low — tambahan field read-only pada respons yang ada._
 
-- [ ] 9. Checkpoint backend
+- [x] 9. Checkpoint backend
   - `cd backend && go test ./...` + integration (`DATABASE_URL` diisi, 0 skip untuk test baru), `golangci-lint run --build-tags integration ./...`, coverage paket baru ≥ 80%, `go test ./internal/handler -run OpenAPI`.
   - _Requirements: 10.2_
   - _Model: Sonnet, Effort: Medium — triase kegagalan build/test/lint._
 
-- [ ] 10. Kontrak OpenAPI
+- [x] 10. Kontrak OpenAPI
   - `backend/api/openapi.yaml`: deskripsi role path `/vendor/replenish-orders*` → ketiga role vendor; tanpa perubahan skema. `pnpm --dir frontend/CompanyPortal-Vite run gen:api`, commit `schema.d.ts`.
   - _Requirements: 9.1, 9.2_
   - _Model: Haiku, Effort: Low — teks deskripsi + regenerasi tipe._
@@ -147,14 +147,15 @@ Lintas grup: Sonnet 4 dan 8 bisa jalan paralel dengan Opus 3/5 setelah 1 + 2 sel
     - _Requirements: 2.8, 2.9, 2.10, 2.11, 5.9, 8.2, 10.2_
   - _Model: Sonnet, Effort: Medium — komponen React mengikuti pola yang ada; guard auth ikut diuji._
 
-- [ ] 13. Seed dev + dokumentasi
+- [x] 13. Seed dev + dokumentasi
   - `backend/scripts/dev/seed_vendor_users.sql`: empat akun ABACUS (design "Seed dev"), cari cabang via `branch_code`, idempoten. Jalankan di dev.
   - Catat deviasi peran PIC di CLAUDE.md Sec 12; perbarui `rbac-role-feature-matrix` steering (role baru), `.claude/development-progress.md`, baris fitur di `.claude/sdlc/README.md`; `graphify update .`.
   - _Requirements: 9.3_
   - _Model: Haiku, Effort: Low — SQL seed sederhana + pembaruan dokumen._
 
-- [ ] 14. Checkpoint akhir
+- [x] 14. Checkpoint akhir
   - Backend + kedua frontend: build, lint, test, coverage hijau. Manual browser check = **outstanding (user)**: login `vendor.abacus` + empat akun seed, buka `REP-ABA-MDN-…`, cek notifikasi, ubah peran PIC, ekspor/impor CSV PIC, buat akun vendor dari APPACCESS.
+  - Hasil otomatis 2026-10-21: go build/vet/golangci-lint (0 issues) hijau; `go test ./...` + integration (`-tags integration`, DB localhost) 2067 pass / 0 skip / 0 fail; OpenAPI contract hijau; `pkg` + `backend-exq` hijau; CP build/lint/test (1425) + VP build/lint/test (250) hijau di atas threshold; `schema.d.ts` identik dengan hasil regen. Manual browser check **belum dilakukan** (user).
   - _Model: Sonnet, Effort: Medium — triase lintas tiga codebase._
 
 ## Notes

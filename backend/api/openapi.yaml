@@ -275,7 +275,10 @@ paths:
     get:
       operationId: listVendorOrders
       tags: [vendor-order]
-      description: VENDOR-USER only, scoped to the caller's vendor (+ branch).
+      description: >-
+        VENDOR-USER, VENDOR-ATM-USER, or VENDOR-VAULT-USER, scoped to the caller's vendor (+ branch).
+        VENDOR-ATM-USER sees only replenish parties; VENDOR-VAULT-USER sees only vault parties;
+        VENDOR-USER sees both.
       parameters:
         - { name: party_status, in: query, schema: { type: string, enum: [pending, accepted, rejected, withdrawn] } }
         - { name: request_status, in: query, schema: { type: string } }
@@ -329,7 +332,9 @@ paths:
     post:
       operationId: submitVendorRealization
       tags: [vendor-order]
-      description: Replenish party only; every ATM of the request at once.
+      description: >-
+        Replenish party only; every ATM of the request at once. Callable by VENDOR-ATM-USER and
+        VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope).
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/RealizationPayload' } } }

@@ -364,7 +364,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description VENDOR-USER only, scoped to the caller's vendor (+ branch). */
+        /** @description VENDOR-USER, VENDOR-ATM-USER, or VENDOR-VAULT-USER, scoped to the caller's vendor (+ branch). VENDOR-ATM-USER sees only replenish parties; VENDOR-VAULT-USER sees only vault parties; VENDOR-USER sees both. */
         get: operations["listVendorOrders"];
         put?: never;
         post?: never;
@@ -443,7 +443,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Replenish party only; every ATM of the request at once. */
+        /** @description Replenish party only; every ATM of the request at once. Callable by VENDOR-ATM-USER and VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope). */
         post: operations["submitVendorRealization"];
         delete?: never;
         options?: never;

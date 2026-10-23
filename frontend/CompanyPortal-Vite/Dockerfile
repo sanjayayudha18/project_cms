@@ -5,6 +5,8 @@ WORKDIR /app
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+ARG VITE_APP_ENV=prod
+ENV VITE_APP_ENV=$VITE_APP_ENV
 RUN pnpm tsc -b tsconfig.app.json && pnpm vite build
 
 # Stage 2: Serve

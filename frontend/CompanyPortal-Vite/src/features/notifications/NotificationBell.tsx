@@ -55,19 +55,17 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--n-100)]"
-        style={{ color: "var(--n-600)" }}
+        className="relative flex size-10 items-center justify-center rounded-xl text-[var(--shell-muted)] outline-none hover:bg-[var(--shell-canvas)] hover:text-[var(--shell-ink)] focus-visible:ring-2 focus-visible:ring-[var(--shell-focus)]"
         aria-label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <Bell size={18} aria-hidden="true" />
+        <Bell size={20} aria-hidden="true" />
         {badge && (
           <span
             data-testid="notification-badge"
             aria-hidden="true"
-            className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none tabular-nums text-white"
-            style={{ backgroundColor: "var(--red-600)" }}
+            className="absolute -right-0.5 -top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--shell-accent)] px-1 font-mono text-[11px] font-semibold leading-none tabular-nums text-[var(--shell-on-accent)] ring-2 ring-[var(--shell-topbar-bg)]"
           >
             {badge}
           </span>

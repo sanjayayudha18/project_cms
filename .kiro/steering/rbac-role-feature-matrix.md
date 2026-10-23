@@ -1,18 +1,20 @@
 ---
 inclusion: auto
 name: rbac-role-feature-matrix
-description: Per-role feature access map for CMS — the 10 roles, the menu/feature catalog, which features each role can access, backend route guards, and frontend nav/route guards. Use when working on roles, permissions, nav visibility, route guards, or answering "what can role X access".
+description: Per-role feature access map for CMS — the 14 roles, the menu/feature catalog, which features each role can access, backend route guards, and frontend nav/route guards. Use when working on roles, permissions, nav visibility, route guards, or answering "what can role X access".
 ---
 
 # RBAC Role → Feature Matrix (CMS)
 
 > Companion to `rbac-design.md` (which covers the hierarchy + maker-checker approval model). This doc maps **each role to the features/menus it can access**, and reconciles the two parallel authorization systems in the codebase.
 >
+> Last verified against code: **2026-10-23** (`dev1`, migrations through `032`).
+>
 > Source of truth (read together):
-> - Roles + `menu_features` catalog + `role_permissions` grants: `backend/migrations/002_baseline_seed.sql`
-> - Actual backend enforcement: `RequireRoles(...)` in `backend/cmd/api/main.go`
+> - Roles + `menu_features` catalog + `role_permissions` grants: `backend/migrations/002_baseline_seed.sql`, then `027_acm_vault_assignment.sql` (ACM roles + CIT menu) and `032_vendor_party_scope.sql` (vendor party roles)
+> - Actual backend enforcement: `RequireRoles(...)` at the mount in `backend/cmd/api/main.go` **and** inside handler `Routes()` (e.g. `vendor_request_handler.go`, `vendor_order_handler.go`, `admin_holiday_handler.go`)
 > - Frontend nav visibility: `frontend/CompanyPortal-Vite/src/lib/config/navigation.ts`
-> - Frontend route guards: `frontend/CompanyPortal-Vite/src/routes/**` (`requireRoles(...)` in `_protected.tsx`)
+> - Frontend route guards: `frontend/CompanyPortal-Vite/src/routes/**` (`requireRoles(...)` from `_protected.tsx`)
 > - Middleware: `pkg/middleware/rbac.go`
 
 ---
@@ -22,7 +24,7 @@ description: Per-role feature access map for CMS — the 10 roles, the menu/feat
 The codebase has **two** authz layers that must be read together — they roughly agree but have deliberate asymmetries:
 
 1. **`role_permissions` DB catalog** (`menu_features` × `roles`). Data-driven, admin-editable via the "Manajemen Peran" screen. Today it drives **frontend nav rendering + the Role Management UI only**.
-2. **Hardcoded `RequireRoles(...)` route guards** in `backend/cmd/api/main.go`. This is the **actual backend enforcement** today.
+2. **Hardcoded `RequireRoles(...)` route guards**, at the mount in `cmd/api/main.go` or inside a handler's `Routes()`. This is the **actual backend enforcement** today. A mount that shows only `RequireAuth` in `main.go` may still be role-guarded per route inside the handler — always open the handler before calling a route "unguarded".
 
 There is **no** `RequirePermission` / `PermissionEvaluator` in `pkg/middleware/rbac.go` — authz is **role-string driven** (`RequireRoles` compares the single JWT `role` claim against an allow-list, case-insensitive). The role-management spec intends the DB catalog to eventually replace the hardcoded guards, but that has not happened yet.
 
@@ -30,55 +32,64 @@ There is **no** `RequirePermission` / `PermissionEvaluator` in `pkg/middleware/r
 
 ---
 
-## 1. The 10 roles
+## 1. The 14 roles
 
-| id | Role (exact string) | Portal | Description |
-|----|--------------------|--------|-------------|
-| 1 | `ADMIN` | Internal | Super administrator — full system access |
-| 2 | `ADMIN_PARAM` | Internal | Parameter admin — master data (ATMs, regions, vendors, denoms) |
-| 3 | `ATM-USER` | Internal | ATM operations staff — daily DSR upload, cash count, order entry |
-| 4 | `ATM-SPV` | Internal | ATM supervisor — approve orders, review forecasts, monitor cash flow |
-| 5 | `BRANCH-USER` | Internal | Branch operations staff — branch cash management |
-| 6 | `BRANCH-SPV` | Internal | Branch supervisor — approve branch-level transactions |
-| 7 | `BRANCH-ATM-USER` | Internal | Branch ATM operator — combined branch + ATM ops |
-| 8 | `BRANCH-ATM-SPV` | Internal | Branch ATM supervisor — approve combined branch + ATM ops |
-| 9 | `VENDOR-USER` | Vendor | CIT vendor user — view schedules, upload delivery confirmations |
-| 10 | `APPACCESS` | Internal | Application access admin — account provisioning + RBAC CRUD-mapping/delegation config |
+| Role (exact string) | Portal | Seeded in | Description |
+|--------------------|--------|-----------|-------------|
+| `ADMIN` | Internal | baseline `002` | Super administrator — full system access |
+| `ADMIN_PARAM` | Internal | baseline `002` | Parameter admin — master data (ATMs, regions, vendors, denoms) |
+| `ATM-USER` | Internal | baseline `002` | ATM operations staff — Vendor Request maker, monitoring |
+| `ATM-SPV` | Internal | baseline `002` | ATM supervisor — Vendor Request checker, vault review |
+| `BRANCH-USER` | Internal | baseline `002` | Branch operations staff — branch cash management |
+| `BRANCH-SPV` | Internal | baseline `002` | Branch supervisor — approve branch-level transactions |
+| `BRANCH-ATM-USER` | Internal | baseline `002` | Branch ATM operator — Vendor Request maker (branch scope) |
+| `BRANCH-ATM-SPV` | Internal | baseline `002` | Branch ATM supervisor — Vendor Request checker (branch scope) |
+| `VENDOR-USER` | Vendor | baseline `002` | Vendor user, both parties (replenish + vault), vendor-wide or branch-scoped |
+| `APPACCESS` | Internal | baseline `002` | Application access admin — account provisioning + RBAC CRUD-mapping/delegation config |
+| `ACM-USER` | Internal | `027` | ACM staff — allocates the request nominal to vaults (Penetapan Vault) |
+| `ACM-SPV` | Internal | `027` | ACM supervisor — approves the area vault plan |
+| `VENDOR-ATM-USER` | Vendor | `032` | Vendor pengisian ATM — replenish party only, branch scope `users.vendor_branch_id` |
+| `VENDOR-VAULT-USER` | Vendor | `032` | Vendor penyedia uang di vault — vault party only, branch scope `users.vendor_branch_id` |
+
+Role `id`s for `027`/`032` rows are identity-assigned at migration time; reference roles by the `role` string, never by id.
+
+Shared role lists in code: `vendorrole.All` (`backend/internal/vendorrole`) = the three vendor roles; `vendorRequestViewerRoles` = ADMIN, ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV; `vendorRequestMakerRoles` = ADMIN, ATM-USER, BRANCH-ATM-USER; `vendorRequestCheckerRoles` = ADMIN, ATM-SPV, BRANCH-ATM-SPV (`backend/internal/handler/vendor_request_handler.go`).
 
 ### Planned / not yet seeded
 
-These roles are **not yet in the DB seed (`roles`), the frontend `DbRole` union, or any route guard** — they are recorded here as planned. Descriptions and portal assignment are TBD (confirm with business before implementing).
+These roles are **not yet in the DB seed (`roles`), the frontend `DbRole` union, or any route guard**. Descriptions and portal assignment are TBD (confirm with business before implementing).
 
 | Role (exact string) | Portal | Description |
 |---|---|---|
-| `ACM-USER` | TBD | TBD |
-| `ACM-SPV` | TBD | TBD |
 | `CMOC-USER` | TBD | TBD |
 | `CMOC-SPV` | TBD | TBD |
 | `CMOC-PIC` | TBD | TBD |
 | `VENDOR-USER-CMOC` | TBD | TBD |
 
-> The `Vendor CIT` / `Vendor CIT Supervisor` sub-roles mentioned in `project-context.md` are **spec-only** — not present in the seed data or the frontend `DbRole` union yet.
+> The `Vendor CIT` / `Vendor CIT Supervisor` sub-roles mentioned in `project-context.md` are **spec-only**. The implemented vendor split is `VENDOR-ATM-USER` / `VENDOR-VAULT-USER` (party), not uploader vs supervisor.
 
 ---
 
 ## 2. Menu / feature catalog (`menu_features`)
 
-8 top-level menus + 3 nested features under Settings:
+9 top-level menus + 4 nested features. Ids 1-11 come from the baseline; the `027` rows are identity-assigned.
 
-| id | parent | key | label | kind |
-|----|--------|-----|-------|------|
-| 1 | — | `dashboard` | Dashboard | menu |
-| 2 | — | `cash-flow` | Cash Flow Monitoring | menu |
-| 3 | — | `monitoring` | Monitoring | menu |
-| 4 | — | `forecasting` | Peramalan | menu |
-| 5 | — | `replenish` | Replenish | menu |
-| 6 | — | `invoice` | Tagihan | menu |
-| 7 | — | `cash-count` | Perhitungan Kas | menu |
-| 8 | — | `settings` | Pengaturan | menu |
-| 9 | 8 | `settings.roles` | Manajemen Peran | feature |
-| 10 | 9 | `settings.roles.create` | Buat Peran | feature |
-| 11 | 9 | `settings.roles.edit` | Ubah Izin Peran | feature |
+| id | parent | key | label | kind | Source |
+|----|--------|-----|-------|------|--------|
+| 1 | — | `dashboard` | Dashboard | menu | baseline |
+| 2 | — | `cash-flow` | Cash Flow Monitoring | menu | baseline |
+| 3 | — | `monitoring` | Monitoring | menu | baseline |
+| 4 | — | `forecasting` | Peramalan | menu | baseline |
+| 5 | — | `replenish` | Replenish | menu | baseline |
+| 6 | — | `invoice` | Tagihan | menu | baseline |
+| 7 | — | `cash-count` | Perhitungan Kas | menu | baseline |
+| 8 | — | `settings` | Pengaturan | menu | baseline |
+| 9 | 8 | `settings.roles` | Manajemen Peran | feature | baseline |
+| 10 | 9 | `settings.roles.create` | Buat Peran | feature | baseline |
+| 11 | 9 | `settings.roles.edit` | Ubah Izin Peran | feature | baseline |
+| — | — | `cit` | CIT | menu | `027` |
+| — | `cit` | `cit.vault-plan` | Penetapan Vault | feature | `027` |
+| — | `settings` | `settings.acm-areas` | Area ACM | feature | `027` |
 
 ---
 
@@ -86,111 +97,115 @@ These roles are **not yet in the DB seed (`roles`), the frontend `DbRole` union,
 
 Legend: ✅ granted · — not granted. New roles created after seeding start with **zero** access by design.
 
-| Feature ↓ / Role → | ADMIN | ADMIN_PARAM | APPACCESS | ATM-USER | ATM-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | BRANCH-USER | BRANCH-SPV | VENDOR-USER |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `cash-flow` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
-| `monitoring` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
-| `forecasting` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
-| `replenish` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — |
-| `invoice` | ✅ | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
-| `cash-count` | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — |
-| `settings` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
-| `settings.roles` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
-| `settings.roles.create` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
-| `settings.roles.edit` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
+| Feature ↓ / Role → | ADMIN | ADMIN_PARAM | APPACCESS | ATM-USER | ATM-SPV | BRANCH-ATM-USER | BRANCH-ATM-SPV | BRANCH-USER | BRANCH-SPV | VENDOR-USER* | ACM-USER | ACM-SPV |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| `cash-flow` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
+| `monitoring` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — |
+| `forecasting` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — |
+| `replenish` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
+| `invoice` | ✅ | ✅ | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — | — |
+| `cash-count` | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — |
+| `settings` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — |
+| `settings.roles` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — |
+| `settings.roles.create` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — |
+| `settings.roles.edit` | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — |
+| `cit` | ✅ | — | — | — | — | — | — | — | — | — | ✅ | ✅ |
+| `cit.vault-plan` | ✅ | — | — | — | — | — | — | — | — | — | ✅ | ✅ |
+| `settings.acm-areas` | ✅ | — | — | — | — | — | — | — | — | — | — | — |
+
+\* `VENDOR-ATM-USER` and `VENDOR-VAULT-USER` carry the same grants as `VENDOR-USER` (copied in `032`). Party (replenish vs vault) + branch scoping is enforced in the data layer of VendorPortal Orders / Realisasi / notifications, not in this menu matrix.
 
 **Summary per role:**
-- **ADMIN / ADMIN_PARAM / APPACCESS** — all 11 features (full catalog).
+- **ADMIN** — all 14 catalog entries.
+- **ADMIN_PARAM / APPACCESS** — the 11 baseline entries (no CIT, no Area ACM).
 - **ATM-USER / ATM-SPV** — dashboard, cash-flow, monitoring, forecasting, replenish.
 - **BRANCH-ATM-USER / BRANCH-ATM-SPV** — dashboard, forecasting, replenish, cash-count.
 - **BRANCH-USER / BRANCH-SPV** — dashboard, invoice.
-- **VENDOR-USER** — dashboard, forecasting, invoice.
-
-### Planned roles — no feature grants yet
-
-The following roles have **no `menu_features` granted yet** (intentionally left blank pending business definition). They are not seeded into `role_permissions`.
-
-| Feature ↓ / Role → | ACM-USER | ACM-SPV | CMOC-USER | CMOC-SPV | CMOC-PIC | VENDOR-USER-CMOC |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `dashboard` | — | — | — | — | — | — |
-| `cash-flow` | — | — | — | — | — | — |
-| `monitoring` | — | — | — | — | — | — |
-| `forecasting` | — | — | — | — | — | — |
-| `replenish` | — | — | — | — | — | — |
-| `invoice` | — | — | — | — | — | — |
-| `cash-count` | — | — | — | — | — | — |
-| `settings` | — | — | — | — | — | — |
-| `settings.roles` | — | — | — | — | — | — |
-| `settings.roles.create` | — | — | — | — | — | — |
-| `settings.roles.edit` | — | — | — | — | — | — |
+- **VENDOR-USER / VENDOR-ATM-USER / VENDOR-VAULT-USER** — dashboard, forecasting, invoice.
+- **ACM-USER / ACM-SPV** — cit, cit.vault-plan only (no dashboard grant).
 
 ---
 
-## 4. Backend route guards (`backend/cmd/api/main.go`)
+## 4. Backend route guards
 
-All routes are wrapped in `RequireAuth` first. This table is the **real enforcement**.
+All routes except `/api/v1/auth` are wrapped in `RequireAuth` first. This table is the **real enforcement**. "Mount" = guard in `main.go`; "Handler" = guard inside the handler's `Routes()`.
 
-| Route prefix | Role guard |
-|---|---|
-| `/api/v1/auth` | public (login/refresh) |
-| `/api/v1/admin/users` | `APPACCESS`, `ADMIN`, `ADMIN_PARAM` |
-| `/api/v1/admin/vendors` | `ADMIN`, `ADMIN_PARAM` |
-| `/api/v1/admin/atms` | `ADMIN`, `ADMIN_PARAM` |
-| `/api/v1/admin/roles` | `APPACCESS`, `ADMIN` (self-guarded by static roles to avoid bootstrap deadlock) |
-| `/api/v1/admin/approval` | `ADMIN`, `ADMIN_PARAM`, `APPACCESS` (hierarchy/delegation/leave/policy) |
-| `/api/v1/audit-logs` | `ADMIN`, `ADMIN_PARAM` |
-| `/api/v1/dmaa-forecast` | `ATM-USER`, `ATM-SPV`, `BRANCH-ATM-USER`, `BRANCH-ATM-SPV`, `ADMIN`, `ADMIN_PARAM` |
-| `/api/v1/atm-portal` | any authenticated (`RequireAuth` only) |
-| `/api/v1/dsr` | any authenticated (`RequireAuth` only) |
-| `/api/v1/approvals` | any authenticated (`RequireAuth` only — orchestrator enforces maker≠checker) |
-| `/api/v1/vendor-requests` | any authenticated (`RequireAuth` only — per-route/actor subset inside handler+service) |
+| Route prefix | Guard | Where |
+|---|---|---|
+| `/api/v1/auth` | public (login/refresh) | — |
+| `/api/v1/admin/users` | `APPACCESS`, `ADMIN` (ADMIN_PARAM removed, vendor-party-scope D8; re-checked in `UserAdminService`) | Mount |
+| `/api/v1/admin/roles` | `APPACCESS`, `ADMIN` (static roles to avoid bootstrap deadlock) | Mount |
+| `/api/v1/admin/approval` | `ADMIN`, `ADMIN_PARAM`, `APPACCESS` (hierarchy/delegation/leave/policy) | Mount |
+| `/api/v1/admin/vendors` (+ `/branches`, `/branches/{id}/atms`, `/vaults`, `/pics`, `/packages`, `/package-prices`, `/dsr-location-maps`) | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin` group) |
+| `/api/v1/admin/atms` (+ `/assignments`, `/assignment-package-options`) | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
+| `/api/v1/admin/regions` | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
+| `/api/v1/admin/master-data/{changes,export,import}` | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
+| `/api/v1/admin/acm-areas` | `ADMIN` | Mount |
+| `/api/v1/admin/holidays` | `ADMIN` (+ service re-check) | Handler |
+| `/api/v1/audit-logs` | `ADMIN`, `ADMIN_PARAM` | Mount |
+| `/api/v1/dmaa-forecast` | `ATM-USER`, `ATM-SPV`, `BRANCH-ATM-USER`, `BRANCH-ATM-SPV`, `ADMIN`, `ADMIN_PARAM` | Mount |
+| `/api/v1/vault-plans` | `ACM-USER`, `ACM-SPV`, `ADMIN` (membership + per-action role re-checked in service; ADMIN read-only) | Mount |
+| `/api/v1/vendor-requests` | per route: viewer / maker / checker / cancel / audit role lists (see Sec 1) | Handler |
+| `/api/v1/vendor/replenish-orders` | `vendorrole.All` (+ service re-checks role, party, branch scope) | Handler |
+| `/api/v1/vendor/replenish-realizations` | `vendorrole.All` | Handler |
+| `/api/v1/replenishment` | `vendorRequestViewerRoles` (+ service re-check) | Handler |
+| `/api/v1/atm-visit-quotas` | GET viewer roles; reset/cancel checker roles | Handler |
+| `/api/v1/atm-portal` | any authenticated (`RequireAuth` only) | — |
+| `/api/v1/dsr` | any authenticated (`RequireAuth` only; vendor scoping in service) | — |
+| `/api/v1/notifications` | any authenticated (own notifications only) | — |
+| `/api/v1/approvals` | any authenticated (orchestrator enforces maker≠checker + hierarchy) | — |
 
-> `backend-cit` has **no** role-guarded routes yet — only `/health` + a `RequireAuth`-only placeholder group.
+> `backend-exq` (renamed from `backend-cit` 2026-10-20) has **no** role-guarded routes yet — only `/health`, `/ready` + a `RequireAuth`-only placeholder group.
 
-**Gaps to be aware of:** `/api/v1/dsr`, `/api/v1/atm-portal`, `/api/v1/vendor-requests` are `RequireAuth`-only. Any authenticated user (including `VENDOR-USER`) can reach them at the HTTP layer; finer-grained authz is either absent or pushed to the service layer.
+**Gaps to be aware of:** `/api/v1/dsr` and `/api/v1/atm-portal` are `RequireAuth`-only at the HTTP layer, so any authenticated user (including vendor roles) reaches them; finer-grained authz is either in the service layer or absent.
 
 ---
 
 ## 5. Frontend guards (CompanyPortal-Vite)
 
-Three layers, evaluated independently of the backend.
+Three layers, evaluated independently of the backend. CompanyPortal rejects all three vendor roles at login and refresh (`lib/auth/store.ts`).
 
 ### (a) Sidebar visibility — `filterNavByRoles()`
 - **ADMIN and ADMIN_PARAM see every nav item** (early return, ignores the item's `roles` list).
-- Items with `roles: ["*"]` show for all authenticated users (e.g. `dashboard`).
+- Items with `roles: ["*"]` show for all authenticated users.
 - Otherwise the user's role must be in the item's `roles` array.
 
-Active nav items and their allowed roles:
+Active nav items (`navigation.ts`, mock screens removed from the menu by FE-05):
 
-| Nav item (label) | Roles |
-|---|---|
-| Dashboard | `*` |
-| Cash Flow Monitoring | ATM-USER, ATM-SPV |
-| Pengaturan | ADMIN, ADMIN_PARAM, APPACCESS |
-| Rekomendasi CIT | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
-| Request CIT | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
-| Jadwal CIT | ATM-USER, ATM-SPV |
-| ATM Portal | ATM-USER, ATM-SPV |
-| EOD Monitoring | ADMIN, ADMIN_PARAM |
-| DSR Dashboard | ATM-USER, ATM-SPV, VENDOR-USER |
-| DMAA Forecast | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
-| Daftar Invoice | BRANCH-USER, BRANCH-SPV, VENDOR-USER |
-| Rekonsiliasi | BRANCH-USER, BRANCH-SPV |
+| Nav item (label) | Route | Roles |
+|---|---|---|
+| Dashboard | `/` | `*` |
+| Cash Flow Monitoring | `/cash-flow` | ATM-USER, ATM-SPV |
+| Persetujuan | `/approvals` | `*` |
+| Pengaturan | `/settings` | ADMIN, ADMIN_PARAM, APPACCESS |
+| Rekomendasi CIT | `/replenishment/forecast-browser` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
+| Request CIT | `/replenishment/vendor-requests` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
+| Jadwal CIT | `/replenishment` | ATM-USER, ATM-SPV |
+| Penetapan Vault | `/cit/vault-plans` | ACM-USER, ACM-SPV |
+| ATM Portal | `/atm-portal` | ATM-USER, ATM-SPV |
+| EOD Monitoring | `/eod-monitoring` | ADMIN, ADMIN_PARAM |
+| Log Audit | `/audit-logs` | ADMIN, ADMIN_PARAM |
+| DMAA Forecast | `/forecasting/dmaa-forecast` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
+| Kalender Libur | `/settings/admin/holidays` | ADMIN |
 
-(Several other items exist but are `disabled` or commented out: Kalender Libur, Unggah Invoice, Penjadwalan, Pelaksanaan BA, Rekapitulasi, etc.)
+Commented out or `disabled`: Instruksi Pengisian, Validasi Pengisian, Cash Supply, Proyeksi H+2, Unggah Invoice, Perhitungan Beban, Pembuatan Dokumen, and all Perhitungan Kas items (Penjadwalan, Analisis Tier Saldo, Pelaksanaan (BA), Checklist, Rekonsiliasi, Rekapitulasi).
 
 ### (b) Route guards — `requireRoles([...])` in route files
+`requireRoles()` lets ADMIN/ADMIN_PARAM through on every route (shared bypass in `_protected.tsx`), so the lists below are the extra roles allowed.
+
 | Route | Roles |
 |---|---|
 | `/settings` | ADMIN, ADMIN_PARAM, APPACCESS |
 | `/settings/roles` | **APPACCESS only** |
 | `/settings/rbac/{users,policies,leaves,delegations}` | ADMIN, ADMIN_PARAM, APPACCESS |
-| `/settings/admin/users` | **APPACCESS only** (stricter than backend, which also allows ADMIN/ADMIN_PARAM) |
-| `/settings/admin/vendors` | ADMIN, ADMIN_PARAM |
-| `/settings/admin/atms` | ADMIN, ADMIN_PARAM |
-| `/replenishment/forecast-browser`, `/replenishment/vendor-requests` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
-| `/replenishment/vendor-requests/new` | MAKER_ROLES (maker subset) |
+| `/settings/admin/users` | **APPACCESS only** |
+| `/settings/admin/vendors`, `/settings/admin/vendors/$vendorId`, `.../branches/$branchId/edit` | ADMIN, ADMIN_PARAM |
+| `/settings/admin/atms`, `/settings/admin/regions`, `/settings/admin/master-data-io` | ADMIN, ADMIN_PARAM |
+| `/settings/admin/holidays`, `/settings/admin/acm-areas` | ADMIN |
+| `/replenishment/forecast-browser`, `/replenishment/vendor-requests`, `/replenishment/vendor-requests/$id` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
+| `/replenishment/vendor-requests/new` | maker roles (own redirect, not `requireRoles`) |
+| `/cit/vault-plans` | ACM-USER, ACM-SPV, ADMIN (same as backend) |
 | `/forecasting/dmaa-forecast` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
 | `/eod-monitoring` | ADMIN, ADMIN_PARAM |
 | `/audit-logs` | ADMIN, ADMIN_PARAM |
@@ -198,20 +213,21 @@ Active nav items and their allowed roles:
 ### (c) Settings hub card visibility — `SettingsHubPage.tsx`
 Only the "Manajemen Peran" card is role-gated at the card level (`canSeeRoleManagementCard` → APPACCESS or ADMIN). Every other card relies solely on its target route's `beforeLoad` guard (a known, documented gap: ADMIN_PARAM sees the other cards on the hub).
 
-> VendorPortal-Vite has **no** centralized nav config equivalent to `navigation.ts`.
+> VendorPortal-Vite has **no** centralized nav config equivalent to `navigation.ts`. It accepts the three vendor roles (`src/lib/vendorRoles.ts`, `VENDOR_ROLES`).
 
 ---
 
 ## 6. Known asymmetries (intentional or to-be-fixed)
 
-- **`/admin/users`** — backend allows `APPACCESS`+`ADMIN`+`ADMIN_PARAM`; frontend route+card is `APPACCESS`-only. Deliberate.
-- **DB catalog vs route guards** — `role_permissions` grants `settings` to ADMIN/ADMIN_PARAM/APPACCESS, but `/settings/roles` and `/settings/admin/users` are frontend-gated to APPACCESS only. The DB catalog is not yet the enforcement authority.
-- **`RequireAuth`-only routes** — `dsr`, `atm-portal`, `vendor-requests`, `approvals` are not role-gated at the route. For `approvals` this is by design (hierarchy handles it); the others are a coarser-than-catalog gap.
+- **ADMIN_PARAM frontend bypass** — `filterNavByRoles()` and `requireRoles()` let ADMIN_PARAM see every menu and route, but the backend rejects ADMIN_PARAM on `/admin/users`, `/admin/roles`, `/admin/acm-areas`, `/admin/holidays`, and `/vault-plans`. ADMIN_PARAM reaching those screens gets 403s from the API.
+- **`/admin/users`** — backend allows `APPACCESS` + `ADMIN`; frontend route is `APPACCESS`-only (plus the ADMIN/ADMIN_PARAM bypass). Deliberate.
+- **DB catalog vs route guards** — `role_permissions` grants `settings` to ADMIN/ADMIN_PARAM/APPACCESS, but `/settings/roles` and `/settings/admin/users` are frontend-gated to APPACCESS. ACM roles have no `dashboard` grant but `Dashboard` nav is `*`. The DB catalog is not yet the enforcement authority.
+- **`RequireAuth`-only routes** — `dsr`, `atm-portal`, `notifications`, `approvals` are not role-gated at the route. For `approvals` this is by design (hierarchy handles it); for `notifications` each user only reads their own; `dsr` / `atm-portal` are a coarser-than-catalog gap.
 
 ---
 
 ## Conventions
 
-- Update this matrix whenever a role is added, a `menu_features` entry changes, a `role_permissions` seed grant changes, or a `RequireRoles(...)` / `requireRoles(...)` guard changes.
+- Update this matrix whenever a role is added, a `menu_features` entry changes, a `role_permissions` seed grant changes, or a `RequireRoles(...)` / `requireRoles(...)` guard changes (in `main.go` **or** a handler's `Routes()`).
 - When the role-management catalog becomes the backend enforcement authority (replacing hardcoded `RequireRoles`), revise Section 4 and the "two parallel systems" note.
 - Keep the exact role strings verbatim (`ATM-USER`, not `atm_user`) — guards compare case-insensitively but the seed strings are the canonical identifiers.

@@ -30,6 +30,8 @@ Warm crimson. Full 10-shade scale so hover/pressed/tint variants exist instead o
 | `--red-800` | `oklch(0.325 0.120 29)` |  |
 | `--red-900` | `oklch(0.250 0.082 29)` | Text on red tints |
 
+**Documented deviation (2026-10-23, spec `.kiro/specs/app-shell-revamp/`, D14):** the hue-22 accent from the CIMB Red brief is used **only for navigation/shell** as `--shell-accent` (CompanyPortal `tokens.css`, `--shell-*` tokens). `--red-500` and primary page buttons are unchanged.
+
 * * *
 ## 3\. Neutrals — tinted toward red (hue 29)
 No dead gray. Every neutral carries a whisper of brand chroma (0.003–0.009) so surfaces feel cohesive without reading as "tinted." Never use `#000` or `#fff`.
@@ -87,6 +89,8 @@ Rules:
 *   `text-wrap: balance` on headings, `text-wrap: pretty` on prose.
 *   Body measure 65–75ch max.
 
+**Documented deviation (2026-10-23, spec `.kiro/specs/app-shell-revamp/`, PO-approved D2):** CompanyPortal uses self-hosted **Plus Jakarta Sans** + **JetBrains Mono** (`@fontsource-variable/plus-jakarta-sans@5.3.0`, `@fontsource-variable/jetbrains-mono@5.3.0`, exact pins) instead of the system stack above. No external font URLs. Hierarchy rules above still apply.
+
 * * *
 ## 7\. Spacing, radius, elevation
 *   **4pt base scale:** 4, 8, 12, 16, 24, 32, 48, 72px. Named tokens (`--space-sm`…), use `gap` not margins.
@@ -133,6 +137,11 @@ Rules:
 *   No em dashes in UI copy. No pure black/white.
 *   No signalling error/status by color alone, always icon + text.
 
+**Documented deviation (2026-10-23, spec `.kiro/specs/app-shell-revamp/`, D4/D6):**
+*   Active nav indicator = gradient + red icon + 6px dot before the label. No side-stripe.
+*   `backdrop-blur` is allowed **only** on the modal overlay (Ctrl+K command palette). Topbar stays solid, no blur.
+*   The sidebar `width` transition (Expanded 264px / Rail 76px) is the one allowed layout-property animation. It is disabled under `prefers-reduced-motion`.
+
 * * *
 ## 11\. Two Themes — One Per Frontend
 
@@ -141,6 +150,8 @@ Rules:
 ### Internal App — "Merah Sirih" (`frontend/CompanyPortal-Vite`)
 
 Warm off-white neutrals, red as a ≤10% accent (primary buttons, active states, key figures). Optimized for data-dense screens operators stare at all day. This is the theme described in Sections 1-10 above.
+
+**Documented deviation (2026-10-23, spec `.kiro/specs/app-shell-revamp/`, D5/D6/D14):** the navigation shell is the exception to "light only". The Sidebar is dark oxblood by default with its own `dark`/`light` toggle (Sidebar only). Content, Topbar and dialogs stay light. The shell accent `--shell-accent` (hue 22) is used only in navigation; primary buttons stay `--red-500`.
 
 | Token | OKLCH | Role |
 | ---| ---| --- |

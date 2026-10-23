@@ -67,6 +67,12 @@ The feature changelog (`.claude/development-progress.md`) and `.claude/bugfixes.
 ### RBAC has three parallel authorization axes — never assume editing one changes another
 Authz in CMS is three separate systems: (1) role-string `RequireRoles(...)` guards in `cmd/api/main.go` = the **real backend enforcement**; (2) the `role_permissions` DB catalog = **frontend nav + Role Management UI only**, NOT backend enforcement yet; (3) maker-checker approval keyed on `supervisor_id`/`approval_level`, enforced inside `approval.Orchestrator`, NOT middleware (that's why `/api/v1/approvals` is `RequireAuth`-only). Editing a role's grants in "Manajemen Peran" changes what the user *sees*, not what the backend *allows*. When reasoning about "can role X do Y", identify which axis the question is about first — conflating role (capability) with hierarchy (who-approves-whom) is the most common RBAC mistake here.
 
+### Feature flows describe the FSD target, not what is built
+`.claude/feature-flows/*` diagrams show the URS/FSD target. Example: `10-order-atm-lifecycle` includes cash pickup, officer/plate validation, and BDS pindah buku, none of which exist in code. To describe the Order ATM flow that actually runs, use the Vendor Request status enum in `backend/api/openapi.yaml` (`vault_assignment` → `vault_review` → `ready` → `sent_to_vendor` → `vendor_accepted` / `vendor_rejected`) and the mounts in `backend/cmd/api/main.go`. Never cite a feature flow as evidence that a feature exists.
+
+### `main.go` alone does not show a route's role guard
+Many mounts in `backend/cmd/api/main.go` show only `RequireAuth` (`/vendor-requests`, `/vendor/replenish-orders`, `/vendor/replenish-realizations`, `/replenishment`, `/admin/holidays`, `/atm-visit-quotas`), but the handler's `Routes()` adds `RequireRoles(...)` per route (shared lists `vendorRequestViewerRoles` / `MakerRoles` / `CheckerRoles` in `vendor_request_handler.go`, `vendorrole.All` for vendor routes). Before calling a route "any authenticated" in a doc or review, grep `RequireRoles(` in the handler file too.
+
 ### Assessment docs live in `.claude/sdlc/<feature>/assessment.md` with a fixed structure
 Development-readiness assessments follow a consistent 9-11 section shape: Executive Summary (with a readiness verdict emoji ⚠️/✅), Module Scope, Current State (table with ✅/❌ + evidence column), Dependencies, Data/Schema, State Machine, Open Questions, Recommendations & Model-per-stage table, Definition of Done. Match this structure for new assessments. For a **built** module (vs a parked one), frame it as an "as-built source of truth" — verify claims against actual code before writing status, and flag doc-vs-code drift explicitly rather than repeating what the specs claim.
 
@@ -550,3 +556,21 @@ A live baseline (16-core/15.5GiB host, 2026-10-13) measured idle usage of ~40 Mi
 - The read replica pool is read from config but **not wired** — heavy dashboard reads hit primary.
 
 When asked about performance, read `stress-test.txt` first and steer toward a real load tool (k6) against real endpoints rather than re-measuring idle containers. For meaningful pass/fail thresholds you need: prod VM spec, CloudSQL max-connections tier, and typical DSR file row count.
+
+### CompanyPortal CSP blocks every CDN asset — self-host fonts
+The CSP lives in `frontend/CompanyPortal-Vite/security-headers.conf` (included by `nginx.conf`, not inline): `style-src 'self'; font-src 'self' data:; default-src 'self'`. Google Fonts, icon CDNs, or any external stylesheet work in `pnpm dev` but are blocked behind Nginx. Web fonts must be self-hosted (e.g. `@fontsource-variable/*`, pinned exact, Golden Rule #1 approval) and bundled by Vite.
+
+### External UI briefs regularly conflict with `design.md` Sec 10 bans — surface, never adopt silently
+PO/generator briefs keep asking for banned patterns: 3px active `border-left` stripe, `backdrop-blur` topbars, hex/rgba colors, animating `width`, theme toggles, Google Fonts. Before speccing, check the brief against `design.md` Sec 10 + Sec 1 (light mode only). Each conflict becomes an Open Question with a suggested compliant alternative, or a documented deviation recorded back into `design.md`.
+
+### Nav visibility and route access are two separate hard-coded lists
+`NAV_CONFIG[].roles` + `filterNavByRoles` (`src/lib/config/navigation.ts`, ADMIN/ADMIN_PARAM see all) decide what the menu shows; `requireRoles([...])` in each route's `beforeLoad` decides access (also ADMIN/ADMIN_PARAM bypass). They already drift (e.g. vault-plans route allows ADMIN, nav lists ACM only). UI/nav work must never widen visibility beyond `filterNavByRoles`; security lives in route guards + backend `RequireRoles`.
+
+### Sidebar active-state needs longest-prefix match, not exact match
+The pre-revamp sidebar used `currentPath === href`, so nested routes (`/replenishment/vendor-requests/$id`, `/atm-portal/$terminalId`) highlighted nothing, and `/replenishment` vs `/replenishment/vendor-requests` overlap. Use longest segment-prefix match; `/` matches only exactly.
+
+### Shell badge data: reuse existing hooks, only for items the role can see
+No count endpoints exist. Use `useUnreadCount()` (notifications), `useInbox().length` (approvals), `useVendorRequests({page_size:1}).pagination.total_count` (Request CIT), `useEodStatus()` (ADMIN/ADMIN_PARAM only). Call a badge hook only when its nav item is visible to the role, otherwise the shell fires requests the backend will 403.
+
+### Internal users: no office field, no password change
+`AuthUser` = `{id, username, fullName, email, role, isKaryawan, vendorId}` with no kantor/region, and CompanyPortal users authenticate via LDAP, so "Ganti password" has no meaning for them. UI that needs either requires a backend change first.

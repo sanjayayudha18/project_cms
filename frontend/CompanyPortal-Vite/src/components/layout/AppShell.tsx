@@ -1,40 +1,85 @@
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_RAIL, Sidebar } from "@/components/layout/Sidebar";
+import { Topbar } from "@/components/layout/Topbar";
+import { useNavBadges } from "@/components/layout/useNavBadges";
 import { useAuthStore } from "@/lib/auth/store";
-import { cn } from "@/lib/utils/cn";
+import { type NavItem, findActiveNavItem, getVisibleNav } from "@/lib/config/navigation";
+import { useShellPrefs } from "@/lib/shell/prefs";
+import { useShellShortcuts } from "@/lib/shell/shortcuts";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Component,
+  type ReactNode,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+// Palette dimuat lazy supaya tidak masuk initial-load budget (Req 15.4).
+const CommandPalette = lazy(() => import("./CommandPalette"));
 
 interface AppShellProps {
   children: React.ReactNode;
-  /** Rendered in the header (the notification bell). */
+  /** Rendered in the topbar (the notification bell). */
   notifications?: React.ReactNode;
 }
 
-const SIDEBAR_EXPANDED_WIDTH = "256px";
-const SIDEBAR_COLLAPSED_WIDTH = "64px";
-const BREAKPOINT_LG = 1024;
+const NARROW_QUERY = "(max-width: 1023px)";
+
+/** Gagal memuat chunk palette → tutup palette, shell tetap hidup. */
+class PaletteBoundary extends Component<
+  { onError: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches);
+  useEffect(() => {
+    const mql = window.matchMedia(NARROW_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    setNarrow(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return narrow;
+}
 
 /**
  * AppShell — the persistent layout frame for CMS.
  *
- * Renders a fixed Sidebar (left) + fixed Header (top) + scrollable main content area.
- * Uses CSS Grid: sidebar column + header row + main area.
- * Manages sidebar expanded/collapsed state via local state.
- * Responsive: sidebar collapses to icon-only at < 1024px.
+ * Grid `var(--sb-w) 1fr`: Sidebar (row-span-2) + Topbar (row 1) + scrollable <main> (row 2).
+ * Rail = prefs.rail || viewport < 1024px (never written back to prefs).
  */
 export function AppShell({ children, notifications }: AppShellProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLButtonElement>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const role = useAuthStore((s) => s.user?.role ?? null);
+  const prefs = useShellPrefs();
+  const isNarrow = useIsNarrow();
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
+  const visible = useMemo(() => getVisibleNav(role), [role]);
+  const badges = useNavBadges(visible, role);
 
   // Move focus to main content on route change for keyboard users
-  const location = useRouterState({ select: (s) => s.location });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isFirstRender = useRef(true);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: location.pathname is the intentional trigger to shift focus to <main> on route change, even though it isn't read in the body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the intentional trigger to shift focus to <main> on route change, even though it isn't read in the body.
   useEffect(() => {
     // Skip focus shift on initial mount
     if (isFirstRender.current) {
@@ -42,144 +87,95 @@ export function AppShell({ children, notifications }: AppShellProps) {
       return;
     }
     mainRef.current?.focus();
-  }, [location.pathname]);
+  }, [pathname]);
 
-  // Collapse sidebar on small viewports
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${BREAKPOINT_LG - 1}px)`);
-
-    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      setSidebarCollapsed(e.matches);
-    };
-
-    // Set initial state
-    handleChange(mql);
-
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const closePalette = useCallback(() => {
+    setPaletteOpen(false);
+    searchRef.current?.focus();
   }, []);
-
-  const handleSidebarToggle = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
-  }, []);
-
-  const handleNavigate = useCallback(
-    (href: string) => {
-      router.navigate({ to: href });
+  const selectItem = useCallback(
+    (item: NavItem) => {
+      router.navigate({ to: item.href });
+      closePalette();
     },
-    [router],
+    [router, closePalette],
   );
 
-  const sidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH;
+  useShellShortcuts({
+    onPalette: openPalette,
+    onToggleRail: prefs.toggleRail,
+    enabled: !paletteOpen,
+  });
+
+  const active = findActiveNavItem(visible.all, pathname);
+  const rail = prefs.rail || isNarrow;
 
   return (
     <div
       className="grid h-screen overflow-hidden"
-      style={{
-        gridTemplateColumns: `${sidebarWidth} 1fr`,
-        gridTemplateRows: "auto minmax(0, 1fr)",
-      }}
+      style={
+        {
+          "--sb-w": rail ? SIDEBAR_WIDTH_RAIL : SIDEBAR_WIDTH_EXPANDED,
+          gridTemplateColumns: "var(--sb-w) 1fr",
+          gridTemplateRows: "auto minmax(0, 1fr)",
+        } as React.CSSProperties
+      }
     >
-      {/* Sidebar — spans both rows */}
-      <aside
-        className={cn(
-          "row-span-2 flex flex-col overflow-y-auto",
-          "border-r transition-[width] duration-200",
-        )}
-        style={{
-          width: sidebarWidth,
-          borderColor: "var(--n-200)",
-          backgroundColor: "var(--n-0)",
-          transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-        }}
-        aria-label="Navigasi utama"
+      <a
+        href="#main-content"
+        className="shell-focus sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-[var(--shell-accent)] focus:px-4 focus:py-2 focus:text-[var(--shell-on-accent)]"
       >
-        {/* Sidebar toggle + brand */}
-        <div
-          className="flex items-center px-[var(--space-4)] py-[var(--space-3)]"
-          style={{ borderBottom: "1px solid var(--n-200)" }}
-        >
-          <button
-            type="button"
-            onClick={handleSidebarToggle}
-            className={cn(
-              "flex items-center justify-center rounded-[var(--radius-md)]",
-              "h-8 w-8 transition-colors duration-200",
-            )}
-            style={{
-              color: "var(--n-600)",
-              transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-            aria-label={sidebarCollapsed ? "Perluas navigasi" : "Kecilkan navigasi"}
-            aria-expanded={!sidebarCollapsed}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          {!sidebarCollapsed && (
-            <span
-              className="ml-[var(--space-3)] text-sm font-semibold"
-              style={{ color: "var(--n-900)" }}
-            >
-              CMS
-            </span>
-          )}
-        </div>
+        Lewati ke konten utama
+      </a>
 
-        {/* Sidebar navigation */}
+      <div className="row-span-2 min-h-0" style={{ gridRow: "1 / span 2" }}>
         <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggle={handleSidebarToggle}
-          currentPath={location.pathname}
-          onNavigate={handleNavigate}
+          visible={visible}
+          active={active}
+          badges={badges}
+          rail={rail}
+          theme={prefs.sidebarTheme}
+          collapsedGroups={prefs.collapsedGroups}
+          onToggleGroup={prefs.toggleGroup}
+          onToggleRail={prefs.toggleRail}
         />
-      </aside>
+      </div>
 
-      {/* Header — occupies top-right cell */}
-      <header
-        className="flex items-center px-[var(--space-6)] py-[var(--space-3)]"
-        style={{
-          borderBottom: "1px solid var(--n-200)",
-          backgroundColor: "var(--n-0)",
-        }}
-      >
-        {user && (
-          <Header
-            user={user}
-            onLogout={logout}
-            onSidebarToggle={handleSidebarToggle}
-            sidebarCollapsed={sidebarCollapsed}
-            notifications={notifications}
-          />
-        )}
-      </header>
+      <Topbar
+        active={active}
+        settings={visible.settings}
+        sidebarTheme={prefs.sidebarTheme}
+        onToggleTheme={prefs.toggleTheme}
+        onOpenPalette={openPalette}
+        searchRef={searchRef}
+        notifications={notifications}
+      />
 
-      {/* Main content — scrollable area. `relative` makes <main> the containing
-          block for absolutely-positioned descendants (e.g. `sr-only`), so they are
-          clipped by its scroll instead of stretching the document height. */}
+      {/* `relative` makes <main> the containing block for absolutely-positioned
+          descendants (e.g. `sr-only`), so they are clipped by its scroll. */}
       <main
         ref={mainRef}
         tabIndex={-1}
         id="main-content"
         className="relative overflow-y-auto px-[var(--space-6)] py-[var(--space-6)] outline-none"
-        style={{ backgroundColor: "var(--n-50)" }}
+        style={{ backgroundColor: "var(--shell-canvas)" }}
       >
         {children}
       </main>
+
+      {paletteOpen && (
+        <PaletteBoundary onError={closePalette}>
+          <Suspense fallback={null}>
+            <CommandPalette
+              items={visible.all}
+              activeId={active?.id}
+              onSelect={selectItem}
+              onClose={closePalette}
+            />
+          </Suspense>
+        </PaletteBoundary>
+      )}
     </div>
   );
 }

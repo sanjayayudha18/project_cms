@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
@@ -453,5 +455,209 @@ describe("Property 21: Design System Contrast Compliance", () => {
         }),
       );
     });
+  });
+});
+
+// ============================================================
+// Property 10 (app-shell-revamp): --shell-* tokens, read from tokens.css
+// ============================================================
+
+type Rgb = [number, number, number];
+const TOKENS_CSS = readFileSync(resolve(process.cwd(), "src/styles/tokens.css"), "utf-8").replace(
+  /\/\*[\s\S]*?\*\//g,
+  "",
+);
+
+function scopeDecls(selector: string): Record<string, string> {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const block = TOKENS_CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
+  if (!block) throw new Error(`Scope not found in tokens.css: ${selector}`);
+  const out: Record<string, string> = {};
+  for (const decl of block[1].split(";")) {
+    const m = decl.match(/^\s*(--[\w-]+)\s*:\s*([\s\S]+?)\s*$/);
+    if (m) out[m[1]] = m[2];
+  }
+  return out;
+}
+
+const ROOT_DECLS = scopeDecls(":root");
+const SIDEBAR_THEMES = {
+  dark: { ...ROOT_DECLS, ...scopeDecls('[data-sidebar-theme="dark"]') },
+  light: { ...ROOT_DECLS, ...scopeDecls('[data-sidebar-theme="light"]') },
+};
+
+/** Resolve a token to sRGB (gamma) channels + alpha; gradients use their first (strongest) stop. */
+function resolveColor(token: string, scope: Record<string, string>): { rgb: Rgb; a: number } {
+  let value = scope[token];
+  if (value === undefined) throw new Error(`Unknown token ${token}`);
+  for (let depth = 0; depth < 8; depth++) {
+    const ref = value.match(/^var\((--[\w-]+)\)$/);
+    if (!ref) break;
+    value = scope[ref[1]];
+    if (value === undefined) throw new Error(`Unresolved var in ${token}`);
+  }
+  const m = value.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)/);
+  if (!m) throw new Error(`No oklch color in ${token}: ${value}`);
+  const [L, C, H] = [m[1], m[2], m[3]].map(Number.parseFloat);
+  const lin = oklabToLinearSrgb(...oklchToOklab(L, C, H));
+  const rgb = lin.map((c) => linearToSrgb(Math.max(0, Math.min(1, c)))) as Rgb;
+  return { rgb, a: m[4] === undefined ? 1 : Number.parseFloat(m[4]) };
+}
+
+function over(top: { rgb: Rgb; a: number }, bottom: Rgb): Rgb {
+  return bottom.map((b, i) => top.rgb[i] * top.a + b * (1 - top.a)) as Rgb;
+}
+
+function luminanceOf(rgb: Rgb): number {
+  return relativeLuminance(srgbToLinear(rgb[0]), srgbToLinear(rgb[1]), srgbToLinear(rgb[2]));
+}
+
+interface ShellPair {
+  name: string;
+  theme: "dark" | "light";
+  fg: string;
+  /** Background layers, bottom first; the first must be opaque. */
+  bg: string[];
+  minRatio: number;
+}
+
+function shellRatio(pair: ShellPair): number {
+  const scope = SIDEBAR_THEMES[pair.theme];
+  const [base, ...layers] = pair.bg.map((t) => resolveColor(t, scope));
+  const bg = layers.reduce((acc, l) => over(l, acc), base.rgb);
+  const fg = over(resolveColor(pair.fg, scope), bg);
+  return contrastRatio(luminanceOf(fg), luminanceOf(bg));
+}
+
+function sidebarPairs(theme: "dark" | "light"): ShellPair[] {
+  // dark: flat bg and the lighter glow corner; light: the --n-0 surface
+  const bases = theme === "dark" ? ["--shell-sb-bg", "--shell-sb-glow"] : ["--n-0"];
+  const pairs: ShellPair[] = [];
+  for (const base of bases) {
+    const at = `${theme} sidebar on ${base}`;
+    const states: [string, string[]][] = [
+      ["", [base]],
+      ["hover ", [base, "--shell-sb-hover"]],
+      ["active ", [base, "--shell-active-bg"]],
+    ];
+    for (const [state, bg] of states) {
+      for (const fg of ["--shell-sb-text", "--shell-sb-strong", "--shell-sb-group"]) {
+        pairs.push({ name: `${fg} ${state}(${at})`, theme, fg, bg, minRatio: 4.5 });
+      }
+    }
+    const badge = [base, "--shell-badge-bg"];
+    pairs.push(
+      {
+        name: `--shell-icon-active (${at})`,
+        theme,
+        fg: "--shell-icon-active",
+        bg: [base],
+        minRatio: 3,
+      },
+      {
+        name: `--shell-icon-active active row (${at})`,
+        theme,
+        fg: "--shell-icon-active",
+        bg: [base, "--shell-active-bg"],
+        minRatio: 3,
+      },
+      { name: `--shell-focus ring (${at})`, theme, fg: "--shell-focus", bg: [base], minRatio: 3 },
+      {
+        name: `--shell-sb-text on badge (${at})`,
+        theme,
+        fg: "--shell-sb-text",
+        bg: badge,
+        minRatio: 4.5,
+      },
+      {
+        name: `--shell-sb-strong on badge (${at})`,
+        theme,
+        fg: "--shell-sb-strong",
+        bg: badge,
+        minRatio: 4.5,
+      },
+    );
+    if (theme === "dark") {
+      pairs.push({
+        name: `--shell-gold on env chip (${at})`,
+        theme,
+        fg: "--shell-gold",
+        bg: [base, "--shell-gold-bg"],
+        minRatio: 4.5,
+      });
+    }
+  }
+  return pairs;
+}
+
+const page = (name: string, fg: string, bg: string[], minRatio = 4.5): ShellPair => ({
+  name,
+  theme: "light",
+  fg,
+  bg,
+  minRatio,
+});
+
+const SHELL_PAIRS: ShellPair[] = [
+  ...sidebarPairs("dark"),
+  ...sidebarPairs("light"),
+  // Topbar
+  page("Topbar: --shell-ink on --shell-topbar-bg", "--shell-ink", ["--shell-topbar-bg"]),
+  page("Topbar: --shell-muted on --shell-topbar-bg", "--shell-muted", ["--shell-topbar-bg"]),
+  page(
+    "Topbar: --shell-accent icon on --shell-topbar-bg",
+    "--shell-accent",
+    ["--shell-topbar-bg"],
+    3,
+  ),
+  page("Topbar: --shell-on-accent on --shell-accent", "--shell-on-accent", ["--shell-accent"]),
+  page("Topbar: --shell-on-accent on --shell-accent-hover", "--shell-on-accent", [
+    "--shell-accent-hover",
+  ]),
+  page("Topbar: --shell-on-accent on avatar --shell-maroon", "--shell-on-accent", [
+    "--shell-maroon",
+  ]),
+  // Chip
+  page("Chip: --shell-ink on --shell-chip-bg", "--shell-ink", ["--shell-chip-bg"]),
+  page("Chip: --shell-muted on --shell-chip-bg", "--shell-muted", ["--shell-chip-bg"]),
+  // Palette
+  page("Palette: --shell-ink on --n-0", "--shell-ink", ["--n-0"]),
+  page("Palette: --shell-muted on --n-0", "--shell-muted", ["--n-0"]),
+  page(
+    "Palette: --shell-on-accent icon on selected --shell-accent",
+    "--shell-on-accent",
+    ["--shell-accent"],
+    3,
+  ),
+  page("Palette: --shell-maroon icon on --shell-chip-bg", "--shell-maroon", ["--shell-chip-bg"], 3),
+  // Dropdown
+  page("Dropdown: --shell-ink on --n-0", "--shell-ink", ["--n-0"]),
+  page("Dropdown: --shell-muted on --n-0", "--shell-muted", ["--n-0"]),
+  page("Dropdown: --shell-ink on hover --shell-accent-tint", "--shell-ink", [
+    "--n-0",
+    "--shell-accent-tint",
+  ]),
+  page("Dropdown: --shell-muted on hover --shell-chip-bg", "--shell-muted", ["--shell-chip-bg"]),
+  // Tooltip
+  page("Tooltip: --shell-on-accent on --shell-tooltip-bg", "--shell-on-accent", [
+    "--shell-tooltip-bg",
+  ]),
+  // Badge on light surface
+  page("Badge: --shell-on-accent on --shell-accent", "--shell-on-accent", ["--shell-accent"]),
+];
+
+describe("Property 10: shell token contrast (tokens.css)", () => {
+  for (const pair of SHELL_PAIRS) {
+    it(`${pair.name} meets ${pair.minRatio}:1`, () => {
+      expect(shellRatio(pair)).toBeGreaterThanOrEqual(pair.minRatio);
+    });
+  }
+
+  it("every registered shell pair meets its minimum ratio (sampled)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: SHELL_PAIRS.length - 1 }), (idx) => {
+        expect(shellRatio(SHELL_PAIRS[idx])).toBeGreaterThanOrEqual(SHELL_PAIRS[idx].minRatio);
+      }),
+    );
   });
 });

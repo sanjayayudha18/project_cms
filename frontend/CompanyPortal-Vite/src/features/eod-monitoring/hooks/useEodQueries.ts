@@ -36,7 +36,11 @@ export const eodKeys = {
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-export function useEodSummary(processingDate: string, refetchInterval: number | false) {
+export function useEodSummary(
+  processingDate: string,
+  refetchInterval: number | false,
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
   return useQuery({
     queryKey: eodKeys.summary(processingDate),
     queryFn: async () => {
@@ -46,7 +50,8 @@ export function useEodSummary(processingDate: string, refetchInterval: number | 
       );
       return unwrap(res.data);
     },
-    refetchInterval,
+    enabled: options?.enabled,
+    refetchInterval: options?.refetchInterval ?? refetchInterval,
   });
 }
 

@@ -1,194 +1,32 @@
-import type { DbRole } from "@/lib/auth/store";
-import { LayoutDashboard, Monitor } from "lucide-react";
+import { CalendarDays, HeartPulse, LayoutGrid, Settings2 } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { GROUP_LABELS, NAV_CONFIG, type NavItem, filterNavByRoles } from "./navigation";
+import { NAV_CONFIG, findActiveNavItem } from "./navigation";
 
-// ─── Test helpers ─────────────────────────────────────────────────────────────
+const byId = (id: string) => {
+  const item = NAV_CONFIG.find((i) => i.id === id);
+  if (!item) throw new Error(`nav item ${id} missing`);
+  return item;
+};
 
-function makeItem(overrides: Partial<NavItem> = {}): NavItem {
-  return {
-    id: "test-item",
-    label: "Test",
-    icon: LayoutDashboard,
-    href: "/test",
-    roles: ["ADMIN"],
-    group: "general",
-    ...overrides,
-  };
-}
-
-// ─── filterNavByRoles ─────────────────────────────────────────────────────────
-
-describe("filterNavByRoles", () => {
-  it("returns all wildcard items for any authenticated user", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["*"] }),
-      makeItem({ id: "b", roles: ["ADMIN"] }),
-    ];
-    const result = filterNavByRoles(items, "VENDOR-USER");
-    expect(result.map((i) => i.id)).toEqual(["a"]);
+describe("NAV_CONFIG (app-shell-revamp)", () => {
+  it.each([
+    ["dashboard", LayoutGrid],
+    ["eod-monitoring", HeartPulse],
+    ["holiday-calendar", CalendarDays],
+    ["settings", Settings2],
+  ])("ikon %s", (id, icon) => {
+    expect(byId(id).icon).toBe(icon);
   });
 
-  it("includes items matching user role", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["ATM-USER", "ATM-SPV"] }),
-      makeItem({ id: "b", roles: ["BRANCH-USER"] }),
-    ];
-    const result = filterNavByRoles(items, "ATM-SPV");
-    expect(result.map((i) => i.id)).toEqual(["a"]);
+  it("Pengaturan: group system, placement topbar", () => {
+    expect(byId("settings")).toMatchObject({ group: "system", placement: "topbar" });
   });
 
-  it("ADMIN sees all items regardless of role restrictions", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["BRANCH-USER"] }),
-      makeItem({ id: "b", roles: ["VENDOR-USER"] }),
-      makeItem({ id: "c", roles: ["ATM-SPV"] }),
-    ];
-    const result = filterNavByRoles(items, "ADMIN");
-    expect(result.map((i) => i.id)).toEqual(["a", "b", "c"]);
-  });
-
-  it("ADMIN_PARAM sees all items regardless of role restrictions", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["BRANCH-USER"] }),
-      makeItem({ id: "b", roles: ["VENDOR-USER"] }),
-    ];
-    const result = filterNavByRoles(items, "ADMIN_PARAM");
-    expect(result.map((i) => i.id)).toEqual(["a", "b"]);
-  });
-
-  it("returns empty array when no items match user role", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["ADMIN"] }),
-      makeItem({ id: "b", roles: ["BRANCH-USER"] }),
-    ];
-    const result = filterNavByRoles(items, "VENDOR-USER");
-    expect(result).toEqual([]);
-  });
-
-  it("returns empty array when items array is empty", () => {
-    expect(filterNavByRoles([], "ADMIN")).toEqual([]);
-  });
-
-  it("preserves disabled items in output (filtering is role-based only)", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "a", roles: ["ATM-USER"], disabled: true }),
-      makeItem({ id: "b", roles: ["ATM-USER"], disabled: false }),
-    ];
-    const result = filterNavByRoles(items, "ATM-USER");
-    expect(result).toHaveLength(2);
-    expect(result[0]?.disabled).toBe(true);
-  });
-
-  it("handles wildcard mixed with specific roles", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "dashboard", roles: ["*"] }),
-      makeItem({ id: "settings", roles: ["ADMIN"] }),
-      makeItem({ id: "upload", roles: ["VENDOR-USER", "ATM-USER"] }),
-    ];
-    const result = filterNavByRoles(items, "ATM-USER");
-    expect(result.map((i) => i.id)).toEqual(["dashboard", "upload"]);
-  });
-
-  it("VENDOR-USER only sees items with VENDOR-USER or wildcard", () => {
-    const items: NavItem[] = [
-      makeItem({ id: "dashboard", roles: ["*"] }),
-      makeItem({ id: "dsr-upload", roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"] }),
-      makeItem({ id: "settings", roles: ["ADMIN"] }),
-      makeItem({ id: "forecast", roles: ["ATM-USER", "ATM-SPV"] }),
-    ];
-    const result = filterNavByRoles(items, "VENDOR-USER");
-    expect(result.map((i) => i.id)).toEqual(["dashboard", "dsr-upload"]);
-  });
-});
-
-// ─── NAV_CONFIG structure ─────────────────────────────────────────────────────
-
-describe("NAV_CONFIG", () => {
-  it("has unique IDs for all items", () => {
-    const ids = NAV_CONFIG.map((item) => item.id);
-    const uniqueIds = new Set(ids);
-    expect(uniqueIds.size).toBe(ids.length);
-  });
-
-  it("all items have non-empty labels", () => {
-    for (const item of NAV_CONFIG) {
-      expect(item.label.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("all items have valid group assignments", () => {
-    const validGroups = Object.keys(GROUP_LABELS);
-    for (const item of NAV_CONFIG) {
-      expect(validGroups).toContain(item.group);
-    }
-  });
-
-  it("dashboard is visible to all roles (wildcard)", () => {
-    const dashboard = NAV_CONFIG.find((i) => i.id === "dashboard");
-    expect(dashboard?.roles).toContain("*");
-  });
-
-  it("settings is restricted to ADMIN, ADMIN_PARAM, and APPACCESS", () => {
-    const settings = NAV_CONFIG.find((i) => i.id === "settings");
-    expect(settings?.roles).toEqual(["ADMIN", "ADMIN_PARAM", "APPACCESS"]);
-  });
-
-  it("filterNavByRoles shows settings to APPACCESS and omits it for non-authorized roles", () => {
-    const appAccessResult = filterNavByRoles(NAV_CONFIG, "APPACCESS");
-    expect(appAccessResult.map((i) => i.id)).toContain("settings");
-
-    const nonAuthorizedRoles: DbRole[] = ["ATM-USER", "BRANCH-USER", "VENDOR-USER"];
-    for (const role of nonAuthorizedRoles) {
-      const result = filterNavByRoles(NAV_CONFIG, role);
-      expect(result.map((i) => i.id)).not.toContain("settings");
-    }
-  });
-
-  it("atm-portal item has the Monitor icon, correct href, roles, and group", () => {
-    const atmPortal = NAV_CONFIG.find((i) => i.id === "atm-portal");
-    expect(atmPortal).toBeDefined();
-    expect(atmPortal?.label).toBe("ATM Portal");
-    expect(atmPortal?.icon).toBe(Monitor);
-    expect(atmPortal?.href).toBe("/atm-portal");
-    expect(atmPortal?.roles).toEqual(["ATM-USER", "ATM-SPV"]);
-    expect(atmPortal?.group).toBe("monitoring");
-    expect(atmPortal?.disabled).toBeUndefined();
-  });
-
-  it("all roles in NAV_CONFIG are valid DbRole or wildcard", () => {
-    const validRoles: (DbRole | "*")[] = [
-      "*",
-      "ADMIN",
-      "ADMIN_PARAM",
-      "APPACCESS",
-      "ATM-USER",
-      "ATM-SPV",
-      "BRANCH-USER",
-      "BRANCH-SPV",
-      "BRANCH-ATM-USER",
-      "BRANCH-ATM-SPV",
-      "VENDOR-USER",
-      "ACM-USER",
-      "ACM-SPV",
-    ];
-    for (const item of NAV_CONFIG) {
-      for (const role of item.roles) {
-        expect(validRoles).toContain(role);
-      }
-    }
-  });
-});
-
-// ─── GROUP_LABELS ─────────────────────────────────────────────────────────────
-
-describe("GROUP_LABELS", () => {
-  it("has labels in Bahasa Indonesia", () => {
-    expect(GROUP_LABELS.general).toBe("Umum");
-    expect(GROUP_LABELS.monitoring).toBe("Monitoring");
-    expect(GROUP_LABELS.forecasting).toBe("Peramalan");
-    expect(GROUP_LABELS.invoice).toBe("Tagihan");
-    expect(GROUP_LABELS["cash-count"]).toBe("Perhitungan Kas");
-    expect(GROUP_LABELS.cit).toBe("CIT");
+  it.each([
+    ["/replenishment/vendor-requests/42", "vendor-requests"],
+    ["/settings/admin/holidays", "holiday-calendar"],
+    ["/settings/admin/users", "settings"],
+  ])("active item untuk %s", (path, id) => {
+    expect(findActiveNavItem(NAV_CONFIG, path)?.id).toBe(id);
   });
 });

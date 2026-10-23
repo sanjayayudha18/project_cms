@@ -21,10 +21,12 @@ export const approvalKeys = {
   masterData: (requestId: number) => [...approvalKeys.all, "master-data", requestId] as const,
 };
 
-export function useInbox() {
+export function useInbox(options?: { enabled?: boolean; refetchInterval?: number | false }) {
   return useQuery<InboxItem[], ApiError>({
     queryKey: approvalKeys.inbox(),
     queryFn: getInbox,
+    enabled: options?.enabled,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

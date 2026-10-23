@@ -115,12 +115,17 @@ export function useForecastSelectAll(
   });
 }
 
-export function useVendorRequests(params: ListVendorRequestParams) {
+export function useVendorRequests(
+  params: ListVendorRequestParams,
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
   return useQuery<VendorRequestListResponse, ApiError>({
     queryKey: vendorRequestKeys.list(params),
     queryFn: () => fetchVendorRequests(params),
     staleTime: VENDOR_REQUEST_STALE_TIME,
     placeholderData: keepPreviousData,
+    enabled: options?.enabled,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

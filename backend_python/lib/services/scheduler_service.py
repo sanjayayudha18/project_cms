@@ -22,6 +22,7 @@ from ..utils.timezone import WIB, current_processing_date
 from .audit_service import AuditService
 from .detector import FileDetector, LateDetector
 from .retry_executor import RetryExecutor, RetryResult
+from dsr_late_notify import job as dsr_late_job
 from replenish_classify import job as replenish_job
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,8 @@ logger = logging.getLogger(__name__)
 # after the EOD window that closes windows even when no new file came in.
 CLASSIFY_SOURCE = "itm_replenish"
 CLASSIFY_CRON = {"hour": 9, "minute": 15}
+# dsr-late-report FR5.1: every day incl. holidays, at the DSR deadline.
+DSR_LATE_CRON = {"hour": 9, "minute": 0}
 
 
 # FR14/C3: the legacy ETLs record success in their own tables and never write
@@ -129,6 +132,14 @@ class SchedulerService:
                 CronTrigger(**CLASSIFY_CRON, timezone=WIB),
                 id="replenish_classify",
                 kwargs={"trigger": "cron"},
+            )
+
+        # dsr-late-report FR5.1: only services whose settings carry the start date (not service_dsr_etl).
+        if getattr(self.settings, "dsr_late_start_date", None):
+            self._scheduler.add_job(
+                self._run_dsr_late_notify,
+                CronTrigger(**DSR_LATE_CRON, timezone=WIB),
+                id="dsr_late_notify",
             )
 
         self._scheduler.start()
@@ -365,6 +376,15 @@ class SchedulerService:
                 email_enabled=getattr(self.settings, "notify_email_enabled", False))
         except Exception:
             logger.exception("replenish_classify could not run (trigger=%s)", trigger)
+
+    async def _run_dsr_late_notify(self) -> None:
+        """Never raises: a failed run is logged + audited by run_once; the next manual run may retry."""
+        try:
+            await dsr_late_job.run_once(
+                self.pool, current_processing_date(), getattr(self.settings, "dsr_late_start_date", None),
+                trigger="auto", email_enabled=getattr(self.settings, "notify_email_enabled", False))
+        except Exception:
+            logger.exception("dsr_late_notify could not run")
 
 
 if __name__ == "__main__":

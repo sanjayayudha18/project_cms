@@ -287,6 +287,25 @@ type DsrLocationVaultMap struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Append-only: one row per confirmed DSR commit (daily_status completed). Never updated or deleted; a revision adds a row. Basis of the DSR late report (first_received_at = MIN(received_at)).
+type DsrReceipt struct {
+	ID int64 `json:"id"`
+	// dsr_uploads.vendor as uploaded (raw label).
+	VendorLabel string `json:"vendor_label"`
+	// Resolved at commit by vendors.name = vendor_label; NULL when unresolved (shown as a warning, counted for no branch).
+	VendorID *int64 `json:"vendor_id"`
+	// DSR report date the upload covers.
+	ReportDate pgtype.Date `json:"report_date"`
+	// SHA-256 hex of the uploaded file; same file committed again does not add a row.
+	Checksum string `json:"checksum"`
+	// Distinct non-empty btrim(dsr_daily_rows.location) labels of that upload; mapped to vaults via dsr_location_vault_maps.
+	Locations []string `json:"locations"`
+	// Vendor user who confirmed the upload, if known.
+	UploadedByUserID *int64 `json:"uploaded_by_user_id"`
+	// Commit/confirmation time (spec K2), not file staging time.
+	ReceivedAt pgtype.Timestamptz `json:"received_at"`
+}
+
 type DsrRencanaIsiRow struct {
 	ID       int64 `json:"id"`
 	UploadID int64 `json:"upload_id"`

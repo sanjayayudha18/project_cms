@@ -481,6 +481,15 @@ func main() {
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-realizations", handler.NewVendorOrderHandler(vendorOrderService).RealizationRoutes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/replenishment",
 		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbPool, dbReadPool)).Routes())
+	// dsr-late-report FR4: monthly late/missing DSR per vendor branch, read on the replica; DSR_LATE_START_DATE
+	// (same value as the Python RETRY_DSR_LATE_START_DATE) empty = report off.
+	dsrLateStart, err := service.ParseDsrLateStartDate(getenvDefault("DSR_LATE_START_DATE", ""))
+	if err != nil {
+		slog.Error("invalid DSR_LATE_START_DATE", "error", err)
+		os.Exit(1)
+	}
+	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr-late-reports",
+		handler.NewDsrLateHandler(service.NewDsrLateReportService(dbPool, dbReadPool, dsrLateStart)).Routes())
 	// Hari libur (FR1): ADMIN only (route + service), immediate apply + audit in the same tx (GR#3 deviation).
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/admin/holidays",
 		handler.NewAdminHolidayHandler(service.NewHolidayAdminService(dbPool, dbReadPool)).Routes())

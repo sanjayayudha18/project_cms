@@ -451,6 +451,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dsr-late-reports/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Internal only (ATM-USER, ATM-SPV, BRANCH-ATM-SPV, ADMIN). One row per vendor branch per obliged day of the month. With `format=csv` returns every row (no paging) as a CSV file and writes a `report_exported` audit row. */
+        get: operations["listDsrLateDaily"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dsr-late-reports/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Internal only. Per vendor branch totals for the month. With `format=csv` returns a CSV file and writes a `report_exported` audit row. */
+        get: operations["getDsrLateSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dsr-late-reports/warnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Internal only. Mapping gaps that make the month's report incomplete. */
+        get: operations["getDsrLateWarnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -463,6 +514,114 @@ export interface components {
         FieldError: {
             field: string;
             message: string;
+        };
+        /** @enum {string} */
+        DsrLateStatus: "ok" | "late" | "not_sent" | "pending";
+        DsrLateDailyRow: {
+            /** Format: date */
+            report_date: string;
+            /** Format: int64 */
+            vendor_id: number;
+            vendor_code: string;
+            vendor_name: string;
+            /** Format: int64 */
+            vendor_branch_id: number;
+            branch_code: string;
+            branch_name: string;
+            region_code: string | null;
+            /**
+             * Format: date-time
+             * @description 09:00 WIB of report_date
+             */
+            deadline: string;
+            /** Format: date-time */
+            first_received_at: string | null;
+            receipt_checksum: string;
+            matched_locations: string[];
+            status: components["schemas"]["DsrLateStatus"];
+            /** Format: int32 */
+            late_minutes: number;
+        };
+        DsrLateDailyList: {
+            items: components["schemas"]["DsrLateDailyRow"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+            /**
+             * Format: date
+             * @description DSR_LATE_START_DATE; null = feature off (always empty)
+             */
+            start_date: string | null;
+        };
+        DsrLateSummaryRow: {
+            /** Format: int64 */
+            vendor_id: number;
+            vendor_code: string;
+            vendor_name: string;
+            /** Format: int64 */
+            vendor_branch_id: number;
+            branch_code: string;
+            branch_name: string;
+            region_code: string | null;
+            /** Format: int32 */
+            obliged_days: number;
+            /** Format: int32 */
+            ok_days: number;
+            /** Format: int32 */
+            late_days: number;
+            /** Format: int32 */
+            not_sent_days: number;
+            /** Format: int32 */
+            pending_days: number;
+            /** Format: int32 */
+            late_minutes_total: number;
+        };
+        DsrLateSummary: {
+            items: components["schemas"]["DsrLateSummaryRow"][];
+            /** Format: date */
+            start_date: string | null;
+        };
+        DsrLateUnmappedVault: {
+            /** Format: int64 */
+            vendor_id: number;
+            vendor_name: string;
+            /** Format: int64 */
+            vendor_branch_id: number;
+            branch_code: string;
+            branch_name: string;
+            /** Format: int64 */
+            vendor_vault_id: number;
+            vault_code: string;
+            branch_excluded: boolean;
+        };
+        DsrLateUnmappedLabel: {
+            /** Format: int64 */
+            vendor_id: number;
+            vendor_name: string;
+            dsr_location: string;
+            /** Format: int32 */
+            receipt_count: number;
+            /** Format: date */
+            first_report_date: string | null;
+            /** Format: date */
+            last_report_date: string | null;
+        };
+        DsrLateUnresolvedVendor: {
+            vendor_label: string;
+            /** Format: int32 */
+            receipt_count: number;
+            /** Format: date */
+            first_report_date: string | null;
+            /** Format: date */
+            last_report_date: string | null;
+        };
+        DsrLateWarnings: {
+            unmapped_vaults: components["schemas"]["DsrLateUnmappedVault"][];
+            unmapped_labels: components["schemas"]["DsrLateUnmappedLabel"][];
+            unresolved_vendors: components["schemas"]["DsrLateUnresolvedVendor"][];
+            /** Format: date */
+            start_date: string | null;
         };
         UserRef: {
             /** Format: int64 */
@@ -1090,6 +1249,11 @@ export interface components {
     parameters: {
         Page: number;
         PageSize: number;
+        /** @description YYYY-MM, not after the current month (WIB) */
+        DsrLateMonth: string;
+        DsrLateVendorID: number;
+        DsrLateVendorBranchID: number;
+        DsrLateFormat: "csv";
         VendorRequestID: number;
         /** @description vendor party id (not the request id) */
         PartyID: number;
@@ -1910,6 +2074,100 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDsrLateDaily: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM, not after the current month (WIB) */
+                month: components["parameters"]["DsrLateMonth"];
+                vendor_id?: components["parameters"]["DsrLateVendorID"];
+                vendor_branch_id?: components["parameters"]["DsrLateVendorBranchID"];
+                status?: components["schemas"]["DsrLateStatus"];
+                page?: components["parameters"]["Page"];
+                page_size?: components["parameters"]["PageSize"];
+                format?: components["parameters"]["DsrLateFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK (JSON page, or CSV when format=csv) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DsrLateDailyList"];
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getDsrLateSummary: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM, not after the current month (WIB) */
+                month: components["parameters"]["DsrLateMonth"];
+                vendor_id?: components["parameters"]["DsrLateVendorID"];
+                vendor_branch_id?: components["parameters"]["DsrLateVendorBranchID"];
+                format?: components["parameters"]["DsrLateFormat"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK (JSON, or CSV when format=csv) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DsrLateSummary"];
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getDsrLateWarnings: {
+        parameters: {
+            query: {
+                /** @description YYYY-MM, not after the current month (WIB) */
+                month: components["parameters"]["DsrLateMonth"];
+                vendor_id?: components["parameters"]["DsrLateVendorID"];
+                vendor_branch_id?: components["parameters"]["DsrLateVendorBranchID"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DsrLateWarnings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             500: components["responses"]["InternalError"];
         };
     };

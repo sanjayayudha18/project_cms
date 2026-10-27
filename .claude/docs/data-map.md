@@ -168,3 +168,23 @@ Source: FSD "DSR End To End Cash Management" v1.0 field tables (Master Vendor, M
 - **A5** Coverage: average daily balance **≤** limit → Covered; > limit → Not Covered; no limit set → "Limit belum diisi".
 - **A6** Monitoring Limit CIS is **deferred** until daily escrow balance ingest (SIBS/Corebanking → `escrow_batch_rows`) exists. The first feature = PKS + Limit CIS input only.
 - Still open (tables B): everything for cash count (sections B/D questions 2, 4, 5). `holidays` was resolved by 2.2c (migration 031).
+
+## DSR receipts (migration 033)
+
+Source: `.claude/sdlc/dsr-late-report/spec.md` (S1, K2). File: `backend/migrations/033_dsr_receipts.sql` (applied to dev 2026-10-27 via `migrate up`). Additive only; forward-only.
+
+- **Table `dsr_receipts`** — append-only, one row per confirmed DSR commit (`dsr_etl.py --mode commit`, `daily_status` completed), written in the same tx as `dsr_uploads`.
+  - `id` bigint identity PK
+  - `vendor_label` text NOT NULL — `dsr_uploads.vendor` as uploaded (raw label)
+  - `vendor_id` bigint NULL, FK `vendors(id)` — resolved at commit by the unique vendor code from the upload filename (review R1, 2026-10-27; the DB column comment in 033 still says `vendors.name`, migration not edited); `vendor_label` keeps the name; NULL only on pre-fix rows (warned, counted for no branch)
+  - `report_date` date NOT NULL — DSR report date the upload covers
+  - `checksum` text NOT NULL — SHA-256 hex of the file, CHECK `^[0-9a-f]{64}$`
+  - `locations` text[] NOT NULL DEFAULT `'{}'` — distinct non-empty `btrim(dsr_daily_rows.location)` labels of that upload
+  - `uploaded_by_user_id` bigint NULL, FK `users(id)` — vendor user who confirmed, if known
+  - `received_at` timestamptz NOT NULL DEFAULT now() — commit/confirmation time (K2), not staging time
+  - UNIQUE `(vendor_label, report_date, checksum)` — same file committed again adds no row
+  - Index `dsr_receipts_date_vendor_idx (report_date, vendor_id)`
+- **No FK to `dsr_uploads`**: that row is replaced on revision, so a receipt must not depend on it.
+- **Reads**: "first received" = `MIN(received_at)` per (vendor, report_date). Revisions add rows; they never change the earlier one.
+- **Append-only rule**: never UPDATE or DELETE. Enforced by convention and code review (no trigger in 033).
+- Uses: DSR late report (`/api/v1/dsr-late-reports`, replica reads). Mapping of `locations` to vaults goes through `dsr_location_vault_maps` (027) — no change to that table.

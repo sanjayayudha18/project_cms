@@ -479,7 +479,25 @@ def read_rencana_isi_rows(path: Path) -> tuple[date | None, list[dict[str, Any]]
 # ============================================================
 # DB writes
 # ============================================================
-def _upsert_upload(conn, path: Path, vendor_name: str, uploaded_by: int | None) -> str:
+def _insert_receipt(cur, vendor_label: str, vendor_id: int, report_date: date, checksum: str,
+                    daily_rows: list[dict[str, Any]], uploaded_by: int | None) -> None:
+    """Append-only receipt (033_dsr_receipts.sql), same tx as dsr_uploads. Never
+    UPDATE/DELETE this table; a failure here rolls the whole upload back (plan R1).
+    vendor_id comes from the unique vendor code in the filename, never from the
+    non-unique vendors.name (review R1)."""
+    locations = sorted({loc for row in daily_rows if (loc := (row.get("location") or "").strip())})
+    cur.execute(
+        """
+        INSERT INTO public.dsr_receipts
+            (vendor_label, vendor_id, report_date, checksum, locations, uploaded_by_user_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (vendor_label, report_date, checksum) DO NOTHING
+        """,
+        (vendor_label, vendor_id, report_date, checksum, locations, uploaded_by),
+    )
+
+
+def _upsert_upload(conn, path: Path, vendor_name: str, vendor_id: int, uploaded_by: int | None) -> str:
     """Writes one workbook into dsr_uploads + both row tables, in one transaction.
 
     Both sheets share a single dsr_uploads row (020_dsr_daily_rencana_isi.sql), so
@@ -588,6 +606,9 @@ def _upsert_upload(conn, path: Path, vendor_name: str, uploaded_by: int | None) 
         )
         upload_id = cur.fetchone()[0]
 
+        if daily_status == "completed":
+            _insert_receipt(cur, vendor_name, vendor_id, report_date, checksum, daily_rows, uploaded_by)
+
         if daily_rows:
             cur.executemany(
                 """
@@ -648,7 +669,7 @@ def dry_run_file(conn, path: Path) -> dict[str, Any]:
     trusting data echoed back from the browser for what actually gets persisted).
     """
     vendor_code, uploaded_by, original_name = parse_upload_filename(path.name)
-    vendor_name = resolve_vendor_name(conn, vendor_code)
+    _vendor_id, vendor_name = resolve_vendor(conn, vendor_code)
     checksum = file_checksum(path)
 
     result: dict[str, Any] = {
@@ -683,19 +704,20 @@ def dry_run_file(conn, path: Path) -> dict[str, Any]:
     return result
 
 
-def resolve_vendor_name(conn, vendor_code: str) -> str:
+def resolve_vendor(conn, vendor_code: str) -> tuple[int, str]:
+    """(id, name) by the unique vendors.code."""
     with conn.cursor() as cur:
-        cur.execute("SELECT name FROM public.vendors WHERE code = %s", (vendor_code,))
+        cur.execute("SELECT id, name FROM public.vendors WHERE code = %s", (vendor_code,))
         row = cur.fetchone()
     if not row:
         raise ValueError(f"Unknown vendor code '{vendor_code}' -- Go should have rejected this upload")
-    return row[0]
+    return row[0], row[1]
 
 
 def process_file(conn, path: Path) -> str:
     vendor_code, uploaded_by, _original_name = parse_upload_filename(path.name)
-    vendor_name = resolve_vendor_name(conn, vendor_code)
-    return _upsert_upload(conn, path, vendor_name, uploaded_by)
+    vendor_id, vendor_name = resolve_vendor(conn, vendor_code)
+    return _upsert_upload(conn, path, vendor_name, vendor_id, uploaded_by)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

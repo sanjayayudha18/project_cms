@@ -33,6 +33,7 @@ import (
 const (
 	contractVRBase = "/api/v1/vendor-requests"
 	contractVOBase = "/api/v1/vendor/replenish-orders"
+	contractDLBase = "/api/v1/dsr-late-reports"
 )
 
 // -- spec loading + validation ----------------------------------------------
@@ -82,6 +83,7 @@ func TestOpenAPIContract_RouteCoverage(t *testing.T) {
 	mounted := map[string]chi.Router{
 		"/vendor-requests":         contractVRHandler(&fakeVendorRequestServicer{}, &fakeVaultReviewer{}, contractPartyReader{}).Routes(),
 		"/vendor/replenish-orders": NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
+		"/dsr-late-reports":        NewDsrLateHandler(&contractDsrLate{}).Routes(),
 	}
 	for prefix, routes := range mounted {
 		t.Run(prefix, func(t *testing.T) {
@@ -123,6 +125,7 @@ type contractCase struct {
 	vault      *fakeVaultReviewer
 	parties    contractPartyReader
 	orders     *contractOrderSvc
+	dsrLate    *contractDsrLate
 	wantStatus int
 }
 
@@ -208,6 +211,11 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 	r := chi.NewRouter()
 	r.With(custommw.RequireAuth(ts)).Mount(contractVRBase, contractVRHandler(vr, vault, tc.parties).Routes())
 	r.With(custommw.RequireAuth(ts)).Mount(contractVOBase, NewVendorOrderHandler(orders).Routes())
+	dsrLate := tc.dsrLate
+	if dsrLate == nil {
+		dsrLate = &contractDsrLate{}
+	}
+	r.With(custommw.RequireAuth(ts)).Mount(contractDLBase, NewDsrLateHandler(dsrLate).Routes())
 
 	req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 	req.Header.Set("Content-Type", "application/json")
@@ -222,6 +230,40 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 	r.ServeHTTP(rec, req)
 	// a fresh request for the validator: the served one has a consumed body
 	return rec, httptest.NewRequest(tc.method, tc.path, nil)
+}
+
+// contractDsrLate is fakeDsrLateReader with warnings shaped as the real service builds them
+// (every list non-nil, a label and a vendor row so their fields are validated too).
+type contractDsrLate struct{ fakeDsrLateReader }
+
+func (c *contractDsrLate) Daily(ctx context.Context, a service.Actor, f service.DsrLateFilter) (*service.DsrLateDailyList, error) {
+	out, err := c.fakeDsrLateReader.Daily(ctx, a, f)
+	if err != nil {
+		return nil, err
+	}
+	region, recv := "JKT", contractTime().In(testWIB)
+	deadline := time.Date(2026, 10, 5, 9, 0, 0, 0, testWIB)
+	out.Items = []service.DsrLateDailyView{
+		{ReportDate: "2026-10-05", VendorID: 2, VendorCode: "V1", VendorName: "PT A", VendorBranchID: 11, BranchCode: "B11", BranchName: "Cabang 11",
+			RegionCode: &region, Deadline: deadline, FirstReceivedAt: &recv, ReceiptChecksum: "abc", MatchedLabels: []string{"Gudang X"},
+			Status: "late", LateMinutes: 12},
+		{ReportDate: "2026-10-06", VendorID: 2, VendorCode: "V1", VendorName: "PT A", VendorBranchID: 11, BranchCode: "B11", BranchName: "Cabang 11",
+			Deadline: deadline, MatchedLabels: []string{}, Status: "not_sent"},
+	}
+	out.Total = 2
+	return out, nil
+}
+
+func (c *contractDsrLate) Warnings(ctx context.Context, a service.Actor, f service.DsrLateFilter) (*service.DsrLateWarnings, error) {
+	out, err := c.fakeDsrLateReader.Warnings(ctx, a, f)
+	if err != nil {
+		return nil, err
+	}
+	first, last := "2026-10-01", "2026-10-05"
+	out.UnmappedLabels = []service.DsrLateUnmappedLabel{{VendorID: 2, VendorName: "PT A", DsrLocation: "Gudang X", ReceiptCount: 3,
+		FirstReportDate: &first, LastReportDate: &last}}
+	out.UnresolvedVendors = []service.DsrLateUnresolvedVendor{{VendorLabel: "PT Z", ReceiptCount: 1}}
+	return out, nil
 }
 
 // contractPartyReader returns parties as the real service builds them (non-nil slices).
@@ -389,7 +431,7 @@ func contractOrderFull() *service.VendorOrderDetail {
 }
 
 func contractCases() []contractCase {
-	vr, vo := contractVRBase, contractVOBase
+	vr, vo, dl := contractVRBase, contractVOBase, contractDLBase
 	full, minimal := contractDetailFull(), contractDetailMinimal()
 	detail := func(d *service.VendorRequestDetail) *fakeVendorRequestServicer {
 		return &fakeVendorRequestServicer{createResult: d, updateResult: d, submitResult: d, approveResult: d, rejectResult: d,
@@ -521,6 +563,23 @@ func contractCases() []contractCase {
 			orders: &contractOrderSvc{err: errors.New("boom")}, wantStatus: 500},
 		{name: "orders internal role denied", method: http.MethodGet, path: vo, role: "ATM-SPV", wantStatus: 403},
 		{name: "orders no token", method: http.MethodGet, path: vo, wantStatus: 401},
+
+		// dsr late report
+		{name: "dsr late daily", method: http.MethodGet, path: dl + "/daily?month=2026-10&status=late&page=1", role: "ATM-USER", wantStatus: 200},
+		{name: "dsr late daily csv", method: http.MethodGet, path: dl + "/daily?month=2026-10&format=csv", role: "ATM-SPV", wantStatus: 200},
+		{name: "dsr late daily no month", method: http.MethodGet, path: dl + "/daily", role: "ATM-USER", wantStatus: 400},
+		{name: "dsr late daily bad status", method: http.MethodGet, path: dl + "/daily?month=2026-10&status=x", role: "ATM-USER", wantStatus: 400},
+		{name: "dsr late daily forbidden", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "ATM-USER",
+			dsrLate: &contractDsrLate{fakeDsrLateReader{err: service.ErrNotAuthorized}}, wantStatus: 403},
+		{name: "dsr late daily error", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "ATM-USER",
+			dsrLate: &contractDsrLate{fakeDsrLateReader{err: errors.New("boom")}}, wantStatus: 500},
+		{name: "dsr late summary", method: http.MethodGet, path: dl + "/summary?month=2026-10&vendor_id=2", role: "BRANCH-ATM-SPV", wantStatus: 200},
+		{name: "dsr late summary csv", method: http.MethodGet, path: dl + "/summary?month=2026-10&format=csv", role: "ADMIN", wantStatus: 200},
+		{name: "dsr late summary bad vendor", method: http.MethodGet, path: dl + "/summary?month=2026-10&vendor_id=0", role: "ADMIN", wantStatus: 400},
+		{name: "dsr late warnings", method: http.MethodGet, path: dl + "/warnings?month=2026-10", role: "ADMIN", wantStatus: 200},
+		{name: "dsr late warnings bad month", method: http.MethodGet, path: dl + "/warnings?month=10-2026", role: "ADMIN", wantStatus: 400},
+		{name: "dsr late no token", method: http.MethodGet, path: dl + "/daily?month=2026-10", wantStatus: 401},
+		{name: "dsr late vendor role denied", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "VENDOR", wantStatus: 403},
 	}
 	// every handleError class once, on a route that reaches it
 	for _, e := range []struct {

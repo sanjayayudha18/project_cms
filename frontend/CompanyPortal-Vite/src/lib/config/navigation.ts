@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  FileClock,
   HeartPulse,
   Landmark,
   LayoutGrid,
@@ -151,6 +152,14 @@ export const NAV_CONFIG: NavItem[] = [
     icon: Monitor,
     href: "/atm-portal",
     roles: ["ATM-USER", "ATM-SPV"],
+    group: "monitoring",
+  },
+  {
+    id: "dsr-late-report",
+    label: "Laporan DSR Telat",
+    icon: FileClock,
+    href: "/dsr-late-report",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"],
     group: "monitoring",
   },
   {

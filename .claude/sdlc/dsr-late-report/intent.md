@@ -1,7 +1,7 @@
 # Intent: laporan DSR telat / tidak kirim (dasar penalti FLM)
 
-Author: TODO (product owner). Status: draft — menunggu penerimaan product owner.
-Stage: 1 Plan. Trigger ke stage berikut: product owner menerima file ini.
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-27** (product owner).
+Stage: 1 Plan selesai → stage berikut `spec.md`.
 Roadmap: Phase 2.3 (`.kiro/steering/development-plan.md`). Sumber: URS v0.3 Phase 1 (FNC 003 Dashboard, aturan DSR 09:00), CLAUDE.md Sec 3a.
 
 ## Problem
@@ -44,6 +44,32 @@ penalti FLM — masih harus disusun manual, dan tidak ada peringatan saat DSR te
 - **Keputusan #3 vs skema saat ini:** `dsr_uploads` unik per `(report_date, vendor)` dan tidak menyimpan cabang. Untuk "per cabang vendor", upload harus bisa dikaitkan ke `vendor_branches` — perlu perubahan skema/alur upload DSR (migrasi → Sec 4 #7, STOP & flag). Perlu dicek juga bagaimana workbook DSR multi-lokasi memetakan ke cabang.
 - **Keputusan #2 vs skema saat ini:** revisi DSR me-*replace* baris `dsr_uploads`, sehingga waktu upload pertama hilang. Perlu kolom/penyimpanan waktu upload sukses pertama (misal `first_received_at`) yang tidak ikut ter-replace.
 - **Keputusan #5** bergantung pada Phase 0.3 `internal/notification` (belum dibangun) dan scheduler jam 09:00 (cron di Go atau di `eod_retry_scheduler` Python — pilih di spec).
+
+## Catatan review 2026-10-27 (fakta yang berubah sejak draft)
+- Phase 0.3 notifikasi **sudah dibangun** (migrasi 025, `notification.Send` + outbox SMTP). Python juga sudah boleh menulis `notifications` langsung (K3, 2.2c). Constraint "bergantung pada 0.3" tidak lagi memblokir.
+- `late_detections` (migrasi 019) sudah mencatat DSR telat terhadap SLA 09:00, tapi hanya per `(file_type, processing_date)`, belum per vendor/cabang.
+- `import_jobs` (019) menyimpan setiap versi file per hash, termasuk `source = dsr`.
+- `holidays` (031) sekarang ada.
+- `users.vendor_branch_id` (032) mengaitkan user vendor ke cabangnya. User vendor-wide nilainya NULL.
+- `dsr_uploads.vendor` masih label teks (bukan FK). Constraint UNIQUE `(report_date, vendor)` masih berlaku.
+
+## Resolved decisions (review dengan user, 2026-10-27)
+8. **Cabang per DSR = dari blok lokasi workbook**: `dsr_daily_rows.location` → `dsr_location_vault_maps` → `vendor_vaults` → `vendor_branches`. Cabang dianggap kirim untuk tanggal X bila ada ≥1 blok lokasinya di DSR sukses tanggal X. Blok yang tidak ter-map tidak dihitung ke cabang mana pun.
+9. **Alur dan form upload DSR tidak berubah.** Out of scope tetap berlaku.
+10. **Waktu diterima pertama dibaca dari `import_jobs`** (`source = dsr`, versi sukses pertama per vendor + `report_date`). Tidak ada kolom baru di `dsr_uploads`.
+11. **`late_detections` tidak diubah.** Tabel itu tetap untuk EOD Monitoring; laporan ini terpisah.
+12. **Wajib kirim setiap hari, termasuk Sabtu, Minggu, dan libur.** Keputusan #1 tetap; `holidays` tidak dipakai.
+13. **Penerima notifikasi di vendor** = PIC cabang itu dengan peran `replenish` atau `vault`, ditambah user vendor cabang itu.
+14. **Notifikasi dikirim sekali pukul 09:00 WIB dari Python `eod_retry_scheduler`.** Ditulis langsung ke `notifications` + `notification_emails` (pola K3). Tidak ada notifikasi kedua saat DSR akhirnya masuk.
+15. **Cabang wajib kirim hanya pada hari ia aktif.** Cabang `ROH` (vendor `INTERNAL`) dikecualikan.
+16. **Hitung mulai tanggal go-live, tanpa backfill.** Tanggal mulai diatur lewat env (seperti `RETRY_REPLENISH_CLASSIFY_START_DATE`).
+17. **Internal saja.** VendorPortal tidak menampilkan laporan ini.
+18. **Satu bulan per tampilan.** Ekspor dibaca dari replica dan dicatat di `audit_logs`, seperti 2.2c.
+
+19. **Role nyata.** Laporan dibaca oleh `ATM-USER`, `ATM-SPV`, `BRANCH-ATM-SPV`, dan `ADMIN`. RBAC dicek di route dan service. Notifikasi internal dikirim ke semua `ATM-USER` aktif.
+
+## Open questions
+Tidak ada.
 
 ## Out of scope
 - Perhitungan nominal penalti FLM (hanya menyediakan data dasarnya).

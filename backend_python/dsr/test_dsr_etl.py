@@ -7,6 +7,7 @@ from pathlib import Path
 import openpyxl
 
 from dsr_etl import (
+    _insert_receipt,
     _rencana_isi_subtotal,
     cell_number,
     parse_upload_filename,
@@ -142,6 +143,40 @@ class DsrSaldoAkhirPerVaultTests(unittest.TestCase):
         # every row carries its block's location; the total block's rows stay NULL
         by_loc = [r["location"] for r in rows if r["flow"] == "saldo_awal"]
         self.assertEqual([None, "LENTENG AGUNG", "BINTARO"], by_loc)
+
+
+class _FakeCursor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple]] = []
+
+    def execute(self, sql: str, params: tuple = ()) -> None:
+        self.calls.append((sql, params))
+
+
+class InsertReceiptTests(unittest.TestCase):
+    ROWS = [{"location": " BINTARO "}, {"location": "BINTARO"}, {"location": "  "},
+            {"location": None}, {"location": "LENTENG AGUNG"}]
+
+    def test_writes_distinct_trimmed_locations_and_given_vendor_id(self) -> None:
+        cur = _FakeCursor()
+        _insert_receipt(cur, "VENDOR X", 42, date(2026, 7, 15), "a" * 64, self.ROWS, 7)
+        sql, params = cur.calls[-1]
+        self.assertIn("ON CONFLICT (vendor_label, report_date, checksum) DO NOTHING", sql)
+        self.assertEqual(
+            ("VENDOR X", 42, date(2026, 7, 15), "a" * 64, ["BINTARO", "LENTENG AGUNG"], 7), params)
+
+    def test_never_looks_up_vendor_by_name(self) -> None:
+        """Review R1: vendors.name is not unique, so the receipt must not query it."""
+        cur = _FakeCursor()
+        _insert_receipt(cur, "V", 1, date(2026, 7, 15), "a" * 64, [], None)
+        self.assertEqual(1, len(cur.calls))
+        self.assertNotIn("public.vendors", cur.calls[0][0])
+
+    def test_never_updates_or_deletes_receipts(self) -> None:
+        cur = _FakeCursor()
+        _insert_receipt(cur, "V", 1, date(2026, 7, 15), "a" * 64, [], None)
+        for sql, _ in cur.calls:
+            self.assertNotRegex(sql.upper(), r"\b(UPDATE|DELETE)\b")
 
 
 class SafeChildTests(unittest.TestCase):

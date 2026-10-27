@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Replenishment realisasi classification (replenishment-realisasi FR3.9): fills/tickets from this
     # date on; empty = the job does not run (no historical backfill, K4).
     replenish_classify_start_date: date | None = None
+    # dsr-late-report FR5.1: 09:00 WIB notification for report dates from this date on; empty = the
+    # job is not registered (no backfill, #16). Must equal the Go DSR_LATE_START_DATE (K5).
+    dsr_late_start_date: date | None = None
     # Late-report emails go to the outbox as pending only when the Go worker has SMTP (else skipped).
     notify_email_enabled: bool = False
 

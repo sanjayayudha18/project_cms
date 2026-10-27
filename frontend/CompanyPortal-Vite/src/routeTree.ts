@@ -9,6 +9,7 @@ import { auditLogsRoute } from "./routes/audit-logs";
 import { cashCountRoute } from "./routes/cash-count/index";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
+import { dsrLateReportRoute } from "./routes/dsr-late-report";
 import { eodMonitoringRoute } from "./routes/eod-monitoring";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { forecastingRoute } from "./routes/forecasting/index";
@@ -49,6 +50,7 @@ export const routeTree = rootRoute.addChildren([
     vaultPlanListRoute,
     vaultPlanDetailRoute,
     replenishmentRoute,
+    dsrLateReportRoute,
     forecastBrowserRoute,
     vendorRequestNewRoute,
     vendorRequestListRoute,

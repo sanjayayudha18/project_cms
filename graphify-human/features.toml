@@ -1,0 +1,177 @@
+# graphify-human: peta fitur yang dibaca manusia.
+#
+# DRAFT pilot (2026-10-23), 3 fitur. Review dulu sebelum generator dibuat.
+#
+# File ini SATU-SATUNYA yang diedit manual. Generator (belum dibuat) membaca:
+#   - file ini              -> label bisnis, status, file inti per fitur
+#   - graphify-out/graph.json -> dependensi file ke file (impor/panggilan) untuk
+#                              "file terkait" di luar file inti
+#   - source code langsung  -> endpoint (chi Routes), panggilan API frontend,
+#                              tabel DB (SQL di backend/queries + SQL inline),
+#                              role guard (RequireRoles / requireRoles / navigation.ts)
+#
+# Aturan isi:
+#   - `files` = glob relatif ke root repo. Test, kode generated, dan config
+#     selalu dibuang otomatis walau cocok dengan glob (lihat [exclude]).
+#   - `status` diisi manual dari development-plan.md:
+#       built | partial | mock | not_built
+#   - `mock_files` = file yang masih data hardcoded; tetap tampil, ditandai "mock".
+#   - Nama fitur bahasa Indonesia, nama teknis (file, tabel, endpoint) tetap asli.
+
+[exclude]
+globs = [
+  "**/*_test.go",
+  "**/*.test.ts",
+  "**/*.test.tsx",
+  "**/__tests__/**",
+  "**/test_*.py",
+  "backend/internal/db/*.sql.go",   # sqlc generated
+  "**/routeTree.gen.ts",
+  "**/schema.d.ts",
+  "**/tsconfig*.json",
+  "**/package.json",
+  "**/biome.json",
+  "archives/**",
+  ".opencode/**",
+  ".claude/worktrees/**",
+  "**/*.md",
+  "**/*.log",
+  "**/.env*",
+  "**/requirements.txt",
+  "**/__init__.py",
+  "**/__pycache__/**",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "vendor-request"
+label = "Request CIT (Vendor Request)"
+summary = """
+Operator ATM memilih rekomendasi DMAA di Rekomendasi CIT, membuat Request CIT,
+lalu supervisor menyetujui atau menolak (maker-checker). Request yang approved
+menjadi instruksi replenishment. Termasuk laporan selesai (completion) dan
+kuota kunjungan ATM.
+"""
+status = "built"
+dev_plan = "2.1, 2.2"
+portal = ["CompanyPortal"]
+files = [
+  # Frontend
+  "frontend/CompanyPortal-Vite/src/features/vendor-request/**",
+  "frontend/CompanyPortal-Vite/src/routes/replenishment/vendor-requests/**",
+  "frontend/CompanyPortal-Vite/src/routes/replenishment/forecast-browser*",
+  # Backend Go
+  "backend/internal/handler/vendor_request_handler.go",
+  "backend/internal/handler/vendor_request_response.go",
+  "backend/internal/service/vendor_request.go",
+  "backend/internal/service/vendor_request_actions.go",
+  "backend/internal/service/vendor_request_completion.go",
+  "backend/internal/service/vendor_request_create.go",
+  "backend/internal/service/vendor_request_queries.go",
+  "backend/internal/service/vendor_request_ticket.go",
+  "backend/internal/service/atm_visit_quota.go",
+  "backend/internal/handler/atm_visit_quota_handler.go",
+  "backend/queries/vendor_request.sql",
+  "backend/queries/atm_visit_quota.sql",
+]
+# Fitur lanjutan yang ditempel ke route /vendor-requests tapi punya halaman sendiri
+# nanti (Penetapan Vault, Kirim ke Vendor). Tampil sebagai "fitur terkait".
+related = ["vault-plan", "send-to-vendor", "dmaa-forecast"]
+docs = [
+  ".claude/feature-flows/10-order-atm-lifecycle/feature-flow.md",
+  ".kiro/specs/.done/request-replenish-to-vendor/",
+  ".kiro/specs/.done/cit-vendor-request-enhancements/",
+  ".claude/sdlc/.done/atm-visit-quota/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "dsr-upload"
+label = "Upload DSR Vendor"
+summary = """
+Vendor mengunggah file DSR harian di VendorPortal. Upload dua tahap: dry-run
+(validasi, tampil pratinjau) lalu confirm (simpan). Parsing dilakukan ETL Python,
+idempoten per hash file. Batas upload 09:00.
+"""
+status = "partial"   # upload vendor built; dashboard DSR di CompanyPortal masih mock
+dev_plan = "1.3"
+portal = ["VendorPortal", "CompanyPortal"]
+files = [
+  # Frontend vendor (real)
+  "frontend/VendorPortal-Vite/src/features/dsr/**",
+  "frontend/VendorPortal-Vite/src/routes/dsr.tsx",
+  # Frontend internal (sebagian mock)
+  "frontend/CompanyPortal-Vite/src/features/dsr/**",
+  # Backend Go
+  "backend/internal/handler/dsr_upload_handler.go",
+  "backend/internal/service/dsr_upload.go",
+  "backend/queries/dsr.sql",
+  # Python ETL
+  "backend_python/service_dsr_etl/**",
+  "backend_python/dsr/dsr_etl.py",
+  "backend_python/lib/import_jobs.py",
+]
+mock_files = [
+  "frontend/CompanyPortal-Vite/src/features/dsr/useDsrData.ts",
+]
+related = ["master-data-vendor", "dsr-late-report"]
+docs = [
+  ".claude/feature-flows/02-dsr-upload/feature-flow.md",
+  ".claude/sdlc/.done/vendor-upload-dsr/",
+  ".kiro/specs/.done/vendor-dsr-home/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "master-data-vendor"
+label = "Master Data Vendor"
+summary = """
+Admin mengelola vendor beserta cabang, vault, PIC, paket, harga paket, ATM per
+cabang, dan pemetaan lokasi DSR. Semua perubahan lewat maker-checker: disimpan
+sebagai change request (202), diterapkan setelah approved. Termasuk impor/ekspor CSV.
+"""
+status = "built"
+dev_plan = "Master data (feature-complete MVP)"
+portal = ["CompanyPortal"]
+files = [
+  # Frontend
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/**",
+  "frontend/CompanyPortal-Vite/src/features/master-data/**",
+  "frontend/CompanyPortal-Vite/src/features/master-data-io/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/vendors.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/vendor-*.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/master-data-io.tsx",
+  # Backend Go: handler
+  "backend/internal/handler/admin_vendor_handler.go",
+  "backend/internal/handler/admin_vendor_*_handler.go",
+  "backend/internal/handler/admin_branch_atm_handler.go",
+  "backend/internal/handler/admin_dsr_location_map_handler.go",
+  "backend/internal/handler/admin_master_data_*.go",
+  "backend/internal/handler/approval_master_data_detail.go",
+  # Backend Go: service (termasuk Applier maker-checker)
+  "backend/internal/service/vendor_admin.go",
+  "backend/internal/service/vendor_*_admin.go",
+  "backend/internal/service/vendor_pic_roles.go",
+  "backend/internal/service/branch_atm.go",
+  "backend/internal/service/dsr_location_map_admin.go",
+  "backend/internal/service/masterdata_*.go",
+  # Backend Go: repository + query
+  "backend/internal/repository/vendor_*_repository.go",
+  "backend/internal/repository/branch_atm_repository.go",
+  "backend/internal/repository/dsr_location_map_admin_repository.go",
+  "backend/internal/repository/masterdata_*_repository.go",
+  "backend/internal/repository/master_data_export_repository.go",
+  "backend/queries/vendor*_admin.sql",
+  "backend/queries/vendor_branch_atms.sql",
+  "backend/queries/dsr_location_maps_admin.sql",
+  "backend/queries/master_data*.sql",
+]
+# ATM dan Region sengaja di luar pilot (fitur sendiri nanti).
+related = ["master-data-atm", "master-data-region", "approval"]
+docs = [
+  ".claude/feature-flows/01-master-data/feature-flow.md",
+  ".claude/sdlc/.done/master-data/",
+  ".kiro/specs/.done/admin-user-vendor-management/",
+  ".kiro/specs/.done/vendor-detail-revamp/",
+  ".claude/sdlc/.done/vendor-pricing/",
+]

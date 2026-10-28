@@ -7,26 +7,26 @@
 
 ## ⛔ Scope guard — read before starting ANY task
 
-**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d built (manual browser checks with the user). **Next: 2.3 DSR late report (awaiting PO acceptance) → 2.4 problem-ATM exclusion.** Cross-cutting item X.1 (CompanyPortal app-shell revamp) is in spec. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job.
+**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d and 2.3 built and committed (manual browser checks with the user). **Next: 2.4 problem-ATM exclusion.** Cross-cutting item X.1 (CompanyPortal app-shell revamp + sidebar-settings-footer follow-up) is built and committed; only its manual browser check remains. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job.
 Anything not listed under Phase 2 or the cross-cutting section is **out of scope right now**. If a request touches it, STOP and ask.
 
 Rules:
 1. **One task = one item in this file.** If the work isn't an item here, add it here first (with user OK), then build it.
-2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed.
+2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed. Exception: read-only export under X.7 (user OK 2026-10-28).
 3. **Do not touch Phases 3–7** (finance, escrow, cash count, CIT, EOD) until Phase 2 lands, unless the user explicitly re-prioritizes.
 4. **Do not wire mock screens** (see "Mock frontends") ad hoc — each gets wired only as part of its owning phase item.
-5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `033`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
+5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `034`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
 6. Accepted known gaps (listed below) are **not** to be "fixed along the way".
 
 ---
 
-## Status snapshot (as of 2026-10-23)
+## Status snapshot (as of 2026-10-28)
 
-Overall completion: **~55%** (rough estimate; was ~45-50% on 2026-10-08). "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
+Overall completion: **~58%** (rough estimate; ~55% on 2026-10-23, ~45-50% on 2026-10-08). "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
 
-Branch: `dev1` is **144 commits ahead** of `main` (`main` at `87b2d78`; `dev1` latest `aad7de4`, vendor-party-scope task 12). Merge `dev1` → `main` is still pending. Uncommitted on `dev1`: vendor-party-scope task 4/9/10 hunks + `openapi.yaml` / `schema.d.ts` (staged), docs, and the new `app-shell-revamp` spec.
+Branch: `dev1` is **149 commits ahead** of `main` (`main` at `87b2d78`; `dev1` latest `f0f1f76`, sidebar-settings-footer). Merge `dev1` → `main` is still pending. Working tree clean apart from this file.
 
-Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`032` (gaps: `022` reserved, `024` dropped), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20.
+Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`033` (gaps: `022` reserved, `024` dropped; 31 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27 (dev `migrate status` 0 pending).
 
 ### Built and wired (verified in code)
 
@@ -45,6 +45,7 @@ Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squash
 | DMAA forecast | `/api/v1/dmaa-forecast` | Read-only viewer. CROWN has **no forecast engine**; DMAA `amount_replenish` is the final order amount |
 | Forecast browser summary | `features/forecast` (summary view) | Vendor × region ringkasan (`7f6d16b`) |
 | DSR (ATM) | `/api/v1/dsr` | Vendor DSR upload, two-phase dry-run/confirm; Python ETL `service_dsr_etl` |
+| DSR late report (2.3) | `/api/v1/dsr-late-reports` (`/daily`, `/summary`, `/warnings`, CSV) + `features/dsr-late-report` + Python `dsr_late_notify/` | ATM-USER/ATM-SPV/BRANCH-ATM-SPV/ADMIN, replica reads, audited CSV export, 09:00 WIB late notification. Append-only `dsr_receipts` (mig `033`). `DSR_LATE_START_DATE` empty = report off (`67a2d72`) |
 | Vendor request | `/api/v1/vendor-requests` | DMAA → replenishment order, maker-checker state machine, vault review. OpenAPI contract pilot (`backend/api/openapi.yaml`) |
 | Vault plans (ACM) | `/api/v1/vault-plans` | ACM-USER/ACM-SPV/ADMIN. Allocate request nominal to vaults + vault fulfillment ticket (migs `027`, `028`, `030`) |
 | Vendor orders | `/api/v1/vendor/replenish-orders` | VendorPortal accept/reject per (request × branch), scoped per vendor party role (migs `029`, `032`) |
@@ -56,7 +57,7 @@ Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squash
 | Platform hardening | both backends + both portals | Read replica routing (0.1), `RequestLogger` + `/ready`, 1 MiB body limit + 30s timeout, trusted client IP, money as decimal strings, CSP headers, lazy routes, FE coverage gate (CP 84/80/80/85, VP 93/84/90/93), Go coverage gate, GitHub Actions CI |
 
 ### Not built
-- **ATM ops:** 2.3 DSR late report, 2.4 problem-ATM exclusion. `internal/cashcount` (Phase 5).
+- **ATM ops:** 2.4 problem-ATM exclusion. `internal/cashcount` (Phase 5).
 - **Finance:** `internal/invoice`, `internal/reconciliation`.
 - **Platform:** `internal/document` (deferred to Phase 3/5), `internal/export` XLSX/PDF (CSV only today; deferred).
 - **Integration:** `internal/corebanking` (escrow ingest).
@@ -75,7 +76,7 @@ Each is wired only by its owning phase item.
 - `atm_vendor_packages.vendor_package_id` isn't validated against the ATM's `price_machine_group`/`price_class` (user decision 2026-09-23).
 - `vendor_packages_branch` and `atm_vendor_packages` were truncated by mig `011`; dev was re-seeded 2026-09-24. A fresh DB built from migrations alone still has them empty.
 - `vendor_package_prices` seed is partial (no SSI Paket 3/6, no per-ATM Harga Khusus / Biaya Tambahan).
-- `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`032` aren't exercised by it (CI `go-integration` does apply them through `cmd/migrate up`).
+- `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`033` aren't exercised by it (CI `go-integration` does apply them through `cmd/migrate up`).
 - `backend-exq` image still runs as root without HEALTHCHECK (BE-06 open item; not deployed).
 
 ---
@@ -145,19 +146,20 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 - Remaining: manual browser check + ITM test (user), Docker build.
 - **Model:** Opus, Effort: High.
 
-#### 2.2d Pisah akun vendor per peran + cakupan cabang — 🟡 tasks 1–14 done (`950ffe1` … `aad7de4`, mig `032`)
+#### 2.2d Pisah akun vendor per peran + cakupan cabang — ✅ built, tasks 1–14 committed (`950ffe1` … `aad7de4`, mig `032`)
 - `.kiro/specs/vendor-party-scope/`: new roles `VENDOR-ATM-USER` / `VENDOR-VAULT-USER` (`VENDOR-USER` keeps both parties), per-branch scope on orders/realisasi/notifications, PIC roles (immediate + audit, GR#3 deviation), `/auth/me` vendor context.
 - Automated checkpoint 2026-10-21 green (Go 2067 pass / 0 skip, CP 1425, VP 250).
-- Remaining: commit the staged/unstaged hunks, manual browser check (user, `vendor.abacus.*` seed accounts).
+- Remaining: manual browser check (user, `vendor.abacus.*` seed accounts).
 - **Model:** Opus, Effort: High.
 
-### 2.3 DSR late/missing report — ⏳ NEXT (intent draft 2026-09-28, `dsr-late-report/`)
-- Monthly late/missing-DSR-per-vendor report (09:00 deadline, FLM penalty basis) + late notification.
-- Needs PO acceptance of the intent first; includes a DSR per-branch schema change.
-- **Depends on:** 0.3 ✅ (0.5 only if XLSX is required).
+### 2.3 DSR late/missing report — ✅ built `67a2d72` (mig `033`, `.claude/sdlc/dsr-late-report/`)
+- Monthly late/missing-DSR report per vendor branch (09:00 WIB deadline, OK / TELAT / TIDAK KIRIM, FLM penalty basis) + daily/summary/warnings views, audited CSV export, and the 09:00 late notification (Python `dsr_late_notify`, scheduled in `eod_retry_scheduler`).
+- `dsr_etl.py` writes an append-only `dsr_receipts` row per commit; vendor resolved by code (review R1). Review R1–R3 fixed 2026-10-27; nits n1–n10 left as is (user decision).
+- Gates 2026-10-27: Go 2136 / 0 skip, Python 113 / 0 skip, CP 1627, OpenAPI contract + `gen:api` clean.
+- Remaining (user): Docker builds `backend` + `backend_python`, manual browser check, real vendor upload around 09:00 WIB + real 09:00 notification run, ADMIN fills `dsr_location_vault_maps` (report and notifications stay empty until then).
 - **Model:** Sonnet, Effort: Medium.
 
-### 2.4 Problem-ATM exclusion + FSD input lists — ⏳ not started (scoped 2026-10-08)
+### 2.4 Problem-ATM exclusion + FSD input lists — ⏳ NEXT, not started (scoped 2026-10-08)
 - CROWN (not DMAA) excludes/flags "problem" ATMs and handles the FSD v1.0 input lists (complaint/project/problem/adjustment) before a Vendor Request is created from DMAA rows.
 - Needs a full AI-DLC chain (`.claude/sdlc/problem-atm-exclusion/`). Likely schema change.
 - **Depends on:** 2.1 ✅, 0.2 ✅.
@@ -174,12 +176,14 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 
 | Item | Status | Next |
 | --- | --- | --- |
-| X.1 CompanyPortal app-shell revamp (`.kiro/specs/app-shell-revamp/`) | 🟡 implementasi selesai 2026-10-23 (task 1–10: sidebar/topbar/Ctrl+K palette baru, font self-hosted, token `--shell-*`, `Header.tsx` dihapus; deviasi di `ui_design.md`); belum di-commit. Follow-up `.kiro/specs/sidebar-settings-footer/` (Pengaturan pindah dari Topbar ke footer Sidebar, EnvBadge dihapus; PO D2/D4 2026-10-27) sudah dibangun, belum di-commit | gate kualitas task 11 (lint, coverage 84/80/80/85, build + `check-bundle.mjs`) outstanding; cek browser manual (user, GR#10), termasuk follow-up footer: Expanded/Rail, ADMIN vs ATM-USER, tooltip Pengaturan di Rail |
+| X.1 CompanyPortal app-shell revamp (`.kiro/specs/app-shell-revamp/`) | ✅ built + committed. Revamp task 1–11 (`a940dad`, `2627fdf`): sidebar/topbar/Ctrl+K palette baru, font self-hosted, token `--shell-*`, `Header.tsx` dihapus; deviasi di `ui_design.md`. Follow-up `.kiro/specs/sidebar-settings-footer/` (`f0f1f76`): Pengaturan pindah dari Topbar ke footer Sidebar, EnvBadge dihapus (PO D2/D4 2026-10-27), plus bugfix `getInitials`. Gate 2026-10-27 hijau: lint, coverage 85.7/81.62/82.17/86.77, build + `check-bundle.mjs`, tsc test = baseline 138 | cek browser manual (user, GR#10): Expanded/Rail, ADMIN vs ATM-USER, tooltip Pengaturan di Rail; lalu task 4 sidebar-settings-footer dicentang |
 | X.2 Tech debt FE (`fe-tech-debt/`, `FE_debt.md`) | 🟡 FE-01/02/03/04/05/07/08/09/10/11/12/13 done | manual browser checks (user); A5, B–E on hold |
 | X.3 Tech debt BE (`be-tech-debt/`, `BE_debt.md`) | 🟡 Fase A–G done (CI, coverage gate, migrate runner, logging/`/ready`, limits, PyJWT, file splits) | first GitHub Actions run after push; GCP log-based alert (user); `backend-exq` image hardening |
 | X.4 OpenAPI contract (BE-10, `openapi-contract/`) | ✅ pilot done `a1b78c9` (`/vendor-requests*`, `/vendor/replenish-orders*`) | extend per new module |
 | X.5 CI move to Jenkins (`ci-jenkins/`) | ⏸ on hold (user 2026-10-15); GitHub Actions stays live | resume ~Dec 2026 |
-| X.6 Merge `dev1` → `main` | ⏳ pending (144 commits) | after the open manual checks / code-owner review |
+| X.6 Merge `dev1` → `main` | ⏳ pending (149 commits) | after the open manual checks / code-owner review |
+| X.7 Export Data (`.kiro/specs/vendor-data-export/`) | 📝 spec: requirements draft (user OK on new scope 2026-10-28). Read-only CSV export per entity at vendor / vendor-branch level + separate Harga Paket export menu, audited (`master_data_exported`), built in **`backend-exq`** (its first content, so it also brings exq to deployable: replica pool, `TrustedRealIP`, non-root image, `/api/v1/exports/` routing) | requirements + design + tasks done 2026-10-28 (18 tasks, 43 leaf; migration `034_export_jobs`, `pkg/csvexport`, shared export SQL via sqlc in both modules) → start task 1 (golden) after user OK. Loading pop-up + auto-download when ready (D18a/b); undownloaded file expires after 10 min (D18c). File deleted right after first successful download (D18). Scope also moves the existing master-data export + template from `backend/` to exq (D13/D14), CSV contract to `pkg/`, old endpoint removed same release (D15). Exports are **async** (D7): new tables `export_jobs` (name already canonical) + `export_job_chunks`, migration `034`, worker inside exq |
+| X.8 Report export migration (`.kiro/specs/report-export-migration/`, requirements + design + tasks 2026-10-28 (11 tasks, 25 leaf), D1–D10 = Kiro suggestions; mig `035_export_jobs_reports`, `pkg/reports`) | 📋 planned (D14, 2026-10-28): move DSR late report CSV + replenishment report CSV from `backend/` to `backend-exq`; decide whether the whole report read side moves (JSON and CSV share SQL) | after X.7 lands and exq is deployed |
 
 ---
 
@@ -210,7 +214,7 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 ## Dependency graph
 
 ```
-Phase 1 ─> Phase 0 ─> Phase 2 (2.1 ✅ ─> 2.2a ✅ ─> 2.2b ✅ ─> 2.2c ✅ ─> 2.2d 🟡 ; 2.3 ⏳ ; 2.4 ⏳)
+Phase 1 ─> Phase 0 ─> Phase 2 (2.1 ✅ ─> 2.2a ✅ ─> 2.2b ✅ ─> 2.2c ✅ ─> 2.2d ✅ ; 2.3 ✅ ; 2.4 ⏳)
                          │
                          ├─> 3 Finance ─> 4 Escrow ─> 5 Cash count
                          ├─> 7 EOD

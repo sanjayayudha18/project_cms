@@ -55,7 +55,8 @@ Hanya empat heading `##`, urut:
    ```json
    { "waves": [{ "id": 0, "tasks": ["1", "2.1"] }, { "id": 1, "tasks": ["2.2"] }] }
    ```
-   ID berupa string, memakai ID leaf (sub-task bila ada, top-level bila tanpa sub-task). Checkpoint dan parent murni tidak dimasukkan. Task yang menyentuh file yang sama diserialkan ke wave berbeda. Array polos (`[["1"]]`) membuat parser gagal.
+   ID berupa string, memakai ID leaf (sub-task bila ada, top-level bila tanpa sub-task). **Semua** leaf task wajib masuk tepat satu kali: termasuk task checkpoint/gate kualitas, task test opsional (`*`), dan task penutup (dokumentasi, cek browser). Parent yang punya sub-task diwakili oleh seluruh sub-task-nya (ID parent tidak ditulis terpisah). Graph = urutan pengerjaan lengkap, jadi checkpoint ditaruh di wave setelah semua task yang di-gate-nya. Task yang menyentuh file yang sama diserialkan ke wave berbeda. Array polos (`[["1"]]`) membuat parser gagal.
+   Tulis juga ringkasan urutan per wave dalam prosa (bullet `**Wave N:** …` + dependensinya) tepat di atas blok JSON.
 
 ## 5. Checklist traceability (wajib sebelum spec dianggap selesai)
 
@@ -66,7 +67,7 @@ Jalankan saat menulis maupun me-review spec:
 - [ ] Setiap Correctness Property punya task test (property test atau integration test) yang menyebut nomor property-nya.
 - [ ] Setiap keputusan PO (D1…Dn) tercermin di requirement dan task yang relevan.
 - [ ] Model Split cocok dengan catatan `_Model:_` per task; setiap task muncul tepat di satu grup.
-- [ ] Task Dependency Graph memuat setiap leaf task non-checkpoint tepat satu kali, dan setiap task berada di wave setelah semua dependensinya.
+- [ ] Task Dependency Graph memuat **setiap** leaf task (termasuk checkpoint, test opsional `*`, dan task penutup) tepat satu kali, tanpa ID hantu, dan setiap task berada di wave setelah semua dependensinya. Cek: daftar semua checkbox `- [ ] N.` / `- [ ] N.M` di `## Tasks` (parent dengan sub-task diganti sub-task-nya), bandingkan dengan gabungan ID di `waves`; selisih harus kosong di dua arah.
 - [ ] Nomor migrasi yang dirujuk belum terpakai di `backend/migrations/` (cek file terakhir; `development-plan.md` bisa basi).
 - [ ] Grep folder spec untuk istilah/ID lama setelah rename. Catatan: sub-nomor criteria tampil sebagai nomor list (`5.`), jadi `grep "14.5"` bisa kosong walau criterion ada; hitung item di bawah heading requirement.
 

@@ -144,7 +144,6 @@ export function AppShell({ children, notifications }: AppShellProps) {
 
       <Topbar
         active={active}
-        settings={visible.settings}
         sidebarTheme={prefs.sidebarTheme}
         onToggleTheme={prefs.toggleTheme}
         onOpenPalette={openPalette}

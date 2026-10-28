@@ -35,7 +35,7 @@ const ITEMS: NavItem[] = [
     href: "/settings",
     roles: ["*"],
     group: "system",
-    placement: "topbar",
+    placement: "sidebar-footer",
   },
 ];
 

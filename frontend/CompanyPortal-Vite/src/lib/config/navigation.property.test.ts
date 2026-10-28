@@ -245,7 +245,7 @@ describe("Property 1: getVisibleNav visibility", () => {
     );
   });
 
-  it("sidebar: hanya grup SIDEBAR_GROUP_ORDER (berurutan), tanpa grup kosong, tanpa item topbar", () => {
+  it("sidebar: hanya grup SIDEBAR_GROUP_ORDER (berurutan), tanpa grup kosong, tanpa item sidebar-footer", () => {
     fc.assert(
       fc.property(arbShellRole, (role) => {
         const nav = getVisibleNav(role);
@@ -256,12 +256,12 @@ describe("Property 1: getVisibleNav visibility", () => {
           expect(items.length).toBeGreaterThan(0);
           for (const item of items) {
             expect(item.group).toBe(group);
-            expect(item.placement).not.toBe("topbar");
+            expect(item.placement).not.toBe("sidebar-footer");
             expect(nav.all).toContain(item);
           }
         }
         if (nav.settings) {
-          expect(nav.settings.placement).toBe("topbar");
+          expect(nav.settings.placement).toBe("sidebar-footer");
           expect(nav.all).toContain(nav.settings);
         }
       }),

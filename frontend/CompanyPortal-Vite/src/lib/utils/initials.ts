@@ -7,12 +7,11 @@
  * @example getInitials("Raden") // "RA"
  */
 export function getInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  // Uppercase before slicing: some letters grow when uppercased ("ß" → "SS", "ᾀ" → "ἈΙ").
+  const parts = fullName.trim().toUpperCase().split(/\s+/).filter(Boolean);
   const first = parts[0];
   const last = parts[parts.length - 1];
   if (first === undefined || last === undefined) return "?";
-  if (parts.length === 1) return Array.from(first).slice(0, 2).join("").toUpperCase();
-  return (
-    Array.from(first).slice(0, 1).join("") + Array.from(last).slice(0, 1).join("")
-  ).toUpperCase();
+  if (parts.length === 1) return Array.from(first).slice(0, 2).join("");
+  return Array.from(first).slice(0, 1).join("") + Array.from(last).slice(0, 1).join("");
 }

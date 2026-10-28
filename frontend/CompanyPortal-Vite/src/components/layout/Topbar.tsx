@@ -10,8 +10,6 @@ import { UserMenu } from "./topbar/UserMenu";
 export interface TopbarProps {
   /** `findActiveNavItem(visible.all, pathname)`; undefined → breadcrumb tidak dirender. */
   active: NavItem | undefined;
-  /** `visible.settings`; undefined → tombol Pengaturan tidak dirender (Req 10.2). */
-  settings: NavItem | undefined;
   sidebarTheme: SidebarTheme;
   onToggleTheme: () => void;
   onOpenPalette: () => void;
@@ -24,7 +22,6 @@ export interface TopbarProps {
 /** Topbar 64px menggantikan `Header` (Req 7–11, D6: solid, tanpa blur). */
 export function Topbar({
   active,
-  settings,
   sidebarTheme,
   onToggleTheme,
   onOpenPalette,
@@ -36,12 +33,7 @@ export function Topbar({
       <Breadcrumb active={active} />
       <SearchTrigger ref={searchRef} onOpen={onOpenPalette} />
       <OpsStatusStrip />
-      <TopbarIconGroup
-        sidebarTheme={sidebarTheme}
-        toggleTheme={onToggleTheme}
-        settings={settings}
-        settingsActive={!!settings && active?.id === settings.id}
-      >
+      <TopbarIconGroup sidebarTheme={sidebarTheme} toggleTheme={onToggleTheme}>
         {notifications}
       </TopbarIconGroup>
       <UserMenu />

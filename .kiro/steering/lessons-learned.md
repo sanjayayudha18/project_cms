@@ -271,6 +271,9 @@ The Kiro task management tools expect the Task Dependency Graph `waves` field to
 ```
 Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure about format.
 
+### Task Dependency Graph = urutan pengerjaan lengkap, semua task wajib masuk (user, 2026-10-27)
+User membaca graph sebagai urutan kerja, jadi **setiap** leaf task harus ada tepat satu kali, termasuk checkpoint/gate kualitas, test opsional (`*`), dan task penutup (catatan supersede, cek browser). Parent dengan sub-task diwakili oleh semua sub-task-nya. Checkpoint ditaruh di wave terakhir setelah semua task yang di-gate-nya. Tulis ringkasan per wave dalam prosa (`**Wave N:** …`) di atas blok JSON. Sebelum menyerahkan spec, diff daftar checkbox di `## Tasks` dengan ID di `waves`; selisih harus kosong di dua arah. Aturan lama "checkpoint tidak dimasukkan" di `kiro-spec-standard.md` sudah diganti.
+
 ### RateLimiter interface in auth package for testability
 Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.
 

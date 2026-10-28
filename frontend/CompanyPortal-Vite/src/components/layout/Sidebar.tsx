@@ -125,7 +125,12 @@ export function Sidebar({
           />
         ))}
       </nav>
-      <SidebarFooter rail={rail} onToggleRail={onToggleRail} />
+      <SidebarFooter
+        rail={rail}
+        onToggleRail={onToggleRail}
+        settings={visible.settings}
+        settingsActive={!!visible.settings && active?.id === visible.settings.id}
+      />
     </aside>
   );
 }

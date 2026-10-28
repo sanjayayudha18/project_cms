@@ -36,6 +36,12 @@ describe("Property 8: getInitials", () => {
     );
   });
 
+  it("regresi: huruf yang memanjang saat uppercase tetap 1–2 karakter", () => {
+    expect(getInitials("\u1f80\u0000")).toBe("\u1f08\u0399");
+    expect(getInitials("\u00df")).toBe("SS");
+    expect(getInitials("\u00dfa budi")).toBe("SB");
+  });
+
   it("nama berhuruf: inisial dari huruf pertama kata pertama dan terakhir", () => {
     fc.assert(
       fc.property(

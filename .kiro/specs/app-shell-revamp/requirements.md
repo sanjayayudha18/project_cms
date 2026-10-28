@@ -68,6 +68,7 @@ Item tercatat di `development-plan.md` sebagai cross-cutting **X.1 CompanyPortal
 1. THE Sidebar SHALL merender grup berurutan Umum, Replenish, CIT, Monitoring, Peramalan, dengan item dari NavConfig yang lolos `filterNavByRoles` untuk role user.
 2. THE NavConfig SHALL memuat item dengan ikon: Dashboard (LayoutGrid), Cash Flow Monitoring (Activity), Persetujuan (ClipboardCheck), Rekomendasi CIT (Search), Request CIT (ClipboardList), Jadwal CIT (Truck), Penetapan Vault (Landmark), ATM Portal (Monitor), EOD Monitoring (HeartPulse), Log Audit (ScrollText), DMAA Forecast (BarChart3), Kalender Libur (CalendarDays).
 3. THE Sidebar SHALL tidak menampilkan item Pengaturan; item Pengaturan tetap ada di NavConfig dengan penanda lokasi topbar agar tersedia untuk Topbar dan CommandPalette.
+   > **Disupersede oleh `sidebar-settings-footer` (PO 2026-10-27):** Pengaturan kini tampil di footer Sidebar, bukan Topbar.
 4. THE Sidebar SHALL tidak menampilkan grup yang tidak memiliki item terlihat dan tidak menampilkan item `disabled`.
 5. WHEN user mengklik label grup, THE Sidebar SHALL melipat atau membuka grup tersebut dengan chevron berputar dan animasi tinggi berbasis grid-rows, serta menyetel `aria-expanded` pada tombol label.
 6. IF grup yang berisi ActiveNavItem dilipat, THEN THE Sidebar SHALL tetap menampilkan ActiveNavItem tersebut.
@@ -97,6 +98,7 @@ Item tercatat di `development-plan.md` sebagai cross-cutting **X.1 CompanyPortal
 1. WHEN user menekan tombol "Ciutkan menu" atau tombol `[`, THE Sidebar SHALL berpindah antara Expanded (264px) dan Rail (76px) dengan transisi 300ms ease-out.
 2. IF fokus berada di input, textarea, select, atau elemen contenteditable, THEN THE AppShell SHALL mengabaikan tombol `[`.
 3. WHILE Sidebar dalam mode Rail, THE Sidebar SHALL menampilkan ikon di tengah, mengganti label grup dengan garis pemisah 24px, mengganti NavBadge dengan dot merah kecil di pojok ikon, dan menyembunyikan EnvBadge.
+   > **Disupersede sebagian oleh `sidebar-settings-footer` (PO 2026-10-27):** bagian EnvBadge gugur karena EnvBadge dihapus; sisanya tetap berlaku.
 4. WHILE Sidebar dalam mode Rail, WHEN pointer atau fokus keyboard berada pada item, THE Sidebar SHALL menampilkan tooltip gelap berisi nama menu (dan nilai badge bila ada) dengan `role="tooltip"` yang terhubung via `aria-describedby`.
 5. THE Sidebar SHALL menampilkan ikon ChevronsLeft pada mode Expanded dan ChevronsRight pada mode Rail, dengan hint kbd `[` dan label aksesibel yang sesuai.
 6. THE ShellPrefs SHALL menyimpan mode Rail pilihan user dan memulihkannya saat aplikasi dimuat ulang.
@@ -112,6 +114,7 @@ Item tercatat di `development-plan.md` sebagai cross-cutting **X.1 CompanyPortal
 2. THE EnvBadge SHALL menampilkan label "LINGKUNGAN", nama lingkungan, dan versi aplikasi yang diambil dari konfigurasi build (bukan teks hardcode).
 3. WHERE lingkungan bukan produksi, THE EnvBadge SHALL menampilkan chip lingkungan berwarna warning (teks + latar 20%).
 4. WHERE lingkungan adalah produksi, THE EnvBadge SHALL tidak menampilkan chip peringatan (sesuai keputusan Q9).
+   > **Disupersede oleh `sidebar-settings-footer` (PO 2026-10-27), Req 5.1–5.4:** EnvBadge dihapus di semua lingkungan; footer Sidebar kini berisi Pengaturan + tombol "Ciutkan menu". Req 5.5 (scrollbar tipis) tetap berlaku.
 5. THE Sidebar SHALL memakai scrollbar tipis 6px pada area navigasi.
 
 ### Requirement 6: Tema Sidebar
@@ -167,8 +170,11 @@ Item tercatat di `development-plan.md` sebagai cross-cutting **X.1 CompanyPortal
 #### Acceptance Criteria
 
 1. THE Topbar SHALL menampilkan tombol ikon 40x40 radius 12px: toggle tema Sidebar, Pengaturan (Settings2), dan Notifikasi (Bell), lalu divider vertikal 1px x 32px.
+   > **Disupersede sebagian oleh `sidebar-settings-footer` (PO 2026-10-27):** tombol Pengaturan dipindah ke footer Sidebar; Topbar tinggal toggle tema + Notifikasi.
 2. WHERE role user lolos `filterNavByRoles` untuk item Pengaturan, THE Topbar SHALL menampilkan tombol Pengaturan yang menavigasi ke `/settings`; selain itu tombol tidak dirender.
+   > **Disupersede oleh `sidebar-settings-footer` (PO 2026-10-27):** aturan ini kini berlaku untuk tautan Pengaturan di footer Sidebar.
 3. WHILE ActiveNavItem adalah Pengaturan, THE Topbar SHALL menampilkan tombol Pengaturan dengan latar merah 8%, ikon merah, dan `aria-current="page"`.
+   > **Disupersede oleh `sidebar-settings-footer` (PO 2026-10-27):** keadaan aktif Pengaturan kini ditampilkan oleh tautan footer Sidebar.
 4. THE Topbar SHALL menampilkan tombol Notifikasi lewat `NotificationBell` yang sudah ada, dengan badge angka bulat 18px (latar CIMB Red, ring terang) dari `useUnreadCount()`, tanpa badge bila nol.
 5. THE Topbar SHALL mempertahankan perilaku panel `NotificationBell` yang ada (buka, tandai baca, Escape menutup).
 

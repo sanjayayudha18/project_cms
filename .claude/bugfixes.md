@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-27 — CompanyPortal: inisial avatar bisa 3 karakter (property test `getInitials` flaky)
+- **Symptom**: `pnpm run test:coverage` kadang merah di `src/lib/utils/initials.property.test.ts` "string apa pun: hasil 1–2 karakter uppercase, atau ?" (counterexample `"ᾀ\u0000"`, seed -540324741). Ditemukan saat gate wave 3 `sidebar-settings-footer`; kode dari `app-shell-revamp` (2627fdf).
+- **Root cause**: `getInitials` memotong (slice) dulu, baru `toUpperCase()`. Beberapa huruf memanjang saat di-uppercase ("ᾀ" → "ἈΙ", "ß" → "SS"), jadi hasil bisa 3 karakter (mis. "ßa budi" → "SSB"). Test baru kena bila fast-check kebetulan membangkitkan huruf seperti itu, sehingga flaky.
+- **Fix**: `frontend/CompanyPortal-Vite/src/lib/utils/initials.ts` — nama di-uppercase sebelum split/slice; `toUpperCase()` setelah slice dihapus. Nama ASCII hasilnya sama.
+- **Tests**: `initials.property.test.ts` +1 test regresi deterministik (`"ᾀ\u0000"` → `"ἈΙ"`, `"ß"` → `"SS"`, `"ßa budi"` → `"SB"`; kode lama memberi 3 karakter untuk kasus 1 dan 3). CP `pnpm run test:coverage` 167 file / 1629 test hijau (85,7/81,62/82,17/86,77), `pnpm run lint` bersih, `tsc -b tsconfig.test.json` 138 error = baseline (0 di initials). Manual browser verification: n/a (fungsi murni; avatar nama ASCII tidak berubah).
+- **Commit**: <sha>
+
+---
+
 ## 2026-10-21 — Backend: guard test `TestBugCondition_NoOldTableNameReferencesInCode` merah karena fixture EOD Monitoring
 - **Symptom**: `cd backend && go test -tags integration ./internal/handler` gagal di `rename_itm_cashpos_bug_test.go`: "still reference itm_cashpos: frontend/CompanyPortal-Vite/src/features/eod-monitoring/components/EodMonitoringPage.test.tsx". Memblokir job CI go-integration. Ditemukan saat menjalankan suite integrasi untuk vendor-party-scope task 3; sudah ada di HEAD sejak `d195c38` (fe-coverage C5).
 - **Root cause**: false positive guard. Di test itu `itm_cashpos` adalah key `FileType` EOD (`by_file_type.itm_cashpos`, `file_type: "itm_cashpos"`) — sama dengan `eod-monitoring/types.ts:32` (sudah dikecualikan) dan `FILE_TYPES` di `backend_python/eod_retry_scheduler/config.py`, bukan nama tabel lama sebelum rename. Allowlist `exemptFiles` belum memuat file test baru itu.

@@ -1,41 +1,24 @@
-import { APP_ENV, APP_VERSION, type AppEnv, ENV_LABEL } from "@/lib/config/appEnv";
+import { SidebarNavItem } from "@/components/layout/sidebar/SidebarNavItem";
+import type { NavItem } from "@/lib/config/navigation";
 import { cn } from "@/lib/utils/cn";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 
-interface EnvBadgeProps {
-  /** Default dari konfigurasi build; bisa di-override untuk test. */
-  env?: AppEnv;
-  version?: string;
-}
-
-/** Kartu lingkungan + versi (Req 5.1–5.4). Chip gold hanya untuk non-produksi. */
-export function EnvBadge({ env = APP_ENV, version = APP_VERSION }: EnvBadgeProps) {
-  const isProd = env === "prod";
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] font-bold tracking-[0.14em] text-[var(--shell-sb-group)] uppercase">
-        Lingkungan
-      </p>
-      <p className="mt-0.5 flex items-center gap-2 text-xs text-[var(--shell-sb-text)] tabular-nums">
-        {!isProd && (
-          <span className="rounded-md bg-[var(--shell-gold-bg)] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-[var(--shell-gold)]">
-            {ENV_LABEL[env]}
-          </span>
-        )}
-        <span>{isProd ? `${ENV_LABEL[env]} · v${version}` : `· v${version}`}</span>
-      </p>
-    </div>
-  );
-}
-
-interface SidebarFooterProps extends EnvBadgeProps {
-  /** Mode rail: EnvBadge tersembunyi, tombol tinggal ikon (Req 4.3). */
+interface SidebarFooterProps {
+  /** Mode rail: link Pengaturan dan tombol tinggal ikon (Req 1.5). */
   rail: boolean;
   onToggleRail: () => void;
+  /** `visible.settings`; undefined → link Pengaturan tidak dirender (Req 1.2). */
+  settings?: NavItem;
+  settingsActive: boolean;
 }
 
-/** Footer Sidebar: EnvBadge + tombol ciutkan/lebarkan menu (Req 4.5, 5.1). */
-export function SidebarFooter({ rail, onToggleRail, env, version }: SidebarFooterProps) {
+/** Footer Sidebar: link Pengaturan + tombol ciutkan/lebarkan menu (Req 1.2–1.6, 3.1). */
+export function SidebarFooter({
+  rail,
+  onToggleRail,
+  settings,
+  settingsActive,
+}: SidebarFooterProps) {
   const Icon = rail ? ChevronsRight : ChevronsLeft;
   const label = rail ? "Lebarkan menu" : "Ciutkan menu";
   return (
@@ -45,11 +28,7 @@ export function SidebarFooter({ rail, onToggleRail, env, version }: SidebarFoote
         rail && "items-center",
       )}
     >
-      {!rail && (
-        <div className="px-1 pt-1">
-          <EnvBadge env={env} version={version} />
-        </div>
-      )}
+      {settings && <SidebarNavItem item={settings} active={settingsActive} rail={rail} />}
       <button
         type="button"
         aria-label={label}

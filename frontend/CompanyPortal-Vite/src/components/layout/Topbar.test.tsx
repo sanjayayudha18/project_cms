@@ -44,7 +44,6 @@ const logout = vi.fn().mockResolvedValue(undefined);
 function renderTopbar(overrides: Partial<ComponentProps<typeof Topbar>> = {}) {
   const props: ComponentProps<typeof Topbar> = {
     active: dashboard,
-    settings: settingsItem,
     sidebarTheme: "dark",
     onToggleTheme: vi.fn(),
     onOpenPalette: vi.fn(),
@@ -169,31 +168,14 @@ describe("Topbar — icon buttons (Req 6.2, 10.1–10.5)", () => {
     expect(btn.querySelector("svg.lucide-moon")).not.toBeNull();
   });
 
-  it.each<[DbRole, boolean]>([
-    ["ADMIN", true],
-    ["ADMIN_PARAM", true],
-    ["APPACCESS", true],
-    ["ATM-USER", false],
-    ["BRANCH-USER", false],
-    ["VENDOR-USER", false],
-  ])("Pengaturan for %s: visible=%s", (role, visible) => {
-    renderTopbar({ settings: getVisibleNav(role).settings });
-    const link = screen.queryByRole("link", { name: "Pengaturan" });
-    if (visible) expect(link).toHaveAttribute("href", "/settings");
-    else expect(link).not.toBeInTheDocument();
-  });
-
-  it("Pengaturan is aria-current only when it is the active item", () => {
-    const { unmount } = renderTopbar({ active: dashboard });
-    expect(screen.getByRole("link", { name: "Pengaturan" })).not.toHaveAttribute("aria-current");
-    unmount();
-
-    renderTopbar({ active: settingsItem });
-    expect(screen.getByRole("link", { name: "Pengaturan" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-  });
+  it.each<DbRole>(["ADMIN", "ADMIN_PARAM", "APPACCESS", "ATM-USER", "BRANCH-USER", "VENDOR-USER"])(
+    "no Pengaturan link in Topbar for %s",
+    (role) => {
+      useAuthStore.setState({ user: { ...mockUser, role } });
+      renderTopbar();
+      expect(screen.queryByRole("link", { name: "Pengaturan" })).not.toBeInTheDocument();
+    },
+  );
 
   it("renders the notifications slot", () => {
     renderTopbar({ notifications: <button type="button">Lonceng</button> });

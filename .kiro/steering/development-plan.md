@@ -174,7 +174,7 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 
 | Item | Status | Next |
 | --- | --- | --- |
-| X.1 CompanyPortal app-shell revamp (`.kiro/specs/app-shell-revamp/`) | 🟡 implementasi selesai 2026-10-23 (task 1–10: sidebar/topbar/Ctrl+K palette baru, font self-hosted, token `--shell-*`, `Header.tsx` dihapus; deviasi di `ui_design.md`); belum di-commit | gate kualitas task 11 (lint, coverage 84/80/80/85, build + `check-bundle.mjs`) outstanding; cek browser manual (user, GR#10) |
+| X.1 CompanyPortal app-shell revamp (`.kiro/specs/app-shell-revamp/`) | 🟡 implementasi selesai 2026-10-23 (task 1–10: sidebar/topbar/Ctrl+K palette baru, font self-hosted, token `--shell-*`, `Header.tsx` dihapus; deviasi di `ui_design.md`); belum di-commit. Follow-up `.kiro/specs/sidebar-settings-footer/` (Pengaturan pindah dari Topbar ke footer Sidebar, EnvBadge dihapus; PO D2/D4 2026-10-27) sudah dibangun, belum di-commit | gate kualitas task 11 (lint, coverage 84/80/80/85, build + `check-bundle.mjs`) outstanding; cek browser manual (user, GR#10), termasuk follow-up footer: Expanded/Rail, ADMIN vs ATM-USER, tooltip Pengaturan di Rail |
 | X.2 Tech debt FE (`fe-tech-debt/`, `FE_debt.md`) | 🟡 FE-01/02/03/04/05/07/08/09/10/11/12/13 done | manual browser checks (user); A5, B–E on hold |
 | X.3 Tech debt BE (`be-tech-debt/`, `BE_debt.md`) | 🟡 Fase A–G done (CI, coverage gate, migrate runner, logging/`/ready`, limits, PyJWT, file splits) | first GitHub Actions run after push; GCP log-based alert (user); `backend-exq` image hardening |
 | X.4 OpenAPI contract (BE-10, `openapi-contract/`) | ✅ pilot done `a1b78c9` (`/vendor-requests*`, `/vendor/replenish-orders*`) | extend per new module |

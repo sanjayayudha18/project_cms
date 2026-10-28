@@ -18,8 +18,8 @@ describe("NAV_CONFIG (app-shell-revamp)", () => {
     expect(byId(id).icon).toBe(icon);
   });
 
-  it("Pengaturan: group system, placement topbar", () => {
-    expect(byId("settings")).toMatchObject({ group: "system", placement: "topbar" });
+  it("Pengaturan: group system, placement sidebar-footer", () => {
+    expect(byId("settings")).toMatchObject({ group: "system", placement: "sidebar-footer" });
   });
 
   it.each([

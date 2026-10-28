@@ -32,7 +32,7 @@ export type NavGroup =
   | "cash-count"
   | "system";
 
-export type NavPlacement = "sidebar" | "topbar";
+export type NavPlacement = "sidebar" | "sidebar-footer";
 export type NavBadgeSource = "approvals-inbox" | "cit-requests" | "eod-health";
 
 export interface NavItem {
@@ -107,7 +107,7 @@ export const NAV_CONFIG: NavItem[] = [
     href: "/settings",
     roles: ["ADMIN", "ADMIN_PARAM", "APPACCESS"],
     group: "system",
-    placement: "topbar",
+    placement: "sidebar-footer",
   },
 
   // Replenish
@@ -362,10 +362,10 @@ export function getVisibleNav(role: DbRole | null): VisibleNav {
   const all = (role ? filterNavByRoles(NAV_CONFIG, role) : []).filter((i) => !i.disabled);
   const sidebar = new Map<NavGroup, NavItem[]>();
   for (const group of SIDEBAR_GROUP_ORDER) {
-    const items = all.filter((i) => i.group === group && i.placement !== "topbar");
+    const items = all.filter((i) => i.group === group && i.placement !== "sidebar-footer");
     if (items.length > 0) sidebar.set(group, items);
   }
-  return { all, sidebar, settings: all.find((i) => i.placement === "topbar") };
+  return { all, sidebar, settings: all.find((i) => i.placement === "sidebar-footer") };
 }
 
 const normalizePath = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") || "/" : p);

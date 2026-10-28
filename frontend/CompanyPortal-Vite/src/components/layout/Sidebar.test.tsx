@@ -3,6 +3,8 @@
  * Req 1.1–1.3, 2.1, 2.3, 2.5, 2.6, 3.3, 3.5–3.8, 4.3–4.5, 5.1, 5.3, 5.4, 16.5.
  */
 
+import type { DbRole } from "@/lib/auth/store";
+import { APP_VERSION, ENV_LABEL } from "@/lib/config/appEnv";
 import {
   GROUP_LABELS,
   type NavGroup,
@@ -11,10 +13,31 @@ import {
 } from "@/lib/config/navigation";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import * as fc from "fast-check";
 import type { ComponentProps, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
-import { SidebarFooter } from "./sidebar/SidebarFooter";
+
+const SHELL_ROLES: DbRole[] = [
+  "ADMIN",
+  "ADMIN_PARAM",
+  "ATM-USER",
+  "ATM-SPV",
+  "BRANCH-USER",
+  "BRANCH-SPV",
+  "BRANCH-ATM-USER",
+  "BRANCH-ATM-SPV",
+  "VENDOR-USER",
+  "APPACCESS",
+  "VENDOR-ATM-USER",
+  "VENDOR-VAULT-USER",
+  "ACM-USER",
+  "ACM-SPV",
+];
+const arbShellRole: fc.Arbitrary<DbRole | null> = fc.oneof(
+  fc.constant(null),
+  fc.constantFrom(...SHELL_ROLES),
+);
 
 // Link jadi <a href> biasa: test ini tidak butuh RouterProvider.
 vi.mock("@tanstack/react-router", () => ({
@@ -86,9 +109,13 @@ describe("Sidebar — groups", () => {
     expect(rendered).toEqual(expected);
   });
 
-  it("does not render Pengaturan (topbar item) in the sidebar (Req 2.3)", () => {
+  it("renders Pengaturan in the footer, outside the 'Menu navigasi' nav (Req 1.2)", () => {
     renderSidebar();
-    expect(screen.queryByRole("link", { name: find("settings").label })).not.toBeInTheDocument();
+    const { label } = find("settings");
+    const link = screen.getByRole("link", { name: label });
+    expect(within(navRegion()).queryByRole("link", { name: label })).not.toBeInTheDocument();
+    expect(navRegion().contains(link)).toBe(false);
+    expect(screen.getByRole("complementary").contains(link)).toBe(true);
     expect(screen.queryByText(GROUP_LABELS.system)).not.toBeInTheDocument();
   });
 
@@ -113,9 +140,27 @@ describe("Sidebar — groups", () => {
 describe("Sidebar — nav item state", () => {
   it("every link has the right href", () => {
     renderSidebar();
-    for (const item of admin.all.filter((i) => i.placement !== "topbar")) {
+    for (const item of admin.all.filter((i) => i.placement !== "sidebar-footer")) {
       expect(screen.getByRole("link", { name: item.label })).toHaveAttribute("href", item.href);
     }
+    const settings = find("settings");
+    expect(screen.getByRole("link", { name: settings.label })).toHaveAttribute(
+      "href",
+      settings.href,
+    );
+  });
+
+  it("Pengaturan has aria-current=page only when it is the active item (Req 1.4)", () => {
+    const settings = find("settings");
+    const { unmount } = renderSidebar({ active: settings });
+    expect(screen.getByRole("link", { name: settings.label })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    unmount();
+
+    renderSidebar({ active: find("dashboard") });
+    expect(screen.getByRole("link", { name: settings.label })).not.toHaveAttribute("aria-current");
   });
 
   it("only the active item has aria-current=page (Req 3.3)", () => {
@@ -191,6 +236,23 @@ describe("Sidebar — rail mode", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent(name);
   });
 
+  it("Pengaturan tooltip shows on hover and focus, linked by aria-describedby (Req 1.5)", () => {
+    const { label } = find("settings");
+    renderSidebar({ rail: true });
+    const link = screen.getByRole("link", { name: label });
+
+    fireEvent.mouseEnter(link);
+    let tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent(label);
+    expect(link).toHaveAttribute("aria-describedby", tip.id);
+    fireEvent.mouseLeave(link);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.focus(link);
+    tip = screen.getByRole("tooltip");
+    expect(link).toHaveAttribute("aria-describedby", tip.id);
+  });
+
   it("expanded mode never shows a tooltip", () => {
     renderSidebar();
     fireEvent.mouseEnter(screen.getByRole("link", { name: find("dashboard").label }));
@@ -199,23 +261,39 @@ describe("Sidebar — rail mode", () => {
 });
 
 describe("Sidebar — footer", () => {
-  it("non-prod: env chip + version, no PRODUKSI (Req 5.2, 5.3)", () => {
-    render(<SidebarFooter rail={false} onToggleRail={() => {}} env="uat" version="1.2.3" />);
-    expect(screen.getByText("Lingkungan")).toBeInTheDocument();
-    expect(screen.getByText("UAT")).toBeInTheDocument();
-    expect(screen.getByText("· v1.2.3")).toBeInTheDocument();
-    expect(screen.queryByText(/PRODUKSI/)).not.toBeInTheDocument();
+  // Feature: sidebar-settings-footer, Property 1 (sisi Sidebar)
+  it("Property 1: Pengaturan link exists ⇔ getVisibleNav(role).settings is defined", () => {
+    fc.assert(
+      fc.property(arbShellRole, fc.boolean(), (role, rail) => {
+        const visible = getVisibleNav(role);
+        const { unmount } = renderSidebar({ visible, rail });
+        const link = screen.queryByRole("link", { name: "Pengaturan" });
+        const ok =
+          (link !== null) === (visible.settings !== undefined) &&
+          (link === null ||
+            (!navRegion().contains(link) && link.getAttribute("href") === "/settings"));
+        unmount();
+        return ok;
+      }),
+      { numRuns: 40 },
+    );
   });
 
-  it("prod: 'PRODUKSI · v…' and no warning chip (Req 5.4)", () => {
-    render(<SidebarFooter rail={false} onToggleRail={() => {}} env="prod" version="1.2.3" />);
-    expect(screen.getByText("PRODUKSI · v1.2.3")).toBeInTheDocument();
-    expect(screen.queryByText("UAT")).not.toBeInTheDocument();
-  });
-
-  it("rail hides EnvBadge (Req 4.3)", () => {
-    renderSidebar({ rail: true });
-    expect(screen.queryByText("Lingkungan")).not.toBeInTheDocument();
+  // Feature: sidebar-settings-footer, Property 3
+  it("Property 3: no 'Lingkungan', ENV_LABEL or version text; collapse button stays", () => {
+    const forbidden = ["Lingkungan", ...Object.values(ENV_LABEL), `v${APP_VERSION}`];
+    fc.assert(
+      fc.property(arbShellRole, fc.boolean(), (role, rail) => {
+        const { container, unmount } = renderSidebar({ visible: getVisibleNav(role), rail });
+        const text = container.textContent ?? "";
+        const ok =
+          forbidden.every((t) => !text.includes(t)) &&
+          screen.queryByRole("button", { name: rail ? "Lebarkan menu" : "Ciutkan menu" }) !== null;
+        unmount();
+        return ok;
+      }),
+      { numRuns: 40 },
+    );
   });
 
   it("expanded: ChevronsLeft + 'Ciutkan menu' + kbd [; rail: ChevronsRight + 'Lebarkan menu' (Req 4.5)", async () => {
@@ -241,6 +319,16 @@ describe("Sidebar — keyboard (Req 3.8, 16.5)", () => {
       .getAllByRole("link")
       .filter((a) => a.tabIndex === 0);
     expect(stops).toEqual([screen.getByRole("link", { name: active.label })]);
+  });
+
+  it("Pengaturan link is reachable with Tab (Req 1.6)", async () => {
+    renderSidebar();
+    const settings = screen.getByRole("link", { name: find("settings").label });
+    const user = userEvent.setup();
+    for (let i = 0; i < 100 && document.activeElement !== settings; i++) {
+      await user.tab();
+    }
+    expect(settings).toHaveFocus();
   });
 
   it("ArrowDown/ArrowUp move focus with wrap; Home/End jump", async () => {

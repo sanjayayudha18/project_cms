@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
 func optStr(s string) *string {
@@ -145,7 +147,7 @@ func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(str
 	case errors.As(err, &ve):
 		add("roles", ve.Message)
 	case roles != nil:
-		v["roles"] = picRolesCell(*roles) // canonical order, so equal sets compare equal to the export
+		v["roles"] = csvexport.PICRolesCell(*roles) // canonical order, so equal sets compare equal to the export
 	}
 }
 

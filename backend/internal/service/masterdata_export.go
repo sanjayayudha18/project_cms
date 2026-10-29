@@ -2,25 +2,24 @@ package service
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
-// Export entities (the {entity} path segment of the export endpoint).
+// Export entities (the {entity} path segment of the export endpoint). The CSV
+// contract (headers, cells, BOM, CSVSafe) lives in pkg/csvexport, shared with
+// backend-exq (vendor-data-export task 3.2); these names are aliases.
 const (
-	ExportVendors        = "vendors"
-	ExportVendorBranches = "vendor-branches"
-	ExportVendorVaults   = "vendor-vaults"
-	ExportVendorPICs     = "vendor-pics"
-	ExportATMs           = "atms"
-	ExportATMAssignments = "atm-assignments"
+	ExportVendors        = csvexport.Vendors
+	ExportVendorBranches = csvexport.VendorBranches
+	ExportVendorVaults   = csvexport.VendorVaults
+	ExportVendorPICs     = csvexport.VendorPICs
+	ExportATMs           = csvexport.ATMs
+	ExportATMAssignments = csvexport.ATMAssignments
 )
 
 // masterDataExportBatchSize is the keyset page size: how many rows are held in
@@ -29,7 +28,7 @@ const masterDataExportBatchSize int32 = 1000
 
 // utf8BOM lets Excel open the file as UTF-8 (Indonesian names/addresses).
 // The T5.3 importer must strip it.
-const utf8BOM = "\xEF\xBB\xBF"
+const utf8BOM = csvexport.BOM
 
 // ErrExportUnknownEntity is returned for an {entity} that is not exportable.
 var ErrExportUnknownEntity = errors.New("unknown export entity")
@@ -69,156 +68,65 @@ func exportPage[R any](rows []R, err error, id func(R) int64, cells func(R) []st
 	return out, last, nil
 }
 
-func boolCell(b bool) string { return strconv.FormatBool(b) }
-
 // picRolesCellNone is the roles cell of a PIC with an empty role set.
-const picRolesCellNone = "none"
+const picRolesCellNone = csvexport.PICRolesNone
 
-// picRolesCell is the CSV form of a PIC's roles: codes joined by ";", or "none".
-func picRolesCell(roles []string) string {
-	if len(roles) == 0 {
-		return picRolesCellNone
-	}
-	return strings.Join(roles, ";")
-}
-
-// exportSpecs is the contract with the T5.3 importer and T5.2 templates: the
-// header order is stable and part of the API. Columns use natural keys
-// (vendor_code, branch_code, terminal_id, package_code) so a file round-trips
-// without depending on database ids; `id` is kept as the first column for
-// reference. Empty cell = NULL; amounts/dates are the exact stored text.
-var exportSpecs = map[string]exportSpec{
-	ExportVendors: {
-		header: []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.Vendors(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportVendorsBatchRow) int64 { return x.ID }, func(x db.ExportVendorsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.Code, x.Name, x.LegalName, x.Npwp, x.ContactEmail, x.ContactPhone, x.HqAddress, boolCell(x.IsActive)}
-			})
-		},
-	},
-	ExportVendorBranches: {
-		header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
-		// Older files have no category (and, before migration 026, no
-		// region_code): keep the branch's current value instead of clearing it.
-		legacyHeaders: [][]string{
-			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
-			{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
-		},
-		legacyFill: map[string]string{"region_code": keepCurrentCell, "category": keepCurrentCell},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.VendorBranches(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportVendorBranchesBatchRow) int64 { return x.ID }, func(x db.ExportVendorBranchesBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.BranchName, x.Region, x.RegionCode, x.Category, x.LocationID, boolCell(x.IsActive)}
-			})
-		},
-	},
-	ExportVendorVaults: {
-		header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.VendorVaults(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportVendorVaultsBatchRow) int64 { return x.ID }, func(x db.ExportVendorVaultsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.VaultCode, x.Category, x.CurrencyCode,
-					x.MinCapacityAmount, x.MaxCapacityAmount, x.Latitude, x.Longitude, x.OperatingHours, x.LocationID, boolCell(x.IsActive)}
-			})
-		},
-	},
-	ExportVendorPICs: {
-		header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
-		// Older files have no roles column: treated as blank (create = all roles, update = unchanged).
-		legacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"}},
-		legacyFill:    map[string]string{"roles": ""},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.VendorPICs(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportVendorPicsBatchRow) int64 { return x.ID }, func(x db.ExportVendorPicsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.VendorCode, x.BranchCode, x.Name, x.Position, x.Phone, x.Email, boolCell(x.IsNotificationRecipient), boolCell(x.IsActive), picRolesCell(x.Roles)}
-			})
-		},
-	},
-	ExportATMs: {
-		header: []string{"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.ATMs(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportATMsBatchRow) int64 { return x.ID }, func(x db.ExportATMsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.TerminalID, strconv.FormatInt(x.LocationID, 10), x.MachineType, x.Brand, x.Model, x.OperationHours, x.DeploymentType,
-					x.CapacityAmount, x.LowThresholdAmount, x.CriticalThresholdAmount, boolCell(x.Blacklisted), x.EscrowAccount, x.PriorityClass, boolCell(x.IsActive)}
-			})
-		},
-	},
-	ExportATMAssignments: {
-		header:        []string{"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
-		legacyHeaders: [][]string{{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"}},
-		legacyFill:    map[string]string{"package_source": AssignmentSourceBranch},
-		page: func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
-			rows, err := r.ATMAssignments(ctx, after, status, limit)
-			return exportPage(rows, err, func(x db.ExportATMAssignmentsBatchRow) int64 { return x.ID }, func(x db.ExportATMAssignmentsBatchRow) []string {
-				return []string{strconv.FormatInt(x.ID, 10), x.TerminalID, x.VendorCode, x.BranchCode, x.PackageSource, x.PackageCode, x.EffectiveStartDate, x.EffectiveEndDate, boolCell(x.IsActive)}
-			})
-		},
-	},
-}
-
-// ParseExportEntity validates the {entity} path segment.
-func ParseExportEntity(name string) (string, error) {
-	if _, ok := exportSpecs[name]; !ok {
-		return "", ErrExportUnknownEntity
-	}
-	return name, nil
-}
-
-// MasterDataExportHeader returns entity's stable CSV header (a copy), for the
-// blank-template download (T5.2) and the importer's header validation (T5.3).
-func MasterDataExportHeader(entity string) ([]string, error) {
-	spec, ok := exportSpecs[entity]
+// spec builds an exportSpec from the shared contract entity plus this module's
+// page adapter (sqlc row -> csvexport row -> cells).
+func spec(entity string, page func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) ([][]string, int64, error)) exportSpec {
+	e, ok := csvexport.Lookup(entity)
 	if !ok {
-		return nil, ErrExportUnknownEntity
+		panic("csvexport: unknown entity " + entity)
 	}
-	return append([]string(nil), spec.header...), nil
+	return exportSpec{header: e.Header, legacyHeaders: e.LegacyHeaders, legacyFill: e.LegacyFill, page: page}
 }
 
-// WriteExportTemplate writes entity's blank CSV template: BOM + header row only
-// (no DB access). The `id` column is kept for parity with the export, so a
-// filled template and an edited export share one importer format (T5.3):
-// empty id = create, id present = update.
-func WriteExportTemplate(w io.Writer, entity string) error {
-	header, err := MasterDataExportHeader(entity)
-	if err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, utf8BOM); err != nil {
-		return err
-	}
-	cw := csv.NewWriter(w)
-	if err := cw.Write(header); err != nil {
-		return err
-	}
-	cw.Flush()
-	return cw.Error()
+// exportSpecs is the contract with the T5.3 importer and T5.2 templates.
+// Headers, legacy headers and cell formats come from pkg/csvexport (one source
+// for export and import, Req 14.3/14.4); only the repo paging lives here.
+// Each sqlc row converts directly to its csvexport row (same fields, same order).
+var exportSpecs = map[string]exportSpec{
+	ExportVendors: spec(ExportVendors, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.Vendors(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportVendorsBatchRow) int64 { return x.ID }, func(x db.ExportVendorsBatchRow) []string {
+			return csvexport.VendorCells(csvexport.VendorRow(x))
+		})
+	}),
+	ExportVendorBranches: spec(ExportVendorBranches, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.VendorBranches(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportVendorBranchesBatchRow) int64 { return x.ID }, func(x db.ExportVendorBranchesBatchRow) []string {
+			return csvexport.VendorBranchCells(csvexport.VendorBranchRow(x))
+		})
+	}),
+	ExportVendorVaults: spec(ExportVendorVaults, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.VendorVaults(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportVendorVaultsBatchRow) int64 { return x.ID }, func(x db.ExportVendorVaultsBatchRow) []string {
+			return csvexport.VendorVaultCells(csvexport.VendorVaultRow(x))
+		})
+	}),
+	ExportVendorPICs: spec(ExportVendorPICs, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.VendorPICs(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportVendorPicsBatchRow) int64 { return x.ID }, func(x db.ExportVendorPicsBatchRow) []string {
+			return csvexport.VendorPICCells(csvexport.VendorPICRow(x))
+		})
+	}),
+	ExportATMs: spec(ExportATMs, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.ATMs(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportATMsBatchRow) int64 { return x.ID }, func(x db.ExportATMsBatchRow) []string {
+			return csvexport.ATMCells(csvexport.ATMRow(x))
+		})
+	}),
+	ExportATMAssignments: spec(ExportATMAssignments, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
+		rows, err := r.ATMAssignments(ctx, after, status, limit)
+		return exportPage(rows, err, func(x db.ExportATMAssignmentsBatchRow) int64 { return x.ID }, func(x db.ExportATMAssignmentsBatchRow) []string {
+			return csvexport.ATMAssignmentCells(csvexport.ATMAssignmentRow(x))
+		})
+	}),
 }
 
-// plainNumberRe matches a bare number/phone ("+62 812-345", "-6.2", "(021) 555"),
-// which CSVSafe leaves alone even though it starts with + or -.
-var plainNumberRe = regexp.MustCompile(`^[+-]?[0-9][0-9 ().-]*$`)
-
-// CSVSafe defuses spreadsheet formula injection: a text cell starting with
-// = @ TAB CR (or + / - when it is not a plain number or phone) gets a leading
-// apostrophe, so opening an export in Excel cannot execute a formula that an
-// admin typed into a vendor name or address. The importer (T5.3) strips one
-// leading apostrophe that precedes such a character.
-func CSVSafe(s string) string {
-	if s == "" {
-		return s
-	}
-	switch s[0] {
-	case '=', '@', '\t', '\r':
-		return "'" + s
-	case '+', '-':
-		if !plainNumberRe.MatchString(s) {
-			return "'" + s
-		}
-	}
-	return s
-}
+// CSVSafe defuses spreadsheet formula injection (see csvexport.CSVSafe); kept
+// for the other CSV writers in this module (replenishment report).
+func CSVSafe(s string) string { return csvexport.CSVSafe(s) }
 
 // MasterDataExporter streams master-data tables as CSV. Read-only; it never
 // writes audit entries (same convention as the admin list endpoints).
@@ -232,13 +140,6 @@ func NewMasterDataExporter(repo MasterDataExportRepo) *MasterDataExporter {
 	return &MasterDataExporter{repo: repo, batchSize: masterDataExportBatchSize}
 }
 
-// Authorize re-checks, independent of the route guard (RBAC at middleware AND
-// service), that the caller holds a master-data admin role. An export is a
-// bulk read of vendor/ATM master data.
-func (e *MasterDataExporter) Authorize(ctx context.Context) error {
-	return authorizeMasterDataAdmin(ctx)
-}
-
 // Write streams entity as CSV to w and returns the number of data rows
 // written. status is "active" | "disabled" | "all". The first page is fetched
 // BEFORE anything is written, so a failure there leaves w untouched and the
@@ -247,7 +148,7 @@ func (e *MasterDataExporter) Authorize(ctx context.Context) error {
 // connection rather than present it as complete). flush, if non-nil, is called
 // after every page so the client receives data as it is produced.
 func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w io.Writer, flush func()) (int, error) {
-	if err := e.Authorize(ctx); err != nil {
+	if err := authorizeMasterDataAdmin(ctx); err != nil {
 		return 0, err
 	}
 	spec, ok := exportSpecs[entity]
@@ -258,8 +159,8 @@ func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w
 		return 0, &ValidationError{Field: "status", Message: "harus active, disabled, atau all"}
 	}
 
-	cw := csv.NewWriter(w)
-	total, afterID, started := 0, int64(0), false
+	var cw *csvexport.Writer
+	total, afterID := 0, int64(0)
 	for {
 		if err := ctx.Err(); err != nil {
 			return total, err
@@ -269,27 +170,18 @@ func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w
 			return total, fmt.Errorf("export %s after id %d: %w", entity, afterID, err)
 		}
 
-		if !started {
-			if _, err := io.WriteString(w, utf8BOM); err != nil {
+		if cw == nil { // BOM + header only once the first page is in hand
+			if cw, err = csvexport.NewWriter(w, spec.header); err != nil {
 				return total, err
 			}
-			if err := cw.Write(spec.header); err != nil {
-				return total, err
-			}
-			started = true
 		}
 		for _, row := range rows {
-			safe := make([]string, len(row))
-			for i, cell := range row {
-				safe[i] = CSVSafe(cell)
-			}
-			if err := cw.Write(safe); err != nil {
+			if err := cw.Write(row); err != nil {
 				return total, err
 			}
 		}
 		total += len(rows)
-		cw.Flush()
-		if err := cw.Error(); err != nil {
+		if err := cw.Flush(); err != nil {
 			return total, err
 		}
 		if flush != nil {

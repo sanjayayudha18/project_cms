@@ -317,14 +317,6 @@ func main() {
 	adminRegionHandler := handler.NewAdminRegionHandler(regionAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/regions", adminRegionHandler.Routes())
 
-	// CSV export of master data (plan.md T5.1): streamed in keyset pages from the
-	// read-replica pool (primary when no replica is configured); read-only, no
-	// approval involved. Same masterDataAdmin guard, re-checked in the exporter.
-	masterDataExportRepo := repository.NewMasterDataExportRepository(dbReadPool)
-	masterDataExporter := service.NewMasterDataExporter(masterDataExportRepo)
-	adminMasterDataExportHandler := handler.NewAdminMasterDataExportHandler(masterDataExporter)
-	masterDataAdmin.Mount("/api/v1/admin/master-data/export", adminMasterDataExportHandler.Routes())
-
 	// ADMIN/ADMIN_PARAM-only: vendor vault CRUD (plan.md T3.2), same
 	// maker-checker-native flow as branches below. Built before the branch
 	// service so its repo can back the branch-disable "no active children"

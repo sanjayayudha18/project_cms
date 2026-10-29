@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-10-29 — Backend: import PIC tanpa diedit terbaca "update" bila roles tersimpan tidak urut abjad
+- **Symptom**: file export `vendor-pics` yang diunggah ulang tanpa diedit ke dry-run import melaporkan PIC sebagai `update`, bukan `unchanged`, untuk PIC dengan roles tersimpan `{replenish,vault,cashcount}` (default migrasi `032`, jadi semua PIC lama) atau urutan lain yang tidak abjad. Konfirmasi import akan membuat approval perubahan palsu. Ditemukan oleh test integrasi round trip `vendor-data-export` task 11.4; dev tidak punya baris `vendor_pics`, jadi belum pernah terlihat di layar. Sudah ada sejak roles masuk CSV (vendor-party-scope), bukan dari refactor `pkg/csvexport`.
+- **Root cause**: sisi file dinormalisasi `normalizePicRoles` (diurutkan abjad: `cashcount;replenish;vault`), sedangkan data saat ini dari `loadAll` memakai sel export apa adanya (urutan DB: `replenish;vault;cashcount`). Perbandingan string sel berbeda walau himpunannya sama.
+- **Fix**: `backend/internal/service/masterdata_import.go` — `loadAll` menormalkan sel `roles` data saat ini untuk `vendor-pics` lewat `canonicalPicRolesCell` (`parsePicRoles` + `csvexport.PICRolesCell`). Isi file export tidak berubah (golden byte `vendor-data-export` 1.1 tetap), import yang benar-benar mengubah roles tetap `update`.
+- **Tests**: `masterdata_import_pic_roles_test.go` +`TestImport_VendorPICUnsortedStoredRolesRoundTripUnchanged` (RED tanpa fix: `Updates:1 Unchanged:0`; GREEN sesudah). Integrasi `TestExportScopedRoundTrip_DryRunIsZeroChanges` (task 11.4, `pics/vendor` sebelumnya `Updates:2`) dan `TestExportRoundTrip_DryRunIsZeroChanges` hijau terhadap DB dev, fixture bersih. `go test ./internal/service ./internal/handler` hijau. Manual browser verification: outstanding (Import/Export master data → unduh `vendor-pics`, unggah ulang tanpa edit → dry-run semua "tidak berubah").
+- **Commit**: <sha>
+
+---
+
 ## 2026-10-27 — CompanyPortal: inisial avatar bisa 3 karakter (property test `getInitials` flaky)
 - **Symptom**: `pnpm run test:coverage` kadang merah di `src/lib/utils/initials.property.test.ts` "string apa pun: hasil 1–2 karakter uppercase, atau ?" (counterexample `"ᾀ\u0000"`, seed -540324741). Ditemukan saat gate wave 3 `sidebar-settings-footer`; kode dari `app-shell-revamp` (2627fdf).
 - **Root cause**: `getInitials` memotong (slice) dulu, baru `toUpperCase()`. Beberapa huruf memanjang saat di-uppercase ("ᾀ" → "ἈΙ", "ß" → "SS"), jadi hasil bisa 3 karakter (mis. "ßa budi" → "SSB"). Test baru kena bila fast-check kebetulan membangkitkan huruf seperti itu, sehingga flaky.

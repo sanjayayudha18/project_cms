@@ -1,8 +1,7 @@
 /**
- * CSV export / template / import client for master data
- * (backend admin_master_data_{export,import}_handler.go, mounted at
- * /api/v1/admin/master-data). Goes through the shared `api` client so a 401
- * triggers the single-flight token refresh like every other call.
+ * CSV import client for master data (backend admin_master_data_import_handler.go, mounted at
+ * /api/v1/admin/master-data). Export + template moved to features/exports (backend-exq).
+ * Goes through the shared `api` client so a 401 triggers the single-flight token refresh.
  */
 
 import { type ApiError, api } from "@/lib/api";
@@ -17,7 +16,6 @@ export const IO_ENTITIES = [
 ] as const;
 
 export type IoEntity = (typeof IO_ENTITIES)[number]["id"];
-export type ExportStatus = "active" | "disabled" | "all";
 
 /** Mirrors backend MasterDataImportMaxBytes / MasterDataImportMaxRows. */
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
@@ -66,30 +64,6 @@ function toImportError(err: unknown): unknown {
   if (typeof e?.status !== "number") return err;
   const rows = Array.isArray(e.details) ? (e.details as ImportRowError[]) : [];
   return new ImportApiError(e.message || "Permintaan gagal", e.status, rows);
-}
-
-async function download(path: string, fallbackName: string): Promise<void> {
-  let res: Awaited<ReturnType<typeof api.get<Blob>>>;
-  try {
-    res = await api.get<Blob>(path, { responseType: "blob" });
-  } catch (err) {
-    throw toImportError(err);
-  }
-  const match = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
-  const url = URL.createObjectURL(res.data);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = match?.[1] ?? fallbackName;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export function downloadExport(entity: IoEntity, status: ExportStatus): Promise<void> {
-  return download(`${BASE}/export/${entity}?status=${status}`, `master-data-${entity}.csv`);
-}
-
-export function downloadTemplate(entity: IoEntity): Promise<void> {
-  return download(`${BASE}/export/${entity}/template`, `master-data-${entity}-template.csv`);
 }
 
 async function upload<T>(path: string, file: File): Promise<T> {

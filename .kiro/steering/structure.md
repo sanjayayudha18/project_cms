@@ -4,13 +4,14 @@
 
 ```
 CMS2/
-├── go.work                       # Go workspace: links backend/, backend-cit/, pkg/
+├── go.work                       # Go workspace: links backend/, backend-exq/, pkg/
 │
 ├── pkg/                          # Shared infra (own go.mod, no dependency on either backend)
 │   ├── auth/                     # JWT TokenService, blacklist, Provider/UserRepository interfaces
 │   ├── middleware/               # RequireAuth, RequireRoles, rate limiter
 │   ├── config/                   # Env config loader, Load(defaultPort)
-│   ├── response/                 # {success,data} JSON envelope (used by backend-cit only)
+│   ├── response/                 # {success,data} JSON envelope (used by backend-exq only)
+│   ├── csvexport/                # Shared CSV contract: CSVSafe, Writer, 6 master-data entities (backend + backend-exq)
 │   └── database/                 # pgxpool: primary (write) + replica (read)
 │
 ├── backend/                      # ATM backend — own go.mod, port 8080
@@ -38,15 +39,16 @@ CMS2/
 │   ├── dsr/dsr_etl.py            # DSR ETL (+ test_dsr_etl.py)
 │   └── itm/{cashpos,replenish}/  # ITM cash-position + replenishment ETL
 │
-├── backend-cit/                  # CIT backend — own go.mod, port 8081
+├── backend-exq/                  # Export jobs + dashboard monitoring queries — own go.mod, port 8081
+│   ├── api/                      # OpenAPI 3.0.3 contract (openapi.yaml, embed.go); FE types via `gen:api:exq`
 │   ├── cmd/
-│   │   └── api/main.go           # Health check + RequireAuth-protected routes; validates tokens, issues none
+│   │   └── api/main.go           # Bootstrap; RequireAuth-protected /api/v1/exports; starts worker + janitor; validates tokens, issues none
 │   ├── internal/
-│   │   ├── cit/                  # CIT orders, handover
-│   │   ├── journal/              # CIT journals
-│   │   ├── dsr/                  # CIT DSR uploads
-│   │   ├── reconciliation/       # CIT reconciliation (order vs DSR vs journal)
-│   │   └── integration/          # Corebanking escrow batch ingest
+│   │   ├── exportjob/            # Export jobs: kinds + role registry, params, producers, ChunkWriter, service, worker, janitor
+│   │   ├── audit/                # Append-only audit writer (export_requested, master_data_exported)
+│   │   ├── handler/              # ExportsHandler: request, template, job list/get, file download
+│   │   └── repository/           # sqlc-generated (queries/: export_jobs, vendor_export, audit, user_role)
+│   ├── queries/                  # sqlc SQL; also reads ../backend/queries/master_data_export.sql
 │   ├── go.mod
 │   └── go.sum
 │
@@ -71,9 +73,9 @@ CMS2/
 │       ├── package.json
 │       └── vite.config.ts
 │
-├── docker-compose.yml            # Local dev: backend + backend-cit + redis (Postgres external)
+├── docker-compose.yml            # Local dev: backend + backend-exq + redis (Postgres external)
 ├── backend/Dockerfile            # Multi-stage, builds from repo root (context .) for go.work
-├── backend-cit/Dockerfile        # Multi-stage, builds from repo root (context .) for go.work
+├── backend-exq/Dockerfile        # Multi-stage, builds from repo root (context .) for go.work
 ├── .env.example                  # Environment variables template
 │
 ├── documents/                    # Business requirements (existing)
@@ -83,12 +85,12 @@ CMS2/
 
 ## Key Architecture Rules
 
-- `pkg/` depends on neither backend. `backend/` and `backend-cit/` depend on `pkg/` only — never on each other. Compiler-enforced acyclic.
+- `pkg/` depends on neither backend. `backend/` and `backend-exq/` depend on `pkg/` only — never on each other. Compiler-enforced acyclic. (`backend-exq` also reads the shared SQL file `backend/queries/master_data_export.sql` through sqlc codegen; no Go import.)
 - `backend/migrations/` is the sole owner of ALL DB migrations (including CIT tables). `backend_python/` reads/writes the same schema but never owns migrations.
-- ATM backend keeps existing flat JSON response shape for wire compatibility. CIT backend uses `pkg/response` envelope. Python services use their own `{status, data, error}` envelope.
+- ATM backend keeps existing flat JSON response shape for wire compatibility. `backend-exq` uses `pkg/response` envelope. Python services use their own `{status, data, error}` envelope.
 - Each backend builds and deploys as an independent artifact (separate Compute Engine in prod).
 - **`backend/internal/` is organized by layer** (handler/service/repository/db) with cross-cutting domains (auth/approval/audit/rolemgmt) as sibling packages — NOT the by-feature layout an older version of this doc showed. Match the layer layout when adding code.
-- **`backend-cit/` is still a skeleton:** `/health` + an auth-protected empty route group only; every `internal/*` package (`cit`, `journal`, `dsr`, `reconciliation`, `integration`) is a stub file. Build it out only in its own late phase (see `development-plan.md`).
+- **`backend-exq/` has content:** export jobs (API, worker, janitor) per spec `.kiro/specs/vendor-data-export/`. CIT logic is not built here (see `.claude/CLAUDE.md` Sec 12).
 - **Python runtime owns EOD/ETL, not Go.** There is no Go `cmd/batch` — that entrypoint was dropped (decision 2026-09-25). Batch/ingest work lives in `backend_python/`.
 
 ## Guidelines

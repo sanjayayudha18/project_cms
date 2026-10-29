@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -173,6 +174,9 @@ func (i *MasterDataImporter) loadAll(ctx context.Context, entity string) ([]map[
 			for c, h := range spec.header {
 				m[h] = r[c]
 			}
+			if entity == ExportVendorPICs {
+				m["roles"] = canonicalPicRolesCell(m["roles"])
+			}
 			out = append(out, m)
 		}
 		if int32(len(rows)) < masterDataExportBatchSize { //nolint:gosec // G115: len(rows) <= batch size (SQL LIMIT)
@@ -180,6 +184,18 @@ func (i *MasterDataImporter) loadAll(ctx context.Context, entity string) ([]map[
 		}
 		after = last
 	}
+}
+
+// canonicalPicRolesCell sorts a stored roles cell the way the file side is
+// normalized (validatePicRow -> normalizePicRoles), so a PIC whose roles are
+// stored unsorted (migration 032 default {replenish,vault,cashcount}) compares
+// unchanged against its own unedited export. The export bytes keep the DB order.
+func canonicalPicRolesCell(cell string) string {
+	roles, err := parsePicRoles(cell)
+	if err != nil || roles == nil {
+		return cell
+	}
+	return csvexport.PICRolesCell(*roles)
 }
 
 // activeSet loads entity and returns the set of key(row) for its active rows.

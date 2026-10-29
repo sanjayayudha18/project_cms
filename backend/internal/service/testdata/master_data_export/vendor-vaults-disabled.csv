@@ -1,0 +1,2 @@
+﻿id,vendor_code,branch_code,vault_code,category,currency_code,min_capacity_amount,max_capacity_amount,latitude,longitude,operating_hours,location_id,is_active
+2,VA,VA_002,VA_002_V1,CASH,IDR,,,,,,,false

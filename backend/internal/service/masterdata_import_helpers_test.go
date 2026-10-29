@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -76,27 +75,5 @@ func TestImport_RowRejection(t *testing.T) {
 	boom := errors.New("db down")
 	if err := rowRejection(6, boom); errors.As(err, &invalid) || !errors.Is(err, boom) || !strings.Contains(err.Error(), "row 6") {
 		t.Errorf("unexpected error must stay a 500, got %v", err)
-	}
-}
-
-func TestExportTemplate(t *testing.T) {
-	if _, err := ParseExportEntity("users"); !errors.Is(err, ErrExportUnknownEntity) {
-		t.Errorf("unknown entity err = %v", err)
-	}
-	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportVendorVaults, ExportVendorPICs, ExportATMs, ExportATMAssignments} {
-		if got, err := ParseExportEntity(entity); err != nil || got != entity {
-			t.Errorf("ParseExportEntity(%s) = %q, %v", entity, got, err)
-		}
-		var buf bytes.Buffer
-		if err := WriteExportTemplate(&buf, entity); err != nil {
-			t.Fatalf("%s: %v", entity, err)
-		}
-		header, _ := MasterDataExportHeader(entity)
-		if want := utf8BOM + strings.Join(header, ",") + "\n"; buf.String() != want {
-			t.Errorf("%s template = %q, want BOM + header only %q", entity, buf.String(), want)
-		}
-	}
-	if err := WriteExportTemplate(&bytes.Buffer{}, "users"); !errors.Is(err, ErrExportUnknownEntity) {
-		t.Errorf("unknown template err = %v", err)
 	}
 }

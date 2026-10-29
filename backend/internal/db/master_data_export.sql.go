@@ -183,15 +183,17 @@ SELECT b.id,
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
 WHERE b.id > $1::bigint
-  AND ($2::text = 'all'
-       OR ($2::text = 'active' AND b.deleted_at IS NULL)
-       OR ($2::text = 'disabled' AND b.deleted_at IS NOT NULL))
+  AND ($2::bigint IS NULL OR b.vendor_id = $2::bigint)
+  AND ($3::text = 'all'
+       OR ($3::text = 'active' AND b.deleted_at IS NULL)
+       OR ($3::text = 'disabled' AND b.deleted_at IS NOT NULL))
 ORDER BY b.id
-LIMIT $3::int
+LIMIT $4::int
 `
 
 type ExportVendorBranchesBatchParams struct {
 	AfterID   int64  `json:"after_id"`
+	VendorID  *int64 `json:"vendor_id"`
 	Status    string `json:"status"`
 	BatchSize int32  `json:"batch_size"`
 }
@@ -209,7 +211,12 @@ type ExportVendorBranchesBatchRow struct {
 }
 
 func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendorBranchesBatchParams) ([]ExportVendorBranchesBatchRow, error) {
-	rows, err := q.db.Query(ctx, exportVendorBranchesBatch, arg.AfterID, arg.Status, arg.BatchSize)
+	rows, err := q.db.Query(ctx, exportVendorBranchesBatch,
+		arg.AfterID,
+		arg.VendorID,
+		arg.Status,
+		arg.BatchSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -253,15 +260,19 @@ FROM vendor_pics p
 JOIN vendors v ON v.id = p.vendor_id
 LEFT JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE p.id > $1::bigint
-  AND ($2::text = 'all'
-       OR ($2::text = 'active' AND p.deleted_at IS NULL)
-       OR ($2::text = 'disabled' AND p.deleted_at IS NOT NULL))
+  AND ($2::bigint IS NULL OR p.vendor_id = $2::bigint)
+  AND ($3::bigint IS NULL OR p.vendor_branch_id = $3::bigint)
+  AND ($4::text = 'all'
+       OR ($4::text = 'active' AND p.deleted_at IS NULL)
+       OR ($4::text = 'disabled' AND p.deleted_at IS NOT NULL))
 ORDER BY p.id
-LIMIT $3::int
+LIMIT $5::int
 `
 
 type ExportVendorPicsBatchParams struct {
 	AfterID   int64  `json:"after_id"`
+	VendorID  *int64 `json:"vendor_id"`
+	BranchID  *int64 `json:"branch_id"`
 	Status    string `json:"status"`
 	BatchSize int32  `json:"batch_size"`
 }
@@ -279,9 +290,16 @@ type ExportVendorPicsBatchRow struct {
 	Roles                   []string `json:"roles"`
 }
 
-// branch_code is ” for a vendor-wide PIC (vendor_branch_id NULL).
+// branch_code is ” for a vendor-wide PIC (vendor_branch_id NULL). A branch_id
+// scope matches only that branch's PICs, never vendor-wide ones (D3).
 func (q *Queries) ExportVendorPicsBatch(ctx context.Context, arg ExportVendorPicsBatchParams) ([]ExportVendorPicsBatchRow, error) {
-	rows, err := q.db.Query(ctx, exportVendorPicsBatch, arg.AfterID, arg.Status, arg.BatchSize)
+	rows, err := q.db.Query(ctx, exportVendorPicsBatch,
+		arg.AfterID,
+		arg.VendorID,
+		arg.BranchID,
+		arg.Status,
+		arg.BatchSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -329,15 +347,19 @@ FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE vl.id > $1::bigint
-  AND ($2::text = 'all'
-       OR ($2::text = 'active' AND vl.deleted_at IS NULL)
-       OR ($2::text = 'disabled' AND vl.deleted_at IS NOT NULL))
+  AND ($2::bigint IS NULL OR v.id = $2::bigint)
+  AND ($3::bigint IS NULL OR b.id = $3::bigint)
+  AND ($4::text = 'all'
+       OR ($4::text = 'active' AND vl.deleted_at IS NULL)
+       OR ($4::text = 'disabled' AND vl.deleted_at IS NOT NULL))
 ORDER BY vl.id
-LIMIT $3::int
+LIMIT $5::int
 `
 
 type ExportVendorVaultsBatchParams struct {
 	AfterID   int64  `json:"after_id"`
+	VendorID  *int64 `json:"vendor_id"`
+	BranchID  *int64 `json:"branch_id"`
 	Status    string `json:"status"`
 	BatchSize int32  `json:"batch_size"`
 }
@@ -359,7 +381,13 @@ type ExportVendorVaultsBatchRow struct {
 }
 
 func (q *Queries) ExportVendorVaultsBatch(ctx context.Context, arg ExportVendorVaultsBatchParams) ([]ExportVendorVaultsBatchRow, error) {
-	rows, err := q.db.Query(ctx, exportVendorVaultsBatch, arg.AfterID, arg.Status, arg.BatchSize)
+	rows, err := q.db.Query(ctx, exportVendorVaultsBatch,
+		arg.AfterID,
+		arg.VendorID,
+		arg.BranchID,
+		arg.Status,
+		arg.BatchSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -405,15 +433,17 @@ SELECT v.id,
        v.is_active
 FROM vendors v
 WHERE v.id > $1::bigint
-  AND ($2::text = 'all'
-       OR ($2::text = 'active' AND v.deleted_at IS NULL)
-       OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL))
+  AND ($2::bigint IS NULL OR v.id = $2::bigint)
+  AND ($3::text = 'all'
+       OR ($3::text = 'active' AND v.deleted_at IS NULL)
+       OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL))
 ORDER BY v.id
-LIMIT $3::int
+LIMIT $4::int
 `
 
 type ExportVendorsBatchParams struct {
 	AfterID   int64  `json:"after_id"`
+	VendorID  *int64 `json:"vendor_id"`
 	Status    string `json:"status"`
 	BatchSize int32  `json:"batch_size"`
 }
@@ -440,8 +470,19 @@ type ExportVendorsBatchRow struct {
 // no NULL handling: NULL -> ” (an empty CSV cell means NULL on import too),
 // numerics and dates are cast to text in SQL so amounts keep their exact
 // stored scale and never pass through float.
+//
+// SHARED FILE: backend-exq generates these queries too (its sqlc.yaml lists
+// this path), so the export (backend-exq) and the importer's current-state
+// comparison (backend/) format cells from the same SQL (vendor-data-export,
+// design "Kenapa SQL juga dibagi"). Optional scope `vendor_id` / `branch_id`:
+// NULL = every row (global export, importer). Regenerate in BOTH modules.
 func (q *Queries) ExportVendorsBatch(ctx context.Context, arg ExportVendorsBatchParams) ([]ExportVendorsBatchRow, error) {
-	rows, err := q.db.Query(ctx, exportVendorsBatch, arg.AfterID, arg.Status, arg.BatchSize)
+	rows, err := q.db.Query(ctx, exportVendorsBatch,
+		arg.AfterID,
+		arg.VendorID,
+		arg.Status,
+		arg.BatchSize,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -460,112 +501,6 @@ func (q *Queries) ExportVendorsBatch(ctx context.Context, arg ExportVendorsBatch
 			&i.HqAddress,
 			&i.IsActive,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const importLocationIDs = `-- name: ImportLocationIDs :many
-SELECT id FROM locations
-`
-
-func (q *Queries) ImportLocationIDs(ctx context.Context) ([]int64, error) {
-	rows, err := q.db.Query(ctx, importLocationIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []int64{}
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const importPackageKeys = `-- name: ImportPackageKeys :many
-SELECT p.id, v.code AS vendor_code, b.branch_code, p.package_code
-FROM vendor_packages_branch p
-JOIN vendor_branches b ON b.id = p.vendor_branch_id
-JOIN vendors v ON v.id = b.vendor_id
-WHERE p.effective_end_date IS NULL OR p.effective_end_date >= CURRENT_DATE
-`
-
-type ImportPackageKeysRow struct {
-	ID          int64  `json:"id"`
-	VendorCode  string `json:"vendor_code"`
-	BranchCode  string `json:"branch_code"`
-	PackageCode string `json:"package_code"`
-}
-
-// Active vendor packages by natural key, for the import dry-run's FK check on
-// atm-assignments (plan.md T5.3). Read on the PRIMARY (validation of a write flow).
-// Migration 016 dropped is_active/deleted_at from vendor_packages_branch --
-// "active" now means an open (or not-yet-ended) price period, same
-// convention as DisableVendorPackage's own WHERE guard.
-func (q *Queries) ImportPackageKeys(ctx context.Context) ([]ImportPackageKeysRow, error) {
-	rows, err := q.db.Query(ctx, importPackageKeys)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ImportPackageKeysRow{}
-	for rows.Next() {
-		var i ImportPackageKeysRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.VendorCode,
-			&i.BranchCode,
-			&i.PackageCode,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const importVendorPackageLabels = `-- name: ImportVendorPackageLabels :many
-SELECT DISTINCT v.code AS vendor_code, vpp.package::text AS package
-FROM vendor_package_prices vpp
-JOIN vendors v ON v.id = vpp.vendor_id
-WHERE v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR'
-  AND vpp.atm_id IS NULL
-  AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= CURRENT_DATE)
-`
-
-type ImportVendorPackageLabelsRow struct {
-	VendorCode string `json:"vendor_code"`
-	Package    string `json:"package"`
-}
-
-// Vendor-wide package labels per FLM vendor (atm-assignments import, package_source
-// 'vendor'): the vendor has a PT-/branch-level tariff that is still open or not yet
-// ended. Whether the tariff fits a given ATM is checked at confirm (FR9).
-func (q *Queries) ImportVendorPackageLabels(ctx context.Context) ([]ImportVendorPackageLabelsRow, error) {
-	rows, err := q.db.Query(ctx, importVendorPackageLabels)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ImportVendorPackageLabelsRow{}
-	for rows.Next() {
-		var i ImportVendorPackageLabelsRow
-		if err := rows.Scan(&i.VendorCode, &i.Package); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

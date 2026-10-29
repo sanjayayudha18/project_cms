@@ -1,0 +1,2 @@
+﻿id,terminal_id,location_id,machine_type,brand,model,operation_hours,deployment_type,capacity_amount,low_threshold_amount,critical_threshold_amount,blacklisted,escrow_account,priority_class,is_active
+2,T0002,13,CRM,,,,,,,,true,,,false

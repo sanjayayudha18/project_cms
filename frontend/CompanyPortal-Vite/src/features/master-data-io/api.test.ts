@@ -1,80 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// fe-coverage C3: master-data CSV export/import client. The HTTP client is mocked;
-// jsdom has no object URLs, so those and the anchor click are stubbed.
+// fe-coverage C3: master-data CSV import client. The HTTP client is mocked.
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: client }));
 
-import {
-  ImportApiError,
-  confirmImport,
-  downloadExport,
-  downloadTemplate,
-  dryRunImport,
-} from "./api";
-
-const createObjectURL = vi.fn(() => "blob:fake");
-const revokeObjectURL = vi.fn();
-let clicked: { href: string; download: string }[] = [];
+import { ImportApiError, confirmImport, dryRunImport } from "./api";
 
 beforeEach(() => {
   client.get.mockReset();
   client.post.mockReset();
-  createObjectURL.mockClear();
-  revokeObjectURL.mockClear();
-  clicked = [];
-  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL }));
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
-    this: HTMLAnchorElement,
-  ) {
-    clicked.push({ href: this.getAttribute("href") ?? "", download: this.download });
-  });
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
-
-const blobResponse = (disposition: string | null) => ({
-  data: new Blob(["code,name\n"]),
-  status: 200,
-  headers: new Headers(disposition ? { "Content-Disposition": disposition } : {}),
-});
-
-describe("master-data CSV download", () => {
-  it("export asks for a blob and saves it under the server's file name", async () => {
-    client.get.mockResolvedValue(blobResponse('attachment; filename="vendors-2026-10-15.csv"'));
-
-    await downloadExport("vendors", "all");
-
-    expect(client.get).toHaveBeenCalledWith("/admin/master-data/export/vendors?status=all", {
-      responseType: "blob",
-    });
-    expect(clicked).toEqual([{ href: "blob:fake", download: "vendors-2026-10-15.csv" }]);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake");
-  });
-
-  it("template falls back to a local file name when there is no Content-Disposition", async () => {
-    client.get.mockResolvedValue(blobResponse(null));
-
-    await downloadTemplate("atm-assignments");
-
-    expect(client.get).toHaveBeenCalledWith("/admin/master-data/export/atm-assignments/template", {
-      responseType: "blob",
-    });
-    expect(clicked[0]?.download).toBe("master-data-atm-assignments-template.csv");
-  });
-
-  it("a failed download becomes an ImportApiError and nothing is saved", async () => {
-    client.get.mockRejectedValue({ status: 403, message: "Akses ditolak" });
-
-    const err = await downloadExport("atms", "active").catch((e: unknown) => e);
-
-    expect(err).toBeInstanceOf(ImportApiError);
-    expect(err).toMatchObject({ status: 403, message: "Akses ditolak", errors: [] });
-    expect(clicked).toEqual([]);
-  });
 });
 
 describe("master-data CSV import", () => {

@@ -1,0 +1,3 @@
+﻿id,terminal_id,vendor_code,branch_code,package_source,package_code,effective_start_date,effective_end_date,is_active
+1,T0001,VA,VA_001,branch,VA_001_PKT3,2026-01-01,,true
+4,T0009,VC,VC_001,vendor,PAKET 1,2026-10-01,,true

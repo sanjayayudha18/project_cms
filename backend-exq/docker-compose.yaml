@@ -1,4 +1,4 @@
-name: CMS-Backend-CIT
+name: CMS-Backend-EXQ
 
 # Depends on backend/docker-compose.yaml having created the `cms-net`
 # network + Redis first:

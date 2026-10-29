@@ -68,12 +68,33 @@ jobs:
           fi
       - name: Coverage not below backend/coverage-thresholds.txt
         run: bash scripts/check-coverage.sh test.log
+      # Sequential after backend on purpose: both suites share this one DB.
+      # Integration tests in backend-exq/internal/exportjob create/clean export_jobs rows
+      # and must not run in parallel with other job-creating tests (tasks.md note 11).
+      - name: Integration tests backend-exq and pkg (no skips allowed)
+        run: |
+          set -o pipefail
+          for m in backend-exq pkg; do
+            (cd "../$m" && go test -tags integration -race -count=1 -cover -v ./... | tee "test.log")
+            if grep -q -- "--- SKIP" "../$m/test.log"; then
+              echo "::error::$m integration tests skipped"; grep -- "--- SKIP" "../$m/test.log"; exit 1
+            fi
+          done
+      - name: Coverage not below backend-exq/ and pkg/ coverage-thresholds.txt
+        run: |
+          bash scripts/check-coverage.sh ../backend-exq/test.log ../backend-exq/coverage-thresholds.txt
+          bash scripts/check-coverage.sh ../pkg/test.log ../pkg/coverage-thresholds.txt
 
   sqlc:
+    name: sqlc (${{ matrix.module }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [backend, backend-exq]
     defaults:
       run:
-        working-directory: backend
+        working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -82,9 +103,10 @@ jobs:
       - run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
       - run: sqlc generate
       # Known v1.31.1 inflector quirk (CLAUDE.md Sec 2a): user_leaves -> UserLeafe.
-      - run: sed -i 's/UserLeafe/UserLeave/g' internal/db/*.go
+      # backend-exq renames it in sqlc.yaml (generates internal/repository); sed is then a no-op.
+      - run: sed -i 's/UserLeafe/UserLeave/g' internal/db/*.go internal/repository/*.go 2>/dev/null || true
       - name: Generated code matches queries/migrations
-        run: git diff --exit-code -- internal/db
+        run: git diff --exit-code -- internal/db internal/repository
 
   python:
     runs-on: ubuntu-latest

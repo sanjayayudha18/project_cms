@@ -8,6 +8,12 @@
 -- no NULL handling: NULL -> '' (an empty CSV cell means NULL on import too),
 -- numerics and dates are cast to text in SQL so amounts keep their exact
 -- stored scale and never pass through float.
+--
+-- SHARED FILE: backend-exq generates these queries too (its sqlc.yaml lists
+-- this path), so the export (backend-exq) and the importer's current-state
+-- comparison (backend/) format cells from the same SQL (vendor-data-export,
+-- design "Kenapa SQL juga dibagi"). Optional scope `vendor_id` / `branch_id`:
+-- NULL = every row (global export, importer). Regenerate in BOTH modules.
 
 -- name: ExportVendorsBatch :many
 SELECT v.id,
@@ -21,6 +27,7 @@ SELECT v.id,
        v.is_active
 FROM vendors v
 WHERE v.id > sqlc.arg('after_id')::bigint
+  AND (sqlc.narg('vendor_id')::bigint IS NULL OR v.id = sqlc.narg('vendor_id')::bigint)
   AND (sqlc.arg('status')::text = 'all'
        OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
        OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL))
@@ -40,6 +47,7 @@ SELECT b.id,
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
 WHERE b.id > sqlc.arg('after_id')::bigint
+  AND (sqlc.narg('vendor_id')::bigint IS NULL OR b.vendor_id = sqlc.narg('vendor_id')::bigint)
   AND (sqlc.arg('status')::text = 'all'
        OR (sqlc.arg('status')::text = 'active' AND b.deleted_at IS NULL)
        OR (sqlc.arg('status')::text = 'disabled' AND b.deleted_at IS NOT NULL))
@@ -64,6 +72,8 @@ FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
 WHERE vl.id > sqlc.arg('after_id')::bigint
+  AND (sqlc.narg('vendor_id')::bigint IS NULL OR v.id = sqlc.narg('vendor_id')::bigint)
+  AND (sqlc.narg('branch_id')::bigint IS NULL OR b.id = sqlc.narg('branch_id')::bigint)
   AND (sqlc.arg('status')::text = 'all'
        OR (sqlc.arg('status')::text = 'active' AND vl.deleted_at IS NULL)
        OR (sqlc.arg('status')::text = 'disabled' AND vl.deleted_at IS NOT NULL))
@@ -71,7 +81,8 @@ ORDER BY vl.id
 LIMIT sqlc.arg('batch_size')::int;
 
 -- name: ExportVendorPicsBatch :many
--- branch_code is '' for a vendor-wide PIC (vendor_branch_id NULL).
+-- branch_code is '' for a vendor-wide PIC (vendor_branch_id NULL). A branch_id
+-- scope matches only that branch's PICs, never vendor-wide ones (D3).
 SELECT p.id,
        v.code                                       AS vendor_code,
        COALESCE(b.branch_code, '')::text            AS branch_code,
@@ -86,6 +97,8 @@ FROM vendor_pics p
 JOIN vendors v ON v.id = p.vendor_id
 LEFT JOIN vendor_branches b ON b.id = p.vendor_branch_id
 WHERE p.id > sqlc.arg('after_id')::bigint
+  AND (sqlc.narg('vendor_id')::bigint IS NULL OR p.vendor_id = sqlc.narg('vendor_id')::bigint)
+  AND (sqlc.narg('branch_id')::bigint IS NULL OR p.vendor_branch_id = sqlc.narg('branch_id')::bigint)
   AND (sqlc.arg('status')::text = 'all'
        OR (sqlc.arg('status')::text = 'active' AND p.deleted_at IS NULL)
        OR (sqlc.arg('status')::text = 'disabled' AND p.deleted_at IS NOT NULL))
@@ -142,29 +155,3 @@ WHERE av.id > sqlc.arg('after_id')::bigint
        OR (sqlc.arg('status')::text = 'disabled' AND NOT av.is_active))
 ORDER BY av.id
 LIMIT sqlc.arg('batch_size')::int;
-
--- name: ImportPackageKeys :many
--- Active vendor packages by natural key, for the import dry-run's FK check on
--- atm-assignments (plan.md T5.3). Read on the PRIMARY (validation of a write flow).
--- Migration 016 dropped is_active/deleted_at from vendor_packages_branch --
--- "active" now means an open (or not-yet-ended) price period, same
--- convention as DisableVendorPackage's own WHERE guard.
-SELECT p.id, v.code AS vendor_code, b.branch_code, p.package_code
-FROM vendor_packages_branch p
-JOIN vendor_branches b ON b.id = p.vendor_branch_id
-JOIN vendors v ON v.id = b.vendor_id
-WHERE p.effective_end_date IS NULL OR p.effective_end_date >= CURRENT_DATE;
-
--- name: ImportVendorPackageLabels :many
--- Vendor-wide package labels per FLM vendor (atm-assignments import, package_source
--- 'vendor'): the vendor has a PT-/branch-level tariff that is still open or not yet
--- ended. Whether the tariff fits a given ATM is checked at confirm (FR9).
-SELECT DISTINCT v.code AS vendor_code, vpp.package::text AS package
-FROM vendor_package_prices vpp
-JOIN vendors v ON v.id = vpp.vendor_id
-WHERE v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR'
-  AND vpp.atm_id IS NULL
-  AND (vpp.effective_end_date IS NULL OR vpp.effective_end_date >= CURRENT_DATE);
-
--- name: ImportLocationIDs :many
-SELECT id FROM locations;

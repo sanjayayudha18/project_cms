@@ -26,6 +26,8 @@ export default defineConfig({
         target: "http://localhost:8091",
         rewrite: (path) => path.replace(/^\/api\/eod/, ""),
       },
+      // Async exports live in backend-exq (:8081); must come before "/api".
+      "/api/v1/exports": "http://localhost:8081",
       "/api": "http://localhost:8080",
     },
   },

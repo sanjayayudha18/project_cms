@@ -1,0 +1,2 @@
+﻿id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active,roles
+2,VA,VA_001,Sari Contoh,,0812000111,,false,false,none

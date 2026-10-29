@@ -1,0 +1,9 @@
+# Minimum statement coverage per package (`go test -tags integration -cover`).
+# Checked by backend/scripts/check-coverage.sh in CI job go-integration. Baseline 2026-10-29
+# rounded down; only ever raise.
+github.com/cimb-niaga/cms/pkg/auth 83
+github.com/cimb-niaga/cms/pkg/config 100
+github.com/cimb-niaga/cms/pkg/csvexport 94
+github.com/cimb-niaga/cms/pkg/health 100
+github.com/cimb-niaga/cms/pkg/middleware 89
+github.com/cimb-niaga/cms/pkg/response 100

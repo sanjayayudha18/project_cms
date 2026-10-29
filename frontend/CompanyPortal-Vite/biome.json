@@ -42,7 +42,14 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "coverage", "*.min.js", "src/lib/api/schema.d.ts"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      "coverage",
+      "*.min.js",
+      "src/lib/api/schema.d.ts",
+      "src/lib/api/exq-schema.d.ts"
+    ]
   },
   "overrides": [
     {

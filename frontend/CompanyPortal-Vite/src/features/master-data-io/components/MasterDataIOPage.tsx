@@ -1,23 +1,29 @@
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
+import {
+  ExportProgressDialog,
+  type StatusFilter,
+  downloadMasterDataTemplate,
+  isApiError,
+  isTooManyExports,
+  useExportFlow,
+} from "@/features/exports";
 import { useToast } from "@/lib/hooks/useToast";
 import { useMutation } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import {
-  type ExportStatus,
   IMPORT_MAX_BYTES,
   IMPORT_MAX_ROWS,
   IO_ENTITIES,
   type ImportPreview,
   type IoEntity,
   confirmImport,
-  downloadExport,
-  downloadTemplate,
   dryRunImport,
 } from "../api";
 
-const STATUS_OPTIONS: { id: ExportStatus; label: string }[] = [
+const STATUS_OPTIONS: { id: StatusFilter; label: string }[] = [
   { id: "active", label: "Aktif" },
   { id: "disabled", label: "Nonaktif" },
   { id: "all", label: "Semua" },
@@ -25,6 +31,12 @@ const STATUS_OPTIONS: { id: ExportStatus; label: string }[] = [
 
 const SELECT_CLASS =
   "rounded border border-[var(--n-300)] bg-[var(--n-0)] px-3 py-2 text-sm text-[var(--n-900)]";
+
+function requestErrorText(e: unknown): string {
+  if (isTooManyExports(e))
+    return "Terlalu banyak ekspor yang sedang berjalan. Tunggu salah satu selesai lalu coba lagi.";
+  return isApiError(e) || e instanceof Error ? e.message : "Permintaan ekspor gagal.";
+}
 
 /**
  * Ekspor / impor CSV data master. Impor selalu lewat pratinjau (dry-run): file
@@ -34,14 +46,17 @@ const SELECT_CLASS =
 export function MasterDataIOPage() {
   const { toast } = useToast();
   const [entity, setEntity] = useState<IoEntity>("vendors");
-  const [status, setStatus] = useState<ExportStatus>("active");
+  const [status, setStatus] = useState<StatusFilter>("active");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
 
   const onError = (err: Error) => toast({ type: "error", message: err.message });
 
-  const exportMut = useMutation({ mutationFn: () => downloadExport(entity, status), onError });
-  const templateMut = useMutation({ mutationFn: () => downloadTemplate(entity), onError });
+  const exportFlow = useExportFlow();
+  const templateMut = useMutation({
+    mutationFn: () => downloadMasterDataTemplate(entity),
+    onError,
+  });
   const previewMut = useMutation({
     mutationFn: (f: File) => dryRunImport(entity, f),
     onSuccess: setPreview,
@@ -85,7 +100,7 @@ export function MasterDataIOPage() {
       <PageHeader
         eyebrow="Data master"
         title="Ekspor & Impor CSV"
-        description="Unduh data atau templat, ubah di spreadsheet, lalu impor kembali. Perubahan baru diterapkan setelah disetujui."
+        description="Minta ekspor data (diproses di latar belakang) atau unduh templat, ubah di spreadsheet, lalu impor kembali. Perubahan baru diterapkan setelah disetujui."
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -111,7 +126,7 @@ export function MasterDataIOPage() {
           <select
             className={SELECT_CLASS}
             value={status}
-            onChange={(e) => setStatus(e.target.value as ExportStatus)}
+            onChange={(e) => setStatus(e.target.value as StatusFilter)}
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.id} value={o.id}>
@@ -122,10 +137,10 @@ export function MasterDataIOPage() {
         </label>
         <Button
           variant="secondary"
-          onClick={() => exportMut.mutate()}
-          disabled={exportMut.isPending}
+          onClick={() => void exportFlow.request({ kind: "master_data_global", entity, status })}
+          disabled={exportFlow.isRequesting}
         >
-          Unduh data (CSV)
+          Minta ekspor
         </Button>
         <Button
           variant="secondary"
@@ -135,6 +150,22 @@ export function MasterDataIOPage() {
           Unduh templat
         </Button>
       </div>
+
+      <div className="flex flex-col gap-2 text-sm">
+        {exportFlow.requestError != null && (
+          <p role="alert" className="flex items-center gap-2 text-[var(--danger-fg)]">
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
+            {requestErrorText(exportFlow.requestError)}
+          </p>
+        )}
+        <Link
+          to="/settings/admin/exports"
+          className="w-fit font-medium text-[var(--red-600)] underline"
+        >
+          Lihat Ekspor Saya
+        </Link>
+      </div>
+      <ExportProgressDialog {...exportFlow.dialogProps} />
 
       <section className="flex flex-col gap-3 rounded-lg border border-[var(--n-200)] p-4">
         <h2 className="text-base font-semibold text-[var(--n-900)]">Impor</h2>

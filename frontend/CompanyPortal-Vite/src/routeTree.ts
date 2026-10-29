@@ -24,6 +24,7 @@ import { vendorRequestNewRoute } from "./routes/replenishment/vendor-requests/ne
 import { settingsRoute } from "./routes/settings";
 import { adminAcmAreasRoute } from "./routes/settings/admin/acm-areas";
 import { adminATMsRoute } from "./routes/settings/admin/atms";
+import { adminExportsRoute } from "./routes/settings/admin/exports";
 import { adminHolidaysRoute } from "./routes/settings/admin/holidays";
 import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
 import { adminRegionsRoute } from "./routes/settings/admin/regions";
@@ -68,6 +69,7 @@ export const routeTree = rootRoute.addChildren([
     adminVendorBranchDetailRoute,
     adminVendorBranchEditRoute,
     adminMasterDataIORoute,
+    adminExportsRoute,
     adminATMsRoute,
     adminRegionsRoute,
     adminHolidaysRoute,

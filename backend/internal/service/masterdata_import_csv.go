@@ -8,15 +8,14 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
 // cleanCell undoes the export's formula-injection guard (strips ONE leading
 // apostrophe that precedes = @ + - TAB CR) and trims spaces.
 func cleanCell(s string) string {
-	if len(s) >= 2 && s[0] == '\'' && strings.ContainsRune("=@+-\t\r", rune(s[1])) {
-		s = s[1:]
-	}
-	return strings.TrimSpace(s)
+	return strings.TrimSpace(csvexport.UnCSVSafe(s))
 }
 
 // readImportCSV parses the upload: size guard, BOM strip, `,` or `;` delimiter

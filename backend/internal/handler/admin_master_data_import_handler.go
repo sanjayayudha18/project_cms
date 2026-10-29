@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/service"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -69,13 +70,13 @@ func (h *AdminMasterDataImportHandler) DryRun(w http.ResponseWriter, r *http.Req
 // uploadedCSV validates the {entity} segment and extracts the multipart `file`
 // under the size cap; on failure it has already answered.
 func uploadedCSV(w http.ResponseWriter, r *http.Request) (entity string, file multipart.File, ok bool) {
-	entity, err := service.ParseExportEntity(chi.URLParam(r, "entity"))
-	if err != nil {
+	entity = chi.URLParam(r, "entity")
+	if _, known := csvexport.Lookup(entity); !known {
 		writeError(w, http.StatusNotFound, "not_found", "Entitas impor tidak dikenal")
 		return "", nil, false
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, service.MasterDataImportMaxBytes+multipartOverhead)
-	file, _, err = r.FormFile("file")
+	file, _, err := r.FormFile("file")
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {

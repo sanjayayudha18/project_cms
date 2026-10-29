@@ -1,0 +1,4 @@
+﻿id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active,roles
+1,VA,,Budi Contoh,Kepala Operasional,+62 812-3456-7890,budi@alpha.example,true,true,replenish;vault;cashcount
+2,VA,VA_001,Sari Contoh,,0812000111,,false,false,none
+6,VC,VC_001,"'=HYPERLINK(""http://evil"")",,,'@x.example,false,true,vault

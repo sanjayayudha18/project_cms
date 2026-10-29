@@ -1,0 +1,13 @@
+atm-assignments header: id,terminal_id,vendor_code,branch_code,package_source,package_code,effective_start_date,effective_end_date,is_active
+atm-assignments legacy[0]: id,terminal_id,vendor_code,branch_code,package_code,effective_start_date,effective_end_date,is_active
+atm-assignments legacy fill: package_source=branch
+atms header: id,terminal_id,location_id,machine_type,brand,model,operation_hours,deployment_type,capacity_amount,low_threshold_amount,critical_threshold_amount,blacklisted,escrow_account,priority_class,is_active
+vendor-branches header: id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active
+vendor-branches legacy[0]: id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active
+vendor-branches legacy[1]: id,vendor_code,branch_code,branch_name,region,location_id,is_active
+vendor-branches legacy fill: category=<keep>,region_code=<keep>
+vendor-pics header: id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active,roles
+vendor-pics legacy[0]: id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active
+vendor-pics legacy fill: roles=
+vendor-vaults header: id,vendor_code,branch_code,vault_code,category,currency_code,min_capacity_amount,max_capacity_amount,latitude,longitude,operating_hours,location_id,is_active
+vendors header: id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active

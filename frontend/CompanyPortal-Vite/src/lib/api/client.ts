@@ -27,6 +27,8 @@ export interface ApiError {
   status: number;
   message: string;
   details?: unknown;
+  /** Machine code from the pkg/response envelope (`error.code`) or a flat `code`, when present. */
+  code?: string;
 }
 
 export interface ApiResponse<T = unknown> {
@@ -128,13 +130,19 @@ async function parseApiError(response: Response): Promise<ApiError> {
   try {
     const body = (await response.json()) as {
       message?: string;
+      code?: string;
       details?: unknown;
       errors?: unknown;
+      error?: { code?: string; message?: string } | string;
     };
+    // pkg/response envelope: {success:false, error:{code,message}}; flat: {error,message}.
+    const env = typeof body.error === "object" && body.error !== null ? body.error : undefined;
+    const code = env?.code ?? body.code;
     return {
       status: response.status,
-      message: body.message ?? response.statusText ?? "Request failed",
+      message: env?.message ?? body.message ?? response.statusText ?? "Request failed",
       details: body.details ?? body.errors,
+      ...(code ? { code } : {}),
     };
   } catch {
     return createApiError(response);

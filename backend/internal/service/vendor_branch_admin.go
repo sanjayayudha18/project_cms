@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
 // Sentinel errors for VendorBranchAdminService.
@@ -28,7 +29,7 @@ var validVendorBranchCategories = map[string]bool{
 // keepCurrentCell is the CSV legacyFill for vendor-branch files without the
 // region_code/category columns; the importer swaps it for the row's current
 // value ("" when creating).
-const keepCurrentCell = "<keep>" // never a valid code (branchRegionCodeRe) or category
+const keepCurrentCell = csvexport.KeepCurrentCell // "<keep>": never a valid code (branchRegionCodeRe) or category
 
 // branchRegionCodeRe mirrors vendor_branches_region_code_chk (migration 026).
 var branchRegionCodeRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)

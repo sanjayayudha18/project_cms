@@ -119,16 +119,9 @@ func TestExport_HeaderContract(t *testing.T) {
 		t.Fatalf("exportSpecs has %d entities, contract lists %d", len(exportSpecs), len(want))
 	}
 	for entity, header := range want {
-		got, err := MasterDataExportHeader(entity)
-		if err != nil || !reflect.DeepEqual(got, header) {
-			t.Errorf("%s header = %v (err %v), want %v", entity, got, err, header)
+		if got := exportSpecs[entity].header; !reflect.DeepEqual(got, header) {
+			t.Errorf("%s header = %v, want %v", entity, got, header)
 		}
-	}
-	// The returned header is a copy: mutating it must not corrupt the contract.
-	h, _ := MasterDataExportHeader(ExportVendors)
-	h[0] = "tampered"
-	if again, _ := MasterDataExportHeader(ExportVendors); again[0] != "id" {
-		t.Error("MasterDataExportHeader must return a copy")
 	}
 }
 

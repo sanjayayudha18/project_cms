@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "gen:api": "openapi-typescript ../../backend/api/openapi.yaml -o src/lib/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../../backend/api/openapi.yaml -o src/lib/api/schema.d.ts",
+    "gen:api:exq": "openapi-typescript ../../backend-exq/api/openapi.yaml -o src/lib/api/exq-schema.d.ts"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "5.3.0",

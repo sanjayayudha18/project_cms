@@ -18,6 +18,7 @@ import {
   Building2,
   CalendarDays,
   CalendarOff,
+  Download,
   FileSpreadsheet,
   GitBranch,
   HelpCircle,
@@ -123,6 +124,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Unduh, ubah massal, dan impor data master vendor dan ATM.",
     href: "/settings/admin/master-data-io",
     icon: FileSpreadsheet,
+    category: "master",
+  },
+  {
+    id: "admin-exports",
+    title: "Export Data",
+    description: "Minta ekspor data vendor dan harga paket, lalu unduh hasilnya.",
+    href: "/settings/admin/exports",
+    icon: Download,
     category: "master",
   },
   {

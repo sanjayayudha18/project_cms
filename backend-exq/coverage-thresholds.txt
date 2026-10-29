@@ -1,0 +1,7 @@
+# Minimum statement coverage per package (`go test -tags integration -cover`, needs DATABASE_URL).
+# Checked by backend/scripts/check-coverage.sh in CI job go-integration. Baseline 2026-10-29
+# rounded down; only ever raise. cmd/api (bootstrap) and internal/repository (sqlc-generated)
+# are excluded, like backend's cmd/api and internal/db.
+github.com/cimb-niaga/cms/backend-exq/internal/audit 93
+github.com/cimb-niaga/cms/backend-exq/internal/exportjob 93
+github.com/cimb-niaga/cms/backend-exq/internal/handler 97

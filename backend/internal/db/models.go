@@ -369,6 +369,42 @@ type DsrUpload struct {
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Permintaan ekspor asinkron (backend-exq). Status teknis queued -> running -> succeeded|failed; succeeded -> downloading -> downloaded|succeeded; succeeded -> expired. Baris disimpan sebagai riwayat, file ada di export_job_chunks. Migrasi 034.
+type ExportJob struct {
+	ID                int64              `json:"id"`
+	RequestedBy       int64              `json:"requested_by"`
+	Kind              string             `json:"kind"`
+	Entity            string             `json:"entity"`
+	VendorID          *int64             `json:"vendor_id"`
+	VendorCode        *string            `json:"vendor_code"`
+	VendorBranchID    *int64             `json:"vendor_branch_id"`
+	BranchCode        *string            `json:"branch_code"`
+	StatusFilter      string             `json:"status_filter"`
+	PriceLevel        *string            `json:"price_level"`
+	ParamsHash        string             `json:"params_hash"`
+	FileName          string             `json:"file_name"`
+	Status            string             `json:"status"`
+	RowCount          int64              `json:"row_count"`
+	ByteSize          *int64             `json:"byte_size"`
+	ChunkCount        *int32             `json:"chunk_count"`
+	ErrorMessage      *string            `json:"error_message"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	FinishedAt        pgtype.Timestamptz `json:"finished_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	DownloadStartedAt pgtype.Timestamptz `json:"download_started_at"`
+	DownloadedAt      pgtype.Timestamptz `json:"downloaded_at"`
+	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Isi file CSV ekspor per potongan (<= 1 MiB). Berisi data pribadi PIC / harga kontrak: dihapus setelah berhasil diunduh, saat gagal, atau 10 menit setelah siap. Migrasi 034.
+type ExportJobChunk struct {
+	ExportJobID int64  `json:"export_job_id"`
+	Seq         int32  `json:"seq"`
+	Data        []byte `json:"data"`
+}
+
 type Holiday struct {
 	ID          int64              `json:"id"`
 	HolidayDate pgtype.Date        `json:"holiday_date"`

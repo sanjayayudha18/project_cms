@@ -1,8 +1,13 @@
 package service
 
 import (
+	"bytes"
+	"context"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
 const (
@@ -44,6 +49,37 @@ func TestImport_VendorPICRoles(t *testing.T) {
 	}
 	if p := res.Preview; p.Creates != 3 || p.Updates != 0 || p.Unchanged != 2 {
 		t.Errorf("want 3 creates and 2 unchanged, got %+v", p)
+	}
+}
+
+// unsortedRolesRepo stores PIC 1's roles in migration 032's default order
+// ({replenish,vault,cashcount}), not the sorted order the importer normalizes to.
+type unsortedRolesRepo struct{ fakeImportRepo }
+
+func (unsortedRolesRepo) VendorPICs(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
+	all := []db.ExportVendorPicsBatchRow{
+		{ID: 1, VendorCode: "V1", BranchCode: "B1", Name: "Ani", Roles: []string{"replenish", "vault", "cashcount"}, IsActive: true},
+	}
+	return page(all, after, limit, func(r db.ExportVendorPicsBatchRow) int64 { return r.ID }), nil
+}
+
+// Regression (bugfixes.md 2026-10-29): an unedited export of a PIC whose roles
+// are stored unsorted must dry-run as unchanged, not as an update.
+func TestImport_VendorPICUnsortedStoredRolesRoundTripUnchanged(t *testing.T) {
+	repo := unsortedRolesRepo{}
+	var file bytes.Buffer
+	if _, err := NewMasterDataExporter(repo).Write(adminCtx(1), ExportVendorPICs, "all", &file, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(file.String(), "replenish;vault;cashcount") {
+		t.Fatalf("export must keep the stored order (golden bytes), got %q", file.String())
+	}
+	res, err := NewMasterDataImporter(repo).DryRun(adminCtx(1), ExportVendorPICs, &file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := res.Preview; len(p.Errors) != 0 || p.Updates != 0 || p.Creates != 0 || p.Unchanged != 1 {
+		t.Fatalf("want 1 unchanged, got %+v", p)
 	}
 }
 

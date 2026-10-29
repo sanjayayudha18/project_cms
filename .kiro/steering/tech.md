@@ -80,12 +80,12 @@ Two Go modules in a workspace (`go.work`: `backend`, `backend-exq`, `pkg`), shar
 | Service | Module | Port | Role |
 |---------|--------|------|------|
 | ATM backend | `backend/` | 8080 | ATM operations, **CIT functions** (decision 2026-10-08), auth issuer, master data, approval, notification, vendor request flow |
-| EXQ backend | `backend-exq/` | 8081 | Export + dashboard monitoring queries (replica reads). Renamed from `backend-cit` on 2026-10-20. Skeleton only; not deployed until it has content |
+| EXQ backend | `backend-exq/` | 8081 | Async export jobs (`/api/v1/exports/*`: API, worker, janitor; OpenAPI `backend-exq/api/openapi.yaml`, FE types via `gen:api:exq`) + dashboard monitoring queries (replica reads). Renamed from `backend-cit` on 2026-10-20. Has content since spec `vendor-data-export`; first deployment comes with that release (not yet deployed) |
 
-- `pkg/` is shared infra (`auth`, `middleware`, `config`, `response`, `health`). No dependency on either backend. There is no `pkg/database`.
+- `pkg/` is shared infra (`auth`, `middleware`, `config`, `response`, `health`, `csvexport`). No dependency on either backend. There is no `pkg/database`. `pkg/csvexport` is the shared CSV contract (`CSVSafe`, `Writer`, 6 master-data entities) used by `backend/` (import/export) and `backend-exq/` (export jobs).
 - ATM backend keeps flat JSON responses for wire compatibility, including the CIT endpoints built there. `backend-exq` uses the `pkg/response` envelope.
 - Both reach the same PostgreSQL primary/replica and the same Redis instance, and share one `JWT_SECRET`. Only ATM issues tokens.
-- **Deployment (current):** ONE Compute Engine VM runs `backend` only. `backend-exq` is deployed once it has content. Planned split to one VM per backend in 2028 — the module separation already makes that a zero-code-change deployment change.
+- **Deployment (current):** ONE Compute Engine VM runs `backend` only. `backend-exq` has content (export API + worker + janitor) and is deployed with the vendor-data-export release. Planned split to one VM per backend in 2028 — the module separation already makes that a zero-code-change deployment change.
 
 ## Python EOD / ETL Runtime (`backend_python/`)
 
@@ -127,7 +127,7 @@ Layout inside `backend_python/`:
 | Service | Image | Purpose |
 |---------|-------|---------|
 | ATM Backend API | Custom (multi-stage Go build, `backend/Dockerfile`, Alpine 3.24, non-root) | Port 8080, HEALTHCHECK on `/health` |
-| EXQ Backend API | Custom (multi-stage Go build, `backend-exq/Dockerfile`) | Port 8081. Still root + no HEALTHCHECK (open item in BE-06) |
+| EXQ Backend API | Custom (multi-stage Go build, `backend-exq/Dockerfile`, non-root `appuser`) | Port 8081, HEALTHCHECK on `/health` |
 | Python ETL / EOD | `backend_python/Dockerfile` (python:3.14-slim) | DSR ETL + EOD retry scheduler services |
 | Frontend (internal) | nginx:alpine + static build | Serves CompanyPortal-Vite output |
 | Frontend (vendor) | nginx:alpine + static build | Serves VendorPortal-Vite output |

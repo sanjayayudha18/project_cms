@@ -140,7 +140,7 @@ All routes except `/api/v1/auth` are wrapped in `RequireAuth` first. This table 
 | `/api/v1/admin/vendors` (+ `/branches`, `/branches/{id}/atms`, `/vaults`, `/pics`, `/packages`, `/package-prices`, `/dsr-location-maps`) | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin` group) |
 | `/api/v1/admin/atms` (+ `/assignments`, `/assignment-package-options`) | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
 | `/api/v1/admin/regions` | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
-| `/api/v1/admin/master-data/{changes,export,import}` | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
+| `/api/v1/admin/master-data/{changes,import}` | `ADMIN`, `ADMIN_PARAM` | Mount (`masterDataAdmin`) |
 | `/api/v1/admin/acm-areas` | `ADMIN` | Mount |
 | `/api/v1/admin/holidays` | `ADMIN` (+ service re-check) | Handler |
 | `/api/v1/audit-logs` | `ADMIN`, `ADMIN_PARAM` | Mount |
@@ -156,7 +156,13 @@ All routes except `/api/v1/auth` are wrapped in `RequireAuth` first. This table 
 | `/api/v1/notifications` | any authenticated (own notifications only) | — |
 | `/api/v1/approvals` | any authenticated (orchestrator enforces maker≠checker + hierarchy) | — |
 
-> `backend-exq` (renamed from `backend-cit` 2026-10-20) has **no** role-guarded routes yet — only `/health`, `/ready` + a `RequireAuth`-only placeholder group.
+> `backend-exq` (renamed from `backend-cit` 2026-10-20) mounts the export API `/api/v1/exports` (spec `vendor-data-export`) behind `RequireAuth`; `/health` and `/ready` are unguarded. The old `/api/v1/admin/master-data/export/*` route no longer exists in `backend/`.
+
+| Route prefix (`backend-exq`) | Guard | Where |
+|---|---|---|
+| `POST /api/v1/exports/vendors/{vendorID}/{entity}`, `POST …/branches/{branchID}/{entity}`, `POST …/package-prices`, `POST …/master-data/{entity}`, `GET …/master-data/{entity}/template` | `ADMIN`, `ADMIN_PARAM` (per kind, `exportjob.KindRoles`) | Handler (+ service re-check on create) |
+| `GET /api/v1/exports/jobs`, `GET /api/v1/exports/jobs/{jobID}` | any authenticated; own jobs only (another user's job = 404) | Service |
+| `GET /api/v1/exports/jobs/{jobID}/file` | owner; role re-checked from DB at download (403) | Service |
 
 **Gaps to be aware of:** `/api/v1/dsr` and `/api/v1/atm-portal` are `RequireAuth`-only at the HTTP layer, so any authenticated user (including vendor roles) reaches them; finer-grained authz is either in the service layer or absent.
 
@@ -202,6 +208,7 @@ Commented out or `disabled`: Instruksi Pengisian, Validasi Pengisian, Cash Suppl
 | `/settings/admin/users` | **APPACCESS only** |
 | `/settings/admin/vendors`, `/settings/admin/vendors/$vendorId`, `.../branches/$branchId/edit` | ADMIN, ADMIN_PARAM |
 | `/settings/admin/atms`, `/settings/admin/regions`, `/settings/admin/master-data-io` | ADMIN, ADMIN_PARAM |
+| `/settings/admin/exports` | ADMIN, ADMIN_PARAM (kartu "Export Data" di `SettingsHubPage`, tanpa item sidebar) |
 | `/settings/admin/holidays`, `/settings/admin/acm-areas` | ADMIN |
 | `/replenishment/forecast-browser`, `/replenishment/vendor-requests`, `/replenishment/vendor-requests/$id` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
 | `/replenishment/vendor-requests/new` | maker roles (own redirect, not `requireRoles`) |

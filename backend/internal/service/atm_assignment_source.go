@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
 // Package sources of an ATM assignment (migration 023,
@@ -18,7 +19,7 @@ import (
 // vendor_packages_branch row; "vendor" stores vendor + managing branch + the
 // vendor-wide package label (vendor_package_prices.package).
 const (
-	AssignmentSourceBranch = "branch"
+	AssignmentSourceBranch = csvexport.AssignmentSourceBranch // "branch"; also the legacy CSV fill
 	AssignmentSourceVendor = "vendor"
 )
 

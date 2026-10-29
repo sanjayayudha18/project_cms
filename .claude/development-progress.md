@@ -1,6 +1,6 @@
 # Development Progress — CMS2 Cash Management System
 
-**Last Updated:** 2026-10-14
+**Last Updated:** 2026-10-29
 
 Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` — Phase 0 + replenish ticket). Merge `dev1` → `main` pending.
 
@@ -25,6 +25,7 @@ Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` —
 | Kelolaan ATM: paket khusus cabang / vendor-wide | `atm-package-source/` | 5 Deploy (review 2026-10-07) | ✅ built, merged to main (`ff005fa` + fixes `321a10b`, `00b05a1`; mig 023 applied to dev); tests green; review R1 fixed | manual browser check (user) |
 | Kuota kunjungan replenish per ATM | `atm-visit-quota/` | 5 Deploy (review 2026-10-01) | ✅ built, merged to main (committed in `ff005fa`; mig 021 applied to dev); review R1 fixed | manual browser check (user, seed kelolaan dulu) |
 | Nomor tiket replenish per ATM | `replenish-ticket/` | 5 Deploy (review 2026-10-08) | ✅ built, committed `291f488`; mig 026 applied to dev; review R1/R2 fixed | manual browser check (user); isi `region_code` cabang yang masih kosong; merge `dev1` → `main` |
+| Export data async: vendor / cabang / Harga Paket / master data global (X.7) | `vendor-data-export/` (Kiro spec `.kiro/specs/vendor-data-export/`) | 4 Test (tasks 1–17 selesai, gate 16 hijau 2026-10-29) | ✅ built, not committed; mig 034 applied to dev 2026-10-28; `backend-exq` export API + worker + janitor + OpenAPI; `pkg/csvexport` shared CSV contract; endpoint export lama di `backend/` dihapus (cutover); CompanyPortal `/settings/admin/exports` | manual browser check (user, task 18); commit; `govulncheck` GO-2026-6809 (Go toolchain bump); CI change in `ci.yml` not yet run on a real runner; Jenkins not adapted |
 | Vendor PKS / CIS limit | `vendor-pks-cis-limit/` | 1 Plan (intent draft 2026-10-05) | ⏳ not built; columns approved 2026-10-05 (CLAUDE.md Sec 3), migration `022` not created | PO accept intent → spec → migration 022 |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
 | Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 5 Deploy (review 2026-10-07) | ✅ built (`eb457cf`, review R1–R3 fixed): `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |

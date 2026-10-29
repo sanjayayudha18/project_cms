@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: CROWN CMS - backend-exq export API
+  version: v1
+  description: |
+    Contract of `backend-exq` export jobs (sdlc `vendor-data-export`). Success and
+    handler errors use the `pkg/response` envelope. 401/403 produced by
+    `pkg/middleware` (RequireAuth / RequireRoles) are a flat
+    `{"error","message"}` body (documented deviation 2). Validated by
+    `backend-exq/internal/handler/openapi_contract_test.go`.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /exports/vendors/{vendorID}/{entity}:
+    post:
+      operationId: requestVendorExport
+      summary: Request a vendor-scoped export (kind vendor)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: entity, in: path, required: true, schema: { type: string, enum: [vendor, branches, vaults, pics, dsr-location-maps] } }
+        - $ref: '#/components/parameters/StatusFilter'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/vendors/{vendorID}/branches/{branchID}/{entity}:
+    post:
+      operationId: requestBranchExport
+      summary: Request a cabang-scoped export (kind cabang)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: branchID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: entity, in: path, required: true, schema: { type: string, enum: [vaults, pics, dsr-location-maps] } }
+        - $ref: '#/components/parameters/StatusFilter'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/vendors/{vendorID}/package-prices:
+    post:
+      operationId: requestPackagePriceExport
+      summary: Request a package-price export (kind harga_paket)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: price_level, in: query, description: 'default all', schema: { $ref: '#/components/schemas/PriceLevel' } }
+        - $ref: '#/components/parameters/StatusFilter'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/master-data/{entity}:
+    post:
+      operationId: requestMasterDataExport
+      summary: Request a global master-data export (kind master_data_global)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/MasterDataEntity'
+        - $ref: '#/components/parameters/StatusFilter'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/master-data/{entity}/template:
+    get:
+      operationId: downloadImportTemplate
+      summary: Blank import template (header only), synchronous, no job, no audit
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/MasterDataEntity'
+      responses:
+        '200': { $ref: '#/components/responses/Csv' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /exports/jobs:
+    get:
+      operationId: listExportJobs
+      summary: Own export jobs, newest first
+      tags: [exports]
+      parameters:
+        - { name: limit, in: query, description: 'default 20', schema: { type: integer, minimum: 1, maximum: 50 } }
+      responses:
+        '200':
+          description: Jobs of the caller
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: '#/components/schemas/ExportJob' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/jobs/{jobID}:
+    get:
+      operationId: getExportJob
+      summary: One own export job (poll until status succeeded)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/JobID'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/jobs/{jobID}/file:
+    get:
+      operationId: downloadExportFile
+      summary: Stream the CSV once (status succeeded -> downloading -> downloaded)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/JobID'
+      responses:
+        '200': { $ref: '#/components/responses/Csv' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/NotReady' }
+        '410': { $ref: '#/components/responses/Gone' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    VendorID: { name: vendorID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+    JobID: { name: jobID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+    StatusFilter:
+      name: status
+      in: query
+      description: 'default active'
+      schema: { $ref: '#/components/schemas/StatusFilter' }
+    MasterDataEntity:
+      name: entity
+      in: path
+      required: true
+      schema: { type: string, enum: [atm-assignments, atms, vendor-branches, vendor-pics, vendor-vaults, vendors] }
+
+  schemas:
+    StatusFilter: { type: string, enum: [active, disabled, all] }
+    PriceLevel: { type: string, enum: [vendor, branch, atm, all] }
+    ExportKind: { type: string, enum: [vendor, cabang, harga_paket, master_data_global] }
+    ExportStatus: { type: string, enum: [queued, running, succeeded, failed, downloading, downloaded, expired] }
+
+    ExportJob:
+      type: object
+      description: Public job view; every key is always present, absent values are null. Times are RFC 3339 UTC.
+      required: [id, kind, entity, vendor_id, vendor_code, branch_id, branch_code, status_filter, price_level, file_name, status, row_count, byte_size, error_message, created_at, started_at, finished_at, expires_at, downloaded_at]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { $ref: '#/components/schemas/ExportKind' }
+        entity: { type: string }
+        vendor_id: { type: integer, format: int64, nullable: true }
+        vendor_code: { type: string, nullable: true }
+        branch_id: { type: integer, format: int64, nullable: true }
+        branch_code: { type: string, nullable: true }
+        status_filter: { $ref: '#/components/schemas/StatusFilter' }
+        price_level: { type: string, enum: [vendor, branch, atm, all], nullable: true }
+        file_name: { type: string }
+        status: { $ref: '#/components/schemas/ExportStatus' }
+        row_count: { type: integer, format: int64 }
+        byte_size: { type: integer, format: int64, nullable: true }
+        error_message: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        downloaded_at: { type: string, format: date-time, nullable: true }
+
+    JobEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/ExportJob' }
+
+    ErrorEnvelope:
+      type: object
+      description: pkg/response error envelope
+      required: [success, error]
+      properties:
+        success: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+    MiddlewareError:
+      type: object
+      description: Flat body written by pkg/middleware for 401 (`token_invalid`) and 403 (`forbidden`)
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+
+    AuthError:
+      oneOf:
+        - $ref: '#/components/schemas/ErrorEnvelope'
+        - $ref: '#/components/schemas/MiddlewareError'
+
+  responses:
+    JobCreated:
+      description: New job queued
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/JobEnvelope' }
+    JobExisting:
+      description: Existing job (an idempotent request returns the active one) or a job read
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/JobEnvelope' }
+    Csv:
+      description: CSV file (UTF-8, attachment, no-store)
+      headers:
+        Content-Disposition: { schema: { type: string } }
+        Cache-Control: { schema: { type: string } }
+        X-Content-Type-Options: { schema: { type: string } }
+      content:
+        text/csv:
+          schema: { type: string, format: binary }
+    BadRequest:
+      description: bad_request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: No/invalid token (middleware, token_invalid) or service unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AuthError' }
+    Forbidden:
+      description: Role not allowed (middleware or service forbidden)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AuthError' }
+    NotFound:
+      description: not_found (unknown entity, or job absent/not owned)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotReady:
+      description: export_not_ready
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Gone:
+      description: export_gone
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    TooManyExports:
+      description: too_many_exports (max 3 active)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Internal:
+      description: internal_error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

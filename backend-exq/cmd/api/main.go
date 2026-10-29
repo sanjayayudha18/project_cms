@@ -14,6 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/cimb-niaga/cms/backend-exq/internal/audit"
+	"github.com/cimb-niaga/cms/backend-exq/internal/exportjob"
+	"github.com/cimb-niaga/cms/backend-exq/internal/handler"
 	"github.com/cimb-niaga/cms/pkg/auth"
 	"github.com/cimb-niaga/cms/pkg/config"
 	"github.com/cimb-niaga/cms/pkg/health"
@@ -32,6 +35,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Invalid worker env = refuse to start (Req 10.7, 11.7).
+	workerCfg, err := exportjob.LoadWorkerConfig()
+	if err != nil {
+		slog.Error("invalid export worker config", "error", err)
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	// PostgreSQL primary pool
@@ -41,6 +51,20 @@ func main() {
 		os.Exit(1)
 	}
 	defer dbPool.Close()
+
+	// Read-replica pool; unset = reuse the primary (not closed twice).
+	dbReadPool := dbPool
+	if cfg.DatabaseReplicaURL != "" {
+		replicaPool, err := pgxpool.New(ctx, cfg.DatabaseReplicaURL)
+		if err != nil {
+			slog.Error("failed to create read-replica pool", "error", err)
+			os.Exit(1)
+		}
+		defer replicaPool.Close()
+		dbReadPool = replicaPool
+	} else {
+		slog.Warn("DATABASE_REPLICA_URL not set; reads use the primary")
+	}
 
 	// Redis
 	redisOpts, err := redis.ParseURL(cfg.RedisURL)
@@ -60,10 +84,11 @@ func main() {
 	}, tokenBlacklist)
 
 	r := chi.NewRouter()
+	// Client IP first: X-Forwarded-For only from TRUSTED_PROXIES (QC F13).
+	r.Use(custommw.TrustedRealIP(cfg.TrustedProxies))
 	r.Use(middleware.RequestID)
 	r.Use(custommw.RequestLogger(slog.Default())) // BE-04: JSON slog, msg "http_request"
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(custommw.BodyLimit(1<<20, nil)) // BE-08: no upload endpoints here
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -73,16 +98,25 @@ func main() {
 	})
 
 	// Readiness (BE-04): pings the DB and Redis; 503 when any fails.
-	r.Get("/ready", health.Ready(2*time.Second, map[string]func(context.Context) error{
+	readyChecks := map[string]func(context.Context) error{
 		"db":    dbPool.Ping,
 		"redis": func(ctx context.Context) error { return redisClient.Ping(ctx).Err() },
-	}))
+	}
+	if dbReadPool != dbPool {
+		readyChecks["db_replica"] = dbReadPool.Ping
+	}
+	r.Get("/ready", health.Ready(2*time.Second, readyChecks))
 
-	// Protected route group (placeholder for future CIT endpoints)
-	r.Group(func(r chi.Router) {
-		r.Use(custommw.RequireAuth(tokenService))
-		// CIT routes will be mounted here
-	})
+	// Export job pipeline. Worker first: its Wake is the service's wake hook.
+	worker := exportjob.NewWorker(dbPool, dbReadPool, exportjob.DefaultProducers(), workerCfg)
+	svc := exportjob.NewService(dbPool, audit.NewWriter(), worker.Wake)
+	janitor := exportjob.NewJanitor(dbPool, workerCfg.JanitorInterval)
+	mountExports(r, custommw.RequireAuth(tokenService), handler.NewExportsHandler(svc))
+
+	workerCtx, cancelWorkers := context.WithCancel(context.Background())
+	defer cancelWorkers()
+	go worker.Run(workerCtx)
+	go janitor.Run(workerCtx)
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{
@@ -97,7 +131,7 @@ func main() {
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		slog.Info("starting CIT backend", "addr", addr)
+		slog.Info("starting backend-exq", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("HTTP server error", "error", err)
 			os.Exit(1)
@@ -110,10 +144,31 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		slog.Error("server shutdown error", "error", err)
+	// Order (design): stop HTTP, stop claiming/janitor, then let running jobs
+	// finish (<=10 s) before the pools close; unfinished jobs go back to queued.
+	srvErr := srv.Shutdown(shutdownCtx)
+	slog.Info("http server stopped", "error", srvErr)
+	cancelWorkers()
+	slog.Info("export workers: waiting for running jobs", "grace", workerShutdownGrace)
+	worker.Wait(workerShutdownGrace)
+	slog.Info("export workers stopped")
+	if srvErr != nil {
+		slog.Error("server shutdown error", "error", srvErr)
 		os.Exit(1)
 	}
 
 	slog.Info("CIT backend stopped gracefully")
+}
+
+const workerShutdownGrace = 10 * time.Second
+
+// mountExports registers /api/v1/exports. Everything except the file download
+// shares a 30 s timeout; the download gets the 5 min lease (chi routes the
+// explicit /jobs/{jobID}/file ahead of the "/*" catch-all of the mounted subrouter).
+func mountExports(r chi.Router, authMW func(http.Handler) http.Handler, h *handler.ExportsHandler) {
+	r.Route("/api/v1/exports", func(r chi.Router) {
+		r.Use(authMW)
+		r.With(middleware.Timeout(exportjob.DownloadLease)).Get("/jobs/{jobID}/file", h.Download)
+		r.With(middleware.Timeout(30*time.Second)).Mount("/", h.Routes())
+	})
 }

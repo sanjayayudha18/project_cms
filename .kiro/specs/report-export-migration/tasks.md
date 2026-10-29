@@ -48,7 +48,8 @@ Dependensi lintas grup: Sonnet 3.2 menunggu Opus 3.1. Sonnet 5.4, 5.6, 6.2 menun
 ## Tasks
 
 - [ ] 1. Kunci CSV laporan lama sebelum disentuh
-  - [ ] 1.1 Rekam golden CSV empat laporan
+  - [x] 1.1 Rekam golden CSV empat laporan
+    - _Catatan 2026-10-29: golden direkam dari fake reader di level handler (bukan fixture DB, sama dengan pilihan golden X.7), test `backend/internal/handler/report_csv_golden_test.go` (`-update` untuk merekam ulang), 6 file di `testdata/report_csv/`. Nama file dicek lewat `Content-Disposition`. Konsekuensi: 6.1 (Property 1) harus men-seed DB dengan baris yang menghasilkan view yang sama._
     - Fixture DB deterministik: vendor FLM + cabang + vault + `dsr_location_vault_maps` + `dsr_receipts` (OK, telat, tidak kirim, pending), `replenish_classifications` + `replenish_classification_amounts` (beberapa denom, selisih, `void`), nama dengan karakter non-ASCII dan sel berawalan `=`/`+`/`-`.
     - Jalankan handler lama dengan `format=csv` untuk `daily` (dengan dan tanpa `status`), `summary`, `amount-mismatch` (dengan dan tanpa `classification`), `trips`, dengan `now`/`as_of` tetap; simpan ke `backend/internal/handler/testdata/report_csv/` beserta nama file dari `Content-Disposition`.
     - Test integrasi yang membandingkan handler lama dengan golden (lulus sebelum perubahan apa pun).

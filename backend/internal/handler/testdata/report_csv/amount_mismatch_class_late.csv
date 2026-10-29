@@ -1,0 +1,3 @@
+report_date,ticket_number,request_number,terminal_id,vendor,branch_code,region_code,scheduled_date,realized_date,classification,workday_offset,denom,order_amount,itm_amount,vendor_amount,diff,currency
+2026-10-05,ATM001_100K_20261005_001,REP-ABC-MDN-20261005-001,ATM001,PT Abacus Cash Solution,ABACUS_004,MDN,2026-10-05,2026-10-06,late,1,50000,200000000,150000000,150000000,-50000000,IDR
+2026-10-05,ATM001_100K_20261005_001,REP-ABC-MDN-20261005-001,ATM001,PT Abacus Cash Solution,ABACUS_004,MDN,2026-10-05,2026-10-06,late,1,100000,300000000,300000000,,0,IDR

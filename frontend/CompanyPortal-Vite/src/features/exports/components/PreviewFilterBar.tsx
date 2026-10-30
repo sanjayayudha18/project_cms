@@ -22,13 +22,13 @@ interface PreviewFilterBarProps {
   dataset: MasterDataset;
   /** The Applied_Filter (from the URL). The draft restarts from it whenever it changes. */
   applied: PreviewFilter;
-  /** "Terapkan": the page writes the draft to the URL search. */
+  /** "Search": the page writes the draft to the URL search. */
   onApply: (draft: PreviewFilter) => void;
   /** Fires on every draft edit so the page can compute `dirty`. */
   onDraftChange?: (draft: PreviewFilter) => void;
 }
 
-/** Draft filter inputs for one dataset; nothing reaches the table until "Terapkan". */
+/** Draft filter inputs for one dataset; nothing reaches the table until "Search". */
 export function PreviewFilterBar({
   dataset,
   applied,
@@ -100,7 +100,7 @@ export function PreviewFilterBar({
           />
         )}
         <Button type="submit" variant="secondary" disabled={missingVendor}>
-          Terapkan
+          Search
         </Button>
       </div>
       {missingVendor && (

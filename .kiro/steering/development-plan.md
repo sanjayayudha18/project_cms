@@ -7,7 +7,7 @@
 
 ## ⛔ Scope guard — read before starting ANY task
 
-**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d and 2.3 built and committed (manual browser checks with the user). **Next: 2.4 problem-ATM exclusion.** Cross-cutting item X.1 (CompanyPortal app-shell revamp + sidebar-settings-footer follow-up) is built and committed; only its manual browser check remains. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job.
+**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d and 2.3 built and committed (manual browser checks with the user). **Next: 2.4 problem-ATM exclusion.** Cross-cutting item X.1 (CompanyPortal app-shell revamp + sidebar-settings-footer follow-up) is built and committed; only its manual browser check remains. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job. Follow-up X.9 `export-preview-simplify` (2026-10-30): kode, test, dan gate selesai, belum di-commit; cek browser manual oleh user masih outstanding.
 Anything not listed under Phase 2 or the cross-cutting section is **out of scope right now**. If a request touches it, STOP and ask.
 
 Rules:
@@ -15,18 +15,18 @@ Rules:
 2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed. Exception: read-only export under X.7 (user OK 2026-10-28).
 3. **Do not touch Phases 3–7** (finance, escrow, cash count, CIT, EOD) until Phase 2 lands, unless the user explicitly re-prioritizes.
 4. **Do not wire mock screens** (see "Mock frontends") ad hoc — each gets wired only as part of its owning phase item.
-5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `034`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
+5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `036`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
 6. Accepted known gaps (listed below) are **not** to be "fixed along the way".
 
 ---
 
-## Status snapshot (as of 2026-10-28)
+## Status snapshot (as of 2026-10-30)
 
 Overall completion: **~58%** (rough estimate; ~55% on 2026-10-23, ~45-50% on 2026-10-08). "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
 
-Branch: `dev1` is **149 commits ahead** of `main` (`main` at `87b2d78`; `dev1` latest `f0f1f76`, sidebar-settings-footer). Merge `dev1` → `main` is still pending. Working tree clean apart from this file.
+Branch: `dev1` is **155 commits ahead** of `main` (`dev1` latest `3f56450`). Merge `dev1` → `main` is still pending. `export-preview-simplify` is uncommitted in the working tree.
 
-Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`033` (gaps: `022` reserved, `024` dropped; 31 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27 (dev `migrate status` 0 pending).
+Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`035` (gaps: `022` reserved, `024` dropped; 33 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29.
 
 ### Built and wired (verified in code)
 
@@ -61,10 +61,10 @@ Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squash
 - **Finance:** `internal/invoice`, `internal/reconciliation`.
 - **Platform:** `internal/document` (deferred to Phase 3/5), `internal/export` XLSX/PDF (CSV only today; deferred).
 - **Integration:** `internal/corebanking` (escrow ingest).
-- **`backend-exq/`** (renamed from `backend-cit` 2026-10-20, `8b41612`): export + dashboard monitoring queries. Skeleton only, not deployed. CIT functions live in `backend/` (decision 2026-10-08).
+- **`backend-exq/`** (renamed from `backend-cit` 2026-10-20, `8b41612`): async export is built (X.7–X.9), dashboard monitoring queries are not. Not deployed yet; first deployment comes with the export release. CIT functions live in `backend/` (decision 2026-10-08).
 - **EOD Final Realisasi** calc + `eod_runs` table + late-completion alert.
 - **Vendor PKS / CIS limit** (`vendor-pks-cis-limit/`, mig `022` reserved): intent draft, awaiting PO.
-- **Unmigrated tables:** `documents`, `export_jobs`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated). `replenishment_instructions` is dropped: an approved Vendor Request is the instruction.
+- **Unmigrated tables:** `documents`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated). `replenishment_instructions` is dropped: an approved Vendor Request is the instruction.
 
 ### Mock frontends (hardcoded data, not API-backed)
 Mock screens were removed from menus/routes with a "Data contoh" banner on the dashboard (FE-05, `d25ae2b`).
@@ -76,7 +76,7 @@ Each is wired only by its owning phase item.
 - `atm_vendor_packages.vendor_package_id` isn't validated against the ATM's `price_machine_group`/`price_class` (user decision 2026-09-23).
 - `vendor_packages_branch` and `atm_vendor_packages` were truncated by mig `011`; dev was re-seeded 2026-09-24. A fresh DB built from migrations alone still has them empty.
 - `vendor_package_prices` seed is partial (no SSI Paket 3/6, no per-ATM Harga Khusus / Biaya Tambahan).
-- `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`033` aren't exercised by it (CI `go-integration` does apply them through `cmd/migrate up`).
+- `backend/internal/handler/integration_test.go` runs only `001`+`002`; `003`–`035` aren't exercised by it (CI `go-integration` does apply them through `cmd/migrate up`).
 - `backend-exq` image still runs as root without HEALTHCHECK (BE-06 open item; not deployed).
 
 ---
@@ -181,10 +181,10 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 | X.3 Tech debt BE (`be-tech-debt/`, `BE_debt.md`) | 🟡 Fase A–G done (CI, coverage gate, migrate runner, logging/`/ready`, limits, PyJWT, file splits) | first GitHub Actions run after push; GCP log-based alert (user); `backend-exq` image hardening |
 | X.4 OpenAPI contract (BE-10, `openapi-contract/`) | ✅ pilot done `a1b78c9` (`/vendor-requests*`, `/vendor/replenish-orders*`) | extend per new module |
 | X.5 CI move to Jenkins (`ci-jenkins/`) | ⏸ on hold (user 2026-10-15); GitHub Actions stays live | resume ~Dec 2026 |
-| X.6 Merge `dev1` → `main` | ⏳ pending (149 commits) | after the open manual checks / code-owner review |
+| X.6 Merge `dev1` → `main` | ⏳ pending (155 commits) | after the open manual checks / code-owner review |
 | X.7 Export Data (`.kiro/specs/vendor-data-export/`) | ✅ built, code complete 2026-10-29 (tasks 1–17 selesai, gate 16 hijau; not committed). Export CSV async per vendor / cabang / Harga Paket / master data global, dibangun di **`backend-exq`** (replica pool, `TrustedRealIP`, image non-root, `/api/v1/exports/`); migrasi `034_export_jobs` applied to dev 2026-10-28; kontrak CSV di `pkg/csvexport`; endpoint export lama di `backend/` dihapus (cutover, D15); unduh otomatis + hapus file setelah unduh pertama (D18) | manual browser check (user, task 18: pop-up + unduh otomatis, Log Audit, screen reader, keyboard); commit; `govulncheck` GO-2026-6809 (naik toolchain Go 1.26.10 seluruh workspace + image, open) |
 | X.8 Report export migration (`.kiro/specs/report-export-migration/`, requirements + design + tasks 2026-10-28 (11 tasks, 25 leaf), D1–D10 = Kiro suggestions; mig `035_export_jobs_reports`, `pkg/reports`) | ✅ built 2026-10-29 (tasks 1–10 selesai, gate 9 hijau; not committed): CSV DSR telat + replenishment pindah ke `backend-exq` (`/api/v1/exports/reports/*`, Ekspor Saya di `/exports`); `format=csv` di `backend/` dihapus (400); layar JSON tetap di `backend/`; mig `035` applied to dev 2026-10-29 | manual browser check (user, task 11: ekspor per peran, Ekspor Saya, Log Audit `report_exported`, Excel non-ASCII); commit |
-| X.9 Export menu revamp (`.kiro/specs/export-menu-revamp/`) | ✅ built 2026-10-30 (tasks 1–13 selesai, gate 6 dan 12 hijau; not committed). Katalog `/exports` (item sidebar) → halaman pratinjau `/exports/<data>` (tabel + filter + jumlah baris, API pratinjau baru di `backend-exq`) → ekspor sesuai filter tabel lewat `export_jobs` yang ada. Tanpa migrasi, tanpa tabel baru; `pgregory.net/rapid` (test-only) ditambahkan ke `backend-exq/go.mod` atas izin user | manual browser check (user, task 14: katalog per peran, pratinjau + filter + paging, tombol ekspor sesuai filter, pengalihan `/settings/admin/exports`); commit |
+| X.9 Export menu revamp (`.kiro/specs/export-menu-revamp/`) | ✅ built 2026-10-30 (tasks 1–13 selesai, gate 6 dan 12 hijau; not committed). Katalog `/exports` (item sidebar) → halaman pratinjau `/exports/<data>` (tabel + filter + jumlah baris, API pratinjau baru di `backend-exq`) → ekspor sesuai filter tabel lewat `export_jobs` yang ada. Tanpa migrasi, tanpa tabel baru; `pgregory.net/rapid` (test-only) ditambahkan ke `backend-exq/go.mod` atas izin user | manual browser check (user, task 14: katalog per peran, pratinjau + filter + paging, tombol ekspor sesuai filter, pengalihan `/settings/admin/exports`); commit. Follow-up `.kiro/specs/export-preview-simplify/` (2026-10-30, D1–D5 disetujui PO): dropdown Vendor saja (tanpa kotak "Cari vendor"), tombol "Search" menggantikan "Terapkan", catatan pengambilan file dihapus, tombol "Ekspor" tanpa jumlah baris; tanpa perubahan backend. Permintaan gabung ATM + Kelolaan ATM dibatalkan PO (D1). Kode, test, dan gate selesai, belum di-commit; cek browser manual (user, task 8 spec) outstanding |
 
 ---
 

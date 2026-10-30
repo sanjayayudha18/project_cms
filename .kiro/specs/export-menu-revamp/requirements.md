@@ -1,6 +1,8 @@
 # Requirements Document
 
 > **Status:** requirements disetujui 2026-10-30. PO memilih mengikuti semua saran Kiro (D1-D11) dan menyetujui item X.9 di `development-plan.md`.
+>
+> **Catatan 2026-10-30:** Req 5.1 (label tombol ekspor dengan jumlah baris) dan Req 5.9 (catatan pengambilan file) digantikan `export-preview-simplify` (`.kiro/specs/export-preview-simplify/`). Teks requirement di bawah tidak diubah.
 
 ## Introduction
 

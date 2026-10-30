@@ -17,7 +17,9 @@ export interface ExportButtonState {
 
 /** Enabled iff `!dirty && !loading && 0 < total <= MAX_EXPORT_ROWS` (Req 5.4-5.6). */
 export function exportButtonState({ dirty, loading, total }: ExportButtonInput): ExportButtonState {
-  if (dirty) return { enabled: false, message: "Terapkan filter dulu" };
+  if (dirty) {
+    return { enabled: false, message: "Klik Search untuk memperbarui tabel sebelum mengekspor." };
+  }
   if (loading) return { enabled: false, message: "Menunggu tabel selesai dimuat" };
   if (total <= 0) return { enabled: false, message: "Tidak ada baris untuk diekspor" };
   if (total > MAX_EXPORT_ROWS) {

@@ -6,8 +6,6 @@ import type { MasterExportParams } from "../types";
 import { ExportProgressDialog } from "./ExportProgressDialog";
 import { RequestError } from "./exportFormParts";
 
-const formatCount = new Intl.NumberFormat("id-ID");
-
 interface PreviewExportBarProps {
   /** Applied_Filter params (never the draft); `null` = required filter missing. */
   params: MasterExportParams | null;
@@ -18,7 +16,7 @@ interface PreviewExportBarProps {
   loading: boolean;
 }
 
-/** "Ekspor N baris" for exactly the rows the table shows (Req 5). */
+/** "Ekspor" for the rows the table shows; `total` only drives the enabled state (Req 5). */
 export function PreviewExportBar({ params, total, dirty, loading }: PreviewExportBarProps) {
   const flow = useExportFlow();
   const state = exportButtonState({ dirty, loading, total });
@@ -34,7 +32,7 @@ export function PreviewExportBar({ params, total, dirty, loading }: PreviewExpor
         }}
       >
         <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-        Ekspor <span className="tabular-nums">&nbsp;{formatCount.format(total)}&nbsp;</span> baris
+        Ekspor
       </Button>
       {state.message && (
         <output className="flex items-center gap-2 text-sm text-[var(--n-600)]">
@@ -43,9 +41,6 @@ export function PreviewExportBar({ params, total, dirty, loading }: PreviewExpor
         </output>
       )}
       <RequestError error={flow.requestError} />
-      <p className="text-xs text-[var(--n-500)]">
-        File diambil saat ekspor diproses; perubahan data setelah tabel dimuat bisa ikut masuk.
-      </p>
       <ExportProgressDialog {...flow.dialogProps} />
     </div>
   );

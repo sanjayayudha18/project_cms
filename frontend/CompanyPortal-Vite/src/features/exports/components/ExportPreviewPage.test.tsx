@@ -82,7 +82,7 @@ function renderPage(id: DatasetId = "vendor-vaults", initial?: Record<string, un
   );
 }
 
-const exportButton = () => screen.getByRole("button", { name: /Ekspor\s+[\d.]+\s+baris/ });
+const exportButton = () => screen.getByRole("button", { name: "Ekspor" });
 
 beforeEach(() => {
   for (const m of Object.values(apiMock)) m.mockReset();
@@ -152,7 +152,7 @@ describe("ExportPreviewPage table", () => {
     await screen.findByText("V-03");
 
     await user.selectOptions(screen.getByLabelText("Status"), "disabled");
-    await user.click(screen.getByRole("button", { name: "Terapkan" }));
+    await user.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => expect(screen.getByText("Halaman 1")).toBeInTheDocument());
     const last = apiMock.previewExport.mock.calls.at(-1);
@@ -183,9 +183,11 @@ describe("ExportPreviewPage filters", () => {
     const user = userEvent.setup();
     renderPage("package-prices", { vendorId: 3 });
     await screen.findByText("V-01");
-    for (const label of ["Cari vendor", "Vendor", "Cabang", "Status", "Tingkat harga"]) {
+    for (const label of ["Vendor", "Cabang", "Status", "Tingkat harga"]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByLabelText("Cari vendor")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Vendor"), "");
     expect(screen.queryByLabelText("Cabang")).not.toBeInTheDocument();
   });
@@ -193,9 +195,27 @@ describe("ExportPreviewPage filters", () => {
   it("asks for a vendor first and makes no API call while a required vendor is missing", async () => {
     renderPage("package-prices");
     expect(await screen.findByText(/Pilih vendor dulu/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terapkan" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Terapkan" })).not.toBeInTheDocument();
     expect(apiMock.previewExport).not.toHaveBeenCalled();
     expect(exportButton()).toBeDisabled();
+  });
+
+  it("submits the filter from the keyboard (Enter on Search) and resets to page 1", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("V-01");
+    await user.click(screen.getByRole("button", { name: "Berikutnya" }));
+    await screen.findByText("V-03");
+
+    await user.selectOptions(screen.getByLabelText("Status"), "disabled");
+    screen.getByRole("button", { name: "Search" }).focus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(screen.getByText("Halaman 1")).toBeInTheDocument());
+    const last = apiMock.previewExport.mock.calls.at(-1);
+    expect(last?.[0]).toMatchObject({ status: "disabled" });
+    expect(last?.[1]).toBe(0);
   });
 });
 
@@ -208,7 +228,9 @@ describe("ExportPreviewPage export", () => {
 
     await user.selectOptions(screen.getByLabelText("Status"), "disabled");
     expect(exportButton()).toBeDisabled();
-    expect(screen.getByText("Terapkan filter dulu")).toBeInTheDocument();
+    expect(
+      screen.getByText("Klik Search untuk memperbarui tabel sebelum mengekspor."),
+    ).toBeInTheDocument();
   });
 
   it("exports the applied filter (not the draft) and opens the progress dialog", async () => {
@@ -250,13 +272,11 @@ describe("ExportPreviewPage export", () => {
     expect(screen.getByText(/Lebih dari 1\.000\.000 baris/)).toBeInTheDocument();
   });
 
-  it("tells the user the file is fetched when the export is processed", async () => {
+  it("labels the button 'Ekspor' without a count, keeps the total in the header, and has no fetch note", async () => {
     renderPage();
     await screen.findByText("V-01");
-    expect(
-      screen.getByText(
-        "File diambil saat ekspor diproses; perubahan data setelah tabel dimuat bisa ikut masuk.",
-      ),
-    ).toBeInTheDocument();
+    expect(exportButton()).toHaveTextContent(/^Ekspor$/);
+    expect(screen.getByText(/^Total/)).toHaveTextContent("Total 1.240 baris");
+    expect(screen.queryByText(/File diambil saat ekspor diproses/)).not.toBeInTheDocument();
   });
 });

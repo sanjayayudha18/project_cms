@@ -8,6 +8,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
@@ -18,7 +19,7 @@ func cleanCell(s string) string {
 	return strings.TrimSpace(csvexport.UnCSVSafe(s))
 }
 
-// readImportCSV parses the upload: size guard, BOM strip, `,` or `;` delimiter
+// readImportCSV parses the upload: size guard, BOM strip, UTF-8/NUL check, `,` or `;` delimiter
 // (whichever the header line uses -- Excel in an Indonesian locale writes `;`),
 // header validation, empty-row skipping. A non-empty errs means the file is
 // unusable as a whole (bad CSV / wrong header) and no row was processed.
@@ -31,6 +32,9 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 		return nil, nil, &ValidationError{Field: "file", Message: fmt.Sprintf("ukuran file melebihi %d MB", MasterDataImportMaxBytes>>20)}
 	}
 	data = bytes.TrimPrefix(data, []byte(utf8BOM))
+	if line, msg, bad := invalidText(data); bad {
+		return nil, []ImportRowError{{Row: line, Field: "file", Message: msg}}, nil
+	}
 
 	firstLine := data
 	if n := bytes.IndexByte(data, '\n'); n >= 0 {
@@ -93,6 +97,29 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 		return nil, []ImportRowError{{Row: 1, Field: "header", Message: "file kosong"}}, nil
 	}
 	return recs, nil, nil
+}
+
+// invalidText finds the first byte PostgreSQL text columns reject (invalid
+// UTF-8 or NUL), so such a file fails at dry-run instead of at apply time.
+// line is the 1-based file line of that byte.
+func invalidText(data []byte) (line int, msg string, bad bool) {
+	if utf8.Valid(data) && bytes.IndexByte(data, 0) < 0 {
+		return 0, "", false
+	}
+	for i := 0; i < len(data); {
+		r, size := utf8.DecodeRune(data[i:])
+		switch {
+		case r == utf8.RuneError && size == 1:
+			msg = "file bukan teks UTF-8 yang valid; simpan ulang dari Excel sebagai \"CSV UTF-8 (Comma delimited)\""
+		case r == 0:
+			msg = "file berisi karakter NUL (bukan file teks CSV)"
+		default:
+			i += size
+			continue
+		}
+		return bytes.Count(data[:i], []byte("\n")) + 1, msg, true
+	}
+	return 0, "", false
 }
 
 // cleanRecord applies cleanCell to every cell; empty reports an all-blank row.

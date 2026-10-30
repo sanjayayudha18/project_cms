@@ -15,7 +15,7 @@ describe("exportButtonState", () => {
   it("is disabled with a message when the filter is not applied yet", () => {
     const s = exportButtonState({ dirty: true, loading: false, total: 10 });
     expect(s.enabled).toBe(false);
-    expect(s.message).toBe("Terapkan filter dulu");
+    expect(s.message).toBe("Klik Search untuk memperbarui tabel sebelum mengekspor.");
   });
 
   it("is disabled while loading or when there are no rows", () => {

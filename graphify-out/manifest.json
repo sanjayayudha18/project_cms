@@ -1224,9 +1224,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/config/navigation.ts": {
-    "mtime": 1793092613.8476393,
-    "seen": 1793342014.7127473,
-    "ast_hash": "c6caaeb1753cd1ba1aac50c6915dfcf7",
+    "mtime": 1793343713.8596995,
+    "seen": 1793350015.634108,
+    "ast_hash": "27fefc59a0ac8bedd5d0fea6a58b0294",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/hooks/useToast.ts": {
@@ -4602,9 +4602,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/components/SettingsHubPage.tsx": {
-    "mtime": 1793238975.7646942,
-    "seen": 1793342014.7126215,
-    "ast_hash": "16af6f2f7658b73fb0d17000f7481ed5",
+    "mtime": 1793343570.601663,
+    "seen": 1793350015.6340075,
+    "ast_hash": "32ead51e924a3110b5cf1543e3e04a7c",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/components/StatusMessage.tsx": {
@@ -5346,9 +5346,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/MasterDataIOPage.test.tsx": {
-    "mtime": 1793238932.1110332,
-    "seen": 1793342014.7125835,
-    "ast_hash": "f5076846881ecc481bb2cd4d33e1aec4",
+    "mtime": 1793344680.0278368,
+    "seen": 1793350015.6339772,
+    "ast_hash": "f36d21b220ee35b58dd66cd9e8a000f0",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts": {
@@ -5358,9 +5358,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/components/MasterDataIOPage.tsx": {
-    "mtime": 1793238932.126786,
-    "seen": 1793342014.7125876,
-    "ast_hash": "c63a0663372d66748f064b3ea2a9550d",
+    "mtime": 1793344612.1016955,
+    "seen": 1793350015.6339803,
+    "ast_hash": "c850b9e95562ef3277c04e364195b86a",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/index.ts": {
@@ -5406,9 +5406,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1793277812.337282,
-    "seen": 1793342014.7130845,
-    "ast_hash": "b3dbd89d5350bb9149ca02d2ea893413",
+    "mtime": 1793345839.1663814,
+    "seen": 1793350015.6343982,
+    "ast_hash": "d562d225b8c8692615dd8be95159b13a",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -7548,9 +7548,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/routeTree.ts": {
-    "mtime": 1793271977.0312207,
-    "seen": 1793342014.7127836,
-    "ast_hash": "ba27b29609ff5290b62387198c9592ca",
+    "mtime": 1793344612.1016955,
+    "seen": 1793350015.6341527,
+    "ast_hash": "54296a9e7279e03017e5bfcf96d7c80a",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routeTree.test.ts": {
@@ -8886,9 +8886,9 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers.go": {
-    "mtime": 1793340882.283299,
-    "seen": 1793342014.7112856,
-    "ast_hash": "b9d2f57973d8c717ab207852f2e98be1",
+    "mtime": 1793343313.4990385,
+    "seen": 1793350015.6328957,
+    "ast_hash": "5c1e3b3e674c18a1c072c8eef7b5f518",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_integration_test.go": {
@@ -9012,9 +9012,9 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/handler/openapi_contract_test.go": {
-    "mtime": 1793341896.991864,
-    "seen": 1793342014.711311,
-    "ast_hash": "48db7e7204dfa7ef12defd19e28a8340",
+    "mtime": 1793342586.4754062,
+    "seen": 1793350015.6329265,
+    "ast_hash": "fa246ef3713cd0cc9ecfdf5ffe9876a7",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/audit.sql.go": {
@@ -9450,15 +9450,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/api.test.ts": {
-    "mtime": 1793271949.0016413,
-    "seen": 1793342014.7125409,
-    "ast_hash": "386f239615746536bab481559d5c593c",
+    "mtime": 1793343655.2226624,
+    "seen": 1793350015.6339355,
+    "ast_hash": "11c6ed8ba10980091b5f6bd1dd075003",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/api.ts": {
-    "mtime": 1793271839.7668777,
-    "seen": 1793342014.712542,
-    "ast_hash": "de420b8831dcaeb8cf617fea4fb04a61",
+    "mtime": 1793343283.1819148,
+    "seen": 1793350015.6339366,
+    "ast_hash": "d50e0ba7de491aa0d31db209476a39be",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/autoDownload.property.test.ts": {
@@ -9473,46 +9473,22 @@
     "ast_hash": "9e934c90d5f8fb94d6a20086199c9981",
     "semantic_hash": ""
   },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportDataPage.tsx": {
-    "mtime": 1793238973.5968826,
-    "seen": 1793342014.7125454,
-    "ast_hash": "8f69839a12455afa59a66460b94b162e",
-    "semantic_hash": ""
-  },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportForms.test.tsx": {
-    "mtime": 1793239104.8443587,
-    "seen": 1793342014.7125463,
-    "ast_hash": "83a0ee084451b33a9519b74d9e5ba8a9",
-    "semantic_hash": ""
-  },
   "frontend/CompanyPortal-Vite/src/features/exports/components/ExportProgressDialog.test.tsx": {
-    "mtime": 1793271949.6485176,
-    "seen": 1793342014.7125473,
-    "ast_hash": "b667593ec699cd5868c66688bbd310b1",
+    "mtime": 1793343785.1778886,
+    "seen": 1793350015.6339445,
+    "ast_hash": "b4e774b022b58ce45279b7c43d22955f",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/components/ExportProgressDialog.tsx": {
-    "mtime": 1793272105.2198298,
-    "seen": 1793342014.712548,
-    "ast_hash": "198322454433338e58f6ae872c2e2cac",
+    "mtime": 1793343608.92315,
+    "seen": 1793350015.6339457,
+    "ast_hash": "80d8cc3ec5ab90d873cff94c311260d1",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/components/ExportStatusBadge.tsx": {
     "mtime": 1793238597.4460742,
     "seen": 1793342014.7125492,
     "ast_hash": "2d70db182fb290a4a1c162caf7202a41",
-    "semantic_hash": ""
-  },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/MyExportsPage.test.tsx": {
-    "mtime": 1793273246.888683,
-    "seen": 1793342014.7125504,
-    "ast_hash": "99992f047e883b6c3d0755472009e7d8",
-    "semantic_hash": ""
-  },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/MyExportsPage.tsx": {
-    "mtime": 1793271880.6999164,
-    "seen": 1793342014.712551,
-    "ast_hash": "6a7a4c30cea2cbeb52dd0fb614d66694",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/components/MyExportsTable.test.tsx": {
@@ -9527,28 +9503,16 @@
     "ast_hash": "c86b7a24240b763f9ace8133da3271ed",
     "semantic_hash": ""
   },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/PackagePriceExportForm.tsx": {
-    "mtime": 1793239093.9043136,
-    "seen": 1793342014.7125542,
-    "ast_hash": "2666363dacb3040b87f1c6141089a729",
-    "semantic_hash": ""
-  },
   "frontend/CompanyPortal-Vite/src/features/exports/components/ReportExportNotice.tsx": {
     "mtime": 1793272630.9412775,
     "seen": 1793342014.7125552,
     "ast_hash": "21f9c326bfebb90f421cf5f9557b808e",
     "semantic_hash": ""
   },
-  "frontend/CompanyPortal-Vite/src/features/exports/components/VendorExportForm.tsx": {
-    "mtime": 1793238970.6616645,
-    "seen": 1793342014.7125564,
-    "ast_hash": "8fc5baffd1ed9f1a73c4cc47cb9ffa2d",
-    "semantic_hash": ""
-  },
   "frontend/CompanyPortal-Vite/src/features/exports/components/exportFormParts.tsx": {
-    "mtime": 1793238969.0508237,
-    "seen": 1793342014.7125576,
-    "ast_hash": "62dd7d4de5e224c9de59f22fc82cfed3",
+    "mtime": 1793349940.9586747,
+    "seen": 1793350015.6339543,
+    "ast_hash": "059b73ba29418b28527d3bf2de199296",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/hooks.test.tsx": {
@@ -9558,9 +9522,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/hooks.ts": {
-    "mtime": 1793238239.6740608,
-    "seen": 1793342014.7125597,
-    "ast_hash": "fbb0e17dbddb0354359785cdc706f68e",
+    "mtime": 1793343601.7374423,
+    "seen": 1793350015.633962,
+    "ast_hash": "cfa3cc67fe4eecfcb415a606969e4548",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/index.ts": {
@@ -9582,9 +9546,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/types.ts": {
-    "mtime": 1793271831.132423,
-    "seen": 1793342014.7125642,
-    "ast_hash": "479e62b86ff302750ad194b990aa0456",
+    "mtime": 1793343282.4464688,
+    "seen": 1793350015.6339664,
+    "ast_hash": "01f00ea42ce301577f7bdd46e2eb936f",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/useBeforeUnloadGuard.ts": {
@@ -9600,9 +9564,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/__tests__/SettingsHubPage.exportsCard.test.tsx": {
-    "mtime": 1793239025.8065906,
-    "seen": 1793342014.712603,
-    "ast_hash": "ea88b4b770b41907fa9fe7131b5933ae",
+    "mtime": 1793343725.6829443,
+    "seen": 1793350015.6339936,
+    "ast_hash": "a968aa2c5dc299ed0ddc6b43a23a6fec",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/replenishment/__tests__/exportRequest.property.test.tsx": {
@@ -9612,9 +9576,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/exq-schema.d.ts": {
-    "mtime": 1793277523.9194975,
-    "seen": 1793342014.712732,
-    "ast_hash": "e1168dfff8a62c36de3025ca723628d7",
+    "mtime": 1793345595.7329159,
+    "seen": 1793350015.634094,
+    "ast_hash": "92c00721224a76c7e9c3053841401c4e",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/exq-schema.test.ts": {
@@ -9708,9 +9672,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/routes/exports.tsx": {
-    "mtime": 1793271881.02468,
-    "seen": 1793342014.7128088,
-    "ast_hash": "254127f8189ec0f6e7a91b34ca48ce13",
+    "mtime": 1793344604.720162,
+    "seen": 1793350015.6341755,
+    "ast_hash": "463c3170292593fdafb1e35c7b5e7aae",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/routes/settings/admin/exports.test.ts": {
@@ -9720,9 +9684,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/routes/settings/admin/exports.tsx": {
-    "mtime": 1793238974.438192,
-    "seen": 1793342014.7128406,
-    "ast_hash": "3ad34253786c2902f5254b69c651212f",
+    "mtime": 1793343570.3427167,
+    "seen": 1793350015.6341946,
+    "ast_hash": "c3fb18ba0a8a86716ba5ec83d0dc2726",
     "semantic_hash": ""
   },
   "pkg/csvexport/cells.go": {
@@ -9822,9 +9786,9 @@
     "semantic_hash": ""
   },
   "backend-exq/api/openapi.yaml": {
-    "mtime": 1793269145.8237827,
-    "seen": 1793342014.713365,
-    "ast_hash": "6b92bf7e875957ab432c8b8e248f36f3",
+    "mtime": 1793342500.7234457,
+    "seen": 1793350015.6346247,
+    "ast_hash": "9be14a05180a53cb791616092d168614",
     "semantic_hash": ""
   },
   "backend-exq/coverage-thresholds.txt": {
@@ -9837,6 +9801,108 @@
     "mtime": 1793277421.5291862,
     "seen": 1793342014.7134037,
     "ast_hash": "8f66fa8be1d45661b8537376eff26118",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/handler/exports_handler_preview_test.go": {
+    "mtime": 1793342594.5899158,
+    "seen": 1793350015.632917,
+    "ast_hash": "11af4e3f6b72ea819272776a7b2517b6",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportCatalogPage.test.tsx": {
+    "mtime": 1793344680.0273247,
+    "seen": 1793350015.6339402,
+    "ast_hash": "40acea0d9f858fcca09e1a38cdb82d7a",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportCatalogPage.tsx": {
+    "mtime": 1793344612.1016955,
+    "seen": 1793350015.6339412,
+    "ast_hash": "c0ece70a54fb1a14c0dde78150fed2bb",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportPreviewPage.test.tsx": {
+    "mtime": 1793351353.3286052,
+    "seen": 1793351415.2464077,
+    "ast_hash": "0f61650d665a1de7149027d5b958e630",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/ExportPreviewPage.tsx": {
+    "mtime": 1793344438.0476458,
+    "seen": 1793350015.6339433,
+    "ast_hash": "7229368626bb8b3f74b836424795371b",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/PreviewExportBar.tsx": {
+    "mtime": 1793349942.2762265,
+    "seen": 1793350015.63395,
+    "ast_hash": "35e03ac7d88672691981f3f553a90d52",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/PreviewFilterBar.tsx": {
+    "mtime": 1793349941.6136224,
+    "seen": 1793350015.633951,
+    "ast_hash": "1bd5e0706e38335454bd29411df81169",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/PreviewTable.tsx": {
+    "mtime": 1793344276.9930646,
+    "seen": 1793350015.6339517,
+    "ast_hash": "baeb3d7b1d0db32a1eb8ee7f688766ff",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/datasets.property.test.ts": {
+    "mtime": 1793344079.2145255,
+    "seen": 1793350015.633955,
+    "ast_hash": "8fe979688fd644ec8dbf470b1630c0a9",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/datasets.ts": {
+    "mtime": 1793343578.5111742,
+    "seen": 1793350015.6339562,
+    "ast_hash": "2ee553fa936ea9bc8c92b54bf584e93f",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/exportButtonState.property.test.ts": {
+    "mtime": 1793349940.2842267,
+    "seen": 1793350015.6339574,
+    "ast_hash": "6ea18d370759413a2cc46758ea57d3c3",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/exportButtonState.test.ts": {
+    "mtime": 1793349939.6293783,
+    "seen": 1793350015.6339586,
+    "ast_hash": "fd470b59d16b6550f7d272dd2c84ae33",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/exportButtonState.ts": {
+    "mtime": 1793349938.9936635,
+    "seen": 1793350015.6339598,
+    "ast_hash": "898b52748d1ef99fa68d57c434168169",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/usePreviewPaging.ts": {
+    "mtime": 1793344142.0328124,
+    "seen": 1793350015.6339695,
+    "ast_hash": "232b39586c93dec7c8556b3576963428",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/lib/config/exportRoles.ts": {
+    "mtime": 1793343713.802498,
+    "seen": 1793350015.6341052,
+    "ast_hash": "d18394e6a0a72d753fd123cac61bce76",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/routes/exports.preview.test.tsx": {
+    "mtime": 1793345065.9009004,
+    "seen": 1793350015.6341732,
+    "ast_hash": "093de00ed61e972853c14c4f5a2e63d8",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/exportFormParts.test.tsx": {
+    "mtime": 1793351328.8498547,
+    "seen": 1793351415.2464218,
+    "ast_hash": "5bd29aeb0fe53dcd2bcbbb273454901a",
     "semantic_hash": ""
   }
 }

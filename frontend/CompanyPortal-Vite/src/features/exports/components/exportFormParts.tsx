@@ -1,7 +1,6 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { useVendorBranches, useVendorsList } from "@/features/admin-vendors/hooks";
 import { CircleAlert } from "lucide-react";
-import { useId, useState } from "react";
 import { isApiError, isTooManyExports } from "../api";
 import type { StatusFilter } from "../types";
 
@@ -10,9 +9,6 @@ export const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "disabled", label: "Nonaktif" },
   { value: "all", label: "Semua" },
 ];
-
-const INPUT_CLASS =
-  "min-h-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)]";
 
 const LIST_PARAMS = { page: 1, page_size: 100 } as const;
 
@@ -24,40 +20,21 @@ interface PickerProps {
 const toValue = (id: number | null) => (id === null ? null : String(id));
 const fromValue = (v: string | null) => (v === null ? null : Number(v));
 
-/** Vendor picker with a search box (server-side `q`, first 100 matches). */
+/** Vendor picker: one dropdown of active vendors (first 100, endpoint cap). */
 export function VendorSelect({ value, onChange }: PickerProps) {
-  const searchId = useId();
-  const [q, setQ] = useState("");
-  const { data } = useVendorsList({ ...LIST_PARAMS, q: q || undefined, status: "active" });
+  const { data } = useVendorsList({ ...LIST_PARAMS, status: "active" });
   const options = (data?.vendors ?? []).map((v) => ({
     value: String(v.id),
     label: `${v.name} (${v.code})`,
   }));
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor={searchId}
-          className="text-xs font-medium text-[var(--n-600)] uppercase tracking-wider"
-        >
-          Cari vendor
-        </label>
-        <input
-          id={searchId}
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className={INPUT_CLASS}
-        />
-      </div>
-      <FilterSelect
-        label="Vendor"
-        placeholder="Pilih vendor"
-        options={options}
-        value={toValue(value)}
-        onChange={(v) => onChange(fromValue(v))}
-      />
-    </div>
+    <FilterSelect
+      label="Vendor"
+      placeholder="Pilih vendor"
+      options={options}
+      value={toValue(value)}
+      onChange={(v) => onChange(fromValue(v))}
+    />
   );
 }
 

@@ -130,6 +130,9 @@ func TestImport_FileLevelErrors(t *testing.T) {
 		"header wrong order": "code,id,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active\n",
 		"empty file":         "",
 		"unbalanced quote":   vendorHeader + ",V2,\"Vendor,,,,,,\n",
+		"not utf-8":          vendorHeader + ",V2,Vendor Caf\xe9,,,,,,\n", // Windows-1252 "é"
+		"nul byte":           vendorHeader + ",V2,Vendor\x00,,,,,,\n",
+		"binary file":        "MZ\x90\x00\x03\x00\x00\x00\x04\x00",
 	}
 	for name, csvText := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -138,6 +141,22 @@ func TestImport_FileLevelErrors(t *testing.T) {
 				t.Errorf("want one file-level error and no rows processed, got %+v", res.Preview)
 			}
 		})
+	}
+}
+
+func TestImport_InvalidTextReportsLine(t *testing.T) {
+	csvText := vendorHeader + ",V2,Vendor Dua,,,,,,\n" + ",V3,Vendor Caf\xe9,,,,,,\n"
+
+	res := dryRun(t, ExportVendors, utf8BOM+csvText)
+
+	errs := res.Preview.Errors
+	if len(errs) != 1 || errs[0].Row != 3 || errs[0].Field != "file" || !strings.Contains(errs[0].Message, "UTF-8") {
+		t.Fatalf("want one UTF-8 error on line 3, got %+v", errs)
+	}
+
+	// Valid multi-byte UTF-8 (Indonesian/accented names) is still accepted.
+	if res := dryRun(t, ExportVendors, vendorHeader+",V2,Vendor Café 日本,,,,,,\n"); len(res.Preview.Errors) != 0 {
+		t.Errorf("valid UTF-8 rejected: %+v", res.Preview.Errors)
 	}
 }
 

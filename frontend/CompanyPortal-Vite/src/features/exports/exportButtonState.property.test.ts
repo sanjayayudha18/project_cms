@@ -23,6 +23,15 @@ describe("exportButtonState property", () => {
     );
   });
 
+  it("dirty always shows the Search message", () => {
+    fc.assert(
+      fc.property(input, (i) => {
+        const s = exportButtonState(i);
+        return !i.dirty || s.message === "Klik Search untuk memperbarui tabel sebelum mengekspor.";
+      }),
+    );
+  });
+
   it("enabled has no message; disabled by dirty or the row limit always has one", () => {
     fc.assert(
       fc.property(input, (i) => {

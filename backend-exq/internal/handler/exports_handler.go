@@ -15,6 +15,7 @@ import (
 	"github.com/cimb-niaga/cms/backend-exq/internal/exportjob"
 	"github.com/cimb-niaga/cms/pkg/csvexport"
 	"github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 	"github.com/cimb-niaga/cms/pkg/response"
 )
 
@@ -59,9 +60,32 @@ func (h *ExportsHandler) Routes() chi.Router {
 	r.With(guard(exportjob.KindHargaPaket)).Post("/vendors/{vendorID}/package-prices", h.requestPrices)
 	r.With(guard(exportjob.KindMasterDataGlobal)).Post("/master-data/{entity}", h.requestGlobal)
 	r.With(guard(exportjob.KindMasterDataGlobal)).Get("/master-data/{entity}/template", h.template)
+	for path, kind := range reportRoutes {
+		r.With(guard(kind)).Post(path, h.requestReport(kind))
+	}
 	r.Get("/jobs", h.list)
 	r.Get("/jobs/{jobID}", h.get)
 	return r
+}
+
+// reportRoutes maps each report export path (design "ReportExportAPI") to its kind.
+var reportRoutes = map[string]exportjob.Kind{
+	"/reports/dsr-late-daily":                exportjob.KindDsrLateDaily,
+	"/reports/dsr-late-summary":              exportjob.KindDsrLateSummary,
+	"/reports/replenishment-amount-mismatch": exportjob.KindReplenishmentAmountMismatch,
+	"/reports/replenishment-trips":           exportjob.KindReplenishmentTrips,
+}
+
+// requestReport parses the legacy query filters of a report and creates the job.
+func (h *ExportsHandler) requestReport(kind exportjob.Kind) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, err := exportjob.ParseReportParams(kind, r.URL.Query(), time.Now())
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		h.createJob(w, r, p)
+	}
 }
 
 func (h *ExportsHandler) requestVendor(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +135,10 @@ func (h *ExportsHandler) create(w http.ResponseWriter, r *http.Request, kind exp
 		writeServiceError(w, err)
 		return
 	}
+	h.createJob(w, r, p)
+}
+
+func (h *ExportsHandler) createJob(w http.ResponseWriter, r *http.Request, p exportjob.Params) {
 	job, created, err := h.svc.Create(r.Context(), actorFrom(r), p)
 	if err != nil {
 		writeServiceError(w, err)
@@ -257,7 +285,13 @@ func remoteIP(addr string) string {
 }
 
 func writeServiceError(w http.ResponseWriter, err error) {
+	var ve *reports.ValidationError
 	switch {
+	case errors.As(err, &ve):
+		writeJSON(w, http.StatusBadRequest, response.Envelope{Error: &response.ErrorBody{
+			Code: "validation_error", Message: "Validasi gagal",
+			Details: []response.FieldError{{Field: ve.Field, Message: ve.Message}},
+		}})
 	case errors.Is(err, exportjob.ErrValidation):
 		response.WriteError(w, http.StatusBadRequest, "bad_request", err.Error())
 	case errors.Is(err, exportjob.ErrUnauthenticated):
@@ -294,7 +328,7 @@ type jobJSON struct {
 	VendorCode   *string `json:"vendor_code"`
 	BranchID     *int64  `json:"branch_id"`
 	BranchCode   *string `json:"branch_code"`
-	StatusFilter string  `json:"status_filter"`
+	StatusFilter *string `json:"status_filter"` // null for report jobs
 	PriceLevel   *string `json:"price_level"`
 	FileName     string  `json:"file_name"`
 	Status       string  `json:"status"`
@@ -306,6 +340,8 @@ type jobJSON struct {
 	FinishedAt   *string `json:"finished_at"`
 	ExpiresAt    *string `json:"expires_at"`
 	DownloadedAt *string `json:"downloaded_at"`
+
+	ReportParams *exportjob.ReportParams `json:"report_params"` // null for master-data jobs
 }
 
 func toJobJSON(j exportjob.Job) jobJSON {
@@ -313,11 +349,12 @@ func toJobJSON(j exportjob.Job) jobJSON {
 		ID: j.ID, Kind: string(j.Params.Kind), Entity: j.Params.Entity,
 		VendorID: j.Params.VendorID, VendorCode: nilIfEmpty(j.VendorCode),
 		BranchID: j.Params.BranchID, BranchCode: nilIfEmpty(j.BranchCode),
-		StatusFilter: j.Params.StatusFilter, PriceLevel: j.Params.PriceLevel,
+		StatusFilter: nilIfEmpty(j.Params.StatusFilter), PriceLevel: j.Params.PriceLevel,
 		FileName: j.FileName, Status: string(j.Status), RowCount: j.RowCount,
 		ByteSize: j.ByteSize, ErrorMessage: j.ErrorMessage,
 		CreatedAt: j.CreatedAt.UTC().Format(time.RFC3339), StartedAt: ts(j.StartedAt),
 		FinishedAt: ts(j.FinishedAt), ExpiresAt: ts(j.ExpiresAt), DownloadedAt: ts(j.DownloadedAt),
+		ReportParams: j.Params.Report,
 	}
 }
 

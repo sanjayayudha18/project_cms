@@ -5,9 +5,7 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
-import { apiConfig } from "@/lib/api/config";
 import type { components } from "@/lib/api/schema";
-import { useAuthStore } from "@/lib/auth/store";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 type S = components["schemas"];
@@ -36,8 +34,6 @@ export interface ReportFilter {
 export interface DailyFilter extends ReportFilter {
   status: DsrLateStatus | null;
 }
-
-export type ReportKind = "daily" | "summary";
 
 const BASE = "/dsr-late-reports";
 
@@ -81,27 +77,4 @@ export function useDsrLateWarnings(month: string, vendorId: number | null) {
     },
     retry: false,
   });
-}
-
-/** Downloads a CSV report (the server audits the export). */
-export async function downloadReport(
-  kind: ReportKind,
-  f: ReportFilter & { status?: DsrLateStatus | null },
-): Promise<void> {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${apiConfig.baseURL}${BASE}/${kind}?${query(f)}&format=csv`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string };
-    throw new Error(body.message ?? "Gagal mengunduh laporan");
-  }
-  const match = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
-  const url = URL.createObjectURL(await res.blob());
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = match?.[1] ?? `dsr-late-${kind}-${f.month}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

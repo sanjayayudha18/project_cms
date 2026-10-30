@@ -26,7 +26,7 @@
 *   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
 *   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
 
-**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-exq/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, run with `-p 1` (packages share one DB), sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-exq/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
@@ -38,6 +38,12 @@
     3. `go run ./cmd/migrate status`: `0 pending`; keep the output in the deploy log.
 *   **New environment** (staging/prod first time): empty database → `up` builds everything from `001`. An environment that was migrated by hand before the runner existed → `baseline --through NNN` once (NNN = last file verified present), then `status`; dev was baselined this way (CLAUDE.md Sec 12).
 *   Long data migrations (backfills) still follow Sec 14: never inside 07:00–20:00.
+
+**Release checklist: report export (X.8, `.kiro/specs/report-export-migration/`, 2026-10-29)**
+*   `DSR_LATE_START_DATE` must have the same value in `backend`, `backend-exq` and `backend_python` (`RETRY_DSR_LATE_START_DATE`). Nothing checks this automatically: a different value makes the DSR late screen and its CSV disagree. Empty = report off in all three.
+*   Migration `035_export_jobs_reports.sql` runs before the release (Order above: `status` → `up` → `status`).
+*   CompanyPortal (task 7) and `backend` with `format=csv` removed (task 8) ship in the same release.
+*   Rollback = redeploy the previous `backend` and CompanyPortal images. Migration `035` is not rolled back (no down migrations, see above).
 
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 

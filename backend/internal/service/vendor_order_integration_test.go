@@ -5,12 +5,14 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/notification"
@@ -28,11 +30,42 @@ type vendorOrderFixture struct {
 	wideUser   VendorActor // fixture vendor, no branch pin: replenish x2 + cash1 vault
 	branchUser VendorActor // fixture vendor pinned to the terminal's replenish branch
 	cash2User  VendorActor // other vendor pinned to cash2: one vault party
+	users      *[]int64    // vendor users seeded by vendorUserAs, removed by deleteVendorUsers
+}
+
+// deleteVendorUsers removes the test-only vendor users and the audit rows they wrote, after the base
+// fixtures removed every request, party and realization that points at them. Own connection: the
+// fixture pool is already closed by then.
+func deleteVendorUsers(t *testing.T, ids []int64) {
+	if len(ids) == 0 {
+		return
+	}
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		t.Errorf("cleanup vendor users: %v", err)
+		return
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	for _, sql := range []string{
+		`DELETE FROM notification_emails WHERE notification_id IN (SELECT id FROM notifications WHERE recipient_user_id = ANY($1))`,
+		`DELETE FROM notifications WHERE recipient_user_id = ANY($1)`,
+		`DELETE FROM audit_logs WHERE actor_id = ANY($1)`,
+		`DELETE FROM users WHERE id = ANY($1)`,
+	} {
+		if _, err := conn.Exec(ctx, sql, ids); err != nil {
+			t.Errorf("cleanup vendor users %v: %v", ids, err)
+			return
+		}
+	}
 }
 
 func newVendorOrderFixture(t *testing.T) *vendorOrderFixture {
 	t.Helper()
-	f := &vendorOrderFixture{vaultPlanFixture: newVaultPlanFixture(t)}
+	users := &[]int64{}
+	// Registered before the base fixtures, so it runs after them (LIFO).
+	t.Cleanup(func() { deleteVendorUsers(t, *users) })
+	f := &vendorOrderFixture{vaultPlanFixture: newVaultPlanFixture(t), users: users}
 	ctx := context.Background()
 	if err := f.pool.QueryRow(ctx, `SELECT vendor_id FROM vendor_branches WHERE id = $1`, f.cash2).Scan(&f.vendor2); err != nil {
 		t.Fatal(err)
@@ -60,13 +93,12 @@ func (f *vendorOrderFixture) vendorUserAs(t *testing.T, role string, vendorID in
 		"itvnd-"+uuid.NewString()[:8], vendorID, branch, role).Scan(&id); err != nil {
 		t.Fatalf("seed vendor user: %v", err)
 	}
+	*f.users = append(*f.users, id)
+	// Runs before the base cleanup (LIFO), while requests/parties still point at the user: only
+	// release the vendor / cabang FK so the base fixture can delete them. The row itself goes in
+	// deleteVendorUsers, after the base cleanup.
 	t.Cleanup(func() {
-		c := context.Background()
-		_, _ = f.pool.Exec(c, `DELETE FROM notification_emails WHERE notification_id IN (SELECT id FROM notifications WHERE recipient_user_id = $1)`, id)
-		_, _ = f.pool.Exec(c, `DELETE FROM notifications WHERE recipient_user_id = $1`, id)
-		// audit_logs keeps the user as actor: deactivate if the delete is refused.
-		_, _ = f.pool.Exec(c, `UPDATE users SET is_active = false, deleted_at = now() WHERE id = $1`, id)
-		_, _ = f.pool.Exec(c, `DELETE FROM users WHERE id = $1`, id)
+		_, _ = f.pool.Exec(context.Background(), `UPDATE users SET vendor_id = NULL, vendor_branch_id = NULL WHERE id = $1`, id)
 	})
 	v := vendorID
 	return VendorActor{Actor: Actor{UserID: id, Role: role}, ClaimVendorID: &v}

@@ -6,4 +6,5 @@ github.com/cimb-niaga/cms/pkg/config 100
 github.com/cimb-niaga/cms/pkg/csvexport 94
 github.com/cimb-niaga/cms/pkg/health 100
 github.com/cimb-niaga/cms/pkg/middleware 89
+github.com/cimb-niaga/cms/pkg/reports 100
 github.com/cimb-niaga/cms/pkg/response 100

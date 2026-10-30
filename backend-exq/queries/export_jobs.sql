@@ -26,8 +26,8 @@ WHERE requested_by = sqlc.arg('requested_by')::bigint AND status IN ('queued', '
 
 -- name: InsertExportJob :one
 INSERT INTO export_jobs (requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id,
-                         branch_code, status_filter, price_level, params_hash, file_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                         branch_code, status_filter, price_level, params_hash, file_name, report_params)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: ClaimNextExportJob :one

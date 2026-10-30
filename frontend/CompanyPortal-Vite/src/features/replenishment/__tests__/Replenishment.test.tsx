@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,12 +6,32 @@ import { ReplenishmentScreen } from "../ReplenishmentScreen";
 import type { ClassificationParams, ClassificationView } from "../api";
 import { rangeDays, rangeError } from "../api";
 
-const { listParams, download, toast, listResult } = vi.hoisted(() => ({
+const { listParams, request, requestError, listResult } = vi.hoisted(() => ({
   listParams: vi.fn(),
-  download: vi.fn(),
-  toast: vi.fn(),
+  request: vi.fn(),
+  requestError: { current: null as unknown },
   listResult: { current: null as unknown },
 }));
+
+vi.mock("@/features/exports", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/exports")>();
+  return {
+    ...actual,
+    useExportFlow: () => ({
+      request,
+      requestError: requestError.current,
+      isRequesting: false,
+      dialogProps: {
+        open: false,
+        phase: "idle",
+        job: null,
+        message: null,
+        onClose: vi.fn(),
+        onRetry: vi.fn(),
+      },
+    }),
+  };
+});
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
@@ -21,15 +41,12 @@ vi.mock("../api", async (importOriginal) => {
       listParams(p);
       return listResult.current;
     },
-    downloadReport: (...args: unknown[]) => download(...args),
   };
 });
 
 vi.mock("@/features/vendor-request/hooks", () => ({
   useVendorOptions: () => ({ data: { vendors: [{ id: 2, name: "Abacus" }], regions: ["MDN"] } }),
 }));
-
-vi.mock("@/lib/hooks/useToast", () => ({ useToast: () => ({ toast }) }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
@@ -83,8 +100,8 @@ function data(items: ClassificationView[], total = items.length) {
 describe("ReplenishmentScreen", () => {
   beforeEach(() => {
     listParams.mockClear();
-    download.mockReset();
-    toast.mockClear();
+    request.mockReset();
+    requestError.current = null;
     listResult.current = data([ROW]);
   });
 
@@ -118,14 +135,47 @@ describe("ReplenishmentScreen", () => {
     expect(screen.getByRole("button", { name: /Selisih nominal/ })).toBeDisabled();
   });
 
-  it("downloads a report with the current filter and reports a failure", async () => {
-    download.mockRejectedValueOnce(new Error("Anda tidak berhak"));
+  it("amount-mismatch export sends the screen filter including classification", () => {
     render(<ReplenishmentScreen />);
+    fireEvent.change(screen.getByLabelText("Dari tanggal"), { target: { value: "2026-10-01" } });
+    fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "2026-10-15" } });
+    fireEvent.change(screen.getByLabelText("Vendor"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Region"), { target: { value: "MDN" } });
+    fireEvent.change(screen.getByLabelText("Klasifikasi"), { target: { value: "late" } });
+    fireEvent.click(screen.getByRole("button", { name: /Selisih nominal/ }));
+    expect(request).toHaveBeenCalledWith({
+      kind: "report",
+      report: "replenishment-amount-mismatch",
+      params: {
+        date_from: "2026-10-01",
+        date_to: "2026-10-15",
+        vendor_id: 2,
+        region_code: "MDN",
+        classification: "late",
+      },
+    });
+  });
+
+  it("trips export sends no classification", () => {
+    render(<ReplenishmentScreen />);
+    fireEvent.change(screen.getByLabelText("Dari tanggal"), { target: { value: "2026-10-01" } });
+    fireEvent.change(screen.getByLabelText("Sampai tanggal"), { target: { value: "2026-10-15" } });
+    fireEvent.change(screen.getByLabelText("Klasifikasi"), { target: { value: "late" } });
     fireEvent.click(screen.getByRole("button", { name: /Trip per ATM/ }));
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith({ type: "error", message: "Anda tidak berhak" }),
-    );
-    expect(download.mock.calls[0]?.[0]).toBe("trips");
+    expect(request).toHaveBeenCalledWith({
+      kind: "report",
+      report: "replenishment-trips",
+      params: { date_from: "2026-10-01", date_to: "2026-10-15" },
+    });
+  });
+
+  it("shows a 429 inline with text and no dialog, plus the Ekspor Saya link", () => {
+    const { rerender } = render(<ReplenishmentScreen />);
+    expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" })).toBeInTheDocument();
+    requestError.current = { status: 429, code: "too_many_exports", message: "x" };
+    rerender(<ReplenishmentScreen />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Terlalu banyak ekspor");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows an empty state", () => {

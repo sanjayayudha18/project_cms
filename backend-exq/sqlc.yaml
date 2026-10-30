@@ -1,9 +1,11 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    # master_data_export.sql is shared with backend/ (vendor-data-export design,
+    # master_data_export.sql, dsr_late_report.sql and replenish_classifications.sql are
+    # shared with backend/ (vendor-data-export + report-export-migration design,
     # "Kenapa SQL juga dibagi"): regenerate in BOTH modules when it changes.
-    queries: ["queries/", "../backend/queries/master_data_export.sql"]
+    queries: ["queries/", "../backend/queries/master_data_export.sql",
+              "../backend/queries/dsr_late_report.sql", "../backend/queries/replenish_classifications.sql"]
     schema: "../backend/migrations/"
     gen:
       go:

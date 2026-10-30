@@ -458,7 +458,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Internal only (ATM-USER, ATM-SPV, BRANCH-ATM-SPV, ADMIN). One row per vendor branch per obliged day of the month. With `format=csv` returns every row (no paging) as a CSV file and writes a `report_exported` audit row. */
+        /** @description Internal only (ATM-USER, ATM-SPV, BRANCH-ATM-SPV, ADMIN). One row per vendor branch per obliged day of the month. CSV export moved to the async export jobs API; `format=csv` is no longer accepted and returns 400. */
         get: operations["listDsrLateDaily"];
         put?: never;
         post?: never;
@@ -475,7 +475,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Internal only. Per vendor branch totals for the month. With `format=csv` returns a CSV file and writes a `report_exported` audit row. */
+        /** @description Internal only. Per vendor branch totals for the month. CSV export moved to the async export jobs API; `format=csv` is no longer accepted and returns 400. */
         get: operations["getDsrLateSummary"];
         put?: never;
         post?: never;
@@ -1253,7 +1253,6 @@ export interface components {
         DsrLateMonth: string;
         DsrLateVendorID: number;
         DsrLateVendorBranchID: number;
-        DsrLateFormat: "csv";
         VendorRequestID: number;
         /** @description vendor party id (not the request id) */
         PartyID: number;
@@ -2087,7 +2086,6 @@ export interface operations {
                 status?: components["schemas"]["DsrLateStatus"];
                 page?: components["parameters"]["Page"];
                 page_size?: components["parameters"]["PageSize"];
-                format?: components["parameters"]["DsrLateFormat"];
             };
             header?: never;
             path?: never;
@@ -2095,14 +2093,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK (JSON page, or CSV when format=csv) */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["DsrLateDailyList"];
-                    "text/csv": string;
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2118,7 +2115,6 @@ export interface operations {
                 month: components["parameters"]["DsrLateMonth"];
                 vendor_id?: components["parameters"]["DsrLateVendorID"];
                 vendor_branch_id?: components["parameters"]["DsrLateVendorBranchID"];
-                format?: components["parameters"]["DsrLateFormat"];
             };
             header?: never;
             path?: never;
@@ -2126,14 +2122,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK (JSON, or CSV when format=csv) */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["DsrLateSummary"];
-                    "text/csv": string;
                 };
             };
             400: components["responses"]["BadRequest"];

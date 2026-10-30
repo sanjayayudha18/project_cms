@@ -62,7 +62,7 @@ jobs:
       - name: Integration tests (no skips allowed)
         run: |
           set -o pipefail
-          go test -tags integration -race -count=1 -cover -v ./... | tee test.log
+          go test -tags integration -race -count=1 -cover -v -p 1 ./... | tee test.log
           if grep -q -- "--- SKIP" test.log; then
             echo "::error::integration tests skipped"; grep -- "--- SKIP" test.log; exit 1
           fi
@@ -71,11 +71,13 @@ jobs:
       # Sequential after backend on purpose: both suites share this one DB.
       # Integration tests in backend-exq/internal/exportjob create/clean export_jobs rows
       # and must not run in parallel with other job-creating tests (tasks.md note 11).
+      # -p 1: packages run one at a time too; the exportjob worker tests claim any queued job,
+      # including the ones the handler integration tests leave queued (report-export-migration 6.3).
       - name: Integration tests backend-exq and pkg (no skips allowed)
         run: |
           set -o pipefail
           for m in backend-exq pkg; do
-            (cd "../$m" && go test -tags integration -race -count=1 -cover -v ./... | tee "test.log")
+            (cd "../$m" && go test -tags integration -race -count=1 -cover -v -p 1 ./... | tee "test.log")
             if grep -q -- "--- SKIP" "../$m/test.log"; then
               echo "::error::$m integration tests skipped"; grep -- "--- SKIP" "../$m/test.log"; exit 1
             fi

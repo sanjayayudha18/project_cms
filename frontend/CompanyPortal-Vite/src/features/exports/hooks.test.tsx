@@ -136,6 +136,27 @@ describe("useExportFlow", () => {
     expect(result.current.dialogProps.message).toContain("Sudah dihapus");
   });
 
+  it("report variant is passed through to the request and follows the same flow", async () => {
+    const report = {
+      kind: "report",
+      report: "dsr-late-daily",
+      params: { month: "2026-10", status: "late" },
+    } as const;
+    apiMock.requestExport.mockResolvedValue({
+      job: mkJob("queued", { kind: "dsr_late_daily" }),
+      created: true,
+    });
+    apiMock.getExportJob.mockResolvedValue(mkJob("succeeded", { kind: "dsr_late_daily" }));
+    apiMock.downloadExportFile.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useExportFlow(), { wrapper: wrapper() });
+    await act(async () => {
+      await result.current.request(report);
+    });
+    expect(apiMock.requestExport.mock.lastCall?.[0]).toEqual(report);
+    await waitFor(() => expect(result.current.dialogProps.phase).toBe("done"));
+    expect(apiMock.downloadExportFile).toHaveBeenCalledTimes(1);
+  });
+
   it("429 does not open the dialog and exposes the error", async () => {
     const err = { status: 429, code: "too_many_exports", message: "Terlalu banyak" };
     apiMock.requestExport.mockRejectedValue(err);

@@ -8,27 +8,16 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Replenishment read side (.claude/sdlc/replenishment-realisasi/spec.md FR4, FR6): realisasi vs order
-// classifications written by the Python job replenish_classify. Reads on the replica (Sec 6); only the
-// CSV export audit row goes to the primary. Roles = the Vendor Request viewers (FR4.3).
+// classifications written by the Python job replenish_classify. Reads on the replica (Sec 6).
+// Roles = the Vendor Request viewers (FR4.3); roles, classes, range and export limit live in
+// pkg/reports (report-export-migration 3.1). CSV export moved to backend-exq.
 
-const (
-	replenishmentMaxRangeDays = 31 // K5: screen + export
-	replenishmentMaxPageSize  = 100
-	replenishmentExportLimit  = 100000
-	replenishmentReportEntity = "replenishment_report"
-)
-
-var replenishmentViewerRoles = []string{"ADMIN", "ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"}
-
-// ReplenishmentClasses are the classification values a filter may name.
-var ReplenishmentClasses = map[string]bool{
-	"pending": true, "on_schedule": true, "early": true, "late": true, "not_done": true, "no_order": true, "void": true,
-}
+const replenishmentMaxPageSize = 100
 
 type ReplenishmentFilter struct {
 	From, To       time.Time
@@ -111,31 +100,21 @@ type TripRow struct {
 }
 
 type ReplenishmentReadService struct {
-	read  *db.Queries
-	audit *audit.Writer
+	read *db.Queries
 }
 
-// NewReplenishmentReadService: reads on readPool (replica), export audit on pool (primary).
-func NewReplenishmentReadService(pool, readPool *pgxpool.Pool) *ReplenishmentReadService {
-	return &ReplenishmentReadService{read: db.New(readPool), audit: audit.NewWriter(pool)}
+// NewReplenishmentReadService: read-only, all queries on readPool (replica).
+func NewReplenishmentReadService(readPool *pgxpool.Pool) *ReplenishmentReadService {
+	return &ReplenishmentReadService{read: db.New(readPool)}
 }
 
 // validateReplenishmentRange: both dates set, from <= to, at most 31 days (K5).
 func validateReplenishmentRange(from, to time.Time) error {
-	if from.IsZero() || to.IsZero() {
-		return &ValidationError{Field: "date_from", Message: "date_from dan date_to wajib diisi"}
-	}
-	if to.Before(from) {
-		return &ValidationError{Field: "date_to", Message: "date_to tidak boleh sebelum date_from"}
-	}
-	if civilDate(to).Sub(civilDate(from)) > (replenishmentMaxRangeDays-1)*24*time.Hour {
-		return &ValidationError{Field: "date_to", Message: fmt.Sprintf("rentang maksimal %d hari", replenishmentMaxRangeDays)}
-	}
-	return nil
+	return reportErr(reports.ValidateReplenishmentRange(from, to))
 }
 
 func (s *ReplenishmentReadService) authorize(actor Actor) error {
-	if !roleIn(actor.Role, replenishmentViewerRoles) {
+	if !roleIn(actor.Role, reports.ReplenishmentViewerRoles) {
 		return ErrNotAuthorized
 	}
 	return nil
@@ -265,7 +244,7 @@ func (s *ReplenishmentReadService) AmountMismatch(ctx context.Context, actor Act
 		return nil, err
 	}
 	f.OnlyDiff, f.FinalOnly = true, true
-	return classificationViews(ctx, s.read, f, replenishmentExportLimit, 0)
+	return classificationViews(ctx, s.read, f, reports.ReplenishmentExportLimit, 0)
 }
 
 // Trips: report trip / realisasi per vendor per ATM (FR6.2).
@@ -286,19 +265,6 @@ func (s *ReplenishmentReadService) Trips(ctx context.Context, actor Actor, from,
 			FirstDate: dateToPtr(r.FirstDate), LastDate: dateToPtr(r.LastDate)}
 	}
 	return out, nil
-}
-
-// RecordExport writes the report_exported audit row (FR6.3) before a CSV is sent. Not tied to one
-// entity: entity_id 0, the report + filter go in "after".
-func (s *ReplenishmentReadService) RecordExport(ctx context.Context, actor Actor, report string, filter map[string]any) error {
-	if err := s.authorize(actor); err != nil {
-		return err
-	}
-	if err := s.audit.Write(ctx, audit.Entry{ActorID: actor.UserID, Action: "report_exported", EntityType: replenishmentReportEntity,
-		After: map[string]any{"report": report, "filter": filter}, IP: actor.IP}); err != nil {
-		return fmt.Errorf("write audit log: %w", err)
-	}
-	return nil
 }
 
 // ListRealizations: GET /api/v1/vendor/replenish-realizations (FR5.2) -- the vendor's own

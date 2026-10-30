@@ -91,6 +91,22 @@ func (f *fakeQ) ExportPackagePricesBatch(_ context.Context, a repository.ExportP
 	return out, f.err
 }
 
+func (f *fakeQ) ListDsrLateDaily(context.Context, repository.ListDsrLateDailyParams) ([]repository.ListDsrLateDailyRow, error) {
+	return nil, f.err
+}
+func (f *fakeQ) ListDsrLateSummary(context.Context, repository.ListDsrLateSummaryParams) ([]repository.ListDsrLateSummaryRow, error) {
+	return nil, f.err
+}
+func (f *fakeQ) ListReplenishClassifications(context.Context, repository.ListReplenishClassificationsParams) ([]repository.ListReplenishClassificationsRow, error) {
+	return nil, f.err
+}
+func (f *fakeQ) ListReplenishClassificationAmounts(context.Context, []int64) ([]repository.ReplenishClassificationAmount, error) {
+	return nil, f.err
+}
+func (f *fakeQ) ReportReplenishTrips(context.Context, repository.ReportReplenishTripsParams) ([]repository.ReportReplenishTripsRow, error) {
+	return nil, f.err
+}
+
 func i64(v int64) *int64 { return &v }
 
 func run(t *testing.T, f *fakeQ, p Params, asOf time.Time) [][]string {

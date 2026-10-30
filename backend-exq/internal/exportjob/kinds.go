@@ -1,11 +1,17 @@
 package exportjob
 
-import "slices"
+import (
+	"slices"
 
-// Audit actions of export jobs (Req 8.1, 8.2).
+	"github.com/cimb-niaga/cms/pkg/reports"
+)
+
+// Audit actions of export jobs (Req 8.1, 8.2). report_exported is the action the legacy
+// backend/ report CSV wrote, kept so old and new rows are found together (report-export-migration Req 5).
 const (
 	ActionExportRequested    = "export_requested"
 	ActionMasterDataExported = "master_data_exported"
+	ActionReportExported     = "report_exported"
 )
 
 // KindSpec collects every rule that differs per Export_Kind (design "Registry per Kind", D23).
@@ -36,12 +42,25 @@ func priceRef(j Job) (string, int64) {
 	return vendorRef(j)
 }
 
-// KindSpecs is the per-kind registry. report-export-migration adds entries here only.
+// fixed is the audit entity of a report kind: the legacy entity_type, id 0 (report-export-migration Req 5.3).
+func fixed(entityType string) func(Job) (string, int64) {
+	return func(Job) (string, int64) { return entityType, 0 }
+}
+
+// KindSpecs is the per-kind registry. Report kinds take the roles of the report screens (pkg/reports);
+// master-data kinds stay ADMIN/ADMIN_PARAM.
 var KindSpecs = map[Kind]KindSpec{
 	KindVendor:           {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: vendorRef},
 	KindCabang:           {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: branchRef},
 	KindHargaPaket:       {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: priceRef},
 	KindMasterDataGlobal: {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: globalRef},
+
+	KindDsrLateDaily:   {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},
+	KindDsrLateSummary: {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},
+	KindReplenishmentAmountMismatch: {Roles: reports.ReplenishmentViewerRoles, DownloadAction: ActionReportExported,
+		EntityRef: fixed("replenishment_report")},
+	KindReplenishmentTrips: {Roles: reports.ReplenishmentViewerRoles, DownloadAction: ActionReportExported,
+		EntityRef: fixed("replenishment_report")},
 }
 
 // KindRoles maps each kind to its allowed roles; used by the route guard and the service.

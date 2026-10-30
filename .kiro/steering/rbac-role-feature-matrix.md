@@ -163,6 +163,10 @@ All routes except `/api/v1/auth` are wrapped in `RequireAuth` first. This table 
 | `POST /api/v1/exports/vendors/{vendorID}/{entity}`, `POST …/branches/{branchID}/{entity}`, `POST …/package-prices`, `POST …/master-data/{entity}`, `GET …/master-data/{entity}/template` | `ADMIN`, `ADMIN_PARAM` (per kind, `exportjob.KindRoles`) | Handler (+ service re-check on create) |
 | `GET /api/v1/exports/jobs`, `GET /api/v1/exports/jobs/{jobID}` | any authenticated; own jobs only (another user's job = 404) | Service |
 | `GET /api/v1/exports/jobs/{jobID}/file` | owner; role re-checked from DB at download (403) | Service |
+| `POST /api/v1/exports/reports/dsr-late-daily`, `POST …/reports/dsr-late-summary` | `ATM-USER`, `ATM-SPV`, `BRANCH-ATM-SPV`, `ADMIN` (`reports.DsrLateViewerRoles`, per `KindSpecs`) | Handler (`RequireRoles`) |
+| `POST /api/v1/exports/reports/replenishment-amount-mismatch`, `POST …/reports/replenishment-trips` | `ADMIN`, `ATM-USER`, `ATM-SPV`, `BRANCH-ATM-USER`, `BRANCH-ATM-SPV` (`reports.ReplenishmentViewerRoles`, per `KindSpecs`) | Handler (`RequireRoles`) |
+
+> Report CSV (spec `report-export-migration`, 2026-10-29): `format=csv` on `backend/` `/dsr-late-reports/{daily,summary}` and `/replenishment/reports/{amount-mismatch,trips}` now returns 400 `validation_error` (field `format`). The CSV is produced only by the `backend-exq` report routes above; the JSON responses are unchanged.
 
 **Gaps to be aware of:** `/api/v1/dsr` and `/api/v1/atm-portal` are `RequireAuth`-only at the HTTP layer, so any authenticated user (including vendor roles) reaches them; finer-grained authz is either in the service layer or absent.
 
@@ -216,6 +220,7 @@ Commented out or `disabled`: Instruksi Pengisian, Validasi Pengisian, Cash Suppl
 | `/forecasting/dmaa-forecast` | ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV |
 | `/eod-monitoring` | ADMIN, ADMIN_PARAM |
 | `/audit-logs` | ADMIN, ADMIN_PARAM |
+| `/exports` (Ekspor Saya, spec `report-export-migration`) | union of report viewer roles: ATM-USER, ATM-SPV, BRANCH-ATM-USER, BRANCH-ATM-SPV, ADMIN (+ ADMIN_PARAM via bypass); no sidebar item |
 
 ### (c) Settings hub card visibility — `SettingsHubPage.tsx`
 Only the "Manajemen Peran" card is role-gated at the card level (`canSeeRoleManagementCard` → APPACCESS or ADMIN). Every other card relies solely on its target route's `beforeLoad` guard (a known, documented gap: ADMIN_PARAM sees the other cards on the hub).

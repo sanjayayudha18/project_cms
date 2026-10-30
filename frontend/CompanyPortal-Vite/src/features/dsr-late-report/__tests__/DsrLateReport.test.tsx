@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,9 +13,29 @@ const m = vi.hoisted(() => ({
   warnings: { current: null as unknown },
   dailyArgs: vi.fn(),
   summaryArgs: vi.fn(),
-  download: vi.fn(),
-  toast: vi.fn(),
+  request: vi.fn(),
+  requestError: { current: null as unknown },
 }));
+
+vi.mock("@/features/exports", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/exports")>();
+  return {
+    ...actual,
+    useExportFlow: () => ({
+      request: m.request,
+      requestError: m.requestError.current,
+      isRequesting: false,
+      dialogProps: {
+        open: false,
+        phase: "idle",
+        job: null,
+        message: null,
+        onClose: vi.fn(),
+        onRetry: vi.fn(),
+      },
+    }),
+  };
+});
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
@@ -30,13 +50,11 @@ vi.mock("../api", async (importOriginal) => {
       return m.summary.current;
     },
     useDsrLateWarnings: () => m.warnings.current,
-    downloadReport: (...a: unknown[]) => m.download(...a),
   };
 });
 vi.mock("@/features/vendor-request/hooks", () => ({
   useVendorOptions: () => ({ data: { vendors: [{ id: 2, name: "Abacus" }], regions: [] } }),
 }));
-vi.mock("@/lib/hooks/useToast", () => ({ useToast: () => ({ toast: m.toast }) }));
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -103,7 +121,8 @@ function setAll() {
 }
 
 beforeEach(() => {
-  for (const f of [m.dailyArgs, m.summaryArgs, m.download, m.toast]) f.mockReset();
+  for (const f of [m.dailyArgs, m.summaryArgs, m.request]) f.mockReset();
+  m.requestError.current = null;
   setAll();
   useAuthStore.setState({ user: { role: "ATM-SPV" } as never });
 });
@@ -149,24 +168,53 @@ describe("DsrLateReportScreen", () => {
     });
   });
 
-  it("export button calls the download for the active tab with the filter", async () => {
+  it("summary tab exports dsr-late-summary with the filter and no status", () => {
     render(<DsrLateReportScreen />);
+    fireEvent.change(screen.getByLabelText("Vendor"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: /Ekspor CSV/ }));
-    await waitFor(() => expect(m.download).toHaveBeenCalledTimes(1));
-    expect(m.download.mock.calls[0]?.[0]).toBe("summary");
-    fireEvent.click(screen.getByRole("tab", { name: "Detail harian" }));
-    fireEvent.click(screen.getByRole("button", { name: /Ekspor CSV/ }));
-    await waitFor(() => expect(m.download).toHaveBeenCalledTimes(2));
-    expect(m.download.mock.calls[1]?.[0]).toBe("daily");
+    expect(m.request).toHaveBeenCalledWith({
+      kind: "report",
+      report: "dsr-late-summary",
+      params: { month: expect.stringMatching(/^\d{4}-\d{2}$/), vendor_id: 2 },
+    });
   });
 
-  it("toasts when the export fails", async () => {
-    m.download.mockRejectedValueOnce(new Error("Anda tidak berhak"));
+  it("detail tab exports dsr-late-daily with the status and branch filter", () => {
     render(<DsrLateReportScreen />);
+    fireEvent.change(screen.getByLabelText("Vendor"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Cabang"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Detail harian" }));
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "late" } });
     fireEvent.click(screen.getByRole("button", { name: /Ekspor CSV/ }));
-    await waitFor(() =>
-      expect(m.toast).toHaveBeenCalledWith({ type: "error", message: "Anda tidak berhak" }),
-    );
+    expect(m.request).toHaveBeenCalledWith({
+      kind: "report",
+      report: "dsr-late-daily",
+      params: {
+        month: expect.stringMatching(/^\d{4}-\d{2}$/),
+        vendor_id: 2,
+        vendor_branch_id: 10,
+        status: "late",
+      },
+    });
+  });
+
+  it("a status chosen on the detail tab is not sent from the summary tab", () => {
+    render(<DsrLateReportScreen />);
+    fireEvent.click(screen.getByRole("tab", { name: "Detail harian" }));
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "late" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Rekap per cabang" }));
+    fireEvent.click(screen.getByRole("button", { name: /Ekspor CSV/ }));
+    expect(m.request.mock.calls[0]?.[0].params).not.toHaveProperty("status");
+  });
+
+  it("shows a 429 inline with text and no dialog, plus the Ekspor Saya link", () => {
+    const { rerender } = render(<DsrLateReportScreen />);
+    expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    m.requestError.current = { status: 429, code: "too_many_exports", message: "x" };
+    rerender(<DsrLateReportScreen />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Terlalu banyak ekspor");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows the warnings panel with the excluded-branch marker and admin link", () => {

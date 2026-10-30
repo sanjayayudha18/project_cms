@@ -3,6 +3,7 @@ export * from "./autoDownload";
 export * from "./components/ExportProgressDialog";
 export * from "./components/ExportStatusBadge";
 export * from "./components/MyExportsTable";
+export * from "./components/ReportExportNotice";
 export * from "./hooks";
 export * from "./status";
 export * from "./types";

@@ -7,17 +7,20 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PageNumbers } from "@/components/ui/PageNumbers";
 import { formatAtmDate } from "@/features/atm-portal/lib/formatters";
 import { getTodayWib } from "@/features/eod-monitoring/utils";
+import {
+  ExportProgressDialog,
+  ReportExportNotice,
+  type ReportParams,
+  useExportFlow,
+} from "@/features/exports";
 import { useVendorOptions } from "@/features/vendor-request/hooks";
 import type { ApiError } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/auth/store";
-import { useToast } from "@/lib/hooks/useToast";
 import { StatusBadge } from "./StatusBadge";
 import { WarningsPanel } from "./WarningsPanel";
 import {
   type DsrLateStatus,
-  type ReportKind,
   STATUS_LABELS,
-  downloadReport,
   useDsrLateDaily,
   useDsrLateSummary,
   useDsrLateWarnings,
@@ -71,7 +74,7 @@ function ErrorCell({ error, retry }: { error: unknown; retry: () => void }) {
 
 /** Laporan DSR telat / tidak kirim per cabang vendor (dsr-late-report FR6): dasar penalti FLM. */
 export function DsrLateReportScreen() {
-  const { toast } = useToast();
+  const exportFlow = useExportFlow();
   const isAdmin = useAuthStore((s) => s.user?.role === "ADMIN");
   const [month, setMonth] = useState(getTodayWib().slice(0, 7));
   const [vendorId, setVendorId] = useState<string | null>(null);
@@ -79,7 +82,6 @@ export function DsrLateReportScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("summary");
   const [page, setPage] = useState(1);
-  const [downloading, setDownloading] = useState(false);
 
   const vendorNum = vendorId === null ? null : Number(vendorId);
   const branchNum = branchId === null ? null : Number(branchId);
@@ -115,18 +117,16 @@ export function DsrLateReportScreen() {
     };
   }
 
-  async function download(kind: ReportKind) {
-    setDownloading(true);
-    try {
-      await downloadReport(kind, {
-        ...filter,
-        status: kind === "daily" ? (status as DsrLateStatus | null) : null,
-      });
-    } catch (e) {
-      toast({ type: "error", message: e instanceof Error ? e.message : "Gagal mengunduh laporan" });
-    } finally {
-      setDownloading(false);
-    }
+  function requestExport() {
+    const params: ReportParams = { month };
+    if (vendorNum !== null) params.vendor_id = vendorNum;
+    if (branchNum !== null) params.vendor_branch_id = branchNum;
+    if (tab === "daily" && status) params.status = status;
+    void exportFlow.request({
+      kind: "report",
+      report: tab === "daily" ? "dsr-late-daily" : "dsr-late-summary",
+      params,
+    });
   }
 
   const emptyText = featureOff
@@ -144,14 +144,16 @@ export function DsrLateReportScreen() {
         actions={
           <Button
             variant="secondary"
-            disabled={downloading || !month}
-            onClick={() => download(tab)}
+            disabled={exportFlow.isRequesting || !month}
+            onClick={requestExport}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             Ekspor CSV
           </Button>
         }
       />
+      <ReportExportNotice error={exportFlow.requestError} />
+      <ExportProgressDialog {...exportFlow.dialogProps} />
 
       {warnings.data && <WarningsPanel data={warnings.data} isAdmin={isAdmin} />}
 

@@ -72,6 +72,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/reports/dsr-late-daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request the DSR late daily report export (kind dsr_late_daily) */
+        post: operations["requestDsrLateDailyExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/reports/dsr-late-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request the DSR late monthly summary export (kind dsr_late_summary) */
+        post: operations["requestDsrLateSummaryExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/reports/replenishment-amount-mismatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request the replenishment amount-mismatch report export (kind replenishment_amount_mismatch) */
+        post: operations["requestReplenishmentAmountMismatchExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/reports/replenishment-trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request the replenishment trips report export (kind replenishment_trips) */
+        post: operations["requestReplenishmentTripsExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/master-data/{entity}/template": {
         parameters: {
             query?: never;
@@ -149,7 +217,23 @@ export interface components {
         /** @enum {string} */
         PriceLevel: "vendor" | "branch" | "atm" | "all";
         /** @enum {string} */
-        ExportKind: "vendor" | "cabang" | "harga_paket" | "master_data_global";
+        ExportKind: "vendor" | "cabang" | "harga_paket" | "master_data_global" | "dsr_late_daily" | "dsr_late_summary" | "replenishment_amount_mismatch" | "replenishment_trips";
+        /** @description Validated filter of a report export; keys that do not apply to the kind are absent. Sent again as query string by "Minta ekspor lagi". */
+        ReportParams: {
+            /** @description YYYY-MM (DSR) */
+            month?: string;
+            /** @description YYYY-MM-DD (replenishment) */
+            date_from?: string;
+            /** @description YYYY-MM-DD (replenishment) */
+            date_to?: string;
+            /** Format: int64 */
+            vendor_id?: number;
+            /** Format: int64 */
+            vendor_branch_id?: number;
+            region_code?: string;
+            status?: string;
+            classification?: string;
+        };
         /** @enum {string} */
         ExportStatus: "queued" | "running" | "succeeded" | "failed" | "downloading" | "downloaded" | "expired";
         /** @description Public job view; every key is always present, absent values are null. Times are RFC 3339 UTC. */
@@ -164,7 +248,8 @@ export interface components {
             /** Format: int64 */
             branch_id: number | null;
             branch_code: string | null;
-            status_filter: components["schemas"]["StatusFilter"];
+            /** @description null for report jobs */
+            status_filter: components["schemas"]["StatusFilter"] | null;
             /** @enum {string|null} */
             price_level: "vendor" | "branch" | "atm" | "all" | null;
             file_name: string;
@@ -184,6 +269,8 @@ export interface components {
             expires_at: string | null;
             /** Format: date-time */
             downloaded_at: string | null;
+            /** @description null for master-data jobs */
+            report_params: components["schemas"]["ReportParams"] | null;
         };
         JobEnvelope: {
             /** @enum {boolean} */
@@ -197,6 +284,11 @@ export interface components {
             error: {
                 code: string;
                 message: string;
+                /** @description Field-level detail; present on report parameter validation errors (code validation_error) */
+                details?: {
+                    field: string;
+                    message: string;
+                }[];
             };
         };
         /** @description Flat body written by pkg/middleware for 401 (`token_invalid`) and 403 (`forbidden`) */
@@ -315,6 +407,13 @@ export interface components {
         JobID: number;
         /** @description default active */
         StatusFilter: components["schemas"]["StatusFilter"];
+        /** @description YYYY-MM, not after the current month (WIB) */
+        ReportMonth: string;
+        /** @description YYYY-MM-DD */
+        ReportDateFrom: string;
+        /** @description YYYY-MM-DD, range at most 31 days */
+        ReportDateTo: string;
+        ReportVendorID: number;
         MasterDataEntity: "atm-assignments" | "atms" | "vendor-branches" | "vendor-pics" | "vendor-vaults" | "vendors";
     };
     requestBodies: never;
@@ -421,6 +520,104 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyExports"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    requestDsrLateDailyExport: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM, not after the current month (WIB) */
+                month?: components["parameters"]["ReportMonth"];
+                vendor_id?: components["parameters"]["ReportVendorID"];
+                vendor_branch_id?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JobExisting"];
+            202: components["responses"]["JobCreated"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyExports"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    requestDsrLateSummaryExport: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM, not after the current month (WIB) */
+                month?: components["parameters"]["ReportMonth"];
+                vendor_id?: components["parameters"]["ReportVendorID"];
+                vendor_branch_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JobExisting"];
+            202: components["responses"]["JobCreated"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyExports"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    requestReplenishmentAmountMismatchExport: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD */
+                date_from?: components["parameters"]["ReportDateFrom"];
+                /** @description YYYY-MM-DD, range at most 31 days */
+                date_to?: components["parameters"]["ReportDateTo"];
+                vendor_id?: components["parameters"]["ReportVendorID"];
+                region_code?: string;
+                classification?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JobExisting"];
+            202: components["responses"]["JobCreated"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyExports"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    requestReplenishmentTripsExport: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD */
+                date_from?: components["parameters"]["ReportDateFrom"];
+                /** @description YYYY-MM-DD, range at most 31 days */
+                date_to?: components["parameters"]["ReportDateTo"];
+                vendor_id?: components["parameters"]["ReportVendorID"];
+                region_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JobExisting"];
+            202: components["responses"]["JobCreated"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyExports"];
             500: components["responses"]["Internal"];
         };

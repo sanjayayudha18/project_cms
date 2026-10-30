@@ -2,28 +2,17 @@ package handler
 
 import (
 	"context"
-	"flag"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	custommw "github.com/cimb-niaga/cms/pkg/middleware"
 )
 
-// Golden CSV of the legacy report exports (report-export-migration task 1.1). Recorded from the
-// handlers as they are before pkg/reports / backend-exq take over; regenerate only on purpose:
-//
-//	go test ./internal/handler -run TestReportCSVGolden -update
-//
-// Data comes from a fake reader (same choice as the master-data golden), so the files lock the
-// cells, header, CSVSafe and file name; the SQL behind the views is shared and unchanged.
-var updateReportGolden = flag.Bool("update", false, "rewrite report CSV golden files")
+// Fixed fake readers behind the report CSV golden files (report-export-migration task 1.1).
+// The files in testdata/report_csv were recorded from the legacy format=csv handlers, which were
+// removed in 8.1; they are now read-only references, guarded by report_screen_file_test.go (3.2,
+// JSON screen -> pkg/reports == golden), pkg/reports/cells_golden_test.go (6.1) and the backend-exq
+// producers. There is no -update flag any more: nothing in backend/ can rewrite them. Change them
+// only together with the pkg/reports cell contract.
 
 const reportGoldenDir = "testdata/report_csv"
 
@@ -50,6 +39,8 @@ func goldenDailyRows() []service.DsrLateDailyView {
 	}
 }
 
+// DailyAll is a fake-only helper now (no longer part of DsrLateReader): the full filtered list that
+// pagedGoldenDsrLateReader slices into pages.
 func (f *goldenDsrLateReader) DailyAll(_ context.Context, _ service.Actor, flt service.DsrLateFilter) ([]service.DsrLateDailyView, error) {
 	var out []service.DsrLateDailyView
 	for _, v := range goldenDailyRows() {
@@ -107,55 +98,4 @@ func (f *goldenReplenishmentReader) Trips(_ context.Context, _ service.Actor, _,
 		{VendorID: ptr(int64(12)), VendorName: ptr("PT Abacus Cash Solution"), TerminalID: "ATM001", Trips: 3, FirstDate: d(1), LastDate: d(20)},
 		{VendorName: ptr("+Vendor Ü"), TerminalID: "ATM002", Trips: 1, FirstDate: d(7), LastDate: d(7)},
 	}, nil
-}
-
-func TestReportCSVGolden(t *testing.T) {
-	ts := testTokenService()
-	r := chi.NewRouter()
-	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/dsr-late-reports", NewDsrLateHandler(&goldenDsrLateReader{}).Routes())
-	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/replenishment", NewReplenishmentHandler(&goldenReplenishmentReader{}).Routes())
-	token := tokenForRole(t, ts, 1, "ADMIN")
-
-	const rng = "date_from=2026-10-01&date_to=2026-10-31"
-	cases := []struct{ name, path, wantFile string }{
-		{"dsr_late_daily", "/api/v1/dsr-late-reports/daily?month=2026-10&format=csv", "dsr-late-daily-2026-10.csv"},
-		{"dsr_late_daily_status_late", "/api/v1/dsr-late-reports/daily?month=2026-10&status=late&format=csv", "dsr-late-daily-2026-10.csv"},
-		{"dsr_late_summary", "/api/v1/dsr-late-reports/summary?month=2026-10&format=csv", "dsr-late-summary-2026-10.csv"},
-		{"amount_mismatch", "/api/v1/replenishment/reports/amount-mismatch?" + rng + "&format=csv",
-			"replenishment-amount-mismatch-2026-10-01-2026-10-31.csv"},
-		{"amount_mismatch_class_late", "/api/v1/replenishment/reports/amount-mismatch?" + rng + "&classification=late&format=csv",
-			"replenishment-amount-mismatch-2026-10-01-2026-10-31.csv"},
-		{"trips", "/api/v1/replenishment/reports/trips?" + rng + "&format=csv", "replenishment-trips-2026-10-01-2026-10-31.csv"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := doRequest(r, http.MethodGet, tc.path, token, "")
-			if rec.Code != http.StatusOK {
-				t.Fatalf("code = %d: %s", rec.Code, rec.Body.String())
-			}
-			if cd, want := rec.Header().Get("Content-Disposition"), `attachment; filename="`+tc.wantFile+`"`; cd != want {
-				t.Errorf("Content-Disposition = %q, want %q", cd, want)
-			}
-			path := filepath.Join(reportGoldenDir, tc.name+".csv")
-			if *updateReportGolden {
-				if err := os.MkdirAll(reportGoldenDir, 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(path, rec.Body.Bytes(), 0o600); err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			want, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatalf("read golden (run with -update to record): %v", err)
-			}
-			if got := rec.Body.String(); got != string(want) {
-				t.Errorf("CSV differs from %s\n--- got ---\n%s\n--- want ---\n%s", path, got, want)
-			}
-			if strings.HasPrefix(rec.Body.String(), "\xef\xbb\xbf") {
-				t.Error("legacy report CSV has no BOM; golden must not either")
-			}
-		})
-	}
 }

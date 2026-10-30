@@ -45,7 +45,7 @@ func TestIntegration_ReplenishmentRead(t *testing.T) {
 		_, _ = f.pool.Exec(context.Background(), `DELETE FROM replenish_classifications WHERE id = ANY($1)`, []int64{late, noOrder})
 	})
 
-	svc := NewReplenishmentReadService(f.pool, f.pool)
+	svc := NewReplenishmentReadService(f.pool)
 	viewer := Actor{UserID: f.checker.UserID, Role: "ATM-SPV"}
 	base := ReplenishmentFilter{From: sched.AddDate(0, 0, -1), To: sched.AddDate(0, 0, 1), VendorID: &f.vendorID}
 
@@ -87,13 +87,6 @@ func TestIntegration_ReplenishmentRead(t *testing.T) {
 	}
 	if _, err := svc.List(ctx, Actor{UserID: f.checker.UserID, Role: "ACM-USER"}, base); !errors.Is(err, ErrNotAuthorized) {
 		t.Fatalf("ACM-USER: want ErrNotAuthorized, got %v", err)
-	}
-	if err := svc.RecordExport(ctx, viewer, "trips", map[string]any{"date_from": "x"}); err != nil {
-		t.Fatal(err)
-	}
-	if n := countRows(t, f.pool, `SELECT count(*) FROM audit_logs WHERE actor_id = $1 AND action = 'report_exported'
-		AND entity_type = 'replenishment_report' AND created_at > now() - interval '1 minute'`, viewer.UserID); n < 1 {
-		t.Fatal("export not audited")
 	}
 
 	// FR5.2: the vendor sees its own rows only, narrowed to its branch when pinned.

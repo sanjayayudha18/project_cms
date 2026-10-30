@@ -106,6 +106,31 @@ describe("ExportProgressDialog", () => {
     expect(spinner).toHaveClass("motion-reduce:animate-none");
   });
 
+  it("links report jobs to /exports when done or failed", () => {
+    const { unmount } = setup({
+      phase: "done",
+      job: job({ kind: "dsr_late_daily", status: "downloaded" }),
+    });
+    expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" })).toHaveAttribute(
+      "href",
+      "/exports",
+    );
+    unmount();
+    setup({
+      phase: "download_failed",
+      message: "x",
+      job: job({ kind: "replenishment_trips", status: "expired" }),
+    });
+    expect(screen.getByText(/\(\/exports\)/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" })).toBeInTheDocument();
+  });
+
+  it("keeps the master-data path and shows no link for master-data jobs", () => {
+    setup({ phase: "download_failed", message: "x", job: job({ kind: "vendor" }) });
+    expect(screen.getByText(/\/settings\/admin\/exports/)).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
   it("renders nothing when closed", () => {
     setup({ open: false, phase: "idle" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

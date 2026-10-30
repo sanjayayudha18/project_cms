@@ -6,6 +6,14 @@ export type ExportKind = components["schemas"]["ExportKind"];
 export type StatusFilter = components["schemas"]["StatusFilter"];
 export type PriceLevel = components["schemas"]["PriceLevel"];
 
+export type ReportParams = components["schemas"]["ReportParams"];
+/** URL segment of `POST /exports/reports/{report}`. */
+export type ReportKey =
+  | "dsr-late-daily"
+  | "dsr-late-summary"
+  | "replenishment-amount-mismatch"
+  | "replenishment-trips";
+
 export type MasterDataEntity = components["parameters"]["MasterDataEntity"];
 export type VendorEntity = "vendor" | "branches" | "vaults" | "pics" | "dsr-location-maps";
 export type BranchEntity = "vaults" | "pics" | "dsr-location-maps";
@@ -30,7 +38,8 @@ export type ExportRequestParams =
       priceLevel?: PriceLevel;
       status?: StatusFilter;
     }
-  | { kind: "master_data_global"; entity: MasterDataEntity; status?: StatusFilter };
+  | { kind: "master_data_global"; entity: MasterDataEntity; status?: StatusFilter }
+  | { kind: "report"; report: ReportKey; params: ReportParams };
 
 export interface RequestExportResult {
   job: ExportJob;

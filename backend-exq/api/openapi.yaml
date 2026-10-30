@@ -91,6 +91,82 @@ paths:
         '429': { $ref: '#/components/responses/TooManyExports' }
         '500': { $ref: '#/components/responses/Internal' }
 
+  /exports/reports/dsr-late-daily:
+    post:
+      operationId: requestDsrLateDailyExport
+      summary: Request the DSR late daily report export (kind dsr_late_daily)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/ReportMonth'
+        - $ref: '#/components/parameters/ReportVendorID'
+        - { name: vendor_branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/reports/dsr-late-summary:
+    post:
+      operationId: requestDsrLateSummaryExport
+      summary: Request the DSR late monthly summary export (kind dsr_late_summary)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/ReportMonth'
+        - $ref: '#/components/parameters/ReportVendorID'
+        - { name: vendor_branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/reports/replenishment-amount-mismatch:
+    post:
+      operationId: requestReplenishmentAmountMismatchExport
+      summary: Request the replenishment amount-mismatch report export (kind replenishment_amount_mismatch)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/ReportDateFrom'
+        - $ref: '#/components/parameters/ReportDateTo'
+        - $ref: '#/components/parameters/ReportVendorID'
+        - { name: region_code, in: query, schema: { type: string } }
+        - { name: classification, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/reports/replenishment-trips:
+    post:
+      operationId: requestReplenishmentTripsExport
+      summary: Request the replenishment trips report export (kind replenishment_trips)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/ReportDateFrom'
+        - $ref: '#/components/parameters/ReportDateTo'
+        - $ref: '#/components/parameters/ReportVendorID'
+        - { name: region_code, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
   /exports/master-data/{entity}/template:
     get:
       operationId: downloadImportTemplate
@@ -171,6 +247,10 @@ components:
       in: query
       description: 'default active'
       schema: { $ref: '#/components/schemas/StatusFilter' }
+    ReportMonth: { name: month, in: query, description: 'YYYY-MM, not after the current month (WIB)', schema: { type: string } }
+    ReportDateFrom: { name: date_from, in: query, description: 'YYYY-MM-DD', schema: { type: string } }
+    ReportDateTo: { name: date_to, in: query, description: 'YYYY-MM-DD, range at most 31 days', schema: { type: string } }
+    ReportVendorID: { name: vendor_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
     MasterDataEntity:
       name: entity
       in: path
@@ -180,13 +260,25 @@ components:
   schemas:
     StatusFilter: { type: string, enum: [active, disabled, all] }
     PriceLevel: { type: string, enum: [vendor, branch, atm, all] }
-    ExportKind: { type: string, enum: [vendor, cabang, harga_paket, master_data_global] }
+    ExportKind: { type: string, enum: [vendor, cabang, harga_paket, master_data_global, dsr_late_daily, dsr_late_summary, replenishment_amount_mismatch, replenishment_trips] }
+    ReportParams:
+      type: object
+      description: Validated filter of a report export; keys that do not apply to the kind are absent. Sent again as query string by "Minta ekspor lagi".
+      properties:
+        month: { type: string, description: 'YYYY-MM (DSR)' }
+        date_from: { type: string, description: 'YYYY-MM-DD (replenishment)' }
+        date_to: { type: string, description: 'YYYY-MM-DD (replenishment)' }
+        vendor_id: { type: integer, format: int64 }
+        vendor_branch_id: { type: integer, format: int64 }
+        region_code: { type: string }
+        status: { type: string }
+        classification: { type: string }
     ExportStatus: { type: string, enum: [queued, running, succeeded, failed, downloading, downloaded, expired] }
 
     ExportJob:
       type: object
       description: Public job view; every key is always present, absent values are null. Times are RFC 3339 UTC.
-      required: [id, kind, entity, vendor_id, vendor_code, branch_id, branch_code, status_filter, price_level, file_name, status, row_count, byte_size, error_message, created_at, started_at, finished_at, expires_at, downloaded_at]
+      required: [id, kind, entity, vendor_id, vendor_code, branch_id, branch_code, status_filter, price_level, file_name, status, row_count, byte_size, error_message, created_at, started_at, finished_at, expires_at, downloaded_at, report_params]
       properties:
         id: { type: integer, format: int64 }
         kind: { $ref: '#/components/schemas/ExportKind' }
@@ -195,7 +287,10 @@ components:
         vendor_code: { type: string, nullable: true }
         branch_id: { type: integer, format: int64, nullable: true }
         branch_code: { type: string, nullable: true }
-        status_filter: { $ref: '#/components/schemas/StatusFilter' }
+        status_filter:
+          description: null for report jobs
+          allOf: [{ $ref: '#/components/schemas/StatusFilter' }]
+          nullable: true
         price_level: { type: string, enum: [vendor, branch, atm, all], nullable: true }
         file_name: { type: string }
         status: { $ref: '#/components/schemas/ExportStatus' }
@@ -207,6 +302,10 @@ components:
         finished_at: { type: string, format: date-time, nullable: true }
         expires_at: { type: string, format: date-time, nullable: true }
         downloaded_at: { type: string, format: date-time, nullable: true }
+        report_params:
+          description: null for master-data jobs
+          allOf: [{ $ref: '#/components/schemas/ReportParams' }]
+          nullable: true
 
     JobEnvelope:
       type: object
@@ -227,6 +326,15 @@ components:
           properties:
             code: { type: string }
             message: { type: string }
+            details:
+              type: array
+              description: Field-level detail; present on report parameter validation errors (code validation_error)
+              items:
+                type: object
+                required: [field, message]
+                properties:
+                  field: { type: string }
+                  message: { type: string }
 
     MiddlewareError:
       type: object

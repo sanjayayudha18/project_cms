@@ -116,8 +116,27 @@ func (s *Service) resolveScope(ctx context.Context, p Params) (vendorCode, branc
 	return vendorCode, branchCode, nil
 }
 
+// statusFilterOf: status_filter is set for master-data kinds and NULL for report kinds (migration 035).
+func statusFilterOf(p Params) *string {
+	if p.Report != nil {
+		return nil
+	}
+	return &p.StatusFilter
+}
+
 // requestedAfter is the audit `after` of export_requested (design ExqAuditWriter; no row_count).
+// Report kinds keep the legacy report_exported shape (report + filter) so old and new rows read alike.
 func requestedAfter(r repository.ExportJob, a Actor) map[string]any {
+	if rp := reportParamsFromJSON(r.ReportParams); rp != nil && IsReportKind(Kind(r.Kind)) {
+		return map[string]any{
+			"export_job_id": r.ID,
+			"export_kind":   r.Kind,
+			"report":        r.Entity,
+			"filter":        rp.legacyFilter(Kind(r.Kind)),
+			"username":      a.Username,
+			"role":          a.Role,
+		}
+	}
 	return map[string]any{
 		"export_job_id": r.ID,
 		"export_kind":   r.Kind,
@@ -188,10 +207,11 @@ func (s *Service) Create(ctx context.Context, a Actor, p Params) (Job, bool, err
 			VendorCode:     vendorCode,
 			VendorBranchID: p.BranchID,
 			BranchCode:     branchCode,
-			StatusFilter:   p.StatusFilter,
+			StatusFilter:   statusFilterOf(p),
 			PriceLevel:     p.PriceLevel,
 			ParamsHash:     hash,
 			FileName:       FileName(p, strOrEmpty(vendorCode), strOrEmpty(branchCode), s.now()),
+			ReportParams:   reportParamsJSON(p.Report),
 		})
 		if err != nil {
 			return wrapInternal("insert job", err)

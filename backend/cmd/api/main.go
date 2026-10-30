@@ -26,6 +26,7 @@ import (
 	"github.com/cimb-niaga/cms/pkg/config"
 	"github.com/cimb-niaga/cms/pkg/health"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
@@ -472,16 +473,16 @@ func main() {
 	// replenishment-realisasi FR4-FR6: classifications written by the Python job; reads on the replica.
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-realizations", handler.NewVendorOrderHandler(vendorOrderService).RealizationRoutes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/replenishment",
-		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbPool, dbReadPool)).Routes())
+		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbReadPool)).Routes())
 	// dsr-late-report FR4: monthly late/missing DSR per vendor branch, read on the replica; DSR_LATE_START_DATE
 	// (same value as the Python RETRY_DSR_LATE_START_DATE) empty = report off.
-	dsrLateStart, err := service.ParseDsrLateStartDate(getenvDefault("DSR_LATE_START_DATE", ""))
+	dsrLateStart, err := reports.ParseDsrLateStartDate(getenvDefault("DSR_LATE_START_DATE", ""))
 	if err != nil {
 		slog.Error("invalid DSR_LATE_START_DATE", "error", err)
 		os.Exit(1)
 	}
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr-late-reports",
-		handler.NewDsrLateHandler(service.NewDsrLateReportService(dbPool, dbReadPool, dsrLateStart)).Routes())
+		handler.NewDsrLateHandler(service.NewDsrLateReportService(dbReadPool, dsrLateStart)).Routes())
 	// Hari libur (FR1): ADMIN only (route + service), immediate apply + audit in the same tx (GR#3 deviation).
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/admin/holidays",
 		handler.NewAdminHolidayHandler(service.NewHolidayAdminService(dbPool, dbReadPool)).Routes())

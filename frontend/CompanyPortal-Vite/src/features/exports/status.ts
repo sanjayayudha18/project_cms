@@ -8,7 +8,28 @@ import {
   type LucideIcon,
   TimerOff,
 } from "lucide-react";
-import type { ExportStatus } from "./types";
+import type { ExportKind, ExportStatus, ReportKey } from "./types";
+
+export const KIND_LABEL: Record<ExportKind, string> = {
+  vendor: "Vendor",
+  cabang: "Cabang",
+  harga_paket: "Harga paket",
+  master_data_global: "Data master",
+  dsr_late_daily: "Laporan DSR telat (harian)",
+  dsr_late_summary: "Laporan DSR telat (rekap bulanan)",
+  replenishment_amount_mismatch: "Replenish: selisih nominal",
+  replenishment_trips: "Replenish: trip per ATM",
+};
+
+/** Report kind -> `/exports/reports/{report}` segment. */
+export const REPORT_KEY_BY_KIND: Partial<Record<ExportKind, ReportKey>> = {
+  dsr_late_daily: "dsr-late-daily",
+  dsr_late_summary: "dsr-late-summary",
+  replenishment_amount_mismatch: "replenishment-amount-mismatch",
+  replenishment_trips: "replenishment-trips",
+};
+
+export const isReportKind = (k: ExportKind): boolean => k in REPORT_KEY_BY_KIND;
 
 export type StatusTone = "info" | "success" | "neutral" | "danger" | "warning";
 

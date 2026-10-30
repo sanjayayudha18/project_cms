@@ -26,7 +26,7 @@ const claimNextExportJob = `-- name: ClaimNextExportJob :one
 UPDATE export_jobs SET status = 'running', started_at = now()
 WHERE id = (SELECT j.id FROM export_jobs j WHERE j.status = 'queued'
             ORDER BY j.id FOR UPDATE SKIP LOCKED LIMIT 1)
-RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at
+RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params
 `
 
 func (q *Queries) ClaimNextExportJob(ctx context.Context) (ExportJob, error) {
@@ -58,6 +58,7 @@ func (q *Queries) ClaimNextExportJob(ctx context.Context) (ExportJob, error) {
 		&i.DownloadedAt,
 		&i.ExpiredAt,
 		&i.UpdatedAt,
+		&i.ReportParams,
 	)
 	return i, err
 }
@@ -183,7 +184,7 @@ func (q *Queries) FailTimedOutExportJobs(ctx context.Context, arg FailTimedOutEx
 }
 
 const findActiveExportJobByHash = `-- name: FindActiveExportJobByHash :one
-SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at FROM export_jobs
+SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params FROM export_jobs
 WHERE requested_by = $1::bigint
   AND params_hash = $2::text
   AND status IN ('queued', 'running')
@@ -223,6 +224,7 @@ func (q *Queries) FindActiveExportJobByHash(ctx context.Context, arg FindActiveE
 		&i.DownloadedAt,
 		&i.ExpiredAt,
 		&i.UpdatedAt,
+		&i.ReportParams,
 	)
 	return i, err
 }
@@ -245,7 +247,7 @@ func (q *Queries) GetExportJobChunk(ctx context.Context, arg GetExportJobChunkPa
 }
 
 const getExportJobForUser = `-- name: GetExportJobForUser :one
-SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at FROM export_jobs
+SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params FROM export_jobs
 WHERE id = $1::bigint AND requested_by = $2::bigint
 `
 
@@ -283,6 +285,7 @@ func (q *Queries) GetExportJobForUser(ctx context.Context, arg GetExportJobForUs
 		&i.DownloadedAt,
 		&i.ExpiredAt,
 		&i.UpdatedAt,
+		&i.ReportParams,
 	)
 	return i, err
 }
@@ -319,9 +322,9 @@ func (q *Queries) GetVendorCodeByID(ctx context.Context, vendorID int64) (string
 
 const insertExportJob = `-- name: InsertExportJob :one
 INSERT INTO export_jobs (requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id,
-                         branch_code, status_filter, price_level, params_hash, file_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at
+                         branch_code, status_filter, price_level, params_hash, file_name, report_params)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params
 `
 
 type InsertExportJobParams struct {
@@ -332,10 +335,11 @@ type InsertExportJobParams struct {
 	VendorCode     *string `json:"vendor_code"`
 	VendorBranchID *int64  `json:"vendor_branch_id"`
 	BranchCode     *string `json:"branch_code"`
-	StatusFilter   string  `json:"status_filter"`
+	StatusFilter   *string `json:"status_filter"`
 	PriceLevel     *string `json:"price_level"`
 	ParamsHash     string  `json:"params_hash"`
 	FileName       string  `json:"file_name"`
+	ReportParams   []byte  `json:"report_params"`
 }
 
 func (q *Queries) InsertExportJob(ctx context.Context, arg InsertExportJobParams) (ExportJob, error) {
@@ -351,6 +355,7 @@ func (q *Queries) InsertExportJob(ctx context.Context, arg InsertExportJobParams
 		arg.PriceLevel,
 		arg.ParamsHash,
 		arg.FileName,
+		arg.ReportParams,
 	)
 	var i ExportJob
 	err := row.Scan(
@@ -379,6 +384,7 @@ func (q *Queries) InsertExportJob(ctx context.Context, arg InsertExportJobParams
 		&i.DownloadedAt,
 		&i.ExpiredAt,
 		&i.UpdatedAt,
+		&i.ReportParams,
 	)
 	return i, err
 }
@@ -399,7 +405,7 @@ func (q *Queries) InsertExportJobChunk(ctx context.Context, arg InsertExportJobC
 }
 
 const listExportJobsForUser = `-- name: ListExportJobsForUser :many
-SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at FROM export_jobs
+SELECT id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params FROM export_jobs
 WHERE requested_by = $1::bigint
 ORDER BY created_at DESC, id DESC
 LIMIT $2::int
@@ -445,6 +451,7 @@ func (q *Queries) ListExportJobsForUser(ctx context.Context, arg ListExportJobsF
 			&i.DownloadedAt,
 			&i.ExpiredAt,
 			&i.UpdatedAt,
+			&i.ReportParams,
 		); err != nil {
 			return nil, err
 		}
@@ -551,7 +558,7 @@ const startExportJobDownload = `-- name: StartExportJobDownload :one
 UPDATE export_jobs SET status = 'downloading', download_started_at = now()
 WHERE id = $1::bigint AND requested_by = $2::bigint
   AND status = 'succeeded' AND expires_at > now()
-RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at
+RETURNING id, requested_by, kind, entity, vendor_id, vendor_code, vendor_branch_id, branch_code, status_filter, price_level, params_hash, file_name, status, row_count, byte_size, chunk_count, error_message, created_at, started_at, finished_at, expires_at, download_started_at, downloaded_at, expired_at, updated_at, report_params
 `
 
 type StartExportJobDownloadParams struct {
@@ -588,6 +595,7 @@ func (q *Queries) StartExportJobDownload(ctx context.Context, arg StartExportJob
 		&i.DownloadedAt,
 		&i.ExpiredAt,
 		&i.UpdatedAt,
+		&i.ReportParams,
 	)
 	return i, err
 }

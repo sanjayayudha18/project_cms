@@ -21,6 +21,7 @@ import (
 	"github.com/cimb-niaga/cms/pkg/config"
 	"github.com/cimb-niaga/cms/pkg/health"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 func main() {
@@ -39,6 +40,14 @@ func main() {
 	workerCfg, err := exportjob.LoadWorkerConfig()
 	if err != nil {
 		slog.Error("invalid export worker config", "error", err)
+		os.Exit(1)
+	}
+
+	// DSR late report start date (K5: same value as backend and RETRY_DSR_LATE_START_DATE).
+	// Invalid = refuse to start.
+	dsrLateStart, err := reports.ParseDsrLateStartDate(os.Getenv("DSR_LATE_START_DATE"))
+	if err != nil {
+		slog.Error("invalid DSR_LATE_START_DATE", "error", err)
 		os.Exit(1)
 	}
 
@@ -108,7 +117,7 @@ func main() {
 	r.Get("/ready", health.Ready(2*time.Second, readyChecks))
 
 	// Export job pipeline. Worker first: its Wake is the service's wake hook.
-	worker := exportjob.NewWorker(dbPool, dbReadPool, exportjob.DefaultProducers(), workerCfg)
+	worker := exportjob.NewWorker(dbPool, dbReadPool, exportjob.NewProducers(dsrLateStart), workerCfg)
 	svc := exportjob.NewService(dbPool, audit.NewWriter(), worker.Wake)
 	janitor := exportjob.NewJanitor(dbPool, workerCfg.JanitorInterval)
 	mountExports(r, custommw.RequireAuth(tokenService), handler.NewExportsHandler(svc))

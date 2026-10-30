@@ -26,6 +26,7 @@ const mkJob = (id: number, status: ExportStatus, extra: Partial<ExportJob> = {})
   branch_code: "B3",
   status_filter: "active",
   price_level: null,
+  report_params: null,
   file_name: `file-${id}.csv`,
   status,
   row_count: 1234,
@@ -194,6 +195,41 @@ describe("MyExportsTable", () => {
       branchId: 3,
       priceLevel: "branch",
       status: "all",
+    });
+  });
+
+  it("labels report jobs and re-requests them with report_params", async () => {
+    const reportParams = { month: "2026-10", vendor_id: 4 };
+    renderTable([
+      mkJob(1, "expired", {
+        kind: "dsr_late_summary",
+        entity: "summary",
+        vendor_id: null,
+        branch_id: null,
+        status_filter: null,
+        report_params: reportParams,
+      }),
+      mkJob(2, "downloaded", {
+        kind: "replenishment_trips",
+        entity: "trips",
+        vendor_id: null,
+        branch_id: null,
+        status_filter: null,
+        report_params: null,
+      }),
+    ]);
+    await screen.findAllByText("file-1.csv");
+    expect(screen.getByText("Laporan DSR telat (rekap bulanan)")).toBeInTheDocument();
+    expect(screen.getByText("Replenish: trip per ATM")).toBeInTheDocument();
+    // Job 2 has no report_params -> no re-request button.
+    expect(screen.getAllByRole("button", { name: /^Minta ekspor lagi/ })).toHaveLength(1);
+
+    apiMock.requestExport.mockResolvedValue({ job: mkJob(9, "queued"), created: true });
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Minta ekspor lagi/ }));
+    expect(apiMock.requestExport.mock.lastCall?.[0]).toEqual({
+      kind: "report",
+      report: "dsr-late-summary",
+      params: reportParams,
     });
   });
 

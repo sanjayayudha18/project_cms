@@ -113,11 +113,11 @@ const (
 func dlJob(status string, expiresIn time.Duration) repository.ExportJob {
 	vid, bid := int64(3), int64(31)
 	vcode, bcode := "ABA", "MDN"
-	cc := int32(2)
+	cc, sf := int32(2), "active"
 	return repository.ExportJob{
 		ID: dlJobID, RequestedBy: dlOwner, Kind: string(KindCabang), Entity: "pics",
 		VendorID: &vid, VendorCode: &vcode, VendorBranchID: &bid, BranchCode: &bcode,
-		StatusFilter: "active", FileName: "f.csv", Status: status, RowCount: 42, ChunkCount: &cc,
+		StatusFilter: &sf, FileName: "f.csv", Status: status, RowCount: 42, ChunkCount: &cc,
 		ExpiresAt: pgtype.Timestamptz{Time: fixedNow.Add(expiresIn), Valid: true},
 	}
 }

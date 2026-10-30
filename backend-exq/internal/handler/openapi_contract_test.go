@@ -150,6 +150,12 @@ func contractJob() exportjob.Job {
 	}
 }
 
+func contractReportJob() exportjob.Job {
+	m, st := "2026-10", "late"
+	return exportjob.Job{ID: 2, Params: exportjob.Params{Kind: exportjob.KindDsrLateDaily, Entity: "daily", Report: &exportjob.ReportParams{Month: &m, Status: &st}},
+		FileName: "dsr-late-daily-202610.csv", Status: exportjob.StatusQueued, CreatedAt: time.Now()}
+}
+
 func contractQueuedJob() exportjob.Job {
 	return exportjob.Job{ID: 1, Params: exportjob.Params{Kind: exportjob.KindMasterDataGlobal, Entity: "atms", StatusFilter: "active"},
 		FileName: "master-data-atms-20261029.csv", Status: exportjob.StatusQueued, CreatedAt: time.Now()}
@@ -188,6 +194,18 @@ func TestOpenAPIContract_Responses(t *testing.T) {
 		{"global 202", "POST", "/master-data/atms", "ADMIN_PARAM", ok, 202},
 		{"global 400 status", "POST", "/master-data/atms?status=zzz", "ADMIN", ok, 400},
 		{"global 404", "POST", "/master-data/zzz", "ADMIN", ok, 404},
+		{"report daily 202", "POST", "/reports/dsr-late-daily?month=2026-10&status=late", "ATM-USER", &contractSvc{job: contractReportJob(), created: true}, 202},
+		{"report daily 200 existing", "POST", "/reports/dsr-late-daily?month=2026-10", "ADMIN", &contractSvc{job: contractReportJob()}, 200},
+		{"report daily 400 month", "POST", "/reports/dsr-late-daily?month=nope", "ADMIN", ok, 400},
+		{"report daily 401", "POST", "/reports/dsr-late-daily?month=2026-10", "", ok, 401},
+		{"report daily 403", "POST", "/reports/dsr-late-daily?month=2026-10", "BRANCH-ATM-USER", ok, 403},
+		{"report daily 429", "POST", "/reports/dsr-late-daily?month=2026-10", "ADMIN", &contractSvc{err: exportjob.ErrTooManyActive}, 429},
+		{"report daily 500", "POST", "/reports/dsr-late-daily?month=2026-10", "ADMIN", &contractSvc{err: errors.New("boom")}, 500},
+		{"report summary 202", "POST", "/reports/dsr-late-summary?month=2026-10", "ATM-SPV", ok, 202},
+		{"report mismatch 202", "POST", "/reports/replenishment-amount-mismatch?date_from=2026-10-01&date_to=2026-10-07", "BRANCH-ATM-USER", ok, 202},
+		{"report mismatch 400 range", "POST", "/reports/replenishment-amount-mismatch?date_from=2026-09-01&date_to=2026-10-07", "ADMIN", ok, 400},
+		{"report trips 202", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ATM-USER", ok, 202},
+		{"report trips 403", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ADMIN_PARAM", ok, 403},
 		{"template 200", "GET", "/master-data/atms/template", "ADMIN", ok, 200},
 		{"template 404", "GET", "/master-data/zzz/template", "ADMIN", ok, 404},
 		{"template 401", "GET", "/master-data/atms/template", "", ok, 401},

@@ -566,7 +566,7 @@ func contractCases() []contractCase {
 
 		// dsr late report
 		{name: "dsr late daily", method: http.MethodGet, path: dl + "/daily?month=2026-10&status=late&page=1", role: "ATM-USER", wantStatus: 200},
-		{name: "dsr late daily csv", method: http.MethodGet, path: dl + "/daily?month=2026-10&format=csv", role: "ATM-SPV", wantStatus: 200},
+		{name: "dsr late daily csv", method: http.MethodGet, path: dl + "/daily?month=2026-10&format=csv", role: "ATM-SPV", wantStatus: 400},
 		{name: "dsr late daily no month", method: http.MethodGet, path: dl + "/daily", role: "ATM-USER", wantStatus: 400},
 		{name: "dsr late daily bad status", method: http.MethodGet, path: dl + "/daily?month=2026-10&status=x", role: "ATM-USER", wantStatus: 400},
 		{name: "dsr late daily forbidden", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "ATM-USER",
@@ -574,7 +574,7 @@ func contractCases() []contractCase {
 		{name: "dsr late daily error", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "ATM-USER",
 			dsrLate: &contractDsrLate{fakeDsrLateReader{err: errors.New("boom")}}, wantStatus: 500},
 		{name: "dsr late summary", method: http.MethodGet, path: dl + "/summary?month=2026-10&vendor_id=2", role: "BRANCH-ATM-SPV", wantStatus: 200},
-		{name: "dsr late summary csv", method: http.MethodGet, path: dl + "/summary?month=2026-10&format=csv", role: "ADMIN", wantStatus: 200},
+		{name: "dsr late summary csv", method: http.MethodGet, path: dl + "/summary?month=2026-10&format=csv", role: "ADMIN", wantStatus: 400},
 		{name: "dsr late summary bad vendor", method: http.MethodGet, path: dl + "/summary?month=2026-10&vendor_id=0", role: "ADMIN", wantStatus: 400},
 		{name: "dsr late warnings", method: http.MethodGet, path: dl + "/warnings?month=2026-10", role: "ADMIN", wantStatus: 200},
 		{name: "dsr late warnings bad month", method: http.MethodGet, path: dl + "/warnings?month=10-2026", role: "ADMIN", wantStatus: 400},

@@ -1,7 +1,6 @@
 /**
  * fe-coverage C4: realisasi replenish vs order — date-range rules (max 31 days) and the
- * classification/summary queries. downloadReport is not covered here: it calls `fetch`
- * directly instead of the API client (no 401 refresh), reported in fe-coverage/tests.md C4.
+ * classification/summary queries. CSV reports go through the async export flow (features/exports).
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

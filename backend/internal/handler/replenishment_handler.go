@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Replenishment realisasi vs order (.claude/sdlc/replenishment-realisasi/spec.md FR4, FR5.2, FR6).
@@ -24,7 +24,6 @@ type ReplenishmentReader interface {
 	Summary(ctx context.Context, actor service.Actor, from, to time.Time, vendorID *int64) (*service.ReplenishmentSummary, error)
 	AmountMismatch(ctx context.Context, actor service.Actor, f service.ReplenishmentFilter) ([]service.ClassificationView, error)
 	Trips(ctx context.Context, actor service.Actor, from, to time.Time, vendorID *int64) ([]service.TripRow, error)
-	RecordExport(ctx context.Context, actor service.Actor, report string, filter map[string]any) error
 }
 
 type ReplenishmentHandler struct {
@@ -37,7 +36,7 @@ func NewReplenishmentHandler(svc ReplenishmentReader) *ReplenishmentHandler {
 
 func (h *ReplenishmentHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles(vendorRequestViewerRoles...))
+	r.Use(middleware.RequireRoles(reports.ReplenishmentViewerRoles...))
 	r.Get("/classifications", h.List)
 	r.Get("/summary", h.Summary)
 	r.Get("/reports/amount-mismatch", h.AmountMismatch)
@@ -60,7 +59,7 @@ func parseReplenishmentFilter(r *http.Request, internal bool) (service.Replenish
 		}
 	}
 	if c := q.Get("classification"); c != "" {
-		if !service.ReplenishmentClasses[c] {
+		if !reports.ReplenishmentClasses[c] {
 			return f, &service.ValidationError{Field: "classification", Message: "tidak dikenal"}
 		}
 		f.Classification = &c
@@ -137,108 +136,32 @@ func (h *ReplenishmentHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func exportFilter(f service.ReplenishmentFilter) map[string]any {
-	return map[string]any{"date_from": formatDate(f.From), "date_to": formatDate(f.To), "vendor_id": f.VendorID, "region_code": f.RegionCode}
-}
-
-// AmountMismatch handles GET /reports/amount-mismatch[?format=csv] (FR6.1, FR6.3).
+// AmountMismatch handles GET /reports/amount-mismatch (FR6.1); format=csv is rejected (8.1).
 func (h *ReplenishmentHandler) AmountMismatch(w http.ResponseWriter, r *http.Request) {
+	if rejectCSVFormat(w, r) {
+		return
+	}
 	h.withFilter(w, r, func(a service.Actor, f service.ReplenishmentFilter) error {
 		rows, err := h.svc.AmountMismatch(r.Context(), a, f)
-		if err != nil {
-			return err
-		}
-		if r.URL.Query().Get("format") != "csv" {
+		if err == nil {
 			writeJSON(w, http.StatusOK, map[string]any{"items": rows})
-			return nil
 		}
-		if err := h.svc.RecordExport(r.Context(), a, "amount_mismatch", exportFilter(f)); err != nil {
-			return err
-		}
-		lines := [][]string{{"report_date", "ticket_number", "request_number", "terminal_id", "vendor", "branch_code", "region_code",
-			"scheduled_date", "realized_date", "classification", "workday_offset", "denom", "order_amount", "itm_amount",
-			"vendor_amount", "diff", "currency"}}
-		for _, v := range rows {
-			for _, am := range v.Amounts {
-				lines = append(lines, []string{dateCell(v.ScheduledDate, v.RealizedDate), str(v.TicketNumber), str(v.RequestNumber), v.TerminalID,
-					str(v.VendorName), str(v.BranchCode), str(v.RegionCode), dateCell(v.ScheduledDate, nil), dateCell(v.RealizedDate, nil),
-					v.Classification, intCell(v.WorkdayOffset), strconv.Itoa(int(am.Denom)), strconv.FormatInt(am.Order, 10),
-					strconv.FormatInt(am.Itm, 10), int64Cell(am.Vendor), strconv.FormatInt(am.Diff, 10), v.Currency})
-			}
-		}
-		writeCSV(w, "replenishment-amount-mismatch-"+formatDate(f.From)+"-"+formatDate(f.To), lines)
-		return nil
+		return err
 	})
 }
 
-// Trips handles GET /reports/trips[?format=csv] (FR6.2, FR6.3).
+// Trips handles GET /reports/trips (FR6.2); format=csv is rejected (8.1).
 func (h *ReplenishmentHandler) Trips(w http.ResponseWriter, r *http.Request) {
+	if rejectCSVFormat(w, r) {
+		return
+	}
 	h.withFilter(w, r, func(a service.Actor, f service.ReplenishmentFilter) error {
 		rows, err := h.svc.Trips(r.Context(), a, f.From, f.To, f.VendorID)
-		if err != nil {
-			return err
-		}
-		if r.URL.Query().Get("format") != "csv" {
+		if err == nil {
 			writeJSON(w, http.StatusOK, map[string]any{"items": rows})
-			return nil
 		}
-		if err := h.svc.RecordExport(r.Context(), a, "trips", exportFilter(f)); err != nil {
-			return err
-		}
-		lines := [][]string{{"vendor_id", "vendor", "terminal_id", "trips", "first_date", "last_date"}}
-		for _, t := range rows {
-			lines = append(lines, []string{int64Cell(t.VendorID), str(t.VendorName), t.TerminalID, strconv.FormatInt(t.Trips, 10),
-				dateCell(t.FirstDate, nil), dateCell(t.LastDate, nil)})
-		}
-		writeCSV(w, "replenishment-trips-"+formatDate(f.From)+"-"+formatDate(f.To), lines)
-		return nil
+		return err
 	})
-}
-
-// writeCSV sends a small, fully built report (<= 31 days) as a download; amounts are plain integers.
-func writeCSV(w http.ResponseWriter, name string, lines [][]string) {
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.csv"`)
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	for _, line := range lines {
-		for i, cell := range line {
-			line[i] = service.CSVSafe(cell) // vendor/branch names are typed by admins (review R5)
-		}
-	}
-	cw := csv.NewWriter(w)
-	_ = cw.WriteAll(lines) // headers are out: a write error can only abort the stream
-}
-
-func str(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
-func int64Cell(p *int64) string {
-	if p == nil {
-		return ""
-	}
-	return strconv.FormatInt(*p, 10)
-}
-
-func intCell(p *int16) string {
-	if p == nil {
-		return ""
-	}
-	return strconv.Itoa(int(*p))
-}
-
-// dateCell formats the first non-nil date.
-func dateCell(a, b *time.Time) string {
-	for _, t := range []*time.Time{a, b} {
-		if t != nil {
-			return formatDate(*t)
-		}
-	}
-	return ""
 }
 
 // RealizationRoutes: GET / on /api/v1/vendor/replenish-realizations (FR5.2), vendor roles only;

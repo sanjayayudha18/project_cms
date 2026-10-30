@@ -6,8 +6,6 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
-import { apiConfig } from "@/lib/api/config";
-import { useAuthStore } from "@/lib/auth/store";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 export type Classification =
@@ -147,32 +145,4 @@ export function useReplenishmentSummary(dateFrom: string, dateTo: string) {
         )
       ).data,
   });
-}
-
-export type ReportKind = "amount-mismatch" | "trips";
-
-/** Downloads a CSV report (the server audits the export). */
-export async function downloadReport(
-  kind: ReportKind,
-  p: Omit<ClassificationParams, "page">,
-): Promise<void> {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(
-    `${apiConfig.baseURL}/replenishment/reports/${kind}?${query(p)}&format=csv`,
-    {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: "include",
-    },
-  );
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string };
-    throw new Error(body.message ?? "Gagal mengunduh laporan");
-  }
-  const match = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
-  const url = URL.createObjectURL(await res.blob());
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = match?.[1] ?? `replenishment-${kind}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

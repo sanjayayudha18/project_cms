@@ -7,6 +7,7 @@ import { CircleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { downloadExportFile, isApiError } from "../api";
 import { exportKeys, useMyExports, useRequestExport } from "../hooks";
+import { KIND_LABEL, REPORT_KEY_BY_KIND, isReportKind } from "../status";
 import type {
   BranchEntity,
   ExportJob,
@@ -16,19 +17,17 @@ import type {
 } from "../types";
 import { ExportStatusBadge } from "./ExportStatusBadge";
 
-const KIND_LABEL: Record<ExportJob["kind"], string> = {
-  vendor: "Vendor",
-  cabang: "Cabang",
-  harga_paket: "Harga paket",
-  master_data_global: "Data master",
-};
 const TICK_MS = 30_000;
 const DASH = "—";
 
 /** Request params that reproduce `job`, or null when the job lacks the ids to do so. */
 export function jobToParams(job: ExportJob): ExportRequestParams | null {
-  const status = job.status_filter;
+  const status = job.status_filter ?? undefined;
   const { vendor_id: vendorId, branch_id: branchId } = job;
+  const report = REPORT_KEY_BY_KIND[job.kind];
+  if (report) {
+    return job.report_params ? { kind: "report", report, params: job.report_params } : null;
+  }
   switch (job.kind) {
     case "vendor":
       return vendorId === null
@@ -48,7 +47,7 @@ export function jobToParams(job: ExportJob): ExportRequestParams | null {
             priceLevel: job.price_level ?? undefined,
             status,
           };
-    case "master_data_global":
+    default:
       return { kind: "master_data_global", entity: job.entity as MasterDataEntity, status };
   }
 }
@@ -121,7 +120,10 @@ export function MyExportsTable() {
     {
       id: "kind",
       header: "Jenis",
-      cell: ({ row }) => `${KIND_LABEL[row.original.kind]} · ${row.original.entity}`,
+      cell: ({ row }) =>
+        isReportKind(row.original.kind)
+          ? KIND_LABEL[row.original.kind]
+          : `${KIND_LABEL[row.original.kind]} · ${row.original.entity}`,
     },
     {
       id: "created_at",

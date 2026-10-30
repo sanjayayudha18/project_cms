@@ -14,10 +14,11 @@ import {
   requestBranchExport,
   requestMasterDataExport,
   requestPackagePriceExport,
+  requestReportExport,
   requestVendorExport,
 } from "./api";
 import { claimAutoDownload, resetAutoDownloadClaims } from "./autoDownload";
-import { STATUS_META } from "./status";
+import { KIND_LABEL, REPORT_KEY_BY_KIND, STATUS_META, isReportKind } from "./status";
 
 const job = { id: 7, status: "queued" };
 
@@ -51,6 +52,40 @@ describe("request endpoints", () => {
       "/exports/vendors/3/package-prices?branch_id=9&price_level=atm",
       "/exports/master-data/atms?status=disabled",
     ]);
+  });
+});
+
+describe("requestReportExport", () => {
+  it("POSTs to /exports/reports/{report} with legacy query names, skipping undefined", async () => {
+    client.post.mockResolvedValue({ status: 202, data: { success: true, data: job } });
+    const r = await requestReportExport("replenishment-trips", {
+      date_from: "2026-10-01",
+      date_to: "2026-10-31",
+      vendor_id: 4,
+      region_code: undefined,
+    });
+    expect(client.post).toHaveBeenCalledWith(
+      "/exports/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-31&vendor_id=4",
+    );
+    expect(r).toEqual({ job, created: true });
+  });
+
+  it("sends no query string for empty params and maps 200 to created=false", async () => {
+    client.post.mockResolvedValue({ status: 200, data: { success: true, data: job } });
+    const r = await requestReportExport("dsr-late-summary", {});
+    expect(client.post).toHaveBeenCalledWith("/exports/reports/dsr-late-summary");
+    expect(r.created).toBe(false);
+  });
+});
+
+describe("report kind labels", () => {
+  it("labels all 8 kinds in Indonesian and maps report kinds to URL keys", () => {
+    expect(Object.keys(KIND_LABEL)).toHaveLength(8);
+    expect(KIND_LABEL.dsr_late_daily).toBe("Laporan DSR telat (harian)");
+    expect(KIND_LABEL.replenishment_trips).toBe("Replenish: trip per ATM");
+    expect(REPORT_KEY_BY_KIND.replenishment_amount_mismatch).toBe("replenishment-amount-mismatch");
+    expect(isReportKind("dsr_late_summary")).toBe(true);
+    expect(isReportKind("vendor")).toBe(false);
   });
 });
 

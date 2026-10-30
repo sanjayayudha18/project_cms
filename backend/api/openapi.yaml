@@ -346,8 +346,8 @@ paths:
       tags: [dsr-late-report]
       description: >-
         Internal only (ATM-USER, ATM-SPV, BRANCH-ATM-SPV, ADMIN). One row per vendor branch per
-        obliged day of the month. With `format=csv` returns every row (no paging) as a CSV file
-        and writes a `report_exported` audit row.
+        obliged day of the month. CSV export moved to the async export jobs API; `format=csv`
+        is no longer accepted and returns 400.
       parameters:
         - $ref: '#/components/parameters/DsrLateMonth'
         - $ref: '#/components/parameters/DsrLateVendorID'
@@ -355,13 +355,11 @@ paths:
         - { name: status, in: query, schema: { $ref: '#/components/schemas/DsrLateStatus' } }
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
-        - $ref: '#/components/parameters/DsrLateFormat'
       responses:
         '200':
-          description: OK (JSON page, or CSV when format=csv)
+          description: OK
           content:
             application/json: { schema: { $ref: '#/components/schemas/DsrLateDailyList' } }
-            text/csv: { schema: { type: string } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -372,19 +370,17 @@ paths:
       operationId: getDsrLateSummary
       tags: [dsr-late-report]
       description: >-
-        Internal only. Per vendor branch totals for the month. With `format=csv` returns a CSV
-        file and writes a `report_exported` audit row.
+        Internal only. Per vendor branch totals for the month. CSV export moved to the async
+        export jobs API; `format=csv` is no longer accepted and returns 400.
       parameters:
         - $ref: '#/components/parameters/DsrLateMonth'
         - $ref: '#/components/parameters/DsrLateVendorID'
         - $ref: '#/components/parameters/DsrLateVendorBranchID'
-        - $ref: '#/components/parameters/DsrLateFormat'
       responses:
         '200':
-          description: OK (JSON, or CSV when format=csv)
+          description: OK
           content:
             application/json: { schema: { $ref: '#/components/schemas/DsrLateSummary' } }
-            text/csv: { schema: { type: string } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -416,7 +412,6 @@ components:
     DsrLateMonth: { name: month, in: query, required: true, description: 'YYYY-MM, not after the current month (WIB)', schema: { type: string, pattern: '^\d{4}-\d{2}$' } }
     DsrLateVendorID: { name: vendor_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
     DsrLateVendorBranchID: { name: vendor_branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
-    DsrLateFormat: { name: format, in: query, schema: { type: string, enum: [csv] } }
     VendorRequestID: { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
     PartyID: { name: id, in: path, required: true, description: vendor party id (not the request id), schema: { type: integer, format: int64, minimum: 1 } }
 

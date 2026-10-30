@@ -10,15 +10,18 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PageNumbers } from "@/components/ui/PageNumbers";
 import { formatAtmDate } from "@/features/atm-portal/lib/formatters";
 import { getTodayWib } from "@/features/eod-monitoring/utils";
+import {
+  ExportProgressDialog,
+  ReportExportNotice,
+  type ReportParams,
+  useExportFlow,
+} from "@/features/exports";
 import { useVendorOptions } from "@/features/vendor-request/hooks";
-import { useToast } from "@/lib/hooks/useToast";
 import { formatIDRFull } from "@/lib/utils/formatters";
 import {
   CLASSIFICATION_LABELS,
   type Classification,
   type ClassificationView,
-  type ReportKind,
-  downloadReport,
   rangeError,
   useClassifications,
 } from "./api";
@@ -62,7 +65,7 @@ function offsetLabel(row: ClassificationView): string {
  * (or per ITM fill without an order), classified daily by the EOD job against itm_replenish.
  */
 export function ReplenishmentScreen() {
-  const { toast } = useToast();
+  const exportFlow = useExportFlow();
   const today = getTodayWib();
   const [dateFrom, setDateFrom] = useState(addDays(today, -6));
   const [dateTo, setDateTo] = useState(today);
@@ -71,7 +74,6 @@ export function ReplenishmentScreen() {
   const [classification, setClassification] = useState<string | null>(null);
   const [onlyDiff, setOnlyDiff] = useState(false);
   const [page, setPage] = useState(1);
-  const [downloading, setDownloading] = useState<ReportKind | null>(null);
 
   const options = useVendorOptions();
   const filter = {
@@ -94,15 +96,14 @@ export function ReplenishmentScreen() {
     };
   }
 
-  async function download(kind: ReportKind) {
-    setDownloading(kind);
-    try {
-      await downloadReport(kind, filter);
-    } catch (e) {
-      toast({ type: "error", message: e instanceof Error ? e.message : "Gagal mengunduh laporan" });
-    } finally {
-      setDownloading(null);
+  function requestExport(report: "replenishment-amount-mismatch" | "replenishment-trips") {
+    const params: ReportParams = { date_from: dateFrom, date_to: dateTo };
+    if (filter.vendorId !== null) params.vendor_id = filter.vendorId;
+    if (regionCode) params.region_code = regionCode;
+    if (report === "replenishment-amount-mismatch" && classification) {
+      params.classification = classification;
     }
+    void exportFlow.request({ kind: "report", report, params });
   }
 
   return (
@@ -115,16 +116,16 @@ export function ReplenishmentScreen() {
           <>
             <Button
               variant="secondary"
-              disabled={rangeMsg !== null || downloading !== null}
-              onClick={() => download("amount-mismatch")}
+              disabled={rangeMsg !== null || exportFlow.isRequesting}
+              onClick={() => requestExport("replenishment-amount-mismatch")}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               Selisih nominal (CSV)
             </Button>
             <Button
               variant="secondary"
-              disabled={rangeMsg !== null || downloading !== null}
-              onClick={() => download("trips")}
+              disabled={rangeMsg !== null || exportFlow.isRequesting}
+              onClick={() => requestExport("replenishment-trips")}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               Trip per ATM (CSV)
@@ -132,6 +133,8 @@ export function ReplenishmentScreen() {
           </>
         }
       />
+      <ReportExportNotice error={exportFlow.requestError} />
+      <ExportProgressDialog {...exportFlow.dialogProps} />
 
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">

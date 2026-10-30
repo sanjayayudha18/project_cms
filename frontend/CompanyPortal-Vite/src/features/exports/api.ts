@@ -13,6 +13,8 @@ import type {
   ExportRequestParams,
   ListExportJobsResponse,
   MasterDataEntity,
+  ReportKey,
+  ReportParams,
   RequestExportResult,
   VendorEntity,
 } from "./types";
@@ -62,6 +64,12 @@ export const requestMasterDataExport = (
   status?: string,
 ): Promise<RequestExportResult> => post(`/exports/master-data/${entity}${qs({ status })}`);
 
+/** Report filters travel under the legacy query names (same keys as `ReportParams`). */
+export const requestReportExport = (
+  report: ReportKey,
+  params: ReportParams,
+): Promise<RequestExportResult> => post(`/exports/reports/${report}${qs({ ...params })}`);
+
 /** Dispatches on `params.kind` (used by useExportFlow). */
 export function requestExport(p: ExportRequestParams): Promise<RequestExportResult> {
   switch (p.kind) {
@@ -73,6 +81,8 @@ export function requestExport(p: ExportRequestParams): Promise<RequestExportResu
       return requestPackagePriceExport(p.vendorId, p);
     case "master_data_global":
       return requestMasterDataExport(p.entity, p.status);
+    case "report":
+      return requestReportExport(p.report, p.params);
   }
 }
 

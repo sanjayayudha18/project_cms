@@ -46,8 +46,9 @@ type Params struct {
 	Entity       string
 	VendorID     *int64
 	BranchID     *int64
-	StatusFilter string  // active | disabled | all
-	PriceLevel   *string // only for KindHargaPaket
+	StatusFilter string        // active | disabled | all
+	PriceLevel   *string       // only for KindHargaPaket
+	Report       *ReportParams // only for report kinds
 }
 
 func entitiesFor(k Kind) []string {
@@ -121,8 +122,13 @@ func idStr(p *int64) string {
 	return strconv.FormatInt(*p, 10)
 }
 
-// ParamsHash is the hex sha256 of kind|entity|vendor_id|branch_id|status|price_level.
+// ParamsHash is the hex sha256 of kind|entity|vendor_id|branch_id|status|price_level, or of the
+// canonical JSON of kind, entity and ReportParams for a report.
 func ParamsHash(p Params) string {
+	if p.Report != nil {
+		sum := sha256.Sum256(reportHashBytes(p))
+		return hex.EncodeToString(sum[:])
+	}
 	pl := ""
 	if p.PriceLevel != nil {
 		pl = *p.PriceLevel
@@ -146,6 +152,9 @@ func sanitize(s string) string {
 
 // FileName builds the download name (Req 5.2) with the WIB date of now.
 func FileName(p Params, vendorCode, branchCode string, now time.Time) string {
+	if p.Report != nil {
+		return reportFileName(p.Kind, *p.Report)
+	}
 	d := now.In(wib).Format("20060102")
 	v, b := sanitize(vendorCode), sanitize(branchCode)
 	switch p.Kind {

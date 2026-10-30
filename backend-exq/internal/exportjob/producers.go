@@ -14,6 +14,7 @@ import (
 
 // Querier is the subset of *repository.Queries the producers call.
 type Querier interface {
+	ReportQuerier
 	ExportVendorsBatch(ctx context.Context, arg repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error)
 	ExportVendorBranchesBatch(ctx context.Context, arg repository.ExportVendorBranchesBatchParams) ([]repository.ExportVendorBranchesBatchRow, error)
 	ExportVendorVaultsBatch(ctx context.Context, arg repository.ExportVendorVaultsBatchParams) ([]repository.ExportVendorVaultsBatchRow, error)
@@ -198,9 +199,13 @@ func packagePricesProducer() Producer {
 	}}
 }
 
-// DefaultProducers maps kind -> entity -> producer (design "entity table per Kind").
-func DefaultProducers() map[Kind]map[string]Producer {
-	return map[Kind]map[string]Producer{
+// DefaultProducers is NewProducers without a DSR start date (DSR report files are header only).
+func DefaultProducers() map[Kind]map[string]Producer { return NewProducers(nil) }
+
+// NewProducers maps kind -> entity -> producer (design "entity table per Kind"), master data and
+// reports. dsrStart is DSR_LATE_START_DATE; nil = DSR report files are header only.
+func NewProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
+	m := map[Kind]map[string]Producer{
 		KindVendor: {
 			"vendor":            vendorsProducer(true),
 			"branches":          branchesProducer(),
@@ -224,4 +229,8 @@ func DefaultProducers() map[Kind]map[string]Producer {
 			csvexport.ATMAssignments: atmAssignmentsProducer(),
 		},
 	}
+	for k, byEntity := range reportProducers(dsrStart) {
+		m[k] = byEntity
+	}
+	return m
 }

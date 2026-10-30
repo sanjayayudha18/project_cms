@@ -31,12 +31,8 @@ func TestDsrLateReport_Authorize(t *testing.T) {
 			_, e1 := s.Daily(context.Background(), a, f)
 			_, e2 := s.Summary(context.Background(), a, f)
 			_, e3 := s.Warnings(context.Background(), a, f)
-			errs := []error{e1, e2, e3}
-			if !tc.allowed { // allowed roles would write audit_logs (integration test); denial happens before the writer
-				errs = append(errs, s.RecordExport(context.Background(), a, "daily", nil))
-			}
-			for i, err := range errs {
-				if tc.allowed && i < 3 && err != nil {
+			for i, err := range []error{e1, e2, e3} {
+				if tc.allowed && err != nil {
 					t.Errorf("call %d: unexpected error %v", i, err)
 				}
 				if !tc.allowed && !errors.Is(err, ErrNotAuthorized) {
@@ -85,34 +81,11 @@ func TestDsrLateReport_NoStartDateIsEmpty(t *testing.T) {
 	if err != nil || d.Total != 0 || len(d.Items) != 0 || d.StartDate != nil || d.Page != 1 || d.PageSize != dsrLateDefaultPage {
 		t.Fatalf("daily = %+v, %v", d, err)
 	}
-	if rows, err := s.DailyAll(context.Background(), a, f); err != nil || rows == nil || len(rows) != 0 {
-		t.Fatalf("daily all = %v, %v", rows, err)
-	}
 	if sum, err := s.Summary(context.Background(), a, f); err != nil || sum.Items == nil || len(sum.Items) != 0 || sum.StartDate != nil {
 		t.Fatalf("summary = %+v, %v", sum, err)
 	}
 	if w, err := s.Warnings(context.Background(), a, f); err != nil || w.UnmappedVaults == nil || w.UnmappedLabels == nil || w.UnresolvedVendors == nil {
 		t.Fatalf("warnings = %+v, %v", w, err)
-	}
-}
-
-func TestParseDsrLateStartDate(t *testing.T) {
-	cases := []struct {
-		in      string
-		want    string
-		wantErr bool
-	}{
-		{"", "", false}, {"2026-11-01", "2026-11-01", false}, {"01-11-2026", "", true}, {"2026-13-01", "", true},
-	}
-	for _, tc := range cases {
-		got, err := ParseDsrLateStartDate(tc.in)
-		if (err != nil) != tc.wantErr {
-			t.Errorf("%q: err = %v", tc.in, err)
-			continue
-		}
-		if tc.want == "" && got != nil || tc.want != "" && (got == nil || got.Format("2006-01-02") != tc.want) {
-			t.Errorf("%q: got %v, want %q", tc.in, got, tc.want)
-		}
 	}
 }
 

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const client = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api/client", () => ({ api: client }));
 
-import { downloadReport, useDsrLateDaily, useDsrLateSummary, useDsrLateWarnings } from "../api";
+import { useDsrLateDaily, useDsrLateSummary, useDsrLateWarnings } from "../api";
 
 function setup<T>(hook: () => T) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -49,55 +49,5 @@ describe("dsr-late-report queries", () => {
     );
     expect(client.get).toHaveBeenCalledWith("/dsr-late-reports/summary?month=2026-10");
     expect(client.get).toHaveBeenCalledWith("/dsr-late-reports/warnings?month=2026-10&vendor_id=4");
-  });
-});
-
-describe("downloadReport", () => {
-  const filter = { month: "2026-10", vendorId: 2, vendorBranchId: null, status: "late" as const };
-
-  it("calls the CSV endpoint with format=csv and saves the file", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: new Headers({ "Content-Disposition": 'attachment; filename="dsr-late.csv"' }),
-      blob: async () => new Blob(["a"]),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    URL.createObjectURL = vi.fn(() => "blob:x");
-    URL.revokeObjectURL = vi.fn();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-
-    await downloadReport("daily", filter);
-
-    const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain("/dsr-late-reports/daily?");
-    expect(url).toContain("month=2026-10");
-    expect(url).toContain("status=late");
-    expect(url).toContain("format=csv");
-    expect(click).toHaveBeenCalled();
-    click.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it("throws the server message on failure", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: false, json: async () => ({ message: "Dilarang" }) }),
-    );
-    await expect(downloadReport("summary", filter)).rejects.toThrow("Dilarang");
-    vi.unstubAllGlobals();
-  });
-
-  it("falls back to a generic message and default filename", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => {
-          throw new Error("x");
-        },
-      }),
-    );
-    await expect(downloadReport("summary", filter)).rejects.toThrow("Gagal mengunduh laporan");
-    vi.unstubAllGlobals();
   });
 });

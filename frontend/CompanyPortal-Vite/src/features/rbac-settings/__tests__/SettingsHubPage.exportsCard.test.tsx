@@ -29,8 +29,5 @@ it("shows the Export Data card on the Data master tab", async () => {
   });
   render(<SettingsHubPage />);
   await userEvent.setup().click(screen.getByRole("tab", { name: "Data master" }));
-  expect(screen.getByRole("link", { name: /Export Data/ })).toHaveAttribute(
-    "href",
-    "/settings/admin/exports",
-  );
+  expect(screen.getByRole("link", { name: /Export Data/ })).toHaveAttribute("href", "/exports");
 });

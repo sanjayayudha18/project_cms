@@ -129,8 +129,8 @@ const MASTER_DATA_CARDS: HubCard[] = [
   {
     id: "admin-exports",
     title: "Export Data",
-    description: "Minta ekspor data vendor dan harga paket, lalu unduh hasilnya.",
-    href: "/settings/admin/exports",
+    description: "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
+    href: "/exports",
     icon: Download,
     category: "master",
   },

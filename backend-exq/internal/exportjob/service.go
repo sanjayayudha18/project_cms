@@ -86,8 +86,8 @@ func wrapInternal(op string, err error) error {
 
 // resolveScope returns vendor_code / branch_code. Unknown vendor and a cabang
 // that is missing or belongs to another vendor give the same ErrNotFound (Req 2.4, 3.2).
-// Inactive vendors resolve (Req 1.6).
-func (s *Service) resolveScope(ctx context.Context, p Params) (vendorCode, branchCode *string, err error) {
+// Inactive vendors resolve (Req 1.6). Shared by Create and Preview (Req 4.1).
+func resolveScope(ctx context.Context, q createQueries, p Params) (vendorCode, branchCode *string, err error) {
 	notFound := func(op string, err error) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
@@ -95,7 +95,7 @@ func (s *Service) resolveScope(ctx context.Context, p Params) (vendorCode, branc
 		return wrapInternal(op, err)
 	}
 	if p.VendorID != nil {
-		code, err := s.q.GetVendorCodeByID(ctx, *p.VendorID)
+		code, err := q.GetVendorCodeByID(ctx, *p.VendorID)
 		if err != nil {
 			return nil, nil, notFound("get vendor", err)
 		}
@@ -105,7 +105,7 @@ func (s *Service) resolveScope(ctx context.Context, p Params) (vendorCode, branc
 		if p.VendorID == nil {
 			return nil, nil, ErrNotFound // ParseParams never allows this; fail closed anyway
 		}
-		code, err := s.q.GetVendorBranchForVendor(ctx, repository.GetVendorBranchForVendorParams{
+		code, err := q.GetVendorBranchForVendor(ctx, repository.GetVendorBranchForVendorParams{
 			BranchID: *p.BranchID, VendorID: *p.VendorID,
 		})
 		if err != nil {
@@ -168,7 +168,7 @@ func (s *Service) Create(ctx context.Context, a Actor, p Params) (Job, bool, err
 	if !allowed(p.Kind, a.Role) {
 		return Job{}, false, ErrForbidden
 	}
-	vendorCode, branchCode, err := s.resolveScope(ctx, p)
+	vendorCode, branchCode, err := resolveScope(ctx, s.q, p)
 	if err != nil {
 		return Job{}, false, err
 	}

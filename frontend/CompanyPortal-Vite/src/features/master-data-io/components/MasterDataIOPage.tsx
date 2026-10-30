@@ -1,13 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
-import {
-  ExportProgressDialog,
-  type StatusFilter,
-  downloadMasterDataTemplate,
-  isApiError,
-  isTooManyExports,
-  useExportFlow,
-} from "@/features/exports";
+import { downloadMasterDataTemplate } from "@/features/exports";
 import { useToast } from "@/lib/hooks/useToast";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -23,20 +16,8 @@ import {
   dryRunImport,
 } from "../api";
 
-const STATUS_OPTIONS: { id: StatusFilter; label: string }[] = [
-  { id: "active", label: "Aktif" },
-  { id: "disabled", label: "Nonaktif" },
-  { id: "all", label: "Semua" },
-];
-
 const SELECT_CLASS =
   "rounded border border-[var(--n-300)] bg-[var(--n-0)] px-3 py-2 text-sm text-[var(--n-900)]";
-
-function requestErrorText(e: unknown): string {
-  if (isTooManyExports(e))
-    return "Terlalu banyak ekspor yang sedang berjalan. Tunggu salah satu selesai lalu coba lagi.";
-  return isApiError(e) || e instanceof Error ? e.message : "Permintaan ekspor gagal.";
-}
 
 /**
  * Ekspor / impor CSV data master. Impor selalu lewat pratinjau (dry-run): file
@@ -46,13 +27,11 @@ function requestErrorText(e: unknown): string {
 export function MasterDataIOPage() {
   const { toast } = useToast();
   const [entity, setEntity] = useState<IoEntity>("vendors");
-  const [status, setStatus] = useState<StatusFilter>("active");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
 
   const onError = (err: Error) => toast({ type: "error", message: err.message });
 
-  const exportFlow = useExportFlow();
   const templateMut = useMutation({
     mutationFn: () => downloadMasterDataTemplate(entity),
     onError,
@@ -100,7 +79,7 @@ export function MasterDataIOPage() {
       <PageHeader
         eyebrow="Data master"
         title="Ekspor & Impor CSV"
-        description="Minta ekspor data (diproses di latar belakang) atau unduh templat, ubah di spreadsheet, lalu impor kembali. Perubahan baru diterapkan setelah disetujui."
+        description="Ekspor data lewat menu Export Data, atau unduh templat, ubah di spreadsheet, lalu impor kembali. Perubahan baru diterapkan setelah disetujui."
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -121,27 +100,6 @@ export function MasterDataIOPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium text-[var(--n-700)]">
-          Status data ekspor
-          <select
-            className={SELECT_CLASS}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Button
-          variant="secondary"
-          onClick={() => void exportFlow.request({ kind: "master_data_global", entity, status })}
-          disabled={exportFlow.isRequesting}
-        >
-          Minta ekspor
-        </Button>
         <Button
           variant="secondary"
           onClick={() => templateMut.mutate()}
@@ -152,20 +110,14 @@ export function MasterDataIOPage() {
       </div>
 
       <div className="flex flex-col gap-2 text-sm">
-        {exportFlow.requestError != null && (
-          <p role="alert" className="flex items-center gap-2 text-[var(--danger-fg)]">
-            <AlertCircle className="h-4 w-4" aria-hidden="true" />
-            {requestErrorText(exportFlow.requestError)}
-          </p>
-        )}
         <Link
-          to="/settings/admin/exports"
+          to="/exports/$dataset"
+          params={{ dataset: entity }}
           className="w-fit font-medium text-[var(--red-600)] underline"
         >
-          Lihat Ekspor Saya
+          Ekspor data ini
         </Link>
       </div>
-      <ExportProgressDialog {...exportFlow.dialogProps} />
 
       <section className="flex flex-col gap-3 rounded-lg border border-[var(--n-200)] p-4">
         <h2 className="text-base font-semibold text-[var(--n-900)]">Impor</h2>

@@ -64,7 +64,7 @@ func TestMountExportsRoutesAndTimeouts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := &spySvc{}
 			r := chi.NewRouter()
-			mountExports(r, passAuth, handler.NewExportsHandler(spy))
+			mountExports(r, passAuth, handler.NewExportsHandler(spy, nil))
 
 			rec := httptest.NewRecorder()
 			r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
@@ -81,7 +81,7 @@ func TestMountExportsRoutesAndTimeouts(t *testing.T) {
 	t.Run("auth guards the download route too", func(t *testing.T) {
 		spy := &spySvc{}
 		r := chi.NewRouter()
-		mountExports(r, denyAuth, handler.NewExportsHandler(spy))
+		mountExports(r, denyAuth, handler.NewExportsHandler(spy, nil))
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/exports/jobs/7/file", nil))
 		if rec.Code != http.StatusUnauthorized || spy.called != "" {

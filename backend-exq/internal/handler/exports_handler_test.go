@@ -70,7 +70,7 @@ func (f *fakeSvc) CompleteDownload(context.Context, int64) error {
 func (f *fakeSvc) AbortDownload(context.Context, int64) error { f.abortCalls++; return nil }
 
 func newRouter(f *fakeSvc, role string) http.Handler {
-	h := NewExportsHandler(f)
+	h := NewExportsHandler(f, nil)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -119,6 +119,7 @@ func TestErrorMapping(t *testing.T) {
 		{exportjob.ErrNotReady, 409, "export_not_ready"},
 		{exportjob.ErrGone, 410, "export_gone"},
 		{exportjob.ErrTooManyActive, 429, "too_many_exports"},
+		{exportjob.ErrUnavailable, 503, "preview_unavailable"},
 		{fmt.Errorf("%w: secret sql", exportjob.ErrInternal), 500, "internal_error"},
 		{errors.New("boom secret"), 500, "internal_error"},
 	}
@@ -354,5 +355,58 @@ func TestDownloadMissingMetadata(t *testing.T) {
 	rec := do(newRouter(f, "ADMIN"), "GET", "/jobs/3/file")
 	if rec.Code != 500 || f.abortCalls != 1 {
 		t.Fatalf("got %d abort=%d", rec.Code, f.abortCalls)
+	}
+}
+
+type fakePreview struct{ calls int }
+
+func (f *fakePreview) Preview(context.Context, exportjob.Actor, exportjob.Params, int64, int) (exportjob.Preview, error) {
+	f.calls++
+	return exportjob.Preview{Columns: []string{"id"}, Rows: [][]string{}, Limit: 50}, nil
+}
+
+// Preview routes carry the same role guard as their POST twins: a report role is
+// refused on both before any service call; an admin reaches the previewer.
+func TestPreviewRoutesGuardedLikePost(t *testing.T) {
+	paths := []string{"/vendors/1/vendor", "/vendors/1/branches/2/vaults", "/vendors/1/package-prices", "/master-data/vendors"}
+	if len(paths) != len(masterRoutes) {
+		t.Fatalf("paths cover %d routes, masterRoutes has %d", len(paths), len(masterRoutes))
+	}
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			for _, role := range []string{"ATM-SPV", "VENDOR-USER"} {
+				f, pv := &fakeSvc{}, &fakePreview{}
+				r := chi.NewRouter()
+				r.Use(func(next http.Handler) http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						ctx := middleware.WithAuthContext(req.Context(), &middleware.AuthContext{UserID: 7, Role: role})
+						next.ServeHTTP(w, req.WithContext(ctx))
+					})
+				})
+				r.Mount("/", NewExportsHandler(f, pv).Routes())
+				for _, m := range []struct{ method, target string }{{"POST", p}, {"GET", "/preview" + p}} {
+					if rec := do(r, m.method, m.target); rec.Code != http.StatusForbidden {
+						t.Fatalf("%s %s as %s = %d, want 403", m.method, m.target, role, rec.Code)
+					}
+				}
+				if f.createCalls != 0 || pv.calls != 0 {
+					t.Fatalf("service reached despite guard: create=%d preview=%d", f.createCalls, pv.calls)
+				}
+			}
+
+			pv := &fakePreview{}
+			r := chi.NewRouter()
+			r.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					ctx := middleware.WithAuthContext(req.Context(), &middleware.AuthContext{UserID: 7, Role: "ADMIN"})
+					next.ServeHTTP(w, req.WithContext(ctx))
+				})
+			})
+			r.Mount("/", NewExportsHandler(&fakeSvc{}, pv).Routes())
+			rec := do(r, "GET", "/preview"+p)
+			if rec.Code != http.StatusOK || pv.calls != 1 || !strings.Contains(rec.Body.String(), `"success":true`) {
+				t.Fatalf("admin preview = %d calls=%d body=%s", rec.Code, pv.calls, rec.Body.String())
+			}
+		})
 	}
 }

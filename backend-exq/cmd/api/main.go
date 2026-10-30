@@ -117,10 +117,13 @@ func main() {
 	r.Get("/ready", health.Ready(2*time.Second, readyChecks))
 
 	// Export job pipeline. Worker first: its Wake is the service's wake hook.
-	worker := exportjob.NewWorker(dbPool, dbReadPool, exportjob.NewProducers(dsrLateStart), workerCfg)
+	// One producer table shared by the worker (files) and the previewer (tables), so both read the same rows.
+	producers := exportjob.NewProducers(dsrLateStart)
+	worker := exportjob.NewWorker(dbPool, dbReadPool, producers, workerCfg)
 	svc := exportjob.NewService(dbPool, audit.NewWriter(), worker.Wake)
+	previewer := exportjob.NewPreviewer(dbPool, dbReadPool, producers) // scope on primary, rows on replica
 	janitor := exportjob.NewJanitor(dbPool, workerCfg.JanitorInterval)
-	mountExports(r, custommw.RequireAuth(tokenService), handler.NewExportsHandler(svc))
+	mountExports(r, custommw.RequireAuth(tokenService), handler.NewExportsHandler(svc, previewer))
 
 	workerCtx, cancelWorkers := context.WithCancel(context.Background())
 	defer cancelWorkers()

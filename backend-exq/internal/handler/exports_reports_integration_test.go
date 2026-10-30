@@ -97,7 +97,7 @@ func newT62Env(t *testing.T) *t62Env {
 
 func (e *t62Env) buildRouter() http.Handler {
 	svc := exportjob.NewService(e.pool, audit.NewWriter(), nil)
-	h := NewExportsHandler(svc)
+	h := NewExportsHandler(svc, nil)
 	r := chi.NewRouter()
 	r.Route("/api/v1/exports", func(r chi.Router) {
 		r.Use(middleware.RequireAuth(e.ts))

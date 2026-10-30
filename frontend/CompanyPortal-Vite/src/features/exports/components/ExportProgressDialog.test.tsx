@@ -125,9 +125,9 @@ describe("ExportProgressDialog", () => {
     expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" })).toBeInTheDocument();
   });
 
-  it("keeps the master-data path and shows no link for master-data jobs", () => {
+  it("uses the same /exports path and shows no link for master-data jobs", () => {
     setup({ phase: "download_failed", message: "x", job: job({ kind: "vendor" }) });
-    expect(screen.getByText(/\/settings\/admin\/exports/)).toBeInTheDocument();
+    expect(screen.getByText(/\(\/exports\)/)).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 

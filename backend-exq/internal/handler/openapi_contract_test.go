@@ -36,6 +36,8 @@ type contractSvc struct {
 	err      error
 	startErr error
 	chunks   [][]byte
+
+	previewErr error
 }
 
 func (f *contractSvc) Create(context.Context, exportjob.Actor, exportjob.Params) (exportjob.Job, bool, error) {
@@ -62,9 +64,19 @@ func (f *contractSvc) OpenChunks(context.Context, int64, int64) exportjob.ChunkI
 func (f *contractSvc) CompleteDownload(context.Context, int64) error { return nil }
 func (f *contractSvc) AbortDownload(context.Context, int64) error    { return nil }
 
+// Preview makes contractSvc double as the PreviewService; previewErr drives the error cases.
+func (f *contractSvc) Preview(context.Context, exportjob.Actor, exportjob.Params, int64, int) (exportjob.Preview, error) {
+	if f.previewErr != nil {
+		return exportjob.Preview{}, f.previewErr
+	}
+	next := int64(2)
+	return exportjob.Preview{Columns: []string{"id", "code"}, Rows: [][]string{{"1", "A"}, {"2", "B"}}, Total: 5, NextAfter: &next, Limit: 2}, nil
+}
+
 // contractRouter mounts the handler exactly as cmd/api/main.go does.
 func contractRouter(svc ExportsService, role string) http.Handler {
-	h := NewExportsHandler(svc)
+	pv, _ := svc.(PreviewService)
+	h := NewExportsHandler(svc, pv)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -206,6 +218,21 @@ func TestOpenAPIContract_Responses(t *testing.T) {
 		{"report mismatch 400 range", "POST", "/reports/replenishment-amount-mismatch?date_from=2026-09-01&date_to=2026-10-07", "ADMIN", ok, 400},
 		{"report trips 202", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ATM-USER", ok, 202},
 		{"report trips 403", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ADMIN_PARAM", ok, 403},
+		{"preview vendor 200", "GET", "/preview/vendors/3/vaults?after=1&limit=2", "ADMIN", ok, 200},
+		{"preview vendor 400 id", "GET", "/preview/vendors/x/vaults", "ADMIN", ok, 400},
+		{"preview vendor 400 paging", "GET", "/preview/vendors/3/vaults?limit=0", "ADMIN", ok, 400},
+		{"preview vendor 401", "GET", "/preview/vendors/3/vaults", "", ok, 401},
+		{"preview vendor 403", "GET", "/preview/vendors/3/vaults", "VENDOR-USER", ok, 403},
+		{"preview vendor 404", "GET", "/preview/vendors/3/nope", "ADMIN", ok, 404},
+		{"preview vendor 500", "GET", "/preview/vendors/3/vaults", "ADMIN", &contractSvc{previewErr: errors.New("x")}, 500},
+		{"preview vendor 503", "GET", "/preview/vendors/3/vaults", "ADMIN", &contractSvc{previewErr: exportjob.ErrUnavailable}, 503},
+		{"preview branch 200", "GET", "/preview/vendors/3/branches/5/pics", "ADMIN", ok, 200},
+		{"preview branch 400", "GET", "/preview/vendors/3/branches/0/pics", "ADMIN", ok, 400},
+		{"preview prices 200", "GET", "/preview/vendors/3/package-prices?branch_id=5&price_level=atm", "ADMIN", ok, 200},
+		{"preview prices 400", "GET", "/preview/vendors/3/package-prices?branch_id=x", "ADMIN", ok, 400},
+		{"preview global 200", "GET", "/preview/master-data/atms", "ADMIN_PARAM", ok, 200},
+		{"preview global 400 status", "GET", "/preview/master-data/atms?status=zzz", "ADMIN", ok, 400},
+		{"preview global 404", "GET", "/preview/master-data/zzz", "ADMIN", ok, 404},
 		{"template 200", "GET", "/master-data/atms/template", "ADMIN", ok, 200},
 		{"template 404", "GET", "/master-data/zzz/template", "ADMIN", ok, 404},
 		{"template 401", "GET", "/master-data/atms/template", "", ok, 401},

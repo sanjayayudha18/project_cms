@@ -22,6 +22,8 @@ var (
 	// ErrNotDownloading marks a Complete/Abort of a job no longer downloading
 	// (janitor recovered it); nothing changed. Logged only, never sent to the client.
 	ErrNotDownloading = errors.New("exportjob: job not downloading")
+	// ErrUnavailable marks a preview cancelled by a replica recovery conflict; retry later (HTTP 503).
+	ErrUnavailable = errors.New("exportjob: data temporarily unavailable")
 	// ErrInternal wraps DB and audit failures (HTTP 500). The cause stays in the chain for logs only.
 	ErrInternal = errors.New("exportjob: internal error")
 )

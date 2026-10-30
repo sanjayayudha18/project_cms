@@ -72,6 +72,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/preview/vendors/{vendorID}/{entity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview page of the rows requestVendorExport would export */
+        get: operations["previewVendorExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/preview/vendors/{vendorID}/branches/{branchID}/{entity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview page of the rows requestBranchExport would export */
+        get: operations["previewBranchExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/preview/vendors/{vendorID}/package-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview page of the rows requestPackagePriceExport would export */
+        get: operations["previewPackagePriceExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/preview/master-data/{entity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview page of the rows requestMasterDataExport would export */
+        get: operations["previewMasterDataExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/reports/dsr-late-daily": {
         parameters: {
             query?: never;
@@ -272,6 +340,27 @@ export interface components {
             /** @description null for master-data jobs */
             report_params: components["schemas"]["ReportParams"] | null;
         };
+        /** @description One page of a master-data table as the export file would hold it */
+        ExportPreview: {
+            columns: string[];
+            rows: string[][];
+            /**
+             * Format: int64
+             * @description rows matching the filter across all pages
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description pass as `after` for the next page; null on the last page
+             */
+            next_after: number | null;
+            limit: number;
+        };
+        PreviewEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ExportPreview"];
+        };
         JobEnvelope: {
             /** @enum {boolean} */
             success: true;
@@ -315,6 +404,24 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["JobEnvelope"];
+            };
+        };
+        /** @description One preview page */
+        Preview: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["PreviewEnvelope"];
+            };
+        };
+        /** @description preview_unavailable (replica snapshot conflict, retry) */
+        Unavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
         /** @description CSV file (UTF-8, attachment, no-store) */
@@ -407,6 +514,10 @@ export interface components {
         JobID: number;
         /** @description default active */
         StatusFilter: components["schemas"]["StatusFilter"];
+        /** @description keyset cursor: last id of the previous page, default 0 */
+        PreviewAfter: number;
+        /** @description default 50 */
+        PreviewLimit: number;
         /** @description YYYY-MM, not after the current month (WIB) */
         ReportMonth: string;
         /** @description YYYY-MM-DD */
@@ -522,6 +633,120 @@ export interface operations {
             404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyExports"];
             500: components["responses"]["Internal"];
+        };
+    };
+    previewVendorExport: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["StatusFilter"];
+                /** @description keyset cursor: last id of the previous page, default 0 */
+                after?: components["parameters"]["PreviewAfter"];
+                /** @description default 50 */
+                limit?: components["parameters"]["PreviewLimit"];
+            };
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+                entity: "vendor" | "branches" | "vaults" | "pics" | "dsr-location-maps";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Preview"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    previewBranchExport: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["StatusFilter"];
+                /** @description keyset cursor: last id of the previous page, default 0 */
+                after?: components["parameters"]["PreviewAfter"];
+                /** @description default 50 */
+                limit?: components["parameters"]["PreviewLimit"];
+            };
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+                branchID: number;
+                entity: "vaults" | "pics" | "dsr-location-maps";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Preview"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    previewPackagePriceExport: {
+        parameters: {
+            query?: {
+                branch_id?: number;
+                /** @description default all */
+                price_level?: components["schemas"]["PriceLevel"];
+                /** @description default active */
+                status?: components["parameters"]["StatusFilter"];
+                /** @description keyset cursor: last id of the previous page, default 0 */
+                after?: components["parameters"]["PreviewAfter"];
+                /** @description default 50 */
+                limit?: components["parameters"]["PreviewLimit"];
+            };
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Preview"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
+            503: components["responses"]["Unavailable"];
+        };
+    };
+    previewMasterDataExport: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["StatusFilter"];
+                /** @description keyset cursor: last id of the previous page, default 0 */
+                after?: components["parameters"]["PreviewAfter"];
+                /** @description default 50 */
+                limit?: components["parameters"]["PreviewLimit"];
+            };
+            header?: never;
+            path: {
+                entity: components["parameters"]["MasterDataEntity"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Preview"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
+            503: components["responses"]["Unavailable"];
         };
     };
     requestDsrLateDailyExport: {

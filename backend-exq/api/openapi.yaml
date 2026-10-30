@@ -91,6 +91,87 @@ paths:
         '429': { $ref: '#/components/responses/TooManyExports' }
         '500': { $ref: '#/components/responses/Internal' }
 
+  /exports/preview/vendors/{vendorID}/{entity}:
+    get:
+      operationId: previewVendorExport
+      summary: Preview page of the rows requestVendorExport would export
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: entity, in: path, required: true, schema: { type: string, enum: [vendor, branches, vaults, pics, dsr-location-maps] } }
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PreviewAfter'
+        - $ref: '#/components/parameters/PreviewLimit'
+      responses:
+        '200': { $ref: '#/components/responses/Preview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /exports/preview/vendors/{vendorID}/branches/{branchID}/{entity}:
+    get:
+      operationId: previewBranchExport
+      summary: Preview page of the rows requestBranchExport would export
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: branchID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: entity, in: path, required: true, schema: { type: string, enum: [vaults, pics, dsr-location-maps] } }
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PreviewAfter'
+        - $ref: '#/components/parameters/PreviewLimit'
+      responses:
+        '200': { $ref: '#/components/responses/Preview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /exports/preview/vendors/{vendorID}/package-prices:
+    get:
+      operationId: previewPackagePriceExport
+      summary: Preview page of the rows requestPackagePriceExport would export
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/VendorID'
+        - { name: branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: price_level, in: query, description: 'default all', schema: { $ref: '#/components/schemas/PriceLevel' } }
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PreviewAfter'
+        - $ref: '#/components/parameters/PreviewLimit'
+      responses:
+        '200': { $ref: '#/components/responses/Preview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /exports/preview/master-data/{entity}:
+    get:
+      operationId: previewMasterDataExport
+      summary: Preview page of the rows requestMasterDataExport would export
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/MasterDataEntity'
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PreviewAfter'
+        - $ref: '#/components/parameters/PreviewLimit'
+      responses:
+        '200': { $ref: '#/components/responses/Preview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   /exports/reports/dsr-late-daily:
     post:
       operationId: requestDsrLateDailyExport
@@ -247,6 +328,8 @@ components:
       in: query
       description: 'default active'
       schema: { $ref: '#/components/schemas/StatusFilter' }
+    PreviewAfter: { name: after, in: query, description: 'keyset cursor: last id of the previous page, default 0', schema: { type: integer, format: int64, minimum: 0 } }
+    PreviewLimit: { name: limit, in: query, description: 'default 50', schema: { type: integer, minimum: 1, maximum: 100 } }
     ReportMonth: { name: month, in: query, description: 'YYYY-MM, not after the current month (WIB)', schema: { type: string } }
     ReportDateFrom: { name: date_from, in: query, description: 'YYYY-MM-DD', schema: { type: string } }
     ReportDateTo: { name: date_to, in: query, description: 'YYYY-MM-DD, range at most 31 days', schema: { type: string } }
@@ -307,6 +390,24 @@ components:
           allOf: [{ $ref: '#/components/schemas/ReportParams' }]
           nullable: true
 
+    ExportPreview:
+      type: object
+      description: One page of a master-data table as the export file would hold it
+      required: [columns, rows, total, next_after, limit]
+      properties:
+        columns: { type: array, items: { type: string } }
+        rows: { type: array, items: { type: array, items: { type: string } } }
+        total: { type: integer, format: int64, description: rows matching the filter across all pages }
+        next_after: { type: integer, format: int64, nullable: true, description: pass as `after` for the next page; null on the last page }
+        limit: { type: integer }
+
+    PreviewEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: '#/components/schemas/ExportPreview' }
+
     JobEnvelope:
       type: object
       required: [success, data]
@@ -360,6 +461,16 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/JobEnvelope' }
+    Preview:
+      description: One preview page
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PreviewEnvelope' }
+    Unavailable:
+      description: preview_unavailable (replica snapshot conflict, retry)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     Csv:
       description: CSV file (UTF-8, attachment, no-store)
       headers:

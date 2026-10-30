@@ -38,16 +38,41 @@ type ExportsService interface {
 	AbortDownload(ctx context.Context, id int64) error
 }
 
-// ExportsHandler serves /api/v1/exports (design "ExportRequestAPI + TemplateAPI").
-type ExportsHandler struct {
-	svc ExportsService
+// PreviewService is the slice of *exportjob.Previewer the handler uses.
+type PreviewService interface {
+	Preview(ctx context.Context, a exportjob.Actor, p exportjob.Params, after int64, limit int) (exportjob.Preview, error)
 }
 
-// NewExportsHandler wires the handler to its service.
-func NewExportsHandler(svc ExportsService) *ExportsHandler { return &ExportsHandler{svc: svc} }
+// ExportsHandler serves /api/v1/exports (design "ExportRequestAPI + TemplateAPI + ExportPreviewAPI").
+type ExportsHandler struct {
+	svc     ExportsService
+	preview PreviewService
+}
+
+// NewExportsHandler wires the handler to its services.
+func NewExportsHandler(svc ExportsService, preview PreviewService) *ExportsHandler {
+	return &ExportsHandler{svc: svc, preview: preview}
+}
+
+// masterParser reads one master-data request's params from path/query; false = response written.
+type masterParser func(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool)
+
+// masterRoutes is the single source for each master-data export path, its kind and its parser.
+// Routes registers POST <path> and GET /preview<path> from the same entry, so both get the
+// same role guard and the same validation (Req 4.1, 4.8, 4.10).
+var masterRoutes = []struct {
+	path  string
+	kind  exportjob.Kind
+	parse masterParser
+}{
+	{"/vendors/{vendorID}/{entity}", exportjob.KindVendor, parseVendor},
+	{"/vendors/{vendorID}/branches/{branchID}/{entity}", exportjob.KindCabang, parseBranch},
+	{"/vendors/{vendorID}/package-prices", exportjob.KindHargaPaket, parsePrices},
+	{"/master-data/{entity}", exportjob.KindMasterDataGlobal, parseGlobal},
+}
 
 // Routes returns every route except the file download (main mounts Download
-// with its own timeout). RequireAuth is applied by main; request and template
+// with its own timeout). RequireAuth is applied by main; request, preview and template
 // routes add the per-kind role guard here, /jobs* rely on service-level checks (D23).
 func (h *ExportsHandler) Routes() chi.Router {
 	r := chi.NewRouter()
@@ -55,10 +80,11 @@ func (h *ExportsHandler) Routes() chi.Router {
 		return middleware.RequireRoles(exportjob.KindRoles[k]...)
 	}
 
-	r.With(guard(exportjob.KindVendor)).Post("/vendors/{vendorID}/{entity}", h.requestVendor)
-	r.With(guard(exportjob.KindCabang)).Post("/vendors/{vendorID}/branches/{branchID}/{entity}", h.requestBranch)
-	r.With(guard(exportjob.KindHargaPaket)).Post("/vendors/{vendorID}/package-prices", h.requestPrices)
-	r.With(guard(exportjob.KindMasterDataGlobal)).Post("/master-data/{entity}", h.requestGlobal)
+	for _, mr := range masterRoutes {
+		g := r.With(guard(mr.kind))
+		g.Post(mr.path, h.requestMaster(mr.parse))
+		g.Get("/preview"+mr.path, h.previewMaster(mr.parse))
+	}
 	r.With(guard(exportjob.KindMasterDataGlobal)).Get("/master-data/{entity}/template", h.template)
 	for path, kind := range reportRoutes {
 		r.With(guard(kind)).Post(path, h.requestReport(kind))
@@ -88,54 +114,86 @@ func (h *ExportsHandler) requestReport(kind exportjob.Kind) http.HandlerFunc {
 	}
 }
 
-func (h *ExportsHandler) requestVendor(w http.ResponseWriter, r *http.Request) {
-	vid, ok := pathID(w, r, "vendorID")
-	if !ok {
-		return
+// requestMaster creates a master-data export job (POST).
+func (h *ExportsHandler) requestMaster(parse masterParser) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if p, ok := parse(w, r); ok {
+			h.createJob(w, r, p)
+		}
 	}
-	h.create(w, r, exportjob.KindVendor, chi.URLParam(r, "entity"), &vid, nil, "")
 }
 
-func (h *ExportsHandler) requestBranch(w http.ResponseWriter, r *http.Request) {
+// previewMaster serves one preview page of the rows the POST twin would export (Req 4.1-4.3).
+func (h *ExportsHandler) previewMaster(parse masterParser) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, ok := parse(w, r)
+		if !ok {
+			return
+		}
+		q := r.URL.Query()
+		after, limit, err := exportjob.ParsePaging(q.Get("after"), q.Get("limit"))
+		if err != nil {
+			response.WriteError(w, http.StatusBadRequest, "bad_request", "after harus >= 0, limit harus 1-100")
+			return
+		}
+		pv, err := h.preview.Preview(r.Context(), actorFrom(r), p, after, limit)
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		response.WriteSuccess(w, pv)
+	}
+}
+
+func parseVendor(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
 	vid, ok := pathID(w, r, "vendorID")
 	if !ok {
-		return
+		return exportjob.Params{}, false
+	}
+	return parseMaster(w, r, exportjob.KindVendor, chi.URLParam(r, "entity"), &vid, nil, "")
+}
+
+func parseBranch(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
+	vid, ok := pathID(w, r, "vendorID")
+	if !ok {
+		return exportjob.Params{}, false
 	}
 	bid, ok := pathID(w, r, "branchID")
 	if !ok {
-		return
+		return exportjob.Params{}, false
 	}
-	h.create(w, r, exportjob.KindCabang, chi.URLParam(r, "entity"), &vid, &bid, "")
+	return parseMaster(w, r, exportjob.KindCabang, chi.URLParam(r, "entity"), &vid, &bid, "")
 }
 
-func (h *ExportsHandler) requestPrices(w http.ResponseWriter, r *http.Request) {
+func parsePrices(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
 	vid, ok := pathID(w, r, "vendorID")
 	if !ok {
-		return
+		return exportjob.Params{}, false
 	}
 	var bid *int64
 	if raw := r.URL.Query().Get("branch_id"); raw != "" {
 		v, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || v <= 0 {
 			response.WriteError(w, http.StatusBadRequest, "bad_request", "branch_id harus bilangan bulat positif")
-			return
+			return exportjob.Params{}, false
 		}
 		bid = &v
 	}
-	h.create(w, r, exportjob.KindHargaPaket, "package-prices", &vid, bid, r.URL.Query().Get("price_level"))
+	return parseMaster(w, r, exportjob.KindHargaPaket, "package-prices", &vid, bid, r.URL.Query().Get("price_level"))
 }
 
-func (h *ExportsHandler) requestGlobal(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, exportjob.KindMasterDataGlobal, chi.URLParam(r, "entity"), nil, nil, "")
+func parseGlobal(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
+	return parseMaster(w, r, exportjob.KindMasterDataGlobal, chi.URLParam(r, "entity"), nil, nil, "")
 }
 
-func (h *ExportsHandler) create(w http.ResponseWriter, r *http.Request, kind exportjob.Kind, entity string, vendorID, branchID *int64, priceLevel string) {
+// parseMaster validates kind/entity/ids/status/price level; on error it writes the response.
+func parseMaster(w http.ResponseWriter, r *http.Request, kind exportjob.Kind, entity string, vendorID, branchID *int64, priceLevel string) (exportjob.Params, bool) {
 	p, err := exportjob.ParseParams(kind, entity, vendorID, branchID, r.URL.Query().Get("status"), priceLevel)
 	if err != nil {
 		writeServiceError(w, err)
-		return
+		return exportjob.Params{}, false
 	}
-	h.createJob(w, r, p)
+	return p, true
 }
 
 func (h *ExportsHandler) createJob(w http.ResponseWriter, r *http.Request, p exportjob.Params) {
@@ -306,6 +364,8 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		response.WriteError(w, http.StatusGone, "export_gone", "Ekspor sudah diunduh atau kedaluwarsa")
 	case errors.Is(err, exportjob.ErrTooManyActive):
 		response.WriteError(w, http.StatusTooManyRequests, "too_many_exports", msgTooMany)
+	case errors.Is(err, exportjob.ErrUnavailable):
+		response.WriteError(w, http.StatusServiceUnavailable, "preview_unavailable", "Data sedang diperbarui, coba lagi")
 	default:
 		slog.Error("export request failed", "error", err)
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")

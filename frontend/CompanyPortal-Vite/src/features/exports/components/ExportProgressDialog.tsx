@@ -10,8 +10,7 @@ type Icon = ComponentType<{ className?: string }>;
 const NUMBER = new Intl.NumberFormat("id-ID");
 const KEEP_RUNNING_NOTE =
   "Jika ditutup, ekspor tetap berjalan dan file bisa diunduh dari Ekspor Saya selama 10 menit setelah siap.";
-const MY_EXPORTS_PATH = "/settings/admin/exports";
-const REPORT_MY_EXPORTS_PATH = "/exports";
+const MY_EXPORTS_PATH = "/exports";
 
 function describe(
   phase: ExportPhase,
@@ -81,17 +80,13 @@ export function ExportProgressDialog({
             )}
             {phase === "download_failed" && (
               <p className="text-sm text-[var(--n-700)]">
-                Cek menu Ekspor Saya ({isReport ? REPORT_MY_EXPORTS_PATH : MY_EXPORTS_PATH}) untuk
-                mengunduh ulang.
+                Cek menu Ekspor Saya ({MY_EXPORTS_PATH}) untuk mengunduh ulang.
               </p>
             )}
             {isReport && (phase === "done" || isError) && (
               <p className="text-sm">
                 {/* Plain anchor: the unload guard is off in these phases, so a full navigation is safe. */}
-                <a
-                  href={REPORT_MY_EXPORTS_PATH}
-                  className="font-medium text-[var(--red-600)] underline"
-                >
+                <a href={MY_EXPORTS_PATH} className="font-medium text-[var(--red-600)] underline">
                   Lihat Ekspor Saya
                 </a>
               </p>

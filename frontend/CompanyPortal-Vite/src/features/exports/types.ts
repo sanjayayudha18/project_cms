@@ -4,6 +4,7 @@ export type ExportJob = components["schemas"]["ExportJob"];
 export type ExportStatus = components["schemas"]["ExportStatus"];
 export type ExportKind = components["schemas"]["ExportKind"];
 export type StatusFilter = components["schemas"]["StatusFilter"];
+export type ExportPreview = components["schemas"]["ExportPreview"];
 export type PriceLevel = components["schemas"]["PriceLevel"];
 
 export type ReportParams = components["schemas"]["ReportParams"];
@@ -40,6 +41,9 @@ export type ExportRequestParams =
     }
   | { kind: "master_data_global"; entity: MasterDataEntity; status?: StatusFilter }
   | { kind: "report"; report: ReportKey; params: ReportParams };
+
+/** Every export kind except `report` (those have their own screens, no preview). */
+export type MasterExportParams = Exclude<ExportRequestParams, { kind: "report" }>;
 
 export interface RequestExportResult {
   job: ExportJob;

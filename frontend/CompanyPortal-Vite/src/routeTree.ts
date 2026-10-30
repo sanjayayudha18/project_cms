@@ -11,7 +11,7 @@ import { cashFlowRoute } from "./routes/cash-flow";
 import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
 import { dsrLateReportRoute } from "./routes/dsr-late-report";
 import { eodMonitoringRoute } from "./routes/eod-monitoring";
-import { myExportsRoute } from "./routes/exports";
+import { exportPreviewRoute, myExportsRoute } from "./routes/exports";
 import { dmaaForecastRoute } from "./routes/forecasting/dmaa-forecast";
 import { forecastingRoute } from "./routes/forecasting/index";
 import { indexRoute } from "./routes/index";
@@ -72,6 +72,7 @@ export const routeTree = rootRoute.addChildren([
     adminMasterDataIORoute,
     adminExportsRoute,
     myExportsRoute,
+    exportPreviewRoute,
     adminATMsRoute,
     adminRegionsRoute,
     adminHolidaysRoute,

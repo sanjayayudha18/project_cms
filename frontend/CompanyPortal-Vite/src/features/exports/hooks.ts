@@ -1,9 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { downloadExportFile, getExportJob, isApiError, listMyExports, requestExport } from "./api";
+import {
+  downloadExportFile,
+  getExportJob,
+  isApiError,
+  listMyExports,
+  previewExport,
+  requestExport,
+} from "./api";
 import { claimAutoDownload } from "./autoDownload";
 import { isActiveStatus } from "./status";
-import type { ExportJob, ExportRequestParams } from "./types";
+import type { ExportJob, ExportRequestParams, MasterExportParams } from "./types";
 import { useBeforeUnloadGuard } from "./useBeforeUnloadGuard";
 
 export const exportKeys = {
@@ -31,6 +38,18 @@ export function useExportJob(id: number | null, opts: { poll?: boolean } = {}) {
     queryFn: () => getExportJob(id as number),
     enabled: id !== null,
     refetchInterval: poll ? JOB_POLL_MS : false,
+  });
+}
+
+export const PREVIEW_PAGE_SIZE = 50;
+
+/** One keyset page of the table behind an export; `params === null` = required filter missing. */
+export function useExportPreview(params: MasterExportParams | null, after?: number) {
+  return useQuery({
+    queryKey: ["exports", "preview", params, after ?? null] as const,
+    queryFn: () => previewExport(params as MasterExportParams, after, PREVIEW_PAGE_SIZE),
+    enabled: params !== null,
+    placeholderData: keepPreviousData,
   });
 }
 

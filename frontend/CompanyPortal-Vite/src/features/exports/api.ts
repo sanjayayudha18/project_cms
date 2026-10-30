@@ -10,9 +10,11 @@ import { saveBlobResponse } from "@/lib/download";
 import type {
   BranchEntity,
   ExportJob,
+  ExportPreview,
   ExportRequestParams,
   ListExportJobsResponse,
   MasterDataEntity,
+  MasterExportParams,
   ReportKey,
   ReportParams,
   RequestExportResult,
@@ -70,20 +72,45 @@ export const requestReportExport = (
   params: ReportParams,
 ): Promise<RequestExportResult> => post(`/exports/reports/${report}${qs({ ...params })}`);
 
-/** Dispatches on `params.kind` (used by useExportFlow). */
-export function requestExport(p: ExportRequestParams): Promise<RequestExportResult> {
+/**
+ * Request path (+ query) of a master-data export, without the `/exports` prefix.
+ * Shared by the POST request and the GET preview so both validate the same filter.
+ */
+export function masterPath(p: MasterExportParams): string {
   switch (p.kind) {
     case "vendor":
-      return requestVendorExport(p.vendorId, p.entity, p.status);
+      return `/vendors/${p.vendorId}/${p.entity}${qs({ status: p.status })}`;
     case "cabang":
-      return requestBranchExport(p.vendorId, p.branchId, p.entity, p.status);
+      return `/vendors/${p.vendorId}/branches/${p.branchId}/${p.entity}${qs({ status: p.status })}`;
     case "harga_paket":
-      return requestPackagePriceExport(p.vendorId, p);
+      return `/vendors/${p.vendorId}/package-prices${qs({
+        branch_id: p.branchId,
+        price_level: p.priceLevel,
+        status: p.status,
+      })}`;
     case "master_data_global":
-      return requestMasterDataExport(p.entity, p.status);
-    case "report":
-      return requestReportExport(p.report, p.params);
+      return `/master-data/${p.entity}${qs({ status: p.status })}`;
   }
+}
+
+/** Dispatches on `params.kind` (used by useExportFlow). */
+export function requestExport(p: ExportRequestParams): Promise<RequestExportResult> {
+  if (p.kind === "report") return requestReportExport(p.report, p.params);
+  return post(`/exports${masterPath(p)}`);
+}
+
+/** One keyset page of the table that `requestExport(p)` would export. */
+export async function previewExport(
+  p: MasterExportParams,
+  after: number | undefined,
+  limit: number,
+): Promise<ExportPreview> {
+  const path = masterPath(p);
+  const paging = qs({ after, limit }).slice(1);
+  const res = await api.get<{ success: true; data: ExportPreview }>(
+    `/exports/preview${path}${path.includes("?") ? "&" : "?"}${paging}`,
+  );
+  return res.data.data;
 }
 
 export async function listMyExports(limit?: number): Promise<ExportJob[]> {

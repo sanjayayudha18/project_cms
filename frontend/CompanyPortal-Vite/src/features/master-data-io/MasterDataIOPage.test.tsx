@@ -6,30 +6,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImportPreview } from "./api";
 import { MasterDataIOPage } from "./components/MasterDataIOPage";
 
-const requestExport = vi.fn();
-const flow = vi.hoisted(() => ({ requestError: null as unknown, open: false }));
 const downloadTemplate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
-    <a href={to}>{children}</a>
+  Link: ({
+    to,
+    params,
+    children,
+  }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => (
+    <a href={to.replace("$dataset", params?.dataset ?? "")}>{children}</a>
   ),
 }));
 vi.mock("@/features/exports", async (orig) => ({
   ...(await orig<typeof import("@/features/exports")>()),
-  useExportFlow: () => ({
-    request: requestExport,
-    requestError: flow.requestError,
-    isRequesting: false,
-    dialogProps: {
-      open: flow.open,
-      phase: "waiting",
-      job: null,
-      message: null,
-      onClose: vi.fn(),
-      onRetry: vi.fn(),
-    },
-  }),
-  ExportProgressDialog: (p: { open: boolean }) => (p.open ? <div>dialog-ekspor</div> : null),
   downloadMasterDataTemplate: (...a: unknown[]) => downloadTemplate(...a),
 }));
 
@@ -68,8 +56,6 @@ describe("MasterDataIOPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useToastStore.setState({ toasts: [] });
-    flow.requestError = null;
-    flow.open = false;
   });
 
   const renderPage = () =>
@@ -79,38 +65,16 @@ describe("MasterDataIOPage", () => {
       </QueryClientProvider>,
     );
 
-  it("requests an async master_data_global export with the chosen entity and status", async () => {
-    renderPage();
-    await userEvent.selectOptions(screen.getByLabelText("Entitas"), "atms");
-    await userEvent.selectOptions(screen.getByLabelText("Status data ekspor"), "all");
-    await userEvent.click(screen.getByRole("button", { name: "Minta ekspor" }));
-    expect(requestExport).toHaveBeenCalledWith({
-      kind: "master_data_global",
-      entity: "atms",
-      status: "all",
-    });
-  });
-
-  it("renders the progress dialog when the flow is open", () => {
-    flow.open = true;
-    renderPage();
-    expect(screen.getByText("dialog-ekspor")).toBeTruthy();
-  });
-
-  it("shows a 429 inline and no dialog", () => {
-    flow.requestError = { status: 429, code: "too_many_exports", message: "x" };
-    renderPage();
-    expect(screen.getByRole("alert").textContent).toContain("Terlalu banyak ekspor");
-    expect(screen.queryByText("dialog-ekspor")).toBeNull();
-  });
-
-  it("downloads the template via the exports endpoint and links to Ekspor Saya", async () => {
+  it("downloads the template and links to the export preview of the chosen entity", async () => {
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: "Unduh templat" }));
     await waitFor(() => expect(downloadTemplate).toHaveBeenCalledWith("vendors"));
-    expect(screen.getByRole("link", { name: "Lihat Ekspor Saya" }).getAttribute("href")).toBe(
-      "/settings/admin/exports",
-    );
+    expect(screen.queryByRole("button", { name: "Minta ekspor" })).toBeNull();
+    expect(screen.queryByLabelText("Status data ekspor")).toBeNull();
+    const link = () => screen.getByRole("link", { name: "Ekspor data ini" });
+    expect(link().getAttribute("href")).toBe("/exports/vendors");
+    await userEvent.selectOptions(screen.getByLabelText("Entitas"), "atms");
+    expect(link().getAttribute("href")).toBe("/exports/atms");
   });
 
   it("blocks submit and lists row errors when the dry-run finds problems", async () => {

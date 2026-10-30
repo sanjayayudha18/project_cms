@@ -91,6 +91,28 @@ func (f *fakeQ) ExportPackagePricesBatch(_ context.Context, a repository.ExportP
 	return out, f.err
 }
 
+// Count* serve n, the number of rows every Export*Batch query pages through.
+func (f *fakeQ) CountVendors(context.Context, repository.CountVendorsParams) (int64, error) {
+	return int64(f.n), f.err
+}
+func (f *fakeQ) CountVendorBranches(context.Context, repository.CountVendorBranchesParams) (int64, error) {
+	return int64(f.n), f.err
+}
+func (f *fakeQ) CountVendorVaults(context.Context, repository.CountVendorVaultsParams) (int64, error) {
+	return int64(f.n), f.err
+}
+func (f *fakeQ) CountVendorPics(context.Context, repository.CountVendorPicsParams) (int64, error) {
+	return int64(f.n), f.err
+}
+func (f *fakeQ) CountATMs(context.Context, string) (int64, error)           { return int64(f.n), f.err }
+func (f *fakeQ) CountATMAssignments(context.Context, string) (int64, error) { return int64(f.n), f.err }
+func (f *fakeQ) CountDsrLocationMaps(context.Context, repository.CountDsrLocationMapsParams) (int64, error) {
+	return int64(f.n), f.err
+}
+func (f *fakeQ) CountPackagePrices(context.Context, repository.CountPackagePricesParams) (int64, error) {
+	return int64(f.n), f.err
+}
+
 func (f *fakeQ) ListDsrLateDaily(context.Context, repository.ListDsrLateDailyParams) ([]repository.ListDsrLateDailyRow, error) {
 	return nil, f.err
 }

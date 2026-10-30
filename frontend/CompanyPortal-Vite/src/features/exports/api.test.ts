@@ -11,7 +11,10 @@ import {
   getExportJob,
   isTooManyExports,
   listMyExports,
+  masterPath,
+  previewExport,
   requestBranchExport,
+  requestExport,
   requestMasterDataExport,
   requestPackagePriceExport,
   requestReportExport,
@@ -19,6 +22,7 @@ import {
 } from "./api";
 import { claimAutoDownload, resetAutoDownloadClaims } from "./autoDownload";
 import { KIND_LABEL, REPORT_KEY_BY_KIND, STATUS_META, isReportKind } from "./status";
+import type { MasterExportParams } from "./types";
 
 const job = { id: 7, status: "queued" };
 
@@ -52,6 +56,62 @@ describe("request endpoints", () => {
       "/exports/vendors/3/package-prices?branch_id=9&price_level=atm",
       "/exports/master-data/atms?status=disabled",
     ]);
+  });
+});
+
+describe("masterPath / previewExport / requestExport (master data)", () => {
+  const cases: [MasterExportParams, string][] = [
+    [
+      { kind: "vendor", vendorId: 3, entity: "branches", status: "all" },
+      "/vendors/3/branches?status=all",
+    ],
+    [{ kind: "vendor", vendorId: 3, entity: "vaults" }, "/vendors/3/vaults"],
+    [
+      { kind: "cabang", vendorId: 3, branchId: 9, entity: "pics", status: "active" },
+      "/vendors/3/branches/9/pics?status=active",
+    ],
+    [
+      { kind: "harga_paket", vendorId: 3, branchId: 9, priceLevel: "atm", status: "disabled" },
+      "/vendors/3/package-prices?branch_id=9&price_level=atm&status=disabled",
+    ],
+    [{ kind: "harga_paket", vendorId: 3 }, "/vendors/3/package-prices"],
+    [
+      { kind: "master_data_global", entity: "atms", status: "disabled" },
+      "/master-data/atms?status=disabled",
+    ],
+  ];
+
+  it.each(cases)("masterPath(%j) = %s", (p, path) => {
+    expect(masterPath(p)).toBe(path);
+  });
+
+  it.each(cases)(
+    "requestExport(%j) POSTs /exports + path (same URL as before)",
+    async (p, path) => {
+      client.post.mockResolvedValue({ status: 202, data: { success: true, data: job } });
+      await requestExport(p);
+      expect(client.post).toHaveBeenCalledWith(`/exports${path}`);
+    },
+  );
+
+  it("previewExport GETs /exports/preview + path with after/limit and unwraps the envelope", async () => {
+    const page = { columns: ["id"], rows: [["1"]], total: 1, next_after: null, limit: 50 };
+    client.get.mockResolvedValue({ data: { success: true, data: page } });
+    const r = await previewExport(
+      { kind: "cabang", vendorId: 3, branchId: 9, entity: "vaults", status: "active" },
+      120,
+      50,
+    );
+    expect(client.get).toHaveBeenCalledWith(
+      "/exports/preview/vendors/3/branches/9/vaults?status=active&after=120&limit=50",
+    );
+    expect(r).toEqual(page);
+  });
+
+  it("previewExport omits after on the first page and starts the query when path has none", async () => {
+    client.get.mockResolvedValue({ data: { success: true, data: {} } });
+    await previewExport({ kind: "vendor", vendorId: 3, entity: "vaults" }, undefined, 50);
+    expect(client.get).toHaveBeenCalledWith("/exports/preview/vendors/3/vaults?limit=50");
   });
 });
 

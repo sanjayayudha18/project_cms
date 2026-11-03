@@ -76,15 +76,15 @@ WHERE (sqlc.narg('entity_type')::text IS NULL OR entity_type = sqlc.narg('entity
 
 -- name: CreateMasterDataImportBatch :one
 -- Import confirm (T5.4). Runs in the same transaction as the change-request inserts.
-INSERT INTO master_data_import_batches (entity, file_hash, maker_id, row_count)
-VALUES (sqlc.arg('entity'), sqlc.arg('file_hash'), sqlc.arg('maker_id'), sqlc.arg('row_count'))
-RETURNING id, entity, file_hash, maker_id, row_count, created_at;
+INSERT INTO master_data_import_batches (entity, file_hash, maker_id, row_count, file_name)
+VALUES (sqlc.arg('entity'), sqlc.arg('file_hash'), sqlc.arg('maker_id'), sqlc.arg('row_count'), sqlc.narg('file_name'))
+RETURNING id, entity, file_hash, maker_id, row_count, created_at, file_name;
 
 -- name: FindOpenMasterDataImportBatch :one
 -- Idempotency lookup (T5.4): the latest batch of this file whose changes were
 -- not rejected/stale (a rejected/stale file may be uploaded again). head_id is
 -- the first change request, the approval's document_id.
-SELECT b.id, b.entity, b.file_hash, b.maker_id, b.row_count, b.created_at,
+SELECT b.id, b.entity, b.file_hash, b.maker_id, b.row_count, b.created_at, b.file_name,
        h.id AS head_id, h.approval_request_id, h.status AS head_status
 FROM master_data_import_batches b
 JOIN LATERAL (
@@ -104,6 +104,87 @@ SELECT id, entity_type, entity_id, op, payload, before, status, maker_id, approv
 FROM master_data_change_requests
 WHERE batch_id = sqlc.arg('batch_id')
 ORDER BY id;
+
+-- name: ListMasterDataImportBatches :many
+-- Import history (master-data-import-revamp 1.2). Status is derived from the head
+-- change request (first row of the batch); decided_* from the last acted step.
+SELECT b.id, b.entity, b.file_name, b.row_count, b.created_at, b.maker_id,
+       u.full_name AS maker_name,
+       h.id AS head_id, h.status AS head_status, h.error AS head_error, h.approval_request_id,
+       d.acted_at AS decided_at, du.full_name AS decided_by_name
+FROM master_data_import_batches b
+JOIN users u ON u.id = b.maker_id
+JOIN LATERAL (
+    SELECT c.id, c.status, c.error, c.approval_request_id
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+LEFT JOIN LATERAL (
+    SELECT s.acted_at, s.acted_by_id
+    FROM approval_steps s
+    WHERE s.request_id = h.approval_request_id AND s.status <> 'pending'
+    ORDER BY s.acted_at DESC NULLS LAST
+    LIMIT 1
+) d ON true
+LEFT JOIN users du ON du.id = d.acted_by_id
+WHERE (sqlc.narg('entity')::text IS NULL OR b.entity = sqlc.narg('entity')::text)
+  AND (sqlc.narg('status')::text IS NULL OR h.status = sqlc.narg('status')::text)
+  AND (sqlc.narg('maker_id')::bigint IS NULL OR b.maker_id = sqlc.narg('maker_id')::bigint)
+ORDER BY b.id DESC
+LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
+
+-- name: CountMasterDataImportBatches :one
+-- Same filters as ListMasterDataImportBatches, for pagination total.
+SELECT COUNT(*)
+FROM master_data_import_batches b
+JOIN LATERAL (
+    SELECT c.status
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+WHERE (sqlc.narg('entity')::text IS NULL OR b.entity = sqlc.narg('entity')::text)
+  AND (sqlc.narg('status')::text IS NULL OR h.status = sqlc.narg('status')::text)
+  AND (sqlc.narg('maker_id')::bigint IS NULL OR b.maker_id = sqlc.narg('maker_id')::bigint);
+
+-- name: GetMasterDataImportBatch :one
+SELECT b.id, b.entity, b.file_name, b.row_count, b.created_at, b.maker_id,
+       u.full_name AS maker_name,
+       h.id AS head_id, h.status AS head_status, h.error AS head_error, h.approval_request_id,
+       d.acted_at AS decided_at, du.full_name AS decided_by_name
+FROM master_data_import_batches b
+JOIN users u ON u.id = b.maker_id
+JOIN LATERAL (
+    SELECT c.id, c.status, c.error, c.approval_request_id
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+LEFT JOIN LATERAL (
+    SELECT s.acted_at, s.acted_by_id
+    FROM approval_steps s
+    WHERE s.request_id = h.approval_request_id AND s.status <> 'pending'
+    ORDER BY s.acted_at DESC NULLS LAST
+    LIMIT 1
+) d ON true
+LEFT JOIN users du ON du.id = d.acted_by_id
+WHERE b.id = sqlc.arg('id');
+
+-- name: ListPendingApproversForRequest :many
+-- Assigned approvers of the lowest pending step of an approval request (import notifications).
+SELECT s.assigned_approver_id
+FROM approval_steps s
+WHERE s.request_id = sqlc.arg('request_id')
+  AND s.status = 'pending'
+  AND s.step_level = (
+      SELECT MIN(p.step_level) FROM approval_steps p
+      WHERE p.request_id = sqlc.arg('request_id') AND p.status = 'pending'
+  )
+ORDER BY s.assigned_approver_id;
 
 -- name: SetMasterDataBatchApprovalID :exec
 -- Links every change request of the batch to the batch's single approval request.

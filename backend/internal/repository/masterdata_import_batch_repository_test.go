@@ -57,7 +57,7 @@ func TestMasterDataImportBatchRepository(t *testing.T) {
 	if b, err := repo.FindOpen(ctx, entity, hashA); err != nil || b != nil {
 		t.Fatalf("FindOpen before create = %v, %v", b, err)
 	}
-	batch, existing, err := repo.Create(ctx, entity, hashA, makerID, []db.CreateMasterDataChangeRequestParams{row(1), row(2)})
+	batch, existing, err := repo.Create(ctx, entity, hashA, nil, makerID, []db.CreateMasterDataChangeRequestParams{row(1), row(2)})
 	if err != nil || existing || batch.RowCount != 2 || batch.HeadID == 0 {
 		t.Fatalf("Create = %+v, %v, %v", batch, existing, err)
 	}
@@ -67,7 +67,7 @@ func TestMasterDataImportBatchRepository(t *testing.T) {
 	}
 
 	// Same file again: the open batch comes back, nothing new is written.
-	again, existing, err := repo.Create(ctx, entity, hashA, makerID, []db.CreateMasterDataChangeRequestParams{row(3)})
+	again, existing, err := repo.Create(ctx, entity, hashA, nil, makerID, []db.CreateMasterDataChangeRequestParams{row(3)})
 	if err != nil || !existing || again.ID != batch.ID {
 		t.Fatalf("re-upload = %+v, %v, %v, want existing batch %d", again, existing, err, batch.ID)
 	}
@@ -95,7 +95,7 @@ func TestMasterDataImportBatchRepository(t *testing.T) {
 	}
 
 	// A row colliding with a pending change fails the whole batch and names the row.
-	_, _, err = repo.Create(ctx, entity, hashB, makerID, []db.CreateMasterDataChangeRequestParams{row(9), row(2)})
+	_, _, err = repo.Create(ctx, entity, hashB, nil, makerID, []db.CreateMasterDataChangeRequestParams{row(9), row(2)})
 	var rowErr *BatchRowError
 	if !errors.As(err, &rowErr) || rowErr.BatchRowIndex() != 1 || rowErr.Unwrap() == nil || !strings.Contains(rowErr.Error(), "batch row 1") {
 		t.Fatalf("colliding batch err = %v, want BatchRowError index 1", err)

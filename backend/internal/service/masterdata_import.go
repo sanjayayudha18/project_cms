@@ -57,6 +57,82 @@ type ImportPreview struct {
 	Unchanged       int              `json:"unchanged"`
 	Errors          []ImportRowError `json:"errors"`
 	ErrorsTruncated bool             `json:"errors_truncated"`
+	// Updates == DataUpdates + Enables + Disables (Updates keeps counting toggles).
+	DataUpdates int `json:"data_updates"`
+	Enables     int `json:"enables"`
+	Disables    int `json:"disables"`
+	// Changes is one entry per create/update/toggle row; always non-nil, empty when Errors is not.
+	Changes []ImportChangePreview `json:"changes"`
+}
+
+// Preview ops beyond ImportOpCreate / ImportOpUpdate.
+const (
+	ImportOpEnable  = "enable"
+	ImportOpDisable = "disable"
+)
+
+// ImportChangePreview is what one valid row would do; Row is the file line (header = 1).
+type ImportChangePreview struct {
+	Row    int                 `json:"row"`
+	Op     string              `json:"op"` // create | update | enable | disable
+	Key    string              `json:"key"`
+	Fields []ImportFieldChange `json:"fields"`
+}
+
+// ImportFieldChange is one CSV column that changes; Before is "" for a create.
+type ImportFieldChange struct {
+	Field  string `json:"field"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+}
+
+// importKeyColumns are the columns that identify a row to the admin in the preview.
+var importKeyColumns = map[string][]string{
+	ExportVendors:        {"code"},
+	ExportVendorBranches: {"vendor_code", "branch_code"},
+	ExportVendorVaults:   {"vendor_code", "branch_code", "vault_code"},
+	ExportVendorPICs:     {"vendor_code", "branch_code", "name"},
+	ExportATMs:           {"terminal_id"},
+	ExportATMAssignments: {"terminal_id", "effective_start_date"},
+}
+
+// buildChangePreview describes one validated row; nil for an unchanged row. It
+// compares the normalized cells (row.Cells) with cur over header[1:], like rowOp
+// and checkUpdate, so normalization never shows up as a change.
+func buildChangePreview(entity string, header []string, row ImportRow, cur map[string]string) *ImportChangePreview {
+	if row.Op == ImportOpUnchanged {
+		return nil
+	}
+	p := &ImportChangePreview{Row: row.Row, Op: row.Op, Fields: []ImportFieldChange{}}
+	var keys []string
+	for _, col := range importKeyColumns[entity] {
+		if v := row.Cells[col]; v != "" {
+			keys = append(keys, v)
+		}
+	}
+	p.Key = strings.Join(keys, " / ")
+
+	switch {
+	case row.Op == ImportOpCreate:
+		for _, h := range header[1:] {
+			if v := row.Cells[h]; v != "" {
+				p.Fields = append(p.Fields, ImportFieldChange{Field: h, After: v})
+			}
+		}
+	case row.Toggle:
+		p.Op = ImportOpDisable
+		if row.Cells["is_active"] == "true" {
+			p.Op = ImportOpEnable
+		}
+		p.Fields = append(p.Fields, ImportFieldChange{Field: "is_active", Before: cur["is_active"], After: row.Cells["is_active"]})
+	default:
+		for _, h := range header[1:] {
+			if row.Cells[h] != cur[h] {
+				p.Fields = append(p.Fields, ImportFieldChange{Field: h, Before: cur[h], After: row.Cells[h]})
+			}
+		}
+	}
+	return p
 }
 
 // ImportResult is the preview plus the validated rows (not serialized).
@@ -306,7 +382,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	if !ok {
 		return nil, ErrExportUnknownEntity
 	}
-	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}}}
+	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}, Changes: []ImportChangePreview{}}}
 
 	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill)
 	if err != nil {
@@ -367,6 +443,21 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 			res.Preview.Updates++
 		default:
 			res.Preview.Unchanged++
+		}
+		ch := buildChangePreview(entity, spec.header, row, env.cur[row.ID])
+		if ch == nil {
+			continue
+		}
+		switch ch.Op {
+		case ImportOpEnable:
+			res.Preview.Enables++
+		case ImportOpDisable:
+			res.Preview.Disables++
+		case ImportOpUpdate:
+			res.Preview.DataUpdates++
+		}
+		if len(res.Preview.Errors) == 0 {
+			res.Preview.Changes = append(res.Preview.Changes, *ch)
 		}
 	}
 	return res, nil

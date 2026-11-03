@@ -24,10 +24,14 @@ type RequestStore interface {
 	ListSteps(ctx context.Context, requestID int64) ([]db.ApprovalStep, error)
 	FindPendingStep(ctx context.Context, requestID int64) (*db.ApprovalStep, error)
 	UpdateStepStatus(ctx context.Context, id int64, status string, actedByID int64, actedAt time.Time) (db.ApprovalStep, error)
+	// RunInTx commits fn's writes together, or none of them if fn returns an
+	// error. fn must write through the store and tx it is given.
+	RunInTx(ctx context.Context, fn func(store RequestStore, tx db.DBTX) error) error
 }
 
-// AuditWriter is the one method the orchestrator needs from audit.Writer,
-// kept as an interface so tests can fake it without a real DB.
+// AuditWriter is what the orchestrator needs from audit.Writer, kept as an
+// interface so tests can fake it without a real DB.
 type AuditWriter interface {
 	Write(ctx context.Context, entry audit.Entry) error
+	WriteTx(ctx context.Context, tx db.DBTX, entry audit.Entry) error
 }

@@ -266,8 +266,15 @@ func main() {
 	// endpoint.
 	approvalRepo := approval.NewRepository(dbPool)
 	approvalOrchestrator := approval.NewOrchestrator(approvalRepo, approvalRepo, approvalRepo, auditWriter, nil)
-	masterDataApprovalService := service.NewMasterDataApprovalService(approvalOrchestrator, masterDataChangeRepo, dbPool, masterDataApplierRegistry, auditWriter)
-	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo).WithMasterDataDetail(masterDataChangeRepo).WithApplyRetry(masterDataApprovalService)
+	// Notifications (.claude/sdlc/notification): Send runs inside the business
+	// tx; the worker below sends the email outbox and purges after 90 days.
+	// Built here (moved up) because the import notifier needs it.
+	smtpMailer, notifyInterval := loadNotificationConfig()
+	notificationService := notification.NewService(smtpMailer != nil)
+	importBatchRepo := repository.NewMasterDataImportBatchRepository(dbPool, dbPool)
+	importNotifier := service.NewImportNotifier(notificationService, dbPool)
+	masterDataApprovalService := service.NewMasterDataApprovalService(approvalOrchestrator, masterDataChangeRepo, dbPool, masterDataApplierRegistry, auditWriter).WithImportNotifier(importNotifier)
+	approvalHandler := handler.NewApprovalHandler(masterDataApprovalService, approvalRepo).WithMasterDataDetail(masterDataChangeRepo).WithMasterDataBatches(importBatchRepo).WithApplyRetry(masterDataApprovalService)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/approvals", approvalHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: read access to the master-data maker-checker
@@ -392,9 +399,10 @@ func main() {
 	// (the same validation/payload/"before" code as the single-record
 	// endpoints) and stages the result as ONE batch under one approval.
 	masterDataImporter := service.NewMasterDataImporter(repository.NewMasterDataExportRepository(dbPool)).WithConfirm(service.ImportConfirmDeps{
-		Batches:      repository.NewMasterDataImportBatchRepository(dbPool, dbPool),
+		Batches:      importBatchRepo,
 		Orchestrator: approvalOrchestrator,
 		Audit:        auditWriter,
+		Notifier:     importNotifier,
 		Services: func(sub service.ImportSubmitter) service.ImportServices {
 			return service.ImportServices{
 				Vendors:     service.NewVendorAdminService(vendorAdminRepo, sub),
@@ -406,7 +414,7 @@ func main() {
 			}
 		},
 	})
-	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).Routes())
+	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).WithHistory(service.NewMasterDataImportHistoryService(importBatchRepo)).Routes())
 
 	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8),
 	// plus the RBAC settings menu's read-only list views + policy create/edit
@@ -447,10 +455,6 @@ func main() {
 	// endpoint role subset (maker/checker/viewer) is applied inside
 	// Routes() itself since it differs per route, and actor-level
 	// authorization (creator/checker/four-eyes) is enforced in the service.
-	// Notifications (.claude/sdlc/notification): Send runs inside the business
-	// tx; the worker below sends the email outbox and purges after 90 days.
-	smtpMailer, notifyInterval := loadNotificationConfig()
-	notificationService := notification.NewService(smtpMailer != nil)
 	vendorRequestService := service.NewVendorRequestService(dbPool).WithNotifier(notificationService)
 
 	// ADMIN-only: Area ACM (cit-acm-plan FR7) -- immediate-apply + audit in tx,

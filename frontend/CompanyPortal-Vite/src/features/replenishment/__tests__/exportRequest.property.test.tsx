@@ -123,7 +123,8 @@ describe("Property 12: Replenishment export buttons send the screen filter", () 
       }),
       { numRuns: 50 },
     );
-  });
+    // ~2s alone; the default 5s trips under full-suite coverage load.
+  }, 30_000);
 });
 
 function same(a: unknown, b: unknown): boolean {

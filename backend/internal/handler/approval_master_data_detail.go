@@ -2,7 +2,10 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/pkg/middleware"
@@ -21,9 +24,26 @@ func (h *ApprovalHandler) WithMasterDataDetail(r MasterDataApprovalDetailReader)
 	return h
 }
 
-// approvalMasterDataDetailLimit caps the rows returned for an import batch; the
-// per-op counts always cover the whole batch.
-const approvalMasterDataDetailLimit = 200
+// MasterDataApprovalBatchReader reads the import batch header.
+// *repository.MasterDataImportBatchRepository satisfies it. Optional: without
+// it the response simply has no "batch" object.
+type MasterDataApprovalBatchReader interface {
+	GetBatch(ctx context.Context, id int64) (db.GetMasterDataImportBatchRow, error)
+}
+
+// WithMasterDataBatches adds the batch header to GET /{id}/master-data.
+func (h *ApprovalHandler) WithMasterDataBatches(r MasterDataApprovalBatchReader) *ApprovalHandler {
+	h.mdBatch = r
+	return h
+}
+
+const (
+	// approvalMasterDataDetailLimit is the default and maximum page size for an
+	// import batch; the per-op counts always cover the whole batch.
+	approvalMasterDataDetailLimit = 200
+	// approvalMasterDataDetailMaxPage keeps (page-1)*size far from overflow.
+	approvalMasterDataDetailMaxPage = 1_000_000
+)
 
 // MasterDataDetail handles GET /{id}/master-data: what an approval request for
 // a master-data change actually changes (payload + "before" snapshot, or the
@@ -72,11 +92,36 @@ func (h *ApprovalHandler) MasterDataDetail(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusNotFound, "not_found", "Perubahan master data tidak ditemukan")
 		return
 	}
+	// Parsed after authorization so paging never changes who may read.
+	page, ok := queryInt(w, r.URL.Query().Get("page"), "page", 1, 1, approvalMasterDataDetailMaxPage)
+	if !ok {
+		return
+	}
+	pageSize, ok := queryInt(w, r.URL.Query().Get("page_size"), "page_size",
+		approvalMasterDataDetailLimit, 1, approvalMasterDataDetailLimit)
+	if !ok {
+		return
+	}
+
 	changes := []db.MasterDataChangeRequest{head}
+	var batch map[string]any
 	if head.BatchID != nil {
 		if changes, err = h.mdDetail.ListByBatch(r.Context(), *head.BatchID); err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 			return
+		}
+		if h.mdBatch != nil {
+			b, err := h.mdBatch.GetBatch(r.Context(), *head.BatchID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "not_found", "Batch impor tidak ditemukan")
+				return
+			}
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+				return
+			}
+			batch = map[string]any{"id": b.ID, "entity": b.Entity, "file_name": b.FileName,
+				"maker_name": b.MakerName, "row_count": b.RowCount}
 		}
 	}
 
@@ -86,15 +131,22 @@ func (h *ApprovalHandler) MasterDataDetail(w http.ResponseWriter, r *http.Reques
 	}
 	total := len(changes)
 	shown := changes
-	if len(shown) > approvalMasterDataDetailLimit {
-		shown = shown[:approvalMasterDataDetailLimit]
+	if head.BatchID != nil { // a single change shows its one row on any page
+		// Sliced directly rather than exporting service.pageSlice: it is two lines.
+		start := min((page-1)*pageSize, total)
+		shown = changes[start:min(start+pageSize, total)]
 	}
 	out := make([]map[string]any, len(shown))
 	for i, c := range shown {
 		out[i] = masterDataChangeToResponse(c)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"request_id": req.ID, "status": req.Status, "batch_id": head.BatchID,
-		"total": total, "counts": counts, "truncated": total > len(shown), "changes": out,
-	})
+		"total": total, "counts": counts, "truncated": head.BatchID != nil && total > page*pageSize,
+		"changes": out, "page": page, "page_size": pageSize,
+	}
+	if batch != nil {
+		resp["batch"] = batch
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

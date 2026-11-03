@@ -86,7 +86,7 @@ func TestMasterDataImport_PicRoles_Integration(t *testing.T) {
 
 	confirmApprove := func(csv string) {
 		t.Helper()
-		res, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendorPICs, strings.NewReader(csv), "127.0.0.1")
+		res, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendorPICs, "test.csv", strings.NewReader(csv), "127.0.0.1")
 		if err != nil {
 			t.Fatalf("Confirm: %v", err)
 		}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
@@ -120,6 +121,12 @@ func (f *fakeStore) CreateStep(_ context.Context, requestID int64, stepLevel int
 	return step, nil
 }
 
+// RunInTx has no rollback: atomicity is proven against Postgres in
+// TestSubmitForApproval_FailureLeavesNothing.
+func (f *fakeStore) RunInTx(_ context.Context, fn func(store RequestStore, tx db.DBTX) error) error {
+	return fn(f, nil)
+}
+
 func (f *fakeStore) ListSteps(_ context.Context, requestID int64) ([]db.ApprovalStep, error) {
 	if f.forceListStepsErr != nil {
 		return nil, f.forceListStepsErr
@@ -171,6 +178,10 @@ func (f *fakeAuditWriter) Write(_ context.Context, entry audit.Entry) error {
 	}
 	f.entries = append(f.entries, entry)
 	return nil
+}
+
+func (f *fakeAuditWriter) WriteTx(ctx context.Context, _ db.DBTX, entry audit.Entry) error {
+	return f.Write(ctx, entry)
 }
 
 // twoLevelChain is the common test fixture: maker (1) -> supervisor 20
@@ -226,6 +237,82 @@ func TestOrchestrator_SubmitForApproval_DoubleSubmitNotDuplicated(t *testing.T) 
 	}
 	if submitCount != 1 {
 		t.Errorf("submit audit entries = %d, want 1 (double submit must not write a second one)", submitCount)
+	}
+}
+
+// racingStore loses the check-then-create race: the first lookup finds nothing,
+// CreateRequest fails with createErr, and later lookups see what the winner made.
+type racingStore struct {
+	*fakeStore
+	createErr error
+	reread    func() (*db.ApprovalRequest, error)
+	lookups   int
+}
+
+func (s *racingStore) FindRequestByDocument(context.Context, string, int64) (*db.ApprovalRequest, error) {
+	s.lookups++
+	if s.lookups == 1 {
+		return nil, nil
+	}
+	return s.reread()
+}
+
+func (s *racingStore) RunInTx(_ context.Context, fn func(store RequestStore, tx db.DBTX) error) error {
+	return fn(s, nil)
+}
+
+func (s *racingStore) CreateRequest(context.Context, int64, string, int64, pgtype.Numeric, int32) (db.ApprovalRequest, error) {
+	return db.ApprovalRequest{}, s.createErr
+}
+
+func TestOrchestrator_SubmitForApproval_LostCreateRace(t *testing.T) {
+	winner := &db.ApprovalRequest{ID: 77, DocumentType: "invoice", DocumentID: 9001}
+	found := func() (*db.ApprovalRequest, error) { return winner, nil }
+	docConflict := &pgconn.PgError{Code: "23505", ConstraintName: "approval_requests_document_uq"}
+	rereadErr := errors.New("connection lost")
+
+	cases := []struct {
+		name      string
+		createErr error
+		reread    func() (*db.ApprovalRequest, error)
+		wantID    int64 // 0 = an error is expected
+		wantErr   error
+	}{
+		{name: "document constraint returns the winner's request", createErr: fmt.Errorf("wrapped: %w", docConflict), reread: found, wantID: 77},
+		{name: "other unique constraint stays an error", createErr: &pgconn.PgError{Code: "23505", ConstraintName: "approval_requests_pkey"}, reread: found},
+		{name: "other code on that constraint stays an error", createErr: &pgconn.PgError{Code: "23503", ConstraintName: "approval_requests_document_uq"}, reread: found},
+		{name: "non-postgres error stays an error", createErr: errors.New("boom"), reread: found},
+		{name: "failed re-read stays an error", createErr: docConflict, reread: func() (*db.ApprovalRequest, error) { return nil, rereadErr }, wantErr: rereadErr},
+		{name: "re-read finding nothing stays an error", createErr: docConflict, reread: func() (*db.ApprovalRequest, error) { return nil, nil }, wantErr: docConflict},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			chain, base := twoLevelChain()
+			store := &racingStore{fakeStore: base, createErr: tc.createErr, reread: tc.reread}
+			auditW := &fakeAuditWriter{}
+			orch := NewOrchestrator(store, chain, &fakeAvailabilityRepository{}, auditW, nil)
+
+			got, created, err := orch.SubmitForApproval(context.Background(), 1, "invoice", 9001, pgtype.Numeric{Valid: true}, "127.0.0.1")
+
+			if created {
+				t.Errorf("created = true: the caller would audit and notify a second time")
+			}
+			if len(base.steps) != 0 || len(auditW.entries) != 0 {
+				t.Errorf("wrote %d steps and %d audit entries, want none", len(base.steps), len(auditW.entries))
+			}
+			if tc.wantID != 0 {
+				if err != nil || got.ID != tc.wantID {
+					t.Fatalf("got request %d, err %v; want request %d", got.ID, err, tc.wantID)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("err = nil, want an error (request %d)", got.ID)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Errorf("err = %v, want it to wrap %v", err, tc.wantErr)
+			}
+		})
 	}
 }
 

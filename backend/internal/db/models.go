@@ -599,6 +599,8 @@ type MasterDataImportBatch struct {
 	MakerID   int64              `json:"maker_id"`
 	RowCount  int32              `json:"row_count"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	// Original upload file name (base name, control chars stripped, max 255). NULL for batches before 036.
+	FileName *string `json:"file_name"`
 }
 
 type MenuFeature struct {

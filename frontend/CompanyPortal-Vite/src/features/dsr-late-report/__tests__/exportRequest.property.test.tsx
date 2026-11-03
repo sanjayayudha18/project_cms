@@ -126,7 +126,8 @@ describe("Property 12: DSR late export button sends the screen filter", () => {
       }),
       { numRuns: 40 },
     );
-  });
+    // ~1.5s alone; the default 5s trips under full-suite coverage load.
+  }, 30_000);
 });
 
 function sortKeys(v: unknown): unknown {

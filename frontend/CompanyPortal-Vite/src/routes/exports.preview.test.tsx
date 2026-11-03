@@ -77,7 +77,10 @@ describe("/exports/$dataset route", () => {
       history: createMemoryHistory({ initialEntries: ["/exports/nope"] }),
     });
     render(<RouterProvider router={router} />);
-    expect(await screen.findByText("Data ekspor tidak dikenal.")).toBeInTheDocument();
+    // Mounts the whole app tree; the default 1s wait trips under full-suite coverage load.
+    expect(
+      await screen.findByText("Data ekspor tidak dikenal.", {}, { timeout: 10_000 }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Kembali ke Export Data" })).toHaveAttribute(
       "href",
       "/exports",

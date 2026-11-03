@@ -7,15 +7,15 @@
 
 ## ⛔ Scope guard — read before starting ANY task
 
-**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d and 2.3 built and committed (manual browser checks with the user). **Next: 2.4 problem-ATM exclusion.** Cross-cutting item X.1 (CompanyPortal app-shell revamp + sidebar-settings-footer follow-up) is built and committed; only its manual browser check remains. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job. Follow-up X.9 `export-preview-simplify` (2026-10-30): kode, test, dan gate selesai, belum di-commit; cek browser manual oleh user masih outstanding.
+**Current focus (in order):** Phase 2 (ATM ops). 2.1 closed, 2.2a–2.2d and 2.3 built and committed (manual browser checks with the user). **2.4 problem-ATM exclusion is ON HOLD (2026-11-02, data ATM bermasalah belum diberikan); no next Phase 2 item chosen yet.** Cross-cutting item X.1 (CompanyPortal app-shell revamp + sidebar-settings-footer follow-up) is built and committed; only its manual browser check remains. Phase 0 (infra) and Phase 1 (close in-flight) are **done** — only their manual browser checks remain, which are the user's job. Follow-up X.9 `export-preview-simplify` (2026-10-30): committed `f98bc89`; cek browser manual oleh user masih outstanding.
 Anything not listed under Phase 2 or the cross-cutting section is **out of scope right now**. If a request touches it, STOP and ask.
 
 Rules:
 1. **One task = one item in this file.** If the work isn't an item here, add it here first (with user OK), then build it.
-2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed. Exception: read-only export under X.7 (user OK 2026-10-28).
+2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed. Exceptions: read-only export under X.7 (user OK 2026-10-28); CSV import revamp under X.10 (user OK 2026-11-02).
 3. **Do not touch Phases 3–7** (finance, escrow, cash count, CIT, EOD) until Phase 2 lands, unless the user explicitly re-prioritizes.
 4. **Do not wire mock screens** (see "Mock frontends") ad hoc — each gets wired only as part of its owning phase item.
-5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `036`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
+5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `037`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
 6. Accepted known gaps (listed below) are **not** to be "fixed along the way".
 
 ---
@@ -24,9 +24,9 @@ Rules:
 
 Overall completion: **~58%** (rough estimate; ~55% on 2026-10-23, ~45-50% on 2026-10-08). "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
 
-Branch: `dev1` is **155 commits ahead** of `main` (`dev1` latest `3f56450`). Merge `dev1` → `main` is still pending. `export-preview-simplify` is uncommitted in the working tree.
+Branch: `dev1` is **156 commits ahead** of `main` (`dev1` latest `f98bc89`). Merge `dev1` → `main` is still pending.
 
-Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`035` (gaps: `022` reserved, `024` dropped; 33 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29.
+Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`036` (gaps: `022` reserved, `024` dropped; 34 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29; `036_master_data_import_batches_file_name` applied to dev 2026-11-02.
 
 ### Built and wired (verified in code)
 
@@ -159,7 +159,7 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 - Remaining (user): Docker builds `backend` + `backend_python`, manual browser check, real vendor upload around 09:00 WIB + real 09:00 notification run, ADMIN fills `dsr_location_vault_maps` (report and notifications stay empty until then).
 - **Model:** Sonnet, Effort: Medium.
 
-### 2.4 Problem-ATM exclusion + FSD input lists — ⏳ NEXT, not started (scoped 2026-10-08)
+### 2.4 Problem-ATM exclusion + FSD input lists — ⏸ ON HOLD (user 2026-11-02: data ATM bermasalah belum diberikan). Spec draft `.kiro/specs/problem-atm-exclusion/requirements.md` (D1-D19 menunggu PO; dipindah dari `intent.md`) (scoped 2026-10-08)
 - CROWN (not DMAA) excludes/flags "problem" ATMs and handles the FSD v1.0 input lists (complaint/project/problem/adjustment) before a Vendor Request is created from DMAA rows.
 - Needs a full AI-DLC chain (`.claude/sdlc/problem-atm-exclusion/`). Likely schema change.
 - **Depends on:** 2.1 ✅, 0.2 ✅.
@@ -181,10 +181,12 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 | X.3 Tech debt BE (`be-tech-debt/`, `BE_debt.md`) | 🟡 Fase A–G done (CI, coverage gate, migrate runner, logging/`/ready`, limits, PyJWT, file splits) | first GitHub Actions run after push; GCP log-based alert (user); `backend-exq` image hardening |
 | X.4 OpenAPI contract (BE-10, `openapi-contract/`) | ✅ pilot done `a1b78c9` (`/vendor-requests*`, `/vendor/replenish-orders*`) | extend per new module |
 | X.5 CI move to Jenkins (`ci-jenkins/`) | ⏸ on hold (user 2026-10-15); GitHub Actions stays live | resume ~Dec 2026 |
-| X.6 Merge `dev1` → `main` | ⏳ pending (155 commits) | after the open manual checks / code-owner review |
-| X.7 Export Data (`.kiro/specs/vendor-data-export/`) | ✅ built, code complete 2026-10-29 (tasks 1–17 selesai, gate 16 hijau; not committed). Export CSV async per vendor / cabang / Harga Paket / master data global, dibangun di **`backend-exq`** (replica pool, `TrustedRealIP`, image non-root, `/api/v1/exports/`); migrasi `034_export_jobs` applied to dev 2026-10-28; kontrak CSV di `pkg/csvexport`; endpoint export lama di `backend/` dihapus (cutover, D15); unduh otomatis + hapus file setelah unduh pertama (D18) | manual browser check (user, task 18: pop-up + unduh otomatis, Log Audit, screen reader, keyboard); commit; `govulncheck` GO-2026-6809 (naik toolchain Go 1.26.10 seluruh workspace + image, open) |
-| X.8 Report export migration (`.kiro/specs/report-export-migration/`, requirements + design + tasks 2026-10-28 (11 tasks, 25 leaf), D1–D10 = Kiro suggestions; mig `035_export_jobs_reports`, `pkg/reports`) | ✅ built 2026-10-29 (tasks 1–10 selesai, gate 9 hijau; not committed): CSV DSR telat + replenishment pindah ke `backend-exq` (`/api/v1/exports/reports/*`, Ekspor Saya di `/exports`); `format=csv` di `backend/` dihapus (400); layar JSON tetap di `backend/`; mig `035` applied to dev 2026-10-29 | manual browser check (user, task 11: ekspor per peran, Ekspor Saya, Log Audit `report_exported`, Excel non-ASCII); commit |
-| X.9 Export menu revamp (`.kiro/specs/export-menu-revamp/`) | ✅ built 2026-10-30 (tasks 1–13 selesai, gate 6 dan 12 hijau; not committed). Katalog `/exports` (item sidebar) → halaman pratinjau `/exports/<data>` (tabel + filter + jumlah baris, API pratinjau baru di `backend-exq`) → ekspor sesuai filter tabel lewat `export_jobs` yang ada. Tanpa migrasi, tanpa tabel baru; `pgregory.net/rapid` (test-only) ditambahkan ke `backend-exq/go.mod` atas izin user | manual browser check (user, task 14: katalog per peran, pratinjau + filter + paging, tombol ekspor sesuai filter, pengalihan `/settings/admin/exports`); commit. Follow-up `.kiro/specs/export-preview-simplify/` (2026-10-30, D1–D5 disetujui PO): dropdown Vendor saja (tanpa kotak "Cari vendor"), tombol "Search" menggantikan "Terapkan", catatan pengambilan file dihapus, tombol "Ekspor" tanpa jumlah baris; tanpa perubahan backend. Permintaan gabung ATM + Kelolaan ATM dibatalkan PO (D1). Kode, test, dan gate selesai, belum di-commit; cek browser manual (user, task 8 spec) outstanding |
+| X.6 Merge `dev1` → `main` | ⏳ pending (156 commits) | after the open manual checks / code-owner review |
+| X.7 Export Data (`.kiro/specs/vendor-data-export/`) | ✅ built, code complete 2026-10-29 (tasks 1–17 selesai, gate 16 hijau; committed `540ee96`). Export CSV async per vendor / cabang / Harga Paket / master data global, dibangun di **`backend-exq`** (replica pool, `TrustedRealIP`, image non-root, `/api/v1/exports/`); migrasi `034_export_jobs` applied to dev 2026-10-28; kontrak CSV di `pkg/csvexport`; endpoint export lama di `backend/` dihapus (cutover, D15); unduh otomatis + hapus file setelah unduh pertama (D18) | manual browser check (user, task 18: pop-up + unduh otomatis, Log Audit, screen reader, keyboard); `govulncheck` GO-2026-6809 (naik toolchain Go 1.26.10 seluruh workspace + image, open) |
+| X.8 Report export migration (`.kiro/specs/report-export-migration/`, requirements + design + tasks 2026-10-28 (11 tasks, 25 leaf), D1–D10 = Kiro suggestions; mig `035_export_jobs_reports`, `pkg/reports`) | ✅ built 2026-10-29 (tasks 1–10 selesai, gate 9 hijau; committed `0e2cc18`): CSV DSR telat + replenishment pindah ke `backend-exq` (`/api/v1/exports/reports/*`, Ekspor Saya di `/exports`); `format=csv` di `backend/` dihapus (400); layar JSON tetap di `backend/`; mig `035` applied to dev 2026-10-29 | manual browser check (user, task 11: ekspor per peran, Ekspor Saya, Log Audit `report_exported`, Excel non-ASCII) |
+| X.9 Export menu revamp (`.kiro/specs/export-menu-revamp/`) | ✅ built 2026-10-30 (tasks 1–13 selesai, gate 6 dan 12 hijau; committed `3f56450`). Katalog `/exports` (item sidebar) → halaman pratinjau `/exports/<data>` (tabel + filter + jumlah baris, API pratinjau baru di `backend-exq`) → ekspor sesuai filter tabel lewat `export_jobs` yang ada. Tanpa migrasi, tanpa tabel baru; `pgregory.net/rapid` (test-only) ditambahkan ke `backend-exq/go.mod` atas izin user | manual browser check (user, task 14: katalog per peran, pratinjau + filter + paging, tombol ekspor sesuai filter, pengalihan `/settings/admin/exports`). Follow-up `.kiro/specs/export-preview-simplify/` (2026-10-30, D1–D5 disetujui PO): dropdown Vendor saja (tanpa kotak "Cari vendor"), tombol "Search" menggantikan "Terapkan", catatan pengambilan file dihapus, tombol "Ekspor" tanpa jumlah baris; tanpa perubahan backend. Permintaan gabung ATM + Kelolaan ATM dibatalkan PO (D1). Committed `f98bc89`; cek browser manual (user, task 8 spec) outstanding |
+| X.10 Master-data CSV import revamp (`.kiro/specs/master-data-import-revamp/`) | ✅ built 2026-11-03 (tasks 1–15 selesai; requirements + design disetujui PO 2026-11-02, D1–D12 = saran Kiro; mock UI `ui-mock.html`). Belum di-commit. Approval sebelum update DB sudah berjalan (satu batch = satu approval, apply semua atau tidak); revamp menambah pratinjau per baris, riwayat + detail batch, tombol coba terapkan lagi, tinjauan checker lengkap, notifikasi impor. Mig `036` (`master_data_import_batches.file_name`). Pengecualian scope guard rule 2 (user OK 2026-11-02) | cek browser manual (user, task 16: impor tiap entitas, file berisi kesalahan, file sama dua kali, riwayat + detail, batch stale + retry, tinjauan checker, notifikasi, peran non-admin, keyboard + screen reader) outstanding; commit |
+| X.11 graphify-human generator (`graphify-human/`) | 🚧 2026-11-03 (user OK): skrip Python stdlib `graphify-human/generate.py` membaca `features.toml` + `graphify-out/graph.json` + source code, menulis peta fitur Markdown ke `graphify-human/out/`. Tooling dev saja, tidak menyentuh runtime aplikasi | review output pilot 3 fitur, lalu tambah fitur lain di `features.toml` |
 
 ---
 
@@ -215,7 +217,7 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 ## Dependency graph
 
 ```
-Phase 1 ─> Phase 0 ─> Phase 2 (2.1 ✅ ─> 2.2a ✅ ─> 2.2b ✅ ─> 2.2c ✅ ─> 2.2d ✅ ; 2.3 ✅ ; 2.4 ⏳)
+Phase 1 ─> Phase 0 ─> Phase 2 (2.1 ✅ ─> 2.2a ✅ ─> 2.2b ✅ ─> 2.2c ✅ ─> 2.2d ✅ ; 2.3 ✅ ; 2.4 ⏸)
                          │
                          ├─> 3 Finance ─> 4 Escrow ─> 5 Cash count
                          ├─> 7 EOD

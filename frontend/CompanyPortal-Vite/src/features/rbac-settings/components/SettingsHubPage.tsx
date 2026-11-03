@@ -120,8 +120,8 @@ const MASTER_DATA_CARDS: HubCard[] = [
   },
   {
     id: "admin-master-data-io",
-    title: "Ekspor & Impor CSV",
-    description: "Unduh, ubah massal, dan impor data master vendor dan ATM.",
+    title: "Impor CSV Data Master",
+    description: "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
     href: "/settings/admin/master-data-io",
     icon: FileSpreadsheet,
     category: "master",

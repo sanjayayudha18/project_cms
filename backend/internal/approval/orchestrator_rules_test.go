@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
+	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
 // Maker-checker rules of the Orchestrator (be-tech-debt C3): maker != checker,
@@ -241,6 +242,10 @@ func (c *countingFailAudit) Write(context.Context, audit.Entry) error {
 		return errBoom
 	}
 	return nil
+}
+
+func (c *countingFailAudit) WriteTx(ctx context.Context, _ db.DBTX, entry audit.Entry) error {
+	return c.Write(ctx, entry)
 }
 
 func TestOrchestrator_ApproveRejectErrorBranches(t *testing.T) {

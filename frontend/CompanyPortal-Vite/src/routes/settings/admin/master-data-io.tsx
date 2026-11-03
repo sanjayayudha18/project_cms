@@ -1,4 +1,5 @@
 import { Forbidden } from "@/components/pages/Forbidden";
+import { MASTER_DATA_IO_SEARCH_SCHEMA } from "@/features/master-data-io/searchSchema";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute, requireRoles } from "../../_protected";
 
@@ -11,6 +12,7 @@ const MasterDataIOPage = lazyRouteComponent(
 export const adminMasterDataIORoute = createRoute({
   path: "/settings/admin/master-data-io",
   getParentRoute: () => protectedRoute,
+  validateSearch: MASTER_DATA_IO_SEARCH_SCHEMA,
   beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
   loader: () => MasterDataIOPage.preload?.(),
   component: AdminMasterDataIORouteComponent,

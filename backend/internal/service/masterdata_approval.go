@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,6 +21,10 @@ import (
 // and approval (T2.5) -- the change is marked 'stale' and not applied. The
 // maker must review the current state and resubmit.
 var ErrMasterDataChangeStale = errors.New("entity has changed since this change request was submitted")
+
+// importNotifyTimeout bounds the best-effort import notification, which runs on
+// the request's goroutine after the decision is already durable.
+const importNotifyTimeout = 5 * time.Second
 
 // MasterDataApprovalOrchestrator is the narrow approval.Orchestrator surface
 // MasterDataApprovalService needs. Includes SubmitForApproval (passed
@@ -79,11 +86,19 @@ type MasterDataApprovalService struct {
 	pool         MasterDataApprovalPool
 	appliers     ApplierRegistry
 	audit        MasterDataApprovalAuditWriter
+	notifier     ImportNotifier
 }
 
 // NewMasterDataApprovalService creates a MasterDataApprovalService with the given dependencies.
 func NewMasterDataApprovalService(orchestrator MasterDataApprovalOrchestrator, repo MasterDataApprovalRepo, pool MasterDataApprovalPool, appliers ApplierRegistry, auditWriter MasterDataApprovalAuditWriter) *MasterDataApprovalService {
 	return &MasterDataApprovalService{orchestrator: orchestrator, repo: repo, pool: pool, appliers: appliers, audit: auditWriter}
+}
+
+// WithImportNotifier enables import-batch notifications (master-data-import-revamp
+// Req 8). Without it (or with nil) nothing is sent. Single-record changes never notify.
+func (s *MasterDataApprovalService) WithImportNotifier(n ImportNotifier) *MasterDataApprovalService {
+	s.notifier = n
+	return s
 }
 
 // SubmitForApproval passes through to the underlying orchestrator
@@ -112,10 +127,17 @@ func (s *MasterDataApprovalService) Approve(ctx context.Context, requestID, acto
 	if request.DocumentType != masterDataDocumentType || request.Status != "approved" {
 		// Not a master-data request, or not yet the final step (more
 		// approval levels remain) -- nothing to apply yet.
+		if request.DocumentType == masterDataDocumentType && request.Status == "pending" {
+			s.notifyBatch(ctx, request.DocumentID, func(n ImportNotifier, ctx context.Context, batchID, _ int64) {
+				n.BatchSubmitted(ctx, batchID, request.ID)
+			})
+		}
 		return request, nil
 	}
 
-	if applyErr := s.applyMasterDataChange(ctx, actorID, request.DocumentID, actorIP); applyErr != nil {
+	applyErr := s.applyMasterDataChange(ctx, actorID, request.DocumentID, actorIP)
+	s.notifyApplyOutcome(ctx, request.DocumentID, applyErr)
+	if applyErr != nil {
 		return request, fmt.Errorf("approved but apply failed (change request %d): %w", request.DocumentID, applyErr)
 	}
 
@@ -141,7 +163,9 @@ func (s *MasterDataApprovalService) RetryApply(ctx context.Context, changeID, ac
 	if head.Status != "approved" {
 		return ErrMasterDataNotRetryable
 	}
-	return s.applyMasterDataChange(ctx, actorID, changeID, actorIP)
+	applyErr := s.applyMasterDataChange(ctx, actorID, changeID, actorIP)
+	s.notifyApplyOutcome(ctx, changeID, applyErr)
+	return applyErr
 }
 
 // Reject advances the approval chain's reject path for requestID. Rejecting
@@ -191,7 +215,59 @@ func (s *MasterDataApprovalService) Reject(ctx context.Context, requestID, actor
 		return request, fmt.Errorf("write audit log: %w", err)
 	}
 
+	s.notifyBatch(ctx, request.DocumentID, ImportNotifier.BatchRejected)
+
 	return request, nil
+}
+
+// notifyApplyOutcome tells the batch's maker how the apply ended.
+func (s *MasterDataApprovalService) notifyApplyOutcome(ctx context.Context, changeID int64, applyErr error) {
+	if applyErr != nil {
+		s.notifyBatch(ctx, changeID, ImportNotifier.BatchApplyFailed)
+		return
+	}
+	s.notifyBatch(ctx, changeID, ImportNotifier.BatchApplied)
+}
+
+// notifyBatch runs notify if changeID heads an import batch. Called only after
+// the decision and its audit are done, and it can never affect them: it reports
+// nothing back, survives a panic, and detaches from the request's cancellation so
+// a client that went away still gets its batch's notification sent.
+func (s *MasterDataApprovalService) notifyBatch(ctx context.Context, changeID int64, notify func(n ImportNotifier, ctx context.Context, batchID, makerID int64)) {
+	if s.notifier == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), importNotifyTimeout)
+	defer cancel()
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "import notification panicked", "change_request_id", changeID, "panic", r)
+		}
+	}()
+
+	head, err := s.repo.GetByID(ctx, changeID)
+	if err != nil {
+		slog.WarnContext(ctx, "import notification skipped: load change request", "change_request_id", changeID, "error", err)
+		return
+	}
+	if head.BatchID == nil {
+		return
+	}
+	notify(s.notifier, ctx, *head.BatchID, head.MakerID)
+}
+
+// batchCauseMessage is the error text of the row that made a batch roll back.
+// It must never read as a rollback note (isFailedRow finds the cause by the text
+// being non-empty and not starting with BatchRollbackPrefix).
+func batchCauseMessage(err error) string {
+	msg := err.Error()
+	if msg == "" {
+		return "apply failed"
+	}
+	if strings.HasPrefix(msg, BatchRollbackPrefix) {
+		return "apply failed: " + msg
+	}
+	return msg
 }
 
 // applyMasterDataChange runs the T2.4 apply-on-approve flow for one
@@ -201,7 +277,7 @@ func (s *MasterDataApprovalService) Reject(ctx context.Context, requestID, actor
 // the batch has ONE approval, and approving it applies every row of the batch
 // in ONE transaction -- all rows or none. If any row fails (stale, duplicate,
 // overlap, ...) nothing of the batch is written; the failing row records its
-// own error and the head notes the rollback.
+// own error and every other row notes the rollback (BatchRollbackPrefix).
 func (s *MasterDataApprovalService) applyMasterDataChange(ctx context.Context, actorID, changeID int64, actorIP string) error {
 	if err := s.repo.MarkApproved(ctx, changeID); err != nil {
 		return fmt.Errorf("mark change request approved: %w", err)
@@ -234,10 +310,17 @@ func (s *MasterDataApprovalService) applyMasterDataChange(ctx context.Context, a
 	for _, change := range changes {
 		if err := s.applyOne(ctx, tx, actorID, change, actorIP); err != nil {
 			if head.BatchID != nil {
+				// Release the tx first: it still holds the row locks of the rows applied
+				// so far, and the pool writes below would wait on them.
+				_ = tx.Rollback(ctx)
 				// Nothing of the batch landed: retire every row so the same file can be
 				// uploaded again (FindOpen skips stale batches) once the cause is fixed.
-				msg := fmt.Sprintf("batch rolled back: change request %d failed: %v", change.ID, err)
+				note := fmt.Sprintf(BatchRollbackPrefix+"change request %d failed", change.ID)
 				for _, c := range changes {
+					msg := note
+					if c.ID == change.ID {
+						msg = batchCauseMessage(err)
+					}
 					_ = s.repo.MarkStale(ctx, c.ID, msg)
 				}
 			}
@@ -309,6 +392,9 @@ func (s *MasterDataApprovalService) applyOne(ctx context.Context, tx pgx.Tx, act
 		After:      after,
 		IP:         actorIP,
 	}); err != nil {
+		// An encoding failure leaves the tx alive, holding this row's lock from the
+		// status flip above; release it or the pool write below waits on it.
+		_ = tx.Rollback(ctx)
 		_ = s.repo.MarkApplyFailed(ctx, changeID, err.Error())
 		return fmt.Errorf("write audit log: %w", err)
 	}

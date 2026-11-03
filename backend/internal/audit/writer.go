@@ -62,6 +62,11 @@ func (w *Writer) Write(ctx context.Context, entry Entry) error {
 	return err
 }
 
+// WriteTx appends one audit_logs row on tx instead of the Writer's own connection.
+func (w *Writer) WriteTx(ctx context.Context, tx db.DBTX, entry Entry) error {
+	return NewWriter(tx).Write(ctx, entry)
+}
+
 func marshalOrNil(v any) ([]byte, error) {
 	if v == nil {
 		return nil, nil

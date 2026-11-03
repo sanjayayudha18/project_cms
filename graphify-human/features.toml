@@ -1,8 +1,11 @@
 # graphify-human: peta fitur yang dibaca manusia.
 #
-# DRAFT pilot (2026-10-23), 3 fitur. Review dulu sebelum generator dibuat.
+# DRAFT pilot (2026-10-23), 3 fitur.
 #
-# File ini SATU-SATUNYA yang diedit manual. Generator (belum dibuat) membaca:
+# Jalankan dari root repo:  py graphify-human/generate.py   (Python 3.13+, stdlib saja)
+# Hasil: graphify-human/out/index.md + satu <id>.md per fitur.
+#
+# File ini SATU-SATUNYA yang diedit manual. Generator (generate.py) membaca:
 #   - file ini              -> label bisnis, status, file inti per fitur
 #   - graphify-out/graph.json -> dependensi file ke file (impor/panggilan) untuk
 #                              "file terkait" di luar file inti

@@ -14,7 +14,7 @@ vi.mock("@/lib/api/client", () => ({ api: client }));
 import { approveRequest, getInbox, getMasterDataDetail, rejectRequest } from "../api";
 import { approvalKeys, useApprove, useInbox, useMasterDataDetail, useReject } from "../hooks";
 
-function setup<T>(hook: () => T) {
+function setup<T, P = undefined>(hook: (props: P) => T, initialProps?: P) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -22,7 +22,7 @@ function setup<T>(hook: () => T) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  return { ...renderHook(hook, { wrapper }), invalidate };
+  return { ...renderHook(hook, { wrapper, initialProps }), invalidate };
 }
 
 const invalidatedKeys = (spy: { mock: { calls: unknown[][] } }) =>
@@ -81,7 +81,32 @@ describe("approvals hooks", () => {
     const { result } = setup(() => useMasterDataDetail(4));
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(client.get).toHaveBeenCalledWith("/approvals/4/master-data");
+    expect(client.get).toHaveBeenCalledWith("/approvals/4/master-data?page=1&page_size=50");
+  });
+
+  it("useMasterDataDetail asks for the given page and keys the cache by page", async () => {
+    client.get.mockResolvedValue({ data: { request_id: 4, changes: [] } });
+    const { result } = setup(() => useMasterDataDetail(4, 2));
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.get).toHaveBeenCalledWith("/approvals/4/master-data?page=2&page_size=50");
+    expect(approvalKeys.masterData(4, 2)).not.toEqual(approvalKeys.masterData(4, 1));
+    expect(approvalKeys.masterData(4, 2)).toContain(2);
+  });
+
+  it("useMasterDataDetail refetches when the page changes", async () => {
+    client.get.mockResolvedValue({ data: { request_id: 4, changes: [] } });
+    const { result, rerender } = setup(
+      ({ page }: { page: number }) => useMasterDataDetail(4, page),
+      { page: 1 },
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    rerender({ page: 3 });
+
+    await waitFor(() =>
+      expect(client.get).toHaveBeenCalledWith("/approvals/4/master-data?page=3&page_size=50"),
+    );
   });
 
   it("useApprove refreshes approvals, vendors and ATMs after success", async () => {

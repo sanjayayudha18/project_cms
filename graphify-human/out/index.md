@@ -4,8 +4,8 @@
 > Dibuat otomatis dari `graphify-human/features.toml`. Jangan edit file ini:
 > ubah `features.toml`, lalu jalankan `py graphify-human/generate.py`.
 
-- Commit kode: `f98bc89492`
-- Graph dibangun di commit: `f98bc89492`
+- Commit kode: `d6adcead37`
+- Graph dibangun di commit: `d6adcead37`
 
 | Fitur | Status | Portal | Dev plan | File inti | Endpoint | Tabel |
 | --- | --- | --- | --- | --- | --- | --- |

@@ -59,6 +59,8 @@ DEP_RELATIONS = {
     "indirect_call", "uses", "extends", "inherits", "embeds", "triggers", "depends_on",
 }
 RELATED_LIMIT = 20
+# Files whose change can alter graph dependencies (docs, Dockerfiles, go.mod do not).
+CODE_SUFFIXES = (".go", ".ts", ".tsx", ".js", ".jsx", ".py", ".sql")
 
 STR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -1047,9 +1049,12 @@ def main() -> int:
     if graph is None:
         graph_note = "graph.json tidak ada; bagian 'File terkait' kosong. Jalankan `graphify update .`."
     elif head and graph.commit and graph.commit != head:
-        behind = git("rev-list", "--count", f"{graph.commit}..HEAD")
-        graph_note = (f"Graph tertinggal {behind or '?'} commit dari HEAD. "
-                      "Jalankan `graphify update .` supaya 'File terkait' akurat.")
+        # The graph folder is committed, so built_at_commit always trails HEAD. Only code changes count.
+        changed = [p for p in git("diff", "--name-only", graph.commit, "HEAD").splitlines()
+                   if p.endswith(CODE_SUFFIXES) and not is_excluded(p, excludes)]
+        if changed:
+            graph_note = (f"{len(changed)} file kode berubah sejak graph dibangun. "
+                          "Jalankan `graphify update .` dari root repo supaya 'File terkait' akurat.")
 
     by_id = {f.id: f for f in features}
     owners: dict[str, list[str]] = defaultdict(list)

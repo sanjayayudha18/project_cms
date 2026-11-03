@@ -20,12 +20,33 @@ const pgExclusionViolation = "23P01"
 // Repository implements ChainRepository and AvailabilityRepository using
 // sqlc-generated queries.
 type Repository struct {
+	conn    Conn
 	queries *db.Queries
 }
 
+// Conn is a connection that can open a transaction: *pgxpool.Pool, or a pgx.Tx,
+// where Begin opens a savepoint.
+type Conn interface {
+	db.DBTX
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 // NewRepository creates a Repository wrapping the given database connection.
-func NewRepository(dbConn db.DBTX) *Repository {
-	return &Repository{queries: db.New(dbConn)}
+func NewRepository(dbConn Conn) *Repository {
+	return &Repository{conn: dbConn, queries: db.New(dbConn)}
+}
+
+// RunInTx implements RequestStore.
+func (r *Repository) RunInTx(ctx context.Context, fn func(store RequestStore, tx db.DBTX) error) error {
+	tx, err := r.conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(NewRepository(tx), tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // GetApproverInfo implements ChainRepository.

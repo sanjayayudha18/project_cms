@@ -16,7 +16,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   Building2,
+  CalendarDays,
   CalendarOff,
+  Download,
   FileSpreadsheet,
   GitBranch,
   HelpCircle,
@@ -24,6 +26,7 @@ import {
   Landmark,
   Lock,
   Map as MapIcon,
+  MapPinned,
   Scale,
   Search,
   Shield,
@@ -117,10 +120,18 @@ const MASTER_DATA_CARDS: HubCard[] = [
   },
   {
     id: "admin-master-data-io",
-    title: "Ekspor & Impor CSV",
-    description: "Unduh, ubah massal, dan impor data master vendor dan ATM.",
+    title: "Impor CSV Data Master",
+    description: "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
     href: "/settings/admin/master-data-io",
     icon: FileSpreadsheet,
+    category: "master",
+  },
+  {
+    id: "admin-exports",
+    title: "Export Data",
+    description: "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
+    href: "/exports",
+    icon: Download,
     category: "master",
   },
   {
@@ -129,6 +140,22 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Kelola region dan status aktifnya.",
     href: "/settings/admin/regions",
     icon: MapIcon,
+    category: "master",
+  },
+  {
+    id: "admin-holidays",
+    title: "Hari Libur",
+    description: "Kalender libur untuk hitung hari kerja realisasi pengisian ATM.",
+    href: "/settings/admin/holidays",
+    icon: CalendarDays,
+    category: "master",
+  },
+  {
+    id: "admin-acm-areas",
+    title: "Area ACM",
+    description: "Kelompokkan cabang vendor dan anggota tim ACM per area.",
+    href: "/settings/admin/acm-areas",
+    icon: MapPinned,
     category: "master",
   },
 ];
@@ -330,6 +357,14 @@ function canSeeRoleManagementCard(role: string | undefined): boolean {
   return role === "APPACCESS" || role === "ADMIN";
 }
 
+/**
+ * Manajemen Pengguna: backend /api/v1/admin/users hanya APPACCESS + ADMIN
+ * (ADMIN_PARAM dicabut, vendor-party-scope D8); kartu disembunyikan untuk ADMIN_PARAM.
+ */
+function canSeeAdminUsersCard(role: string | undefined): boolean {
+  return role !== "ADMIN_PARAM";
+}
+
 export function SettingsHubPage() {
   const [activeTab, setActiveTab] = useState<SettingsCategory>("access");
   const [query, setQuery] = useState("");
@@ -348,7 +383,12 @@ export function SettingsHubPage() {
       )
     : [];
   const masterCards = showMaster
-    ? MASTER_DATA_CARDS.filter((c) => matchesQuery(c, normalizedQuery))
+    ? MASTER_DATA_CARDS.filter(
+        (c) =>
+          matchesQuery(c, normalizedQuery) &&
+          (c.id !== "admin-acm-areas" || userRole === "ADMIN") &&
+          (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)),
+      )
     : [];
 
   const hasResults = showFeatured || rbacCards.length > 0 || masterCards.length > 0;

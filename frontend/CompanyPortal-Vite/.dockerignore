@@ -6,3 +6,5 @@ e2e
 playwright-report
 test-results
 .kiro
+.env
+.env.*

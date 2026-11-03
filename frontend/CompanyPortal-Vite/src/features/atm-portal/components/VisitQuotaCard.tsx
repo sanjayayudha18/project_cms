@@ -8,7 +8,7 @@
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ReasonModal } from "@/features/vendor-request/VendorRequestDetail";
+import { ReasonModal } from "@/features/vendor-request/VendorRequestDetailParts";
 import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertTriangle, Ban, RotateCcw } from "lucide-react";

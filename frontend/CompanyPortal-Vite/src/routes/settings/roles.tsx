@@ -1,7 +1,12 @@
 import { Forbidden } from "@/components/pages/Forbidden";
-import { RoleManagementPage } from "@/features/role-management";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute, requireRoles } from "../_protected";
+
+// Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
+const RoleManagementPage = lazyRouteComponent(
+  () => import("@/features/role-management"),
+  "RoleManagementPage",
+);
 
 /**
  * /settings/roles — Role Management (Req 4.5, 7.1). Backend restricts this
@@ -16,6 +21,7 @@ export const rolesRoute = createRoute({
   path: "/settings/roles",
   getParentRoute: () => protectedRoute,
   beforeLoad: requireRoles(["APPACCESS"]),
+  loader: () => RoleManagementPage.preload?.(),
   component: RolesRouteComponent,
 });
 

@@ -298,8 +298,9 @@ func TestIntegration_Cancel_ApprovedPreservesRowsAndSingleAudit(t *testing.T) {
 		if err := json.Unmarshal(after, &afterMap); err != nil {
 			t.Fatalf("unmarshal audit after: %v", err)
 		}
-		if beforeMap["state"] != "approved" {
-			t.Errorf("audit before[state] = %v, want approved", beforeMap["state"])
+		// cit-acm-plan S5: approve now lands in vault_assignment (approved = legacy only).
+		if beforeMap["state"] != "vault_assignment" {
+			t.Errorf("audit before[state] = %v, want vault_assignment", beforeMap["state"])
 		}
 		if afterMap["reason"] != reason {
 			t.Errorf("audit after[reason] = %v, want %q", afterMap["reason"], reason)

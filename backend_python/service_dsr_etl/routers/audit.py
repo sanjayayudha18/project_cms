@@ -19,7 +19,7 @@ async def get_audit(
     file_type: str | None = None,
     trigger: str | None = None,
 ):
-    pool = request.app.state.db_pool
+    pool = request.app.state.db_read_pool
 
     params: list = [list(FILE_TYPES)]
     clauses = ["file_type = ANY($1::text[])"]

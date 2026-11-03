@@ -16,27 +16,29 @@ import (
 // service.VendorApplier inside the approval transaction, so a direct write
 // path here would be a way around maker-checker.
 //
-// ponytail: uses dbPool for both reads and writes; swap List/Count to the
-// dbRead pool when DATABASE_REPLICA_URL wiring lands (same TODO convention
-// as AuditLogRepository / UserAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); GetByID/FindByCode/
+// CountActiveUsers stay on the primary since Submit uses them as the
+// "before" snapshot and pre-checks.
 type VendorAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewVendorAdminRepository creates a VendorAdminRepository wrapping the given database connection.
-func NewVendorAdminRepository(dbConn db.DBTX) *VendorAdminRepository {
-	return &VendorAdminRepository{queries: db.New(dbConn)}
+// NewVendorAdminRepository creates a VendorAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewVendorAdminRepository(primary, replica db.DBTX) *VendorAdminRepository {
+	return &VendorAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of vendors matching the given filters (Req 6).
 func (r *VendorAdminRepository) List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
-	return r.queries.ListVendorsAdmin(ctx, arg)
+	return r.dbRead.ListVendorsAdmin(ctx, arg)
 }
 
 // Count returns the total number of vendors matching the given filters (same
 // filter fields as List, without pagination) (Req 6.6).
 func (r *VendorAdminRepository) Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) {
-	return r.queries.CountVendorsAdmin(ctx, arg)
+	return r.dbRead.CountVendorsAdmin(ctx, arg)
 }
 
 // GetByID returns a vendor by id, including soft-deleted rows. Returns nil,

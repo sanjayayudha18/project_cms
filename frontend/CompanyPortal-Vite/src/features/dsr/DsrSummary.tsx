@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 import type { DsrRecord, DsrSummaryTotals } from "./types";
 
@@ -42,7 +42,7 @@ export function DsrSummary({ data }: DsrSummaryProps) {
             {card.label}
           </p>
           <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--n-900)]">
-            {formatIDR(card.value)}
+            {formatThousands(card.value)}
           </p>
         </div>
       ))}

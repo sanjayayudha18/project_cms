@@ -1,5 +1,6 @@
 import attentionData from "@/data/attention-items.json";
 import { AlertCircle, Clock, FileCheck, type LucideIcon, TriangleAlert, Truck } from "lucide-react";
+import { SampleDataBanner } from "./SampleDataBanner";
 import type { AttentionCategory, AttentionItem } from "./types";
 
 /**
@@ -47,6 +48,10 @@ export function AttentionPanel() {
       className="rounded-[var(--radius-lg)] border border-[var(--n-200)] bg-[var(--n-0)] p-5"
       aria-label="Perlu perhatian"
     >
+      <div className="mb-4">
+        <SampleDataBanner />
+      </div>
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <h2 className="text-lg font-semibold text-[var(--n-900)] leading-tight">Perlu Perhatian</h2>

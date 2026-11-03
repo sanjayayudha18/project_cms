@@ -32,6 +32,35 @@ func (q *Queries) CountMasterDataChangeRequests(ctx context.Context, arg CountMa
 	return count, err
 }
 
+const countMasterDataImportBatches = `-- name: CountMasterDataImportBatches :one
+SELECT COUNT(*)
+FROM master_data_import_batches b
+JOIN LATERAL (
+    SELECT c.status
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+WHERE ($1::text IS NULL OR b.entity = $1::text)
+  AND ($2::text IS NULL OR h.status = $2::text)
+  AND ($3::bigint IS NULL OR b.maker_id = $3::bigint)
+`
+
+type CountMasterDataImportBatchesParams struct {
+	Entity  *string `json:"entity"`
+	Status  *string `json:"status"`
+	MakerID *int64  `json:"maker_id"`
+}
+
+// Same filters as ListMasterDataImportBatches, for pagination total.
+func (q *Queries) CountMasterDataImportBatches(ctx context.Context, arg CountMasterDataImportBatchesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countMasterDataImportBatches, arg.Entity, arg.Status, arg.MakerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createMasterDataChangeRequest = `-- name: CreateMasterDataChangeRequest :one
 
 INSERT INTO master_data_change_requests (entity_type, entity_id, op, payload, before, maker_id, batch_id)
@@ -84,16 +113,17 @@ func (q *Queries) CreateMasterDataChangeRequest(ctx context.Context, arg CreateM
 }
 
 const createMasterDataImportBatch = `-- name: CreateMasterDataImportBatch :one
-INSERT INTO master_data_import_batches (entity, file_hash, maker_id, row_count)
-VALUES ($1, $2, $3, $4)
-RETURNING id, entity, file_hash, maker_id, row_count, created_at
+INSERT INTO master_data_import_batches (entity, file_hash, maker_id, row_count, file_name)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, entity, file_hash, maker_id, row_count, created_at, file_name
 `
 
 type CreateMasterDataImportBatchParams struct {
-	Entity   string `json:"entity"`
-	FileHash string `json:"file_hash"`
-	MakerID  int64  `json:"maker_id"`
-	RowCount int32  `json:"row_count"`
+	Entity   string  `json:"entity"`
+	FileHash string  `json:"file_hash"`
+	MakerID  int64   `json:"maker_id"`
+	RowCount int32   `json:"row_count"`
+	FileName *string `json:"file_name"`
 }
 
 // Import confirm (T5.4). Runs in the same transaction as the change-request inserts.
@@ -103,6 +133,7 @@ func (q *Queries) CreateMasterDataImportBatch(ctx context.Context, arg CreateMas
 		arg.FileHash,
 		arg.MakerID,
 		arg.RowCount,
+		arg.FileName,
 	)
 	var i MasterDataImportBatch
 	err := row.Scan(
@@ -112,12 +143,13 @@ func (q *Queries) CreateMasterDataImportBatch(ctx context.Context, arg CreateMas
 		&i.MakerID,
 		&i.RowCount,
 		&i.CreatedAt,
+		&i.FileName,
 	)
 	return i, err
 }
 
 const findOpenMasterDataImportBatch = `-- name: FindOpenMasterDataImportBatch :one
-SELECT b.id, b.entity, b.file_hash, b.maker_id, b.row_count, b.created_at,
+SELECT b.id, b.entity, b.file_hash, b.maker_id, b.row_count, b.created_at, b.file_name,
        h.id AS head_id, h.approval_request_id, h.status AS head_status
 FROM master_data_import_batches b
 JOIN LATERAL (
@@ -145,6 +177,7 @@ type FindOpenMasterDataImportBatchRow struct {
 	MakerID           int64              `json:"maker_id"`
 	RowCount          int32              `json:"row_count"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	FileName          *string            `json:"file_name"`
 	HeadID            int64              `json:"head_id"`
 	ApprovalRequestID *int64             `json:"approval_request_id"`
 	HeadStatus        string             `json:"head_status"`
@@ -163,6 +196,7 @@ func (q *Queries) FindOpenMasterDataImportBatch(ctx context.Context, arg FindOpe
 		&i.MakerID,
 		&i.RowCount,
 		&i.CreatedAt,
+		&i.FileName,
 		&i.HeadID,
 		&i.ApprovalRequestID,
 		&i.HeadStatus,
@@ -219,6 +253,68 @@ func (q *Queries) GetMasterDataChangeRequestByID(ctx context.Context, id int64) 
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getMasterDataImportBatch = `-- name: GetMasterDataImportBatch :one
+SELECT b.id, b.entity, b.file_name, b.row_count, b.created_at, b.maker_id,
+       u.full_name AS maker_name,
+       h.id AS head_id, h.status AS head_status, h.error AS head_error, h.approval_request_id,
+       d.acted_at AS decided_at, du.full_name AS decided_by_name
+FROM master_data_import_batches b
+JOIN users u ON u.id = b.maker_id
+JOIN LATERAL (
+    SELECT c.id, c.status, c.error, c.approval_request_id
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+LEFT JOIN LATERAL (
+    SELECT s.acted_at, s.acted_by_id
+    FROM approval_steps s
+    WHERE s.request_id = h.approval_request_id AND s.status <> 'pending'
+    ORDER BY s.acted_at DESC NULLS LAST
+    LIMIT 1
+) d ON true
+LEFT JOIN users du ON du.id = d.acted_by_id
+WHERE b.id = $1
+`
+
+type GetMasterDataImportBatchRow struct {
+	ID                int64              `json:"id"`
+	Entity            string             `json:"entity"`
+	FileName          *string            `json:"file_name"`
+	RowCount          int32              `json:"row_count"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	MakerID           int64              `json:"maker_id"`
+	MakerName         string             `json:"maker_name"`
+	HeadID            int64              `json:"head_id"`
+	HeadStatus        string             `json:"head_status"`
+	HeadError         *string            `json:"head_error"`
+	ApprovalRequestID *int64             `json:"approval_request_id"`
+	DecidedAt         pgtype.Timestamptz `json:"decided_at"`
+	DecidedByName     *string            `json:"decided_by_name"`
+}
+
+func (q *Queries) GetMasterDataImportBatch(ctx context.Context, id int64) (GetMasterDataImportBatchRow, error) {
+	row := q.db.QueryRow(ctx, getMasterDataImportBatch, id)
+	var i GetMasterDataImportBatchRow
+	err := row.Scan(
+		&i.ID,
+		&i.Entity,
+		&i.FileName,
+		&i.RowCount,
+		&i.CreatedAt,
+		&i.MakerID,
+		&i.MakerName,
+		&i.HeadID,
+		&i.HeadStatus,
+		&i.HeadError,
+		&i.ApprovalRequestID,
+		&i.DecidedAt,
+		&i.DecidedByName,
 	)
 	return i, err
 }
@@ -318,6 +414,134 @@ func (q *Queries) ListMasterDataChangeRequestsByBatch(ctx context.Context, batch
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMasterDataImportBatches = `-- name: ListMasterDataImportBatches :many
+SELECT b.id, b.entity, b.file_name, b.row_count, b.created_at, b.maker_id,
+       u.full_name AS maker_name,
+       h.id AS head_id, h.status AS head_status, h.error AS head_error, h.approval_request_id,
+       d.acted_at AS decided_at, du.full_name AS decided_by_name
+FROM master_data_import_batches b
+JOIN users u ON u.id = b.maker_id
+JOIN LATERAL (
+    SELECT c.id, c.status, c.error, c.approval_request_id
+    FROM master_data_change_requests c
+    WHERE c.batch_id = b.id
+    ORDER BY c.id
+    LIMIT 1
+) h ON true
+LEFT JOIN LATERAL (
+    SELECT s.acted_at, s.acted_by_id
+    FROM approval_steps s
+    WHERE s.request_id = h.approval_request_id AND s.status <> 'pending'
+    ORDER BY s.acted_at DESC NULLS LAST
+    LIMIT 1
+) d ON true
+LEFT JOIN users du ON du.id = d.acted_by_id
+WHERE ($1::text IS NULL OR b.entity = $1::text)
+  AND ($2::text IS NULL OR h.status = $2::text)
+  AND ($3::bigint IS NULL OR b.maker_id = $3::bigint)
+ORDER BY b.id DESC
+LIMIT $5::bigint OFFSET $4::bigint
+`
+
+type ListMasterDataImportBatchesParams struct {
+	Entity     *string `json:"entity"`
+	Status     *string `json:"status"`
+	MakerID    *int64  `json:"maker_id"`
+	PageOffset int64   `json:"page_offset"`
+	PageLimit  int64   `json:"page_limit"`
+}
+
+type ListMasterDataImportBatchesRow struct {
+	ID                int64              `json:"id"`
+	Entity            string             `json:"entity"`
+	FileName          *string            `json:"file_name"`
+	RowCount          int32              `json:"row_count"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	MakerID           int64              `json:"maker_id"`
+	MakerName         string             `json:"maker_name"`
+	HeadID            int64              `json:"head_id"`
+	HeadStatus        string             `json:"head_status"`
+	HeadError         *string            `json:"head_error"`
+	ApprovalRequestID *int64             `json:"approval_request_id"`
+	DecidedAt         pgtype.Timestamptz `json:"decided_at"`
+	DecidedByName     *string            `json:"decided_by_name"`
+}
+
+// Import history (master-data-import-revamp 1.2). Status is derived from the head
+// change request (first row of the batch); decided_* from the last acted step.
+func (q *Queries) ListMasterDataImportBatches(ctx context.Context, arg ListMasterDataImportBatchesParams) ([]ListMasterDataImportBatchesRow, error) {
+	rows, err := q.db.Query(ctx, listMasterDataImportBatches,
+		arg.Entity,
+		arg.Status,
+		arg.MakerID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMasterDataImportBatchesRow{}
+	for rows.Next() {
+		var i ListMasterDataImportBatchesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Entity,
+			&i.FileName,
+			&i.RowCount,
+			&i.CreatedAt,
+			&i.MakerID,
+			&i.MakerName,
+			&i.HeadID,
+			&i.HeadStatus,
+			&i.HeadError,
+			&i.ApprovalRequestID,
+			&i.DecidedAt,
+			&i.DecidedByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingApproversForRequest = `-- name: ListPendingApproversForRequest :many
+SELECT s.assigned_approver_id
+FROM approval_steps s
+WHERE s.request_id = $1
+  AND s.status = 'pending'
+  AND s.step_level = (
+      SELECT MIN(p.step_level) FROM approval_steps p
+      WHERE p.request_id = $1 AND p.status = 'pending'
+  )
+ORDER BY s.assigned_approver_id
+`
+
+// Assigned approvers of the lowest pending step of an approval request (import notifications).
+func (q *Queries) ListPendingApproversForRequest(ctx context.Context, requestID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listPendingApproversForRequest, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var assigned_approver_id int64
+		if err := rows.Scan(&assigned_approver_id); err != nil {
+			return nil, err
+		}
+		items = append(items, assigned_approver_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

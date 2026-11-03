@@ -172,6 +172,7 @@ type vendorRequestItemResponse struct {
 	Denom           int32  `json:"denom"`
 	AmountReplenish int64  `json:"amount_replenish"`
 	AmountRefund    int64  `json:"amount_refund"`
+	TicketNumber    string `json:"ticket_number"`
 }
 
 type vendorRequestDetailResponse struct {
@@ -196,6 +197,7 @@ type vendorRequestDetailResponse struct {
 	IsCanceled         bool                        `json:"is_canceled"`
 	IsManual           bool                        `json:"is_manual"`
 	CancellationReason *string                     `json:"cancellation_reason"`
+	RegionCode         *string                     `json:"region_code"`
 	// atm-visit-quota (FR5): laporan selesai + kuota per ATM.
 	CompletionSubmittedBy     *vendorRequestUserRef  `json:"completion_submitted_by"`
 	CompletionSubmittedAt     *string                `json:"completion_submitted_at"`
@@ -211,10 +213,14 @@ type vendorRequestDetailResponse struct {
 
 type requestAtmStatusResp struct {
 	TerminalID       string  `json:"terminal_id"`
+	TicketNumber     string  `json:"ticket_number"`
 	CompletionResult *string `json:"completion_result"`
 	VisitRemaining   *int32  `json:"visit_remaining"`
 	VisitQuotaTotal  *int32  `json:"visit_quota_total"`
 	IsOverQuota      bool    `json:"is_over_quota"`
+	// replenishment-realisasi FR2: vendor report (null / [] before a report or for a failed ATM).
+	RealizedDate    *string               `json:"realized_date"`
+	RealizedAmounts []service.DenomAmount `json:"realized_amounts"`
 }
 
 func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailResponse {
@@ -223,6 +229,7 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 		items[i] = vendorRequestItemResponse{
 			ID: it.ID, TerminalID: it.TerminalID, PeriodePred: formatDate(it.PeriodePred),
 			Denom: it.Denom, AmountReplenish: it.AmountReplenish, AmountRefund: it.AmountRefund,
+			TicketNumber: it.TicketNumber,
 		}
 	}
 	return vendorRequestDetailResponse{
@@ -244,6 +251,7 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 		IsCanceled:         d.IsCanceled,
 		IsManual:           d.IsManual,
 		CancellationReason: d.CancellationReason,
+		RegionCode:         d.RegionCode,
 
 		CompletionSubmittedBy:     toUserRefResponse(d.CompletionSubmittedBy),
 		CompletionSubmittedAt:     formatTimestampPtr(d.CompletionSubmittedAt),
@@ -259,7 +267,15 @@ func toDetailResponse(d *service.VendorRequestDetail) vendorRequestDetailRespons
 func toRequestAtmStatusResp(in []service.RequestAtmStatus) []requestAtmStatusResp {
 	out := make([]requestAtmStatusResp, len(in))
 	for i, a := range in {
-		out[i] = requestAtmStatusResp(a)
+		amounts := a.RealizedAmounts
+		if amounts == nil {
+			amounts = []service.DenomAmount{}
+		}
+		out[i] = requestAtmStatusResp{
+			TerminalID: a.TerminalID, TicketNumber: a.TicketNumber, CompletionResult: a.CompletionResult,
+			VisitRemaining: a.VisitRemaining, VisitQuotaTotal: a.VisitQuotaTotal, IsOverQuota: a.IsOverQuota,
+			RealizedDate: formatDatePtr(a.RealizedDate), RealizedAmounts: amounts,
+		}
 	}
 	return out
 }

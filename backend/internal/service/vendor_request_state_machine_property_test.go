@@ -21,18 +21,34 @@ import (
 var allVendorRequestStatuses = []string{
 	"draft", "pending_approval", "approved", "rejected",
 	"processing", "completed", "failed", "cancelled",
+	"completion_pending", "vault_assignment", "vault_review", "ready",
+	"sent_to_vendor", "vendor_accepted", "vendor_rejected",
 }
 
-var allVendorRequestActions = []action{actionSubmit, actionApprove, actionReject, actionRevise, actionCancel}
+var allVendorRequestActions = []action{
+	actionSubmit, actionApprove, actionReject, actionRevise, actionCancel,
+	actionSubmitCompletion, actionApproveCompletion, actionRejectCompletion,
+	actionVaultReady, actionVaultApprove, actionVaultReject, actionVendorReturn,
+}
 
 // wantTransitions is the spec, kept independent of the production
 // `transitions` var in vendor_request.go so this test can actually catch a
 // regression there instead of trivially comparing a var to itself.
 var wantTransitions = map[string]map[action]string{
 	"draft":            {actionSubmit: "pending_approval", actionCancel: "cancelled"},
-	"pending_approval": {actionApprove: "approved", actionReject: "rejected", actionCancel: "cancelled"},
+	"pending_approval": {actionApprove: "vault_assignment", actionReject: "rejected", actionCancel: "cancelled"},
 	"rejected":         {actionRevise: "draft"},
-	"approved":         {actionCancel: "cancelled"},
+	// cit-acm-plan spec "Alur & status".
+	"vault_assignment": {actionVaultReady: "vault_review", actionCancel: "cancelled"},
+	// cit-send-vendor spec "Alur & status": vault approve sends to the vendors; ready is legacy.
+	"vault_review":    {actionVaultApprove: "sent_to_vendor", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
+	"sent_to_vendor":  {actionCancel: "cancelled"},
+	"vendor_accepted": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"vendor_rejected": {actionCancel: "cancelled", actionVendorReturn: "rejected"},
+	"ready":           {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"approved":        {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// reject_completion's static target; vault_flow requests are redirected to ready in completionTx.
+	"completion_pending": {actionApproveCompletion: "completed", actionRejectCompletion: "approved"},
 }
 
 // TestProperty8_StateMachineTransitionSet checks nextState against every
@@ -80,7 +96,8 @@ func TestProperty10_CancelApprovedAuthorizationCheckerOnly(t *testing.T) {
 		}
 
 		actor := Actor{UserID: actorID, Role: role}
-		req := db.VendorRequest{Status: "approved", CreatedBy: creatorID}
+		status := rapid.SampledFrom([]string{"approved", "vault_assignment", "vault_review", "ready"}).Draw(rt, "status")
+		req := db.VendorRequest{Status: status, CreatedBy: creatorID}
 
 		err := checkActor(actor, req, actionCancel)
 

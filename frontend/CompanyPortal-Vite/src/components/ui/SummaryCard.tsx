@@ -1,4 +1,4 @@
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 
 interface SummaryCardProps {
   label: string;
@@ -25,7 +25,7 @@ export function SummaryCard({ label, value, format = "text" }: SummaryCardProps)
 
 function formatValue(value: string | number, format: "currency" | "number" | "text"): string {
   if (format === "currency" && typeof value === "number") {
-    return formatIDR(value);
+    return formatThousands(value);
   }
   if (format === "number" && typeof value === "number") {
     return value.toLocaleString("id-ID");

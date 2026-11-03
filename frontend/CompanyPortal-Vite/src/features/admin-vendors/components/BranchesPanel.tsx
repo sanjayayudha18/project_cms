@@ -86,6 +86,11 @@ export function BranchesPanel({ vendorId }: BranchesPanelProps) {
     { accessorKey: "branch_name", header: "Nama" },
     { accessorKey: "region", header: "Wilayah", cell: ({ getValue }) => String(getValue() ?? "—") },
     {
+      accessorKey: "region_code",
+      header: "Kode Region",
+      cell: ({ getValue }) => <span className="font-mono">{String(getValue() ?? "—")}</span>,
+    },
+    {
       accessorKey: "category",
       header: "Tipe",
       cell: ({ getValue }) => (

@@ -1,13 +1,18 @@
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import { useVendorsList } from "@/features/admin-vendors/hooks";
+import { isVendorRole } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
 import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { useCreateUser, useUpdateUser } from "../hooks";
-import { ROLE_OPTIONS, type UserFormValues, buildUserFormSchema } from "../lib/userFormSchema";
+import { useCreateUser, useUpdateUser, useVendorOptions } from "../hooks";
+import {
+  ROLE_OPTIONS,
+  type UserFormValues,
+  buildUserFormSchema,
+  roleLabel,
+} from "../lib/userFormSchema";
 import type { AdminUser, CreateUserPayload, UpdateUserPayload } from "../types";
 
 interface UserFormDialogProps {
@@ -28,6 +33,7 @@ function toDefaultValues(user: AdminUser | null): UserFormValues {
       temporary_password: "",
       employee_id: "",
       vendor_id: null,
+      vendor_branch_id: null,
       supervisor_id: null,
       approval_level: null,
     };
@@ -42,6 +48,7 @@ function toDefaultValues(user: AdminUser | null): UserFormValues {
     temporary_password: "",
     employee_id: user.employee_id ?? "",
     vendor_id: user.vendor_id,
+    vendor_branch_id: user.vendor_branch_id,
     supervisor_id: user.supervisor_id,
     approval_level: user.approval_level,
   };
@@ -56,7 +63,7 @@ function toDefaultValues(user: AdminUser | null): UserFormValues {
 export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
   const mode = user ? "edit" : "create";
   const { toast } = useToast();
-  const vendorsQuery = useVendorsList({ page: 1, page_size: 100, status: "all" });
+  const optionsQuery = useVendorOptions();
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
 
@@ -71,6 +78,9 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
   }, [open, user]);
 
   const authSource = form.watch("auth_source");
+  const role = form.watch("role");
+  const vendorId = form.watch("vendor_id");
+  const branchOptions = (optionsQuery.data?.branches ?? []).filter((b) => b.vendor_id === vendorId);
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   async function onSubmit(values: UserFormValues): Promise<void> {
@@ -87,6 +97,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
             values.auth_source === "local" ? values.temporary_password : undefined,
           employee_id: values.employee_id,
           vendor_id: values.vendor_id,
+          vendor_branch_id: values.vendor_branch_id,
           supervisor_id: values.supervisor_id,
           approval_level: values.approval_level,
         };
@@ -101,6 +112,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
           is_karyawan: values.is_karyawan,
           employee_id: values.employee_id,
           vendor_id: values.vendor_id,
+          vendor_branch_id: values.vendor_branch_id,
           supervisor_id: values.supervisor_id,
           approval_level: values.approval_level,
         };
@@ -147,7 +159,7 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
             <option value="">Pilih role</option>
             {ROLE_OPTIONS.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {roleLabel(r)}
               </option>
             ))}
           </select>
@@ -186,13 +198,45 @@ export function UserFormDialog({ open, onClose, user }: UserFormDialogProps) {
               render={({ field }) => (
                 <select
                   value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => {
+                    field.onChange(e.target.value ? Number(e.target.value) : null);
+                    // Cabang milik vendor lama tidak berlaku lagi (Req 2.10).
+                    form.setValue("vendor_branch_id", null);
+                  }}
                   className={inputClass}
                 >
                   <option value="">Pilih vendor</option>
-                  {(vendorsQuery.data?.vendors ?? []).map((v) => (
+                  {(optionsQuery.data?.vendors ?? []).map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            />
+          </Field>
+        )}
+
+        {isVendorRole(role) && (
+          <Field
+            label="Cabang"
+            error={form.formState.errors.vendor_branch_id?.message}
+            hint="Pilih 'Semua cabang' agar akun melihat pihak di seluruh cabang vendor."
+          >
+            <Controller
+              control={form.control}
+              name="vendor_branch_id"
+              render={({ field }) => (
+                <select
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                  disabled={vendorId === null}
+                  className={inputClass}
+                >
+                  <option value="">Semua cabang</option>
+                  {branchOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.branch_name} ({b.branch_code})
                     </option>
                   ))}
                 </select>

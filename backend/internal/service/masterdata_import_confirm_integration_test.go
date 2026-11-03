@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -62,7 +64,7 @@ func newImportFixture(t *testing.T) *importFixture {
 		Orchestrator: f.orch,
 		Audit:        audit.NewWriter(h.pool),
 		Services: func(sub ImportSubmitter) ImportServices {
-			return ImportServices{Vendors: NewVendorAdminService(repository.NewVendorAdminRepository(h.pool), sub)}
+			return ImportServices{Vendors: NewVendorAdminService(repository.NewVendorAdminRepository(h.pool, h.pool), sub)}
 		},
 	})
 	// Registered after harness's cleanup, so it runs BEFORE it: batches and their
@@ -89,7 +91,7 @@ func (f *importFixture) cleanup() {
 
 func (f *importFixture) confirm(csv string) *ImportConfirmResult {
 	f.t.Helper()
-	res, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, strings.NewReader(csv), "127.0.0.1")
+	res, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, "test.csv", strings.NewReader(csv), "127.0.0.1")
 	if err != nil {
 		f.t.Fatalf("Confirm: %v", err)
 	}
@@ -204,6 +206,97 @@ func TestMasterDataImportConfirm_OneBadRowRollsBackTheWholeBatch_Integration(t *
 	}
 }
 
+// A row that fails WITHOUT an SQL error (stale) leaves the apply tx alive and
+// holding the row locks of the rows before it. Marking those rows stale through
+// the pool must not wait on that tx (bugfixes.md 2026-11-02).
+func TestMasterDataImportConfirm_MiddleRowStale_ReturnsPromptlyAndRetiresWholeBatch_Integration(t *testing.T) {
+	f := newImportFixture(t)
+	res := f.confirm(f.vendorsCSV("A", "B", "C"))
+
+	rows, err := f.svc.repo.ListByBatch(f.ctx, res.BatchID)
+	if err != nil || len(rows) != 3 {
+		t.Fatalf("ListByBatch = %d rows, %v; want 3", len(rows), err)
+	}
+	head, middle, last := rows[0].ID, rows[1].ID, rows[2].ID
+	bystander := f.h.seedVendor("IT-"+f.tag+"Z", "Bystander")
+	if _, err := f.h.pool.Exec(f.ctx, `UPDATE master_data_change_requests SET op = 'update', entity_id = $2, before = '{"name":"not the current state"}' WHERE id = $1`, middle, bystander); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(f.ctx, 3*time.Second)
+	defer cancel()
+	f.svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: head, Status: "approved"}}
+	_, err = f.svc.Approve(ctx, *res.ApprovalRequestID, f.h.makerID, "127.0.0.1")
+
+	if ctx.Err() != nil {
+		t.Errorf("Approve waited until its context expired: the rollback bookkeeping blocked on the apply tx")
+	}
+	if !errors.Is(err, ErrMasterDataChangeStale) {
+		t.Errorf("approve error = %v, want ErrMasterDataChangeStale", err)
+	}
+	if n := f.count(`SELECT count(*) FROM vendors WHERE code = ANY($1)`, []string{"IT-" + f.tag + "A", "IT-" + f.tag + "B", "IT-" + f.tag + "C"}); n != 0 {
+		t.Errorf("%d vendors exist: a failed batch must apply no row", n)
+	}
+	if n := f.count(`SELECT count(*) FROM vendors WHERE id = $1 AND name = 'Bystander'`, bystander); n != 1 {
+		t.Errorf("the stale row's target vendor changed")
+	}
+
+	wantErr := map[int64]string{
+		head:   fmt.Sprintf("%schange request %d failed", BatchRollbackPrefix, middle),
+		middle: ErrMasterDataChangeStale.Error(),
+		last:   fmt.Sprintf("%schange request %d failed", BatchRollbackPrefix, middle),
+	}
+	for id, want := range wantErr {
+		c, err := f.svc.repo.GetByID(f.ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := "<nil>"
+		if c.Error != nil {
+			got = *c.Error
+		}
+		if c.Status != "stale" || got != want {
+			t.Errorf("row %d = status %q error %q, want stale %q", id, c.Status, got, want)
+		}
+	}
+}
+
+// unmarshalableAfterApplier succeeds but returns an after-state the audit writer
+// cannot encode: an audit failure without an SQL error, after the change row was
+// already flipped to 'applied' inside the tx.
+type unmarshalableAfterApplier struct{ VendorApplier }
+
+func (unmarshalableAfterApplier) Apply(context.Context, pgx.Tx, db.MasterDataChangeRequest) (int64, any, error) {
+	return 1, make(chan int), nil
+}
+
+// Same lock, single-record path: recording the failure on the row the tx itself
+// updated must not wait on that tx.
+func TestMasterDataApproval_AuditEncodeFailure_RecordsErrorWithoutBlocking_Integration(t *testing.T) {
+	svc, _, h := harness(t)
+	svc.appliers["vendor"] = unmarshalableAfterApplier{}
+	changeID := h.insertPending("vendor", "create", nil, map[string]string{"code": "unused"})
+
+	ctx, cancel := context.WithTimeout(adminCtx(h.makerID), 3*time.Second)
+	defer cancel()
+	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: changeID, Status: "approved"}}
+	_, err := svc.Approve(ctx, 1, h.makerID, "127.0.0.1")
+
+	if ctx.Err() != nil {
+		t.Errorf("Approve waited until its context expired: MarkApplyFailed blocked on the apply tx")
+	}
+	if err == nil {
+		t.Fatalf("Approve error = nil, want the audit failure")
+	}
+	c, err := svc.repo.GetByID(context.Background(), changeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Status != "approved" || c.Error == nil || *c.Error == "" {
+		t.Errorf("change = status %q error %v, want approved with the error recorded", c.Status, c.Error)
+	}
+}
+
 func TestMasterDataImportConfirm_RejectRejectsWholeBatch_AndFileMayBeReuploaded_Integration(t *testing.T) {
 	f := newImportFixture(t)
 	csv := f.vendorsCSV("A", "B")
@@ -227,7 +320,7 @@ func TestMasterDataImportConfirm_InvalidFileStagesNothing_NoChangesIsAnError_Int
 	f := newImportFixture(t)
 	bad := vendorHeader + ",IT-" + f.tag + "X,,,,,,,\n" // name missing
 
-	_, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, strings.NewReader(bad), "127.0.0.1")
+	_, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, "test.csv", strings.NewReader(bad), "127.0.0.1")
 
 	var invalid *ImportInvalidError
 	if !errors.As(err, &invalid) || len(invalid.Errors) == 0 {
@@ -243,7 +336,7 @@ func TestMasterDataImportConfirm_InvalidFileStagesNothing_NoChangesIsAnError_Int
 	if _, err := exp.Write(f.ctx, ExportVendors, "all", &buf, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, strings.NewReader(buf.String()), "127.0.0.1"); !errors.Is(err, ErrImportNothingToDo) {
+	if _, err := f.importer.Confirm(f.ctx, f.h.makerID, ExportVendors, "test.csv", strings.NewReader(buf.String()), "127.0.0.1"); !errors.Is(err, ErrImportNothingToDo) {
 		t.Errorf("unchanged export: want ErrImportNothingToDo, got %v", err)
 	}
 }
@@ -251,7 +344,7 @@ func TestMasterDataImportConfirm_InvalidFileStagesNothing_NoChangesIsAnError_Int
 func TestMasterDataImportConfirm_RequiresMakerIdentity_Integration(t *testing.T) {
 	f := newImportFixture(t)
 
-	_, err := f.importer.Confirm(adminCtx(f.h.makerID+1), f.h.makerID, ExportVendors, strings.NewReader(f.vendorsCSV("A")), "127.0.0.1")
+	_, err := f.importer.Confirm(adminCtx(f.h.makerID+1), f.h.makerID, ExportVendors, "test.csv", strings.NewReader(f.vendorsCSV("A")), "127.0.0.1")
 
 	if !errors.Is(err, ErrMasterDataForbidden) {
 		t.Fatalf("want ErrMasterDataForbidden when the token user is not the maker, got %v", err)

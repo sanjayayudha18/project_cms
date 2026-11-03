@@ -53,8 +53,22 @@ const dryRunResponse: DsrDryRunResponse = {
 
 const confirmResponse: DsrConfirmResponse = {
   checksum: "abc123",
-  daily: { file_id: 1, status: "completed", row_count: 1, success_count: 1, error_count: 0, errors: [] },
-  rencana_isi: { file_id: 2, status: "completed", row_count: 1, success_count: 1, error_count: 0, errors: [] },
+  daily: {
+    file_id: 1,
+    status: "completed",
+    row_count: 1,
+    success_count: 1,
+    error_count: 0,
+    errors: [],
+  },
+  rencana_isi: {
+    file_id: 2,
+    status: "completed",
+    row_count: 1,
+    success_count: 1,
+    error_count: 0,
+    errors: [],
+  },
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -125,5 +139,16 @@ describe("DsrUploadDialog", () => {
     // Back to the file picker; confirm was never called.
     expect(screen.getByRole("button", { name: /pilih file/i })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DsrUploadDialog keyboard", () => {
+  it("closes on Escape", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<DsrUploadDialog onClose={onClose} />);
+
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

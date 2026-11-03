@@ -42,7 +42,7 @@ func tierMaxInt32(v *int64) *int32 {
 	if v == nil {
 		return nil
 	}
-	out := int32(*v)
+	out := int32(*v) //nolint:gosec // G115: tier <= maxTier, validated at submit
 	return &out
 }
 
@@ -139,7 +139,7 @@ func (VendorPackagePriceApplier) Apply(ctx context.Context, tx pgx.Tx, change db
 		}
 		created, err := q.CreateVendorPackagePriceAdmin(ctx, db.CreateVendorPackagePriceAdminParams{
 			VendorID: p.VendorID, Package: p.Package, PackageCode: packageCode, MachineGroup: p.MachineGroup, PriceClass: p.PriceClass,
-			TierMin: int32(p.TierMin), TierMax: tierMaxInt32(p.TierMax),
+			TierMin: int32(p.TierMin), TierMax: tierMaxInt32(p.TierMax), //nolint:gosec // G115: tier <= maxTier, validated at submit
 			BasePrice:      base,
 			VendorBranchID: p.VendorBranchID, AtmID: p.AtmID, SlaNote: p.SlaNote, Currency: p.Currency,
 			EffectiveStartDate: start, EffectiveEndDate: end,

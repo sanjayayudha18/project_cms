@@ -373,5 +373,30 @@ class LateCheckTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.late_rows(), 0)
 
 
+class DsrLateJobRegistrationTest(unittest.IsolatedAsyncioTestCase):
+    """dsr-late-report FR5.1: the 09:00 job exists only when the start date is set. No DB."""
+
+    def job_ids(self, start: date | None) -> set[str]:
+        class _S(_Settings):
+            scan_interval_minutes, scan_cron_start_hour, scan_cron_end_hour = 15, 5, 9
+            retry_interval_minutes = 30
+            dsr_late_start_date = start
+
+        svc = SchedulerService(_S(), None, ("dmaa",), retry_executor=_FakeExecutor())  # type: ignore[arg-type]
+        svc.start()
+        try:
+            jobs = {j.id: j for j in svc._scheduler.get_jobs()}
+        finally:
+            svc.stop()
+        if "dsr_late_notify" in jobs:
+            self.assertEqual(str(jobs["dsr_late_notify"].trigger),
+                             "cron[hour='9', minute='0']")
+        return set(jobs)
+
+    async def test_registered_only_with_start_date(self):
+        self.assertIn("dsr_late_notify", self.job_ids(date(2026, 10, 27)))
+        self.assertNotIn("dsr_late_notify", self.job_ids(None))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -51,10 +51,22 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	// history that audit_logs and master_data_change_requests still reference.
 	// regions (.kiro/specs/region-management, migration 018): soft-disable via
 	// is_active/deleted_at -- locations.region_id references it.
+	// vendor_request_vendor_parties/_events (cit-send-vendor, migration 029):
+	// keputusan vendor = bukti; pihak yang hilang -> withdrawn, events append-only.
+	// vendor_request_vault_tickets (cit-vault-select, migration 030): nomor tiket
+	// tidak pernah dipakai ulang; vault yang hilang -> nonaktif.
+	// holidays (replenishment-realisasi, migration 031): soft-disable via is_active/deleted_at.
+	// vendor_request_realizations: resubmit menimpa (upsert); replenish_classifications: tiket
+	// nonaktif -> void. Baris anak *_amounts boleh replace-all (bukan bukti sendiri).
+	// dsr_receipts (dsr-late-report, migration 033): append-only, bukti waktu terima DSR pertama.
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
-		"regions",
+		"regions", "dsr_location_vault_maps",
+		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
+		"vendor_request_vault_tickets",
+		"holidays", "vendor_request_realizations", "replenish_classifications",
+		"dsr_receipts",
 	}
 
 	for _, f := range files {
@@ -82,7 +94,11 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 	guarded := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
-		"regions",
+		"regions", "dsr_location_vault_maps",
+		"vendor_request_vendor_parties", "vendor_request_vendor_party_events",
+		"vendor_request_vault_tickets",
+		"holidays", "vendor_request_realizations", "replenish_classifications",
+		"dsr_receipts",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

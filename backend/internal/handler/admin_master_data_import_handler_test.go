@@ -30,12 +30,12 @@ type fakeImportServicer struct {
 	confirmRes *service.ImportConfirmResult
 	gotMaker   int64
 
-	gotEntity, gotBody string
+	gotEntity, gotBody, gotFileName string
 }
 
-func (f *fakeImportServicer) Confirm(_ context.Context, makerID int64, entity string, r io.Reader, _ string) (*service.ImportConfirmResult, error) {
+func (f *fakeImportServicer) Confirm(_ context.Context, makerID int64, entity, fileName string, r io.Reader, _ string) (*service.ImportConfirmResult, error) {
 	b, _ := io.ReadAll(r)
-	f.gotMaker, f.gotEntity, f.gotBody = makerID, entity, string(b)
+	f.gotMaker, f.gotEntity, f.gotBody, f.gotFileName = makerID, entity, string(b), fileName
 	return f.confirmRes, f.err
 }
 
@@ -185,6 +185,9 @@ func TestAdminMasterDataImportHandler_Confirm_202ThenExisting200(t *testing.T) {
 		}
 		if svc.gotMaker != 7 || svc.gotEntity != "vendors" {
 			t.Errorf("service got maker=%d entity=%q, want the token's user and the path entity", svc.gotMaker, svc.gotEntity)
+		}
+		if svc.gotFileName != "vendors.csv" {
+			t.Errorf("service got fileName=%q, want the multipart filename %q", svc.gotFileName, "vendors.csv")
 		}
 	}
 }

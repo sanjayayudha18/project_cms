@@ -114,7 +114,7 @@ describe("DsrSummary", () => {
   it("renders zero totals when data is empty", () => {
     render(<DsrSummary data={[]} />);
 
-    // formatIDR(0) = "0"
+    // formatThousands(0) = "0"
     const zeroValues = screen.getAllByText("0");
     expect(zeroValues).toHaveLength(4);
   });
@@ -158,11 +158,11 @@ describe("DsrTable", () => {
   it("renders monetary values as IDR-formatted", () => {
     render(<DsrTable data={mockRecords} />);
 
-    // formatIDR(320000000) = "320.000.000"
+    // formatThousands(320000000) = "320.000.000"
     expect(screen.getByText("320.000.000")).toBeInTheDocument();
-    // formatIDR(150000000) = "150.000.000"
+    // formatThousands(150000000) = "150.000.000"
     expect(screen.getByText("150.000.000")).toBeInTheDocument();
-    // formatIDR(280000000) = "280.000.000"
+    // formatThousands(280000000) = "280.000.000"
     expect(screen.getByText("280.000.000")).toBeInTheDocument();
   });
 

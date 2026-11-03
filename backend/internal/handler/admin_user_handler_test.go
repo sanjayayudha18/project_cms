@@ -55,6 +55,11 @@ type fakeUserAdminServicer struct {
 	updateErr    error
 	updateCalled bool
 	updateReq    auth.UpdateUserRequest
+
+	actorRole string // role passed to Create/Update (service re-check, D8)
+
+	optionsResult auth.VendorOptions
+	optionsErr    error
 }
 
 func (f *fakeUserAdminServicer) List(context.Context, db.ListUsersAdminParams) ([]db.ListUsersAdminRow, error) {
@@ -69,16 +74,22 @@ func (f *fakeUserAdminServicer) Get(context.Context, int64) (*db.GetUserAdminByI
 	return f.getResult, f.getErr
 }
 
-func (f *fakeUserAdminServicer) Create(_ context.Context, _ int64, req auth.CreateUserRequest, _ string) (db.CreateUserAdminRow, error) {
+func (f *fakeUserAdminServicer) Create(_ context.Context, _ int64, actorRole string, req auth.CreateUserRequest, _ string) (db.CreateUserAdminRow, error) {
 	f.createCalled = true
+	f.actorRole = actorRole
 	f.createReq = req
 	return f.createResult, f.createErr
 }
 
-func (f *fakeUserAdminServicer) Update(_ context.Context, _, _ int64, req auth.UpdateUserRequest, _ string) (db.UpdateUserAdminRow, error) {
+func (f *fakeUserAdminServicer) Update(_ context.Context, _ int64, actorRole string, _ int64, req auth.UpdateUserRequest, _ string) (db.UpdateUserAdminRow, error) {
 	f.updateCalled = true
+	f.actorRole = actorRole
 	f.updateReq = req
 	return f.updateResult, f.updateErr
+}
+
+func (f *fakeUserAdminServicer) VendorOptions(context.Context) (auth.VendorOptions, error) {
+	return f.optionsResult, f.optionsErr
 }
 
 // fakeDeactivateService implements DeactivateService for httptest.
@@ -104,7 +115,7 @@ func (f *fakeDeactivateService) Reactivate(_ context.Context, _, targetUserID in
 }
 
 // mountAdminUserHandler mirrors the real mount in cmd/api/main.go:
-// RequireAuth + RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM") — needed
+// RequireAuth + RequireRoles("APPACCESS", "ADMIN") (D8) — needed
 // to test the role gate itself, not just the handler in isolation.
 func mountAdminUserHandler(svc SetInitialPasswordService, userAdminSvc UserAdminServicer, deactivateSvc DeactivateService) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
@@ -117,7 +128,7 @@ func mountAdminUserHandler(svc SetInitialPasswordService, userAdminSvc UserAdmin
 	r := chi.NewRouter()
 	r.With(
 		custommw.RequireAuth(tokenSvc),
-		custommw.RequireRoles("APPACCESS", "ADMIN", "ADMIN_PARAM"),
+		custommw.RequireRoles("APPACCESS", "ADMIN"),
 	).Mount("/api/v1/admin/users", h.Routes())
 	return r, tokenSvc
 }

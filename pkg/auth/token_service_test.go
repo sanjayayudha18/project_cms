@@ -395,20 +395,20 @@ func TestRefreshDeadline(t *testing.T) {
 		AccessTokenExpiry:  15 * time.Minute,
 		SessionMaxLifetime: time.Hour,
 	}, &mockBlacklist{})
-	
+
 	// Valid token: returns deadline
 	_, rt, _ := svc.GenerateTokenPair(testIdentity())
 	deadline := svc.RefreshDeadline(rt)
 	if deadline.IsZero() {
 		t.Errorf("RefreshDeadline returned zero for valid token")
 	}
-	
+
 	// Invalid token: returns zero
 	invalidRT := svc.RefreshDeadline("invalid.token.string")
 	if !invalidRT.IsZero() {
 		t.Errorf("RefreshDeadline = %v, want zero for invalid token", invalidRT)
 	}
-	
+
 	// Empty token: returns zero
 	emptyRT := svc.RefreshDeadline("")
 	if !emptyRT.IsZero() {
@@ -421,7 +421,7 @@ func TestRotateTokenPair_IdentityNil(t *testing.T) {
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		SessionMaxLifetime: time.Hour,
 	}, &mockBlacklist{})
-	
+
 	_, _, err := svc.RotateTokenPair(nil, time.Now().Add(time.Hour))
 	if err == nil {
 		t.Fatal("expected error for nil identity")

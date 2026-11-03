@@ -1,0 +1,4 @@
+﻿id,terminal_id,location_id,machine_type,brand,model,operation_hours,deployment_type,capacity_amount,low_threshold_amount,critical_threshold_amount,blacklisted,escrow_account,priority_class,is_active
+1,T0001,12,ATM,NCR,SelfServ 22,24,Onsite,200000000.00,50000000.00,20000000.00,false,1234567890,VIP,true
+2,T0002,13,CRM,,,,,,,,true,,,false
+9,T0009,12,ATM,Hyosung,'-X1,,,0.00,,,false,,,true

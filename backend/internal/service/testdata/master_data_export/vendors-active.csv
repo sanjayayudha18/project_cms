@@ -1,0 +1,4 @@
+﻿id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active
+1,VA,PT Alpha Kas,PT Alpha Kas Nusantara,01.234.567.8-901.000,ops@alpha.example,+62 21 555-0101,"Jl. Satu, No. 1
+Lt. ""3""",true
+5,VC,PT Cahaya — Utama ✓,'-cmd,,,(021) 555-1234,,true

@@ -133,6 +133,7 @@ export function FileUpload({
   return (
     <div className="flex flex-col gap-3">
       {/* Drop zone */}
+      {/* biome-ignore lint/a11y/useSemanticElements: drag-and-drop zone with its own Enter/Space handler (handleZoneKeyDown), not a plain button */}
       <div
         role="button"
         tabIndex={0}
@@ -184,6 +185,7 @@ export function FileUpload({
       {allErrors.length > 0 && (
         <ul className="flex flex-col gap-1" role="alert">
           {allErrors.map((error, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: list is rebuilt wholesale each render and messages can repeat
             <li key={i} className="text-sm text-danger-fg">
               {error}
             </li>

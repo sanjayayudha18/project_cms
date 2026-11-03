@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -11,26 +12,37 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
-func f64(v float64) *float64 { return &v }
+func rat(s string) *big.Rat {
+	r, ok := new(big.Rat).SetString(s)
+	if !ok {
+		panic("bad rat " + s)
+	}
+	return r
+}
 
 // TestComputeReplenishmentStatus covers the strict precedence order from
-// design.md Property 4: unconfigured > no_data > critical > low > normal.
+// design.md Property 4: unconfigured > no_data > critical > low > normal,
+// with exact (non-float) money comparison at fractional boundaries (QC F7).
 func TestComputeReplenishmentStatus(t *testing.T) {
 	cases := []struct {
 		name              string
-		lowThreshold      *float64
-		criticalThreshold *float64
+		lowThreshold      *big.Rat
+		criticalThreshold *big.Rat
 		hasReplenish      bool
-		refundTotal       *float64
+		refundTotal       *big.Rat
 		want              string
 	}{
-		{"no low threshold -> unconfigured", nil, f64(1000), true, f64(500), "unconfigured"},
-		{"no replenish record -> no_data", f64(1000), f64(500), false, nil, "no_data"},
-		{"at or below critical -> critical", f64(1000), f64(500), true, f64(500), "critical"},
-		{"below critical -> critical", f64(1000), f64(500), true, f64(100), "critical"},
-		{"between critical and low -> low", f64(1000), f64(500), true, f64(800), "low"},
-		{"no critical configured, below low -> low", f64(1000), nil, true, f64(500), "low"},
-		{"above low -> normal", f64(1000), f64(500), true, f64(1500), "normal"},
+		{"no low threshold -> unconfigured", nil, rat("1000"), true, rat("500"), "unconfigured"},
+		{"no replenish record -> no_data", rat("1000"), rat("500"), false, nil, "no_data"},
+		{"at or below critical -> critical", rat("1000"), rat("500"), true, rat("500"), "critical"},
+		{"below critical -> critical", rat("1000"), rat("500"), true, rat("100"), "critical"},
+		{"between critical and low -> low", rat("1000"), rat("500"), true, rat("800"), "low"},
+		{"no critical configured, below low -> low", rat("1000"), nil, true, rat("500"), "low"},
+		{"above low -> normal", rat("1000"), rat("500"), true, rat("1500"), "normal"},
+		{"one cent above low -> normal", rat("1000000.00"), rat("500000"), true, rat("1000000.01"), "normal"},
+		{"exactly low -> low", rat("1000000.00"), rat("500000"), true, rat("1000000"), "low"},
+		{"exactly critical (fraction) -> critical", rat("1000000"), rat("500000.50"), true, rat("500000.5"), "critical"},
+		{"beyond float precision -> normal", rat("9999999999999999.98"), nil, true, rat("9999999999999999.99"), "normal"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -152,5 +164,75 @@ func TestListATMCashpos_ReversedDateRangeIsValidationError(t *testing.T) {
 	var ve *ValidationError
 	if !errors.As(err, &ve) || ve.Field != "date_from" {
 		t.Fatalf("want date_from ValidationError, got %v", err)
+	}
+}
+
+// numericToRat keeps money exact: NULL → nil, any exponent, NaN rejected.
+func TestNumericToRat(t *testing.T) {
+	num := func(s string) pgtype.Numeric {
+		var n pgtype.Numeric
+		if err := n.Scan(s); err != nil {
+			t.Fatalf("scan %q: %v", s, err)
+		}
+		return n
+	}
+	if r, err := numericToRat(pgtype.Numeric{}); r != nil || err != nil {
+		t.Errorf("NULL = %v, %v; want nil, nil", r, err)
+	}
+	for in, want := range map[string]string{
+		"1250000.50":          "2500001/2",
+		"9999999999999999.99": "999999999999999999/100",
+		"-0.01":               "-1/100",
+	} {
+		r, err := numericToRat(num(in))
+		if err != nil || r.String() != want {
+			t.Errorf("numericToRat(%s) = %v, %v; want %s", in, r, err, want)
+		}
+	}
+	if r, err := numericToRat(pgtype.Numeric{Int: big.NewInt(5), Exp: 3, Valid: true}); err != nil || r.String() != "5000/1" {
+		t.Errorf("positive exponent = %v, %v; want 5000/1", r, err)
+	}
+	if _, err := numericToRat(pgtype.Numeric{NaN: true, Valid: true}); err == nil {
+		t.Error("NaN must be rejected")
+	}
+}
+
+// T1 (QC F7): list ATM money is an exact decimal string; NULL stays nil.
+func TestRowToAtmWithCashPos_MoneyAsDecimalString(t *testing.T) {
+	num := func(s string) pgtype.Numeric {
+		var n pgtype.Numeric
+		if err := n.Scan(s); err != nil {
+			t.Fatalf("scan %q: %v", s, err)
+		}
+		return n
+	}
+	got, err := rowToAtmWithCashPos(db.ListATMsWithCashPosRow{
+		LowThresholdAmount: num("1000000"),
+		RefundTotal:        num("1250000.50"),
+		ReplenishTotal:     num("9999999999999999.99"),
+		Escrow:             num("0"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	str := func(p *string) string {
+		if p == nil {
+			return "<nil>"
+		}
+		return *p
+	}
+	for name, c := range map[string]struct {
+		got  *string
+		want string
+	}{
+		"low":       {got.LowThresholdAmount, "1000000.00"},
+		"critical":  {got.CriticalThresholdAmount, "<nil>"},
+		"refund":    {got.RefundTotal, "1250000.50"},
+		"replenish": {got.ReplenishTotal, "9999999999999999.99"},
+		"escrow":    {got.Escrow, "0.00"},
+	} {
+		if str(c.got) != c.want {
+			t.Errorf("%s = %s, want %s", name, str(c.got), c.want)
+		}
 	}
 }

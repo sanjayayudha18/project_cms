@@ -71,7 +71,7 @@ func findOpenBatch(ctx context.Context, q *db.Queries, entity, fileHash string) 
 // exists it is returned with existing=true and nothing is written. A row that
 // collides with another pending change of the same entity fails the whole
 // batch with a *BatchRowError.
-func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fileHash string, makerID int64, rows []db.CreateMasterDataChangeRequestParams) (batch *ImportBatch, existing bool, err error) {
+func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fileHash string, fileName *string, makerID int64, rows []db.CreateMasterDataChangeRequestParams) (batch *ImportBatch, existing bool, err error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, false, fmt.Errorf("begin batch tx: %w", err)
@@ -89,12 +89,12 @@ func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fi
 	}
 
 	b, err := q.CreateMasterDataImportBatch(ctx, db.CreateMasterDataImportBatchParams{
-		Entity: entity, FileHash: fileHash, MakerID: makerID, RowCount: int32(len(rows)),
+		Entity: entity, FileHash: fileHash, FileName: fileName, MakerID: makerID, RowCount: int32(len(rows)), //nolint:gosec // G115: rows <= MasterDataImportMaxRows (2000)
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("create batch: %w", err)
 	}
-	out := &ImportBatch{ID: b.ID, MakerID: makerID, RowCount: b.RowCount}
+	out := &ImportBatch{ID: b.ID, MakerID: makerID, RowCount: b.RowCount, FileName: b.FileName}
 	for i, row := range rows {
 		row.BatchID = &b.ID
 		change, err := q.CreateMasterDataChangeRequest(ctx, row)
@@ -113,6 +113,45 @@ func (r *MasterDataImportBatchRepository) Create(ctx context.Context, entity, fi
 		return nil, false, fmt.Errorf("commit batch: %w", err)
 	}
 	return out, false, nil
+}
+
+// ImportBatchFilter narrows ListBatches. Nil pointers mean "no filter".
+type ImportBatchFilter struct {
+	Entity, Status *string
+	MakerID        *int64
+	Limit, Offset  int64
+}
+
+// ListBatches returns one page of import batches (newest first) and the total
+// matching the filter. Rows are the sqlc type; the service maps them (the
+// repository must not import service).
+func (r *MasterDataImportBatchRepository) ListBatches(ctx context.Context, f ImportBatchFilter) ([]db.ListMasterDataImportBatchesRow, int64, error) {
+	total, err := r.q.CountMasterDataImportBatches(ctx, db.CountMasterDataImportBatchesParams{Entity: f.Entity, Status: f.Status, MakerID: f.MakerID})
+	if err != nil {
+		return nil, 0, fmt.Errorf("count import batches: %w", err)
+	}
+	rows, err := r.q.ListMasterDataImportBatches(ctx, db.ListMasterDataImportBatchesParams{
+		Entity: f.Entity, Status: f.Status, MakerID: f.MakerID, PageLimit: f.Limit, PageOffset: f.Offset,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("list import batches: %w", err)
+	}
+	return rows, total, nil
+}
+
+// GetBatch returns one batch; pgx.ErrNoRows is passed through for the caller to map to 404.
+func (r *MasterDataImportBatchRepository) GetBatch(ctx context.Context, id int64) (db.GetMasterDataImportBatchRow, error) {
+	return r.q.GetMasterDataImportBatch(ctx, id)
+}
+
+// ListByBatch returns every change request of the batch, ordered by id.
+func (r *MasterDataImportBatchRepository) ListByBatch(ctx context.Context, batchID int64) ([]db.MasterDataChangeRequest, error) {
+	return r.q.ListMasterDataChangeRequestsByBatch(ctx, &batchID)
+}
+
+// ListPendingApprovers returns the assigned approvers of the lowest pending step.
+func (r *MasterDataImportBatchRepository) ListPendingApprovers(ctx context.Context, approvalRequestID int64) ([]int64, error) {
+	return r.q.ListPendingApproversForRequest(ctx, approvalRequestID)
 }
 
 // SetApprovalRequestID links every change request of the batch to its single approval request.

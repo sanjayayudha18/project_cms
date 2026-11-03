@@ -1,0 +1,3 @@
+vendor_code,vendor,branch_code,branch_name,region_code,obliged_days,ok_days,late_days,not_sent_days,pending_days,late_minutes_total
+ABACUS,PT Abacus Cash Solution,ABACUS_004,Medan – Jl. Gatot Subroto Ñ,MDN,3,1,0,0,1,0
+KEJAR,"'=HYPERLINK(""x"")",KJR_01,'+Cabang Plus,JKT,2,0,1,1,0,75

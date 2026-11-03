@@ -6,7 +6,7 @@ import (
 )
 
 // Envelope is the standard API response wrapper used by services that
-// opt into the shared response format (currently backend-cit; the ATM
+// opt into the shared response format (currently backend-exq; the ATM
 // backend keeps its existing flat JSON shape for frontend compatibility).
 type Envelope struct {
 	Success bool        `json:"success"`
@@ -39,7 +39,7 @@ type Meta struct {
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // WriteSuccess writes a 200 success response: {"success":true,"data":<data>}.

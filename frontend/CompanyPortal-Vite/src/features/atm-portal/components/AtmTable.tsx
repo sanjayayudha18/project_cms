@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/feedback/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, ArrowDown, ArrowUp } from "lucide-react";
-import { formatAtmDate, formatRupiah } from "../lib/formatters";
+import { formatAtmDate, formatRupiahDecimal } from "../lib/formatters";
 import type { AtmRecord } from "../types";
 import { StatusBadge } from "./StatusBadge";
 
@@ -147,9 +147,13 @@ function AtmRow({ atm }: { atm: AtmRecord }) {
       <td className="px-3 py-2">
         {atm.last_replenish_date ? formatAtmDate(new Date(atm.last_replenish_date)) : "—"}
       </td>
-      <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.refund_total)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.replenish_total)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{formatRupiah(atm.low_threshold)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatRupiahDecimal(atm.refund_total)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatRupiahDecimal(atm.replenish_total)}
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        {formatRupiahDecimal(atm.low_threshold)}
+      </td>
       <td className="px-3 py-2">
         <StatusBadge status={atm.status} />
       </td>

@@ -10,8 +10,10 @@ import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingCreates, usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendorPic, useEnableVendorPic, useVendorPics } from "../hooks";
+import { formatPicRoles } from "../lib/picRoles";
 import type { AdminVendorPic } from "../types";
 import { PendingCreatesList } from "./PendingCreatesList";
+import { PicRolesDialog } from "./PicRolesDialog";
 import { CHILD_PAGE_SIZE, ServerPager } from "./ServerPager";
 import { VendorPicFormDialog } from "./VendorPicFormDialog";
 
@@ -44,6 +46,7 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
 
   const [formPic, setFormPic] = useState<AdminVendorPic | null>(null);
   const [isFormOpen, setFormOpen] = useState(false);
+  const [rolesPic, setRolesPic] = useState<AdminVendorPic | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     type: "disable" | "enable";
     pic: AdminVendorPic;
@@ -87,6 +90,11 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
         ),
     },
     {
+      id: "roles",
+      header: "Peran",
+      cell: ({ row }) => formatPicRoles(row.original.roles),
+    },
+    {
       id: "status",
       header: "Status",
       cell: ({ row }) => (
@@ -118,6 +126,13 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
               }}
             >
               Ubah
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={isPending || !pic.is_active}
+              onClick={() => setRolesPic(pic)}
+            >
+              Ubah peran
             </Button>
             {pic.is_active ? (
               <Button
@@ -193,6 +208,13 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
         vendorId={vendorId}
         branchId={branchId}
         pic={formPic}
+      />
+
+      <PicRolesDialog
+        open={rolesPic !== null}
+        onClose={() => setRolesPic(null)}
+        vendorId={vendorId}
+        pic={rolesPic}
       />
 
       <ConfirmActionDialog

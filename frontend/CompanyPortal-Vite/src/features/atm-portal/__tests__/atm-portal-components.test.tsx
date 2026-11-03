@@ -52,13 +52,13 @@ const atmFixture: AtmRecord = {
   machine_type: "ATM",
   brand: "Hyosung",
   deployment_type: "ONSITE",
-  low_threshold: 1000000,
-  critical_threshold: 500000,
+  low_threshold: "1000000.00",
+  critical_threshold: "500000.00",
   last_replenish_date: "2026-08-19",
   last_replenish_time: "08:00:00",
-  refund_total: 1500000,
-  replenish_total: 5000000,
-  escrow: 3500000,
+  refund_total: "1500000.00",
+  replenish_total: "5000000.00",
+  escrow: "3500000.00",
   status: "critical",
 };
 
@@ -247,8 +247,23 @@ describe("AtmTable — Req 8.1, 8.2, 8.4, 11.1, 11.7", () => {
       />,
     );
     expect(screen.getByRole("columnheader", { name: /Total Replenish/ })).toBeInTheDocument();
-    // formatRupiah(5000000) → "Rp 5.000.000"
+    // formatRupiahDecimal("5000000.00") → "Rp 5.000.000"
     expect(screen.getByText("Rp 5.000.000")).toBeInTheDocument();
+  });
+
+  it("shows a non-zero fraction exactly, without float rounding (QC F7)", () => {
+    render(
+      <AtmTable
+        data={[{ ...atmFixture, refund_total: "1250000.50" }]}
+        isLoading={false}
+        isError={false}
+        onRetry={noop}
+        sortBy="terminal_id"
+        sortOrder="asc"
+        onSortChange={noop}
+      />,
+    );
+    expect(screen.getByText("Rp 1.250.000,50")).toBeInTheDocument();
   });
 
   it("shows em dash when replenish_total is null (fix1)", () => {

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { VISIT_QUOTA_CHECKER_ROLES, useResetVendorQuota } from "@/features/atm-portal/visitQuota";
 import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { AlertCircle, AlertTriangle, CheckCircle2, Clock, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { ForecastSummaryGroup, ForecastSummaryResponse } from "./types";
@@ -335,7 +335,9 @@ function GroupRow({
       <td className="px-3 py-2 font-medium text-[var(--n-900)]">{vendorLabel}</td>
       <td className="px-3 py-2">{regionLabel}</td>
       <td className="px-3 py-2 text-right tabular-nums">{group.atm_count}</td>
-      <td className="px-3 py-2 text-right tabular-nums">Rp {formatIDR(group.amount_replenish)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">
+        Rp {formatThousands(group.amount_replenish)}
+      </td>
       <td className="px-3 py-2 text-right tabular-nums">
         {isUnassigned ? "-" : group.requested_atm_count}
       </td>
@@ -391,7 +393,9 @@ function KpiCard({
         <span className="text-sm font-normal text-[var(--n-600)]">ATM</span>
       </p>
       {amount !== undefined && (
-        <p className="mt-0.5 text-sm tabular-nums text-[var(--n-600)]">Rp {formatIDR(amount)}</p>
+        <p className="mt-0.5 text-sm tabular-nums text-[var(--n-600)]">
+          Rp {formatThousands(amount)}
+        </p>
       )}
     </div>
   );

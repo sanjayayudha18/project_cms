@@ -61,8 +61,17 @@ The hooks table and Example 5 in README.md document the action type (`runCommand
 ### Migration numbers cited in docs are stale after the 2026-09-18 baseline squash
 Steering docs (`rbac-design.md`, `project-context.md`, `RBAC-Setup/task.md`) and specs still reference migrations by their **pre-baseline numbers** — e.g. `021`-`025` (approval/hierarchy), `039` (atm search index), `040` (role_permissions). Those files no longer exist under those numbers: the 2026-09-18 squash folded `001`-`040` into `001_baseline_schema.sql` + `002_baseline_seed.sql`, and the originals moved to `backend/migrations/archives/2026-09-18_pre-baseline/`. Live migrations now run `001`-`018` and continue from `019`. When a doc points you at a numbered migration, check whether it predates the baseline before searching the live `migrations/` dir — the schema it describes is almost certainly inside `001_baseline_schema.sql` now.
 
+### Steering `development-plan.md` drifts behind `.claude/development-progress.md` — never trust its snapshot alone
+The feature changelog (`.claude/development-progress.md`) and `.claude/bugfixes.md` get updated as work lands, but the steering snapshot in `development-plan.md` lags: its status %, the "← CURRENT" phase marker, the "next free migration" number, and the built/not-built lists all go stale. Before answering a status question or starting a phase, cross-check `development-plan.md` against `development-progress.md`, `bugfixes.md`, `git log --oneline`, and the actual `backend/migrations/` directory. The **next-free migration number is the most dangerous** stale field — the sequence has gaps (e.g. `022` reserved, `024` dropped), so never read it from any doc; always `list_directory backend/migrations/` and take the real max + 1. When you reconcile the plan, also flag whether `project-context.md` Sec 3 and `.claude/CLAUDE.md` need the same sync (all three are canonical and drift independently).
+
 ### RBAC has three parallel authorization axes — never assume editing one changes another
 Authz in CMS is three separate systems: (1) role-string `RequireRoles(...)` guards in `cmd/api/main.go` = the **real backend enforcement**; (2) the `role_permissions` DB catalog = **frontend nav + Role Management UI only**, NOT backend enforcement yet; (3) maker-checker approval keyed on `supervisor_id`/`approval_level`, enforced inside `approval.Orchestrator`, NOT middleware (that's why `/api/v1/approvals` is `RequireAuth`-only). Editing a role's grants in "Manajemen Peran" changes what the user *sees*, not what the backend *allows*. When reasoning about "can role X do Y", identify which axis the question is about first — conflating role (capability) with hierarchy (who-approves-whom) is the most common RBAC mistake here.
+
+### Feature flows describe the FSD target, not what is built
+`.claude/feature-flows/*` diagrams show the URS/FSD target. Example: `10-order-atm-lifecycle` includes cash pickup, officer/plate validation, and BDS pindah buku, none of which exist in code. To describe the Order ATM flow that actually runs, use the Vendor Request status enum in `backend/api/openapi.yaml` (`vault_assignment` → `vault_review` → `ready` → `sent_to_vendor` → `vendor_accepted` / `vendor_rejected`) and the mounts in `backend/cmd/api/main.go`. Never cite a feature flow as evidence that a feature exists.
+
+### `main.go` alone does not show a route's role guard
+Many mounts in `backend/cmd/api/main.go` show only `RequireAuth` (`/vendor-requests`, `/vendor/replenish-orders`, `/vendor/replenish-realizations`, `/replenishment`, `/admin/holidays`, `/atm-visit-quotas`), but the handler's `Routes()` adds `RequireRoles(...)` per route (shared lists `vendorRequestViewerRoles` / `MakerRoles` / `CheckerRoles` in `vendor_request_handler.go`, `vendorrole.All` for vendor routes). Before calling a route "any authenticated" in a doc or review, grep `RequireRoles(` in the handler file too.
 
 ### Assessment docs live in `.claude/sdlc/<feature>/assessment.md` with a fixed structure
 Development-readiness assessments follow a consistent 9-11 section shape: Executive Summary (with a readiness verdict emoji ⚠️/✅), Module Scope, Current State (table with ✅/❌ + evidence column), Dependencies, Data/Schema, State Machine, Open Questions, Recommendations & Model-per-stage table, Definition of Done. Match this structure for new assessments. For a **built** module (vs a parked one), frame it as an "as-built source of truth" — verify claims against actual code before writing status, and flag doc-vs-code drift explicitly rather than repeating what the specs claim.
@@ -261,6 +270,9 @@ The Kiro task management tools expect the Task Dependency Graph `waves` field to
 { "waves": [{ "id": 0, "tasks": ["1.1", "1.2"] }, { "id": 1, "tasks": ["1.3"] }] }
 ```
 Compare against a working spec's tasks.md (e.g., `cms-app-foundation`) if unsure about format.
+
+### Task Dependency Graph = urutan pengerjaan lengkap, semua task wajib masuk (user, 2026-10-27)
+User membaca graph sebagai urutan kerja, jadi **setiap** leaf task harus ada tepat satu kali, termasuk checkpoint/gate kualitas, test opsional (`*`), dan task penutup (catatan supersede, cek browser). Parent dengan sub-task diwakili oleh semua sub-task-nya. Checkpoint ditaruh di wave terakhir setelah semua task yang di-gate-nya. Tulis ringkasan per wave dalam prosa (`**Wave N:** …`) di atas blok JSON. Sebelum menyerahkan spec, diff daftar checkbox di `## Tasks` dengan ID di `waves`; selisih harus kosong di dua arah. Aturan lama "checkpoint tidak dimasukkan" di `kiro-spec-standard.md` sudah diganti.
 
 ### RateLimiter interface in auth package for testability
 Define a `RateLimiter` interface in `internal/auth/` (the consumer package) rather than importing the concrete struct from `internal/middleware/`. This decouples the auth service from Redis implementation details and allows unit testing with a stub that returns configurable errors. The concrete `middleware.RateLimiter` satisfies the interface without needing an explicit assertion — Go structural typing handles it.
@@ -521,3 +533,47 @@ Required layout (copy from a passing spec like `specs/done/cms-app-foundation/ta
 - `## Task Dependency Graph` — required; a ```json``` block with the `{ "waves": [{ "id": N, "tasks": [...] }] }` object format (see the separate dependency-graph note). Use each task's own id scheme as strings: sub-task specs use `"1.1"`, but flat specs whose checkboxes are numbered `- [ ] 0.`..`- [ ] 11.` use `"0"`,`"1"`,...`"11"`.
 
 Fix is additive/re-leveling only — add the four headings, don't rewrite task content. `## Definition of Done` is an allowed extra section and does not conflict. When authoring a NEW tasks.md, include all four canonical headings up front. Sibling specs authored in the same batch (e.g. `admin-atm-management`, `admin-user-vendor-management`) tend to share the same missing-section defect — fix them together.
+
+---
+
+## Performance Testing & Local Stack Operations
+
+### Running the local stack is a two-compose dance with a shared external network
+The local environment is split across two independent docker-compose projects that share one bridge network:
+1. `backend/docker-compose.yaml` **owns** Redis and the `cms-net` network — start it FIRST (`docker compose up -d` from `backend/`).
+2. `frontend/docker-compose.yml` serves both SPAs — `userportal-vite-fe` on **:3001**, `vendorportal-vite-fe` on **:3002** — and `backend-cit` joins `cms-net` as external.
+
+Postgres is NOT dockerized (external instance). The signal that the backend's external Postgres + Redis connections actually work is `cms-backend` reaching `Up (healthy)` on `:8080/health` — if it's healthy, the DB is reachable. Startup order matters: the network must exist (backend compose up) before the frontend/CIT composes can join it.
+
+### PowerShell + Docker/HTTP measurement gotchas (bit us repeatedly)
+When measuring performance from PowerShell on this Windows host:
+- **Docker writes progress to stderr**, so PowerShell flags a *successful* `docker compose up` as a `NativeCommandError` with exit code 1. Ignore the "error" and verify real state with `docker ps --format ...` instead of trusting the exit code.
+- **`Start-Job` output does not come back cleanly** through this tool's shell — jobs run but `Receive-Job` returns empty. For latency sampling, use a plain **sequential loop** with `Measure-Command` + `Write-Host`, not background jobs.
+- `docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"` is the reliable way to snapshot per-container CPU/memory.
+
+### Perf reality: the cost is architectural, not CPU/memory — point work at `stress-test.txt`
+A live baseline (16-core/15.5GiB host, 2026-10-13) measured idle usage of ~40 MiB RAM total across all four containers (backend ~5-7 MiB, redis ~6-7 MiB, each nginx frontend ~12-15 MiB) with near-zero CPU, and a 300-request burst to `/health` returning p50 7.4ms / p95 9.3ms / p99 11.4ms at 128 req/s. **These numbers prove health at rest/trivial load only — they do NOT indicate production capacity.** The real bottlenecks are architectural and already documented in `stress-test.txt` at the repo root:
+- DSR upload calls an **external Python ETL synchronously** (blocking HTTP up to 25s), close to the server's 30s `WriteTimeout` — the Python service, not Go, is the upload ceiling.
+- The pgx pool is **untuned** (default `max(4, NumCPU)`), single primary — likely first hard limit under 500 users.
+- Rate limiter is **fail-closed** (Redis down → all logins rejected); DSR rate limit is 10/hr/vendor, so "100 concurrent uploads" must come from ≥10 vendors.
+- The read replica pool is read from config but **not wired** — heavy dashboard reads hit primary.
+
+When asked about performance, read `stress-test.txt` first and steer toward a real load tool (k6) against real endpoints rather than re-measuring idle containers. For meaningful pass/fail thresholds you need: prod VM spec, CloudSQL max-connections tier, and typical DSR file row count.
+
+### CompanyPortal CSP blocks every CDN asset — self-host fonts
+The CSP lives in `frontend/CompanyPortal-Vite/security-headers.conf` (included by `nginx.conf`, not inline): `style-src 'self'; font-src 'self' data:; default-src 'self'`. Google Fonts, icon CDNs, or any external stylesheet work in `pnpm dev` but are blocked behind Nginx. Web fonts must be self-hosted (e.g. `@fontsource-variable/*`, pinned exact, Golden Rule #1 approval) and bundled by Vite.
+
+### External UI briefs regularly conflict with `design.md` Sec 10 bans — surface, never adopt silently
+PO/generator briefs keep asking for banned patterns: 3px active `border-left` stripe, `backdrop-blur` topbars, hex/rgba colors, animating `width`, theme toggles, Google Fonts. Before speccing, check the brief against `design.md` Sec 10 + Sec 1 (light mode only). Each conflict becomes an Open Question with a suggested compliant alternative, or a documented deviation recorded back into `design.md`.
+
+### Nav visibility and route access are two separate hard-coded lists
+`NAV_CONFIG[].roles` + `filterNavByRoles` (`src/lib/config/navigation.ts`, ADMIN/ADMIN_PARAM see all) decide what the menu shows; `requireRoles([...])` in each route's `beforeLoad` decides access (also ADMIN/ADMIN_PARAM bypass). They already drift (e.g. vault-plans route allows ADMIN, nav lists ACM only). UI/nav work must never widen visibility beyond `filterNavByRoles`; security lives in route guards + backend `RequireRoles`.
+
+### Sidebar active-state needs longest-prefix match, not exact match
+The pre-revamp sidebar used `currentPath === href`, so nested routes (`/replenishment/vendor-requests/$id`, `/atm-portal/$terminalId`) highlighted nothing, and `/replenishment` vs `/replenishment/vendor-requests` overlap. Use longest segment-prefix match; `/` matches only exactly.
+
+### Shell badge data: reuse existing hooks, only for items the role can see
+No count endpoints exist. Use `useUnreadCount()` (notifications), `useInbox().length` (approvals), `useVendorRequests({page_size:1}).pagination.total_count` (Request CIT), `useEodStatus()` (ADMIN/ADMIN_PARAM only). Call a badge hook only when its nav item is visible to the role, otherwise the shell fires requests the backend will 403.
+
+### Internal users: no office field, no password change
+`AuthUser` = `{id, username, fullName, email, role, isKaryawan, vendorId}` with no kantor/region, and CompanyPortal users authenticate via LDAP, so "Ganti password" has no meaning for them. UI that needs either requires a backend change first.

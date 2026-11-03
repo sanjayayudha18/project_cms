@@ -31,7 +31,7 @@ func (fakeImportRepo) Vendors(_ context.Context, after int64, _ string, limit in
 }
 
 func (fakeImportRepo) VendorBranches(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
-	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", LocationID: "5", IsActive: true}}
+	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", Category: "ATM", LocationID: "5", IsActive: true}}
 	return page(all, after, limit, func(r db.ExportVendorBranchesBatchRow) int64 { return r.ID }), nil
 }
 
@@ -39,8 +39,12 @@ func (fakeImportRepo) VendorVaults(context.Context, int64, string, int32) ([]db.
 	return nil, nil
 }
 
-func (fakeImportRepo) VendorPICs(context.Context, int64, string, int32) ([]db.ExportVendorPicsBatchRow, error) {
-	return nil, nil
+func (fakeImportRepo) VendorPICs(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
+	all := []db.ExportVendorPicsBatchRow{
+		{ID: 1, VendorCode: "V1", BranchCode: "B1", Name: "Ani", Roles: []string{"replenish", "vault"}, IsActive: true},
+		{ID: 2, VendorCode: "V1", Name: "Budi", Roles: []string{}, IsActive: true},
+	}
+	return page(all, after, limit, func(r db.ExportVendorPicsBatchRow) int64 { return r.ID }), nil
 }
 
 func (fakeImportRepo) ATMs(_ context.Context, after int64, _ string, limit int32) ([]db.ExportATMsBatchRow, error) {
@@ -89,9 +93,9 @@ func hasErr(res *ImportResult, row int, field string) bool {
 const vendorHeader = "id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active\n"
 
 // Round trip (plan Validate Fase 5): what the exporter writes, the importer
-// accepts as "no change" -- through BOM, csvSafe apostrophes and quoting.
+// accepts as "no change" -- through BOM, CSVSafe apostrophes and quoting.
 func TestImport_RoundTripOfExportIsAllUnchanged(t *testing.T) {
-	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportATMs, ExportATMAssignments} {
+	for _, entity := range []string{ExportVendors, ExportVendorBranches, ExportVendorPICs, ExportATMs, ExportATMAssignments} {
 		var buf bytes.Buffer
 		if _, err := newTestExporter(fakeImportRepo{}, 1).Write(adminCtx(7), entity, "all", &buf, nil); err != nil {
 			t.Fatalf("export %s: %v", entity, err)
@@ -126,6 +130,9 @@ func TestImport_FileLevelErrors(t *testing.T) {
 		"header wrong order": "code,id,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active\n",
 		"empty file":         "",
 		"unbalanced quote":   vendorHeader + ",V2,\"Vendor,,,,,,\n",
+		"not utf-8":          vendorHeader + ",V2,Vendor Caf\xe9,,,,,,\n", // Windows-1252 "é"
+		"nul byte":           vendorHeader + ",V2,Vendor\x00,,,,,,\n",
+		"binary file":        "MZ\x90\x00\x03\x00\x00\x00\x04\x00",
 	}
 	for name, csvText := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -134,6 +141,22 @@ func TestImport_FileLevelErrors(t *testing.T) {
 				t.Errorf("want one file-level error and no rows processed, got %+v", res.Preview)
 			}
 		})
+	}
+}
+
+func TestImport_InvalidTextReportsLine(t *testing.T) {
+	csvText := vendorHeader + ",V2,Vendor Dua,,,,,,\n" + ",V3,Vendor Caf\xe9,,,,,,\n"
+
+	res := dryRun(t, ExportVendors, utf8BOM+csvText)
+
+	errs := res.Preview.Errors
+	if len(errs) != 1 || errs[0].Row != 3 || errs[0].Field != "file" || !strings.Contains(errs[0].Message, "UTF-8") {
+		t.Fatalf("want one UTF-8 error on line 3, got %+v", errs)
+	}
+
+	// Valid multi-byte UTF-8 (Indonesian/accented names) is still accepted.
+	if res := dryRun(t, ExportVendors, vendorHeader+",V2,Vendor Café 日本,,,,,,\n"); len(res.Preview.Errors) != 0 {
+		t.Errorf("valid UTF-8 rejected: %+v", res.Preview.Errors)
 	}
 }
 
@@ -182,6 +205,40 @@ func TestImport_VendorRowRules(t *testing.T) {
 	}
 	if got := res.Rows[0].Cells["npwp"]; got != "012345678901000" {
 		t.Errorf("npwp stored as %q, want digits only", got)
+	}
+}
+
+func TestImport_VendorPICRowRules(t *testing.T) {
+	h := "id,vendor_code,branch_code,name,position,phone,email,is_notification_recipient,is_active\n"
+	csvText := h +
+		",V1,B1,Ani,Supervisor,+62 (812) 345-678,ani@v1.id,,\n" + // row 2: valid branch PIC; recipient blank -> false
+		",V1,,Budi,,,,TRUE,\n" + // row 3: valid vendor-wide PIC; recipient normalized
+		",,,,Manager,,,,\n" + // row 4: vendor_code + name missing
+		",V9,,Cici,,,,,\n" + // row 5: unknown vendor
+		",V1,B9,Dedi,,,,,\n" + // row 6: branch not of this vendor
+		",V1,,Eka,,,eka <eka@v1.id>,,\n" + // row 7: bad email
+		",V1,,Fajar,,12ab,,,\n" + // row 8: bad phone
+		",V1,,Gita,,,,ya,\n" // row 9: recipient not true/false
+
+	res := dryRun(t, ExportVendorPICs, csvText)
+
+	for _, want := range []struct {
+		row   int
+		field string
+	}{{4, "vendor_code"}, {4, "name"}, {5, "vendor_code"}, {6, "branch_code"}, {7, "email"}, {8, "phone"}, {9, "is_notification_recipient"}} {
+		if !hasErr(res, want.row, want.field) {
+			t.Errorf("missing error row %d field %s in %+v", want.row, want.field, res.Preview.Errors)
+		}
+	}
+	if p := res.Preview; p.ValidRows != 2 || p.Creates != 2 {
+		t.Errorf("want rows 2 and 3 valid creates, got %+v", p)
+	}
+	recipient := map[int]string{}
+	for _, r := range res.Rows {
+		recipient[r.Row] = r.Cells["is_notification_recipient"]
+	}
+	if recipient[2] != "false" || recipient[3] != "true" {
+		t.Errorf("is_notification_recipient = %v, want row 2 false (default) and row 3 true", recipient)
 	}
 }
 
@@ -381,6 +438,21 @@ func TestImport_AssignmentLegacyHeaderStillAccepted(t *testing.T) {
 	}
 }
 
+func TestImport_VendorBranchRegionCode(t *testing.T) {
+	legacy := "id,vendor_code,branch_code,branch_name,region,location_id,is_active\n"
+	if res := dryRun(t, ExportVendorBranches, legacy+"1,V1,B1,Cabang 1,Jakarta,5,true\n"); len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+		t.Errorf("pre-026 file without region_code must keep the code (no-op), got %+v", res.Preview)
+	}
+	h := "id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n"
+	res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Jakarta, jktbar ,5,true\n")
+	if len(res.Preview.Errors) != 0 || res.Preview.Updates != 1 || res.Rows[0].Cells["region_code"] != "JKTBAR" {
+		t.Errorf("region_code should normalize to JKTBAR as an update, got %+v", res.Preview)
+	}
+	if res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Jakarta,JKT-1,5,true\n"); !hasErr(res, 2, "region_code") {
+		t.Errorf("invalid region_code must be a row error, got %+v", res.Preview.Errors)
+	}
+}
+
 func TestAssignmentFields_BySource(t *testing.T) {
 	env := &importEnv{packages: map[string]int64{"V1|B1|P1": 11}, vendors: map[string]int64{"V1": 3}, branches: map[string]int64{"V1|B1": 9}}
 	b := assignmentFields(map[string]string{"vendor_code": "V1", "branch_code": "B1", "package_code": "P1", "effective_start_date": "2026-01-01"}, env)
@@ -390,5 +462,72 @@ func TestAssignmentFields_BySource(t *testing.T) {
 	v := assignmentFields(map[string]string{"package_source": "vendor", "vendor_code": "V1", "branch_code": "B1", "package_code": "PAKET 4", "effective_start_date": "2026-01-01"}, env)
 	if v.Source != AssignmentSourceVendor || v.VendorPackageID != 0 || v.VendorID != 3 || v.VendorBranchID != 9 || v.Package != "PAKET 4" {
 		t.Errorf("vendor payload wrong: %+v", v)
+	}
+}
+
+func TestImport_VendorBranchCategory(t *testing.T) {
+	h := "id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active\n"
+	cases := []struct {
+		name, row, wantErr, wantCategory string
+	}{
+		{"create normalizes case", ",V1,B2,Cabang 2,Jakarta,JKT, cash ,5,true", "", "CASH"},
+		{"create without category", ",V1,B2,Cabang 2,Jakarta,JKT,,5,true", "category", ""},
+		{"invalid category", "1,V1,B1,Cabang 1,Jakarta,JKT,VAULT,5,true", "category", ""},
+		{"update changes category", "1,V1,B1,Cabang 1,Jakarta,JKT,ATM_CASH,5,true", "", "ATM_CASH"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := dryRun(t, ExportVendorBranches, h+tc.row+"\n")
+			if tc.wantErr != "" {
+				if !hasErr(res, 2, tc.wantErr) {
+					t.Fatalf("want a %s row error, got %+v", tc.wantErr, res.Preview.Errors)
+				}
+				return
+			}
+			if len(res.Preview.Errors) != 0 || res.Rows[0].Cells["category"] != tc.wantCategory {
+				t.Fatalf("want category %q, got %+v / %+v", tc.wantCategory, res.Preview, res.Rows)
+			}
+		})
+	}
+
+	// Files exported before the category column (with or without region_code) keep the current category.
+	for _, legacy := range []string{
+		"id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n1,V1,B1,Cabang 1,Jakarta,JKT,5,true\n",
+		"id,vendor_code,branch_code,branch_name,region,location_id,is_active\n1,V1,B1,Cabang 1,Jakarta,5,true\n",
+	} {
+		if res := dryRun(t, ExportVendorBranches, legacy); len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+			t.Errorf("file without category must keep the current one (no-op), got %+v", res.Preview)
+		}
+	}
+	legacyCreate := "id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n,V1,B2,Cabang 2,Jakarta,JKT,5,true\n"
+	if res := dryRun(t, ExportVendorBranches, legacyCreate); !hasErr(res, 2, "category") {
+		t.Errorf("a new branch from a file without category must be a row error, got %+v", res.Preview.Errors)
+	}
+}
+
+// The staged payload must pass VendorBranchAdminService's own category check
+// (the regression: stageCreate/stageUpdate dropped category, so every row failed).
+func TestImport_VendorBranchStagesCategory(t *testing.T) {
+	repo := &fakeVendorBranchAdminRepo{getByIDFunc: func(context.Context, int64) (*db.GetVendorBranchAdminByIDRow, error) {
+		return &db.GetVendorBranchAdminByIDRow{ID: 1}, nil
+	}}
+	sub := &fakeVendorBranchSubmitter{}
+	svcs := ImportServices{Branches: NewVendorBranchAdminService(repo, sub, &fakeVendorBranchChildCounter{})}
+
+	res := dryRun(t, ExportVendorBranches, "id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active\n,V1,B2,Cabang 2,Jakarta,JKT,CASH,5,true\n")
+	if err := stageRow(adminCtx(7), 7, ExportVendorBranches, res.Rows[0], res.env, svcs, "127.0.0.1"); err != nil {
+		t.Fatalf("stage create: %v", err)
+	}
+	if p, ok := sub.lastRequest.Payload.(VendorBranchPayload); !ok || p.Category != "CASH" {
+		t.Errorf("create payload = %#v, want category CASH", sub.lastRequest.Payload)
+	}
+
+	// Legacy file (no category) editing the name: the update carries the current category.
+	res = dryRun(t, ExportVendorBranches, "id,vendor_code,branch_code,branch_name,region,location_id,is_active\n1,V1,B1,Cabang Baru,Jakarta,5,true\n")
+	if err := stageRow(adminCtx(7), 7, ExportVendorBranches, res.Rows[0], res.env, svcs, "127.0.0.1"); err != nil {
+		t.Fatalf("stage update: %v", err)
+	}
+	if p, ok := sub.lastRequest.Payload.(VendorBranchUpdatePayload); !ok || p.Category != "ATM" || p.RegionCode == nil || *p.RegionCode != "JKT" {
+		t.Errorf("update payload = %#v, want current category ATM and region code JKT", sub.lastRequest.Payload)
 	}
 }

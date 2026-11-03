@@ -14,7 +14,7 @@ router = APIRouter(dependencies=[Depends(require_eod_role)])
 
 @router.get("/late")
 async def get_late(request: Request, processing_date: date):
-    pool = request.app.state.db_pool
+    pool = request.app.state.db_read_pool
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT * FROM late_detections WHERE processing_date = $1 AND file_type = ANY($2::text[])",

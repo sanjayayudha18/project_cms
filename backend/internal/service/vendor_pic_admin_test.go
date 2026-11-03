@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,6 +48,10 @@ func TestVendorPicAdminService_Validate(t *testing.T) {
 		{"phone letters", func(p *VendorPicUpdatePayload) { p.Phone = sp("08123abc") }, "phone"},
 		{"phone too short", func(p *VendorPicUpdatePayload) { p.Phone = sp("12345") }, "phone"},
 		{"phone too long", func(p *VendorPicUpdatePayload) { p.Phone = sp("1234567890123456") }, "phone"},
+		{"roles normalized", func(p *VendorPicUpdatePayload) { p.Roles = &[]string{" vault", "replenish"} }, ""},
+		{"empty roles ok", func(p *VendorPicUpdatePayload) { p.Roles = &[]string{} }, ""},
+		{"unknown role", func(p *VendorPicUpdatePayload) { p.Roles = &[]string{"courier"} }, "roles"},
+		{"duplicate role", func(p *VendorPicUpdatePayload) { p.Roles = &[]string{"vault", "vault "} }, "roles"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -154,5 +159,28 @@ func TestVendorPicAdminService_Warnings(t *testing.T) {
 	some, _ := NewVendorPicAdminService(&fakeVendorPicAdminRepo{recipients: 2}, nil).Warnings(context.Background(), 3)
 	if len(some) != 0 {
 		t.Errorf("want no warnings, got %v", some)
+	}
+}
+
+func TestNormalizePicRoles(t *testing.T) {
+	cases := []struct {
+		in      []string
+		want    []string
+		wantErr bool
+	}{
+		{[]string{}, []string{}, false},
+		{[]string{" vault", "cashcount", "replenish "}, []string{"cashcount", "replenish", "vault"}, false},
+		{[]string{"Vault"}, nil, true}, // codes are case-sensitive, as in the DB CHECK
+		{[]string{""}, nil, true},
+		{[]string{"replenish", " replenish"}, nil, true},
+	}
+	for _, tc := range cases {
+		got, err := normalizePicRoles(tc.in)
+		if (err != nil) != tc.wantErr || !slices.Equal(got, tc.want) {
+			t.Errorf("normalizePicRoles(%q) = %q, %v; want %q, err=%v", tc.in, got, err, tc.want, tc.wantErr)
+		}
+	}
+	if got := AllPicRoles(); !slices.Equal(got, []string{"cashcount", "replenish", "vault"}) {
+		t.Errorf("AllPicRoles() = %q", got)
 	}
 }

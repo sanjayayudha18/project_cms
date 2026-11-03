@@ -32,7 +32,7 @@ export function periodLabel(p: AdminVendorPackagePrice): { start: string; end: s
 }
 
 /** Grouping only, string-in/string-out. Never Number()/parseFloat() (Req 12.5, Property 3). */
-export function formatIDR(decimalString: string): string {
+export function formatDecimalIDR(decimalString: string): string {
   const [intPart = "", fracPart] = decimalString.split(".");
   const negative = intPart.startsWith("-");
   const digits = negative ? intPart.slice(1) : intPart;
@@ -76,5 +76,5 @@ export function activePriceRange(
     if (compareDecimalStrings(p.base_price, min) < 0) min = p.base_price;
     if (compareDecimalStrings(p.base_price, max) > 0) max = p.base_price;
   }
-  return { minLabel: formatIDR(min), maxLabel: formatIDR(max) };
+  return { minLabel: formatDecimalIDR(min), maxLabel: formatDecimalIDR(max) };
 }

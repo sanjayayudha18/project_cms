@@ -15,6 +15,398 @@ Template:
 
 ---
 
+## 2026-11-03 — Backend: approve/reject approval bisa berhenti setengah jalan
+- **Symptom**: bila proses mati atau audit gagal di tengah `Approve`/`Reject`, step sudah berubah sementara request masih `pending`, atau keputusan tersimpan tanpa audit. Approver yang sama tidak bisa mengulang (`ErrNotAuthorized`/`ErrRequestNotPending`). Ditemukan dari tinjauan kode setelah perbaikan `SubmitForApproval`. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Root cause**: `approval.Orchestrator.Approve` dan `Reject` menulis step, request, dan audit lewat pool secara terpisah. Berlaku untuk semua `document_type`.
+- **Fix**: `approval/orchestrator.go` menulis ketiganya dalam satu `RunInTx` + `WriteTx`; validasi approver tetap di luar transaksi dan nilai kembali tidak berubah. `MasterDataApprovalService` tidak diubah: apply berjalan sesudah keputusan ter-commit, jadi gagal apply tetap menyisakan request `approved` dan `RetryApply` tetap bisa dipakai. Tanpa migrasi. Belum diubah: dua approve bersamaan masih bisa lolos (validasi tanpa lock, `UpdateApprovalStepStatus` tidak mengecek `status = 'pending'`); `MasterDataApprovalService.Reject` menjalankan `MarkRejected` dan audit-nya sesudah transaksi orchestrator.
+- **Tests**: +`approval/decide_tx_integration_test.go` `TestDecision_AuditFailureLeavesNothing` (pool sungguhan, 4 kasus: approve tengah rantai, final approve dengan audit step gagal, final approve dengan audit request gagal, reject; lalu retry oleh approver yang sama berhasil). Sebelum fix keempatnya FAIL, sesudah fix PASS. `go test ./...` dan integration `./internal/approval/... ./internal/service/...` hijau tanpa skip. Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+---
+
+## 2026-11-02 — Backend: submit approval bisa meninggalkan request tanpa step
+- **Symptom**: bila proses mati atau step/audit gagal di tengah `SubmitForApproval`, request tertinggal permanen tanpa step atau tanpa audit `submit`. Request tanpa step tidak bisa di-approve (409). Untuk batch impor, file yang sama terus terbaca terbuka dan confirm ulang mendapat `created=false`. Ditemukan saat `master-data-import-revamp` task 8; belum pernah terjadi di DB dev (0 dari 9 request). Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Root cause**: `approval.Orchestrator.SubmitForApproval` menulis request, step, dan audit lewat pool secara terpisah, tanpa transaksi bersama. Berlaku untuk semua `document_type`.
+- **Fix**: `approval/orchestrator.go` menulis ketiganya dalam satu transaksi lewat `RequestStore.RunInTx` baru (`approval/store.go`, `approval/repository.go`; `NewRepository` kini butuh koneksi yang punya `Begin`) dan `audit.Writer.WriteTx` (`audit/writer.go`). Pembacaan ulang setelah 23505 berjalan sesudah rollback; jawaban `created=false` tetap sama. `Approve`/`Reject` tidak diubah di sini (lihat entri 2026-11-03). Tanpa migrasi dan tanpa self-heal. Sebelum rilis jalankan query read-only ini di data target; bila ada hasil, putuskan per kasus (status `cancelled` tidak ada): `SELECT r.* FROM approval_requests r WHERE NOT EXISTS (SELECT 1 FROM approval_steps s WHERE s.request_id = r.id);`
+- **Tests**: +`approval/submit_tx_integration_test.go` `TestSubmitForApproval_FailureLeavesNothing` (pool sungguhan: FK step kedua ditolak; audit gagal; lalu submit ulang menghasilkan `created=true`, 2 step, 1 audit). Sebelum fix FAIL (1 request + 1 step; 1 request + 2 step), sesudah fix PASS. Fake dan spy P3 menyesuaikan interface baru. `go test ./...`, integration `./internal/approval/... ./internal/service/...` tanpa skip (termasuk P3), vet, dan lint `approval`/`audit` hijau. Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+---
+
+## 2026-11-02 — Backend: submit approval bersamaan menjawab 500 untuk pemanggil yang kalah balapan
+- **Symptom**: integration test `master-data-import-revamp` task 8 (Property 3): 43 dari 120 confirm bersamaan file yang sama menjawab HTTP 500 (`create approval request: ... approval_requests_document_uq`), padahal filenya berhasil diajukan. Data tetap benar: satu batch, satu approval, satu audit, satu notifikasi.
+- **Root cause**: `approval.Orchestrator.SubmitForApproval` mengecek `FindRequestByDocument` lalu `CreateRequest` tanpa kunci. Dua pemanggil bisa sama-sama lolos cek; yang kalah kena unique violation dan error-nya naik apa adanya. Berlaku untuk semua `document_type`.
+- **Fix**: `backend/internal/approval/orchestrator.go` — 23505 khusus pada `approval_requests_document_uq` dibaca ulang dan dijawab seperti submit ulang (`created=false`, tanpa step dan audit tambahan). Unique violation lain, bacaan ulang yang gagal, dan bacaan ulang kosong tetap error. Pemanggil: confirm impor menjawab sukses tanpa audit/notifikasi ulang; `ApprovalHandler.Submit` menjawab 409 `already_submitted` (sebelumnya 500); `MasterDataChangeService.Submit` tidak terdampak karena `change.ID` baru tiap panggilan. Belum diubah, perlu keputusan: request dan step dibuat tanpa transaksi bersama, jadi pemenang yang mati di antaranya meninggalkan request tanpa step.
+- **Tests**: `orchestrator_test.go` +`TestOrchestrator_SubmitForApproval_LostCreateRace` (6 kasus, 2 FAIL sebelum fix); `masterdata_import_invariants_integration_test.go` `TestImportInvariant_P3_ConcurrentConfirm_Integration` FAIL sebelum fix, PASS `-count=3` sesudahnya (balapan 14 dari 15 iterasi, 0 dari 120 panggilan gagal). Mutasi membuang fix: keduanya FAIL lagi (38 dari 120), file dipulihkan dengan checksum cocok. Integration `service`/`handler`/`repository`/`approval`, `go test ./...`, vet, lint hijau. Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+---
+
+## 2026-11-02 — Backend: apply master data macet sampai timeout saat gagal tanpa error SQL
+- **Symptom**: `Approve`/`RetryApply` tertahan sampai context habis (30 detik di produksi lewat middleware `Timeout`) bila baris ke-2 atau setelahnya dari batch impor gagal tanpa error SQL, misalnya stale. Pada batch 3 baris status jadi tercampur: baris yang belum sempat ditandai tetap `approved` tanpa error, jadi batch tidak benar-benar dipensiunkan. Perubahan satu-record juga macet bila penulisan audit gagal di tahap encode JSON. Ditemukan saat `master-data-import-revamp` task 4.2; tidak ada data entitas yang berubah.
+- **Root cause**: `applyMasterDataChange`/`applyOne` menulis `MarkStale`/`MarkApplyFailed` lewat pool selagi tx apply masih terbuka (rollback baru lewat `defer`), padahal tx memegang row lock baris yang sudah ditandai `applied`. Koneksi pool menunggu tx yang menunggu koneksi pool. Error SQL tidak memicunya karena Postgres melepas lock saat tx masuk status aborted, sehingga test lama (duplikat kode) tetap lolos.
+- **Fix**: `backend/internal/service/masterdata_approval.go` — `tx.Rollback` sebelum loop `MarkStale` batch dan sebelum `MarkApplyFailed` pada kegagalan audit di `applyOne`. Rollback lewat `defer` sesudahnya hanya mengembalikan `ErrTxClosed` yang sudah diabaikan. Status, urutan langkah, dan nilai kembali tidak berubah; orchestrator tidak disentuh.
+- **Tests**: `masterdata_import_confirm_integration_test.go` +`TestMasterDataImportConfirm_MiddleRowStale_ReturnsPromptlyAndRetiresWholeBatch_Integration` dan +`TestMasterDataApproval_AuditEncodeFailure_RecordsErrorWithoutBlocking_Integration`. Sebelum fix keduanya FAIL (tertahan sampai timeout 3 detik; baris ketiga tetap `approved` tanpa error), sesudah fix PASS. Build, vet, unit, integration `-run 'Import|MasterData'`, dan lint dijalankan. Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+---
+
+## 2026-10-29 — Backend test: fixture vendor order menumpuk di DB dev (cabang > batas import 2000)
+- **Symptom**: `TestExportRoundTrip_DryRunIsZeroChanges/vendor-branches-*` dan `TestMasterDataImport_RoundTripOnRealDatabase/vendor-branches` (X.7) gagal dengan "jumlah baris melebihi 2000". DB dev punya 2083 `vendor_branches`, dan 1676 di antaranya milik vendor fixture `ITESTNUM-*`/`ITV2-*`. Tiap run integrasi `backend` menambah 10 vendor, 19 cabang, dan 10 user `itvnd-*`. Ditemukan saat verifikasi report-export-migration 8.1, tetapi bukan disebabkan olehnya.
+- **Root cause**: `vendorUserAs` (`backend/internal/service/vendor_order_integration_test.go`) membuat user vendor dengan `vendor_id`/`vendor_branch_id`. Cleanup user ini berjalan sebelum cleanup base fixture (LIFO), padahal `audit_logs`, `vendor_request_vendor_parties.decided_by`, `vendor_request_vault_plans.rejected_by`, dan `vendor_requests.completion_submitted_by` masih menunjuk ke user tersebut. Akibatnya `DELETE FROM users` ditolak, user hanya dinonaktifkan dan tetap memegang FK vendor/cabang. Lalu `DELETE` cabang dan vendor di base fixture ikut ditolak, dan semua error itu diabaikan (`_, _ =`).
+- **Fix**: hanya test. Cleanup per user kini cukup melepas FK (`vendor_id`/`vendor_branch_id` = NULL) supaya base fixture bisa menghapus vendor dan cabangnya. `deleteVendorUsers` didaftarkan sebelum base fixture sehingga berjalan paling akhir: lewat koneksi sendiri (pool fixture sudah ditutup), ia menghapus notifikasi, `audit_logs` milik user fixture, lalu usernya. Kegagalan di langkah ini kini `t.Errorf`, tidak lagi diam.
+- **Tests**: jumlah vendor, cabang, dan user `itvnd-*` dihitung sebelum dan sesudah `go test -tags integration ./internal/service -run "VendorOrder|Replenish"`. Sebelum fix bertambah +10/+19/+10 per run, sesudah fix tetap. Run penuh `backend` (`-p 1`): vendor dan cabang stabil, lint 0. Sisa lama dihapus dari DB dev dengan OK user (2026-10-29): 898 vendor `ITESTNUM-*`/`ITV2-*`, 1676 cabang, 751 `acm_area_branches`, 884 user `itvnd-*` + 1997 `audit_logs` miliknya. Tersisa 9 vendor dan 407 cabang asli. Sesudah itu run penuh `backend -p 1` hijau termasuk dua round-trip `vendor-branches`, dan jumlah tetap 9/407/0 sesudah run. Catatan: user `itacm-*`/`itspv-*` dari fixture vault flow masih sengaja dinonaktifkan, bukan dihapus (perilaku lama, tidak memblokir apa pun). Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+## 2026-10-29 — Backend: import PIC tanpa diedit terbaca "update" bila roles tersimpan tidak urut abjad
+- **Symptom**: file export `vendor-pics` yang diunggah ulang tanpa diedit ke dry-run import melaporkan PIC sebagai `update`, bukan `unchanged`, untuk PIC dengan roles tersimpan `{replenish,vault,cashcount}` (default migrasi `032`, jadi semua PIC lama) atau urutan lain yang tidak abjad. Konfirmasi import akan membuat approval perubahan palsu. Ditemukan oleh test integrasi round trip `vendor-data-export` task 11.4; dev tidak punya baris `vendor_pics`, jadi belum pernah terlihat di layar. Sudah ada sejak roles masuk CSV (vendor-party-scope), bukan dari refactor `pkg/csvexport`.
+- **Root cause**: sisi file dinormalisasi `normalizePicRoles` (diurutkan abjad: `cashcount;replenish;vault`), sedangkan data saat ini dari `loadAll` memakai sel export apa adanya (urutan DB: `replenish;vault;cashcount`). Perbandingan string sel berbeda walau himpunannya sama.
+- **Fix**: `backend/internal/service/masterdata_import.go` — `loadAll` menormalkan sel `roles` data saat ini untuk `vendor-pics` lewat `canonicalPicRolesCell` (`parsePicRoles` + `csvexport.PICRolesCell`). Isi file export tidak berubah (golden byte `vendor-data-export` 1.1 tetap), import yang benar-benar mengubah roles tetap `update`.
+- **Tests**: `masterdata_import_pic_roles_test.go` +`TestImport_VendorPICUnsortedStoredRolesRoundTripUnchanged` (RED tanpa fix: `Updates:1 Unchanged:0`; GREEN sesudah). Integrasi `TestExportScopedRoundTrip_DryRunIsZeroChanges` (task 11.4, `pics/vendor` sebelumnya `Updates:2`) dan `TestExportRoundTrip_DryRunIsZeroChanges` hijau terhadap DB dev, fixture bersih. `go test ./internal/service ./internal/handler` hijau. Manual browser verification: outstanding (Import/Export master data → unduh `vendor-pics`, unggah ulang tanpa edit → dry-run semua "tidak berubah").
+- **Commit**: 540ee96
+
+---
+
+## 2026-10-27 — CompanyPortal: inisial avatar bisa 3 karakter (property test `getInitials` flaky)
+- **Symptom**: `pnpm run test:coverage` kadang merah di `src/lib/utils/initials.property.test.ts` "string apa pun: hasil 1–2 karakter uppercase, atau ?" (counterexample `"ᾀ\u0000"`, seed -540324741). Ditemukan saat gate wave 3 `sidebar-settings-footer`; kode dari `app-shell-revamp` (2627fdf).
+- **Root cause**: `getInitials` memotong (slice) dulu, baru `toUpperCase()`. Beberapa huruf memanjang saat di-uppercase ("ᾀ" → "ἈΙ", "ß" → "SS"), jadi hasil bisa 3 karakter (mis. "ßa budi" → "SSB"). Test baru kena bila fast-check kebetulan membangkitkan huruf seperti itu, sehingga flaky.
+- **Fix**: `frontend/CompanyPortal-Vite/src/lib/utils/initials.ts` — nama di-uppercase sebelum split/slice; `toUpperCase()` setelah slice dihapus. Nama ASCII hasilnya sama.
+- **Tests**: `initials.property.test.ts` +1 test regresi deterministik (`"ᾀ\u0000"` → `"ἈΙ"`, `"ß"` → `"SS"`, `"ßa budi"` → `"SB"`; kode lama memberi 3 karakter untuk kasus 1 dan 3). CP `pnpm run test:coverage` 167 file / 1629 test hijau (85,7/81,62/82,17/86,77), `pnpm run lint` bersih, `tsc -b tsconfig.test.json` 138 error = baseline (0 di initials). Manual browser verification: n/a (fungsi murni; avatar nama ASCII tidak berubah).
+- **Commit**: <sha>
+
+---
+
+## 2026-10-21 — Backend: guard test `TestBugCondition_NoOldTableNameReferencesInCode` merah karena fixture EOD Monitoring
+- **Symptom**: `cd backend && go test -tags integration ./internal/handler` gagal di `rename_itm_cashpos_bug_test.go`: "still reference itm_cashpos: frontend/CompanyPortal-Vite/src/features/eod-monitoring/components/EodMonitoringPage.test.tsx". Memblokir job CI go-integration. Ditemukan saat menjalankan suite integrasi untuk vendor-party-scope task 3; sudah ada di HEAD sejak `d195c38` (fe-coverage C5).
+- **Root cause**: false positive guard. Di test itu `itm_cashpos` adalah key `FileType` EOD (`by_file_type.itm_cashpos`, `file_type: "itm_cashpos"`) — sama dengan `eod-monitoring/types.ts:32` (sudah dikecualikan) dan `FILE_TYPES` di `backend_python/eod_retry_scheduler/config.py`, bukan nama tabel lama sebelum rename. Allowlist `exemptFiles` belum memuat file test baru itu.
+- **Fix**: `backend/internal/handler/rename_itm_cashpos_bug_test.go` — `EodMonitoringPage.test.tsx` ditambahkan ke `exemptFiles` (gofmt merapikan kolom map). Frontend tidak berubah.
+- **Tests**: `go test -tags integration -run TestBugCondition_NoOldTableNameReferencesInCode ./internal/handler` PASS (FAIL sebelum fix); `go test ./internal/handler` dan `go test -tags integration ./internal/handler` hijau; CP `pnpm run test` 157 file / 1386 test hijau. Catatan: path Python di `exemptFiles` (`scheduler/...`) sudah usang — folder aslinya `backend_python/`, yang tidak ikut di-scan guard; tidak diubah di fix ini. Manual browser verification: n/a (hanya test).
+- **Commit**: <sha>
+
+---
+
+## 2026-10-19 — CompanyPortal: EOD Monitoring memanggil `/api/v1/api/eod/*` (prefix ganda)
+- **Symptom**: semua request halaman EOD Monitoring (ringkasan, status file, riwayat, keterlambatan, log audit, retry manual) dikirim ke `/api/v1/api/eod/...`. Proxy Vite dan `nginx.conf` hanya me-route `/api/eod/*` ke `eod_retry_scheduler` (:8091), jadi request itu jatuh ke Go API → 404. Ditemukan saat menulis test `fe-coverage` C5; ada sejak import awal (`b10f23f`). Auth (Sec 4 #7, API client) di-flag; user memilih dokumentasi bugfix.
+- **Root cause**: `eod-monitoring/hooks/useEodQueries.ts` menulis path lengkap `/api/eod/...`, tetapi API client CP selalu menambah `apiConfig.baseURL` (`/api/v1`). Client tidak punya cara untuk layanan di luar `/api/v1`.
+- **Fix**: `frontend/CompanyPortal-Vite/src/lib/api/client.ts` — opsi baru `RequestConfig.baseURL` (override `apiConfig.baseURL`; header Bearer + refresh 401 tetap berlaku; tanpa opsi = perilaku lama, request JSON lain tidak berubah). `eod-monitoring/hooks/useEodQueries.ts` — semua 6 panggilan memakai `{ baseURL: "" }` (`EOD_REQUEST`), retry `api.post(path, undefined, EOD_REQUEST)`.
+- **Tests**: `eod-monitoring/hooks/eodUrls.test.tsx` (baru, client asli + `fetch` di-stub): summary, history, audit, retry → URL persis `/api/eod/...` + `Authorization: Bearer` (RED sebelum fix: `Received: "/api/v1/api/eod/summary?..."`; GREEN sesudah). `lib/api/client.test.ts` +1 (default `/api/v1/items`, override `""` → `/api/eod/summary`, token tetap). `useEodQueries.test.tsx` disesuaikan karena signature panggilan bertambah argumen opsi (bukan perubahan perilaku yang diuji). CP `pnpm run test:coverage` 157 file / 1401 test (84,23/80,09/80,84/85,48, di atas threshold), `pnpm lint`, `pnpm build` hijau. Manual browser verification: **outstanding** (buka EOD Monitoring sebagai ADMIN dengan `eod_retry_scheduler` jalan + `RETRY_AUTH_MODE=jwt`: data tampil, retry manual jalan).
+- **Commit**: `486a950`
+
+---
+
+## 2026-10-19 — CompanyPortal: panel pihak vendor + "kembalikan ke vendor" 404 (prefix ganda)
+- **Symptom**: di detail Vendor Request, panel pihak vendor (`GET /{id}/vendor-parties`) dan aksi ATM-SPV "kembalikan ke vendor" (`POST /{id}/vendor-return`) memanggil `/api/v1/api/v1/vendor-requests/...` → 404 (route backend `vendor_request_handler.go:79-80`). Ditemukan di `fe-coverage` C4 (temuan #1).
+- **Root cause**: `vendor-request/vendorSide.ts` `BASE = "/api/v1/vendor-requests"`, padahal API client sudah menambah `apiConfig.baseURL`. Fitur lain (mis. `vendor-request/api.ts`) memakai path relatif `/vendor-requests`.
+- **Fix**: `frontend/CompanyPortal-Vite/src/features/vendor-request/vendorSide.ts` — `BASE = "/vendor-requests"`.
+- **Tests**: `vendor-request/__tests__/vendorSide.test.tsx` (baru, client asli + `fetch` di-stub): `useVendorParties` → `/api/v1/vendor-requests/5/vendor-parties` + Bearer, `useVendorReturn` → `POST /api/v1/vendor-requests/5/vendor-return` body `{ rejection_reason }` + refresh `["vendor-requests"]` (RED sebelum fix: `/api/v1/api/v1/...`; GREEN sesudah). Root cause dicek di semua caller kedua portal: CP — grep `"/api/v1` / `"/api/eod` di `src`: hanya `vendorSide.ts` + `useEodQueries.ts` yang lewat API client dengan prefix sendiri (`lib/auth/store.ts` dan `replenishment/api.ts` `downloadReport` memakai `fetch` langsung, jadi prefix di sana benar). VP — API client tidak punya `baseURL`; semua pemanggil (`dsr`, `notifications`, `orders`, realisasi) mengirim path lengkap `/api/v1/...` dan memang benar. Manual browser verification: **outstanding** (Vendor Request alur vendor: panel pihak vendor tampil, ATM-SPV bisa kembalikan request yang ditolak vendor).
+- **Commit**: `486a950`
+
+---
+
+## 2026-10-19 — VendorPortal: DSR Monitor terbuka dengan filter tanggal 2024-01-15
+- **Symptom**: vendor yang membuka DSR Monitor melihat filter tanggal `2024-01-15` dan "Tidak ada data DSR" sampai tanggal diganti atau "Tampilkan Semua" ditekan. Ditemukan di `fe-coverage` C4 (Temuan #3).
+- **Root cause**: placeholder tertinggal — `useState<string | undefined>("2024-01-15")` di `features/dsr/DsrPage.tsx`.
+- **Fix**: `frontend/VendorPortal-Vite/src/features/dsr/DsrPage.tsx` — tanggal awal = hari ini Asia/Jakarta (`toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" })`, sama dengan `orders/RealizationPanel.tsx` `todayWib()` / `realizations/RealizationsPage.tsx`), lazy initializer. Default dipilih user (hari ini WIB, bukan tanpa filter).
+- **Tests**: baru di `features/dsr/__tests__/DsrPage.test.tsx` "opens filtered on today's date in Asia/Jakarta, not UTC" (fake `Date` 2026-10-15T20:00Z → harus `2026-10-16`; RED sebelum fix: `2024-01-15`). VP `pnpm run test:coverage` 25 file / 215 test hijau (DsrPage.tsx 96% baris), `pnpm lint` + `pnpm build` hijau. Manual browser verification: **outstanding** (buka DSR Monitor → filter = tanggal hari ini WIB).
+- **Commit**: acd15c9 (test: 1aadb47)
+
+---
+
+## 2026-10-15 — CompanyPortal: import CSV hari libur tidak ikut refresh token 401
+- **Symptom**: upload CSV di halaman Hari Libur gagal ("Impor gagal") bila access token sudah kedaluwarsa, padahal sesi (refresh token) masih sah; request lain di halaman yang sama berhasil karena di-refresh otomatis. Ditemukan saat menulis test `fe-coverage` C2. Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Root cause**: `importHolidays` (`features/admin-holidays/api.ts`) memanggil `fetch` sendiri dengan token dari `useAuthStore`, jadi melewati `lib/api/client.ts`; 401 tidak pernah sampai ke `handleUnauthorized` (single-flight refresh + retry). Komentarnya ("api.post sends JSON") sudah usang sejak FE-08 menambah dukungan FormData.
+- **Fix**: `frontend/CompanyPortal-Vite/src/features/admin-holidays/api.ts` — `importHolidays` memakai `api.post(BASE + "/import", form)`; error dipetakan ke `Error(message server || "Impor gagal")` (pola sama dengan `master-data-io` `toImportError`). Perbedaan kecil: error tanpa body JSON kini menampilkan pesan generik client (`statusText`/"Request failed") alih-alih "Impor gagal"; error JSON dari server tetap sama. Import `apiConfig`/`useAuthStore` dihapus.
+- **Tests**: baru `features/admin-holidays/__tests__/import-refresh.test.ts` (client asli, `fetch` di-mock): import pertama 401 → `refreshToken` 1× → retry dengan token baru + FormData, hasil `{created, skipped}` (RED sebelum fix: "Impor gagal", GREEN sesudah). `__tests__/api.test.tsx` blok `importHolidays` diubah: sebelumnya mengunci `fetch` langsung (URL, header Bearer, `credentials`) — itulah perilaku yang salah, jadi kini mengunci kontrak `api.post("/admin/holidays/import", FormData)` + pemetaan error (pesan server / default "Impor gagal"); header/credentials/refresh sudah diuji di `lib/api/client.test.ts`. CP `pnpm run test:coverage` 138 file / 1189 test hijau, `pnpm build` hijau; `biome check src/features/admin-holidays` bersih. `pnpm lint` (`biome check .`) merah hanya karena folder `coverage/` hasil test:coverage dan format 3 file test untracked dari sesi lain (`admin-vendors/__tests__/apiHooks.test.tsx`, `admin-vendors/lib/formSchemas.test.ts`, `master-data-io/api.test.ts`) — bukan dari fix ini. Manual browser verification: **outstanding** (import CSV setelah access token kedaluwarsa → harus berhasil tanpa login ulang). Pemanggil `fetch` langsung lain di CP `src/features`: `features/replenishment/api.ts` `downloadReport` (unduh CSV laporan) — pola sama, belum diperbaiki (perlu izin).
+- **Commit**: <sha>
+
+---
+
+## 2026-10-15 — VendorPortal: redirect setelah login hilang (selalu ke /orders)
+- **Symptom**: vendor yang dibawa ke `/login?redirect=%2Fdsr` (mis. sesi habis di halaman DSR) setelah login berhasil mendarat di **/orders**, bukan kembali ke `/dsr`. Ditemukan saat menulis test `fe-coverage` C1. Test property "Route-Guard Round-Trip" memakai login page tiruan, jadi kasus ini tidak pernah teruji dengan `LoginPage` asli. Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Root cause**: `LoginPage.onSubmit` sudah `navigate({ href: "/dsr" })`. Effect guest guard `AuthLayout` (`features/auth/ProtectedRoute.tsx`) baru berjalan setelah `isAuthenticated` true; saat itu `useLocation()` sudah `/dsr` tanpa query `redirect`, sehingga guard menghitung fallback `/orders` dan me-navigate lagi (dibuktikan dengan log `router.navigate`: `/dsr` dari `LoginPage.tsx:105`, lalu `/orders` dari `ProtectedRoute.tsx:113`).
+- **Fix**: `frontend/VendorPortal-Vite/src/features/auth/ProtectedRoute.tsx` — `AuthLayout` hanya me-redirect user yang sudah login selama lokasi masih halaman guest (`/login`); navigasi yang sudah keluar dari area guest dibiarkan. Sanitasi `redirect` (`//…`, URL absolut → `/orders`) tidak berubah.
+- **Tests**: `features/auth/__tests__/LoginPage.test.tsx` — "goes to the preserved redirect target after a successful login" (RED sebelum fix: `Unable to find [data-testid="page-dsr"]`; GREEN sesudah, dan tetap di `/dsr`, tidak memantul ke `/orders`); "Guest guard for an already-signed-in vendor": buka `/login?redirect=%2Fdsr` saat sudah login → `/dsr`, `redirect=%2F%2Fevil.com` → `/orders`. Regresi hijau: `routeGuard.property.test.tsx`, `routeMapping.property.test.tsx`, `app/__tests__/integration.test.tsx`. VP `pnpm run test:coverage` 191 test (75,02/64,51/67,94/76,02, di atas threshold), `pnpm lint`, `pnpm build` hijau. Manual browser verification: **outstanding** (login dari link `/login?redirect=/dsr` → harus kembali ke DSR).
+- **Commit**: <sha>
+
+---
+
+## 2026-10-15 — Import CSV master data: baris toggle aktif → payload NULL → HTTP 500
+- **Symptom**: confirm import CSV master data yang berisi baris toggle (hanya `is_active` berubah → op enable/disable) gagal `null value in column "payload" of relation "master_data_change_requests" violates not-null constraint (23502)` → **500**. Berlaku untuk semua entity yang bisa di-toggle lewat CSV (vendor, cabang vendor, vault, PIC, ATM, kelolaan ATM). Temuan be-tech-debt C4.4 (`.claude/sdlc/be-tech-debt/tests.md`, "Temuan produk #2").
+- **Root cause**: `MasterDataImporter.Confirm` (`masterdata_import_confirm.go`) memakai `marshalOrNilJSON(c.req.Payload)` → NULL untuk enable/disable (tanpa payload). `MasterDataChangeService.Submit` sudah punya fallback `{}` inline, tapi jalur import tidak ikut. Maker-checker master data (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Fix**: helper bersama `marshalPayloadJSON` di `backend/internal/service/masterdata_change.go` (nil → `{}`), dipakai `Submit` **dan** import `Confirm`, jadi kedua jalur tidak bisa beda lagi. Fallback inline di `Submit` dihapus.
+- **Tests**: `TestMasterDataImportConfirm_UpdateAndToggleRows_EffectOnlyAfterApproval_Integration` (`masterdata_import_update_toggle_integration_test.go`, merah dulu → hijau). `go test ./...` hijau, `go test -tags integration ./internal/service/` hijau, `golangci-lint run --build-tags integration ./...` 0. Manual browser verification (import CSV dengan baris toggle): outstanding.
+- **Commit**: `1f2e8a3`
+
+---
+
+## 2026-10-15 — Approval: approver cuti tanpa delegate / delegasi ke maker → HTTP 500
+- **Symptom**: approve/reject `/api/v1/approvals/{id}` membalas **500 "Terjadi kesalahan internal"** bila (a) approver cuti dan mendelegasikan ke maker, atau (b) approver cuti tanpa delegate aktif. Aksi tetap ditolak (fail-closed), tapi pesannya salah. Temuan be-tech-debt C3 (`.claude/sdlc/be-tech-debt/tests.md`, "Temuan produk").
+- **Root cause**: `ResolveEffectiveApprover` mengembalikan error polos tanpa sentinel, jadi `ApprovalHandler.handleError` jatuh ke `default`. Satu-satunya pemanggil = `Orchestrator.Approve/Reject`, jadi perbaikan di fungsi ini menutup semua jalur. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+- **Fix**: `backend/internal/approval/errors.go` sentinel baru `ErrApproverOnLeaveNoDelegate`; `effective_approver.go` membungkus (a) dengan `ErrNotAuthorized` → 403, (b) dengan `ErrApproverOnLeaveNoDelegate`; `backend/internal/handler/approval_handler.go` memetakan (b) → **409** "Approver sedang cuti dan tidak memiliki delegasi aktif" (keputusan user).
+- **Tests**: `TestOrchestrator_MakerCannotActOnOwnRequest` + `TestOrchestrator_ApproverOnLeaveWithoutDelegateBlocksStep` dikencangkan ke `errors.Is` sentinel (merah dulu), `TestApprovalHandler_Approve_ApproverOnLeaveNoDelegate` (409) baru. `go test ./...` hijau, `golangci-lint run --build-tags integration ./...` 0. Manual browser verification: outstanding.
+- **Commit**: `448e870`
+
+---
+
+## 2026-10-14 — `TestIntegration_ApplyVaultTickets` gagal karena request dev asli
+- **Symptom**: `go test -tags integration ./...` merah: tes tiket vault memilih `max(id)` dari `vendor_requests` = request dev asli `REP-ABA-MDN-20261014-001` yang sudah punya tiket pemenuhan vault, sehingga sync ikut menonaktifkan `VLT_ABACUS_004_20261014_001` dan audit tidak sesuai harapan.
+- **Root cause**: tes mengasumsikan dua request mana pun belum punya tiket vault; asumsi patah begitu ada request dev yang lewat alur vault v3. Data tidak berubah (tes berjalan dalam tx yang di-rollback).
+- **Fix** (test saja): `backend/internal/service/vault_ticket_integration_test.go` memilih `min/max(id)` hanya dari request tanpa `vendor_request_vault_tickets`.
+- **Tests**: full `go test -tags integration -p 1 ./...` hijau. Manual browser verification: tidak relevan.
+- **Commit**: belum (ikut commit 2.2c; user minta commit setelah semua task selesai)
+
+---
+
+## 2026-10-12 — QC F10 sisa: 4 fungsi cyclo 21–25
+- **Symptom**: gocyclo > 20 (target F10, di bawah ambang lint 30): `VaultPlanService.ReviewRequest` 25, `syncVendorParties` 24, `UserAdminService.Update` 22, `ATMAssignmentApplier.Apply` 21.
+- **Root cause**: cabang-cabang (notifikasi review, refresh/kirim party, cek immutable/unik/error user, create/update kelolaan) ditulis inline di satu fungsi.
+- **Fix** (refactor, perilaku tidak berubah; query, urutan langkah dalam tx, error, dan pesan sama; signature publik tetap):
+  - `backend/internal/service/vault_plan_actions.go`: `plannedBy` (cek checker ≠ pembuat/approver plan), `notifyReviewed` (notifikasi ACM-USER per area + pembuat request).
+  - `backend/internal/service/vendor_party.go`: `refreshParty` (withdraw/resend satu party lama), `newPartyKeys` (party baru, urut cabang lalu role).
+  - `backend/internal/auth/user_admin.go`: `changesImmutable`, `uniqueOnUpdate`, `mapUserUpdateError`. Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
+  - `backend/internal/service/masterdata_applier_atm_assignment.go`: `applyAssignmentCreate`, `applyAssignmentUpdate`.
+- **Tests**: test lama tetap hijau tanpa diubah; full `go test -tags integration -p 1 ./...` hijau (service 81.1%, auth 90.1%), lint 0. gocyclo > 20 di backend tinggal `UpdateItems`/`transition` (23/23), sengaja ikut F9 (keputusan user). Manual browser verification (review vault ATM-SPV, kirim ke vendor, ubah user, approve kelolaan ATM): outstanding.
+- **Commit**: `e926f1e`
+
+## 2026-10-12 — Test validasi PIC vendor di import master data
+- **Symptom**: `importEnv.validatePIC` 0% coverage: aturan baris PIC saat dry-run import CSV (wajib isi, vendor/cabang aktif, email, telepon, `is_notification_recipient`) tidak pernah diuji (temuan refactor F10 `9a2460e`).
+- **Root cause**: test import hanya mencakup vendor, cabang, ATM, dan kelolaan; fake repo tidak punya PIC.
+- **Fix** (test saja, kode produksi tidak berubah): `TestImport_VendorPICRowRules` di `backend/internal/service/masterdata_import_test.go`. Dua create valid (PIC cabang, PIC vendor-wide), lalu error per field untuk: vendor_code + name kosong, vendor tidak dikenal, cabang bukan milik vendor, email rusak, telepon rusak, recipient bukan true/false. Juga dicek recipient kosong → `false` dan `TRUE` → `true`.
+- **Tests**: `validatePIC` 0 → 100%. Uji mutasi lewat `go test -overlay` (tanpa mengubah file): cek telepon dimatikan → test gagal; default recipient diubah ke `true` → test gagal. `go test -tags integration ./internal/service/` hijau, lint 0. Manual browser verification: tidak relevan.
+- **Commit**: `ace023e`
+
+## 2026-10-12 — QC F10: kompleksitas import master data (`masterdata_import.go`)
+- **Symptom**: golangci-lint gocyclo: `importEnv.validateFields` cyclo 47 dan `validateRow` 40 (> 30); `readImportCSV` 22 dan `buildEnv` 21 (> 20, target F10).
+- **Root cause**: validasi semua entity (vendor, cabang, vault, PIC, ATM, kelolaan) dan semua aturan baris (id, natural key, kolom immutable, toggle aktif, tumpang tindih periode, op) ditulis inline di satu fungsi.
+- **Fix** (refactor, perilaku tidak berubah): `backend/internal/service/masterdata_import.go`. Helper privat baru: `rowID`, `checkNatKey`, `checkUpdate`, `checkSpan`, `rowOp` (dari `validateRow`); `validateVendor`/`validateVendorBranch`/`validateVault`/`validatePIC`/`validateATM`/`validateAssignment`/`validateAssignmentPackage` (dari `validateFields`); `cleanRecord`, `expandLegacy` (dari `readImportCSV`); `loadPackages` (dari `buildEnv`). Urutan cek, field error, dan pesan tetap sama; API publik tidak berubah. Flow upsert tetap; replace-all FSD tetap fitur terpisah (user memilih "refactor saja").
+- **Tests**: test import yang ada tetap hijau tanpa diubah; full `go test -tags integration -p 1 ./...` hijau, `internal/service` 80.7%. Cyclo sekarang maks 19 di file ini (validateRow 16, validateFields < 15). `golangci-lint` backend **0 temuan**. Catatan: `validatePIC` 0% coverage (sudah 0% sebelum refactor sebagai cabang PIC di `validateFields`). Manual browser verification (dry-run import CSV): outstanding.
+- **Commit**: `9a2460e`
+
+## 2026-10-12 — Flaky `routeGuard.property.test.tsx` (VendorPortal) saat CPU sibuk
+- **Symptom**: full suite VendorPortal kadang gagal di `src/features/auth/__tests__/routeGuard.property.test.tsx` ("Test timed out in 5000ms", "Unable to find ... login-page / redirect-target"); lolos bila dijalankan sendiri.
+- **Root cause**: timing test, bukan bug guard/sanitasi. Reproduksi 2026-10-12: dua full suite paralel → gagal 3/3, counterexample selalu input pertama tanpa shrink (`"//evil.com"`, `"/dsr"` — nilai yang lolos di run normal). Test pertama Property 1 (100 run) masih memakai timeout default 5 s (dua test interaktif sudah 30 s sejak 2026-10-09), dan `findByTestId`/`waitFor` memakai batas default 1 s, terlalu pendek saat render router lambat.
+- **Fix** (test saja, kode produksi tidak berubah): konstanta `WAIT = { timeout: 5_000 }` untuk semua `findByTestId`/`waitFor` di file itu, dan test pertama memakai `INTERACTIVE_TIMEOUT_MS` (30 s). Batas yang lebih longgar hanya terpakai saat render benar-benar lambat.
+- **Tests**: skenario beban yang sama (2 full suite paralel × 3) → 6/6 run 127/127 hijau. `lint` bersih.
+- **Commit**: `0bcdcf7`
+
+## 2026-10-12 — A11y VendorPortal: sort, baris DSR, dialog DSR, baris invoice lewat keyboard
+- **Symptom**: 9 warning biome a11y. Yang nyata: sort kolom `DataTable` dan buka detail DSR (klik baris) tidak bisa lewat keyboard; dialog DSR tidak tertutup dengan Escape; baris invoice `<tr role="button">` merusak semantik tabel untuk screen reader.
+- **Root cause**: handler `onClick` dipasang di `<th>`/`<tr>`/overlay tanpa jalur keyboard; baris invoice dijadikan tombol.
+- **Fix** (keputusan user 2026-10-12, semua opsi rekomendasi): `components/ui/DataTable.tsx` — header sortable jadi `<button>` di dalam `<th>` (`aria-sort` tetap di `<th>`), baris dengan `onRowClick` dapat `tabIndex=0` + Enter/Space + focus ring. `features/dsr/DsrDetailDialog.tsx` + `DsrUploadDialog.tsx` — Escape menutup dialog (upload: tidak saat `uploading`/`confirming`, sama dengan klik overlay); `<dialog>` native ditunda (biome-ignore beralasan). `features/invoices/InvoicesPage.tsx` — `role="button"`/`aria-expanded`/`aria-label` pindah ke `<button>` chevron di sel pertama; klik tombol (juga Enter/Space) bubble ke `onToggle` baris; `handleRowKeyDown` + prop `onKeyDown` dihapus. `biome-ignore` beralasan untuk `FileUpload` drop zone (sudah punya Enter/Space) dan backdrop `AppShell` (`aria-hidden`, Escape sudah ada).
+- **Tests**: `DataTable.test.tsx` +3 (sort via tombol header + `aria-sort`, Enter/Space di baris klik, baris tanpa `onRowClick` tidak fokusabel), `DsrUploadDialog.test.tsx` +1 (Escape menutup). `lint` 0 error / 0 warning, `test` 18 file / 127 test hijau, `build` hijau. Catatan: `routeGuard.property.test.tsx` sekali gagal flaky saat full run, lolos 5/5 terpisah dan 3/3 di HEAD — tidak terkait. Manual browser verification (Tab ke header & baris DSR, Escape di dialog, expand invoice dengan keyboard, tampilan header/baris tidak berubah): outstanding.
+- **Commit**: `434336a`
+
+## 2026-10-12 — Lint VendorPortal gagal (format test + warning ringan)
+- **Symptom**: `pnpm --dir frontend/VendorPortal-Vite run lint` exit 1 (sudah sejak sebelum QC F7): 1 error + 16 warning.
+- **Root cause**: error = `src/features/dsr/__tests__/DsrUploadDialog.test.tsx` belum diformat biome (baris fixture terlalu panjang). Warning ringan: 2 unused type param, 4 non-null assertion (`!`), 1 key index array.
+- **Fix** (cakupan dipilih user: error + warning ringan, a11y dibiarkan): format test file (hanya pemecahan baris). `DsrDetailDialog.tsx`: `queryFn` dijaga `item.daily ? … : Promise.reject(...)` (dan `rencana_isi`) — tidak berubah di runtime karena query hanya jalan saat `enabled`. `SchedulePage.tsx` + `__tests__/grouping.property.test.ts`: `groupMap.get(date) ?? []` (key selalu ada dari `groupMap.keys()`). `biome-ignore` dengan alasan untuk 2 hal yang memang benar: `DataTable.tsx` `ColumnMeta<TData, TValue>` (declaration merging wajib memakai type parameter TanStack yang sama) dan `FileUpload.tsx` `key={i}` (daftar error dibangun ulang tiap render, pesan bisa sama).
+- **Tests**: `lint` exit 0 (0 error, sisa 9 warning a11y: `useKeyWithClickEvents`/`useSemanticElements` di `DataTable`, `AppShell`, `FileUpload`, dialog DSR, `InvoicesPage` — belum dikerjakan, perlu keputusan markup/keyboard). `test` 18 file / 123 test hijau, `build` hijau. Manual browser verification (detail DSR + halaman Schedule tampil sama): outstanding.
+- **Commit**: `aed93e7`
+
+## 2026-10-12 — IP client retry manual di Python EOD (lanjutan QC F13)
+- **Symptom**: `POST /retry/{file_id}` di `eod_retry_scheduler` dan `service_dsr_etl` mencatat `request.client.host` sebagai IP audit retry; di belakang Nginx nilainya selalu IP Nginx/gateway Docker, bukan IP user.
+- **Root cause**: `uvicorn.run` di kedua `run.py` tanpa konfigurasi proxy: default uvicorn hanya memercayai `X-Forwarded-For` dari `127.0.0.1`, jadi IP Nginx tidak pernah diganti. Entri yang rusak di `forwarded_allow_ips` juga diam-diam diabaikan uvicorn.
+- **Fix**: helper baru `backend_python/lib/utils/proxy.py` (`parse_trusted_proxies`, `uvicorn_proxy_kwargs`). Setting `trusted_proxies` (`RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES`, validator = gagal start bila rusak) di kedua `config.py`, dan kedua `run.py` meneruskan `proxy_headers` + `forwarded_allow_ips`. Kosong = proxy header dimatikan total (juga untuk 127.0.0.1); terisi = middleware uvicorn ≥ 0.30 membaca XFF dari kanan dan melewati hop tepercaya, sama dengan Go `TrustedRealIP`. `retry.py` tidak diubah. Dokumen: kedua `.env.example`, `.claude/docs/deployment.md`, `python_eod_client_ip_todo.md` (selesai).
+- **Tests**: `python -m unittest lib.utils.test_proxy` (8 test: parser, fail-fast kedua `Settings`, kosong = header diabaikan bahkan dari localhost, klien tidak tepercaya tidak bisa memalsukan XFF, Nginx → IP paling kanan, hop LB dilewati; memakai `ProxyHeadersMiddleware` asli uvicorn 0.52.4). `lib` 65 test (dengan DB dev), `dsr` + `itm/cashpos` hijau. Manual (retry manual dari halaman EOD Monitoring lewat Nginx → `retry_audit_logs`/`audit_logs` berisi IP browser): outstanding.
+- **Commit**: `5f0ced8`
+
+## 2026-10-12 — QC F17: harga yang belum berlaku tidak bisa di-disable (approve gagal 409)
+- **Symptom**: disable harga vendor-wide (`vendor_package_prices`) atau harga khusus cabang (`vendor_packages_branch`) yang mulai hari ini atau nanti lolos submit (202), tapi approve-nya selalu gagal 409.
+- **Root cause**: disable mengisi `effective_end_date = CURRENT_DATE - 1` (`queries/vendor_package_prices_admin.sql`, `queries/vendor_packages_admin.sql`), sehingga untuk start ≥ hari ini melanggar `*_period_chk` (`end >= start`). Submit tidak mengecek hal ini.
+- **Fix** (keputusan PO 2026-10-12: tolak saat submit): helper `rejectNotYetEffective` di `backend/internal/service/vendor_package_price_admin.go`, dipanggil di `Disable` kedua service (`vendor_package_price_admin.go`, `vendor_package_admin.go`). Harga dengan start ≥ hari ini (WIB, `jakartaCalendarDate`) → `ValidationError` field `effective_start_date` → 422, tanpa staging. Harga seperti itu dipendekkan lewat Ubah (`effective_end_date`). SQL dan skema tidak berubah.
+- **Tests**: `TestVendorPackageAdminService_Disable_NotYetEffective` (kemarin → di-stage; hari ini / besok → 422 tanpa submit) dan kasus serupa di `TestVendorPackagePriceAdminService_UpdateAndDisable`. Komentar F17 di `masterdata_applier_price_integration_test.go` diperbarui. `go test -tags integration ./...` (backend) hijau. Disable yang lolos submit tetap aman di-approve kapan pun (start < hari ini ≤ tanggal approve); sisa celah hanya sekitar tengah malam bila zona waktu DB (`CURRENT_DATE`) ≠ WIB → tetap 409 seperti sebelumnya. Manual browser verification (tombol Nonaktifkan pada harga yang belum berlaku menampilkan pesan error): outstanding.
+- **Commit**: `491a61f`
+
+## 2026-10-12 — QC F10 (sebagian): kompleksitas `UserAdminService` Create/Update
+- **Symptom**: golangci-lint gocyclo: `UserAdminService.Create` dan `Update` cyclo 34 (> 30).
+- **Root cause**: validasi profil, aturan `auth_source`, cek unik, dan resolusi referensi ditulis inline dan terduplikasi di kedua fungsi.
+- **Fix** (refactor, perilaku tidak berubah): `backend/internal/auth/user_admin.go`. Logika diekstrak ke helper privat `validateProfile`, `localCredentials` (hash bcrypt hanya untuk local; `must_change_password` = ada hash), `uniqueness`, dan `resolveReferences`. Urutan error, field error, dan pesan wrap tetap sama. API dan signature publik tidak berubah. Auth (Sec 4 #7) sudah di-flag; user memilih dokumentasi bugfix.
+- **Tests**: 17 test `user_admin_test.go` tetap hijau tanpa diubah. Coverage Create 89 → 97%, Update 84 → 90%. Lint sekarang tinggal 3 temuan: gocyclo `masterdata_import` (ditunda, menunggu FSD replace-all) dan F13. Manual browser verification (form tambah/ubah user): outstanding.
+- **Commit**: `f4d9b67`
+
+## 2026-10-09 — QC F8 batch 10 (selesai): submit harga vendor-wide, helper import, `pkg/response`
+- **Symptom**: `VendorPackagePriceAdminService` Create/Update/Disable/`checkVendor` 0% (jalur submit maker-checker harga); helper import CSV (`vaultFields`, `picFields`, `atmFields`, `stageToggle`, `rowRejection`) + `ParseExportEntity`/`WriteExportTemplate` 0%; baca admin `MasterDataChangeService`/`VendorBranchAdminService`/`DsrLocationMapAdminService` 0%; `pkg/response` 0%. service 78.9% (< 80%).
+- **Root cause**: belum ada test langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `vendor_package_price_admin_test.go` (unit: vendor tak dikenal / INTERNAL (ROH) / label kosong / harga rusak / gagal cek vendor → ditolak tanpa `Submit`; update row vendor lain / tidak ada / sudah berakhir → `ErrVendorPackagePriceNotFound`, end < start → 422; update + disable mengirim `EntityID` + snapshot `Before`). `masterdata_import_helpers_test.go` (unit: nominal sel tetap string eksak, sel opsional kosong → nil, PIC tanpa `branch_code` = vendor-wide, hanya `"true"` persis yang mem-blacklist; baris toggle → enable/disable bukan update; error validasi/konflik → error baris 422, error lain tetap 500; template = BOM + header saja). `admin_reads_integration_test.go` (repo asli, tx rollback: change request pending, cabang, peta lokasi DSR + label DSR yang belum dipetakan). `pkg/response/response_test.go` (envelope success/created/error/validation, field kosong tidak dikirim).
+- **Tests**: coverage `internal/service` 78.9% → 80.6%, `pkg/response` 0 → 100%. **F8 selesai**: semua package `internal/*` ≥ 80% (`internal/db` generated dikecualikan). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: `b21f2e4`
+
+---
+
+## 2026-10-09 — QC F8 batch 9: test service DSR vendor + baca harga admin
+- **Symptom**: `DsrService` (`ValidateUpload`, `sanitizeFilename`, `ResolveVendor`, `CheckUploadRate`, `GetSaldoFile`, `GetRencanaIsiFile`, `ListUploads` + mapper) 0% di package `service` (test handler di package lain tidak dihitung); List/Count/Get `VendorPackageAdminService` + `VendorPackagePriceAdminService` (mapper `base_price`) 0%.
+- **Root cause**: belum ada test di package `service` untuk jalur ini.
+- **Fix** (test saja, kode produksi tidak berubah): `dsr_upload_read_test.go` (unit: xlsx/xls diterima, kosong / > 10MB / bukan workbook / nama `..` atau kosong ditolak, `../../etc/dsr.xlsx` → `dsr.xlsx`; vendor tidak ada → `ErrDsrVendorNotFound`, error DB lain dibungkus; upload ke-11 per vendor per jam → `ErrDsrRateLimited`, vendor lain punya counter sendiri, key ber-TTL ≤ 1 jam, Redis mati → error biasa; detail daily/rencana isi hanya untuk vendor pemilik (lain → `ErrDsrFileNotFound`), success = row − error, nominal NULL tetap nil; list meneruskan vendor + paging, validasi page/page_size/tanggal). `vendor_price_read_integration_test.go` (repo asli, tx rollback: `base_price` `1250000.50` / `99999999.99` eksak sebagai string, periode berakhir tidak terhitung `active`, Get oleh vendor lain → nil, nil).
+- **Catatan F7**: nominal DSR di test unit masih diassert sebagai `*float64` (perilaku sekarang); ikut diganti saat F7.
+- **Tests**: coverage `internal/service` 75.6% → 78.9% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: `b9d8793`
+
+---
+
+## 2026-10-09 — QC F8 batch 8: handler ≥ 80% (pemetaan error login, toggle admin)
+- **Symptom**: `handleAuthError` (pemetaan error login → HTTP) 52.9%; cabang id rusak di toggle disable/enable handler admin ~53%; handler 79.6%, kurang dari target 80%.
+- **Root cause**: belum ada test untuk cabang-cabang ini.
+- **Fix** (test saja, kode produksi tidak berubah): `auth_error_mapping_test.go` (tabel: validasi 422, rate limit 429 + `Retry-After`, kredensial salah 401 termasuk yang di-wrap, akun nonaktif/portal salah/password kedaluwarsa/terkunci 403 dengan kode masing-masing, LDAP/layanan tidak tersedia 503, error tak dikenal 500 tanpa membocorkan detail internal). `admin_update_handlers_test.go`: id rusak di disable/enable → 400 untuk vault/pic/branch/kelolaan ATM/paket cabang; paket cabang tidak punya route enable → 404 (by design, effective-dated). `extractClientIP` sengaja tidak diuji: akan diubah di F13 (proxy tepercaya).
+- **Tests**: coverage `internal/handler` 79.6% → 80.3% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: `d1e2ca1`
+
+---
+
+## 2026-10-09 — QC F8 batch 7: sisa handler 0% (RetryApply, /auth/me, update admin, dll.)
+- **Symptom**: fungsi handler 0%: `RetryApply`/`WithApplyRetry` (terapkan ulang perubahan master-data approved), `AuthHandler.Me`, ACM area `EligibleUsers`/`BranchOptions`/`Rename`, `Update` admin vault/pic/branch/kelolaan ATM + `Enable` branch, Vendor Request `UpdateItems`/`Revise`, `VaultPlanHandler.Audit`, respons sukses upload/confirm DSR.
+- **Root cause**: belum ada test HTTP untuk jalur ini.
+- **Fix** (test saja, kode produksi tidak berubah): `retry_apply_me_handler_test.go` (retry hanya untuk `master_data` + `approved` → retrier dipanggil dengan change id + actor; pending / dokumen lain / approval tidak ada → 409 tanpa retry; retrier tidak terpasang → 404; `ErrNotAuthorized` → 403. `/me`: profil tanpa field password, user terhapus → 401, DB error → 503, tanpa token → 401). `admin_update_handlers_test.go` (PUT 202 + `change_request_id` di 4 handler admin, body/id rusak 400, role non-admin 403; enable branch 202 / pending 409; UpdateItems 200, periode_pred wajib → 400, bukan creator 403, checker 403 di route; Revise 200 / state salah 409). Baris tabel baru di `admin_acm_area_handler_test.go` dan `vault_plan_handler_test.go`. `dsr_upload_handler_test.go`: dry-run + confirm terhadap ETL tiruan (`httptest`), memeriksa kontrak nama file `<vendor_code>__<user_id>__<basename>` (path dibuang) dan confirm tanpa checksum → 400.
+- **Tests**: coverage `internal/handler` 75.0% → 79.6% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: `151d2d2`
+
+---
+
+## 2026-10-09 — QC F8 batch 6: test handler harga vendor-wide, upload DSR, review vault
+- **Symptom**: `AdminVendorPackagePriceHandler` 0% seluruhnya (endpoint money + maker-checker); `DsrUploadHandler` Upload/GetRencanaIsi/ListUploads/`handleServiceError` 0% (endpoint vendor); `VaultAssignments`/`VaultApprove`/`VaultReject` (review vault ATM-SPV) 0%; `writeTooManyRequests` 0%.
+- **Root cause**: belum ada test HTTP untuk handler ini.
+- **Fix** (test saja, kode produksi tidak berubah): `admin_vendor_package_price_handler_test.go` (fake service: list meneruskan filter + offset, `base_price` tetap string desimal, create/update/disable → 202 + `change_request_id`, 400 path/body rusak, pemetaan error 422/404/409/403/500, role non-admin 403, tanpa token 401). `dsr_upload_handler_test.go` (fake repo terscope vendor + miniredis: detail daily/rencana isi + list, upload id vendor lain → 404, query rusak → 400, non-vendor 403; upload tanpa file/kosong/bukan workbook → 400, dry-run gagal → 502, upload ke-11 dalam satu jam → 429 + `Retry-After: 3600`; nominal dicek sebagai digit agar tahan perubahan F7). `vendor_request_vault_handler_test.go` (fake reviewer: snapshot kosong → `null`, approve/reject meneruskan actor + alasan, maker 403 di route, `ErrSelfApproval`/`ErrNotChecker` 403, `ErrInvalidTransition` 409, alasan kosong 422).
+- **Tests**: coverage `internal/handler` 68.1% → 75.0% (`-tags integration`). `go test -tags integration -p 1 ./...` lulus, lint handler 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: `dfa53f9`
+
+---
+
+## 2026-10-09 — QC F8 batch 5: test repo import batch + guard admin master-data
+- **Symptom**: sisa fungsi 0% di `repository`: `MasterDataImportBatchRepository` (staging CSV import), cek submit kelolaan ATM (`HasOverlap`, `ATMActive`, `PackageActive`, lookup vendor-wide), repo peta lokasi DSR, `CountActiveByBranch`/`BranchVendorID`/`FindByCode` (guard disable cabang), `VendorKind`, `FindByEmployeeID*`, set referensi import.
+- **Root cause**: hanya teruji tidak langsung lewat service; belum ada test repo langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_import_batch_repository_test.go` (helper `integrationTx`; batch dibuat atomik, upload ulang file sama → batch lama `existing=true` tanpa row baru, satu approval untuk semua row, row bentrok dengan pending lain → `BatchRowError` index 1 dan seluruh batch batal). `admin_guard_repository_test.go` (overlap open-ended / exclude diri / periode sebelum mulai; ATM & paket aktif vs berakhir vs tidak ada; label DSR case-insensitive + exclude diri; vault aktif → vendor; hitung anak cabang; pemilik cabang; `VendorKind` FLM_VENDOR; `employee_id` termasuk exclude diri; lokasi baru muncul di referensi import).
+- **Tests**: coverage `internal/repository` 57.1% → 86.9% (`-tags integration`), tidak ada lagi fungsi 0%. `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: `a571719`
+
+---
+
+## 2026-10-09 — QC F8 batch 4: test repo auth + staging maker-checker
+- **Symptom**: `AuthRepository` (jalur login: cari user by email/username/id, lockout, set password, soft-delete) dan `MasterDataChangeRepository` (staging maker-checker) 0% coverage di package `repository` — hanya teruji tidak langsung lewat service/handler.
+- **Root cause**: belum ada test repo langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `auth_repository_test.go` (integration, tx rollback: user tidak ada → `(nil, nil)`; increment/lock/reset lockout; `SetInitialPassword` memaksa ganti, `SetPassword` membersihkan paksa-ganti + counter; `MarkPasswordExpired`; `UpdateLastLogin`; `Deactivate` menutup login + profil, `Reactivate` membuka lagi). `TestAuthRepository_PropagatesDBErrors` (unit, `poolProbe`): error DB selain no-rows diteruskan, bukan dibaca "user tidak ada". `masterdata_change_repository_test.go` (integration: guard pending per entity, link `approval_request_id`, approved-but-not-applied menyimpan error, stale, rejected, List/Count filter, ListByBatch).
+- **Tests**: coverage `internal/repository` 42.9% → 57.1% (`-tags integration`); semua fungsi kedua repo 100% (kecuali `FindPending` 83.3%: cabang error DB). `go test -tags integration -p 1 ./...` lulus, lint repository 0 issue. Manual browser verification: tidak relevan.
+- **Commit**: `aaedccf`
+
+---
+
+## 2026-10-09 — QC F8 batch 3: guard vault plan ACM, `UpdateItems`, cancel party withdrawn
+- **Symptom**: cabang guard yang tidak tersentuh test alur utama: `SaveAssignments`/`validateAssignments` (ATM duplikat, branch vault tidak valid, alasan urgent < 10 / > 500 / kosong, edit plan yang sudah pending), `Submit` ulang, `Reject` (alasan kosong, plan masih draft, maker menolak plan sendiri); `UpdateItems` (item kosong, request tidak ada, bukan creator, bukan draft); `cancelVendorParties` melewati party `withdrawn`.
+- **Root cause**: belum ada test untuk jalur gagal / four-eyes ini.
+- **Fix** (test saja, kode produksi tidak berubah): `vault_plan_guards_integration_test.go` (fixture `newVaultPlanFixture`), `vendor_request_update_items_integration_test.go` (harness nomor request), `TestIntegration_VendorOrder_CancelSkipsWithdrawnParty` di `vendor_order_integration_test.go` (party withdrawn → tanpa event `cancelled`, tanpa notifikasi ke vendornya).
+- **Tests**: coverage `internal/service` 75.3% → 75.6% (`-tags integration`); `Reject` 62.5→87.5%, `SaveAssignments` 68.2→72.7%, `validateAssignments` 93.8%, `UpdateItems` 64.8→74.1%, `cancelVendorParties` 72.7→81.8% (sisa = error DB). `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: `01e2472`
+
+---
+
+## 2026-10-09 — QC F8 batch 2: test `CurrentState` applier + opsi/audit Vendor Request
+- **Symptom**: `CurrentState` (snapshot stale-check saat approve, maker-checker) di 6 applier — atm_assignment, dsr_location_map, vendor_branch, vendor_package, vendor_pic, vendor_vault — 0% coverage; `VendorRequestService.ListVendorOptions` dan `AuditLog` 0%.
+- **Root cause**: belum ada test langsung.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_current_state_integration_test.go` (tx rollback: seed tiap entity, `CurrentState` mengembalikan tipe row `Get*AdminByIDRow` yang sama dengan Before; id hilang → `pgx.ErrNoRows`). `vendor_request_options_audit_test.go` (unit, fake repo: region NULL dilewati, error diteruskan; `AuditLog` request hilang → `ErrNotFound`, error lain dibungkus, `state`/metadata dipetakan, query `entity_type=vendor_request`).
+- **Tests**: coverage `internal/service` 74.3% → 75.3% (`-tags integration`); 6× `CurrentState` 100%, `ListVendorOptions` 92.3%, `AuditLog` 90.9%. `go test -tags integration -p 1 ./...` lulus, lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: `44dabe8`
+
+---
+
+## 2026-10-09 — QC F8 batch 1: test applier harga vendor-wide (money, maker-checker)
+- **Symptom**: `VendorPackagePriceApplier.Apply` (apply-on-approve harga vendor-wide) 0% coverage, termasuk generator `package_code` (`nextPackageCode`, `digitsOrFallback`) dan pemetaan error DB (`mapPriceDBError`, `mapPackageDBError`).
+- **Root cause**: hanya diuji tidak langsung lewat seed SQL; tidak ada test applier.
+- **Fix** (test saja, kode produksi tidak berubah): `masterdata_applier_price_test.go` (unit: digit label → kode, termasuk fallback `0`; exclusion → `ErrVendorPackagePriceOverlap`/`ErrVendorPackageOverlap`, unique `package_code` → `ErrVendorPackageCodeConflict`, error lain diteruskan; Apply menolak op tak dikenal, update/disable tanpa `entity_id`, payload/base_price/tanggal rusak). `masterdata_applier_price_integration_test.go` (tx rollback: create → `PKG3_ITPX_001` lalu `PKG0_ITPX_002`, `base_price` desimal eksak `1250000.50`; update hanya content + money eksak; disable menutup periode; `CurrentState`; overlap grain sama → `ErrVendorPackagePriceOverlap`).
+- **Temuan**: disable harga yang mulai hari ini/di masa depan gagal (`CURRENT_DATE - 1 < effective_start_date` melanggar `vpp_period_chk`), juga di `vendor_packages_branch` → **QC F17**, butuh keputusan produk (Sec 4 #7), tidak diperbaiki di batch ini.
+- **Tests**: coverage `internal/service` 73.0% → 74.3% (`-tags integration`); `VendorPackagePriceApplier.Apply` 0% → 83.3%, `mapPriceDBError`/`mapPackageDBError`/`digitsOrFallback` 100%. Lint bersih (sisa gocyclo = F10). Manual browser verification: tidak relevan.
+- **Commit**: `67c9e54`
+
+---
+
+## 2026-10-09 — QC F16: `page` tanpa batas atas → OFFSET negatif / overflow int4 (500)
+- **Symptom**: semua list endpoint hanya mengecek `page ≥ 1`. `page=3000000000` → `int32(params.Page)` wrap ke negatif, atau `(page-1)*page_size` overflow int4 di SQL (`queries/atm_portal.sql:103,252,314`) → Postgres error → 500, bukan 400.
+- **Root cause**: parser `page` tersebar (shared `parseIntParam`, `parsePageParams` admin, `parseRegionPageParams`, `Atoi` di vendor order) tanpa batas atas; service mengonversi ke int32.
+- **Fix**: `maxPage = 1_000_000` + helper `parsePageParam` (`handler/atm_portal_handler.go`) dipakai 9 pemanggil yang dulu `parseIntParam(q, "page", …)` (ATM portal ×4, audit log, DMAA forecast, DSR uploads, vendor request ×2) — pesan 400 jadi "page harus berupa angka (maksimal 1000000)". `parsePageParams` (12 handler admin) dan `parseRegionPageParams`: `page > maxPage` → "page tidak valid". Vendor order: tetap lenient untuk non-angka, tapi `page > maxPage` → 422 `page`. Notifikasi sudah dibatasi (`parseBoundedInt`, 2²⁰). Semua konversi `int32` page/page_size di service + 2 batch `len(rows)` + audit handler diberi `//nolint:gosec` dengan alasan. gosec kini bersih.
+- **Tests**: `TestPageParsers_RejectAboveMaxPage` (RED tanpa fix: `maxPage`/`parsePageParam` undefined). build + vet + golangci-lint (gosec 0) + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: tidak relevan (UI tidak mengirim page sebesar itu); opsional cek `GET /api/v1/atm-portal/atms?page=3000000000` → 400.
+- **Commit**: `255c6a8`
+
+---
+
+## 2026-10-09 — QC F6: repo admin master-data membaca list dari replica
+- **Symptom**: `dbReadPool` sudah di-wire di `cmd/api/main.go` (Phase 0.1), tetapi 7 repo admin masih primary-only dengan komentar TODO basi "swap List/Count to dbRead when DATABASE_REPLICA_URL wiring lands".
+- **Root cause**: Phase 0.1 (2026-10-07) hanya memindahkan Vendor/ATM/Region/DSR-location-map; repo lain tertinggal.
+- **Fix**: `VendorVault`, `VendorPic`, `VendorPackage`, `VendorPackagePrice`, `VendorBranch`, `ATMAssignment` AdminRepository → constructor `(primary, replica)` seperti `VendorAdminRepository`; **hanya List/Count** ke replica, GetByID + pre-check submit tetap primary (snapshot "before"). `main.go` memberi `dbReadPool`. Aman terhadap replica lag karena master-data maker-checker: row baru berubah setelah approve. **`UserAdminRepository` sengaja tetap primary-only** — create/update user apply langsung dan layar me-list ulang tepat setelah write (alasan sama dengan `MasterDataChangeRepository`); TODO diganti komentar alasan.
+- **Tests**: `TestAdminRepositories_ReadTopology` (18 kasus, probe DBTX tanpa DB: List/Count → replica, GetByID → primary). build + vet + `go test -tags integration -p 1 ./...` (dev DB, primary=replica) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list cabang/vault/PIC/paket/harga/kelolaan di admin; di dev replica = primary).
+- **Commit**: `4298546`
+
+---
+
+## 2026-10-09 — QC F5: permission file upload DSR (diterima, didokumentasikan)
+- **Symptom**: gosec G301/G306 di `dsr_upload.go` (`MkdirAll 0755`, `WriteFile 0644`) untuk file DSR vendor (data cash).
+- **Root cause**: bukan bug — container Go (`appuser`) menulis ke bind mount `FTP_DATA`, dan `backend_python` (user host lain, tidak di-container-kan) harus membaca + `shutil.move` file itu ke `backups/` (`dsr_etl.py:117,680`). 0640 akan memutus flow DSR di server kecuali ada grup bersama.
+- **Fix**: keputusan user 2026-10-09 — **terima 0644/0755**. Komentar alasan + `//nolint:gosec` di `backend/internal/service/dsr_upload.go`; catatan deploy di `.claude/docs/deployment.md` (VM khusus aplikasi; `FTP_DATA` harus writable user Python; perketat ke 0640/0750 + `group_add` saat Python di-container-kan). Perilaku tidak berubah.
+- **Tests**: build + gosec bersih untuk `dsr_upload.go`; `go test -run Dsr ./internal/...` lulus. Manual browser verification: tidak relevan.
+- **Commit**: `e69e4ef`
+
+---
+
+## 2026-10-09 — QC F4: tier paket/harga tanpa batas atas (int64 → int32 terpotong)
+- **Symptom**: gosec G115 di applier `vendor_packages_branch` / `vendor_package_prices` (`int32(p.TierMin)`, `tierMaxInt32`). Validasi submit hanya mengecek `tier_min ≥ 1` dan `tier_max ≥ tier_min`, jadi tier > 2³¹ lolos dan saat approve ter-wrap diam-diam ke angka lain di kolom int4 — tarif bisa jatuh ke tier yang salah.
+- **Root cause**: payload memakai `int64`, kolom DB `integer`, tanpa batas atas di `validatePackageGrain` / `validatePriceGrain`.
+- **Fix**: konstanta `maxTier = 999_999_999` (`vendor_package_admin.go`) = sentinel range terbuka di exclusion constraint migration 009 (`COALESCE(tier_max, 999999999)`), muat di int4. `tier_min` > maxTier → 422 `tier_min` ("harus antara 1 dan 999999999"; pesan untuk < 1 ikut berubah), `tier_max` > maxTier → 422 `tier_max`. Berlaku di kedua validator (paket khusus cabang + harga vendor-wide). Import CSV tidak membawa tier; Update tidak mengubah tier. Konversi yang batasnya kini terbukti diberi `//nolint:gosec` + alasan: kedua applier, dan `RowCount int32(len(rows))` (≤ `MasterDataImportMaxRows` 2000). Konversi `int32(Page)` **tidak** di-nolint — page tanpa batas atas dipisah jadi QC F16.
+- **Tests**: `TestPackageAndPriceGrain_TierUpperBound` (7 kasus × 2 validator; gagal compile/RED tanpa fix). build + vet + `go test -tags integration -p 1 ./...` (dev DB) lulus. Manual browser verification: outstanding (form paket/harga admin — isi tier 1000000000 → pesan error di field tier).
+- **Commit**: `ebcd87a`
+
+---
+
+## 2026-10-09 — QC F3: errcheck di kode produksi
+- **Symptom**: golangci-lint errcheck melaporkan return error yang tidak dicek di 5 file produksi.
+- **Root cause**: pemanggilan Close/Write/Encode best-effort ditulis tanpa `_ =`, berbeda dengan konvensi yang sudah ada (`error_response.go:26`, `dsr_upload_handler.go:103`, `backend/cmd/api/main.go:89,108`).
+- **Fix**: ikut konvensi itu, perilaku tidak berubah — `admin_master_data_import_handler.go:59,106` `defer func() { _ = file.Close() }()`; `notification/smtp.go:51,56,59` `_ = conn.Close()` / `defer func() { _ = c.Close() }()`; `pkg/middleware/rbac.go:113` + `pkg/response/response.go:42` `_ = json.NewEncoder(w).Encode(...)` (header sudah terkirim, tidak ada yang bisa dilakukan); `backend-cit/cmd/api/main.go:51,70` `redisClient.Close` / `w.Write`.
+- **Tests**: errcheck bersih di 3 modul; build + vet + `go test ./...` (pkg, backend-cit) + `go test -tags integration -p 1 ./...` (backend, dev DB) lulus. Manual browser verification: tidak relevan.
+- **Commit**: `e2de53d`
+
+---
+
+## 2026-10-09 — QC F15: context build Docker backend membawa seluruh repo + `.env`
+- **Symptom**: compose kedua backend memakai `context: ..` (root repo), tapi tidak ada `.dockerignore` di root; `backend/.dockerignore` tidak pernah dibaca Docker (Docker hanya membaca yang ada di root context). Seluruh repo ikut jadi context, dan `COPY backend/` membawa `backend/.env` ke stage builder (tidak ke image final, tapi ada di cache layer builder). CLAUDE.md Sec 9 menyebut root `docker-compose.yml` yang tidak ada.
+- **Root cause**: `.dockerignore` ditaruh per folder backend, padahal context build dipindah ke root saat split `pkg/` + `go.work`.
+- **Fix**: `.dockerignore` root berbentuk allowlist (`go.work`, `go.work.sum`, `pkg/`, `backend/`, `backend-cit/`) + exclude `**/.env`, `**/.env.*`, `**/bin/`, `*.exe`, `*.test`, `*.out`, `*.md`. `backend/.dockerignore` (mati) dihapus. CLAUDE.md Sec 9: teks compose + dockerignore diperbaiki. Frontend tidak terpengaruh (context folder sendiri).
+- **Tests**: Dockerfile probe (`COPY . /ctx`) dari working tree yang berisi `.env` asli → context 8.1MB, hanya `backend/ backend-cit/ go.work go.work.sum pkg/`, tanpa `.env*` dan `*.md`. `docker build` kedua backend berhasil. Manual browser verification: tidak relevan.
+- **Commit**: `ce9fa0f`
+
+---
+
+## 2026-10-09 — QC F14: `go.work` di-gitignore padahal di-COPY Dockerfile
+- **Symptom**: `backend/Dockerfile` & `backend-cit/Dockerfile` menjalankan `COPY go.work go.work.sum ./`, tetapi kedua file di-gitignore → `docker build` dari clone bersih (CI/Cloud Build) gagal; hanya jalan di mesin dev yang kebetulan punya file lokal.
+- **Root cause**: `.gitignore` memakai default template Go ("go.work tidak di-commit"), sedangkan repo ini sengaja memakai workspace (CLAUDE.md Sec 3).
+- **Fix**: `.gitignore` tidak lagi mengabaikan `go.work`/`go.work.sum`; keduanya di-commit (`go.work` berisi `toolchain go1.26.9` dari F12).
+- **Tests**: export index git (`git checkout-index`, setara clone bersih) → `docker build -f backend/Dockerfile .` dan `-f backend-cit/Dockerfile .` berhasil (67.1MB / 37.7MB). Tidak ada perubahan kode; manual browser verification: tidak relevan.
+- **Commit**: `21f8cff`
+
+---
+
+## 2026-10-09 — QC F12: dependency + toolchain Go yang kena CVE
+- **Symptom**: `govulncheck` (QC F2) melaporkan CVE yang reachable: chi v5.2.1 (GO-2025-3770 open redirect `RedirectSlashes`, GO-2026-5777), pgx v5.7.4 (GO-2026-5004), `golang.org/x/text` v0.40.0 (GO-2026-6629), dan 11 advisory stdlib (crypto/tls, x509, asn1, xml, net/http, textproto, url) di go1.26.3 lokal. Dockerfile memakai `golang:1.25-alpine` — seri 1.25 sudah tidak didukung (rilis yang didukung: 1.26.9, 1.27.2), beberapa CVE tidak punya fix di 1.25.
+- **Root cause**: versi dependency tidak pernah di-scan/di-upgrade; image builder memakai tag mengambang di seri yang sudah EOL.
+- **Fix**: `backend/` + `backend-cit/` go.mod/go.sum: chi v5.3.0, pgx v5.9.2, x/text v0.41.0 (`go mod tidy` juga menghapus require indirect testify/x/crypto yang tak terpakai di backend-cit). `toolchain go1.26.9` di `go.mod` ketiga modul (+ `go.work` lokal; `go.work` di-gitignore). `go` directive tetap `1.25.0`. Dockerfile `backend/` & `backend-cit/` → `golang:1.26.9-alpine`.
+- **Tests**: govulncheck 3 modul dengan go1.26.9 → "No vulnerabilities found". build + vet + `go test ./...` (3 modul) + `go test -tags integration -p 1 ./internal/...` (dev DB) lulus. Docker build diverifikasi di F14. Tidak ada UI berubah; manual browser verification: outstanding (smoke login + 1 halaman admin).
+- **Catatan**: chi v5.3 menandai `middleware.RealIP` deprecated (IP spoofing) → lint SA1019 di `cmd/api/main.go` kedua backend; ditangani terpisah sebagai QC F13 (auth, Sec 4 #7).
+- **Commit**: `9f44cf0`
+
+---
+
+## 2026-10-08 — Import CSV cabang vendor selalu gagal "category: harus ATM, CASH, atau ATM_CASH"
+- **Symptom**: import master-data `vendor-branches` (create maupun update) ditolak per baris dengan error category, walaupun file hasil export sendiri.
+- **Root cause**: `stageCreate`/`stageUpdate` (`masterdata_import_confirm.go`) membangun `VendorBranchPayload`/`VendorBranchUpdatePayload` tanpa `Category`, sedangkan `VendorBranchAdminService.Create/Update` mewajibkan category. Export `vendor-branches` juga tidak punya kolom `category`, jadi round-trip tidak bisa membawanya.
+- **Fix**: query `ExportVendorBranchesBatch` (`backend/queries/master_data_export.sql` + sqlc regen) + header export kini punya `category` (setelah `region_code`). Importer: `category` divalidasi (uppercase, ATM/CASH/ATM_CASH) di `validateFields` dan diteruskan di stageCreate/stageUpdate. File lama tanpa `category` (dengan atau tanpa `region_code`) tetap diterima: update mempertahankan category (dan region_code) saat ini, create → error baris `category`. Mekanisme legacy header digeneralisasi: `exportSpec.legacyHeaders [][]string` + `legacyFill map[kolom]nilai` (sebelumnya satu header kurang satu kolom); sentinel `keepRegionCode` → `keepCurrentCell`.
+- **Tests**: `TestImport_VendorBranchCategory` (normalisasi, wajib saat create, invalid, dua bentuk file lama) + `TestImport_VendorBranchStagesCategory` (dry-run → stageRow lewat service asli; gagal tanpa fix), `TestExport_HeaderContract` diperbarui. `go test ./...` + `go test -tags integration ./...` (dev DB localhost) lulus. Manual browser verification: outstanding (export → import cabang vendor di halaman admin).
+- **Commit**: _(belum)_
+
+---
+
+## 2026-10-07 — Phase 0.1: read-replica routing selesai (Go + Python)
+- **Symptom**: read untuk list/viewer/laporan masih ke primary (TODO `ponytail: swap dbPool for the dbRead pool` di `cmd/api/main.go`); service EOD Python tidak punya pool replica (deferred dari import-export-jobs C2).
+- **Root cause**: pool replica baru dipakai export master-data, region, dan branch-ATM; repo lain belum dipisah.
+- **Fix**: Go — `main.go` memakai `dbReadPool` untuk ATM Portal, DMAA Forecast viewer, Role Management (list/catalog/permission, sesuai spec Req 8), RBAC list views, Audit Log viewer. `VendorAdminRepository`/`ATMAdminRepository` jadi `(primary, replica)`: List/Count (+ ATM ListLocations) ke replica; GetByID/pre-check tetap primary (snapshot "before" saat Submit). Sengaja **tetap primary**: DSR upload (read-after-write hasil commit Python), `MasterDataChangeRepository` List/Count (badge pending dibaca tepat setelah Submit). Python — `lib/database.create_read_pool` (`*_DATABASE_REPLICA_URL`, kosong = primary) → `app.state.db_read_pool` dipakai `/status`, `/status/{id}/history`, `/summary`, `/late`, `/audit` di `eod_retry_scheduler` + `service_dsr_etl`; `/health` + proses/retry tetap primary. `.env.example` keduanya ditambah.
+- **Tests**: `go test ./...` + `go test -tags integration ./internal/...` (dev DB) lulus; `rolemgmt` `TestRepository_WriteReadTopology` lulus; Python `lib.test_eod_api` + `lib.test_import_jobs` (34, dev DB), `dsr`, `itm/cashpos`, `python -m lib.database` (fallback check) lulus. Tidak ada UI berubah; manual browser verification: outstanding (smoke list pages + EOD monitoring).
+- **Commit**: `d7ede9e`
+
+---
+
 ## 2026-10-07 — Kelolaan ATM: dropdown "Paket seluruh vendor" hanya label + tabel terpotong
 - **Symptom**: di `/settings/admin/atms` → Kelolaan ATM, mode "Paket seluruh vendor" hanya menampilkan label (PAKET 3/4/5) tanpa kode paket; modal terlalu sempit sehingga kolom tabel riwayat kelolaan terpotong.
 - **Root cause**: `ListATMPackageOptions` mengembalikan `DISTINCT package` saja; `ATMAssignmentsDialog` memakai lebar default `Dialog` (`max-w-lg`).

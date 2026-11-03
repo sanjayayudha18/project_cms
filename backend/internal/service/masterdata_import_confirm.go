@@ -8,7 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -38,7 +42,7 @@ type ImportServices struct {
 // ImportBatchStore stages a whole import file atomically. *repository.MasterDataImportBatchRepository satisfies it.
 type ImportBatchStore interface {
 	FindOpen(ctx context.Context, entity, fileHash string) (*db.FindOpenMasterDataImportBatchRow, error)
-	Create(ctx context.Context, entity, fileHash string, makerID int64, rows []db.CreateMasterDataChangeRequestParams) (*db.FindOpenMasterDataImportBatchRow, bool, error)
+	Create(ctx context.Context, entity, fileHash string, fileName *string, makerID int64, rows []db.CreateMasterDataChangeRequestParams) (*db.FindOpenMasterDataImportBatchRow, bool, error)
 	SetApprovalRequestID(ctx context.Context, batchID, approvalRequestID int64) error
 }
 
@@ -47,6 +51,8 @@ type ImportConfirmDeps struct {
 	Batches      ImportBatchStore
 	Orchestrator MasterDataChangeOrchestrator
 	Audit        MasterDataChangeAuditWriter
+	// Notifier tells the assigned approvers about a newly submitted batch; nil = no notifications.
+	Notifier ImportNotifier
 	// Services builds the per-entity services over the given submitter.
 	Services func(ImportSubmitter) ImportServices
 }
@@ -100,7 +106,7 @@ func (c *importCollector) Submit(_ context.Context, _ int64, req SubmitRequest, 
 // instead of staging again (and finishes its approval submission if an earlier
 // attempt died between staging and submitting). Nothing changes until the
 // approval passes; then every row is applied in one transaction.
-func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity string, r io.Reader, actorIP string) (*ImportConfirmResult, error) {
+func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity, fileName string, r io.Reader, actorIP string) (*ImportConfirmResult, error) {
 	if err := authorizeMasterDataMaker(ctx, makerID); err != nil {
 		return nil, err
 	}
@@ -117,6 +123,7 @@ func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity 
 	if len(data) > MasterDataImportMaxBytes {
 		return nil, &ValidationError{Field: "file", Message: fmt.Sprintf("ukuran file melebihi %d MB", MasterDataImportMaxBytes>>20)}
 	}
+	name := sanitizeImportFileName(fileName)
 	sum := sha256.Sum256(data)
 	hash := hex.EncodeToString(sum[:])
 
@@ -153,7 +160,7 @@ func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity 
 
 	params := make([]db.CreateMasterDataChangeRequestParams, len(collector.reqs))
 	for n, c := range collector.reqs {
-		payload, err := marshalOrNilJSON(c.req.Payload)
+		payload, err := marshalPayloadJSON(c.req.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("marshal payload (row %d): %w", c.row, err)
 		}
@@ -165,7 +172,8 @@ func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity 
 			Payload: payload, Before: before, MakerID: makerID}
 	}
 
-	batch, existed, err := i.confirm.Batches.Create(ctx, entity, hash, makerID, params)
+	// An already-open batch keeps the name it was created with (Create does not rewrite it).
+	batch, existed, err := i.confirm.Batches.Create(ctx, entity, hash, name, makerID, params)
 	if err != nil {
 		var rowErr interface{ BatchRowIndex() int }
 		if errors.As(err, &rowErr) && rowErr.BatchRowIndex() < len(collector.reqs) {
@@ -177,6 +185,12 @@ func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity 
 }
 
 // finish submits the batch's single approval request when it has none yet.
+// The audit names the file stored on the batch, not the current upload.
+// The submit audit and the approver notification run only when this call
+// actually created the approval (created=true): two concurrent confirms of the
+// same batch both pass the nil check, but only one gets created=true.
+// ponytail: if an attempt dies after SubmitForApproval but before this audit, the retry
+// sees created=false and skips audit + notification; fix = reconcile on approval age.
 func (i *MasterDataImporter) finish(ctx context.Context, makerID int64, entity, hash string, batch *db.FindOpenMasterDataImportBatchRow, existing bool, actorIP string) (*ImportConfirmResult, error) {
 	out := &ImportConfirmResult{BatchID: batch.ID, Rows: int(batch.RowCount), ApprovalRequestID: batch.ApprovalRequestID, Existing: existing}
 	if batch.ApprovalRequestID != nil {
@@ -186,7 +200,7 @@ func (i *MasterDataImporter) finish(ctx context.Context, makerID int64, entity, 
 	if err := amount.Scan("0"); err != nil {
 		return nil, fmt.Errorf("build zero amount: %w", err)
 	}
-	approval, _, err := i.confirm.Orchestrator.SubmitForApproval(ctx, batch.MakerID, masterDataDocumentType, batch.HeadID, amount, actorIP)
+	approval, created, err := i.confirm.Orchestrator.SubmitForApproval(ctx, batch.MakerID, masterDataDocumentType, batch.HeadID, amount, actorIP)
 	if err != nil {
 		return nil, fmt.Errorf("submit import batch %d for approval: %w", batch.ID, err)
 	}
@@ -194,13 +208,41 @@ func (i *MasterDataImporter) finish(ctx context.Context, makerID int64, entity, 
 		return nil, fmt.Errorf("link approval request: %w", err)
 	}
 	out.ApprovalRequestID = &approval.ID
+	if !created {
+		return out, nil
+	}
 	if err := i.confirm.Audit.Write(ctx, audit.Entry{
 		ActorID: makerID, Action: "submit_batch", EntityType: "master_data_import_batch", EntityID: batch.ID,
-		After: map[string]any{"entity": entity, "file_hash": hash, "rows": batch.RowCount}, IP: actorIP,
+		After: map[string]any{"entity": entity, "file_hash": hash, "file_name": batch.FileName, "rows": batch.RowCount}, IP: actorIP,
 	}); err != nil {
 		return nil, fmt.Errorf("write audit log: %w", err)
 	}
+	if i.confirm.Notifier != nil {
+		i.confirm.Notifier.BatchSubmitted(ctx, batch.ID, approval.ID)
+	}
 	return out, nil
+}
+
+const maxImportFileNameRunes = 255
+
+// sanitizeImportFileName reduces an untrusted upload name to a base name of 1-255
+// runes without control characters or path separators; nil when nothing is left.
+func sanitizeImportFileName(raw string) *string {
+	base := path.Base(strings.ReplaceAll(raw, `\`, "/"))
+	base = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, base)
+	base = strings.TrimSpace(base)
+	if utf8.RuneCountInString(base) > maxImportFileNameRunes {
+		base = strings.TrimSpace(string([]rune(base)[:maxImportFileNameRunes]))
+	}
+	if base == "" || base == "." || base == ".." || base == "/" {
+		return nil
+	}
+	return &base
 }
 
 // rowRejection turns an entity service's refusal of a row into a 422 row error.
@@ -257,7 +299,7 @@ func stageCreate(ctx context.Context, maker int64, entity string, v map[string]s
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
 		_, err = s.Branches.Create(ctx, maker, VendorBranchPayload{VendorID: env.vendors[v["vendor_code"]], BranchCode: v["branch_code"],
-			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"])}, ip)
+			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
 	case ExportVendorVaults:
 		_, err = s.Vaults.Create(ctx, maker, env.vendors[v["vendor_code"]], VendorVaultPayload{
 			VendorBranchID: env.branches[v["vendor_code"]+"|"+v["branch_code"]], VaultCode: v["vault_code"],
@@ -285,11 +327,15 @@ func stageUpdate(ctx context.Context, maker int64, entity string, row ImportRow,
 		_, err = s.Vendors.Update(ctx, maker, id, UpdateVendorRequest{Name: v["name"], LegalName: &legal, NPWP: &npwp,
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
-		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"])}, ip)
+		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
 	case ExportVendorVaults:
 		_, err = s.Vaults.Update(ctx, maker, id, vaultFields(v), ip)
 	case ExportVendorPICs:
-		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, picFields(v, env), ip)
+		p := picFields(v, env)
+		if v["roles"] == env.cur[id]["roles"] {
+			p.Roles = nil // roles not changed by this file: leave them (and any concurrent change) alone
+		}
+		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, p, ip)
 	case ExportATMs:
 		_, u := atmFields(v)
 		_, err = s.ATMs.Update(ctx, maker, id, u, ip)
@@ -359,8 +405,9 @@ func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
 		id := env.branches[v["vendor_code"]+"|"+v["branch_code"]]
 		branch = &id
 	}
+	roles, _ := parsePicRoles(v["roles"]) // already validated in the dry-run
 	return VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
-		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true"}
+		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true", Roles: roles}
 }
 
 func assignmentFields(v map[string]string, env *importEnv) ATMAssignmentUpdatePayload {

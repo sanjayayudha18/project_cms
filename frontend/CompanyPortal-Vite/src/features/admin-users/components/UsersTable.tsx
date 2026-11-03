@@ -1,14 +1,13 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
-import type { AdminVendor } from "@/features/admin-vendors/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
 import type { AdminUser } from "../types";
 
 interface UsersTableProps {
   users: AdminUser[];
-  vendorsById: Map<number, AdminVendor>;
+  vendorsById: Map<number, { name: string }>;
   onEdit: (user: AdminUser) => void;
   onDisable: (user: AdminUser) => void;
   onEnable: (user: AdminUser) => void;
@@ -32,6 +31,15 @@ export function UsersTable({ users, vendorsById, onEdit, onDisable, onEnable }: 
         const vendorId = row.original.vendor_id;
         if (vendorId === null) return "-";
         return vendorsById.get(vendorId)?.name ?? `#${vendorId}`;
+      },
+    },
+    {
+      id: "branch",
+      header: "Cabang",
+      cell: ({ row }) => {
+        // Hanya akun vendor yang punya cakupan cabang; NULL = vendor-wide.
+        if (row.original.vendor_id === null) return "-";
+        return row.original.vendor_branch_name ?? "Semua cabang";
       },
     },
     {

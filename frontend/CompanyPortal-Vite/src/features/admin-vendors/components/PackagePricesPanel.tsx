@@ -13,7 +13,7 @@ import { useDisableVendorPackagePrice, useVendorPackagePrices } from "../hooks";
 import {
   type PriceStatus,
   classLabel,
-  formatIDR,
+  formatDecimalIDR,
   levelLabel,
   machineLabel,
   periodLabel,
@@ -131,7 +131,7 @@ export function PackagePricesPanel({ vendorId }: PackagePricesPanelProps) {
       meta: { align: "right" },
       cell: ({ row }) => (
         <span className="tabular-nums">
-          {row.original.base_price === null ? "—" : formatIDR(row.original.base_price)}
+          {row.original.base_price === null ? "—" : formatDecimalIDR(row.original.base_price)}
         </span>
       ),
     },

@@ -1,0 +1,108 @@
+{
+  "_comment": "dsr-late-report shared case fixture (plan D2). Read by internal/repository/dsr_late_report_repository_integration_test.go and by backend_python/dsr_late_notify (P6). Keys are symbolic: the test appends a run tag to vendor codes/names/labels and branch/vault codes, and derives receipt checksums as sha256(tag + key). All times are Asia/Jakarta. expected rows are the full report for the fixture vendors (any vendor filter off); only_date limits a scenario to that report date.",
+  "month": "2026-10",
+  "start_date": "2026-10-02",
+  "vendors": [
+    {"key": "FLM", "kind": "FLM_VENDOR"},
+    {"key": "ROH", "kind": "INTERNAL"}
+  ],
+  "branches": [
+    {"key": "OK", "vendor": "FLM", "created_at": "2026-01-01T08:00:00+07:00", "is_active": true, "region_code": "JKT"},
+    {"key": "VAULTNEW", "vendor": "FLM", "created_at": "2026-01-01T08:00:00+07:00", "is_active": true, "region_code": "JKT"},
+    {"key": "UNMAPPED", "vendor": "FLM", "created_at": "2026-01-01T08:00:00+07:00", "is_active": true},
+    {"key": "PARTIAL", "vendor": "FLM", "created_at": "2026-01-01T08:00:00+07:00", "is_active": true},
+    {"key": "DELETED", "vendor": "FLM", "created_at": "2026-01-01T08:00:00+07:00", "is_active": false, "deleted_at": "2026-10-03T05:00:00+07:00"},
+    {"key": "NEW", "vendor": "FLM", "created_at": "2026-10-04T00:30:00+07:00", "is_active": true},
+    {"key": "ROHB", "vendor": "ROH", "created_at": "2026-01-01T08:00:00+07:00", "is_active": true}
+  ],
+  "vaults": [
+    {"key": "VA", "branch": "OK", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true},
+    {"key": "VB", "branch": "VAULTNEW", "created_at": "2026-10-04T06:00:00+07:00", "is_active": true},
+    {"key": "VC", "branch": "UNMAPPED", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true},
+    {"key": "VD", "branch": "PARTIAL", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true},
+    {"key": "VE", "branch": "PARTIAL", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true},
+    {"key": "VF", "branch": "DELETED", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true},
+    {"key": "VG", "branch": "NEW", "created_at": "2026-10-04T00:30:00+07:00", "is_active": true},
+    {"key": "VI", "branch": "OK", "created_at": "2026-09-01T08:00:00+07:00", "is_active": false},
+    {"key": "VR", "branch": "ROHB", "created_at": "2026-09-01T08:00:00+07:00", "is_active": true}
+  ],
+  "maps": [
+    {"vendor": "FLM", "label": "LOK A", "vault": "VA"},
+    {"vendor": "FLM", "label": "LOK B", "vault": "VB"},
+    {"vendor": "FLM", "label": "LOK D", "vault": "VD"},
+    {"vendor": "FLM", "label": "LOK F", "vault": "VF"},
+    {"vendor": "FLM", "label": "LOK G", "vault": "VG"},
+    {"vendor": "FLM", "label": "LOK I", "vault": "VI"},
+    {"vendor": "ROH", "label": "LOK R", "vault": "VR"}
+  ],
+  "receipts": [
+    {"key": "r_ok_0101", "vendor": "FLM", "report_date": "2026-10-01", "received_at": "2026-10-01T08:00:00+07:00", "locations": ["LOK A"]},
+    {"key": "r_ok_0102", "vendor": "FLM", "report_date": "2026-10-02", "received_at": "2026-10-02T09:00:00.999+07:00", "locations": ["LOK A"]},
+    {"key": "r_ok_0102_rev", "vendor": "FLM", "report_date": "2026-10-02", "received_at": "2026-10-02T12:00:00+07:00", "locations": ["LOK A"]},
+    {"key": "r_multi_0102", "vendor": "FLM", "report_date": "2026-10-02", "received_at": "2026-10-02T10:00:00+07:00", "locations": ["LOK D", "LOK G", "LOK X"]},
+    {"key": "r_ok_0103", "vendor": "FLM", "report_date": "2026-10-03", "received_at": "2026-10-03T09:00:01+07:00", "locations": ["lok a"]},
+    {"key": "r_vnew_0103", "vendor": "FLM", "report_date": "2026-10-03", "received_at": "2026-10-03T08:00:00+07:00", "locations": ["LOK B"]},
+    {"key": "r_typo_0104", "vendor": "FLM", "report_date": "2026-10-04", "received_at": "2026-10-04T08:00:00+07:00", "locations": ["LOK A-typo", "LOK I"]},
+    {"key": "r_vnew_0104", "vendor": "FLM", "report_date": "2026-10-04", "received_at": "2026-10-04T09:30:00+07:00", "locations": ["LOK B"]},
+    {"key": "r_new_0104", "vendor": "FLM", "report_date": "2026-10-04", "received_at": "2026-10-04T08:59:59+07:00", "locations": ["LOK G"]},
+    {"key": "r_new_0105", "vendor": "FLM", "report_date": "2026-10-05", "received_at": "2026-10-05T08:15:00+07:00", "locations": ["LOK G"]},
+    {"key": "r_roh_0102", "vendor": "ROH", "report_date": "2026-10-02", "received_at": "2026-10-02T15:00:00+07:00", "locations": ["LOK R"]},
+    {"key": "r_unknown_0103", "vendor": null, "vendor_label": "UNKNOWN", "report_date": "2026-10-03", "received_at": "2026-10-03T08:00:00+07:00", "locations": ["LOK A"]}
+  ],
+  "scenarios": [
+    {
+      "name": "before 09:00 on the last day",
+      "as_of": "2026-10-05T08:30:00+07:00",
+      "expected": [
+        {"report_date": "2026-10-02", "branch": "DELETED", "status": "not_sent"},
+        {"report_date": "2026-10-02", "branch": "OK", "status": "ok", "receipt": "r_ok_0102", "matched_locations": ["LOK A"]},
+        {"report_date": "2026-10-02", "branch": "PARTIAL", "status": "late", "late_minutes": 60, "receipt": "r_multi_0102", "matched_locations": ["LOK D"]},
+        {"report_date": "2026-10-03", "branch": "OK", "status": "late", "late_minutes": 1, "receipt": "r_ok_0103", "matched_locations": ["lok a"]},
+        {"report_date": "2026-10-03", "branch": "PARTIAL", "status": "not_sent"},
+        {"report_date": "2026-10-04", "branch": "NEW", "status": "ok", "receipt": "r_new_0104", "matched_locations": ["LOK G"]},
+        {"report_date": "2026-10-04", "branch": "OK", "status": "not_sent"},
+        {"report_date": "2026-10-04", "branch": "PARTIAL", "status": "not_sent"},
+        {"report_date": "2026-10-04", "branch": "VAULTNEW", "status": "late", "late_minutes": 30, "receipt": "r_vnew_0104", "matched_locations": ["LOK B"]},
+        {"report_date": "2026-10-05", "branch": "NEW", "status": "ok", "receipt": "r_new_0105", "matched_locations": ["LOK G"]},
+        {"report_date": "2026-10-05", "branch": "OK", "status": "pending"},
+        {"report_date": "2026-10-05", "branch": "PARTIAL", "status": "pending"},
+        {"report_date": "2026-10-05", "branch": "VAULTNEW", "status": "pending"}
+      ],
+      "warnings": {
+        "unmapped_vaults": [
+          {"branch": "PARTIAL", "vault": "VE", "branch_excluded": false},
+          {"branch": "UNMAPPED", "vault": "VC", "branch_excluded": true}
+        ],
+        "unmapped_labels": [
+          {"vendor": "FLM", "label": "LOK A-typo", "receipt_count": 1},
+          {"vendor": "FLM", "label": "LOK X", "receipt_count": 1}
+        ],
+        "unresolved_vendors": [
+          {"vendor_label": "UNKNOWN", "receipt_count": 1}
+        ]
+      }
+    },
+    {
+      "name": "exactly 09:00:00 is still pending (K1 inclusive)",
+      "as_of": "2026-10-05T09:00:00+07:00",
+      "only_date": "2026-10-05",
+      "expected": [
+        {"report_date": "2026-10-05", "branch": "NEW", "status": "ok", "receipt": "r_new_0105", "matched_locations": ["LOK G"]},
+        {"report_date": "2026-10-05", "branch": "OK", "status": "pending"},
+        {"report_date": "2026-10-05", "branch": "PARTIAL", "status": "pending"},
+        {"report_date": "2026-10-05", "branch": "VAULTNEW", "status": "pending"}
+      ]
+    },
+    {
+      "name": "09:00:01 turns pending into not_sent",
+      "as_of": "2026-10-05T09:00:01+07:00",
+      "only_date": "2026-10-05",
+      "expected": [
+        {"report_date": "2026-10-05", "branch": "NEW", "status": "ok", "receipt": "r_new_0105", "matched_locations": ["LOK G"]},
+        {"report_date": "2026-10-05", "branch": "OK", "status": "not_sent"},
+        {"report_date": "2026-10-05", "branch": "PARTIAL", "status": "not_sent"},
+        {"report_date": "2026-10-05", "branch": "VAULTNEW", "status": "not_sent"}
+      ]
+    }
+  ]
+}

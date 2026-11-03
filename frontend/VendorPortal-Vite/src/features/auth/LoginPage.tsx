@@ -101,7 +101,7 @@ export function LoginPage() {
     try {
       await login(data.email, data.password);
       // Use href so an arbitrary preserved path (possibly with dynamic segments,
-      // e.g. /orders/123/evidence) resolves correctly.
+      // e.g. /orders/123) resolves correctly.
       void navigate({ href: redirectTo, replace: true });
     } catch {
       // Error state is managed by AuthContext

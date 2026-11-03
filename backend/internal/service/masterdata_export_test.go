@@ -50,7 +50,7 @@ func (f *fakeExportRepo) Vendors(_ context.Context, after int64, status string, 
 }
 
 func (f *fakeExportRepo) VendorBranches(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
-	return []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V", BranchCode: "B", BranchName: "Cab", Region: "R", LocationID: "9", IsActive: true}}, f.record(after, status, limit)
+	return []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V", BranchCode: "B", BranchName: "Cab", Region: "R", Category: "CASH", LocationID: "9", IsActive: true}}, f.record(after, status, limit)
 }
 
 func (f *fakeExportRepo) VendorVaults(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorVaultsBatchRow, error) {
@@ -59,7 +59,7 @@ func (f *fakeExportRepo) VendorVaults(_ context.Context, after int64, status str
 }
 
 func (f *fakeExportRepo) VendorPICs(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
-	return []db.ExportVendorPicsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "", Name: "Budi", Position: "Kepala", Phone: "+62 812", Email: "b@x.id", IsNotificationRecipient: true, IsActive: true}}, f.record(after, status, limit)
+	return []db.ExportVendorPicsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "", Name: "Budi", Position: "Kepala", Phone: "+62 812", Email: "b@x.id", IsNotificationRecipient: true, IsActive: true, Roles: []string{"replenish", "vault"}}}, f.record(after, status, limit)
 }
 
 func (f *fakeExportRepo) ATMs(_ context.Context, after int64, status string, limit int32) ([]db.ExportATMsBatchRow, error) {
@@ -109,9 +109,9 @@ func export(t *testing.T, e *MasterDataExporter, entity, status string) (header 
 func TestExport_HeaderContract(t *testing.T) {
 	want := map[string][]string{
 		ExportVendors:        {"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
+		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
 		ExportVendorVaults:   {"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
-		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
+		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
 		ExportATMs:           {"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},
 		ExportATMAssignments: {"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
 	}
@@ -119,16 +119,9 @@ func TestExport_HeaderContract(t *testing.T) {
 		t.Fatalf("exportSpecs has %d entities, contract lists %d", len(exportSpecs), len(want))
 	}
 	for entity, header := range want {
-		got, err := MasterDataExportHeader(entity)
-		if err != nil || !reflect.DeepEqual(got, header) {
-			t.Errorf("%s header = %v (err %v), want %v", entity, got, err, header)
+		if got := exportSpecs[entity].header; !reflect.DeepEqual(got, header) {
+			t.Errorf("%s header = %v, want %v", entity, got, header)
 		}
-	}
-	// The returned header is a copy: mutating it must not corrupt the contract.
-	h, _ := MasterDataExportHeader(ExportVendors)
-	h[0] = "tampered"
-	if again, _ := MasterDataExportHeader(ExportVendors); again[0] != "id" {
-		t.Error("MasterDataExportHeader must return a copy")
 	}
 }
 
@@ -229,8 +222,8 @@ func TestCSVSafe(t *testing.T) {
 		{"-", "'-"},
 	}
 	for _, tt := range tests {
-		if got := csvSafe(tt.in); got != tt.want {
-			t.Errorf("csvSafe(%q) = %q, want %q", tt.in, got, tt.want)
+		if got := CSVSafe(tt.in); got != tt.want {
+			t.Errorf("CSVSafe(%q) = %q, want %q", tt.in, got, tt.want)
 		}
 	}
 }

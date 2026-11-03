@@ -1,6 +1,0 @@
-bin/
-*.exe
-*.test
-.git
-.gitignore
-*.md

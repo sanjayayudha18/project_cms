@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateVendorPic, useUpdateVendorPic } from "../hooks";
+import { ALL_PIC_ROLES, PIC_ROLE_OPTIONS } from "../lib/picRoles";
 import { type VendorPicFormValues, vendorPicFormSchema } from "../lib/vendorPicFormSchema";
 import type { AdminVendorPic, VendorPicFormPayload } from "../types";
 
@@ -21,7 +22,14 @@ interface VendorPicFormDialogProps {
 
 function toDefaultValues(pic: AdminVendorPic | null): VendorPicFormValues {
   if (!pic) {
-    return { name: "", position: "", phone: "", email: "", is_notification_recipient: false };
+    return {
+      name: "",
+      position: "",
+      phone: "",
+      email: "",
+      is_notification_recipient: false,
+      roles: [...ALL_PIC_ROLES],
+    };
   }
   return {
     name: pic.name,
@@ -29,6 +37,7 @@ function toDefaultValues(pic: AdminVendorPic | null): VendorPicFormValues {
     phone: pic.phone ?? "",
     email: pic.email ?? "",
     is_notification_recipient: pic.is_notification_recipient,
+    roles: pic.roles,
   };
 }
 
@@ -71,7 +80,7 @@ export function VendorPicFormDialog({
   async function onSubmit(values: VendorPicFormValues): Promise<void> {
     try {
       if (mode === "create") {
-        const res = await createMutation.mutateAsync(toPayload(values));
+        const res = await createMutation.mutateAsync({ ...toPayload(values), roles: values.roles });
         toast({ type: "success", message: pendingApprovalMessage(res) });
       } else {
         if (!pic) return;
@@ -120,6 +129,26 @@ export function VendorPicFormDialog({
           <input type="checkbox" {...form.register("is_notification_recipient")} />
           Penerima notifikasi
         </label>
+
+        {mode === "create" && (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="mb-1 text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
+              Peran
+            </legend>
+            {PIC_ROLE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--n-800)]"
+              >
+                <input type="checkbox" value={opt.value} {...form.register("roles")} />
+                {opt.label}
+              </label>
+            ))}
+            <span className="text-xs text-[var(--n-500)]">
+              Peran PIC yang sudah ada diubah lewat aksi "Ubah peran".
+            </span>
+          </fieldset>
+        )}
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" disabled={isPending} onClick={onClose}>

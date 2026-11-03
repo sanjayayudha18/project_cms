@@ -505,6 +505,6 @@ describe("LoginPage", () => {
 describe("Auth layout artwork (via LoginPage shell expectations)", () => {
   it("documents expected artwork path used by AuthLayout", () => {
     // Artwork is owned by _auth.tsx; contract verified here for task traceability.
-    expect("/assets/crown-login-artwork.png").toMatch(/^\/assets\//);
+    expect("/assets/crown-login-artwork.webp").toMatch(/^\/assets\//);
   });
 });

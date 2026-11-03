@@ -13,25 +13,27 @@ import (
 // VendorPicAdminService. Mutation queries run only inside VendorPicApplier
 // (tx-scoped), not through this repository.
 //
-// ponytail: primary pool for reads too; swap List/Count to dbRead when
-// DATABASE_REPLICA_URL wiring lands (same TODO as VendorBranchAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); every other lookup stays on
+// the primary because Submit uses it as the "before" snapshot / pre-check.
 type VendorPicAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewVendorPicAdminRepository creates a VendorPicAdminRepository wrapping the given database connection.
-func NewVendorPicAdminRepository(dbConn db.DBTX) *VendorPicAdminRepository {
-	return &VendorPicAdminRepository{queries: db.New(dbConn)}
+// NewVendorPicAdminRepository creates a VendorPicAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewVendorPicAdminRepository(primary, replica db.DBTX) *VendorPicAdminRepository {
+	return &VendorPicAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of a vendor's PICs.
 func (r *VendorPicAdminRepository) List(ctx context.Context, arg db.ListVendorPicsAdminParams) ([]db.ListVendorPicsAdminRow, error) {
-	return r.queries.ListVendorPicsAdmin(ctx, arg)
+	return r.dbRead.ListVendorPicsAdmin(ctx, arg)
 }
 
 // Count returns the total number of PICs matching List's filters.
 func (r *VendorPicAdminRepository) Count(ctx context.Context, arg db.CountVendorPicsAdminParams) (int64, error) {
-	return r.queries.CountVendorPicsAdmin(ctx, arg)
+	return r.dbRead.CountVendorPicsAdmin(ctx, arg)
 }
 
 // GetByID returns a PIC by id incl. soft-deleted rows; nil, nil if absent.

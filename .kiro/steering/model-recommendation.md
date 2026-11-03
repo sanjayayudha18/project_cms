@@ -65,6 +65,38 @@ Effort is the reasoning/thinking budget the model spends before and while writin
 
 ---
 
+## Mandatory Model Split Section (Sonnet vs Opus)
+
+Every `task.md` / `tasks.md` MUST open (right after the title/overview, before the first task) with a **Model Split** section that explicitly separates the tasks Sonnet can run from the tasks that need Opus. The per-task `Model:` note stays; this section is the at-a-glance summary so whoever runs the spec can batch work per model without reading every task.
+
+Rules:
+- Two groups, always both present (write `— none` if a group is empty):
+  - **Sonnet-runnable** — every task tagged Sonnet or Haiku (Haiku tasks are listed here with a `(Haiku)` marker; they can always run on Sonnet).
+  - **Opus-required** — every task tagged Opus. Each entry needs a short reason (which danger zone: money, auth, approval/maker-checker, reconciliation, live-data migration, cross-module orchestration, rippling design decision).
+- Every task appears in exactly one group. The group must match the task's own `Model:` note; if they disagree, the task note is wrong or the split is stale. Fix both together.
+- If an Opus task has sub-tasks that are plain Sonnet work (e.g. tests, UI wiring under an Opus service task), list those sub-tasks under Sonnet-runnable by sub-task number.
+- Note dependencies that cross groups (e.g. "Sonnet 5 needs Opus 3 done first") so the order of execution stays clear.
+- Update the split whenever a task is added, removed, or re-tiered.
+
+Format:
+
+```
+## Model Split
+
+**Sonnet-runnable**
+- 1. Migration: add columns — Sonnet, Low
+- 2. Repository queries — Sonnet, Medium
+- 5. Frontend list screen — Sonnet, Medium (needs 3)
+- 6. Nav registration — Haiku, Low (Haiku)
+- 3.4 Service unit tests — Sonnet, Medium
+
+**Opus-required**
+- 3. Service state machine + maker-checker guards — Opus, High — approval correctness
+- 4. Money aggregation per vendor — Opus, High — money math
+```
+
+---
+
 ## Quick Heuristic
 
 **Tier** — ask: *if the model gets this wrong, what breaks?*
@@ -84,5 +116,6 @@ Effort is the reasoning/thinking budget the model spends before and while writin
 ## Conventions
 
 - Add a `Model:` **and** `Effort:` note to every new task when authoring a spec. A task file missing either is incomplete.
+- A task file without the **Model Split** section (Sonnet-runnable vs Opus-required) is also incomplete.
 - Checkpoint / verification tasks (build, lint, test gates) are usually **Sonnet, Medium** — they need judgment to triage failures, but rarely Opus-level reasoning or High effort.
 - Update the note if a task's scope changes materially (e.g. a "simple config" task grows to touch auth → bump tier to Opus and effort to High).

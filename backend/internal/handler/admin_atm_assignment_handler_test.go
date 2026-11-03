@@ -231,7 +231,7 @@ func TestMasterDataAdminSharedGroup_AllMountsGuardedAndRouted(t *testing.T) {
 	r := chi.NewRouter()
 	group := r.With(custommw.RequireAuth(tokenSvc), custommw.RequireRoles("ADMIN", "ADMIN_PARAM"))
 	group.Mount("/api/v1/admin/vendors/{vendorID}/packages", NewAdminVendorPackageHandler(&fakeVendorPackageAdminServicer{}).Routes())
-	group.Mount("/api/v1/admin/vendors/{vendorID}/pics", NewAdminVendorPicHandler(&fakeVendorPicAdminServicer{}).Routes())
+	group.Mount("/api/v1/admin/vendors/{vendorID}/pics", NewAdminVendorPicHandler(&fakeVendorPicAdminServicer{}, &fakeVendorPicAdminServicer{}).Routes())
 	group.Mount("/api/v1/admin/atms/{atmID}/assignments", NewAdminATMAssignmentHandler(&fakeATMAssignmentAdminServicer{}).Routes())
 
 	paths := []string{"/api/v1/admin/vendors/3/packages", "/api/v1/admin/vendors/3/pics", "/api/v1/admin/atms/3/assignments"}

@@ -177,7 +177,7 @@ describe("CitTable", () => {
   it("renders amount as IDR-formatted value", () => {
     render(<CitTable data={mockOrders} />);
 
-    // formatIDR(250000000) = "250.000.000"
+    // formatThousands(250000000) = "250.000.000"
     expect(screen.getByText("250.000.000")).toBeInTheDocument();
     expect(screen.getByText("350.000.000")).toBeInTheDocument();
   });

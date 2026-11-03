@@ -8,7 +8,7 @@ Source document: `DSR End To End Cash Management V01.docx` (repo root) — FSD "
 
 | # | Topic | Before (URS) | Now (FSD) | Code impact |
 |---|---|---|---|---|
-| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | None (`internal/forecast` not built) |
+| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | None — **superseded 2026-10-08**: CROWN does no forecasting; DMAA `amount_replenish` is final (CLAUDE.md Sec 3a) |
 | 2 | Cash count reconciliation | In-system 3-way (cash count vs escrow H-1 vs proofing) | CROWN builds the recap report → reconciliation runs externally in **Rec 7** | None (`internal/cashcount` not built) |
 | 3 | Master data upload | Upsert, all-or-nothing batch, one approval | **Replace-all**; rejected records corrected + re-uploaded; checker approves only clean data | **Yes** — `backend/internal/service/masterdata_import*.go`; needs AI-DLC (Sec 4 #7) |
 | 4 | Pemenuhan dana | Surat tugas, KTP/NIP, maker-checker on officer data | Head approval → ACM Branch Coordinator (escrow H-1, manual pindah buku in BDS) → Vendor Receiver/Provider pickup with employee ID + plate validation | None (not built) |
@@ -99,3 +99,34 @@ Schema questions on Area Vault Vendor, CIS maker-checker and PKS threshold above
 3. Start the AI-DLC for the first build: PKS + Limit CIS (additive columns, existing Master Vendor menu) → migration `021+`.
 4. Separate AI-DLC for the master-data replace upload (#3), since it changes existing code and touches deletes.
 5. Update `development-progress.md` and `.claude/sdlc/README.md` once a feature starts.
+
+---
+
+## 7. Addendum 2026-11-03 — full FSD PDF review (`DSR End To End Cash Management V01.md`, converted from the PDF at repo root)
+
+The PDF is a fuller version of FSD v1.0 (1-Sept-2026). Items below were **not** in the repo before. Nothing here is approved or built; schema changes still need approval (CLAUDE.md Sec 3) and the AI-DLC question (Sec 4a rule 0).
+
+### 7.1 New requirements
+- **Invoicing trip (FSD §6)** — replaces the URS "vendor uploads invoice" idea with CROWN-computed billing:
+  - *Parameter Invoice*: ATM Monitoring uploads a price scheme (Vendor, Paket, Jenis mesin ATM/CDM, Kategori VIP/Reguler, Price, Additional Trip Price); upload replaces the old scheme, upload date = effective date.
+  - Package price is per month with a max trip per package (paket 3 = 30, 4 = 40, 5 = 50); trips above max use Additional Trip price.
+  - Prorata for ATM activated/deactivated mid-month: price/day = package price ÷ days in month; deactivate = (deactivate date − active date + 1) × price/day; new activate = (days in month − activation date + 1) × price/day.
+  - Penalty: system shows count from late-DSR flags per vendor area; ATM Monitoring enters the amount.
+  - Dispute loop: ATM Monitoring sends billing → vendor confirms or appeals (reason + mandatory evidence) → ATM Monitoring responds; **max 3 appeal rounds**; final → task for VOC (download invoice, add penalty memo, email ATM Business). Payment via SMART out of scope.
+  - ATM master source: ESQ daily file via MFT; Area/Region/City/Provinsi/FLM vendor/Paket formats must match Master Vendor.
+  - Schedule text is contradictory: "last 3 business days of the first week of next month" vs "3 business days before month end".
+- **Cash count vault**: H/M/L ranges **High > 15 bio (3×), Medium 5–15 bio (2×), Low < 5 bio (1×)** per 6 months (answers open question). Variance threshold **Rp10 juta**: ≤ → recount then archive; > → email escalation, final report downloaded and escalated to Ops & IT Director. Approval by **D3**; final report emailed to D1 officers (CBO, ORM, OIT Risk, CB Risk Control, Digital Banking, NSO, SPAPM). Formulas: Selisih Cash Count = Uang Fisik + Uang Beredar − Uang Masuk Geser Vault H+0 − Uang Bongkaran H+0 − Saldo DSR H-1; Selisih Cek Escrow = same without DSR, minus Saldo Escrow. BA also has UTLE and Uang Rusak. Visit method onsite or virtual (WhatsApp/Webex/Teams).
+- **Cash count selektif mesin (was "empty in FSD")**: schedule by Cash Control & Resolution (one surat tugas may cover several ATM IDs), PIC 1/2 accept or reschedule; statuses Assigned → Requested Reschedule → Reschedule → Accepted → Ready for Execution; unique task ID; ID card upload; task to ATM Vendor. Day 1 (H+1): inspection, seal BA, checklist points 1–9; machine problem → estimated resolution duration: ≤ 1 month = On Progress then Day 2, > 1 month = Cancelled and Day 2 stops. Day 2 (H+2): per-cassette count vs Remaining Bill Counter, checklist points 10–15, discrepancy → investigation report signed/stamped by vendor; CCR completeness review loop; D3 then D2 approval. New parameter menus: Category ATM Anomaly, Checklist Berita Acara (selected machine / non-machine, Day 1 / Day 2). Manual field "Konfirmasi Hasil Proofing RPS".
+- **Reports (FSD §5)**: 11 cash count reports not in `requirements.md` — Dashboard Summary Plan Vault, Status Cash Count Vault, Progress ATM / Cash / Cash Valas, Selisih Cash Count Vault, Penalty, Temuan Vault (categories 1–20), Performance Month-to-Month, Performance Rank (Human Error, Workstation Support, Infrastructure), Rekap ATM/Cash/Valas. Transaction report reads H+1, kept 1 month then replaced.
+- **Forecast daily timeline**: forecast 06:00, DSR upload 06:30–09:00, calc 09:30–10:00, complain/project upload 10:00–11:30, order merge 11:35–12:15, manual adjust 11:45–12:00, final order 12:30. Duplicate ATM ID in complain/project is dropped and a one-way info email goes to the uploading team; ATM ID absent from forecast becomes an order with blank amount, filled by ATM Monitoring.
+- **Master vendor / kelolaan**: columns Service Type, ATM Escrow, Cash Escrow, Limit CIS (Ops-editable), Region; in-app notification of Amber/Red PKS to authorized PIC only; manual "Terminated" by company name.
+
+### 7.2 Conflicts with what is recorded
+1. Order formula step 8 = `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)`, Plan Replenish from the H-1 forecast file — conflicts with the 2026-10-08 decision (DMAA amount is final).
+2. Cash count reconciliation: §3 has ATM Digital & Reconciliation entering results in CROWN, §4 says results come from Rec 7 → Rec 7 results are **keyed into CROWN manually** (partial answer to open question #2); the note "CROWN computes no cash count deltas" needs revisiting.
+3. PKS: flow says check < 8 months, Amber < 6, Red 3, Green ≥ 9; repo has 9 months (A4). Status value lists differ between table (Active/Expired/Terminated) and field description (Draft … Dihentikan).
+4. Invoice schedule wording (see 7.1).
+5. Overall plan table uses "Category 3 Mths / 1 Mths" while the flow uses a 6-month average.
+
+### 7.3 Open questions now answered
+Order approval = single level (ATM Monitoring & Support Head); Provider and Receiver are both Vendor ATM (distinguished by escrow number); H/M/L ranges (7.1). Still open: next step after Provider rejects a pickup; source of H-1 escrow balance (SIBS vs Corebanking file).

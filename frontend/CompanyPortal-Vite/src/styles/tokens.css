@@ -58,8 +58,46 @@
   --shadow-sm: 0 1px 2px oklch(0.25 0.02 29 / 0.06);
   --shadow-md: 0 4px 12px oklch(0.25 0.02 29 / 0.08);
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Typography: --font-sans / --font-mono live in index.css @theme */
+
+  /* ─── App shell (CompanyPortal sidebar/topbar). Accent hue 22 is shell-only (D14); --red-* untouched ─── */
+  --shell-sb-bg: oklch(0.188 0.031 6);
+  --shell-sb-glow: oklch(0.249 0.064 12);
+  --shell-accent: oklch(0.53 0.207 22);
+  --shell-accent-hover: oklch(0.483 0.188 22);
+  --shell-accent-tint: oklch(0.53 0.207 22 / 0.08);
+  --shell-on-accent: oklch(0.985 0.006 17);
+  --shell-maroon: oklch(0.376 0.138 20);
+  --shell-ink: oklch(0.24 0.026 7);
+  --shell-muted: oklch(0.51 0.03 6);
+  --shell-canvas: oklch(0.978 0.003 40);
+  --shell-topbar-bg: oklch(0.995 0.002 17);
+  --shell-topbar-line: oklch(0.932 0.01 17);
+  --shell-input-line: oklch(0.912 0.012 17);
+  --shell-chip-bg: oklch(0.958 0.008 17);
+  --shell-gold: oklch(0.791 0.133 79);
+  --shell-gold-bg: oklch(0.791 0.133 79 / 0.2);
+  --shell-overlay: oklch(0.188 0.031 6 / 0.4);
+  --shell-tooltip-bg: var(--shell-ink);
+  --shell-avatar-bg: linear-gradient(135deg, var(--shell-accent), var(--shell-maroon));
+  --shell-shadow-pop: 0 12px 32px oklch(0.25 0.02 20 / 0.12);
+
+  /* Default sidebar theme = dark (also covers pages without the data attribute) */
+  --shell-icon-active: oklch(0.677 0.213 18);
+  --shell-active-bg: linear-gradient(
+    90deg,
+    oklch(0.53 0.207 22 / 0.28),
+    oklch(0.53 0.207 22 / 0.08)
+  );
+  --shell-sb-surface: radial-gradient(120% 60% at 0% 0%, var(--shell-sb-glow) 0%, transparent 60%),
+    var(--shell-sb-bg);
+  --shell-sb-text: oklch(0.836 0.025 8);
+  --shell-sb-strong: oklch(0.978 0.011 17);
+  --shell-sb-group: oklch(0.72 0.036 6);
+  --shell-sb-hover: oklch(1 0 0 / 0.05);
+  --shell-sb-line: oklch(1 0 0 / 0.08);
+  --shell-badge-bg: oklch(1 0 0 / 0.09);
+  --shell-focus: var(--shell-icon-active);
 
   /* ─── Login shell only (scoped CIMB Red-dominant exception; global app stays light) ───── */
   --login-chrome-deep: oklch(0.28 0.135 27);
@@ -79,4 +117,36 @@
   --login-focus-ring: oklch(0.93 0.02 27 / 0.55);
   --login-artwork-well: oklch(0.26 0.13 27);
   --login-mark-glow: oklch(0.56 0.223 27 / 0.45);
+}
+
+/* Sidebar theme scopes (design.md Data Models). Dark values repeat :root so a theme switch is a pure attribute change. */
+[data-sidebar-theme="dark"] {
+  --shell-icon-active: oklch(0.677 0.213 18);
+  --shell-active-bg: linear-gradient(
+    90deg,
+    oklch(0.53 0.207 22 / 0.28),
+    oklch(0.53 0.207 22 / 0.08)
+  );
+  --shell-sb-surface: radial-gradient(120% 60% at 0% 0%, var(--shell-sb-glow) 0%, transparent 60%),
+    var(--shell-sb-bg);
+  --shell-sb-text: oklch(0.836 0.025 8);
+  --shell-sb-strong: oklch(0.978 0.011 17);
+  --shell-sb-group: oklch(0.72 0.036 6);
+  --shell-sb-hover: oklch(1 0 0 / 0.05);
+  --shell-sb-line: oklch(1 0 0 / 0.08);
+  --shell-badge-bg: oklch(1 0 0 / 0.09);
+  --shell-focus: var(--shell-icon-active);
+}
+
+[data-sidebar-theme="light"] {
+  --shell-icon-active: var(--shell-accent);
+  --shell-active-bg: linear-gradient(90deg, oklch(0.53 0.207 22 / 0.1), oklch(0.53 0.207 22 / 0.04));
+  --shell-sb-surface: var(--n-0);
+  --shell-sb-text: oklch(0.431 0.027 8);
+  --shell-sb-strong: var(--shell-ink);
+  --shell-sb-group: var(--shell-muted);
+  --shell-sb-hover: oklch(0.24 0.026 7 / 0.04);
+  --shell-sb-line: var(--shell-topbar-line);
+  --shell-badge-bg: var(--shell-chip-bg);
+  --shell-focus: var(--shell-accent);
 }

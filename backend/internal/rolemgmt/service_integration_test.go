@@ -423,3 +423,35 @@ func queryRowScan(ctx context.Context, svc *PermissionService, sql string, args 
 	dbtx := svc.pool.(db.DBTX)
 	return dbtx.QueryRow(ctx, sql, queryArgs...).Scan(dest)
 }
+
+// staleNameCheck hides existing roles from the uniqueness pre-check, simulating
+// two admins creating the same name concurrently: both pass FindRoleByName.
+type staleNameCheck struct{ Repo }
+
+func (staleNameCheck) FindRoleByName(context.Context, string) (*int64, error) { return nil, nil }
+
+// When the pre-check misses a concurrent create, the roles unique constraint
+// is the source of truth: CreateRole maps it to ErrRoleNameConflict (409)
+// and the savepoint rollback leaves exactly one row.
+func TestCreateRole_ConcurrentDuplicateCaughtByUniqueConstraint(t *testing.T) {
+	svc, adminUserID, _, tag := harness(t)
+	ctx := context.Background()
+	roleName := "TROLE-RACE-" + tag
+
+	if _, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, ""); err != nil {
+		t.Fatalf("first CreateRole: %v", err)
+	}
+
+	racing := NewPermissionService(staleNameCheck{svc.repo}, svc.pool)
+	if _, err := racing.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, ""); !errors.Is(err, ErrRoleNameConflict) {
+		t.Fatalf("racing CreateRole error = %v, want ErrRoleNameConflict", err)
+	}
+
+	var count int
+	if err := queryRowScan(ctx, svc, `SELECT COUNT(*) FROM roles WHERE role = $1`, roleName, &count); err != nil {
+		t.Fatalf("counting roles: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("roles named %q = %d rows, want 1", roleName, count)
+	}
+}

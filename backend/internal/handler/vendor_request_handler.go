@@ -36,6 +36,8 @@ var (
 // VendorRequestHandler handles Vendor Request HTTP endpoints.
 type VendorRequestHandler struct {
 	service service.VendorRequestServicer
+	vault   VendorRequestVaultReviewer // nil = vault routes not mounted
+	vendor  *vendorSide                // nil = cit-send-vendor routes not mounted
 }
 
 // NewVendorRequestHandler creates a new VendorRequestHandler with the given service.
@@ -66,6 +68,17 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/", h.List)
 	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}", h.Get)
 	r.With(middleware.RequireRoles(vendorRequestAuditRoles...)).Get("/{id}/audit-log", h.AuditLog)
+	if h.vault != nil {
+		// cit-acm-plan FR5: ATM-SPV review of the ACM vault recommendation.
+		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vault-assignments", h.VaultAssignments)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-approve", h.VaultApprove)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-reject", h.VaultReject)
+	}
+	if h.vendor != nil {
+		// cit-send-vendor FR6.1/FR6.6: vendor status panel + return to maker.
+		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vendor-parties", h.VendorParties)
+		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vendor-return", h.VendorReturn)
+	}
 	return r
 }
 
@@ -74,9 +87,9 @@ func (h *VendorRequestHandler) Routes() chi.Router {
 // BrowseForecast handles GET /forecast (Req 3).
 func (h *VendorRequestHandler) BrowseForecast(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka")
+		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka (maksimal 1000000)")
 		return
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultVendorRequestPageSize)
@@ -440,9 +453,9 @@ func (h *VendorRequestHandler) doTransition(w http.ResponseWriter, r *http.Reque
 // List handles GET / (Req 9.1-9.5).
 func (h *VendorRequestHandler) List(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka")
+		writeError(w, http.StatusBadRequest, "bad_request", "page harus berupa angka (maksimal 1000000)")
 		return
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultVendorRequestPageSize)
@@ -596,6 +609,8 @@ func (h *VendorRequestHandler) handleError(w http.ResponseWriter, err error) {
 		writeValidationError(w, "rejection_reason", "wajib diisi")
 	case errors.Is(err, service.ErrCompletionReasonEmpty):
 		writeValidationError(w, "reason", "wajib diisi")
+	case errors.Is(err, service.ErrCompletionByVendor):
+		writeError(w, http.StatusConflict, "completion_by_vendor", "Laporan realisasi request ini diisi oleh vendor di VendorPortal")
 	case errors.Is(err, service.ErrCancelReasonEmpty):
 		writeValidationError(w, "cancellation_reason", "wajib diisi")
 	case errors.Is(err, service.ErrNumberGeneration):

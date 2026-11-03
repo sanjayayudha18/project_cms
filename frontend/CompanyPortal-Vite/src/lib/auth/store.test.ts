@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AuthUser, type DbRole, SESSION_EXPIRED_REASON, useAuthStore } from "./store";
+import {
+  type AuthUser,
+  type DbRole,
+  SESSION_EXPIRED_REASON,
+  isVendorRole,
+  useAuthStore,
+} from "./store";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -623,5 +629,168 @@ describe("useAuthStore", () => {
       expect(localStorage.getItem("accessToken")).toBeNull();
       expect(localStorage.getItem("token")).toBeNull();
     });
+  });
+});
+
+// ─── fe-coverage C1: remaining login / refresh / initialize branches ─────────
+
+describe("useAuthStore (C1 branches)", () => {
+  const vendorPayload = {
+    access_token: "vendor-token",
+    user: {
+      id: 2,
+      username: "vendor.user",
+      full_name: "Vendor User",
+      email: "vendor@partner.co",
+      role: "VENDOR-USER" as DbRole,
+      is_karyawan: false,
+      vendor_id: 10,
+    },
+  };
+
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isAuthLoading: true,
+      error: null,
+      rateLimitRetryAfter: null,
+    });
+    mockFetch.mockReset();
+    mockLocation.href = "";
+    mockLocation.pathname = "/dashboard";
+    mockLocation.search = "?tab=1";
+  });
+
+  it.each([
+    [
+      "403 other with message",
+      { ok: false, status: 403, json: async () => ({ error: "x", message: "Diblokir" }) },
+      "Diblokir",
+    ],
+    [
+      "403 unreadable body",
+      { ok: false, status: 403, json: async () => Promise.reject(new Error("bad json")) },
+      "Akses ditolak",
+    ],
+    [
+      "422 without details uses message",
+      { ok: false, status: 422, json: async () => ({ message: "Email tidak valid" }) },
+      "Email tidak valid",
+    ],
+    [
+      "422 unreadable body",
+      { ok: false, status: 422, json: async () => Promise.reject(new Error("bad json")) },
+      "Validasi gagal",
+    ],
+    [
+      "500 with message",
+      { ok: false, status: 500, json: async () => ({ message: "Kesalahan internal" }) },
+      "Kesalahan internal",
+    ],
+    [
+      "500 unreadable body",
+      { ok: false, status: 500, json: async () => Promise.reject(new Error("bad json")) },
+      "Terjadi kesalahan. Silakan coba lagi.",
+    ],
+  ])("login %s → error message, still logged out", async (_name, response, message) => {
+    mockFetch.mockResolvedValueOnce(response);
+
+    await useAuthStore.getState().login("user@cimb.local", "pass");
+
+    expect(useAuthStore.getState().error).toBe(message);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("refresh returning a VENDOR-USER is rejected and redirects without session-expired reason", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => vendorPayload });
+
+    const ok = await useAuthStore.getState().refreshToken();
+
+    expect(ok).toBe(false);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().accessToken).toBeNull();
+    expect(mockLocation.href).toBe(`/login?redirect=${encodeURIComponent("/dashboard?tab=1")}`);
+  });
+
+  it("refresh network error clears the session and redirects to /login", async () => {
+    useAuthStore.setState({ user: testUser, accessToken: "old", isAuthenticated: true });
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const ok = await useAuthStore.getState().refreshToken();
+
+    expect(ok).toBe(false);
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(mockLocation.href).toBe(`/login?redirect=${encodeURIComponent("/dashboard?tab=1")}`);
+  });
+
+  it("initialize ignores a VENDOR-USER refresh session on the company portal", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => vendorPayload });
+
+    await useAuthStore.getState().initialize();
+
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.user).toBeNull();
+    expect(state.isAuthLoading).toBe(false);
+    expect(mockLocation.href).toBe("");
+  });
+
+  // vendor-party-scope Req 8.2: all three vendor roles belong to VendorPortal only.
+  describe.each(["VENDOR-USER", "VENDOR-ATM-USER", "VENDOR-VAULT-USER"] as const)(
+    "vendor role %s on the company portal",
+    (role) => {
+      const payload = { ...vendorPayload, user: { ...vendorPayload.user, role } };
+
+      it("refreshToken rejects the session and redirects", async () => {
+        mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload });
+
+        const ok = await useAuthStore.getState().refreshToken();
+
+        expect(ok).toBe(false);
+        expect(useAuthStore.getState().isAuthenticated).toBe(false);
+        expect(useAuthStore.getState().accessToken).toBeNull();
+        expect(mockLocation.href).toBe(`/login?redirect=${encodeURIComponent("/dashboard?tab=1")}`);
+      });
+
+      it("initialize does not restore the session", async () => {
+        mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload });
+
+        await useAuthStore.getState().initialize();
+
+        const state = useAuthStore.getState();
+        expect(state.isAuthenticated).toBe(false);
+        expect(state.user).toBeNull();
+        expect(state.accessToken).toBeNull();
+        expect(state.isAuthLoading).toBe(false);
+      });
+
+      it("isVendorRole recognises it", () => {
+        expect(isVendorRole(role)).toBe(true);
+      });
+    },
+  );
+
+  it("isVendorRole is false for internal roles", () => {
+    for (const role of ["ADMIN", "ADMIN_PARAM", "APPACCESS", "ATM-USER", "ACM-SPV"]) {
+      expect(isVendorRole(role)).toBe(false);
+    }
+  });
+
+  it("an internal role refresh is still restored", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "t",
+        user: { ...vendorPayload.user, role: "APPACCESS", vendor_id: null, is_karyawan: true },
+      }),
+    });
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().user?.role).toBe("APPACCESS");
   });
 });

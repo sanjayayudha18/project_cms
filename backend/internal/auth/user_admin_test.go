@@ -31,6 +31,7 @@ type fakeUserAdminRepo struct {
 	getRoleByNameFunc               func(ctx context.Context, role string) (*db.GetRoleByNameRow, error)
 	vendorExistsFunc                func(ctx context.Context, vendorID int64) (bool, error)
 	supervisorExistsFunc            func(ctx context.Context, userID int64) (bool, error)
+	branchBelongsFunc               func(ctx context.Context, branchID, vendorID int64) (bool, error)
 
 	createCalled bool
 	updateCalled bool
@@ -67,7 +68,7 @@ func (f *fakeUserAdminRepo) Create(ctx context.Context, arg db.CreateUserAdminPa
 	return db.CreateUserAdminRow{
 		ID: 1, Username: arg.Username, FullName: arg.FullName, Email: arg.Email,
 		RoleID: arg.RoleID, IsKaryawan: arg.IsKaryawan, AuthSource: arg.AuthSource,
-		EmployeeID: arg.EmployeeID, VendorID: arg.VendorID, IsActive: true,
+		EmployeeID: arg.EmployeeID, VendorID: arg.VendorID, VendorBranchID: arg.VendorBranchID, IsActive: true,
 		SupervisorID: arg.SupervisorID, ApprovalLevel: arg.ApprovalLevel,
 	}, nil
 }
@@ -133,6 +134,13 @@ func (f *fakeUserAdminRepo) VendorExists(ctx context.Context, vendorID int64) (b
 	return true, nil
 }
 
+func (f *fakeUserAdminRepo) VendorBranchBelongsToVendor(ctx context.Context, branchID, vendorID int64) (bool, error) {
+	if f.branchBelongsFunc != nil {
+		return f.branchBelongsFunc(ctx, branchID, vendorID)
+	}
+	return true, nil
+}
+
 func (f *fakeUserAdminRepo) SupervisorExists(ctx context.Context, userID int64) (bool, error) {
 	if f.supervisorExistsFunc != nil {
 		return f.supervisorExistsFunc(ctx, userID)
@@ -187,9 +195,9 @@ func TestUserAdminService_Create_Validation(t *testing.T) {
 			tt.mutate(&req)
 			repo := &fakeUserAdminRepo{}
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(repo, auditW)
+			svc := NewUserAdminService(repo, nil, auditW)
 
-			_, err := svc.Create(context.Background(), 1, req, "10.0.0.1")
+			_, err := svc.Create(context.Background(), 1, "APPACCESS", req, "10.0.0.1")
 			var valErr *pkgauth.ValidationError
 			if !errors.As(err, &valErr) {
 				t.Fatalf("Create err = %v, want *pkgauth.ValidationError", err)
@@ -221,9 +229,9 @@ func TestUserAdminService_Create_LdapForbiddenFields(t *testing.T) {
 			tt.mutate(&req)
 			repo := &fakeUserAdminRepo{}
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(repo, auditW)
+			svc := NewUserAdminService(repo, nil, auditW)
 
-			_, err := svc.Create(context.Background(), 1, req, "10.0.0.1")
+			_, err := svc.Create(context.Background(), 1, "APPACCESS", req, "10.0.0.1")
 			if !errors.Is(err, ErrLdapFieldsNotAllowed) {
 				t.Fatalf("err = %v, want ErrLdapFieldsNotAllowed", err)
 			}
@@ -239,14 +247,14 @@ func TestUserAdminService_Create_LdapForbiddenFields(t *testing.T) {
 func TestUserAdminService_Create_Local_HashesPasswordAndForcesChange(t *testing.T) {
 	repo := &fakeUserAdminRepo{}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
 	req := validCreateReq()
 	req.AuthSource = "local"
 	req.VendorID = ptrInt64(1)
 	req.TemporaryPassword = "Passw0rd1"
 
-	_, err := svc.Create(context.Background(), 1, req, "10.0.0.1")
+	_, err := svc.Create(context.Background(), 1, "APPACCESS", req, "10.0.0.1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -270,9 +278,9 @@ func TestUserAdminService_Create_Local_HashesPasswordAndForcesChange(t *testing.
 func TestUserAdminService_Create_Ldap_NoPasswordHash(t *testing.T) {
 	repo := &fakeUserAdminRepo{}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Create(context.Background(), 1, validCreateReq(), "10.0.0.1")
+	_, err := svc.Create(context.Background(), 1, "APPACCESS", validCreateReq(), "10.0.0.1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -314,9 +322,9 @@ func TestUserAdminService_Create_Conflicts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(tt.repo, auditW)
+			svc := NewUserAdminService(tt.repo, nil, auditW)
 
-			_, err := svc.Create(context.Background(), 1, tt.req(), "10.0.0.1")
+			_, err := svc.Create(context.Background(), 1, "APPACCESS", tt.req(), "10.0.0.1")
 			var conflictErr *ConflictError
 			if !errors.As(err, &conflictErr) {
 				t.Fatalf("err = %v, want *ConflictError", err)
@@ -341,9 +349,9 @@ func TestUserAdminService_Create_DBUniqueViolationFallback(t *testing.T) {
 		},
 	}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Create(context.Background(), 1, validCreateReq(), "10.0.0.1")
+	_, err := svc.Create(context.Background(), 1, "APPACCESS", validCreateReq(), "10.0.0.1")
 	var conflictErr *ConflictError
 	if !errors.As(err, &conflictErr) || conflictErr.Field != "email" {
 		t.Fatalf("err = %v, want *ConflictError{Field: email}", err)
@@ -384,9 +392,9 @@ func TestUserAdminService_Create_ReferenceErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(tt.repo, auditW)
+			svc := NewUserAdminService(tt.repo, nil, auditW)
 
-			_, err := svc.Create(context.Background(), 1, tt.req(), "10.0.0.1")
+			_, err := svc.Create(context.Background(), 1, "APPACCESS", tt.req(), "10.0.0.1")
 			var refErr *ReferenceError
 			if !errors.As(err, &refErr) {
 				t.Fatalf("err = %v, want *ReferenceError", err)
@@ -403,14 +411,14 @@ func TestUserAdminService_Create_ReferenceErrors(t *testing.T) {
 func TestUserAdminService_Create_Success_AuditsOnce_NoPasswordInPayload(t *testing.T) {
 	repo := &fakeUserAdminRepo{}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
 	req := validCreateReq()
 	req.AuthSource = "local"
 	req.VendorID = ptrInt64(1)
 	req.TemporaryPassword = "Passw0rd1"
 
-	got, err := svc.Create(context.Background(), 7, req, "10.0.0.1")
+	got, err := svc.Create(context.Background(), 7, "APPACCESS", req, "10.0.0.1")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -441,9 +449,9 @@ func TestUserAdminService_Create_Success_AuditsOnce_NoPasswordInPayload(t *testi
 func TestUserAdminService_Create_AuditFailureSurfacesError(t *testing.T) {
 	repo := &fakeUserAdminRepo{}
 	auditW := &fakeAuditWriter{forceErr: errors.New("audit db down")}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Create(context.Background(), 1, validCreateReq(), "10.0.0.1")
+	_, err := svc.Create(context.Background(), 1, "APPACCESS", validCreateReq(), "10.0.0.1")
 	if err == nil {
 		t.Fatal("Create: want an error when the audit write fails, got nil")
 	}
@@ -470,9 +478,9 @@ func TestUserAdminService_Update_NotFound(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &fakeUserAdminRepo{getByIDFunc: tt.getByID}
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(repo, auditW)
+			svc := NewUserAdminService(repo, nil, auditW)
 
-			_, err := svc.Update(context.Background(), 1, 99, UpdateUserRequest{FullName: "X", Email: "x@example.com", Role: "APPACCESS"}, "10.0.0.1")
+			_, err := svc.Update(context.Background(), 1, "APPACCESS", 99, UpdateUserRequest{FullName: "X", Email: "x@example.com", Role: "APPACCESS"}, "10.0.0.1")
 			if !errors.Is(err, pkgauth.ErrUserNotFound) {
 				t.Fatalf("err = %v, want pkgauth.ErrUserNotFound", err)
 			}
@@ -501,9 +509,9 @@ func TestUserAdminService_Update_ImmutableFields(t *testing.T) {
 				},
 			}
 			auditW := &fakeAuditWriter{}
-			svc := NewUserAdminService(repo, auditW)
+			svc := NewUserAdminService(repo, nil, auditW)
 
-			_, err := svc.Update(context.Background(), 1, 1, tt.req, "10.0.0.1")
+			_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, tt.req, "10.0.0.1")
 			if !errors.Is(err, ErrImmutableField) {
 				t.Fatalf("err = %v, want ErrImmutableField", err)
 			}
@@ -521,9 +529,9 @@ func TestUserAdminService_Update_SelfSupervision(t *testing.T) {
 		},
 	}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{
+	_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{
 		FullName: "X", Email: "x@example.com", Role: "APPACCESS", SupervisorID: ptrInt64(1),
 	}, "10.0.0.1")
 	if !errors.Is(err, ErrSelfSupervision) {
@@ -541,7 +549,7 @@ func TestUserAdminService_Update_Validation(t *testing.T) {
 		},
 	}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
 	tests := []struct {
 		name      string
@@ -555,7 +563,7 @@ func TestUserAdminService_Update_Validation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.Update(context.Background(), 1, 1, tt.req, "10.0.0.1")
+			_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, tt.req, "10.0.0.1")
 			var valErr *pkgauth.ValidationError
 			if !errors.As(err, &valErr) || valErr.Field != tt.wantField {
 				t.Fatalf("err = %v, want *pkgauth.ValidationError{Field: %s}", err, tt.wantField)
@@ -578,9 +586,9 @@ func TestUserAdminService_Update_Conflicts(t *testing.T) {
 		repo := base()
 		repo.findByEmailExcludingIDFunc = func(ctx context.Context, email string, excludeID int64) (*int64, error) { return &existingID, nil }
 		auditW := &fakeAuditWriter{}
-		svc := NewUserAdminService(repo, auditW)
+		svc := NewUserAdminService(repo, nil, auditW)
 
-		_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "new@example.com", Role: "APPACCESS"}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "new@example.com", Role: "APPACCESS"}, "10.0.0.1")
 		var conflictErr *ConflictError
 		if !errors.As(err, &conflictErr) || conflictErr.Field != "email" {
 			t.Fatalf("err = %v, want *ConflictError{Field: email}", err)
@@ -591,9 +599,9 @@ func TestUserAdminService_Update_Conflicts(t *testing.T) {
 		repo := base()
 		repo.findByEmployeeIDExcludingIDFunc = func(ctx context.Context, employeeID string, excludeID int64) (*int64, error) { return &existingID, nil }
 		auditW := &fakeAuditWriter{}
-		svc := NewUserAdminService(repo, auditW)
+		svc := NewUserAdminService(repo, nil, auditW)
 
-		_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "orig@example.com", Role: "APPACCESS", EmployeeID: "EMP99"}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "orig@example.com", Role: "APPACCESS", EmployeeID: "EMP99"}, "10.0.0.1")
 		var conflictErr *ConflictError
 		if !errors.As(err, &conflictErr) || conflictErr.Field != "employee_id" {
 			t.Fatalf("err = %v, want *ConflictError{Field: employee_id}", err)
@@ -611,9 +619,9 @@ func TestUserAdminService_Update_RepoNoRowsMapsToNotFound(t *testing.T) {
 		},
 	}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS"}, "10.0.0.1")
+	_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS"}, "10.0.0.1")
 	if !errors.Is(err, pkgauth.ErrUserNotFound) {
 		t.Fatalf("err = %v, want pkgauth.ErrUserNotFound", err)
 	}
@@ -628,9 +636,9 @@ func TestUserAdminService_Update_Success_AuditsOnceWithBeforeAfter(t *testing.T)
 		getByIDFunc: func(ctx context.Context, id int64) (*db.GetUserAdminByIDRow, error) { return before, nil },
 	}
 	auditW := &fakeAuditWriter{}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Update(context.Background(), 7, 1, UpdateUserRequest{FullName: "Renamed", Email: "orig@example.com", Role: "APPACCESS"}, "10.0.0.1")
+	_, err := svc.Update(context.Background(), 7, "APPACCESS", 1, UpdateUserRequest{FullName: "Renamed", Email: "orig@example.com", Role: "APPACCESS"}, "10.0.0.1")
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -650,9 +658,9 @@ func TestUserAdminService_Update_AuditFailureSurfacesError(t *testing.T) {
 		},
 	}
 	auditW := &fakeAuditWriter{forceErr: errors.New("audit db down")}
-	svc := NewUserAdminService(repo, auditW)
+	svc := NewUserAdminService(repo, nil, auditW)
 
-	_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS"}, "10.0.0.1")
+	_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS"}, "10.0.0.1")
 	if err == nil {
 		t.Fatal("Update: want an error when the audit write fails, got nil")
 	}
@@ -694,9 +702,9 @@ func TestUserAdminService_Update_ReferenceErrors(t *testing.T) {
 	t.Run("unknown role", func(t *testing.T) {
 		repo := base()
 		repo.getRoleByNameFunc = func(ctx context.Context, role string) (*db.GetRoleByNameRow, error) { return nil, nil }
-		svc := NewUserAdminService(repo, &fakeAuditWriter{})
+		svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
-		_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "MISSING"}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "MISSING"}, "10.0.0.1")
 		var refErr *ReferenceError
 		if !errors.As(err, &refErr) || refErr.Field != "role" {
 			t.Fatalf("err = %v, want *ReferenceError{Field: role}", err)
@@ -706,9 +714,9 @@ func TestUserAdminService_Update_ReferenceErrors(t *testing.T) {
 	t.Run("unknown vendor_id", func(t *testing.T) {
 		repo := base()
 		repo.vendorExistsFunc = func(ctx context.Context, vendorID int64) (bool, error) { return false, nil }
-		svc := NewUserAdminService(repo, &fakeAuditWriter{})
+		svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
-		_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS", VendorID: ptrInt64(99)}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS", VendorID: ptrInt64(99)}, "10.0.0.1")
 		var refErr *ReferenceError
 		if !errors.As(err, &refErr) || refErr.Field != "vendor_id" {
 			t.Fatalf("err = %v, want *ReferenceError{Field: vendor_id}", err)
@@ -718,9 +726,9 @@ func TestUserAdminService_Update_ReferenceErrors(t *testing.T) {
 	t.Run("unknown supervisor_id", func(t *testing.T) {
 		repo := base()
 		repo.supervisorExistsFunc = func(ctx context.Context, userID int64) (bool, error) { return false, nil }
-		svc := NewUserAdminService(repo, &fakeAuditWriter{})
+		svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
-		_, err := svc.Update(context.Background(), 1, 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS", SupervisorID: ptrInt64(99)}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS", SupervisorID: ptrInt64(99)}, "10.0.0.1")
 		var refErr *ReferenceError
 		if !errors.As(err, &refErr) || refErr.Field != "supervisor_id" {
 			t.Fatalf("err = %v, want *ReferenceError{Field: supervisor_id}", err)
@@ -738,7 +746,7 @@ func TestUserAdminService_List_PassesThroughToRepo(t *testing.T) {
 		}
 		return want, nil
 	}}
-	svc := NewUserAdminService(repo, &fakeAuditWriter{})
+	svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
 	got, err := svc.List(context.Background(), db.ListUsersAdminParams{Status: "active"})
 	if err != nil {
@@ -751,7 +759,7 @@ func TestUserAdminService_List_PassesThroughToRepo(t *testing.T) {
 
 func TestUserAdminService_Count_PassesThroughToRepo(t *testing.T) {
 	repo := &fakeUserAdminRepo{countFunc: func(ctx context.Context, arg db.CountUsersAdminParams) (int64, error) { return 42, nil }}
-	svc := NewUserAdminService(repo, &fakeAuditWriter{})
+	svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
 	got, err := svc.Count(context.Background(), db.CountUsersAdminParams{Status: "all"})
 	if err != nil {
@@ -766,7 +774,7 @@ func TestUserAdminService_Get_PassesThroughToRepo(t *testing.T) {
 	repo := &fakeUserAdminRepo{getByIDFunc: func(ctx context.Context, id int64) (*db.GetUserAdminByIDRow, error) {
 		return activeUserRow(id, "u", "ldap", "u@example.com"), nil
 	}}
-	svc := NewUserAdminService(repo, &fakeAuditWriter{})
+	svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
 	got, err := svc.Get(context.Background(), 7)
 	if err != nil {

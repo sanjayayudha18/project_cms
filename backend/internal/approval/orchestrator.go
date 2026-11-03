@@ -1,15 +1,22 @@
 package approval
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"context"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+)
+
+const (
+	pgUniqueViolation        = "23505"
+	documentUniqueConstraint = "approval_requests_document_uq"
 )
 
 // Orchestrator drives the maker-checker state machine: submit, approve,
@@ -57,29 +64,54 @@ func (o *Orchestrator) SubmitForApproval(ctx context.Context, makerID int64, doc
 		return db.ApprovalRequest{}, false, err
 	}
 
-	request, err = o.store.CreateRequest(ctx, makerID, documentType, documentID, amount, requiredLevel)
-	if err != nil {
-		return db.ApprovalRequest{}, false, fmt.Errorf("create approval request: %w", err)
-	}
-
-	for _, approver := range chain {
-		if _, err := o.store.CreateStep(ctx, request.ID, *approver.ApprovalLevel, approver.UserID); err != nil {
-			return db.ApprovalRequest{}, false, fmt.Errorf("create approval step (level %d): %w", *approver.ApprovalLevel, err)
+	// One transaction, so a request is never visible, or left behind, without its
+	// steps and audit.
+	err = o.store.RunInTx(ctx, func(store RequestStore, tx db.DBTX) error {
+		var err error
+		request, err = store.CreateRequest(ctx, makerID, documentType, documentID, amount, requiredLevel)
+		if err != nil {
+			return fmt.Errorf("create approval request: %w", err)
+		}
+		for _, approver := range chain {
+			if _, err := store.CreateStep(ctx, request.ID, *approver.ApprovalLevel, approver.UserID); err != nil {
+				return fmt.Errorf("create approval step (level %d): %w", *approver.ApprovalLevel, err)
+			}
+		}
+		if err := o.audit.WriteTx(ctx, tx, audit.Entry{
+			ActorID:    makerID,
+			Action:     "submit",
+			EntityType: "approval_request",
+			EntityID:   request.ID,
+			After:      request,
+			IP:         actorIP,
+		}); err != nil {
+			return fmt.Errorf("write audit log: %w", err)
+		}
+		return nil
+	})
+	if isDocumentConflict(err) {
+		// A concurrent submit won between the lookup above and the insert: same
+		// answer as a repeat submit. Re-read outside the transaction, which the
+		// conflict aborted; the winner has committed its steps and audit.
+		existing, findErr := o.store.FindRequestByDocument(ctx, documentType, documentID)
+		if findErr != nil {
+			return db.ApprovalRequest{}, false, fmt.Errorf("reload request for %s/%d: %w", documentType, documentID, findErr)
+		}
+		if existing != nil {
+			return *existing, false, nil
 		}
 	}
-
-	if err := o.audit.Write(ctx, audit.Entry{
-		ActorID:    makerID,
-		Action:     "submit",
-		EntityType: "approval_request",
-		EntityID:   request.ID,
-		After:      request,
-		IP:         actorIP,
-	}); err != nil {
-		return db.ApprovalRequest{}, false, fmt.Errorf("write audit log: %w", err)
+	if err != nil {
+		return db.ApprovalRequest{}, false, err
 	}
 
 	return request, true, nil
+}
+
+// isDocumentConflict reports a unique violation of the one-request-per-document constraint.
+func isDocumentConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == documentUniqueConstraint
 }
 
 // Approve validates that actorID is the effective approver (assigned approver,
@@ -99,57 +131,64 @@ func (o *Orchestrator) Approve(ctx context.Context, requestID, actorID int64, ac
 		return db.ApprovalRequest{}, fmt.Errorf("actor %d, expected approver %d for step %d: %w", actorID, effectiveApprover, step.ID, ErrNotAuthorized)
 	}
 
-	updatedStep, err := o.store.UpdateStepStatus(ctx, step.ID, "approved", actorID, o.now())
-	if err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("update approval step %d: %w", step.ID, err)
-	}
-
-	if err := o.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "approve",
-		EntityType: "approval_step",
-		EntityID:   updatedStep.ID,
-		Before:     map[string]string{"status": "pending"},
-		After:      map[string]string{"status": "approved"},
-		IP:         actorIP,
-	}); err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	steps, err := o.store.ListSteps(ctx, requestID)
-	if err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("list steps for request %d: %w", requestID, err)
-	}
-	var maxLevel int32
-	for _, s := range steps {
-		if s.StepLevel > maxLevel {
-			maxLevel = s.StepLevel
+	// One transaction, so a decision is never left half-made or without its audit.
+	err = o.store.RunInTx(ctx, func(store RequestStore, tx db.DBTX) error {
+		updatedStep, err := store.UpdateStepStatus(ctx, step.ID, "approved", actorID, o.now())
+		if err != nil {
+			return fmt.Errorf("update approval step %d: %w", step.ID, err)
 		}
-	}
 
-	if updatedStep.StepLevel < maxLevel {
-		// More steps above this one — request stays pending.
-		return request, nil
-	}
+		if err := o.audit.WriteTx(ctx, tx, audit.Entry{
+			ActorID:    actorID,
+			Action:     "approve",
+			EntityType: "approval_step",
+			EntityID:   updatedStep.ID,
+			Before:     map[string]string{"status": "pending"},
+			After:      map[string]string{"status": "approved"},
+			IP:         actorIP,
+		}); err != nil {
+			return fmt.Errorf("write audit log: %w", err)
+		}
 
-	finalRequest, err := o.store.UpdateRequestStatus(ctx, requestID, "approved")
+		steps, err := store.ListSteps(ctx, requestID)
+		if err != nil {
+			return fmt.Errorf("list steps for request %d: %w", requestID, err)
+		}
+		var maxLevel int32
+		for _, s := range steps {
+			if s.StepLevel > maxLevel {
+				maxLevel = s.StepLevel
+			}
+		}
+
+		if updatedStep.StepLevel < maxLevel {
+			// More steps above this one — request stays pending.
+			return nil
+		}
+
+		request, err = store.UpdateRequestStatus(ctx, requestID, "approved")
+		if err != nil {
+			return fmt.Errorf("update approval request %d: %w", requestID, err)
+		}
+
+		if err := o.audit.WriteTx(ctx, tx, audit.Entry{
+			ActorID:    actorID,
+			Action:     "final_approve",
+			EntityType: "approval_request",
+			EntityID:   requestID,
+			Before:     map[string]string{"status": "pending"},
+			After:      map[string]string{"status": "approved"},
+			IP:         actorIP,
+		}); err != nil {
+			return fmt.Errorf("write audit log: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("update approval request %d: %w", requestID, err)
+		return db.ApprovalRequest{}, err
 	}
 
-	if err := o.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "final_approve",
-		EntityType: "approval_request",
-		EntityID:   requestID,
-		Before:     map[string]string{"status": "pending"},
-		After:      map[string]string{"status": "approved"},
-		IP:         actorIP,
-	}); err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("write audit log: %w", err)
-	}
-
-	return finalRequest, nil
+	return request, nil
 }
 
 // Reject validates that actorID is the effective approver for the request's
@@ -168,25 +207,34 @@ func (o *Orchestrator) Reject(ctx context.Context, requestID, actorID int64, act
 		return db.ApprovalRequest{}, fmt.Errorf("actor %d, expected approver %d for step %d: %w", actorID, effectiveApprover, step.ID, ErrNotAuthorized)
 	}
 
-	if _, err := o.store.UpdateStepStatus(ctx, step.ID, "rejected", actorID, o.now()); err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("update approval step %d: %w", step.ID, err)
-	}
+	// One transaction, so a decision is never left half-made or without its audit.
+	var finalRequest db.ApprovalRequest
+	err = o.store.RunInTx(ctx, func(store RequestStore, tx db.DBTX) error {
+		if _, err := store.UpdateStepStatus(ctx, step.ID, "rejected", actorID, o.now()); err != nil {
+			return fmt.Errorf("update approval step %d: %w", step.ID, err)
+		}
 
-	finalRequest, err := o.store.UpdateRequestStatus(ctx, requestID, "rejected")
+		var err error
+		finalRequest, err = store.UpdateRequestStatus(ctx, requestID, "rejected")
+		if err != nil {
+			return fmt.Errorf("update approval request %d: %w", requestID, err)
+		}
+
+		if err := o.audit.WriteTx(ctx, tx, audit.Entry{
+			ActorID:    actorID,
+			Action:     "reject",
+			EntityType: "approval_request",
+			EntityID:   requestID,
+			Before:     map[string]string{"status": "pending"},
+			After:      map[string]string{"status": "rejected"},
+			IP:         actorIP,
+		}); err != nil {
+			return fmt.Errorf("write audit log: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("update approval request %d: %w", requestID, err)
-	}
-
-	if err := o.audit.Write(ctx, audit.Entry{
-		ActorID:    actorID,
-		Action:     "reject",
-		EntityType: "approval_request",
-		EntityID:   requestID,
-		Before:     map[string]string{"status": "pending"},
-		After:      map[string]string{"status": "rejected"},
-		IP:         actorIP,
-	}); err != nil {
-		return db.ApprovalRequest{}, fmt.Errorf("write audit log: %w", err)
+		return db.ApprovalRequest{}, err
 	}
 
 	return finalRequest, nil

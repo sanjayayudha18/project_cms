@@ -121,8 +121,8 @@ func (s *AtmPortalService) ListCashpos(ctx context.Context, params ListCashposPa
 		DateTo:    params.DateTo,
 		SortBy:    params.SortBy,
 		SortOrder: params.SortOrder,
-		Page:      int32(params.Page),
-		PageSize:  int32(params.PageSize),
+		Page:      int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:  int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	}
 	rows, err := repo.ListItmCashpos(ctx, listArg)
 	if err != nil {

@@ -27,6 +27,18 @@ async def create_db_pool(settings: Any) -> asyncpg.Pool:
     return await asyncpg.create_pool(dsn=settings.database_url, min_size=1, max_size=10)
 
 
+async def create_read_pool(settings: Any, primary: asyncpg.Pool) -> asyncpg.Pool:
+    """Read-replica pool for the read-only monitoring APIs (CLAUDE.md Sec 6).
+
+    Falls back to `primary` when `database_replica_url` is empty (local/dev).
+    Callers close it only if it is not `primary`.
+    """
+    url = getattr(settings, "database_replica_url", "")
+    if not url:
+        return primary
+    return await asyncpg.create_pool(dsn=url, min_size=1, max_size=10)
+
+
 @asynccontextmanager
 async def get_db_pool(settings: Any) -> AsyncIterator[asyncpg.Pool]:
     """Lifespan helper: yields a pool, closes it on exit."""
@@ -96,6 +108,12 @@ if __name__ == "__main__":
 
         result = await with_db_retry(_succeeds_on_second, max_attempts=3, base_delay=0.01)
         assert result == "ok"
+        class _NoReplica:
+            database_replica_url = ""
+
+        primary = object()
+        assert await create_read_pool(_NoReplica(), primary) is primary
+
         print("database.py demo OK")
 
     asyncio.run(_demo())

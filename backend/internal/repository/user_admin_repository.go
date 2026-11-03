@@ -14,9 +14,10 @@ import (
 // enable reuse the existing AuthRepository.Deactivate/Reactivate via
 // DeactivateUserService — not duplicated here.
 //
-// ponytail: uses dbPool for both reads and writes; swap List/Count to the
-// dbRead pool when DATABASE_REPLICA_URL wiring lands (same TODO convention
-// as AuditLogRepository / RbacReadRepository).
+// Deliberately primary-only (no replica): user create/update apply immediately
+// (not maker-checker), and the admin screen re-lists right after a write, so
+// replica lag would hide the user just created (same reason as
+// MasterDataChangeRepository List/Count).
 type UserAdminRepository struct {
 	queries *db.Queries
 }
@@ -168,4 +169,23 @@ func (r *UserAdminRepository) VendorExists(ctx context.Context, vendorID int64) 
 // (Req 3.7, 4.7).
 func (r *UserAdminRepository) SupervisorExists(ctx context.Context, userID int64) (bool, error) {
 	return r.queries.UserAdminExists(ctx, userID)
+}
+
+// VendorBranchBelongsToVendor reports whether branchID is an active branch of
+// vendorID (vendor-party-scope Req 2.4).
+func (r *UserAdminRepository) VendorBranchBelongsToVendor(ctx context.Context, branchID, vendorID int64) (bool, error) {
+	return r.queries.VendorBranchBelongsToVendor(ctx, db.VendorBranchBelongsToVendorParams{BranchID: branchID, VendorID: vendorID})
+}
+
+// ListVendorOptions returns active vendors for the admin user form
+// (vendor-party-scope Req 2.7). Construct this repository on the replica
+// pool for this read.
+func (r *UserAdminRepository) ListVendorOptions(ctx context.Context) ([]db.ListVendorOptionsAdminRow, error) {
+	return r.queries.ListVendorOptionsAdmin(ctx)
+}
+
+// ListVendorBranchOptions returns active branches of active vendors for the
+// admin user form (vendor-party-scope Req 2.7).
+func (r *UserAdminRepository) ListVendorBranchOptions(ctx context.Context) ([]db.ListVendorBranchOptionsAdminRow, error) {
+	return r.queries.ListVendorBranchOptionsAdmin(ctx)
 }

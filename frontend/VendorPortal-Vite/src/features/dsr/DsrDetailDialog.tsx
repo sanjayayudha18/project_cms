@@ -1,36 +1,51 @@
 import type { DsrUploadListItem } from "@/features/dsr/dsrUploadApi";
 import { getDsrDailyDetail, getDsrRencanaIsiDetail } from "@/features/dsr/dsrUploadApi";
+import { formatDecimalIDR } from "@/lib/formatters";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
+import { useEffect } from "react";
 
 interface DsrDetailDialogProps {
   readonly item: DsrUploadListItem;
   readonly onClose: () => void;
 }
 
-function formatIDR(value: number | null): string {
-  if (value === null) return "-";
-  return value.toLocaleString("id-ID");
-}
-
 export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
   const dailyQuery = useQuery({
     queryKey: ["dsr-daily-detail", item.daily?.file_id],
-    queryFn: () => getDsrDailyDetail(item.daily!.file_id),
+    // Only runs when enabled (file present); the guard just satisfies the type.
+    queryFn: () =>
+      item.daily
+        ? getDsrDailyDetail(item.daily.file_id)
+        : Promise.reject(new Error("no daily file")),
     enabled: item.daily !== null,
   });
 
   const rencanaQuery = useQuery({
     queryKey: ["dsr-rencana-detail", item.rencana_isi?.file_id],
-    queryFn: () => getDsrRencanaIsiDetail(item.rencana_isi!.file_id),
+    queryFn: () =>
+      item.rencana_isi
+        ? getDsrRencanaIsiDetail(item.rencana_isi.file_id)
+        : Promise.reject(new Error("no rencana isi file")),
     enabled: item.rencana_isi !== null,
   });
 
   const isLoading = dailyQuery.isLoading || rencanaQuery.isLoading;
 
+  // Escape closes the dialog (keyboard counterpart of the overlay click).
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: overlay click has a keyboard counterpart (Escape, above)
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      // biome-ignore lint/a11y/useSemanticElements: custom modal overlay; native <dialog> deferred (user 2026-10-12)
       role="dialog"
       aria-modal="true"
       aria-labelledby="dsr-detail-title"
@@ -81,7 +96,7 @@ export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
                             <td className="px-3 py-1.5 text-neutral-400">{row.row_no}</td>
                             <td className="px-3 py-1.5">{row.line_label}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.line_total_idr)}
+                              {formatDecimalIDR(row.line_total_idr)}
                             </td>
                           </tr>
                         ))}
@@ -110,10 +125,10 @@ export function DsrDetailDialog({ item, onClose }: DsrDetailDialogProps) {
                             <td className="px-3 py-1.5">{row.atm_terminal_id}</td>
                             <td className="px-3 py-1.5">{row.atm_location ?? "-"}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.fill_100k_idr)}
+                              {formatDecimalIDR(row.fill_100k_idr)}
                             </td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
-                              {formatIDR(row.fill_50k_idr)}
+                              {formatDecimalIDR(row.fill_50k_idr)}
                             </td>
                           </tr>
                         ))}

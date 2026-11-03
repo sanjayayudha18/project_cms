@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -113,8 +114,26 @@ func (f *quotaFixture) approvedRequest(t *testing.T, terminals ...string) int64 
 				t.Fatalf("insert item: %v", err)
 			}
 		}
+		seedTicket(t, f.tx, id, term)
 	}
 	return id
+}
+
+// seedTicket gives a fixture request's ATM its active ticket (replenish-ticket
+// FR9: laporan selesai is stored on the ticket).
+func seedTicket(t *testing.T, q interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}, requestID int64, terminal string) {
+	t.Helper()
+	if _, err := q.Exec(context.Background(), `
+		INSERT INTO vendor_request_tickets (request_number, terminal_id, denom_code, replenish_date, seq, ticket_number)
+		SELECT vr.request_number, $2, 'MIX', CURRENT_DATE, n.seq, $2 || '_MIX_' || to_char(CURRENT_DATE, 'YYYYMMDD') || '_' || lpad(n.seq::text, 3, '0')
+		FROM vendor_requests vr,
+		     (SELECT (COALESCE(max(seq), 0) + 1)::smallint AS seq FROM vendor_request_tickets
+		      WHERE terminal_id = $2 AND replenish_date = CURRENT_DATE) n
+		WHERE vr.id = $1`, requestID, terminal); err != nil {
+		t.Fatalf("seed ticket %s: %v", terminal, err)
+	}
 }
 
 func (f *quotaFixture) complete(t *testing.T, id int64, results map[string]string) []string {
@@ -387,7 +406,7 @@ func TestIntegration_VisitQuota_ParallelApprovals(t *testing.T) {
 		_, _ = pool.Exec(ctx, `DELETE FROM atm_visit_quotas WHERE atm_id = $1`, ids.atm)
 		_, _ = pool.Exec(ctx, `DELETE FROM atm_vendor_packages WHERE atm_id = $1`, ids.atm)
 		for _, id := range reqs {
-			_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_atm_results WHERE vendor_request_id = $1`, id)
+			_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_tickets WHERE request_number = (SELECT request_number FROM vendor_requests WHERE id = $1)`, id)
 			_, _ = pool.Exec(ctx, `DELETE FROM vendor_request_items WHERE vendor_request_id = $1`, id)
 			_, _ = pool.Exec(ctx, `DELETE FROM audit_logs WHERE entity_type = 'vendor_request' AND entity_id = $1`, id)
 			_, _ = pool.Exec(ctx, `DELETE FROM vendor_requests WHERE id = $1`, id)
@@ -416,6 +435,7 @@ func TestIntegration_VisitQuota_ParallelApprovals(t *testing.T) {
 			VALUES ($1, CURRENT_DATE, $2, 'approved') RETURNING id`, "IVQP-"+uuid.NewString()[:12], checker.UserID).Scan(&id))
 		reqs = append(reqs, id)
 		exec(`INSERT INTO vendor_request_items (vendor_request_id, terminal_id, periode_pred, denom, amount_replenish) VALUES ($1, $2, CURRENT_DATE, 50000, 1)`, id, terminal)
+		seedTicket(t, pool, id, terminal)
 	}
 
 	svc := NewVendorRequestService(pool)

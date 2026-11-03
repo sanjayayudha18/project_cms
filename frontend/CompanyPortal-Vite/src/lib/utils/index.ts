@@ -1,9 +1,9 @@
 export { cn } from "./cn";
 export { formatDate, formatDateShort, formatDateTime } from "./date";
-export { formatIDR } from "./format";
+export { formatRp } from "./format";
 export { deriveStatus } from "./deriveStatus";
 export type { BalanceStatus } from "./deriveStatus";
-export { formatIDR as formatIDRRaw, parseIDR } from "./formatCurrency";
+export { formatThousands, parseIDR } from "./formatCurrency";
 export {
   formatIDRAbbreviated,
   formatIDRFull,

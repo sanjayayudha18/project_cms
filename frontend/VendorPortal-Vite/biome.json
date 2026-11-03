@@ -42,7 +42,7 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "*.min.js"]
+    "ignore": ["node_modules", "dist", "coverage", "*.min.js"]
   },
   "overrides": [
     {

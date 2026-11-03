@@ -188,11 +188,15 @@ func (s *DsrService) WriteAndDryRun(ctx context.Context, vendorCode string, user
 	// <vendor_code>__<user_id>__<original_filename> -- the filename contract
 	// backend_python/dsr/dsr_etl.py's parse_upload_filename expects.
 	diskName := fmt.Sprintf("%s__%d__%s", vendorCode, userID, sanitizedName)
-	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil {
+	// 0755/0644 on purpose: backend_python (a different host user, outside this
+	// container) must read the file and move it to backups/. Accepted because the
+	// VM is application-only; tighten to a shared group once Python is containerised
+	// (backend_QC_fixes.md F5, docs/deployment.md).
+	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil { //nolint:gosec // G301: see above
 		return nil, fmt.Errorf("creating upload dir: %w", err)
 	}
 	diskPath := filepath.Join(s.uploadDir, diskName)
-	if err := os.WriteFile(diskPath, content, 0o644); err != nil {
+	if err := os.WriteFile(diskPath, content, 0o644); err != nil { //nolint:gosec // G306: see above
 		return nil, fmt.Errorf("writing upload: %w", err)
 	}
 
@@ -335,14 +339,14 @@ type DsrDailyRow struct {
 	Flow         string
 	LineLabel    string
 	MemoNo       *string
-	Denom100k    *float64
-	Denom50k     *float64
-	Denom20k     *float64
-	Denom10k     *float64
-	Denom5k      *float64
-	Denom2k      *float64
-	Denom1k      *float64
-	LineTotalIdr *float64
+	Denom100k    *string
+	Denom50k     *string
+	Denom20k     *string
+	Denom10k     *string
+	Denom5k      *string
+	Denom2k      *string
+	Denom1k      *string
+	LineTotalIdr *string
 	Remarks      *string
 }
 
@@ -352,9 +356,9 @@ type DsrRencanaIsiRow struct {
 	AtmTerminalID        string
 	AtmLocation          *string
 	DenomConfig          *string
-	Fill100kIdr          *float64
-	Fill50kIdr           *float64
-	SplankBalance0800Idr *float64
+	Fill100kIdr          *string
+	Fill50kIdr           *string
+	SplankBalance0800Idr *string
 	Remarks              *string
 }
 
@@ -506,7 +510,7 @@ func (s *DsrService) ListUploads(ctx context.Context, params DsrListUploadsParam
 
 	uploads, err := s.repo.ListDsrUploadsByVendor(ctx, db.ListDsrUploadsByVendorParams{
 		Vendor: params.VendorName, DateFrom: params.DateFrom, DateTo: params.DateTo,
-		Page: int32(params.Page), PageSize: int32(params.PageSize),
+		Page: int32(params.Page), PageSize: int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing uploads: %w", err)
@@ -565,28 +569,28 @@ func dailyRowsToDto(rows []db.ListDsrDailyRowsRow) ([]DsrDailyRow, error) {
 	for i, r := range rows {
 		var err error
 		row := DsrDailyRow{RowNo: r.RowNo, Section: r.Section, Flow: r.Flow, LineLabel: r.LineLabel, MemoNo: r.MemoNo, Remarks: r.Remarks}
-		if row.Denom100k, err = numericToFloat64Ptr(r.Denom100kIdr); err != nil {
+		if row.Denom100k, err = numericToDecimalStringPtr(r.Denom100kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom50k, err = numericToFloat64Ptr(r.Denom50kIdr); err != nil {
+		if row.Denom50k, err = numericToDecimalStringPtr(r.Denom50kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom20k, err = numericToFloat64Ptr(r.Denom20kIdr); err != nil {
+		if row.Denom20k, err = numericToDecimalStringPtr(r.Denom20kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom10k, err = numericToFloat64Ptr(r.Denom10kIdr); err != nil {
+		if row.Denom10k, err = numericToDecimalStringPtr(r.Denom10kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom5k, err = numericToFloat64Ptr(r.Denom5kIdr); err != nil {
+		if row.Denom5k, err = numericToDecimalStringPtr(r.Denom5kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom2k, err = numericToFloat64Ptr(r.Denom2kIdr); err != nil {
+		if row.Denom2k, err = numericToDecimalStringPtr(r.Denom2kIdr); err != nil {
 			return nil, err
 		}
-		if row.Denom1k, err = numericToFloat64Ptr(r.Denom1kIdr); err != nil {
+		if row.Denom1k, err = numericToDecimalStringPtr(r.Denom1kIdr); err != nil {
 			return nil, err
 		}
-		if row.LineTotalIdr, err = numericToFloat64Ptr(r.LineTotalIdr); err != nil {
+		if row.LineTotalIdr, err = numericToDecimalStringPtr(r.LineTotalIdr); err != nil {
 			return nil, err
 		}
 		out[i] = row
@@ -599,13 +603,13 @@ func rencanaIsiRowsToDto(rows []db.ListDsrRencanaIsiRowsRow) ([]DsrRencanaIsiRow
 	for i, r := range rows {
 		var err error
 		row := DsrRencanaIsiRow{RowNo: r.RowNo, AtmTerminalID: r.AtmTerminalID, AtmLocation: r.AtmLocation, DenomConfig: r.DenomConfig, Remarks: r.Remarks}
-		if row.Fill100kIdr, err = numericToFloat64Ptr(r.Fill100kIdr); err != nil {
+		if row.Fill100kIdr, err = numericToDecimalStringPtr(r.Fill100kIdr); err != nil {
 			return nil, err
 		}
-		if row.Fill50kIdr, err = numericToFloat64Ptr(r.Fill50kIdr); err != nil {
+		if row.Fill50kIdr, err = numericToDecimalStringPtr(r.Fill50kIdr); err != nil {
 			return nil, err
 		}
-		if row.SplankBalance0800Idr, err = numericToFloat64Ptr(r.SplankBalance0800Idr); err != nil {
+		if row.SplankBalance0800Idr, err = numericToDecimalStringPtr(r.SplankBalance0800Idr); err != nil {
 			return nil, err
 		}
 		out[i] = row

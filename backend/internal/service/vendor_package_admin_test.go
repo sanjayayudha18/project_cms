@@ -199,3 +199,32 @@ func TestVendorPackageAdminService_Disable_Scoping(t *testing.T) {
 		})
 	}
 }
+
+// QC F17: disable ends the period as of yesterday, so only a price that
+// already started (before today, WIB) can be disabled; a later one is a 422
+// at submit instead of a 409 at approve.
+func TestVendorPackageAdminService_Disable_NotYetEffective(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		startDays  int
+		wantStaged bool
+	}{
+		{"running since yesterday", -1, true},
+		{"starts today", 0, false},
+		{"starts tomorrow", 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			row := &db.GetVendorPackageAdminByIDRow{ID: 1, VendorID: 3,
+				EffectiveStartDate: pgtype.Date{Time: jakartaCalendarDate(tc.startDays), Valid: true}}
+			sub := &fakeVendorBranchSubmitter{}
+			_, err := NewVendorPackageAdminService(&fakeVendorPackageAdminRepo{getByID: row}, sub).Disable(context.Background(), 7, 3, 1, "ip")
+			var ve *ValidationError
+			switch {
+			case tc.wantStaged && (err != nil || sub.lastRequest.Op != "disable"):
+				t.Fatalf("want staged disable, got %v (%+v)", err, sub.lastRequest)
+			case !tc.wantStaged && (!errors.As(err, &ve) || ve.Field != "effective_start_date" || sub.submitCalled):
+				t.Fatalf("want effective_start_date ValidationError and no submit, got %v", err)
+			}
+		})
+	}
+}

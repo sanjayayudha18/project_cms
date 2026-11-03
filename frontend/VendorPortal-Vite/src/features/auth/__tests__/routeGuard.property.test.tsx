@@ -170,18 +170,8 @@ function buildRouter(initialPath: string) {
     getParentRoute: () => shellRoute,
     component: ProtectedProbe,
   });
-  const evidenceRoute = createRoute({
-    path: "/orders/$id/evidence",
-    getParentRoute: () => shellRoute,
-    component: ProtectedProbe,
-  });
-  const invoicesRoute = createRoute({
-    path: "/invoices",
-    getParentRoute: () => shellRoute,
-    component: ProtectedProbe,
-  });
-  const scheduleRoute = createRoute({
-    path: "/schedule",
+  const orderDetailRoute = createRoute({
+    path: "/orders/$id",
     getParentRoute: () => shellRoute,
     component: ProtectedProbe,
   });
@@ -207,14 +197,7 @@ function buildRouter(initialPath: string) {
   const routeTree = rootRoute.addChildren([
     authRoute.addChildren([loginRoute]),
     protectedRoute.addChildren([
-      shellRoute.addChildren([
-        ordersRoute,
-        evidenceRoute,
-        invoicesRoute,
-        scheduleRoute,
-        dsrRoute,
-        notificationsRoute,
-      ]),
+      shellRoute.addChildren([ordersRoute, orderDetailRoute, dsrRoute, notificationsRoute]),
     ]),
     indexRoute,
   ]);
@@ -227,13 +210,11 @@ function buildRouter(initialPath: string) {
 
 const protectedPathArb = fc.oneof(
   fc.constant("/orders"),
-  fc.constant("/invoices"),
-  fc.constant("/schedule"),
   fc.constant("/dsr"),
   fc.constant("/notifications"),
   fc
     .array(fc.constantFrom("a", "b", "c", "1", "2", "3", "-"), { minLength: 1, maxLength: 8 })
-    .map((chars) => `/orders/${chars.join("")}/evidence`),
+    .map((chars) => `/orders/${chars.join("")}`),
 );
 
 // Optional query string appended to a protected path. Keys are unique (a subset of
@@ -262,67 +243,83 @@ async function settle() {
 // run, which is memory-heavy. The non-interactive redirect check stays at 100 runs;
 // interactive checks use a smaller-but-still-broad sample to stay within heap limits.
 const INTERACTIVE_RUNS = 40;
+// 40 rendered login round-trips per test: the 5 s vitest default is too tight
+// once the full suite runs in parallel (seen flaky 2026-10-09).
+const INTERACTIVE_TIMEOUT_MS = 30_000;
+// findBy*/waitFor default to 1 s; with the CPU busy (full suite next to another
+// job) the router render misses it and the property fails on its first input
+// (reproduced 2026-10-12, "Unable to find ... login-page"). A larger budget only
+// costs time when rendering is actually slow.
+const WAIT = { timeout: 5_000 };
 
 // ─── Property 1: Route-Guard Round-Trip ─────────────────────────────────────────
 
 describe("Feature: vendor-portal-tanstack-router-migration, Property 1: Route-Guard Round-Trip", () => {
-  it("unauthenticated access to a protected path redirects to /login preserving the path + query", async () => {
-    await fc.assert(
-      fc.asyncProperty(protectedPathArb, queryStringArb, async (path, qs) => {
-        cleanup();
-        queryClient.clear();
-        const fullPath = path + qs;
-        const router = buildRouter(fullPath);
-        const { unmount } = render(<RouterProvider router={router} />);
+  it(
+    "unauthenticated access to a protected path redirects to /login preserving the path + query",
+    async () => {
+      await fc.assert(
+        fc.asyncProperty(protectedPathArb, queryStringArb, async (path, qs) => {
+          cleanup();
+          queryClient.clear();
+          const fullPath = path + qs;
+          const router = buildRouter(fullPath);
+          const { unmount } = render(<RouterProvider router={router} />);
 
-        await settle();
+          await settle();
 
-        // Redirected to /login
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
-        expect(screen.getByTestId("pathname").textContent).toBe("/login");
+          // Redirected to /login
+          expect(await screen.findByTestId("login-page", {}, WAIT)).toBeInTheDocument();
+          expect(screen.getByTestId("pathname").textContent).toBe("/login");
 
-        // redirect target preserves the original full path (pathname + search)
-        expect(screen.getByTestId("redirect-target").textContent).toBe(fullPath);
+          // redirect target preserves the original full path (pathname + search)
+          expect(screen.getByTestId("redirect-target").textContent).toBe(fullPath);
 
-        unmount();
-        cleanup();
-        queryClient.clear();
-      }),
-      { numRuns: 100 },
-    );
-  });
+          unmount();
+          cleanup();
+          queryClient.clear();
+        }),
+        { numRuns: 100 },
+      );
+    },
+    INTERACTIVE_TIMEOUT_MS,
+  );
 
-  it("after successful login, user is returned to the originally requested path", async () => {
-    const user = userEvent.setup();
-    await fc.assert(
-      fc.asyncProperty(protectedPathArb, async (path) => {
-        cleanup();
-        queryClient.clear();
-        const router = buildRouter(path);
-        const { unmount } = render(<RouterProvider router={router} />);
+  it(
+    "after successful login, user is returned to the originally requested path",
+    async () => {
+      const user = userEvent.setup();
+      await fc.assert(
+        fc.asyncProperty(protectedPathArb, async (path) => {
+          cleanup();
+          queryClient.clear();
+          const router = buildRouter(path);
+          const { unmount } = render(<RouterProvider router={router} />);
 
-        await settle();
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
-        // The guard must have preserved the requested path into the redirect target
-        // before we log in, otherwise post-login would fall back to /orders.
-        await waitFor(() => {
-          expect(screen.getByTestId("redirect-target").textContent).toBe(path);
-        });
+          await settle();
+          expect(await screen.findByTestId("login-page", {}, WAIT)).toBeInTheDocument();
+          // The guard must have preserved the requested path into the redirect target
+          // before we log in, otherwise post-login would fall back to /orders.
+          await waitFor(() => {
+            expect(screen.getByTestId("redirect-target").textContent).toBe(path);
+          }, WAIT);
 
-        await user.click(screen.getByTestId("do-login"));
-        await settle();
+          await user.click(screen.getByTestId("do-login"));
+          await settle();
 
-        // Back on the protected page at the original path
-        expect(screen.getByTestId("protected-page")).toBeInTheDocument();
-        expect(screen.getByTestId("pathname").textContent).toBe(path);
+          // Back on the protected page at the original path
+          expect(await screen.findByTestId("protected-page", {}, WAIT)).toBeInTheDocument();
+          expect(screen.getByTestId("pathname").textContent).toBe(path);
 
-        unmount();
-        cleanup();
-        queryClient.clear();
-      }),
-      { numRuns: INTERACTIVE_RUNS },
-    );
-  });
+          unmount();
+          cleanup();
+          queryClient.clear();
+        }),
+        { numRuns: INTERACTIVE_RUNS },
+      );
+    },
+    INTERACTIVE_TIMEOUT_MS,
+  );
 });
 
 // ─── Property 2: Sanitasi Redirect Param ────────────────────────────────────────
@@ -340,31 +337,35 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 2: Sanitasi
       .filter((s) => !s.startsWith("/")),
   );
 
-  it("unsafe redirect values result in landing on /orders after login", async () => {
-    const user = userEvent.setup();
-    await fc.assert(
-      fc.asyncProperty(unsafeRedirectArb, async (unsafe) => {
-        cleanup();
-        queryClient.clear();
-        const router = buildRouter(`/login?redirect=${encodeURIComponent(unsafe)}`);
-        const { unmount } = render(<RouterProvider router={router} />);
+  it(
+    "unsafe redirect values result in landing on /orders after login",
+    async () => {
+      const user = userEvent.setup();
+      await fc.assert(
+        fc.asyncProperty(unsafeRedirectArb, async (unsafe) => {
+          cleanup();
+          queryClient.clear();
+          const router = buildRouter(`/login?redirect=${encodeURIComponent(unsafe)}`);
+          const { unmount } = render(<RouterProvider router={router} />);
 
-        await settle();
-        expect(screen.getByTestId("login-page")).toBeInTheDocument();
-        // sanitized target falls back to /orders
-        expect(screen.getByTestId("redirect-target").textContent).toBe("/orders");
+          await settle();
+          expect(await screen.findByTestId("login-page", {}, WAIT)).toBeInTheDocument();
+          // sanitized target falls back to /orders
+          expect(screen.getByTestId("redirect-target").textContent).toBe("/orders");
 
-        await user.click(screen.getByTestId("do-login"));
-        await settle();
+          await user.click(screen.getByTestId("do-login"));
+          await settle();
 
-        expect(screen.getByTestId("protected-page")).toBeInTheDocument();
-        expect(screen.getByTestId("pathname").textContent).toBe("/orders");
+          expect(await screen.findByTestId("protected-page", {}, WAIT)).toBeInTheDocument();
+          expect(screen.getByTestId("pathname").textContent).toBe("/orders");
 
-        unmount();
-        cleanup();
-        queryClient.clear();
-      }),
-      { numRuns: INTERACTIVE_RUNS },
-    );
-  });
+          unmount();
+          cleanup();
+          queryClient.clear();
+        }),
+        { numRuns: INTERACTIVE_RUNS },
+      );
+    },
+    INTERACTIVE_TIMEOUT_MS,
+  );
 });

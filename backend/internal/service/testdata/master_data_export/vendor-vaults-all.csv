@@ -1,0 +1,4 @@
+﻿id,vendor_code,branch_code,vault_code,category,currency_code,min_capacity_amount,max_capacity_amount,latitude,longitude,operating_hours,location_id,is_active
+1,VA,VA_001,VA_001_V1,ATM_CASH,IDR,1000000.00,5000000000.00,-6.200000,106.816666,24 jam,12,true
+2,VA,VA_002,VA_002_V1,CASH,IDR,,,,,,,false
+7,VC,VC_001,VC_001_V1,ATM,IDR,0.00,999999999999999999.99,,,'+abc,,true

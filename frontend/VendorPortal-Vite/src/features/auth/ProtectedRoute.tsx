@@ -96,9 +96,14 @@ export function AuthLayout() {
   const hasRedirected = useRef(false);
 
   const shouldRedirect = !state.isAuthLoading && state.isAuthenticated;
+  // A fresh login already navigates to the redirect target (LoginPage.onSubmit). By the
+  // time this effect sees isAuthenticated, `location` can be that target (e.g. /dsr) with
+  // no `redirect` param left, so redirecting here would bounce the user on to /orders.
+  // Only bounce while still on the guest page itself.
+  const isOnGuestPage = location.pathname === "/login";
 
   useEffect(() => {
-    if (shouldRedirect && !hasRedirected.current) {
+    if (shouldRedirect && isOnGuestPage && !hasRedirected.current) {
       hasRedirected.current = true;
       // Read `redirect` from the raw query string. The _auth layout route has no
       // validateSearch, so its typed `location.search` does not carry `redirect`
@@ -108,11 +113,11 @@ export function AuthLayout() {
       const rawRedirect = params.get("redirect");
       const isSafe = rawRedirect?.startsWith("/") && !rawRedirect.startsWith("//");
       // Navigate via href so an arbitrary preserved path (possibly with dynamic
-      // segments, e.g. /orders/123/evidence) resolves; fall back to /orders default.
+      // segments, e.g. /orders/123) resolves; fall back to /orders default.
       const target = isSafe && rawRedirect ? rawRedirect : "/orders";
       void navigate({ href: target, replace: true });
     }
-  }, [shouldRedirect, location.searchStr, navigate]);
+  }, [shouldRedirect, isOnGuestPage, location.searchStr, navigate]);
 
   if (state.isAuthLoading) {
     return <AuthLoadingSpinner />;

@@ -110,6 +110,7 @@ vi.mock("../hooks", () => ({
   useUpdateVendorPic: () => noopMutation,
   useDisableVendorPic: () => noopMutation,
   useEnableVendorPic: () => noopMutation,
+  useSetPicRoles: () => noopMutation,
   useVendorPackages: () => ({
     isLoading: false,
     isError: false,
@@ -164,10 +165,10 @@ describe("VendorDetailPage", () => {
     expect(screen.getByText("Belum ada PIC vendor-wide")).toBeTruthy();
   });
 
-  it("presents exactly four tabs in order: Info, Cabang, PIC Vendor-wide, Harga Paket", () => {
+  it("presents exactly five tabs in order: Info, Cabang, PIC Vendor-wide, Harga Paket, Mapping DSR", () => {
     render(<VendorDetailPage vendorId={1} />);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(tabs).toEqual(["Info", "Cabang", "PIC Vendor-wide", "Harga Paket"]);
+    expect(tabs).toEqual(["Info", "Cabang", "PIC Vendor-wide", "Harga Paket", "Mapping DSR"]);
   });
 
   it("shows only the selected tab's panel when switching tabs", async () => {

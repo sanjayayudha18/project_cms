@@ -1,13 +1,18 @@
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { truncate } from "@/lib/formatters";
-import type { Notification } from "@/lib/types";
 import { useNavigate } from "@tanstack/react-router";
 import { Bell, CheckCheck } from "lucide-react";
-import { useMarkAllAsRead, useMarkAsRead, useNotifications } from "./useNotifications";
+import type { VendorNotification } from "./api";
+import {
+  useMarkAllAsRead,
+  useMarkAsRead,
+  useNotifications,
+  useUnreadCount,
+} from "./useNotifications";
 
 /**
- * Format ISO timestamp to "DD MMM YYYY HH:mm" in Indonesian locale.
+ * Format ISO timestamp to "DD MMM YYYY HH:mm" in Asia/Jakarta (CLAUDE.md Sec 6).
  */
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
@@ -17,38 +22,30 @@ function formatTimestamp(iso: string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta",
   });
 }
 
 export function NotificationsPage() {
-  const { data: notifications = [], unreadCount, isLoading } = useNotifications();
+  // Server returns newest first; no client-side sort needed.
+  const { data: sorted = [], isLoading, isError } = useNotifications();
+  const { data: unreadCount = 0 } = useUnreadCount();
   const { mutate: markAsRead } = useMarkAsRead();
   const { mutate: markAllAsRead, isPending: isMarkingAll } = useMarkAllAsRead();
   const navigate = useNavigate();
 
-  // Sort by timestamp descending (newest first)
-  const sorted = [...notifications].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
-
-  function handleNotificationClick(notification: Notification) {
-    if (!notification.isRead) {
+  function handleNotificationClick(notification: VendorNotification) {
+    if (!notification.is_read) {
       markAsRead(notification.id);
     }
-    // relatedRoute is an arbitrary internal path; href resolves dynamic segments.
-    void navigate({ href: notification.relatedRoute });
+    // link is an arbitrary internal path; href resolves dynamic segments.
+    if (notification.link) {
+      void navigate({ href: notification.link });
+    }
   }
 
   function handleMarkAllAsRead() {
     markAllAsRead();
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="size-6 animate-spin rounded-full border-2 border-neutral-300 border-t-sidebar-active" />
-      </div>
-    );
   }
 
   return (
@@ -69,8 +66,15 @@ export function NotificationsPage() {
         </Button>
       </div>
 
-      {/* Empty state */}
-      {sorted.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="size-6 animate-spin rounded-full border-2 border-neutral-300 border-t-sidebar-active" />
+        </div>
+      ) : isError ? (
+        <p role="alert" className="py-12 text-center text-sm text-danger-fg">
+          Gagal memuat notifikasi. Coba muat ulang halaman.
+        </p>
+      ) : sorted.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="Tidak ada notifikasi"
@@ -86,7 +90,7 @@ export function NotificationsPage() {
                   Timestamp
                 </th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-neutral-500">
-                  Type
+                  Title
                 </th>
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-neutral-500">
                   Message
@@ -108,24 +112,24 @@ export function NotificationsPage() {
                     }
                   }}
                   tabIndex={0}
-                  aria-label={`${notification.type}: ${notification.message}`}
+                  aria-label={`${notification.title}: ${notification.body}`}
                   className={[
                     "cursor-pointer border-b border-neutral-100 transition-colors duration-150",
                     "hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-sidebar-active",
-                    notification.isRead ? "bg-white" : "bg-info-bg/30 font-bold",
+                    notification.is_read ? "bg-white" : "bg-info-bg/30 font-bold",
                   ].join(" ")}
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-600">
-                    {formatTimestamp(notification.timestamp)}
+                    {formatTimestamp(notification.created_at)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-700">
-                    {notification.type}
+                    {notification.title}
                   </td>
                   <td className="px-4 py-3 text-surface-text">
-                    {truncate(notification.message, 120)}
+                    {truncate(notification.body, 120)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    {notification.isRead ? (
+                    {notification.is_read ? (
                       <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
                         Read
                       </span>

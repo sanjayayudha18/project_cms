@@ -66,8 +66,9 @@ func NewService(providers []auth.Provider, tokenService *auth.TokenService, user
 // 3. User lookup (not found / deleted_at → generic error)
 // 4. is_active check
 // 4b. Lockout check (per-account, local-password only)
-// 5. Credential verification via Provider (based on auth_source); on failure,
-//    increments the per-account lockout counter (local-password only)
+//  5. Credential verification via Provider (based on auth_source); on failure,
+//     increments the per-account lockout counter (local-password only)
+//
 // 5c. Password expiry policy (local-password only)
 // 6. Portal type restriction
 // 7. Generate tokens

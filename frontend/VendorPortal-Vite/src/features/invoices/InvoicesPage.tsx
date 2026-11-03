@@ -33,16 +33,6 @@ export function InvoicesPage() {
     });
   }, []);
 
-  const handleRowKeyDown = useCallback(
-    (e: React.KeyboardEvent, id: string) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggleExpanded(id);
-      }
-    },
-    [toggleExpanded],
-  );
-
   // Summary computations
   const summary = useMemo(() => {
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
@@ -149,7 +139,6 @@ export function InvoicesPage() {
                   invoice={invoice}
                   isExpanded={isExpanded}
                   onToggle={() => toggleExpanded(invoice.id)}
-                  onKeyDown={(e) => handleRowKeyDown(e, invoice.id)}
                 />
               );
             })}
@@ -164,29 +153,32 @@ interface InvoiceRowProps {
   readonly invoice: Invoice;
   readonly isExpanded: boolean;
   readonly onToggle: () => void;
-  readonly onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-function InvoiceRow({ invoice, isExpanded, onToggle, onKeyDown }: InvoiceRowProps) {
+function InvoiceRow({ invoice, isExpanded, onToggle }: InvoiceRowProps) {
   const status = invoice.validationStatus;
 
   return (
     <>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: mouse convenience; the keyboard path is the chevron button below */}
       <tr
         className="border-b border-neutral-100 hover:bg-red-50/30 cursor-pointer"
         onClick={onToggle}
-        onKeyDown={onKeyDown}
-        tabIndex={0}
-        role="button"
-        aria-expanded={isExpanded}
-        aria-label={`Invoice ${invoice.invoiceNumber}, ${isExpanded ? "collapse" : "expand"} details`}
       >
         <td className="px-4 py-3">
-          {isExpanded ? (
-            <ChevronDown className="size-4 text-neutral-500" aria-hidden="true" />
-          ) : (
-            <ChevronRight className="size-4 text-neutral-500" aria-hidden="true" />
-          )}
+          {/* No onClick: its click (also from Enter/Space) bubbles to the row's onToggle. */}
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-label={`Invoice ${invoice.invoiceNumber}, ${isExpanded ? "collapse" : "expand"} details`}
+            className="flex items-center rounded cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-active"
+          >
+            {isExpanded ? (
+              <ChevronDown className="size-4 text-neutral-500" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="size-4 text-neutral-500" aria-hidden="true" />
+            )}
+          </button>
         </td>
         <td className="px-4 py-3 font-medium">{invoice.invoiceNumber}</td>
         <td className="px-4 py-3">{invoice.period}</td>

@@ -43,6 +43,21 @@ vi.mock("../hooks", async (importOriginal) => {
   };
 });
 
+// cit-acm-plan: the panel is covered in features/vault-plan/VaultPlan.test.tsx; here only its gating.
+vi.mock("@/features/vault-plan/RequestVaultPanel", () => ({
+  RequestVaultPanel: ({ canReview }: { canReview: boolean }) => (
+    <p>{canReview ? "vault-panel:review" : "vault-panel:read-only"}</p>
+  ),
+}));
+
+// cit-send-vendor: vendor parties panel + "Kembalikan ke pembuat".
+const useVendorPartiesMock = vi.fn();
+const vendorReturnSpy = vi.fn();
+vi.mock("../vendorSide", () => ({
+  useVendorParties: (...args: unknown[]) => useVendorPartiesMock(...args),
+  useVendorReturn: () => ({ mutateAsync: vendorReturnSpy, isPending: false }),
+}));
+
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -88,6 +103,7 @@ const BASE_DETAIL: VendorRequestDetailType = {
       denom: 100000,
       amount_replenish: 5_000_000,
       amount_refund: 0,
+      ticket_number: "ATM001_100K_20260913_001",
     },
   ],
   total_amount: 5_000_000,
@@ -96,6 +112,7 @@ const BASE_DETAIL: VendorRequestDetailType = {
   is_canceled: false,
   is_manual: false,
   cancellation_reason: null,
+  region_code: "JKT",
   completion_submitted_by: null,
   completion_submitted_at: null,
   completion_approved_by: null,
@@ -131,6 +148,10 @@ function setUser(id: number, role: string) {
 
 beforeEach(() => {
   useVendorRequestMock.mockReset();
+  useVendorPartiesMock.mockReset();
+  useVendorPartiesMock.mockReturnValue({ data: undefined });
+  vendorReturnSpy.mockReset();
+  vendorReturnSpy.mockResolvedValue(undefined);
 });
 
 describe("VendorRequestDetail", () => {
@@ -160,6 +181,25 @@ describe("VendorRequestDetail", () => {
     renderWithProviders();
 
     expect(screen.getByRole("heading", { name: /tidak ditemukan/i })).toBeInTheDocument();
+  });
+
+  it("vault panel: ATM-SPV reviews only in vault_review; hidden for legacy approved", () => {
+    mockDetail({ status: "vault_review" });
+    setUser(2, "ATM-SPV");
+    const first = renderWithProviders();
+    expect(screen.getByText("vault-panel:review")).toBeInTheDocument();
+    first.unmount();
+
+    mockDetail({ status: "vault_review" });
+    setUser(1, "ATM-USER");
+    const second = renderWithProviders();
+    expect(screen.getByText("vault-panel:read-only")).toBeInTheDocument();
+    second.unmount();
+
+    mockDetail({ status: "approved" });
+    setUser(2, "ATM-SPV");
+    renderWithProviders();
+    expect(screen.queryByText(/vault-panel/)).not.toBeInTheDocument();
   });
 
   it("draft + creator sees Edit Item, Submit, and Cancel — not Approve/Reject", () => {
@@ -313,6 +353,7 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
   const ATMS = [
     {
       terminal_id: "ATM001",
+      ticket_number: "ATM001_100K_20260913_001",
       completion_result: null,
       visit_remaining: 3,
       visit_quota_total: 5,
@@ -320,6 +361,7 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
     },
     {
       terminal_id: "ATM002",
+      ticket_number: "ATM002_MIX_20260913_002",
       completion_result: null,
       visit_remaining: 0,
       visit_quota_total: 4,
@@ -330,6 +372,15 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
   beforeEach(() => {
     submitCompletionSpy.mockReset().mockResolvedValue(undefined);
     approveCompletionSpy.mockReset().mockResolvedValue({ over_quota_terminals: ["ATM002"] });
+  });
+
+  it("shows the ticket number per ATM (replenish-ticket FR8.1)", () => {
+    mockDetail({ status: "approved", atms: ATMS });
+    setUser(1, "ATM-USER");
+    renderWithProviders();
+    expect(screen.getAllByRole("columnheader", { name: "No. Tiket" })).toHaveLength(2);
+    expect(screen.getAllByText("ATM001_100K_20260913_001")).toHaveLength(2); // item row + ATM status row
+    expect(screen.getByText("ATM002_MIX_20260913_002")).toBeInTheDocument();
   });
 
   it("approved + maker sees Laporkan Selesai; checker does not", () => {
@@ -418,5 +469,134 @@ describe("VendorRequestDetail — laporan selesai + kuota kunjungan (atm-visit-q
     expect(screen.getByText("0/4")).toBeInTheDocument();
     expect(screen.getByText("(+1)")).toBeInTheDocument();
     expect(screen.getByText("Kelebihan kuota")).toBeInTheDocument();
+  });
+});
+
+describe("VendorRequestDetail — kirim ke vendor (cit-send-vendor S8)", () => {
+  const parties = {
+    parties: [
+      {
+        id: 7,
+        role: "replenish",
+        status: "rejected",
+        branch_id: 27,
+        branch_code: "GRD-JKT",
+        branch_name: "Gardanet Jakarta",
+        vendor_id: 4,
+        vendor_name: "Gardanet",
+        sent_at: "2026-10-09T01:00:00Z",
+        decided_at: "2026-10-09T02:00:00Z",
+        decided_by_name: "Ops Gardanet",
+        rejection_reason: "armada tidak tersedia",
+      },
+      {
+        id: 8,
+        role: "vault",
+        status: "pending",
+        branch_id: 30,
+        branch_code: "C1",
+        branch_name: "Cash Satu",
+        vendor_id: 5,
+        vendor_name: "Bijak",
+        sent_at: "2026-10-09T01:00:00Z",
+        decided_at: null,
+        decided_by_name: null,
+        rejection_reason: null,
+      },
+    ],
+    events: [
+      {
+        id: 1,
+        party_id: 7,
+        event: "sent",
+        reason: null,
+        actor_name: "SPV",
+        created_at: "2026-10-09T01:00:00Z",
+      },
+      {
+        id: 2,
+        party_id: 7,
+        event: "rejected",
+        reason: "armada tidak tersedia",
+        actor_name: "Ops Gardanet",
+        created_at: "2026-10-09T02:00:00Z",
+      },
+    ],
+  };
+
+  it("shows the new statuses as text badges", () => {
+    for (const [status, label] of [
+      ["sent_to_vendor", "Terkirim ke Vendor"],
+      ["vendor_accepted", "Diterima Vendor"],
+      ["vendor_rejected", "Ditolak Vendor"],
+    ] as const) {
+      mockDetail({ status });
+      setUser(2, "ATM-SPV");
+      const { unmount } = renderWithProviders();
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("Status Vendor panel lists every party with its decision and history", async () => {
+    mockDetail({ status: "vendor_rejected" });
+    setUser(2, "ATM-SPV");
+    useVendorPartiesMock.mockReturnValue({ data: parties });
+    const user = userEvent.setup();
+    renderWithProviders();
+
+    const panel = screen.getByRole("region", { name: "Status Vendor" });
+    expect(within(panel).getByText("Gardanet Jakarta")).toBeInTheDocument();
+    expect(within(panel).getByText("Ditolak")).toBeInTheDocument();
+    expect(within(panel).getByText("Menunggu keputusan")).toBeInTheDocument();
+    expect(within(panel).getAllByText("armada tidak tersedia").length).toBeGreaterThan(0);
+    await user.click(within(panel).getByText(/Riwayat keputusan vendor \(2\)/));
+    expect(within(panel).getByText(/Dikirim ·/)).toBeInTheDocument();
+  });
+
+  it("vendor_rejected: a non-creator checker returns to the maker with a reason; the maker cannot", async () => {
+    mockDetail({ status: "vendor_rejected" });
+    setUser(1, "ATM-SPV"); // creator: four-eyes
+    const { unmount } = renderWithProviders();
+    expect(screen.queryByRole("button", { name: "Kembalikan ke Pembuat" })).not.toBeInTheDocument();
+    unmount();
+
+    setUser(2, "ATM-SPV");
+    const user = userEvent.setup();
+    renderWithProviders();
+    await user.click(screen.getByRole("button", { name: "Kembalikan ke Pembuat" }));
+    const confirm = screen.getByRole("button", { name: "Kembalikan" });
+    expect(confirm).toBeDisabled();
+    await user.type(screen.getByLabelText(/Alasan \(dibaca pembuat request\)/), "kurangi ATM");
+    await user.click(confirm);
+    expect(vendorReturnSpy).toHaveBeenCalledWith({ id: 42, reason: "kurangi ATM" });
+  });
+
+  it("a vendor request is reported by the vendor, not by ATM-USER (replenishment-realisasi FR2.5)", () => {
+    setUser(1, "ATM-USER");
+    mockDetail({ status: "sent_to_vendor" });
+    const { unmount } = renderWithProviders();
+    expect(screen.queryByRole("button", { name: /Laporkan Selesai/ })).not.toBeInTheDocument();
+    unmount();
+
+    mockDetail({ status: "vendor_accepted" });
+    const second = renderWithProviders();
+    expect(screen.queryByRole("button", { name: /Laporkan Selesai/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Menunggu laporan realisasi dari vendor replenish/),
+    ).toBeInTheDocument();
+    second.unmount();
+
+    // legacy request (never sent to a vendor): ATM-USER still reports it.
+    mockDetail({ status: "approved" });
+    renderWithProviders();
+    expect(screen.getByRole("button", { name: /Laporkan Selesai/ })).toBeInTheDocument();
+  });
+
+  it("a checker can cancel a request already sent to vendors", () => {
+    mockDetail({ status: "sent_to_vendor" });
+    setUser(2, "ATM-SPV");
+    renderWithProviders();
+    expect(screen.getByRole("button", { name: "Batalkan" })).toBeInTheDocument();
   });
 });

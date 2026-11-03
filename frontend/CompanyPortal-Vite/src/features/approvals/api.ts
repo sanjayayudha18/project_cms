@@ -31,17 +31,34 @@ export interface MasterDataChange {
   maker_id: number;
 }
 
+/** Import batch header (master-data-import-revamp design, "Frontend: ReviewDialog"). */
+export interface MasterDataBatch {
+  id: number;
+  entity: string;
+  /** Null for batches imported before migration 036. */
+  file_name: string | null;
+  maker_name: string;
+  row_count: number;
+}
+
 export interface MasterDataDetail {
   request_id: number;
   status: string;
   /** Set when the request is a CSV import batch (one approval for many rows). */
   batch_id: number | null;
+  /** Absent until the backend sends it; the dialog must cope without it. */
+  batch?: MasterDataBatch;
   total: number;
   counts: Partial<Record<MasterDataOp, number>>;
-  /** True when `changes` holds only the first rows of a bigger batch. */
+  /** True when `changes` holds only the first rows of a bigger batch (legacy, pre-paging). */
   truncated: boolean;
   changes: MasterDataChange[];
+  /** 1-based page of `changes` and its size; absent from the pre-paging backend. */
+  page?: number;
+  page_size?: number;
 }
+
+export const MASTER_DATA_PAGE_SIZE = 50;
 
 const BASE = "/approvals";
 
@@ -50,8 +67,17 @@ export async function getInbox(): Promise<InboxItem[]> {
   return data;
 }
 
-export async function getMasterDataDetail(requestId: number): Promise<MasterDataDetail> {
-  const { data } = await api.get<MasterDataDetail>(`${BASE}/${requestId}/master-data`);
+export async function getMasterDataDetail(
+  requestId: number,
+  page?: number,
+  pageSize?: number,
+): Promise<MasterDataDetail> {
+  const base = `${BASE}/${requestId}/master-data`;
+  const url =
+    page === undefined
+      ? base
+      : `${base}?page=${page}&page_size=${pageSize ?? MASTER_DATA_PAGE_SIZE}`;
+  const { data } = await api.get<MasterDataDetail>(url);
   return data;
 }
 

@@ -261,6 +261,19 @@ export async function updateVendorPic(
   return data;
 }
 
+/** Peran PIC langsung berlaku (tanpa maker-checker), audit di tx yang sama. */
+export async function setVendorPicRoles(
+  vendorId: number,
+  picId: number,
+  roles: string[],
+): Promise<{ id: number; roles: string[] }> {
+  const { data } = await api.put<{ id: number; roles: string[] }>(
+    `${BASE}/${vendorId}/pics/${picId}/roles`,
+    { roles },
+  );
+  return data;
+}
+
 export async function disableVendorPic(
   vendorId: number,
   picId: number,

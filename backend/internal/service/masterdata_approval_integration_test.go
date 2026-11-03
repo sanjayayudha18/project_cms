@@ -151,6 +151,11 @@ func (h *testHelpers) cleanup() {
 			h.t.Logf("cleanup: delete vendor_pics: %v", err)
 		}
 	}
+	if len(h.vendorIDs) > 0 {
+		if _, err := h.pool.Exec(h.ctx, `DELETE FROM dsr_location_vault_maps WHERE vendor_id = ANY($1)`, h.vendorIDs); err != nil {
+			h.t.Logf("cleanup: delete dsr_location_vault_maps: %v", err)
+		}
+	}
 	if len(h.vendorVaultIDs) > 0 {
 		if _, err := h.pool.Exec(h.ctx, `DELETE FROM audit_logs WHERE entity_type = 'vendor_vault' AND entity_id = ANY($1)`, h.vendorVaultIDs); err != nil {
 			h.t.Logf("cleanup: delete audit_logs (vendor_vaults): %v", err)
@@ -222,13 +227,14 @@ func harness(t *testing.T) (svc *MasterDataApprovalService, tag string, h *testH
 
 	repo := repository.NewMasterDataChangeRepository(pool)
 	svc = NewMasterDataApprovalService(nil, repo, pool, ApplierRegistry{
-		"vendor":         VendorApplier{},
-		"vendor_branch":  VendorBranchApplier{},
-		"vendor_vault":   VendorVaultApplier{},
-		"vendor_pic":     VendorPicApplier{},
-		"vendor_package": VendorPackageApplier{},
-		"atm_assignment": ATMAssignmentApplier{},
-		"atm":            ATMApplier{},
+		"vendor":           VendorApplier{},
+		"vendor_branch":    VendorBranchApplier{},
+		"vendor_vault":     VendorVaultApplier{},
+		"vendor_pic":       VendorPicApplier{},
+		"vendor_package":   VendorPackageApplier{},
+		"atm_assignment":   ATMAssignmentApplier{},
+		"atm":              ATMApplier{},
+		"dsr_location_map": DsrLocationMapApplier{},
 	}, audit.NewWriter(pool))
 
 	return svc, strconv.FormatInt(time.Now().UnixNano(), 10), h
@@ -1268,15 +1274,10 @@ func TestATMAssignmentApplier_AutoPeriod_HandsOverRunningPeriod_Integration(t *t
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var atmID, pkgID int64
-	err = tx.QueryRow(ctx, `SELECT a.id FROM atms a WHERE a.deleted_at IS NULL
-		AND NOT EXISTS (SELECT 1 FROM atm_vendor_packages p WHERE p.atm_id = a.id) ORDER BY a.id LIMIT 1`).Scan(&atmID)
-	if err != nil {
-		t.Skipf("no ATM without kelolaan available: %v", err)
-	}
-	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch ORDER BY id LIMIT 1`).Scan(&pkgID); err != nil {
-		t.Skipf("no vendor package available: %v", err)
-	}
+	// Own fixtures (rolled back with tx) so the test runs on a freshly migrated DB too.
+	marker := "AUTOP-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	atmID := seedForecastATM(t, tx, marker, seedForecastRegionAndLocation(t, tx, marker))
+	pkgID := seedForecastVendorPackage(t, tx, marker, "Vendor "+marker)
 
 	now := time.Date(2026, 9, 25, 20, 0, 0, 0, time.UTC) // 2026-09-26 03:00 WIB
 	if _, err := tx.Exec(ctx, `INSERT INTO atm_vendor_packages (atm_id, vendor_package_id, effective_start_date)
@@ -1316,11 +1317,7 @@ func TestATMAssignmentApplier_AutoPeriod_HandsOverRunningPeriod_Integration(t *t
 	}
 
 	// Second handover the same day: the period that began today is disabled.
-	var pkg2 int64
-	if err := tx.QueryRow(ctx, `SELECT id FROM vendor_packages_branch WHERE id <> $1 ORDER BY id LIMIT 1`, pkgID).Scan(&pkg2); err != nil {
-		t.Skipf("need a second vendor package: %v", err)
-	}
-	payload.VendorPackageID = pkg2
+	payload.VendorPackageID = seedForecastVendorPackage(t, tx, marker+"-2", "Vendor "+marker+"-2")
 	if _, _, err := applyAutoAssignment(ctx, db.New(tx), payload, now); err != nil {
 		t.Fatalf("second applyAutoAssignment: %v", err)
 	}

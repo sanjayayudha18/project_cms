@@ -19,7 +19,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import type { BadgeVariant } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import { InvoiceDetail } from "./InvoiceDetail";
 import type { Invoice, InvoiceWithVendor, ValidationStatus } from "./types";
 
@@ -84,7 +84,7 @@ const columns = [
   }),
   columnHelper.accessor("totalAmount", {
     header: "Total (Rp)",
-    cell: (info) => <span className="tabular-nums">{formatIDR(info.getValue())}</span>,
+    cell: (info) => <span className="tabular-nums">{formatThousands(info.getValue())}</span>,
   }),
   columnHelper.accessor("lineItemsCount", {
     header: "Jumlah Item",

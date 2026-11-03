@@ -2,60 +2,6 @@ import { useAuthStore } from "@/lib/auth/store";
 import * as fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
-import { computeDelay } from "./stubs/index";
-
-/**
- * Property 17: Stub API Latency Range
- * Validates: Requirements 8.2
- *
- * For any request intercepted by the Stub API, the simulated delay SHALL be
- * a value in the inclusive range [200ms, 800ms].
- */
-describe("Stub API — Property 17: Stub API Latency Range", () => {
-  const randomValue = fc.double({
-    min: 0,
-    max: 1,
-    noNaN: true,
-    noDefaultInfinity: true,
-    maxExcluded: true,
-  });
-
-  it("computeDelay always produces a value >= 200 for any random in [0, 1)", () => {
-    fc.assert(
-      fc.property(randomValue, (r) => {
-        const delay = computeDelay(r, 200, 800);
-        expect(delay).toBeGreaterThanOrEqual(200);
-      }),
-    );
-  });
-
-  it("computeDelay always produces a value <= 800 for any random in [0, 1)", () => {
-    fc.assert(
-      fc.property(randomValue, (r) => {
-        const delay = computeDelay(r, 200, 800);
-        expect(delay).toBeLessThanOrEqual(800);
-      }),
-    );
-  });
-
-  it("computeDelay always produces an integer", () => {
-    fc.assert(
-      fc.property(randomValue, (r) => {
-        const delay = computeDelay(r, 200, 800);
-        expect(Number.isInteger(delay)).toBe(true);
-      }),
-    );
-  });
-
-  it("computeDelay covers the full range boundaries", () => {
-    // random = 0 should give min
-    expect(computeDelay(0, 200, 800)).toBe(200);
-    // random just below 1 should give max
-    const almostOne = 1 - Number.EPSILON;
-    expect(computeDelay(almostOne, 200, 800)).toBeLessThanOrEqual(800);
-    expect(computeDelay(almostOne, 200, 800)).toBeGreaterThanOrEqual(200);
-  });
-});
 
 /**
  * Property 18: Auth Header Injection

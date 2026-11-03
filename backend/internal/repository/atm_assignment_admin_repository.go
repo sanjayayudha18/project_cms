@@ -16,25 +16,27 @@ import (
 // for ATMAssignmentAdminService. Mutation queries run only inside
 // ATMAssignmentApplier (tx-scoped), not through this repository.
 //
-// ponytail: primary pool for reads too; swap List/Count to dbRead when
-// DATABASE_REPLICA_URL wiring lands (same TODO as VendorBranchAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); every other lookup stays on
+// the primary because Submit uses it as the "before" snapshot / pre-check.
 type ATMAssignmentAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewATMAssignmentAdminRepository creates an ATMAssignmentAdminRepository wrapping the given database connection.
-func NewATMAssignmentAdminRepository(dbConn db.DBTX) *ATMAssignmentAdminRepository {
-	return &ATMAssignmentAdminRepository{queries: db.New(dbConn)}
+// NewATMAssignmentAdminRepository creates a ATMAssignmentAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewATMAssignmentAdminRepository(primary, replica db.DBTX) *ATMAssignmentAdminRepository {
+	return &ATMAssignmentAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of an ATM's assignments.
 func (r *ATMAssignmentAdminRepository) List(ctx context.Context, arg db.ListATMAssignmentsAdminParams) ([]db.ListATMAssignmentsAdminRow, error) {
-	return r.queries.ListATMAssignmentsAdmin(ctx, arg)
+	return r.dbRead.ListATMAssignmentsAdmin(ctx, arg)
 }
 
 // Count returns the total number of assignments matching List's filters.
 func (r *ATMAssignmentAdminRepository) Count(ctx context.Context, arg db.CountATMAssignmentsAdminParams) (int64, error) {
-	return r.queries.CountATMAssignmentsAdmin(ctx, arg)
+	return r.dbRead.CountATMAssignmentsAdmin(ctx, arg)
 }
 
 // GetByID returns an assignment by id incl. disabled rows; nil, nil if absent.

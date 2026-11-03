@@ -2,11 +2,10 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { useVendorsList } from "@/features/admin-vendors/hooks";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
-import { useDisableUser, useEnableUser, useUsersList } from "../hooks";
+import { useDisableUser, useEnableUser, useUsersList, useVendorOptions } from "../hooks";
 import type { AdminUser } from "../types";
 import { useAdminUsersUrlState } from "../useAdminUsersUrlState";
 import { UserFilterBar } from "./UserFilterBar";
@@ -19,8 +18,8 @@ export function AdminUsersPage() {
   const { toast } = useToast();
 
   const usersQuery = useUsersList(params);
-  const vendorsQuery = useVendorsList({ page: 1, page_size: 100, status: "all" });
-  const vendorsById = new Map((vendorsQuery.data?.vendors ?? []).map((v) => [v.id, v]));
+  const optionsQuery = useVendorOptions();
+  const vendorsById = new Map((optionsQuery.data?.vendors ?? []).map((v) => [v.id, v]));
 
   const disableMutation = useDisableUser();
   const enableMutation = useEnableUser();

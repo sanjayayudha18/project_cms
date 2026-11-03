@@ -35,6 +35,7 @@ type ApprovalHandler struct {
 	orchestrator ApprovalOrchestrator
 	reader       ApprovalReader
 	mdDetail     MasterDataApprovalDetailReader // set by WithMasterDataDetail; nil = endpoint answers 404
+	mdBatch      MasterDataApprovalBatchReader  // set by WithMasterDataBatches; nil = no "batch" object
 	retrier      MasterDataApplyRetrier         // set by WithApplyRetry; nil = endpoint answers 404
 }
 
@@ -190,6 +191,8 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 		writeForbidden(w, "Anda tidak berhak melakukan aksi ini")
 	case errors.Is(err, approval.ErrRequestNotPending):
 		writeError(w, http.StatusConflict, "conflict", "Approval request tidak dalam status pending")
+	case errors.Is(err, approval.ErrApproverOnLeaveNoDelegate):
+		writeError(w, http.StatusConflict, "conflict", "Approver sedang cuti dan tidak memiliki delegasi aktif")
 	case errors.Is(err, approval.ErrPolicyNotFound):
 		writeError(w, http.StatusBadRequest, "bad_request", "Tidak ada kebijakan approval untuk jenis dokumen ini")
 	// Master-data apply-on-approve failures a checker can act on (T3.5): the

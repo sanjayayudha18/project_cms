@@ -90,7 +90,7 @@ func (h *DsrUploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	// Cap the whole request body slightly above the file cap (multipart
 	// framing overhead) -- ValidateUpload re-checks the exact file size.
 	r.Body = http.MaxBytesReader(w, r.Body, service.DsrMaxUploadBytes+64*1024)
-	if err := r.ParseMultipartForm(service.DsrMaxUploadBytes + 64*1024); err != nil {
+	if err := r.ParseMultipartForm(service.DsrMaxUploadBytes + 64*1024); err != nil { //nolint:gosec // G120: body capped by MaxBytesReader above
 		writeError(w, http.StatusBadRequest, "bad_request", "File terlalu besar atau request tidak valid")
 		return
 	}
@@ -238,9 +238,9 @@ func parseFileID(r *http.Request) (int64, error) {
 }
 
 func parseDsrListUploadsParams(vendorName string, q url.Values) (service.DsrListUploadsParams, error) {
-	page, err := parseIntParam(q, "page", defaultPage)
+	page, err := parsePageParam(q, defaultPage)
 	if err != nil {
-		return service.DsrListUploadsParams{}, fmt.Errorf("page harus berupa angka")
+		return service.DsrListUploadsParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", defaultPageSize)
 	if err != nil {
@@ -318,31 +318,31 @@ func toDsrUploadResponse(result *service.DsrUploadResult) dsrUploadResponse {
 }
 
 type dsrDailyRowResponse struct {
-	RowNo        int32    `json:"row_no"`
-	Section      string   `json:"section"`
-	Flow         string   `json:"flow"`
-	LineLabel    string   `json:"line_label"`
-	MemoNo       *string  `json:"memo_no"`
-	Denom100k    *float64 `json:"denom_100k"`
-	Denom50k     *float64 `json:"denom_50k"`
-	Denom20k     *float64 `json:"denom_20k"`
-	Denom10k     *float64 `json:"denom_10k"`
-	Denom5k      *float64 `json:"denom_5k"`
-	Denom2k      *float64 `json:"denom_2k"`
-	Denom1k      *float64 `json:"denom_1k"`
-	LineTotalIdr *float64 `json:"line_total_idr"`
-	Remarks      *string  `json:"remarks"`
+	RowNo        int32   `json:"row_no"`
+	Section      string  `json:"section"`
+	Flow         string  `json:"flow"`
+	LineLabel    string  `json:"line_label"`
+	MemoNo       *string `json:"memo_no"`
+	Denom100k    *string `json:"denom_100k"`
+	Denom50k     *string `json:"denom_50k"`
+	Denom20k     *string `json:"denom_20k"`
+	Denom10k     *string `json:"denom_10k"`
+	Denom5k      *string `json:"denom_5k"`
+	Denom2k      *string `json:"denom_2k"`
+	Denom1k      *string `json:"denom_1k"`
+	LineTotalIdr *string `json:"line_total_idr"`
+	Remarks      *string `json:"remarks"`
 }
 
 type dsrRencanaIsiRowResponse struct {
-	RowNo                int32    `json:"row_no"`
-	AtmTerminalID        string   `json:"atm_terminal_id"`
-	AtmLocation          *string  `json:"atm_location"`
-	DenomConfig          *string  `json:"denom_config"`
-	Fill100kIdr          *float64 `json:"fill_100k_idr"`
-	Fill50kIdr           *float64 `json:"fill_50k_idr"`
-	SplankBalance0800Idr *float64 `json:"splank_balance_0800_idr"`
-	Remarks              *string  `json:"remarks"`
+	RowNo                int32   `json:"row_no"`
+	AtmTerminalID        string  `json:"atm_terminal_id"`
+	AtmLocation          *string `json:"atm_location"`
+	DenomConfig          *string `json:"denom_config"`
+	Fill100kIdr          *string `json:"fill_100k_idr"`
+	Fill50kIdr           *string `json:"fill_50k_idr"`
+	SplankBalance0800Idr *string `json:"splank_balance_0800_idr"`
+	Remarks              *string `json:"remarks"`
 }
 
 type dsrSheetDetailResponse struct {

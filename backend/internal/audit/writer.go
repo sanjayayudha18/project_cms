@@ -1,6 +1,6 @@
 // Package audit writes append-only audit_logs rows. It has no HTTP or auth
 // dependency: callers (handlers/services) resolve the actor and IP themselves
-// (via middleware.GetAuthContext + chi's RealIP-normalized r.RemoteAddr) and
+// (via middleware.GetAuthContext + the TrustedRealIP-normalized r.RemoteAddr) and
 // pass them in on Entry.
 package audit
 
@@ -60,6 +60,11 @@ func (w *Writer) Write(ctx context.Context, entry Entry) error {
 		IP:         ip,
 	})
 	return err
+}
+
+// WriteTx appends one audit_logs row on tx instead of the Writer's own connection.
+func (w *Writer) WriteTx(ctx context.Context, tx db.DBTX, entry Entry) error {
+	return NewWriter(tx).Write(ctx, entry)
 }
 
 func marshalOrNil(v any) ([]byte, error) {

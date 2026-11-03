@@ -8,20 +8,39 @@
 
 import type { ApiError } from "@/lib/api/client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createUser, disableUser, enableUser, getUser, listUsers, updateUser } from "./api";
+import {
+  createUser,
+  disableUser,
+  enableUser,
+  getUser,
+  getVendorOptions,
+  listUsers,
+  updateUser,
+} from "./api";
 import type {
   AdminUser,
   AdminUsersListParams,
   AdminUsersListResponse,
   CreateUserPayload,
   UpdateUserPayload,
+  VendorOptionsResponse,
 } from "./types";
 
 export const adminUserKeys = {
   all: ["admin-users"] as const,
   list: (params: AdminUsersListParams) => [...adminUserKeys.all, "list", params] as const,
   detail: (id: number) => [...adminUserKeys.all, "detail", id] as const,
+  vendorOptions: ["admin-users", "vendor-options"] as const,
 };
+
+/** Vendor + cabang aktif; dipakai form dan filter user (bukan /admin/vendors, yang tertutup untuk APPACCESS). */
+export function useVendorOptions() {
+  return useQuery<VendorOptionsResponse, ApiError>({
+    queryKey: adminUserKeys.vendorOptions,
+    queryFn: getVendorOptions,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useUsersList(params: AdminUsersListParams) {
   return useQuery<AdminUsersListResponse, ApiError>({

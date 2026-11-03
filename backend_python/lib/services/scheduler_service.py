@@ -22,8 +22,17 @@ from ..utils.timezone import WIB, current_processing_date
 from .audit_service import AuditService
 from .detector import FileDetector, LateDetector
 from .retry_executor import RetryExecutor, RetryResult
+from dsr_late_notify import job as dsr_late_job
+from replenish_classify import job as replenish_job
 
 logger = logging.getLogger(__name__)
+
+# replenishment-realisasi FR3.1: classify after the ITM replenish file lands, plus a daily pass
+# after the EOD window that closes windows even when no new file came in.
+CLASSIFY_SOURCE = "itm_replenish"
+CLASSIFY_CRON = {"hour": 9, "minute": 15}
+# dsr-late-report FR5.1: every day incl. holidays, at the DSR deadline.
+DSR_LATE_CRON = {"hour": 9, "minute": 0}
 
 
 # FR14/C3: the legacy ETLs record success in their own tables and never write
@@ -115,6 +124,22 @@ class SchedulerService:
                 CronTrigger(hour=sla.hour, minute=sla.minute, timezone=WIB),
                 id=f"late_check_{file_type}",
                 kwargs={"file_type": file_type},
+            )
+
+        if CLASSIFY_SOURCE in self.file_types:
+            self._scheduler.add_job(
+                self._run_classification,
+                CronTrigger(**CLASSIFY_CRON, timezone=WIB),
+                id="replenish_classify",
+                kwargs={"trigger": "cron"},
+            )
+
+        # dsr-late-report FR5.1: only services whose settings carry the start date (not service_dsr_etl).
+        if getattr(self.settings, "dsr_late_start_date", None):
+            self._scheduler.add_job(
+                self._run_dsr_late_notify,
+                CronTrigger(**DSR_LATE_CRON, timezone=WIB),
+                id="dsr_late_notify",
             )
 
         self._scheduler.start()
@@ -324,6 +349,8 @@ class SchedulerService:
                         logger.warning("import_job %s stays %s: another run is in flight", file_id, job["status"])
         if job["status"] == "completed":
             await self.late_detector.resolve_late_detection(self.pool, file_type, processing_date)
+            if file_type == CLASSIFY_SOURCE:
+                await self._run_classification("manual" if actor_id else "auto")
         return job["status"]
 
     # -- generic manual trigger (POST /process/{file_type}) --------------
@@ -335,7 +362,29 @@ class SchedulerService:
         extra_args targets a single file for DSR's dry-run/commit endpoints; every
         other caller omits it."""
         async with self._scan_lock:
-            return await self.retry_executor.execute_retry(file_type, extra_args)
+            result = await self.retry_executor.execute_retry(file_type, extra_args)
+        if file_type == CLASSIFY_SOURCE and result.success:
+            await self._run_classification("manual")
+        return result
+
+    async def _run_classification(self, trigger: str) -> None:
+        """Never raises: a classification failure is logged + audited by run_once, the ETL result stands."""
+        try:
+            await replenish_job.run_once(
+                self.pool, current_processing_date(),
+                getattr(self.settings, "replenish_classify_start_date", None), trigger=trigger,
+                email_enabled=getattr(self.settings, "notify_email_enabled", False))
+        except Exception:
+            logger.exception("replenish_classify could not run (trigger=%s)", trigger)
+
+    async def _run_dsr_late_notify(self) -> None:
+        """Never raises: a failed run is logged + audited by run_once; the next manual run may retry."""
+        try:
+            await dsr_late_job.run_once(
+                self.pool, current_processing_date(), getattr(self.settings, "dsr_late_start_date", None),
+                trigger="auto", email_enabled=getattr(self.settings, "notify_email_enabled", False))
+        except Exception:
+            logger.exception("dsr_late_notify could not run")
 
 
 if __name__ == "__main__":
@@ -369,6 +418,7 @@ if __name__ == "__main__":
         assert "auto_retry_cycle" in job_ids
         for ft in file_types:
             assert f"late_check_{ft}" in job_ids
+        assert "replenish_classify" in job_ids  # itm_replenish is in file_types
         svc.stop()
         async with svc._scan_lock:
             assert svc._scan_lock.locked()

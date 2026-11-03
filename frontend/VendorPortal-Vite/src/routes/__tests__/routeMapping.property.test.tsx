@@ -110,21 +110,6 @@ function buildRouter(initialPath: string) {
     getParentRoute: () => shellRoute,
     component: pageProbe("orders"),
   });
-  const evidenceRoute = createRoute({
-    path: "/orders/$id/evidence",
-    getParentRoute: () => shellRoute,
-    component: pageProbe("evidence"),
-  });
-  const invoicesRoute = createRoute({
-    path: "/invoices",
-    getParentRoute: () => shellRoute,
-    component: pageProbe("invoices"),
-  });
-  const scheduleRoute = createRoute({
-    path: "/schedule",
-    getParentRoute: () => shellRoute,
-    component: pageProbe("schedule"),
-  });
   const dsrRoute = createRoute({
     path: "/dsr",
     getParentRoute: () => shellRoute,
@@ -169,14 +154,7 @@ function buildRouter(initialPath: string) {
   const routeTree = rootRoute.addChildren([
     authRoute.addChildren([loginRoute]),
     protectedRoute.addChildren([
-      shellRoute.addChildren([
-        ordersRoute,
-        evidenceRoute,
-        invoicesRoute,
-        scheduleRoute,
-        dsrRoute,
-        notificationsRoute,
-      ]),
+      shellRoute.addChildren([ordersRoute, dsrRoute, notificationsRoute]),
     ]),
     indexRoute,
     dashboardRoute,
@@ -196,11 +174,8 @@ function buildRouter(initialPath: string) {
 describe("Feature: vendor-portal-tanstack-router-migration, Property 3: Preservasi Pemetaan Path Route", () => {
   const protectedPageArb = fc.constantFrom(
     { path: "/orders", testid: "page-orders" },
-    { path: "/invoices", testid: "page-invoices" },
-    { path: "/schedule", testid: "page-schedule" },
     { path: "/dsr", testid: "page-dsr" },
     { path: "/notifications", testid: "page-notifications" },
-    { path: "/orders/abc/evidence", testid: "page-evidence" },
   );
 
   it("each protected path resolves to the same page inside the shell", async () => {
@@ -238,7 +213,14 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 4: Internal
   // Internal-only paths and arbitrary unknown paths must both render NotFound,
   // observably indistinguishable.
   const maskedOrUnknownArb = fc.oneof(
-    fc.constantFrom("/admin", "/forecasting", "/reconciliation"),
+    fc.constantFrom(
+      "/admin",
+      "/forecasting",
+      "/reconciliation",
+      // FE-05: mock screens removed from the route tree.
+      "/invoices",
+      "/schedule",
+    ),
     fc
       .array(fc.constantFrom("a", "b", "c", "x", "y", "z", "1", "2", "9", "-", "_"), {
         minLength: 1,
@@ -250,8 +232,6 @@ describe("Feature: vendor-portal-tanstack-router-migration, Property 4: Internal
         (p) =>
           ![
             "/orders",
-            "/invoices",
-            "/schedule",
             "/dsr",
             "/notifications",
             "/login",

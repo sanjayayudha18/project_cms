@@ -82,9 +82,9 @@ func (h *AuditLogHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // (Property 3), unlike the ATM Portal handler's own default-application
 // convention, because design.md puts that responsibility in the service here.
 func parseListAuditLogsParams(q url.Values) (service.ListAuditLogsParams, error) {
-	page, err := parseIntParam(q, "page", 0)
+	page, err := parsePageParam(q, 0)
 	if err != nil {
-		return service.ListAuditLogsParams{}, fmt.Errorf("page harus berupa angka")
+		return service.ListAuditLogsParams{}, fmt.Errorf("page harus berupa angka (maksimal 1000000)")
 	}
 	pageSize, err := parseIntParam(q, "page_size", 0)
 	if err != nil {
@@ -120,8 +120,8 @@ func parseListAuditLogsParams(q url.Values) (service.ListAuditLogsParams, error)
 		EntityID:   entityID,
 		DateFrom:   dateFrom,
 		DateTo:     dateTo,
-		Page:       int32(page),
-		PageSize:   int32(pageSize),
+		Page:       int32(page),     //nolint:gosec // G115: page <= maxPage (parsePageParam)
+		PageSize:   int32(pageSize), //nolint:gosec // G115: service clamps to 1..100 (clampAuditLogPageSize), so any wrap is harmless
 	}, nil
 }
 

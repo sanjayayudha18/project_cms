@@ -5,6 +5,8 @@ WORKDIR /app
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+ARG VITE_APP_ENV=prod
+ENV VITE_APP_ENV=$VITE_APP_ENV
 RUN pnpm tsc -b tsconfig.app.json && pnpm vite build
 
 # Stage 2: Serve
@@ -15,6 +17,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
     && touch /var/run/nginx.pid && chown appuser:appgroup /var/run/nginx.pid
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 USER appuser
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \

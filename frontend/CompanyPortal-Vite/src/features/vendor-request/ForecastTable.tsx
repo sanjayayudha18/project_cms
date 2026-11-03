@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/feedback/Skeleton";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { visitSisa } from "@/features/atm-portal/visitQuota";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import {
   type ColumnDef,
   type OnChangeFn,
@@ -137,13 +137,13 @@ const columns: ColumnDef<ForecastRow>[] = [
   {
     accessorKey: "denom",
     header: "Denominasi",
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
     meta: { align: "right" },
   },
   {
     accessorKey: "amount_replenish",
     header: "Amount Replenish",
-    cell: ({ getValue }) => formatIDR(getValue<number>()),
+    cell: ({ getValue }) => formatThousands(getValue<number>()),
     meta: { align: "right" },
   },
   // replenishment-request-enhancements (Req 5.1, 6.1): Amount Refund's
@@ -178,7 +178,7 @@ const columns: ColumnDef<ForecastRow>[] = [
     // null (no itm_replenish row) renders "-", not "0" (Req 5.11).
     cell: ({ getValue }) => {
       const escrow = getValue<string | null>();
-      return escrow === null ? "-" : formatIDR(Number(escrow));
+      return escrow === null ? "-" : formatThousands(Number(escrow));
     },
     meta: { align: "right" },
     enableSorting: false,

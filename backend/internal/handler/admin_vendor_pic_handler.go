@@ -26,16 +26,23 @@ type VendorPicAdminServicer interface {
 	Enable(ctx context.Context, makerID, vendorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 }
 
+// VendorPicRoleSetter is service.VendorPicRoleService's surface: immediate
+// roles change with audit in the same tx (documented GR#3 deviation).
+type VendorPicRoleSetter interface {
+	SetRoles(ctx context.Context, actorID, vendorID, picID int64, roles []string, actorIP string) ([]string, error)
+}
+
 // AdminVendorPicHandler handles ADMIN/ADMIN_PARAM-only vendor PIC management
 // (T3.3). Mount at /api/v1/admin/vendors/{vendorID}/pics behind RequireAuth +
 // RequireRoles("ADMIN", "ADMIN_PARAM") -- see cmd/api/main.go.
 type AdminVendorPicHandler struct {
-	svc VendorPicAdminServicer
+	svc   VendorPicAdminServicer
+	roles VendorPicRoleSetter
 }
 
-// NewAdminVendorPicHandler creates a new AdminVendorPicHandler with the given dependency.
-func NewAdminVendorPicHandler(svc VendorPicAdminServicer) *AdminVendorPicHandler {
-	return &AdminVendorPicHandler{svc: svc}
+// NewAdminVendorPicHandler creates a new AdminVendorPicHandler with the given dependencies.
+func NewAdminVendorPicHandler(svc VendorPicAdminServicer, roles VendorPicRoleSetter) *AdminVendorPicHandler {
+	return &AdminVendorPicHandler{svc: svc, roles: roles}
 }
 
 // Routes returns a chi.Router with all admin vendor PIC endpoints mounted.
@@ -45,6 +52,7 @@ func (h *AdminVendorPicHandler) Routes() chi.Router {
 	r.Post("/", h.Create)
 	r.Get("/{id}", h.Get)
 	r.Put("/{id}", h.Update)
+	r.Put("/{id}/roles", h.SetRoles)
 	r.Post("/{id}/disable", h.Disable)
 	r.Post("/{id}/enable", h.Enable)
 	return r
@@ -55,7 +63,7 @@ func picToResponse(p service.VendorPic) map[string]any {
 		"id": p.ID, "vendor_id": p.VendorID, "vendor_branch_id": p.VendorBranchID, "name": p.Name,
 		"position": p.Position, "phone": p.Phone, "email": p.Email,
 		"is_notification_recipient": p.IsNotificationRecipient, "is_active": p.IsActive,
-		"deleted_at": formatTimePtr(p.DeletedAt),
+		"deleted_at": formatTimePtr(p.DeletedAt), "roles": p.Roles,
 	}
 }
 
@@ -191,6 +199,9 @@ func (h *AdminVendorPicHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
 		return
 	}
+	// The form never changes roles (vendor-party-scope Req 5.7); only
+	// PUT /{id}/roles (immediate) and CSV import (maker-checker) do.
+	body.Roles = nil
 
 	change, err := h.svc.Update(r.Context(), authCtx.UserID, vendorID, id, body, extractClientIP(r))
 	if err != nil {
@@ -198,6 +209,44 @@ func (h *AdminVendorPicHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, changeRequestAcceptedResponse(change))
+}
+
+// SetRoles handles PUT /{id}/roles -- applies the PIC's roles immediately
+// with an audit entry in the same tx (200, not 202; GR#3 deviation).
+func (h *AdminVendorPicHandler) SetRoles(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+	vendorID, err := parsePathID(r, "vendorID")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	id, err := parsePathID(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		return
+	}
+	var body struct {
+		Roles *[]string `json:"roles"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
+		return
+	}
+	if body.Roles == nil {
+		writeValidationError(w, "roles", "wajib diisi (boleh kosong)")
+		return
+	}
+
+	roles, err := h.roles.SetRoles(r.Context(), authCtx.UserID, vendorID, id, *body.Roles, extractClientIP(r))
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "roles": roles})
 }
 
 // Disable handles POST /{id}/disable -- stages a disable for approval (202).

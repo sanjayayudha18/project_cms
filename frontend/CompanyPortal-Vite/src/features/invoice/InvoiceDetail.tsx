@@ -2,7 +2,7 @@ import { CheckCircle, Clock, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import type { BadgeVariant } from "@/components/ui/Badge";
-import { formatIDR } from "@/lib/utils/formatCurrency";
+import { formatThousands } from "@/lib/utils/formatCurrency";
 import type { InvoiceLineItem, MatchStatus } from "./types";
 
 interface InvoiceDetailProps {
@@ -56,16 +56,16 @@ export function InvoiceDetail({ lineItems }: InvoiceDetailProps) {
               <tr key={item.id} className="border-b border-[var(--n-100)]">
                 <td className="px-3 py-2 text-[var(--n-800)]">{item.description}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--n-800)]">
-                  {formatIDR(item.invoicedAmount)}
+                  {formatThousands(item.invoicedAmount)}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-[var(--n-700)]">
                   {item.matchedOrderRef ?? "—"}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--n-800)]">
-                  {formatIDR(item.expectedAmount)}
+                  {formatThousands(item.expectedAmount)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-[var(--n-800)]">
-                  {formatIDR(item.variance)}
+                  {formatThousands(item.variance)}
                 </td>
                 <td className="px-3 py-2">
                   <Badge variant={config.variant} icon={config.icon} label={config.label} />

@@ -1,5 +1,4 @@
-import { ApprovalInboxPage } from "@/features/approvals";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
 import { protectedRoute } from "./_protected";
 
 /**
@@ -10,5 +9,5 @@ import { protectedRoute } from "./_protected";
 export const approvalsRoute = createRoute({
   path: "/approvals",
   getParentRoute: () => protectedRoute,
-  component: ApprovalInboxPage,
+  component: lazyRouteComponent(() => import("@/features/approvals"), "ApprovalInboxPage"),
 });

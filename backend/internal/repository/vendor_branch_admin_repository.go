@@ -13,26 +13,27 @@ import (
 // for VendorBranchAdminService (Submit-time validation + read), and
 // create/update/disable/enable for VendorBranchApplier (apply-on-approve).
 //
-// ponytail: uses dbPool for both reads and writes; swap List/Count to the
-// dbRead pool when DATABASE_REPLICA_URL wiring lands (same TODO convention
-// as VendorAdminRepository/ATMAdminRepository).
+// List/Count read the replica (CLAUDE.md Sec 6); every other lookup stays on
+// the primary because Submit uses it as the "before" snapshot / pre-check.
 type VendorBranchAdminRepository struct {
-	queries *db.Queries
+	queries *db.Queries // primary
+	dbRead  *db.Queries // replica: List/Count
 }
 
-// NewVendorBranchAdminRepository creates a VendorBranchAdminRepository wrapping the given database connection.
-func NewVendorBranchAdminRepository(dbConn db.DBTX) *VendorBranchAdminRepository {
-	return &VendorBranchAdminRepository{queries: db.New(dbConn)}
+// NewVendorBranchAdminRepository creates a VendorBranchAdminRepository. Pass the primary
+// pool for both arguments when no replica is configured.
+func NewVendorBranchAdminRepository(primary, replica db.DBTX) *VendorBranchAdminRepository {
+	return &VendorBranchAdminRepository{queries: db.New(primary), dbRead: db.New(replica)}
 }
 
 // List returns a page of a vendor's branches matching the given filters.
 func (r *VendorBranchAdminRepository) List(ctx context.Context, arg db.ListVendorBranchesAdminParams) ([]db.ListVendorBranchesAdminRow, error) {
-	return r.queries.ListVendorBranchesAdmin(ctx, arg)
+	return r.dbRead.ListVendorBranchesAdmin(ctx, arg)
 }
 
 // Count returns the total number of branches matching List's filters.
 func (r *VendorBranchAdminRepository) Count(ctx context.Context, arg db.CountVendorBranchesAdminParams) (int64, error) {
-	return r.queries.CountVendorBranchesAdmin(ctx, arg)
+	return r.dbRead.CountVendorBranchesAdmin(ctx, arg)
 }
 
 // GetByID returns a vendor branch by id, including soft-deleted rows.

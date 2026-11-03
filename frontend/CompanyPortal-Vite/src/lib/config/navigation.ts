@@ -2,23 +2,25 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
-  Calendar,
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  FileText,
-  GitCompare,
-  LayoutDashboard,
+  Download,
+  FileClock,
+  HeartPulse,
+  Landmark,
+  LayoutGrid,
   Monitor,
   Receipt,
   ScrollText,
   Search,
-  Settings,
+  Settings2,
   Table,
   Truck,
 } from "lucide-react";
 
 import type { DbRole } from "@/lib/auth/store";
+import { EXPORTS_PAGE_ROLES } from "./exportRoles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,8 +29,13 @@ export type NavGroup =
   | "monitoring"
   | "forecasting"
   | "replenish"
+  | "cit"
   | "invoice"
-  | "cash-count";
+  | "cash-count"
+  | "system";
+
+export type NavPlacement = "sidebar" | "sidebar-footer";
+export type NavBadgeSource = "approvals-inbox" | "cit-requests" | "eod-health";
 
 export interface NavItem {
   id: string;
@@ -38,6 +45,10 @@ export interface NavItem {
   roles: (DbRole | "*")[];
   group: NavGroup;
   disabled?: boolean;
+  /** Default "sidebar". */
+  placement?: NavPlacement;
+  /** Sumber NavBadge (bukan nilai). */
+  badge?: NavBadgeSource;
 }
 
 // ─── Group Labels (Bahasa Indonesia) ──────────────────────────────────────────
@@ -47,9 +58,20 @@ export const GROUP_LABELS: Record<NavGroup, string> = {
   monitoring: "Monitoring",
   forecasting: "Peramalan",
   replenish: "Replenish",
+  cit: "CIT",
   invoice: "Tagihan",
   "cash-count": "Perhitungan Kas",
+  system: "Sistem",
 };
+
+/** Grup yang tampil di sidebar, berurutan. */
+export const SIDEBAR_GROUP_ORDER: NavGroup[] = [
+  "general",
+  "replenish",
+  "cit",
+  "monitoring",
+  "forecasting",
+];
 
 // ─── Navigation Configuration ─────────────────────────────────────────────────
 
@@ -58,7 +80,7 @@ export const NAV_CONFIG: NavItem[] = [
   {
     id: "dashboard",
     label: "Dashboard",
-    icon: LayoutDashboard,
+    icon: LayoutGrid,
     href: "/",
     roles: ["*"],
     group: "general",
@@ -78,14 +100,24 @@ export const NAV_CONFIG: NavItem[] = [
     href: "/approvals",
     roles: ["*"],
     group: "general",
+    badge: "approvals-inbox",
+  },
+  {
+    id: "exports",
+    label: "Export Data",
+    icon: Download,
+    href: "/exports",
+    roles: [...EXPORTS_PAGE_ROLES],
+    group: "general",
   },
   {
     id: "settings",
     label: "Pengaturan",
-    icon: Settings,
+    icon: Settings2,
     href: "/settings",
     roles: ["ADMIN", "ADMIN_PARAM", "APPACCESS"],
-    group: "general",
+    group: "system",
+    placement: "sidebar-footer",
   },
 
   // Replenish
@@ -104,6 +136,7 @@ export const NAV_CONFIG: NavItem[] = [
     href: "/replenishment/vendor-requests",
     roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
     group: "replenish",
+    badge: "cit-requests",
   },
   {
     id: "replenishment",
@@ -113,16 +146,15 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["ATM-USER", "ATM-SPV"],
     group: "replenish",
   },
-  /*
+  // CIT (cit-acm-plan): tim ACM menetapkan branch vault per ATM.
   {
-    id: "cit",
-    label: "CIT Tracker",
-    icon: Truck,
-    href: "/cit",
-    roles: ["ATM-USER", "ATM-SPV"],
-    group: "general",
+    id: "vault-plans",
+    label: "Penetapan Vault",
+    icon: Landmark,
+    href: "/cit/vault-plans",
+    roles: ["ACM-USER", "ACM-SPV"],
+    group: "cit",
   },
-  */
   // Monitoring
   {
     id: "atm-portal",
@@ -133,12 +165,21 @@ export const NAV_CONFIG: NavItem[] = [
     group: "monitoring",
   },
   {
+    id: "dsr-late-report",
+    label: "Laporan DSR Telat",
+    icon: FileClock,
+    href: "/dsr-late-report",
+    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"],
+    group: "monitoring",
+  },
+  {
     id: "eod-monitoring",
     label: "EOD Monitoring",
-    icon: Activity,
+    icon: HeartPulse,
     href: "/eod-monitoring",
     roles: ["ADMIN", "ADMIN_PARAM"],
     group: "monitoring",
+    badge: "eod-health",
   },
   {
     id: "audit-logs",
@@ -149,34 +190,6 @@ export const NAV_CONFIG: NavItem[] = [
     group: "monitoring",
   },
 
-  // Forecasting
-  /*
-  {
-    id: "dsr-upload",
-    label: "Unggah DSR",
-    icon: Upload,
-    href: "/forecasting/dsr-upload",
-    roles: ["VENDOR-USER", "ATM-USER", "ATM-SPV"],
-    group: "forecasting",
-  },
-  */
-  {
-    id: "dsr-dashboard",
-    label: "DSR Dashboard",
-    icon: BarChart3,
-    href: "/forecasting/dsr-dashboard",
-    roles: ["ATM-USER", "ATM-SPV", "VENDOR-USER"],
-    group: "forecasting",
-  },
-  // Manually hidden from sidebar — route still exists, just not listed in nav.
-  // {
-  //   id: "forecast",
-  //   label: "Forecasting",
-  //   icon: TrendingUp,
-  //   href: "/forecasting/forecast",
-  //   roles: ["ATM-USER", "ATM-SPV"],
-  //   group: "forecasting",
-  // },
   {
     id: "dmaa-forecast",
     label: "DMAA Forecast",
@@ -230,24 +243,16 @@ export const NAV_CONFIG: NavItem[] = [
   },
   */
   {
+    // replenishment-realisasi FR1: the calendar the realisasi job counts workdays with; ADMIN only (Q14).
     id: "holiday-calendar",
     label: "Kalender Libur",
-    icon: Calendar,
-    href: "/forecasting/holiday-calendar",
-    roles: ["ATM-USER", "ATM-SPV"],
+    icon: CalendarDays,
+    href: "/settings/admin/holidays",
+    roles: ["ADMIN"],
     group: "forecasting",
-    disabled: true,
   },
 
   // Invoice
-  {
-    id: "invoice-list",
-    label: "Daftar Invoice",
-    icon: FileText,
-    href: "/invoice/list",
-    roles: ["BRANCH-USER", "BRANCH-SPV", "VENDOR-USER"],
-    group: "invoice",
-  },
   {
     id: "invoice-upload",
     label: "Unggah Invoice",
@@ -256,15 +261,6 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["VENDOR-USER", "BRANCH-USER"],
     group: "invoice",
     disabled: true,
-  },
-  {
-    id: "reconciliation",
-    label: "Rekonsiliasi",
-    icon: GitCompare,
-    href: "/invoice/reconciliation",
-    roles: ["BRANCH-USER", "BRANCH-SPV"],
-    group: "invoice",
-    disabled: false,
   },
   /*
   {
@@ -363,4 +359,46 @@ export function filterNavByRoles(items: NavItem[], userRole: DbRole): NavItem[] 
     if (item.roles.includes("*")) return true;
     return item.roles.includes(userRole);
   });
+}
+
+export interface VisibleNav {
+  all: NavItem[];
+  sidebar: Map<NavGroup, NavItem[]>;
+  settings?: NavItem;
+}
+
+/** Item yang terlihat untuk role (tanpa `disabled`), dikelompokkan untuk sidebar; grup kosong dibuang. */
+export function getVisibleNav(role: DbRole | null): VisibleNav {
+  const all = (role ? filterNavByRoles(NAV_CONFIG, role) : []).filter((i) => !i.disabled);
+  const sidebar = new Map<NavGroup, NavItem[]>();
+  for (const group of SIDEBAR_GROUP_ORDER) {
+    const items = all.filter((i) => i.group === group && i.placement !== "sidebar-footer");
+    if (items.length > 0) sidebar.set(group, items);
+  }
+  return { all, sidebar, settings: all.find((i) => i.placement === "sidebar-footer") };
+}
+
+const normalizePath = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") || "/" : p);
+
+/** Item dengan href terpanjang yang cocok per segmen; "/" hanya exact. */
+export function findActiveNavItem(items: NavItem[], pathname: string): NavItem | undefined {
+  const path = normalizePath(pathname);
+  let best: NavItem | undefined;
+  for (const item of items) {
+    const href = normalizePath(item.href);
+    const match = href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
+    if (match && (!best || href.length > normalizePath(best.href).length)) best = item;
+  }
+  return best;
+}
+
+/** Filter label/nama grup, case-insensitive; urutan asli dipertahankan. */
+export function filterPaletteItems(items: NavItem[], query: string): NavItem[] {
+  const q = query.trim().toLocaleLowerCase("id-ID");
+  if (!q) return items;
+  return items.filter(
+    (i) =>
+      i.label.toLocaleLowerCase("id-ID").includes(q) ||
+      GROUP_LABELS[i.group].toLocaleLowerCase("id-ID").includes(q),
+  );
 }

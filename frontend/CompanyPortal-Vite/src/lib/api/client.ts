@@ -9,21 +9,32 @@ import { apiConfig } from "./config";
 export interface RequestConfig {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
+  /** FormData is sent as-is (multipart); anything else is JSON-encoded */
   body?: unknown;
+  /** "blob" returns the raw body (file downloads); default "json" */
+  responseType?: "json" | "blob";
   headers?: Record<string, string>;
   /** Skip auth header injection (e.g., for login/refresh endpoints) */
   skipAuth?: boolean;
+  /**
+   * Overrides apiConfig.baseURL for services outside /api/v1 (e.g. "" for the EOD scheduler
+   * behind /api/eod/*). Auth header + 401 refresh still apply.
+   */
+  baseURL?: string;
 }
 
 export interface ApiError {
   status: number;
   message: string;
   details?: unknown;
+  /** Machine code from the pkg/response envelope (`error.code`) or a flat `code`, when present. */
+  code?: string;
 }
 
 export interface ApiResponse<T = unknown> {
   data: T;
   status: number;
+  headers: Headers;
 }
 
 // ─── Request Interceptor ──────────────────────────────────────────────────────
@@ -70,10 +81,12 @@ async function handleUnauthorized(config: RequestConfig): Promise<Response | nul
 // ─── Core Fetch Execution ─────────────────────────────────────────────────────
 
 async function executeRequest(config: RequestConfig, isRetry = false): Promise<Response> {
-  const url = `${apiConfig.baseURL}${config.path}`;
+  const url = `${config.baseURL ?? apiConfig.baseURL}${config.path}`;
 
+  const isForm = config.body instanceof FormData;
+  // FormData: let the browser set the multipart Content-Type + boundary
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isForm ? {} : { "Content-Type": "application/json" }),
     ...config.headers,
   };
 
@@ -82,7 +95,11 @@ async function executeRequest(config: RequestConfig, isRetry = false): Promise<R
   const fetchOptions: RequestInit = {
     method: config.method,
     headers: finalHeaders,
-    body: config.body ? JSON.stringify(config.body) : undefined,
+    body: isForm
+      ? (config.body as FormData)
+      : config.body
+        ? JSON.stringify(config.body)
+        : undefined,
     credentials: "include",
   };
 
@@ -111,11 +128,21 @@ function createApiError(response: Response): ApiError {
 
 async function parseApiError(response: Response): Promise<ApiError> {
   try {
-    const body = (await response.json()) as { message?: string; details?: unknown };
+    const body = (await response.json()) as {
+      message?: string;
+      code?: string;
+      details?: unknown;
+      errors?: unknown;
+      error?: { code?: string; message?: string } | string;
+    };
+    // pkg/response envelope: {success:false, error:{code,message}}; flat: {error,message}.
+    const env = typeof body.error === "object" && body.error !== null ? body.error : undefined;
+    const code = env?.code ?? body.code;
     return {
       status: response.status,
-      message: body.message ?? response.statusText ?? "Request failed",
-      details: body.details,
+      message: env?.message ?? body.message ?? response.statusText ?? "Request failed",
+      details: body.details ?? body.errors,
+      ...(code ? { code } : {}),
     };
   } catch {
     return createApiError(response);
@@ -133,11 +160,13 @@ export async function apiClient<T = unknown>(config: RequestConfig): Promise<Api
 
   // Handle 204 No Content
   if (response.status === 204) {
-    return { data: undefined as T, status: 204 };
+    return { data: undefined as T, status: 204, headers: response.headers };
   }
 
-  const data = (await response.json()) as T;
-  return { data, status: response.status };
+  const data = (
+    config.responseType === "blob" ? await response.blob() : await response.json()
+  ) as T;
+  return { data, status: response.status, headers: response.headers };
 }
 
 // ─── Convenience Methods ──────────────────────────────────────────────────────

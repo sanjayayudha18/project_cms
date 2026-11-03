@@ -95,7 +95,7 @@ func (h *AdminVendorBranchHandler) List(w http.ResponseWriter, r *http.Request) 
 	for i, b := range branches {
 		items[i] = map[string]any{
 			"id": b.ID, "vendor_id": b.VendorID, "branch_code": b.BranchCode, "branch_name": b.BranchName,
-			"location_id": b.LocationID, "region": b.Region, "category": b.Category, "is_active": b.IsActive,
+			"location_id": b.LocationID, "region": b.Region, "region_code": b.RegionCode, "category": b.Category, "is_active": b.IsActive,
 			"deleted_at": formatTimestamptz(b.DeletedAt),
 		}
 	}
@@ -123,7 +123,7 @@ func (h *AdminVendorBranchHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": branch.ID, "vendor_id": branch.VendorID, "branch_code": branch.BranchCode, "branch_name": branch.BranchName,
-		"location_id": branch.LocationID, "region": branch.Region, "category": branch.Category, "is_active": branch.IsActive,
+		"location_id": branch.LocationID, "region": branch.Region, "region_code": branch.RegionCode, "category": branch.Category, "is_active": branch.IsActive,
 		"deleted_at": formatTimestamptz(branch.DeletedAt),
 	})
 }
@@ -133,6 +133,7 @@ type createVendorBranchRequestBody struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
 }
 
@@ -158,7 +159,7 @@ func (h *AdminVendorBranchHandler) Create(w http.ResponseWriter, r *http.Request
 
 	change, err := h.svc.Create(r.Context(), authCtx.UserID, service.VendorBranchPayload{
 		VendorID: vendorID, BranchCode: body.BranchCode, BranchName: body.BranchName,
-		LocationID: body.LocationID, Region: body.Region, Category: body.Category,
+		LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)
@@ -172,6 +173,7 @@ type updateVendorBranchRequestBody struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
 	Region     *string `json:"region"`
+	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
 }
 
@@ -196,7 +198,7 @@ func (h *AdminVendorBranchHandler) Update(w http.ResponseWriter, r *http.Request
 	}
 
 	change, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.VendorBranchUpdatePayload{
-		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region, Category: body.Category,
+		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)

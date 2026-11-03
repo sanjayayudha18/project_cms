@@ -1,5 +1,67 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
 @import "./tokens.css";
+
+/* static: body uses var(--font-sans) outside Tailwind utilities, so always emit */
+@theme static {
+  --font-sans: "Plus Jakarta Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ─── App shell utilities ──────────────────────────────────────────────────── */
+
+@keyframes shell-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.shell-pop {
+  animation: shell-pop 150ms ease-out;
+}
+
+.shell-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--shell-sb-line) transparent;
+}
+
+.shell-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.shell-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--shell-sb-line);
+  border-radius: 9999px;
+}
+
+.shell-focus:focus-visible {
+  outline: 2px solid var(--shell-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-pop {
+    animation: none;
+  }
+
+  .animate-ping,
+  .animate-pulse {
+    animation: none;
+  }
+
+  .shell-chevron,
+  .shell-sidebar {
+    transition: none;
+  }
+}
 
 /* ─── Toast Animation ──────────────────────────────────────────────────────── */
 
@@ -574,5 +636,43 @@ p {
   .login-form__input,
   .login-form__submit {
     transition: none;
+  }
+}
+
+/* EOD monitoring dialog/drawer animations (kept out of inline <style> for CSP style-src 'self') */
+@keyframes eod-dialog-enter {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes eod-dialog-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes eod-drawer-enter {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes eod-drawer-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

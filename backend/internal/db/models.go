@@ -8,6 +8,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AcmArea struct {
+	ID        int64              `json:"id"`
+	Name      string             `json:"name"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedBy int64              `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AcmAreaBranch struct {
+	AcmAreaID      int64              `json:"acm_area_id"`
+	VendorBranchID int64              `json:"vendor_branch_id"`
+	CreatedBy      int64              `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type AcmAreaMember struct {
+	AcmAreaID int64              `json:"acm_area_id"`
+	UserID    int64              `json:"user_id"`
+	CreatedBy int64              `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type AcmAreaRegion struct {
+	AcmAreaID  int64              `json:"acm_area_id"`
+	RegionCode string             `json:"region_code"`
+	CreatedBy  int64              `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 // Explicit fallback: while from_user_id cannot act (see user_leaves), to_user_id acts in their place. Overlap-range rejection is enforced at the admin endpoint layer (Task 8), not here.
 type ApprovalDelegation struct {
 	ID         int64              `json:"id"`
@@ -224,7 +255,7 @@ type DsrDailyRow struct {
 	Location *string `json:"location"`
 	// d0 = section 1 (report_date, settled, sampai pukul 00:00). d1 = section 2 (daily_status_date, status sementara).
 	Section string `json:"section"`
-	// saldo_awal = opening balance (d0 only). penerimaan / pengeluaran = receipt / disbursement line, sign stored verbatim as printed. status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak), d1 only.
+	// saldo_awal = opening balance (d0 only). penerimaan / pengeluaran = receipt / disbursement line, sign stored verbatim as printed. status_cadangan = STATUS UANG CADANGAN ATM lines (Layak Edar / Rusak), d1 only. saldo_akhir = closing balance per vault block (d0, located blocks only; since 027, feeds vault saldo via dsr_location_vault_maps).
 	Flow string `json:"flow"`
 	// Uraian text verbatim, e.g. Dari CIMB Niaga CIT, Untuk Cartridge Replenishment ATM & CRM.
 	LineLabel string `json:"line_label"`
@@ -242,6 +273,37 @@ type DsrDailyRow struct {
 	LineTotalIdr pgtype.Numeric     `json:"line_total_idr"`
 	Remarks      *string            `json:"remarks"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+// Label lokasi blok DSR (dsr_daily_rows.location) per vendor -> vendor_vaults. DSR dikaitkan ke vendor via dsr_uploads.vendor = vendors.name.
+type DsrLocationVaultMap struct {
+	ID            int64              `json:"id"`
+	VendorID      int64              `json:"vendor_id"`
+	DsrLocation   string             `json:"dsr_location"`
+	VendorVaultID int64              `json:"vendor_vault_id"`
+	IsActive      bool               `json:"is_active"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Append-only: one row per confirmed DSR commit (daily_status completed). Never updated or deleted; a revision adds a row. Basis of the DSR late report (first_received_at = MIN(received_at)).
+type DsrReceipt struct {
+	ID int64 `json:"id"`
+	// dsr_uploads.vendor as uploaded (raw label).
+	VendorLabel string `json:"vendor_label"`
+	// Resolved at commit by vendors.name = vendor_label; NULL when unresolved (shown as a warning, counted for no branch).
+	VendorID *int64 `json:"vendor_id"`
+	// DSR report date the upload covers.
+	ReportDate pgtype.Date `json:"report_date"`
+	// SHA-256 hex of the uploaded file; same file committed again does not add a row.
+	Checksum string `json:"checksum"`
+	// Distinct non-empty btrim(dsr_daily_rows.location) labels of that upload; mapped to vaults via dsr_location_vault_maps.
+	Locations []string `json:"locations"`
+	// Vendor user who confirmed the upload, if known.
+	UploadedByUserID *int64 `json:"uploaded_by_user_id"`
+	// Commit/confirmation time (spec K2), not file staging time.
+	ReceivedAt pgtype.Timestamptz `json:"received_at"`
 }
 
 type DsrRencanaIsiRow struct {
@@ -305,6 +367,53 @@ type DsrUpload struct {
 	ProcessedAt           pgtype.Timestamptz `json:"processed_at"`
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Permintaan ekspor asinkron (backend-exq). Status teknis queued -> running -> succeeded|failed; succeeded -> downloading -> downloaded|succeeded; succeeded -> expired. Baris disimpan sebagai riwayat, file ada di export_job_chunks. Migrasi 034.
+type ExportJob struct {
+	ID                int64              `json:"id"`
+	RequestedBy       int64              `json:"requested_by"`
+	Kind              string             `json:"kind"`
+	Entity            string             `json:"entity"`
+	VendorID          *int64             `json:"vendor_id"`
+	VendorCode        *string            `json:"vendor_code"`
+	VendorBranchID    *int64             `json:"vendor_branch_id"`
+	BranchCode        *string            `json:"branch_code"`
+	StatusFilter      string             `json:"status_filter"`
+	PriceLevel        *string            `json:"price_level"`
+	ParamsHash        string             `json:"params_hash"`
+	FileName          string             `json:"file_name"`
+	Status            string             `json:"status"`
+	RowCount          int64              `json:"row_count"`
+	ByteSize          *int64             `json:"byte_size"`
+	ChunkCount        *int32             `json:"chunk_count"`
+	ErrorMessage      *string            `json:"error_message"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	StartedAt         pgtype.Timestamptz `json:"started_at"`
+	FinishedAt        pgtype.Timestamptz `json:"finished_at"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	DownloadStartedAt pgtype.Timestamptz `json:"download_started_at"`
+	DownloadedAt      pgtype.Timestamptz `json:"downloaded_at"`
+	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Isi file CSV ekspor per potongan (<= 1 MiB). Berisi data pribadi PIC / harga kontrak: dihapus setelah berhasil diunduh, saat gagal, atau 10 menit setelah siap. Migrasi 034.
+type ExportJobChunk struct {
+	ExportJobID int64  `json:"export_job_id"`
+	Seq         int32  `json:"seq"`
+	Data        []byte `json:"data"`
+}
+
+type Holiday struct {
+	ID          int64              `json:"id"`
+	HolidayDate pgtype.Date        `json:"holiday_date"`
+	Name        string             `json:"name"`
+	IsActive    bool               `json:"is_active"`
+	CreatedBy   int64              `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 // One row per ingested file. Idempotent per (source, file_hash); a different hash for a completed (source, processing_date) becomes version+1 and supersedes the old row on completion. Status machine: see .claude/sdlc/import-export-jobs/spec.md FR10.
@@ -490,6 +599,8 @@ type MasterDataImportBatch struct {
 	MakerID   int64              `json:"maker_id"`
 	RowCount  int32              `json:"row_count"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	// Original upload file name (base name, control chars stripped, max 255). NULL for batches before 036.
+	FileName *string `json:"file_name"`
 }
 
 type MenuFeature struct {
@@ -502,6 +613,36 @@ type MenuFeature struct {
 	IsActive  bool               `json:"is_active"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+// Notifikasi in-app, satu baris per user penerima. Dibaca hanya oleh penerimanya. Dihapus setelah 90 hari (retensi). Migrasi 025.
+type Notification struct {
+	ID              int64              `json:"id"`
+	RecipientUserID int64              `json:"recipient_user_id"`
+	Type            string             `json:"type"`
+	Title           string             `json:"title"`
+	Body            string             `json:"body"`
+	Link            *string            `json:"link"`
+	EntityType      *string            `json:"entity_type"`
+	EntityID        *int64             `json:"entity_id"`
+	IsRead          bool               `json:"is_read"`
+	ReadAt          pgtype.Timestamptz `json:"read_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+// Outbox email notifikasi, satu baris per alamat. notification_id NULL untuk PIC vendor (bukan user). status: pending|sent|failed|skipped (skipped = SMTP tidak dikonfigurasi). Migrasi 025.
+type NotificationEmail struct {
+	ID             int64              `json:"id"`
+	NotificationID *int64             `json:"notification_id"`
+	ToAddress      string             `json:"to_address"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	Status         string             `json:"status"`
+	Attempts       int32              `json:"attempts"`
+	LastError      *string            `json:"last_error"`
+	NextAttemptAt  pgtype.Timestamptz `json:"next_attempt_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 // Frekuensi CR & FLM per bulan untuk tiap (kode paket, kelompok mesin). Grainnya (kode, kelompok mesin) - bukan kolom di vendor_packages - karena FLM berbeda menurut tipe mesin: PAKET 3 ATM = FLM 4, PAKET 3 CDM/CRM = FLM 6. Nilai dari archives/Harga Paket per vendor FLM.docx. Migrasi 009.
@@ -523,6 +664,40 @@ type Region struct {
 	IsActive  bool               `json:"is_active"`
 	// Soft-disable timestamp (set with is_active=false). Never hard-delete: locations.region_id references this table.
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Klasifikasi realisasi vs order per tiket replenish (atau no_order per baris ITM). Ditulis job Python replenish_classify; final tidak dihitung ulang.
+type ReplenishClassification struct {
+	ID               int64              `json:"id"`
+	TicketID         *int64             `json:"ticket_id"`
+	ItmReplenishID   *int64             `json:"itm_replenish_id"`
+	TerminalID       string             `json:"terminal_id"`
+	VendorID         *int64             `json:"vendor_id"`
+	VendorBranchID   *int64             `json:"vendor_branch_id"`
+	ScheduledDate    pgtype.Date        `json:"scheduled_date"`
+	RealizedDate     pgtype.Date        `json:"realized_date"`
+	RealizedTime     pgtype.Time        `json:"realized_time"`
+	ReportDate       pgtype.Date        `json:"report_date"`
+	WorkdayOffset    *int16             `json:"workday_offset"`
+	Classification   string             `json:"classification"`
+	IsFinal          bool               `json:"is_final"`
+	HasAmountDiff    bool               `json:"has_amount_diff"`
+	VendorMismatch   bool               `json:"vendor_mismatch"`
+	VendorReportLate bool               `json:"vendor_report_late"`
+	LateNotifiedAt   pgtype.Timestamptz `json:"late_notified_at"`
+	ClassifiedAt     pgtype.Timestamptz `json:"classified_at"`
+	FinalizedAt      pgtype.Timestamptz `json:"finalized_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReplenishClassificationAmount struct {
+	ClassificationID int64  `json:"classification_id"`
+	Denom            int32  `json:"denom"`
+	OrderAmount      int64  `json:"order_amount"`
+	ItmAmount        int64  `json:"itm_amount"`
+	VendorAmount     *int64 `json:"vendor_amount"`
+	Diff             *int64 `json:"diff"`
 }
 
 type RetryAuditLog struct {
@@ -592,7 +767,7 @@ type User struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
-	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (enforced in app). NULL for internal/LDAP users.
+	// Optional: pins a vendor user to one vendor_branches row. Must belong to the same vendor as vendor_id (FK users_vendor_branch_owner_fk, migration 032). NULL = vendor-wide or internal/LDAP user.
 	VendorBranchID *int64 `json:"vendor_branch_id"`
 	// Direct supervisor in the reporting line (self-FK, tree). NULL = top of hierarchy or not yet assigned.
 	SupervisorID *int64 `json:"supervisor_id"`
@@ -653,6 +828,8 @@ type VendorBranch struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 	// Tipe cabang: ATM, CASH, or ATM_CASH -- mirrors vendor_vaults.category. Added per .claude/sdlc/vendor-branch-tipe/plan.md; existing rows default to ATM pending re-seed.
 	Category string `json:"category"`
+	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
+	RegionCode *string `json:"region_code"`
 }
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
@@ -721,6 +898,8 @@ type VendorPic struct {
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
+	// Peran PIC: replenish (PIC replenish ATM), vault (PIC penyedia uang), cashcount (PIC cash count). Kosong = kontak saja. Ubah lewat layar = langsung + audit (deviasi GR#3, vendor-party-scope).
+	Roles []string `json:"roles"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.
@@ -760,14 +939,18 @@ type VendorRequest struct {
 	CompletionRejectedBy      *int64             `json:"completion_rejected_by"`
 	CompletionRejectedAt      pgtype.Timestamptz `json:"completion_rejected_at"`
 	CompletionRejectionReason *string            `json:"completion_rejection_reason"`
-}
-
-// Hasil laporan selesai per ATM (terminal distinct dari vendor_request_items). Ditimpa saat laporan diajukan ulang setelah ditolak. Migrasi 021.
-type VendorRequestAtmResult struct {
-	VendorRequestID int64              `json:"vendor_request_id"`
-	TerminalID      string             `json:"terminal_id"`
-	Result          string             `json:"result"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	// Snapshot kode region vendor cabang saat create. NULL = request format nomor lama.
+	RegionCode *string `json:"region_code"`
+	// true = request di-approve setelah rilis 2.2a dan melewati penetapan vault ACM (laporan selesai ditolak -> ready). false = request lama (-> approved).
+	VaultFlow            bool               `json:"vault_flow"`
+	VaultReviewedBy      *int64             `json:"vault_reviewed_by"`
+	VaultReviewedAt      pgtype.Timestamptz `json:"vault_reviewed_at"`
+	VaultRejectionReason *string            `json:"vault_rejection_reason"`
+	// true = request pernah dikirim ke vendor (2.2b); laporan selesai ditolak -> vendor_accepted. false = ready/approved lama.
+	VendorSent bool `json:"vendor_sent"`
+	// Waktu kirim (ulang) terakhir ke vendor.
+	SentAt           pgtype.Timestamptz `json:"sent_at"`
+	VendorAcceptedAt pgtype.Timestamptz `json:"vendor_accepted_at"`
 }
 
 // Line items of a vendor_request, each referencing an ATM/date/denom row from dmaa_atm_forecast.
@@ -789,9 +972,141 @@ type VendorRequestItem struct {
 
 // Atomic per-(vendor, replenish_date) sequence backing the REP<prefix><YYYYMMDD><seq> request-number format (Req 4, Q3).
 type VendorRequestNumberSeq struct {
-	VendorID int64       `json:"vendor_id"`
-	SeqDate  pgtype.Date `json:"seq_date"`
-	LastSeq  int32       `json:"last_seq"`
+	VendorID   int64       `json:"vendor_id"`
+	SeqDate    pgtype.Date `json:"seq_date"`
+	LastSeq    int32       `json:"last_seq"`
+	RegionCode *string     `json:"region_code"`
+}
+
+type VendorRequestRealization struct {
+	ID              int64              `json:"id"`
+	TicketID        int64              `json:"ticket_id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	RealizedDate    pgtype.Date        `json:"realized_date"`
+	SubmittedBy     int64              `json:"submitted_by"`
+	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestRealizationAmount struct {
+	RealizationID int64 `json:"realization_id"`
+	Denom         int32 `json:"denom"`
+	Amount        int64 `json:"amount"`
+}
+
+// Tiket replenish: satu aktif per (request, ATM) = satu jalan. NNN global per (terminal_id, replenish_date), tidak dipakai ulang.
+type VendorRequestTicket struct {
+	ID              int64              `json:"id"`
+	RequestNumber   string             `json:"request_number"`
+	TerminalID      string             `json:"terminal_id"`
+	DenomCode       string             `json:"denom_code"`
+	ReplenishDate   pgtype.Date        `json:"replenish_date"`
+	Seq             int16              `json:"seq"`
+	TicketNumber    string             `json:"ticket_number"`
+	IsActive        bool               `json:"is_active"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
+	Result          *string            `json:"result"`
+	ResultUpdatedAt pgtype.Timestamptz `json:"result_updated_at"`
+}
+
+type VendorRequestVaultAllocation struct {
+	ID              int64   `json:"id"`
+	VaultPlanID     int64   `json:"vault_plan_id"`
+	VendorRequestID int64   `json:"vendor_request_id"`
+	VendorVaultID   int64   `json:"vendor_vault_id"`
+	VaultBranchID   int64   `json:"vault_branch_id"`
+	Tier            int16   `json:"tier"`
+	IsUrgent        bool    `json:"is_urgent"`
+	UrgentReason    *string `json:"urgent_reason"`
+	// Saldo vault per denom saat disimpan/submit, {"100000": "123000000", ...}; null = tidak diketahui.
+	SaldoSnapshot []byte `json:"saldo_snapshot"`
+	// Sisa kapasitas vault per denom (saldo - alokasi rencana lain) saat disimpan/submit; null = tidak diketahui.
+	CapacitySnapshot []byte             `json:"capacity_snapshot"`
+	CapacityWarning  bool               `json:"capacity_warning"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVaultAllocationAmount struct {
+	AllocationID int64 `json:"allocation_id"`
+	Denom        int32 `json:"denom"`
+	Amount       int64 `json:"amount"`
+}
+
+// Penetapan branch vault per ATM (027). Tidak ditulis lagi sejak 030 — diganti vendor_request_vault_allocations.
+type VendorRequestVaultAssignment struct {
+	ID                int64   `json:"id"`
+	VaultPlanID       int64   `json:"vault_plan_id"`
+	VendorRequestID   int64   `json:"vendor_request_id"`
+	TerminalID        string  `json:"terminal_id"`
+	ReplenishBranchID int64   `json:"replenish_branch_id"`
+	VaultBranchID     int64   `json:"vault_branch_id"`
+	Tier              int16   `json:"tier"`
+	IsUrgent          bool    `json:"is_urgent"`
+	UrgentReason      *string `json:"urgent_reason"`
+	// Saldo branch vault per denom saat disimpan, {"100000": "123000000.00", ...}; null per denom = tidak diketahui.
+	SaldoSnapshot    []byte             `json:"saldo_snapshot"`
+	CapacitySnapshot []byte             `json:"capacity_snapshot"`
+	CapacityWarning  bool               `json:"capacity_warning"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVaultPlan struct {
+	ID              int64              `json:"id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	AcmAreaID       int64              `json:"acm_area_id"`
+	Status          string             `json:"status"`
+	SubmittedBy     *int64             `json:"submitted_by"`
+	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
+	ApprovedBy      *int64             `json:"approved_by"`
+	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
+	RejectedBy      *int64             `json:"rejected_by"`
+	RejectedAt      pgtype.Timestamptz `json:"rejected_at"`
+	RejectionReason *string            `json:"rejection_reason"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	BufferReason    *string            `json:"buffer_reason"`
+}
+
+type VendorRequestVaultTicket struct {
+	ID              int64              `json:"id"`
+	VendorRequestID int64              `json:"vendor_request_id"`
+	VendorVaultID   int64              `json:"vendor_vault_id"`
+	ReplenishDate   pgtype.Date        `json:"replenish_date"`
+	Seq             int16              `json:"seq"`
+	TicketNumber    string             `json:"ticket_number"`
+	IsActive        bool               `json:"is_active"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
+}
+
+type VendorRequestVendorParty struct {
+	ID              int64  `json:"id"`
+	VendorRequestID int64  `json:"vendor_request_id"`
+	VendorBranchID  int64  `json:"vendor_branch_id"`
+	Role            string `json:"role"`
+	Status          string `json:"status"`
+	// Snapshot isi yang dilihat vendor saat dikirim (ATM, nominal per denom, pihak lawan). Tidak memuat data internal (saldo, tier, urgent, harga).
+	Content         []byte             `json:"content"`
+	SentAt          pgtype.Timestamptz `json:"sent_at"`
+	DecidedBy       *int64             `json:"decided_by"`
+	DecidedAt       pgtype.Timestamptz `json:"decided_at"`
+	RejectionReason *string            `json:"rejection_reason"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type VendorRequestVendorPartyEvent struct {
+	ID        int64              `json:"id"`
+	PartyID   int64              `json:"party_id"`
+	Event     string             `json:"event"`
+	ActorID   int64              `json:"actor_id"`
+	Reason    *string            `json:"reason"`
+	Content   []byte             `json:"content"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type VendorVault struct {

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Mock UI: Impor CSV Data Master (master-data-import-revamp)</title>
+<style>
+:root{
+  --red-50:oklch(0.965 0.018 29);--red-100:oklch(0.925 0.045 29);--red-400:oklch(0.640 0.185 29);
+  --red-500:oklch(0.552 0.205 29);--red-600:oklch(0.485 0.193 29);
+  --n-0:oklch(0.992 0.003 29);--n-50:oklch(0.975 0.004 29);--n-100:oklch(0.952 0.005 29);--n-200:oklch(0.908 0.006 29);
+  --n-300:oklch(0.845 0.007 29);--n-400:oklch(0.700 0.008 29);--n-500:oklch(0.560 0.009 29);--n-600:oklch(0.448 0.008 29);
+  --n-700:oklch(0.352 0.007 29);--n-800:oklch(0.258 0.006 29);--n-900:oklch(0.178 0.005 29);
+  --ok-bg:oklch(0.955 0.03 155);--ok-fg:oklch(0.480 0.115 155);
+  --warn-bg:oklch(0.960 0.055 78);--warn-fg:oklch(0.520 0.115 78);
+  --dan-bg:oklch(0.955 0.035 12);--dan-fg:oklch(0.500 0.195 12);--dan-500:oklch(0.545 0.205 12);
+  --info-bg:oklch(0.955 0.03 245);--info-fg:oklch(0.480 0.110 245);
+  --shadow-sm:0 1px 2px oklch(0.25 0.02 29 / 0.06);--shadow-md:0 4px 12px oklch(0.25 0.02 29 / 0.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--n-100);color:var(--n-800);font:14px/1.5 "Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+.mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-size:13px}
+.num{font-variant-numeric:tabular-nums}
+.r{text-align:right}
+h1,h2,h3{text-wrap:balance;margin:0;color:var(--n-900)}
+svg.i{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.doc{max-width:1180px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:40px}
+.doc-head h1{font-size:28px}
+.doc-head p{max-width:75ch;color:var(--n-600);margin:8px 0 0}
+.screen-label{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.screen-label b{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--red-600)}
+.screen-label span{color:var(--n-600)}
+.frame{background:var(--n-50);border:1px solid var(--n-300);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-md)}
+.topbar{display:flex;align-items:center;justify-content:space-between;background:var(--n-0);border-bottom:1px solid var(--n-200);padding:10px 20px;font-size:13px;color:var(--n-600)}
+.topbar .who{display:flex;align-items:center;gap:8px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--red-500);color:var(--n-0);display:grid;place-items:center;font-size:11px;font-weight:700}
+.page{padding:28px 32px 32px;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--red-600)}
+.page-title{font-size:28px;font-weight:700;margin:4px 0 6px}
+.desc{color:var(--n-600);max-width:70ch;margin:0;text-wrap:pretty}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--n-200)}
+.tab{padding:10px 14px;font-weight:600;color:var(--n-600);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--n-900);border-bottom-color:var(--red-500)}
+.tab .count{margin-left:6px;font-size:12px;background:var(--n-200);color:var(--n-700);border-radius:999px;padding:1px 7px}
+.steps{display:flex;gap:8px;list-style:none;margin:0;padding:0}
+.steps li{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--n-200);border-radius:6px;background:var(--n-0);color:var(--n-600)}
+.steps .dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;background:var(--n-200);color:var(--n-700);flex:none}
+.steps li.done .dot{background:var(--ok-bg);color:var(--ok-fg)}
+.steps li.cur{border-color:var(--red-400);box-shadow:0 0 0 3px var(--red-100);color:var(--n-900);font-weight:600}
+.steps li.cur .dot{background:var(--red-500);color:var(--n-0)}
+.steps small{display:block;font-weight:400;color:var(--n-500);font-size:12px}
+.card{background:var(--n-0);border:1px solid var(--n-200);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm)}
+.card.dim{opacity:.92}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-h h2{font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
+.step-n{font-size:12px;font-weight:700;color:var(--n-500)}
+.row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:500;color:var(--n-700);font-size:13px}
+.select,.input{height:36px;min-width:180px;border:1px solid var(--n-300);border-radius:4px;background:var(--n-0);padding:0 10px;display:flex;align-items:center;justify-content:space-between;color:var(--n-800);font-size:14px}
+.select:after{content:"";width:7px;height:7px;border-right:2px solid var(--n-500);border-bottom:2px solid var(--n-500);transform:rotate(45deg) translateY(-2px);margin-left:12px}
+.btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:6px;font-weight:600;font-size:14px;border:1px solid transparent;white-space:nowrap}
+.btn.primary{background:var(--red-500);color:var(--n-0)}
+.btn.secondary{background:var(--n-0);border-color:var(--n-300);color:var(--n-800)}
+.btn.ghost{background:transparent;color:var(--red-600);padding:0 8px}
+.btn.disabled{background:var(--n-200);color:var(--n-400)}
+.btn.sm{height:30px;font-size:13px;padding:0 10px}
+.link{color:var(--red-600);font-weight:600;text-decoration:underline}
+.rules{margin:0;padding-left:18px;color:var(--n-600);font-size:13px}
+.file{display:flex;align-items:center;gap:10px;border:1px dashed var(--n-300);border-radius:6px;padding:10px 12px;background:var(--n-50);flex:1;min-width:280px}
+.file b{color:var(--n-900)}
+.file small{color:var(--n-500)}
+.summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.stat{border:1px solid var(--n-200);border-radius:6px;padding:8px 10px;background:var(--n-50)}
+.stat small{display:block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--n-500)}
+.stat b{font-size:20px;font-variant-numeric:tabular-nums;color:var(--n-900)}
+.note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:6px;font-size:13px}
+.note svg.i{margin-top:3px}
+.note.ok{background:var(--ok-bg);color:var(--ok-fg)}
+.note.info{background:var(--info-bg);color:var(--info-fg)}
+.note.warn{background:var(--warn-bg);color:var(--warn-fg)}
+.note.dan{background:var(--dan-bg);color:var(--dan-fg)}
+.note b{color:inherit}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--n-500);background:var(--n-50);text-align:left;padding:8px 10px;border-bottom:1px solid var(--n-200)}
+td{padding:9px 10px;border-bottom:1px solid var(--n-100);vertical-align:top}
+tr.hover td{background:var(--red-50)}
+.tbl{border:1px solid var(--n-200);border-radius:10px;overflow:hidden}
+.chg{display:flex;flex-direction:column;gap:2px}
+.chg span{color:var(--n-500)}
+.chg s{color:var(--n-500);text-decoration:line-through}
+.chg em{font-style:normal;color:var(--n-900);font-weight:500}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-ok{background:var(--ok-bg);color:var(--ok-fg)}
+.b-warn{background:var(--warn-bg);color:var(--warn-fg)}
+.b-dan{background:var(--dan-bg);color:var(--dan-fg)}
+.b-info{background:var(--info-bg);color:var(--info-fg)}
+.b-neu{background:var(--n-100);color:var(--n-700)}
+.tfoot{display:flex;align-items:center;justify-content:space-between;padding:10px;color:var(--n-500);font-size:13px;background:var(--n-0)}
+.pager{display:flex;gap:4px}
+.pager span{min-width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--n-300);border-radius:4px;background:var(--n-0);color:var(--n-700)}
+.pager span.on{background:var(--red-500);border-color:var(--red-500);color:var(--n-0);font-weight:700}
+.actions{display:flex;justify-content:flex-end;gap:8px;align-items:center}
+.muted{color:var(--n-500)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.overlay{background:oklch(0.25 0.02 29 / 0.35);padding:48px 24px;display:flex;justify-content:center;min-height:100%}
+.dialog{background:var(--n-0);border-radius:10px;box-shadow:0 12px 32px oklch(0.25 0.02 29 / 0.18);width:100%;max-width:560px;display:flex;flex-direction:column}
+.dialog.wide{max-width:900px}
+.dialog-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--n-200)}
+.dialog-h h3{font-size:18px}
+.x{color:var(--n-500);font-size:20px;line-height:1}
+.dialog-b{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.dialog-f{padding:14px 20px;border-top:1px solid var(--n-200);display:flex;justify-content:flex-end;gap:8px}
+dl.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;margin:0}
+dl.kv dt{color:var(--n-500)}
+dl.kv dd{margin:0;color:var(--n-900);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.result{display:flex;gap:16px;align-items:flex-start}
+.result .big{width:40px;height:40px;border-radius:50%;background:var(--warn-bg);color:var(--warn-fg);display:grid;place-items:center;flex:none}
+.result .big svg.i{width:20px;height:20px}
+.check{display:inline-flex;align-items:center;gap:8px;height:36px;color:var(--n-700)}
+.check i{width:16px;height:16px;border:1px solid var(--n-300);border-radius:4px;background:var(--n-0);display:grid;place-items:center}
+.check i.on{background:var(--red-500);border-color:var(--red-500)}
+.check i.on:after{content:"";width:4px;height:8px;border:solid var(--n-0);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.disc{display:inline-flex;align-items:center;gap:4px;color:var(--red-600);font-weight:600;font-size:13px}
+.diff td,.diff th{padding:6px 10px}
+.diff th{background:transparent;border-bottom:1px solid var(--n-200)}
+.inset{background:var(--n-50);padding:4px 10px 10px 34px}
+.legend{background:var(--n-0);border:1px solid var(--n-200);border-radius:10px;padding:16px 20px}
+.legend h2{font-size:17px;margin-bottom:8px}
+.legend ul{margin:0;padding-left:18px;color:var(--n-700)}
+.legend li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header class="doc-head">
+  <div class="eyebrow">Mock UI · spec master-data-import-revamp</div>
+  <h1>Impor CSV Data Master (CompanyPortal)</h1>
+  <p>Mock statis untuk review PO sebelum tasks ditulis. Data contoh fiktif. Token warna, tipografi, dan badge mengikuti design system Merah Sirih (ui_design.md). Rute tetap <span class="mono">/settings/admin/master-data-io</span>; Sidebar tidak digambar.</p>
+</header>
+
+<!-- ============ LAYAR A ============ -->
+<section>
+  <div class="screen-label"><b>Layar A</b><span>Tab Impor baru, langkah 3: file valid, siap diajukan (Req 2, 3)</span></div>
+  <div class="frame">
+    <div class="topbar"><span>Sistem › Pengaturan › Impor CSV Data Master</span><span class="who"><span class="avatar">SA</span>System Administrator · ADMIN</span></div>
+    <div class="page">
+      <div>
+        <div class="eyebrow">Data master</div>
+        <h1 class="page-title">Impor CSV Data Master</h1>
+        <p class="desc">Unduh templat, ubah di spreadsheet, lalu impor. Data baru berubah setelah pengajuan disetujui.</p>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <div class="tab on" role="tab" aria-selected="true">Impor baru</div>
+        <div class="tab" role="tab" aria-selected="false">Riwayat impor <span class="count num">1 menunggu</span></div>
+      </div>
+
+      <ol class="steps">
+        <li class="done"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span>1. Pilih data<small>Vendor</small></span></li>
+        <li class="done"><span class="dot"><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span><span>2. Unggah dan periksa<small>vendor_update_nov.csv</small></span></li>
+        <li class="cur" aria-current="step"><span class="dot">3</span><span>3. Tinjau dan ajukan<small>36 perubahan</small></span></li>
+      </ol>
+
+      <div class="card dim">
+        <div class="card-h"><h2><span class="step-n">LANGKAH 1</span> Pilih data</h2></div>
+        <div class="row">
+          <label class="f">Entitas<span class="select">Vendor</span></label>
+          <span class="btn secondary"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Unduh templat</span>
+          <a class="link" style="height:36px;display:inline-flex;align-items:center">Ekspor data ini</a>
+        </div>
+        <ul class="rules">
+          <li>CSV dengan pemisah koma atau titik koma, maks. 5 MiB dan 2.000 baris. Kolom <span class="mono">id</span> kosong = data baru; terisi = ubah.</li>
+          <li>Excel menghapus angka nol di depan (mis. NPWP). Buka CSV di Excel dengan kolom bertipe Teks (Data → Dari Teks/CSV), atau awali nilai dengan tanda petik satu (').</li>
+          <li>Baris tidak bisa mengubah data dan status aktif sekaligus.</li>
+        </ul>
+      </div>
+
+      <div class="card dim">
+        <div class="card-h"><h2><span class="step-n">LANGKAH 2</span> Unggah dan periksa</h2></div>
+        <div class="row">
+          <div class="file"><svg class="i" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg><span><b>vendor_update_nov.csv</b> <small>· 6,2 KB</small></span><span style="margin-left:auto" class="link">Ganti file</span></div>
+          <span class="btn secondary">Periksa ulang</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <h2><span class="step-n">LANGKAH 3</span> Tinjau dan ajukan</h2>
+          <span class="btn primary"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Ajukan untuk persetujuan</span>
+        </div>
+        <div class="summary">
+          <div class="stat"><small>Total baris</small><b>38</b></div>
+          <div class="stat"><small>Baru</small><b>3</b></div>
+          <div class="stat"><small>Ubah</small><b>30</b></div>
+          <div class="stat"><small>Aktifkan</small><b>1</b></div>
+          <div class="stat"><small>Nonaktifkan</small><b>2</b></div>
+          <div class="stat"><small>Tanpa perubahan</small><b>2</b></div>
+          <div class="stat"><small>Kesalahan</small><b>0</b></div>
+        </div>
+        <div class="note ok"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span><b>File valid.</b> 36 perubahan siap diajukan. Data belum berubah sampai pengajuan disetujui.</span></div>
+
+        <div class="row" style="justify-content:space-between">
+          <label class="f">Operasi<span class="select">Semua operasi (36)</span></label>
+          <span class="muted">Baris tanpa perubahan tidak ditampilkan</span>
+        </div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th style="width:70px">Baris</th><th style="width:150px">Data</th><th style="width:150px">Operasi</th><th>Perubahan (sebelum → sesudah)</th></tr></thead>
+            <tbody>
+              <tr><td class="num">2</td><td class="mono">VND07</td>
+                <td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru</span></td>
+                <td class="chg"><span>name: <em>PT Kas Nusantara</em></span><span>npwp: <em class="mono">01.234.567.8-901.000</em></span><span>contact_email: <em>ops@kasnusantara.co.id</em></span></td></tr>
+              <tr class="hover"><td class="num">5</td><td class="mono">VND01</td>
+                <td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah</span></td>
+                <td class="chg"><span>contact_phone: <s>021-555-0101</s> → <em>021-555-0199</em></span></td></tr>
+              <tr><td class="num">6</td><td class="mono">VND02</td>
+                <td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah</span></td>
+                <td class="chg"><span>hq_address: <s>Jl. Sudirman 10, Jakarta</s> → <em>Jl. Sudirman Kav. 12, Jakarta</em></span><span>contact_email: <s>admin@vnd02.id</s> → <em>ops@vnd02.id</em></span></td></tr>
+              <tr><td class="num">11</td><td class="mono">VND04</td>
+                <td><span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>Nonaktifkan</span></td>
+                <td class="chg"><span>Status: <s>Aktif</s> → <em>Nonaktif</em></span></td></tr>
+              <tr><td class="num">12</td><td class="mono">VND05</td>
+                <td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Aktifkan</span></td>
+                <td class="chg"><span>Status: <s>Nonaktif</s> → <em>Aktif</em></span></td></tr>
+            </tbody>
+          </table>
+          <div class="tfoot"><span class="num">Menampilkan 1-50 dari 36 perubahan (mock: 5 baris digambar)</span><div class="pager"><span class="on">1</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYAR B ============ -->
+<section>
+  <div class="screen-label"><b>Layar B</b><span>Langkah 3 saat file berisi kesalahan: tabel perubahan disembunyikan, tombol ajukan nonaktif (Req 3.4, 4.6)</span></div>
+  <div class="frame"><div class="page">
+    <div class="card">
+      <div class="card-h">
+        <h2><span class="step-n">LANGKAH 3</span> Tinjau dan ajukan</h2>
+        <span class="btn disabled">Ajukan untuk persetujuan</span>
+      </div>
+      <div class="summary">
+        <div class="stat"><small>Total baris</small><b>38</b></div>
+        <div class="stat"><small>Baru</small><b>3</b></div>
+        <div class="stat"><small>Ubah</small><b>27</b></div>
+        <div class="stat"><small>Aktifkan</small><b>1</b></div>
+        <div class="stat"><small>Nonaktifkan</small><b>2</b></div>
+        <div class="stat"><small>Tanpa perubahan</small><b>2</b></div>
+        <div class="stat" style="border-color:var(--dan-500)"><small>Kesalahan</small><b style="color:var(--dan-fg)">3</b></div>
+      </div>
+      <div class="note dan" role="alert"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span><b>3 kesalahan.</b> Perbaiki file, lalu unggah dan periksa ulang. Tidak ada data yang diajukan.</span></div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th style="width:70px">Baris</th><th style="width:160px">Kolom</th><th>Kesalahan</th></tr></thead>
+          <tbody>
+            <tr><td class="num">8</td><td class="mono">npwp</td><td>format NPWP tidak valid (15 atau 16 digit)</td></tr>
+            <tr><td class="num">14</td><td class="mono">is_active</td><td>data dan status aktif tidak bisa diubah dalam satu baris; pisahkan menjadi dua impor</td></tr>
+            <tr><td class="num">21</td><td class="mono">code</td><td>tidak boleh diubah (nilai saat ini: "VND03")</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============ LAYAR C + D ============ -->
+<section>
+  <div class="screen-label"><b>Layar C dan D</b><span>Dialog konfirmasi sebelum mengirim (Req 4.2) dan panel hasil setelah berhasil (Req 4.3, 4.4)</span></div>
+  <div class="two">
+    <div class="frame"><div class="overlay">
+      <div class="dialog">
+        <div class="dialog-h"><h3>Ajukan impor untuk persetujuan?</h3><span class="x">×</span></div>
+        <div class="dialog-b">
+          <dl class="kv">
+            <dt>Entitas</dt><dd>Vendor</dd>
+            <dt>File</dt><dd>vendor_update_nov.csv</dd>
+            <dt>Perubahan</dt><dd class="num">36 baris</dd>
+          </dl>
+          <div class="chips">
+            <span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru <span class="num">3</span></span>
+            <span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah <span class="num">30</span></span>
+            <span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Aktifkan <span class="num">1</span></span>
+            <span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>Nonaktifkan <span class="num">2</span></span>
+          </div>
+          <div class="note info"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Data belum berubah sampai pengajuan disetujui. Semua baris diterapkan sekaligus; jika satu baris gagal, tidak ada yang diterapkan.</span></div>
+        </div>
+        <div class="dialog-f"><span class="btn secondary">Batal</span><span class="btn primary">Ajukan</span></div>
+      </div>
+    </div></div>
+
+    <div class="frame"><div class="page">
+      <div class="card">
+        <div class="result">
+          <span class="big"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h2 style="font-size:18px">Impor diajukan</h2>
+            <p class="desc" style="margin:0">Batch <b class="num">#14</b> berisi <b class="num">36</b> perubahan Vendor menunggu persetujuan. Approver sudah diberi notifikasi.</p>
+            <div><span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Menunggu persetujuan</span></div>
+          </div>
+        </div>
+        <div class="actions"><span class="btn secondary">Impor file lain</span><span class="btn ghost">Lihat di riwayat →</span></div>
+      </div>
+      <div class="card">
+        <div class="note info"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span><b>Varian file sama:</b> File ini sudah diajukan sebelumnya sebagai batch <b class="num">#14</b> dan masih menunggu persetujuan. Tidak ada pengajuan baru.</span></div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<!-- ============ LAYAR E ============ -->
+<section>
+  <div class="screen-label"><b>Layar E</b><span>Tab Riwayat impor: semua batch ADMIN/ADMIN_PARAM, filter, paging 20 (Req 5)</span></div>
+  <div class="frame">
+    <div class="topbar"><span>Sistem › Pengaturan › Impor CSV Data Master</span><span class="who"><span class="avatar">SA</span>System Administrator · ADMIN</span></div>
+    <div class="page">
+      <div>
+        <div class="eyebrow">Data master</div>
+        <h1 class="page-title">Impor CSV Data Master</h1>
+      </div>
+      <div class="tabs" role="tablist">
+        <div class="tab" role="tab" aria-selected="false">Impor baru</div>
+        <div class="tab on" role="tab" aria-selected="true">Riwayat impor <span class="count num">1 menunggu</span></div>
+      </div>
+      <div class="row">
+        <label class="f">Entitas<span class="select">Semua entitas</span></label>
+        <label class="f">Status<span class="select">Semua status</span></label>
+        <span class="check"><i></i>Hanya milik saya</span>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Batch</th><th>Entitas</th><th>Nama file</th><th class="r">Baris</th><th>Diajukan oleh</th><th>Diajukan (WIB)</th><th>Status</th><th>Diputuskan (WIB)</th></tr></thead>
+          <tbody>
+            <tr class="hover"><td class="num"><a class="link">#14</a></td><td>Vendor</td><td>vendor_update_nov.csv</td><td class="r mono">36</td><td>System Administrator</td><td class="num">02 Nov 2026 10.12</td>
+              <td><span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Menunggu persetujuan</span></td><td class="muted">-</td></tr>
+            <tr><td class="num"><a class="link">#13</a></td><td>ATM</td><td>atm_kapasitas_okt.csv</td><td class="r mono">120</td><td>Budi Santoso</td><td class="num">01 Nov 2026 14.05</td>
+              <td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>Diterapkan</span></td><td class="num">01 Nov 2026 15.40<br><span class="muted">Rina Wulandari</span></td></tr>
+            <tr><td class="num"><a class="link">#12</a></td><td>Kelolaan ATM</td><td>kelolaan_q4.csv</td><td class="r mono">48</td><td>System Administrator</td><td class="num">31 Okt 2026 09.30</td>
+              <td><span class="badge b-dan"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Gagal diterapkan</span></td><td class="num">31 Okt 2026 11.02<br><span class="muted">Rina Wulandari</span></td></tr>
+            <tr><td class="num"><a class="link">#11</a></td><td>PIC vendor</td><td>pic_abacus.csv</td><td class="r mono">12</td><td>Budi Santoso</td><td class="num">30 Okt 2026 16.20</td>
+              <td><span class="badge b-neu"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>Ditolak</span></td><td class="num">30 Okt 2026 17.05<br><span class="muted">Rina Wulandari</span></td></tr>
+            <tr><td class="num"><a class="link">#10</a></td><td>Cabang vendor</td><td class="muted">-</td><td class="r mono">5</td><td>System Administrator</td><td class="num">28 Okt 2026 08.45</td>
+              <td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>Disetujui belum diterapkan</span></td><td class="num">28 Okt 2026 09.10<br><span class="muted">Rina Wulandari</span></td></tr>
+          </tbody>
+        </table>
+        <div class="tfoot"><span class="num">Menampilkan 1-5 dari 5 batch</span><div class="pager"><span class="on">1</span></div></div>
+      </div>
+      <p class="muted" style="margin:0;font-size:13px">Batch #10 dibuat sebelum migrasi 036, jadi nama filenya kosong. Klik nomor batch membuka detail (Layar F/G).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYAR F + G ============ -->
+<section>
+  <div class="screen-label"><b>Layar F dan G</b><span>Detail batch: gagal diterapkan (penyebab + boleh ajukan ulang) dan disetujui belum diterapkan (tombol coba lagi) (Req 6)</span></div>
+  <div class="frame"><div class="overlay">
+    <div class="dialog wide">
+      <div class="dialog-h"><h3>Batch #12 · Kelolaan ATM</h3><span class="x">×</span></div>
+      <div class="dialog-b">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <dl class="kv" style="grid-template-columns:120px 1fr 120px 1fr">
+            <dt>File</dt><dd>kelolaan_q4.csv</dd><dt>Status</dt><dd><span class="badge b-dan"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Gagal diterapkan</span></dd>
+            <dt>Diajukan</dt><dd class="num">31 Okt 2026 09.30 · System Administrator</dd><dt>Diputuskan</dt><dd class="num">31 Okt 2026 11.02 · Rina Wulandari</dd>
+          </dl>
+        </div>
+        <div class="chips">
+          <span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru <span class="num">40</span></span>
+          <span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah <span class="num">8</span></span>
+        </div>
+        <div class="note dan" role="alert"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <span><b>Tidak ada data yang diterapkan.</b> Baris T0815 gagal: periode tumpang tindih dengan kelolaan aktif lain. Seluruh batch dibatalkan. Perbaiki file, lalu ajukan ulang file yang sama atau file baru.</span></div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Data</th><th>Operasi</th><th>Status</th><th>Perubahan</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">T0812 / 2026-11-01</td><td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru</span></td><td><span class="badge b-neu">Dibatalkan</span></td><td><span class="disc">Lihat perubahan ▾</span></td></tr>
+              <tr class="hover"><td class="mono">T0815 / 2026-11-01</td><td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru</span></td>
+                <td><span class="badge b-dan"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Gagal</span><div style="color:var(--dan-fg);font-size:12px;margin-top:4px">periode tumpang tindih dengan kelolaan aktif lain</div></td>
+                <td><span class="disc">Sembunyikan ▴</span></td></tr>
+              <tr><td colspan="4" class="inset">
+                <table class="diff"><thead><tr><th>Bidang</th><th>Sebelum</th><th>Sesudah</th></tr></thead><tbody>
+                  <tr><td>Vendor</td><td class="muted">-</td><td>VND02 / MDN</td></tr>
+                  <tr><td>Paket</td><td class="muted">-</td><td class="mono">PKT-3</td></tr>
+                  <tr><td>Mulai</td><td class="muted">-</td><td class="num">2026-11-01</td></tr>
+                </tbody></table>
+              </td></tr>
+              <tr><td class="mono">T0901 / 2026-07-01</td><td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah</span></td><td><span class="badge b-neu">Dibatalkan</span></td><td><span class="disc">Lihat perubahan ▾</span></td></tr>
+            </tbody>
+          </table>
+          <div class="tfoot"><span class="num">Menampilkan 1-50 dari 48 baris (mock: 3 digambar)</span><div class="pager"><span class="on">1</span></div></div>
+        </div>
+      </div>
+      <div class="dialog-f"><span class="btn secondary">Tutup</span></div>
+    </div>
+  </div></div>
+
+  <div class="frame" style="margin-top:16px"><div class="page">
+    <div class="card">
+      <div class="card-h"><h2>Batch #10 · Cabang vendor</h2><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>Disetujui belum diterapkan</span></div>
+      <div class="note warn"><svg class="i" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span><b>Sudah disetujui, tetapi penyimpanan gagal.</b> Kesalahan: koneksi database terputus saat menyimpan. Data belum berubah. Coba terapkan lagi tanpa persetujuan ulang.</span></div>
+      <div class="actions"><span class="btn secondary">Tutup</span><span class="btn primary"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>Coba terapkan lagi</span></div>
+      <p class="muted" style="margin:0;font-size:13px">Tombol ini hanya muncul untuk status "Disetujui belum diterapkan". Status lain hanya menampilkan tombol Tutup.</p>
+    </div>
+  </div></div>
+</section>
+
+<!-- ============ LAYAR H ============ -->
+<section>
+  <div class="screen-label"><b>Layar H</b><span>Checker di /approvals: tinjauan batch lengkap dengan diff per baris dan paging 50 (Req 7)</span></div>
+  <div class="frame"><div class="overlay">
+    <div class="dialog wide">
+      <div class="dialog-h"><h3>Tinjau perubahan master data</h3><span class="x">×</span></div>
+      <div class="dialog-b">
+        <div>
+          <div style="font-weight:600;color:var(--n-900);font-size:16px">Impor CSV · ATM · atm_kapasitas_nov.csv</div>
+          <div class="muted">Diajukan oleh Budi Santoso · 02 Nov 2026 09.40 WIB · <span class="num">120</span> perubahan</div>
+        </div>
+        <div class="chips">
+          <span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru <span class="num">4</span></span>
+          <span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah <span class="num">114</span></span>
+          <span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>Nonaktifkan <span class="num">2</span></span>
+        </div>
+        <div class="note info"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Semua baris diterapkan sekaligus saat disetujui; jika satu baris gagal, tidak ada yang diterapkan.</span></div>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Data</th><th>Operasi</th><th>Perubahan</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">T0001</td><td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah</span></td><td><span class="disc" aria-expanded="true">Sembunyikan ▴</span></td></tr>
+              <tr><td colspan="3" class="inset">
+                <table class="diff"><thead><tr><th>Bidang</th><th class="r">Sebelum</th><th class="r">Sesudah</th><th></th></tr></thead><tbody>
+                  <tr><td>Capacity amount (IDR)</td><td class="r mono">400.000.000</td><td class="r mono">500.000.000</td><td><span class="badge b-info">Berubah</span></td></tr>
+                  <tr><td>Low threshold amount (IDR)</td><td class="r mono">80.000.000</td><td class="r mono">100.000.000</td><td><span class="badge b-info">Berubah</span></td></tr>
+                  <tr><td>Brand</td><td class="r">Hyosung</td><td class="r">Hyosung</td><td></td></tr>
+                </tbody></table>
+              </td></tr>
+              <tr class="hover"><td class="mono">T0002</td><td><span class="badge b-info"><svg class="i" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/></svg>Ubah</span></td><td><span class="disc" aria-expanded="false">Lihat perubahan ▾</span></td></tr>
+              <tr><td class="mono">T0377</td><td><span class="badge b-warn"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>Nonaktifkan</span></td><td><span class="disc" aria-expanded="false">Lihat perubahan ▾</span></td></tr>
+              <tr><td class="mono">T1204</td><td><span class="badge b-ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Baru</span></td><td><span class="disc" aria-expanded="false">Lihat perubahan ▾</span></td></tr>
+            </tbody>
+          </table>
+          <div class="tfoot"><span class="num">Menampilkan 1-50 dari 120 perubahan</span><div class="pager"><span>‹</span><span class="on">1</span><span>2</span><span>3</span><span>›</span></div></div>
+        </div>
+      </div>
+      <div class="dialog-f"><span class="btn secondary">Tolak</span><span class="btn primary">Setujui</span></div>
+    </div>
+  </div></div>
+</section>
+
+<section class="legend">
+  <h2>Catatan untuk review</h2>
+  <ul>
+    <li>Satu tombol primer (merah brand) per layar: "Ajukan untuk persetujuan", "Ajukan", "Coba terapkan lagi", "Setujui". Tombol lain secondary/ghost.</li>
+    <li>Status batch selalu badge ikon + label, tidak memakai merah brand. "Gagal diterapkan" memakai merah rose (danger), terpisah dari merah brand.</li>
+    <li>Angka dan nominal memakai tabular-nums; nominal rata kanan, monospace, dengan mata uang IDR di label kolom.</li>
+    <li>Langkah 1 dan 2 tetap terlihat (sedikit redup) supaya pengguna bisa mengganti entitas atau file; mengganti salah satunya menghapus hasil langkah 3.</li>
+    <li>Badge "Dibatalkan" di Layar F adalah label tampilan untuk baris berstatus <span class="mono">stale</span> yang ikut dibatalkan karena baris lain gagal; baris penyebabnya berlabel "Gagal" dengan pesan error.</li>
+    <li>Notifikasi (bell) memakai komponen notifikasi yang sudah ada, jadi tidak digambar ulang di sini.</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>

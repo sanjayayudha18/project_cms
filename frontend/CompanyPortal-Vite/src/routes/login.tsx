@@ -1,7 +1,6 @@
 import { useAuthStore } from "@/lib/auth";
-import { createRoute, redirect } from "@tanstack/react-router";
+import { createRoute, lazyRouteComponent, redirect } from "@tanstack/react-router";
 import { authRoute } from "./_auth";
-import { LoginPage } from "./_auth/login";
 
 export const loginRoute = createRoute({
   path: "/login",
@@ -12,5 +11,5 @@ export const loginRoute = createRoute({
       throw redirect({ to: "/" });
     }
   },
-  component: LoginPage,
+  component: lazyRouteComponent(() => import("./_auth/login"), "LoginPage"),
 });

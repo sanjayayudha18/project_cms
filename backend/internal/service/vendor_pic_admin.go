@@ -59,6 +59,10 @@ type VendorPicUpdatePayload struct {
 	Phone                   *string `json:"phone"`
 	Email                   *string `json:"email"`
 	IsNotificationRecipient bool    `json:"is_notification_recipient"`
+	// Roles: create nil = all three PIC roles (Req 5.6). Update nil = roles
+	// unchanged; only CSV import sets it on update -- the form handler
+	// clears it (Req 5.7). Non-nil is normalized by validate.
+	Roles *[]string `json:"roles,omitempty"`
 }
 
 // VendorPicPayload is the jsonb payload VendorPicApplier unmarshals for op=create.
@@ -79,6 +83,7 @@ type VendorPic struct {
 	IsNotificationRecipient bool
 	IsActive                bool
 	DeletedAt               *time.Time
+	Roles                   []string
 }
 
 // List returns a page of a vendor's PICs. Read-only, no audit.
@@ -91,7 +96,7 @@ func (s *VendorPicAdminService) List(ctx context.Context, arg db.ListVendorPicsA
 	for i, r := range rows {
 		out[i] = VendorPic{ID: r.ID, VendorID: r.VendorID, VendorBranchID: r.VendorBranchID, Name: r.Name, Position: r.Position,
 			Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient, IsActive: r.IsActive,
-			DeletedAt: timestamptzToPtr(r.DeletedAt)}
+			DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles}
 	}
 	return out, nil
 }
@@ -110,7 +115,7 @@ func (s *VendorPicAdminService) Get(ctx context.Context, vendorID, id int64) (*V
 	}
 	return &VendorPic{ID: r.ID, VendorID: r.VendorID, VendorBranchID: r.VendorBranchID, Name: r.Name, Position: r.Position,
 		Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient, IsActive: r.IsActive,
-		DeletedAt: timestamptzToPtr(r.DeletedAt)}, nil
+		DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles}, nil
 }
 
 // Warnings returns non-blocking advisories for a vendor's PIC set: currently
@@ -186,6 +191,14 @@ func (s *VendorPicAdminService) validate(ctx context.Context, vendorID int64, p 
 	}
 	if p.Phone != nil && !phoneRe.MatchString(strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(*p.Phone)) {
 		return &ValidationError{Field: "phone", Message: "format telepon tidak valid (6-15 digit, boleh diawali +)"}
+	}
+
+	if p.Roles != nil {
+		roles, err := normalizePicRoles(*p.Roles)
+		if err != nil {
+			return err
+		}
+		p.Roles = &roles
 	}
 
 	if p.VendorBranchID != nil {

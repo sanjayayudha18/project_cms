@@ -92,8 +92,11 @@ export function formatRupiahDecimal(value: string | null | undefined): string {
   const [intRaw, fracRaw = ""] = raw.split(".");
   const intDigits = (intRaw || "0").replace(/\D/g, "") || "0";
   const grouped = groupThousands(intDigits);
+  // Non-zero fraction shows at least 2 digits (",50", not ",5"); extra
+  // precision beyond 2 digits is kept, never rounded.
   const fracSignificant = fracRaw.replace(/0+$/, "");
-  const body = fracSignificant.length > 0 ? `${grouped},${fracSignificant}` : grouped;
+  const body =
+    fracSignificant.length > 0 ? `${grouped},${fracSignificant.padEnd(2, "0")}` : grouped;
   return `Rp ${neg ? `-${body}` : body}`;
 }
 

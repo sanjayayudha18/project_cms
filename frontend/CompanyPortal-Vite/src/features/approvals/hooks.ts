@@ -8,6 +8,7 @@ import type { ApiError } from "@/lib/api/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type InboxItem,
+  MASTER_DATA_PAGE_SIZE,
   type MasterDataDetail,
   approveRequest,
   getInbox,
@@ -18,20 +19,23 @@ import {
 export const approvalKeys = {
   all: ["approvals"] as const,
   inbox: () => [...approvalKeys.all, "inbox"] as const,
-  masterData: (requestId: number) => [...approvalKeys.all, "master-data", requestId] as const,
+  masterData: (requestId: number, page = 1) =>
+    [...approvalKeys.all, "master-data", requestId, page] as const,
 };
 
-export function useInbox() {
+export function useInbox(options?: { enabled?: boolean; refetchInterval?: number | false }) {
   return useQuery<InboxItem[], ApiError>({
     queryKey: approvalKeys.inbox(),
     queryFn: getInbox,
+    enabled: options?.enabled,
+    refetchInterval: options?.refetchInterval,
   });
 }
 
-export function useMasterDataDetail(requestId: number | null) {
+export function useMasterDataDetail(requestId: number | null, page = 1) {
   return useQuery<MasterDataDetail, ApiError>({
-    queryKey: approvalKeys.masterData(requestId ?? 0),
-    queryFn: () => getMasterDataDetail(requestId as number),
+    queryKey: approvalKeys.masterData(requestId ?? 0, page),
+    queryFn: () => getMasterDataDetail(requestId as number, page, MASTER_DATA_PAGE_SIZE),
     enabled: requestId !== null,
   });
 }

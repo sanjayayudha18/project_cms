@@ -119,8 +119,8 @@ func (s *DmaaForecastService) ListDmaaForecast(ctx context.Context, params ListD
 		TerminalID: params.TerminalID,
 		SortBy:     params.SortBy,
 		SortOrder:  params.SortOrder,
-		Page:       int32(params.Page),
-		PageSize:   int32(params.PageSize),
+		Page:       int32(params.Page),     //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
+		PageSize:   int32(params.PageSize), //nolint:gosec // G115: page <= maxPage, page_size <= 100 (handler)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing dmaa forecast: %w", err)

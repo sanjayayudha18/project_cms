@@ -12,6 +12,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
 )
 
 // Actor carries who is acting, resolved from the JWT by the handler.
@@ -133,6 +134,7 @@ type VendorRequestItemOut struct {
 	Denom           int32
 	AmountReplenish int64
 	AmountRefund    int64
+	TicketNumber    string // replenish-ticket FR5.1: the ATM's active ticket
 }
 
 // VendorRequestDetail is the full single-request response shape (Req 9.6).
@@ -160,6 +162,7 @@ type VendorRequestDetail struct {
 	IsCanceled         bool
 	IsManual           bool
 	CancellationReason *string // nil unless canceled after migration 038 (Req 3.11 Opsi B)
+	RegionCode         *string // replenish-ticket FR10.3; nil for requests before migration 026
 
 	// atm-visit-quota (spec FR5): laporan selesai + per-ATM kuota info.
 	CompletionSubmittedBy     *UserRef
@@ -178,10 +181,14 @@ type VendorRequestDetail struct {
 // request's (uncancelled) visit for the ATM went over quota.
 type RequestAtmStatus struct {
 	TerminalID       string
+	TicketNumber     string // replenish-ticket FR5.1
 	CompletionResult *string
 	VisitRemaining   *int32
 	VisitQuotaTotal  *int32
 	IsOverQuota      bool
+	// replenishment-realisasi FR2: the vendor's report (nil/empty before a report or for a failed ATM).
+	RealizedDate    *time.Time
+	RealizedAmounts []DenomAmount
 }
 
 // VendorRequestSummary is one row of the list response (Req 9.4). CIT-2
@@ -380,9 +387,11 @@ type VendorRequestRepository interface {
 	// ListVendorOptions support (Req 1.2, 1.3, 3 Q2).
 	ListActiveVendors(ctx context.Context) ([]db.ListActiveVendorsRow, error)
 	ListDistinctVendorBranchRegions(ctx context.Context) ([]*string, error)
-	// atm-visit-quota: detail per-ATM status.
-	ListVendorRequestAtmResults(ctx context.Context, vendorRequestID int64) ([]db.VendorRequestAtmResult, error)
+	// atm-visit-quota + replenish-ticket: detail per-ATM ticket + status.
+	ListActiveVendorRequestTickets(ctx context.Context, requestNumber string) ([]db.ListActiveVendorRequestTicketsRow, error)
 	ListRequestVisitInfo(ctx context.Context, id int64) ([]db.ListRequestVisitInfoRow, error)
+	// replenishment-realisasi FR2: vendor realisasi per ATM on the detail screen.
+	ListVendorRealizationsForRequest(ctx context.Context, vendorRequestID int64) ([]db.ListVendorRealizationsForRequestRow, error)
 }
 
 // VendorRequestPool is the *pgxpool.Pool surface the service needs: db.DBTX
@@ -420,8 +429,9 @@ type VendorRequestServicer interface {
 
 // VendorRequestService implements VendorRequestServicer.
 type VendorRequestService struct {
-	pool VendorRequestPool
-	read VendorRequestRepository // db.New(pool): read-only queries, no tx needed
+	pool     VendorRequestPool
+	read     VendorRequestRepository // db.New(pool): read-only queries, no tx needed
+	notifier Notifier                // nil = no notifications (tests, or not wired)
 }
 
 // NewVendorRequestService creates a VendorRequestService wrapping the given
@@ -435,6 +445,19 @@ type VendorRequestService struct {
 // vendor_request_actions.go.
 func NewVendorRequestService(pool VendorRequestPool) *VendorRequestService {
 	return &VendorRequestService{pool: pool, read: db.New(pool)}
+}
+
+// Notifier sends notifications inside the caller's tx (implemented by
+// notification.Service; notification plan D1).
+type Notifier interface {
+	Send(ctx context.Context, q notification.Querier, msg notification.Message, to notification.Recipients) error
+}
+
+// WithNotifier enables notifications (cmd/api/main.go). Kept as a setter so
+// the many NewVendorRequestService call sites (mostly tests) stay unchanged.
+func (s *VendorRequestService) WithNotifier(n Notifier) *VendorRequestService {
+	s.notifier = n
+	return s
 }
 
 // --- State machine -----------------------------------------------------
@@ -452,6 +475,17 @@ const (
 	actionSubmitCompletion  action = "submit_completion"
 	actionApproveCompletion action = "approve_completion"
 	actionRejectCompletion  action = "reject_completion"
+
+	// cit-acm-plan: penetapan vault. vault_ready is the system step taken when
+	// every ACM area plan is approved (FR4.6); vault_approve/vault_reject are
+	// the ATM-SPV review of the ACM recommendation (FR5.2).
+	actionVaultReady   action = "vault_ready"
+	actionVaultApprove action = "vault_approve"
+	actionVaultReject  action = "vault_reject"
+
+	// cit-send-vendor FR6.1: ATM-SPV returns a request a replenish branch
+	// rejected to its maker (vendor_rejected -> rejected -> revise -> draft).
+	actionVendorReturn action = "vendor_return"
 )
 
 // transitions is the valid-transition table (Req 2.1). approved->processing,
@@ -460,12 +494,25 @@ const (
 // requirement or endpoint here triggers them — they belong to whatever
 // downstream module executes the approved order.
 var transitions = map[string]map[action]string{
-	"draft":            {actionSubmit: "pending_approval", actionCancel: "cancelled"},
-	"pending_approval": {actionApprove: "approved", actionReject: "rejected", actionCancel: "cancelled"},
+	"draft": {actionSubmit: "pending_approval", actionCancel: "cancelled"},
+	// cit-acm-plan S5: approve now hands the request to ACM (vault_assignment)
+	// instead of approved.
+	"pending_approval": {actionApprove: "vault_assignment", actionReject: "rejected", actionCancel: "cancelled"},
 	"rejected":         {actionRevise: "draft"},
-	"approved":         {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
-	// atm-visit-quota FR1: a rejected report goes back to approved so the
-	// maker can resubmit; no cancel from completion_pending (FR1.4).
+	"vault_assignment": {actionVaultReady: "vault_review", actionCancel: "cancelled"},
+	// cit-send-vendor S1: vault approve sends the request to the vendors
+	// (sent_to_vendor); ready is legacy (2.2a requests approved before 2.2b).
+	"vault_review":    {actionVaultApprove: "sent_to_vendor", actionVaultReject: "vault_assignment", actionCancel: "cancelled"},
+	"ready":           {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"sent_to_vendor":  {actionCancel: "cancelled"},
+	"vendor_accepted": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	"vendor_rejected": {actionCancel: "cancelled", actionVendorReturn: "rejected"},
+	// approved = legacy: requests approved before the vault flow (F12/N2) keep
+	// their old path, including laporan selesai.
+	"approved": {actionCancel: "cancelled", actionSubmitCompletion: "completion_pending"},
+	// atm-visit-quota FR1: a rejected report goes back for resubmission -- to
+	// approved here, or to ready for vault_flow requests (completionTx);
+	// no cancel from completion_pending (FR1.4).
 	"completion_pending": {actionApproveCompletion: "completed", actionRejectCompletion: "approved"},
 }
 
@@ -495,7 +542,7 @@ func checkActor(actor Actor, req db.VendorRequest, a action) error {
 		if actor.UserID != req.CreatedBy {
 			return ErrNotCreator
 		}
-	case actionApprove, actionReject:
+	case actionApprove, actionReject, actionVendorReturn:
 		if !isChecker(actor.Role) {
 			return ErrNotChecker
 		}
@@ -508,7 +555,7 @@ func checkActor(actor Actor, req db.VendorRequest, a action) error {
 			if actor.UserID != req.CreatedBy {
 				return ErrNotCreator
 			}
-		case "approved":
+		case "approved", "vault_assignment", "vault_review", "ready", "sent_to_vendor", "vendor_accepted", "vendor_rejected":
 			if !isChecker(actor.Role) {
 				return ErrNotChecker
 			}

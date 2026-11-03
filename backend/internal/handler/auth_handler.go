@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -204,15 +204,30 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, auth.UserProfile{
-		ID:         user.ID,
-		Username:   user.Username,
-		FullName:   user.FullName,
-		Email:      user.Email,
-		Role:       user.Role,
-		IsKaryawan: user.IsKaryawan,
-		VendorID:   user.VendorID,
+	writeJSON(w, http.StatusOK, meResponse{
+		UserProfile: auth.UserProfile{
+			ID:         user.ID,
+			Username:   user.Username,
+			FullName:   user.FullName,
+			Email:      user.Email,
+			Role:       user.Role,
+			IsKaryawan: user.IsKaryawan,
+			VendorID:   user.VendorID,
+		},
+		VendorName:       user.VendorName,
+		VendorBranchID:   user.VendorBranchID,
+		VendorBranchName: user.VendorBranchName,
 	})
+}
+
+// meResponse is auth.UserProfile plus the vendor context for the VendorPortal
+// scope line (vendor-party-scope Req 8.3). New fields are explicit null when
+// empty (no omitempty); existing fields are unchanged.
+type meResponse struct {
+	auth.UserProfile
+	VendorName       *string `json:"vendor_name"`
+	VendorBranchID   *int64  `json:"vendor_branch_id"`
+	VendorBranchName *string `json:"vendor_branch_name"`
 }
 
 // changePasswordRequest is the expected JSON body for POST /change-password.
@@ -333,24 +348,12 @@ func clearRefreshCookie(w http.ResponseWriter) {
 	})
 }
 
-// extractClientIP gets the client IP from X-Forwarded-For or RemoteAddr.
+// extractClientIP returns the host part of r.RemoteAddr. Headers are never read
+// here: pkg/middleware.TrustedRealIP already resolved X-Forwarded-For from
+// trusted proxies into RemoteAddr (bare IP), so a client cannot spoof it.
 func extractClientIP(r *http.Request) string {
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		// Take the first IP in the chain (original client)
-		parts := strings.SplitN(forwarded, ",", 2)
-		return strings.TrimSpace(parts[0])
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
-	// Strip port from RemoteAddr
-	addr := r.RemoteAddr
-	if idx := strings.LastIndex(addr, ":"); idx != -1 {
-		// Handle IPv6 addresses in brackets like [::1]:8080
-		if strings.Contains(addr, "]") {
-			if bracketIdx := strings.LastIndex(addr, "]"); bracketIdx < idx {
-				return addr[:idx]
-			}
-		} else {
-			return addr[:idx]
-		}
-	}
-	return addr
+	return r.RemoteAddr
 }

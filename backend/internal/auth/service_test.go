@@ -47,10 +47,10 @@ type stubUserRepo struct {
 	incrementFailedLoginErr    error
 	incrementFailedLoginCalled bool
 
-	lockAccountErr     error
-	lockAccountCalled  bool
-	lockAccountUserID  int64
-	lockAccountUntil   time.Time
+	lockAccountErr    error
+	lockAccountCalled bool
+	lockAccountUserID int64
+	lockAccountUntil  time.Time
 
 	resetLockoutErr    error
 	resetLockoutCalled bool

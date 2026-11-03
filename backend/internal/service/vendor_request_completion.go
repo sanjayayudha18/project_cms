@@ -10,6 +10,8 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Laporan selesai replenish (.claude/sdlc/atm-visit-quota/spec.md FR1):
@@ -20,13 +22,19 @@ import (
 // against the order's creator, while here the checker must differ from the
 // report's maker, and approve writes visits in the same tx (plan D2).
 
-// completionMakerRoles: who may report a request as replenished (intent #4:
-// internal ATM-USER, not the vendor). Mirrors handler.vendorRequestMakerRoles.
+// completionMakerRoles: who may report a legacy request (never sent to a
+// vendor) as replenished. Mirrors handler.vendorRequestMakerRoles. A request
+// that went through the vendor flow (vendor_sent) is reported by its
+// replenish vendor instead (replenishment-realisasi FR2, decision 2026-10-14).
 var completionMakerRoles = []string{"ADMIN", "ATM-USER", "BRANCH-ATM-USER"}
 
 // ErrCompletionReasonEmpty: reject-report reason missing (body field "reason",
 // distinct from the order's ErrRejectReasonEmpty / "rejection_reason").
 var ErrCompletionReasonEmpty = errors.New("completion rejection reason is required")
+
+// ErrCompletionByVendor: an internal laporan selesai on a request the vendor
+// reports itself (replenishment-realisasi FR2.5) -> 409 completion_by_vendor.
+var ErrCompletionByVendor = errors.New("completion is reported by the vendor")
 
 const (
 	completionSuccess = "success"
@@ -42,7 +50,11 @@ type CompletionResultInput struct {
 func checkCompletionActor(actor Actor, req db.VendorRequest, a action) error {
 	switch a {
 	case actionSubmitCompletion:
-		if !roleIn(actor.Role, completionMakerRoles) {
+		if req.VendorSent {
+			if !vendorrole.IsVendor(actor.Role) {
+				return ErrCompletionByVendor
+			}
+		} else if !roleIn(actor.Role, completionMakerRoles) {
 			return ErrNotAuthorized
 		}
 	case actionApproveCompletion, actionRejectCompletion:
@@ -87,7 +99,14 @@ func validateCompletionResults(terminals []string, results []CompletionResultInp
 // returns the extra audit "after" fields.
 func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id int64, a action,
 	apply func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error)) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	return runCompletionTx(ctx, s.pool, actor, id, a, apply)
+}
+
+// runCompletionTx is completionTx without the service, so the VendorPortal
+// realisasi report (VendorOrderService) runs the same state machine.
+func runCompletionTx(ctx context.Context, pool VendorRequestPool, actor Actor, id int64, a action,
+	apply func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error)) error {
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
@@ -107,6 +126,11 @@ func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id
 	newStatus, ok := nextState(req.Status, a)
 	if !ok {
 		return ErrInvalidTransition
+	}
+	if a == actionRejectCompletion && req.VendorSent {
+		newStatus = "vendor_accepted" // cit-send-vendor FR6.3: back to where the report was made from
+	} else if a == actionRejectCompletion && req.VaultFlow {
+		newStatus = "ready" // cit-acm-plan FR5.4: legacy 2.2a requests
 	}
 	if err := checkCompletionActor(actor, req, a); err != nil {
 		return err
@@ -131,8 +155,13 @@ func (s *VendorRequestService) completionTx(ctx context.Context, actor Actor, id
 
 // SubmitCompletion: approved -> completion_pending with per-ATM results.
 // A resubmission after rejection overwrites the previous results (FR1.1).
+// Internal path only: a vendor reports through VendorOrderService.SubmitRealization
+// (scope-checked), never here.
 func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor, id int64, results []CompletionResultInput) (*VendorRequestDetail, error) {
-	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
+	if vendorrole.IsVendor(actor.Role) {
+		return nil, ErrNotAuthorized
+	}
+	err := s.completionTx(ctx, actor, id, actionSubmitCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		terminals, err := q.ListDistinctRequestTerminals(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("list terminals of %d: %w", id, err)
@@ -142,8 +171,9 @@ func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor
 		}
 		byTerminal := make(map[string]string, len(results))
 		for _, r := range results {
-			if err := q.UpsertVendorRequestAtmResult(ctx, db.UpsertVendorRequestAtmResultParams{
-				VendorRequestID: id, TerminalID: r.TerminalID, Result: r.Result,
+			// replenish-ticket FR9.2: the result lives on the ATM's active ticket.
+			if _, err := q.SetVendorRequestTicketResult(ctx, db.SetVendorRequestTicketResultParams{
+				RequestNumber: req.RequestNumber, TerminalID: r.TerminalID, Result: r.Result,
 			}); err != nil {
 				return nil, fmt.Errorf("save result %s: %w", r.TerminalID, err)
 			}
@@ -166,17 +196,19 @@ func (s *VendorRequestService) SubmitCompletion(ctx context.Context, actor Actor
 // records one visit (recordVisit: idempotent per request+ATM, atomic quota
 // decrement) in the same tx. Returns the terminals that went over quota so
 // the checker sees the warning (FR6.2); over quota never blocks (intent #10).
+// Over quota also notifies the report's maker + every active ATM-SPV
+// (notification spec FR6), in the same tx: a failed Send rolls back the approve.
 func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Actor, id int64) (*VendorRequestDetail, []string, error) {
 	overQuota := []string{}
-	err := s.completionTx(ctx, actor, id, actionApproveCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
-		results, err := q.ListVendorRequestAtmResults(ctx, id)
+	err := s.completionTx(ctx, actor, id, actionApproveCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
+		results, err := q.ListActiveVendorRequestTickets(ctx, req.RequestNumber)
 		if err != nil {
 			return nil, fmt.Errorf("list results of %d: %w", id, err)
 		}
 		today := jakartaCalendarDate(0)
 		visits := make([]visitOutcome, 0, len(results))
 		for _, r := range results {
-			if r.Result != completionSuccess {
+			if r.Result == nil || *r.Result != completionSuccess {
 				continue
 			}
 			out, err := recordVisit(ctx, q, id, r.TerminalID, today)
@@ -187,6 +219,15 @@ func (s *VendorRequestService) ApproveCompletion(ctx context.Context, actor Acto
 				overQuota = append(overQuota, out.TerminalID)
 			}
 			visits = append(visits, out)
+		}
+		if len(overQuota) > 0 && s.notifier != nil {
+			msg, to := overQuotaNotification(req, overQuota)
+			if err := s.notifier.Send(ctx, q, msg, to); err != nil {
+				return nil, fmt.Errorf("notify over quota for %d: %w", id, err)
+			}
+		}
+		if err := notifyRealizationDecision(ctx, q, s.notifier, req, ""); err != nil {
+			return nil, err
 		}
 		if _, err := q.UpdateVendorRequestCompletion(ctx, db.UpdateVendorRequestCompletionParams{
 			Status: newStatus, ActorID: actor.UserID, ID: id,
@@ -215,11 +256,14 @@ func (s *VendorRequestService) RejectCompletion(ctx context.Context, actor Actor
 	if len(trimmed) > 500 {
 		return nil, &ValidationError{Field: "reason", Message: "maksimal 500 karakter"}
 	}
-	err := s.completionTx(ctx, actor, id, actionRejectCompletion, func(q *db.Queries, _ db.VendorRequest, newStatus string) (map[string]any, error) {
+	err := s.completionTx(ctx, actor, id, actionRejectCompletion, func(q *db.Queries, req db.VendorRequest, newStatus string) (map[string]any, error) {
 		if _, err := q.UpdateVendorRequestCompletion(ctx, db.UpdateVendorRequestCompletionParams{
 			Status: newStatus, ActorID: actor.UserID, Reason: &trimmed, ID: id,
 		}); err != nil {
 			return nil, fmt.Errorf("update vendor request %d: %w", id, err)
+		}
+		if err := notifyRealizationDecision(ctx, q, s.notifier, req, trimmed); err != nil {
+			return nil, err
 		}
 		return map[string]any{"reason": trimmed}, nil
 	})
@@ -230,15 +274,12 @@ func (s *VendorRequestService) RejectCompletion(ctx context.Context, actor Actor
 }
 
 // requestAtmStatuses merges the report results with current kuota per
-// distinct terminal of the request (detail screen, FR6.2/6.3).
-func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64) ([]RequestAtmStatus, error) {
-	results, err := s.read.ListVendorRequestAtmResults(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("list completion results of %d: %w", id, err)
-	}
-	byTerminal := make(map[string]string, len(results))
-	for _, r := range results {
-		byTerminal[r.TerminalID] = r.Result
+// distinct terminal of the request (detail screen, FR6.2/6.3); results and
+// ticket numbers come from the active tickets (replenish-ticket FR9.3).
+func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64, tickets []db.ListActiveVendorRequestTicketsRow) ([]RequestAtmStatus, error) {
+	byTerminal := make(map[string]db.ListActiveVendorRequestTicketsRow, len(tickets))
+	for _, t := range tickets {
+		byTerminal[t.TerminalID] = t
 	}
 	rows, err := s.read.ListRequestVisitInfo(ctx, id)
 	if err != nil {
@@ -252,8 +293,19 @@ func (s *VendorRequestService) requestAtmStatuses(ctx context.Context, id int64)
 			VisitQuotaTotal: r.VisitQuotaTotal,
 			IsOverQuota:     r.IsOverQuota,
 		}
-		if res, ok := byTerminal[r.TerminalID]; ok {
-			out[i].CompletionResult = &res
+		if t, ok := byTerminal[r.TerminalID]; ok {
+			out[i].TicketNumber = t.TicketNumber
+			out[i].CompletionResult = t.Result
+		}
+	}
+	reports, err := s.read.ListVendorRealizationsForRequest(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("list realizations of %d: %w", id, err)
+	}
+	views := realizationViews(reports)
+	for i := range out {
+		if v, ok := views[out[i].TerminalID]; ok {
+			out[i].RealizedDate, out[i].RealizedAmounts = v.RealizedDate, v.Amounts
 		}
 	}
 	return out, nil
@@ -264,4 +316,34 @@ func userRefOrNil(id *int64, name *string) *UserRef {
 		return nil
 	}
 	return &UserRef{ID: *id, FullName: notesOrEmpty(name)}
+}
+
+// overQuotaListMax caps the terminals named in the notification body so it
+// stays under the 1000-character limit however many ATMs went over quota.
+const overQuotaListMax = 20
+
+// overQuotaNotification builds the "kelebihan kuota" notification (spec
+// FR6.1, S1/S2): maker of the report + all active ATM-SPV, in-app + email.
+func overQuotaNotification(req db.VendorRequest, terminals []string) (notification.Message, notification.Recipients) {
+	listed := terminals
+	suffix := ""
+	if len(terminals) > overQuotaListMax {
+		listed = terminals[:overQuotaListMax]
+		suffix = fmt.Sprintf(" dan %d ATM lainnya", len(terminals)-overQuotaListMax)
+	}
+	id := req.ID
+	msg := notification.Message{
+		Type:       "visit_quota.over_quota",
+		Title:      "Kelebihan kuota kunjungan",
+		Body:       fmt.Sprintf("Vendor request %s: ATM %s%s melebihi kuota kunjungan replenish.", req.RequestNumber, strings.Join(listed, ", "), suffix),
+		Link:       fmt.Sprintf("/replenishment/vendor-requests/%d", req.ID),
+		EntityType: "vendor_request",
+		EntityID:   &id,
+		Email:      true,
+	}
+	to := notification.Recipients{Roles: []string{"ATM-SPV"}}
+	if req.CompletionSubmittedBy != nil {
+		to.UserIDs = []int64{*req.CompletionSubmittedBy}
+	}
+	return msg, to
 }

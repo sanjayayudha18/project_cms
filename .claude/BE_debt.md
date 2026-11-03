@@ -1,0 +1,43 @@
+# Backend Tech Debt
+
+Hasil review arsitektur BE (`backend/`, `backend-cit/` (kini `backend-exq/`), `pkg/`, `backend_python/`) terhadap standar aplikasi modern, 2026-10-12. Satu baris per item; ubah **Status** saat dikerjakan (`open` → `in-progress` → `done <sha>`). Sebelum mengerjakan item, tanya dulu: AI-DLC baru atau cukup `bugfixes.md` (CLAUDE.md Sec 4a rule 0). Item yang menyentuh migrasi/auth/uang selalu full chain (Sec 4 #7).
+
+Pasangan: [FE_debt.md](./FE_debt.md). AI-DLC perbaikan: [`sdlc/be-tech-debt/`](./sdlc/be-tech-debt/intent.md). Riwayat QC sebelumnya: `backend_QC_result.md`, `backend_QC_fixes.md` (root repo).
+
+## Baseline saat review
+
+| | backend | backend-exq | pkg | backend_python |
+|---|---|---|---|---|
+| Test | lulus | – (belum ada kode) | lulus | 79 lulus, 53 skip (butuh `DATABASE_URL`) |
+| `go vet` / golangci-lint (+gosec, gocyclo) | 0 issue | 0 | 0 | – |
+| govulncheck | 0 terjangkau (4 di module, tidak dipanggil) | 0 | 0 | – |
+| Coverage unit | approval 54,2 · auth 90,1 · handler 79,5 · notification 81,2 · repository 15,4 · rolemgmt 35,8 · service 44,6 | – | 83,9–100 | – |
+
+Sudah baik (jangan dirombak): Go 1.26 + chi v5 + pgx v5 + sqlc pinned, minim dependency; workspace 3 module acyclic; handler → service → repository → sqlc; maker-checker + audit dalam satu tx; pool primary/replica; tidak ada SQL via `Sprintf`; error 500 tidak bocor ke client; `JWT_SECRET` ≥ 32 byte; rate limit Redis; trusted-proxy IP; `slog` JSON, graceful shutdown, server timeouts; Docker multi-stage non-root + HEALTHCHECK; Python: `Decimal`, idempotent SHA-256, `hmac.compare_digest`, `create_subprocess_exec`.
+
+## HIGH
+
+| ID | Item | Bukti | Perbaikan | Status |
+|---|---|---|---|---|
+| BE-01 | Coverage modul uang/maker-checker di bawah 80% | Lihat baseline: `service` 44,6%, `approval` 54,2%, `rolemgmt` 35,8%, `repository` 15,4%. 55 file test `//go:build integration` ter-skip tanpa `DATABASE_URL` | Jalankan integration test di CI (BE-02) lalu ukur ulang; tambah test pada gap yang tersisa. | done 56d0a8f (C4.4) + ddefb12 (ambang C1) — target tercapai: semua `internal/*` ≥ 80%, ambang dicek di CI. Riwayat: baseline baru 2026-10-15 (unit + integration, DB bermigrasi penuh, `-race`): `service` 81,6% → 81,7% (C4.1 masterdata_approval `82ae252`) → 82,0% (C4.2 vendor_request `f9f66e8`) → 82,2% (C4.3 vault plan + vendor order `fb92794`) → 82,3% (C4.4 money `56d0a8f`), `approval` 81,3% → 88,6% (C3 `993540b`), `rolemgmt` 85,4% → 93,5% (C2 `8013dd6`), `repository` 86,9%, `handler` 80,7%, `auth` 90,1%, `audit` 86,7%, `notification` 83,9% — semua ≥ 80%; ambang anti-turun `backend/coverage-thresholds.txt` dicek di CI (C1, `ddefb12`). Test prioritas FR-C3 = C2–C4 |
+| BE-02 | Tanpa CI pipeline | Tidak ada `.github/workflows` / Cloud Build; lint, test, govulncheck, sqlc diff semuanya manual | Pipeline per module: `go vet`, `golangci-lint --build-tags integration`, `go test` + service Postgres, `govulncheck`, `sqlc diff`; Python unittest. Gabung dengan FE-06: tambah job ke `.github/workflows/ci.yml` yang dibuat `sdlc/fe-tech-debt`, termasuk job E2E Playwright (`frontend/CompanyPortal-Vite/e2e/`) di atas Postgres + backend (keputusan S3 FE). | in-progress (ci.yml job go/go-integration/sqlc/python green lokal 2026-10-15, committed `077ce05` (+ `8b3a32b`), belum push; job e2e menunggu FE E3) |
+| BE-03 | Migrasi manual tanpa tracking | `psql -f backend/migrations/0NN_*.sql`; tidak ada tabel pencatat → drift dev/staging/prod | Keputusan stack ("no migrate tool") → **butuh approval**. Opsi minimal: tabel `schema_migrations` + runner stdlib; alternatif golang-migrate. | done 88a3139 (be-tech-debt Fase D: runner `backend/cmd/migrate` + `schema_migrations` + CI pakai runner; dev di-baseline `--through 031` 2026-10-15: 29 applied, 0 pending) |
+| BE-04 | Observability belum siap produksi | Tanpa metrics/tracing (NFR p95 ≤ 3 s, 300 user tidak terukur); `middleware.Logger` chi menulis teks, bercampur dengan `slog` JSON (`backend/cmd/api/main.go:104`); `/health` hanya liveness, tidak cek DB/Redis (`main.go:108`) | Logger request berbasis `slog`; endpoint readiness (ping DB + Redis); metrics latency/error (Cloud Monitoring). | done 180d9f8 — be-tech-debt E1/E2/E5: `pkg/middleware.RequestLogger` (JSON `http_request`, level per status) + `pkg/health.Ready` → `GET /ready` (db, db_replica, redis) di kedua backend; log-based metric + alert p95 > 3 s didokumentasikan di `docs/deployment.md`, pembuatan di GCP = user (outstanding) |
+| BE-05 | Dependency Python tidak di-pin + `python-jose` | `backend_python/*/requirements.txt` memakai `>=`, tanpa lockfile; `python-jose` minim maintenance, riwayat CVE algorithm-confusion; layanan Python tanpa Dockerfile | Pin versi (lock), ganti ke PyJWT (perlu approval dependency), Dockerfile untuk `eod_retry_scheduler` + `service_dsr_etl`. | done c34a038 (be-tech-debt Fase F: 6 requirements di-pin `==`, PyJWT 2.15.1 HS256-only + test negatif, `backend_python/Dockerfile` + CI `python-image`) |
+| BE-06 | Base image runtime EOL | `backend/Dockerfile`: `FROM alpine:3.20` (support berakhir April 2026) | Naik ke Alpine terbaru yang didukung atau distroless (CLAUDE.md Sec 9). Cek juga `backend-cit/Dockerfile`. | done fb3b6fd |
+
+## MEDIUM
+
+| ID | Item | Bukti | Perbaikan | Status |
+|---|---|---|---|---|
+| BE-07 | Package dan file terlalu besar | `internal/service` 44 file / 13,5k LOC, `internal/handler` 38 file; `service/vendor_request_actions.go` 1210 baris, `service/masterdata_import.go` 862 baris (batas 800) | Pecah file > 800 saat disentuh; package per domain (mis. `internal/vendorrequest`) hanya bila disetujui — layering flat adalah keputusan terdokumentasi. | done b007b64 — G1 built 2026-10-19: `vendor_request_actions.go` → actions 502 + queries 349 + create 382; `masterdata_import.go` → 526 + csv 157 + validate 195; same package, blocks moved only. Tersisa: file test > 800 (`masterdata_approval_integration_test.go`, `vendor_request_handler_test.go`) tidak dipecah; package per domain tetap butuh persetujuan. |
+| BE-08 | Tanpa limit body JSON global + timeout per request | `MaxBytesReader` hanya di handler upload (`admin_master_data_import_handler.go`, `dsr_upload_handler.go`); tanpa middleware timeout → query tetap jalan setelah client putus | Middleware `http.MaxBytesReader` (mis. 1 MB) untuk route non-upload; `middleware.Timeout` chi. | `pkg/middleware.BodyLimit` 1 MiB (exempt DSR upload + master-data import) + `Timeout(30s)` di kedua backend; be-tech-debt E3. done 9f54d5a |
+| BE-09 | Ukuran pool DB default | `pgxpool.New(ctx, cfg.DatabaseURL)` (`main.go:47,66`) → `max(4, NumCPU)` koneksi | Set `pool_max_conns` di `DATABASE_URL` / `DATABASE_REPLICA_URL` dan dokumentasikan di `.env.example` + `docs/deployment.md`. Tanpa ubah kode. | `.env.example` `pool_max_conns=20`, usulan per env di `deployment.md`, log `db pool` saat start; nilai prod diterapkan user. be-tech-debt E4. done 9f54d5a |
+| BE-10 | Tanpa kontrak OpenAPI | 138+ endpoint; tipe FE ditulis manual → drift | Spec OpenAPI untuk endpoint yang dipakai FE (mulai dari modul baru); generate tipe FE bila disetujui. | done a1b78c9 — sdlc/openapi-contract: slice 1 d1e7082 (spec + Go contract test), slice 2–3 062b0d9 (CP generated types + CLAUDE.md DoD), review + fix R1 a1b78c9. Pilot = `/vendor-requests` + `/vendor/replenish-orders`; modul lain masuk spec saat disentuh (DoD Sec 11). |
+
+## LOW
+
+| ID | Item | Bukti | Perbaikan | Status |
+|---|---|---|---|---|
+| BE-11 | `backend-cit` masih kosong tapi dijadwalkan deploy | `backend-cit/internal/*` = 8 file `doc.go` satu baris; rename ke `backend-exq` belum dilakukan | Jangan deploy container-nya sampai `backend-exq` berisi; rename sesuai keputusan 2026-10-08. | done b007b64 — G2 built 2026-10-19 (docs only): `deployment.md` + CLAUDE.md Sec 10/12 → satu VM menjalankan `backend` saja; `backend-cit` masuk deploy setelah rename ke `backend-exq` dan berisi. Rename = user. | Rename `backend-cit` → `backend-exq` selesai 2026-10-20, 8b41612 (go.work, CI matrix, Dockerfile/compose, .dockerignore); deploy tetap ditahan sampai ada isi.
+| BE-12 | Vuln di module yang di-require (tidak terjangkau) + file usang ter-track | govulncheck: 4 vuln di module `backend`; `backend_python/dmaa/bak/` ter-track di git | `go get -u` module terkait + `go mod tidy`; hapus `dmaa/bak/`. | x/crypto v0.56.0 → v0.58.0 (2026-10-19, pemeliharaan rutin, done 36abcf8); GO-2026-5932 (openpgp, tanpa fix, tidak di-import) tetap accepted. done fb3b6fd (go) + 9a5af6d (dmaa/bak) |

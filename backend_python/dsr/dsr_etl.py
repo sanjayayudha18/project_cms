@@ -251,6 +251,7 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
 
         section = "d0"
         flow: str | None = None
+        block_start = len(rows)
 
         for r in range(data_start, data_end):
             row = grid.iloc[r]
@@ -293,9 +294,17 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
             elif label.startswith("SUBTOTAL"):
                 flow = None
             elif label.startswith("SALDO AKHIR"):
-                if location is None and section == "d0":
+                if section == "d0" and location is None:
                     _, total_amt, _ = totals()
                     file_fields["saldo_akhir_0000_total_idr"] = total_amt
+                elif section == "d0":
+                    # Per-vault saldo akhir 00:00 -- the vault-capacity source (cit-acm-plan FR1).
+                    denoms, total_amt, err = totals()
+                    error_count += err
+                    row_no += 1
+                    rows.append({"row_no": row_no, "section": section, "flow": "saldo_akhir",
+                                  "line_label": col2, "memo_no": None,
+                                  **denoms, "line_total_idr": total_amt, "remarks": None})
                 flow = None
             elif label.startswith("SALDO SEMENTARA"):
                 if location is None:
@@ -355,6 +364,9 @@ def read_daily_rows(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], i
                 rows.append({"row_no": row_no, "section": section, "flow": flow,
                               "line_label": col3 or col2, "memo_no": _extract_memo(col2),
                               **denoms, "line_total_idr": total_amt, "remarks": None})
+
+        for row in rows[block_start:]:
+            row["location"] = location
 
     for row in rows:
         for key in DENOM_VALUES.values():
@@ -467,7 +479,25 @@ def read_rencana_isi_rows(path: Path) -> tuple[date | None, list[dict[str, Any]]
 # ============================================================
 # DB writes
 # ============================================================
-def _upsert_upload(conn, path: Path, vendor_name: str, uploaded_by: int | None) -> str:
+def _insert_receipt(cur, vendor_label: str, vendor_id: int, report_date: date, checksum: str,
+                    daily_rows: list[dict[str, Any]], uploaded_by: int | None) -> None:
+    """Append-only receipt (033_dsr_receipts.sql), same tx as dsr_uploads. Never
+    UPDATE/DELETE this table; a failure here rolls the whole upload back (plan R1).
+    vendor_id comes from the unique vendor code in the filename, never from the
+    non-unique vendors.name (review R1)."""
+    locations = sorted({loc for row in daily_rows if (loc := (row.get("location") or "").strip())})
+    cur.execute(
+        """
+        INSERT INTO public.dsr_receipts
+            (vendor_label, vendor_id, report_date, checksum, locations, uploaded_by_user_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (vendor_label, report_date, checksum) DO NOTHING
+        """,
+        (vendor_label, vendor_id, report_date, checksum, locations, uploaded_by),
+    )
+
+
+def _upsert_upload(conn, path: Path, vendor_name: str, vendor_id: int, uploaded_by: int | None) -> str:
     """Writes one workbook into dsr_uploads + both row tables, in one transaction.
 
     Both sheets share a single dsr_uploads row (020_dsr_daily_rencana_isi.sql), so
@@ -576,6 +606,9 @@ def _upsert_upload(conn, path: Path, vendor_name: str, uploaded_by: int | None) 
         )
         upload_id = cur.fetchone()[0]
 
+        if daily_status == "completed":
+            _insert_receipt(cur, vendor_name, vendor_id, report_date, checksum, daily_rows, uploaded_by)
+
         if daily_rows:
             cur.executemany(
                 """
@@ -636,7 +669,7 @@ def dry_run_file(conn, path: Path) -> dict[str, Any]:
     trusting data echoed back from the browser for what actually gets persisted).
     """
     vendor_code, uploaded_by, original_name = parse_upload_filename(path.name)
-    vendor_name = resolve_vendor_name(conn, vendor_code)
+    _vendor_id, vendor_name = resolve_vendor(conn, vendor_code)
     checksum = file_checksum(path)
 
     result: dict[str, Any] = {
@@ -671,19 +704,20 @@ def dry_run_file(conn, path: Path) -> dict[str, Any]:
     return result
 
 
-def resolve_vendor_name(conn, vendor_code: str) -> str:
+def resolve_vendor(conn, vendor_code: str) -> tuple[int, str]:
+    """(id, name) by the unique vendors.code."""
     with conn.cursor() as cur:
-        cur.execute("SELECT name FROM public.vendors WHERE code = %s", (vendor_code,))
+        cur.execute("SELECT id, name FROM public.vendors WHERE code = %s", (vendor_code,))
         row = cur.fetchone()
     if not row:
         raise ValueError(f"Unknown vendor code '{vendor_code}' -- Go should have rejected this upload")
-    return row[0]
+    return row[0], row[1]
 
 
 def process_file(conn, path: Path) -> str:
     vendor_code, uploaded_by, _original_name = parse_upload_filename(path.name)
-    vendor_name = resolve_vendor_name(conn, vendor_code)
-    return _upsert_upload(conn, path, vendor_name, uploaded_by)
+    vendor_id, vendor_name = resolve_vendor(conn, vendor_code)
+    return _upsert_upload(conn, path, vendor_name, vendor_id, uploaded_by)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

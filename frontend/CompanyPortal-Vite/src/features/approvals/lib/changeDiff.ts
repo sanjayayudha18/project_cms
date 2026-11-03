@@ -13,6 +13,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   vendor_package: "Paket",
   atm: "ATM",
   atm_assignment: "Kelolaan ATM",
+  dsr_location_map: "Mapping lokasi DSR",
 };
 
 export const OP_LABELS: Record<MasterDataOp, string> = {

@@ -1,22 +1,22 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { formatIDR } from "./format";
+import { formatRp } from "./format";
 
 /**
  * Property 6: IDR Currency Formatting
  * Validates: Requirements 4.3, 7.6
  *
- * For any non-negative integer value, formatIDR SHALL produce a string
+ * For any non-negative integer value, formatRp SHALL produce a string
  * beginning with "Rp" followed by the number formatted with dot-separated
  * thousands (Indonesian locale).
  */
-describe("formatIDR — Property 6: IDR Currency Formatting", () => {
+describe("formatRp — Property 6: IDR Currency Formatting", () => {
   const nonNegativeInt = fc.integer({ min: 0, max: Number.MAX_SAFE_INTEGER });
 
   it("output always starts with 'Rp' prefix", () => {
     fc.assert(
       fc.property(nonNegativeInt, (value) => {
-        const result = formatIDR(value);
+        const result = formatRp(value);
         expect(result.startsWith("Rp")).toBe(true);
       }),
     );
@@ -25,7 +25,7 @@ describe("formatIDR — Property 6: IDR Currency Formatting", () => {
   it("output after 'Rp' contains only digits and dots", () => {
     fc.assert(
       fc.property(nonNegativeInt, (value) => {
-        const result = formatIDR(value);
+        const result = formatRp(value);
         const afterPrefix = result.slice(2);
         expect(afterPrefix).toMatch(/^[0-9.]+$/);
       }),
@@ -35,7 +35,7 @@ describe("formatIDR — Property 6: IDR Currency Formatting", () => {
   it("dots are placed correctly as thousand separators (every 3 digits from the right)", () => {
     fc.assert(
       fc.property(nonNegativeInt, (value) => {
-        const result = formatIDR(value);
+        const result = formatRp(value);
         const afterPrefix = result.slice(2);
         const parts = afterPrefix.split(".");
 
@@ -54,7 +54,7 @@ describe("formatIDR — Property 6: IDR Currency Formatting", () => {
   it("numeric value can be reconstructed by removing 'Rp' and dots", () => {
     fc.assert(
       fc.property(nonNegativeInt, (value) => {
-        const result = formatIDR(value);
+        const result = formatRp(value);
         const numericStr = result.slice(2).replace(/\./g, "");
         const reconstructed = Number.parseInt(numericStr, 10);
         expect(reconstructed).toBe(value);
@@ -65,17 +65,17 @@ describe("formatIDR — Property 6: IDR Currency Formatting", () => {
   it("output has no trailing or leading whitespace", () => {
     fc.assert(
       fc.property(nonNegativeInt, (value) => {
-        const result = formatIDR(value);
+        const result = formatRp(value);
         expect(result).toBe(result.trim());
       }),
     );
   });
 
-  it("formatIDR(0) returns 'Rp0' (boundary)", () => {
-    expect(formatIDR(0)).toBe("Rp0");
+  it("formatRp(0) returns 'Rp0' (boundary)", () => {
+    expect(formatRp(0)).toBe("Rp0");
   });
 
-  it("formatIDR(1000) returns 'Rp1.000' (boundary)", () => {
-    expect(formatIDR(1000)).toBe("Rp1.000");
+  it("formatRp(1000) returns 'Rp1.000' (boundary)", () => {
+    expect(formatRp(1000)).toBe("Rp1.000");
   });
 });

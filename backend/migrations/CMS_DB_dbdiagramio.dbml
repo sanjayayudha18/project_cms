@@ -238,6 +238,7 @@ Table vendor_branches {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   region text [note: 'FLM vendor region']
+  region_code text [note: 'migration 026: CHECK ^[A-Z0-9]{2,10}$; segmen nomor request']
   deleted_at timestamptz [note: 'migration 003 soft-delete']
 }
 
@@ -609,18 +610,29 @@ Table vendor_requests {
   completion_rejected_by bigint
   completion_rejected_at timestamptz
   completion_rejection_reason text
+  region_code text [note: 'migration 026: snapshot; NULL = format nomor lama']
 }
 
-Table vendor_request_atm_results {
-  vendor_request_id bigint [not null]
+Table vendor_request_tickets {
+  id bigint [pk, increment]
+  request_number text [not null]
   terminal_id text [not null]
-  result text [not null, note: 'success | failed']
-  updated_at timestamptz [not null, default: `now()`]
+  denom_code text [not null, note: '50K | 100K | MIX']
+  replenish_date date [not null]
+  seq smallint [not null, note: 'CHECK 1..999; global per (terminal_id, replenish_date)']
+  ticket_number text [not null, unique, note: '<terminal_id>_<denom_code>_<YYYYMMDD>_<NNN>']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  deactivated_at timestamptz
+  result text [note: 'success | failed; laporan selesai']
+  result_updated_at timestamptz
 
   indexes {
-    (vendor_request_id, terminal_id) [pk]
+    (terminal_id, replenish_date, seq) [unique]
+    (request_number, terminal_id, denom_code) [unique]
+    (request_number, terminal_id) [unique, note: 'WHERE is_active']
   }
-  Note: 'migration 021: laporan selesai per ATM'
+  Note: 'migration 026: tiket replenish per (request, ATM); menggantikan vendor_request_atm_results (021)'
 }
 
 Table atm_visit_quotas {
@@ -667,11 +679,12 @@ Table vendor_request_items {
 
 Table vendor_request_number_seq {
   vendor_id bigint [not null]
+  region_code text [note: 'migration 026; NULL = format nomor lama']
   seq_date date [not null]
   last_seq integer [not null, default: 0, note: 'CHECK 0..999']
 
   indexes {
-    (vendor_id, seq_date) [pk]
+    (vendor_id, region_code, seq_date) [unique, note: 'NULLS NOT DISTINCT']
   }
 }
 
@@ -749,7 +762,7 @@ Ref: vendor_request_number_seq.vendor_id > vendors.id
 Ref: vendor_requests.completion_submitted_by > users.id
 Ref: vendor_requests.completion_approved_by > users.id
 Ref: vendor_requests.completion_rejected_by > users.id
-Ref: vendor_request_atm_results.vendor_request_id > vendor_requests.id
+Ref: vendor_request_tickets.request_number > vendor_requests.request_number
 
 // ATM visit quota (migration 021)
 Ref: atm_visit_quotas.atm_id - atms.id

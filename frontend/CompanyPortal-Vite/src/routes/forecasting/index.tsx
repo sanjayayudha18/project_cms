@@ -1,6 +1,6 @@
 import { ModuleCard, type ModuleCardProps } from "@/components/ui/ModuleCard";
 import { createRoute } from "@tanstack/react-router";
-import { Calculator, Calendar, CheckCircle, FileText, TrendingUp, Upload } from "lucide-react";
+import { Calculator, Calendar, CheckCircle, FileText, TrendingUp } from "lucide-react";
 import { protectedRoute } from "../_protected";
 
 export const forecastingRoute = createRoute({
@@ -10,15 +10,6 @@ export const forecastingRoute = createRoute({
 });
 
 const FORECASTING_CARDS: ModuleCardProps[] = [
-  {
-    id: "dsr-upload",
-    title: "Unggah DSR",
-    description:
-      "Unggah laporan harian saldo vault, rencana pengisian, dan hasil rekonsiliasi dari vendor.",
-    href: "/forecasting/dsr-upload",
-    icon: Upload,
-    disabled: false,
-  },
   {
     id: "fill-instruction",
     title: "Instruksi Pengisian",

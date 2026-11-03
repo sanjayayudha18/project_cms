@@ -4,7 +4,7 @@ import { api, apiClient } from "./client";
 
 // Mock config to provide baseURL
 vi.mock("./config", () => ({
-  apiConfig: { mode: "real", baseURL: "/api/v1", stubLatency: { min: 200, max: 800 } },
+  apiConfig: { baseURL: "/api/v1" },
 }));
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -208,5 +208,92 @@ describe("API Client - 401 Single-Flight Refresh", () => {
 
     // Only 1 call, no retry
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("API Client - FormData and blob (FE-08)", () => {
+  it("sends FormData as-is without a JSON Content-Type", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    const form = new FormData();
+    form.append("file", new Blob(["a,b"]), "x.csv");
+
+    await api.post("/upload", form);
+
+    const [, options] = mockFetch.mock.calls[0];
+    expect(options?.body).toBe(form);
+    expect((options?.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
+
+  it("returns the raw blob and response headers when responseType is blob", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response("a,b", { status: 200, headers: { "Content-Disposition": 'filename="x.csv"' } }),
+    );
+
+    const res = await api.get<Blob>("/export", { responseType: "blob" });
+
+    expect(res.data).toBeInstanceOf(Blob);
+    expect(res.data.size).toBe(3);
+    expect(res.headers.get("Content-Disposition")).toBe('filename="x.csv"');
+  });
+
+  it("refreshes on 401 and retries a FormData upload", async () => {
+    const refreshToken = vi.fn().mockResolvedValue(true);
+    useAuthStore.setState({ accessToken: "t", refreshToken });
+    mockFetch
+      .mockResolvedValueOnce(unauthorizedResponse())
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    await api.post("/upload", new FormData());
+
+    expect(refreshToken).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("API Client - remaining branches (fe-coverage C1)", () => {
+  it("sends PUT and PATCH with JSON bodies", async () => {
+    mockFetch.mockImplementation(async () => jsonResponse({ ok: true }));
+
+    await api.put("/items/1", { a: 1 });
+    await api.patch("/items/1", { b: 2 });
+
+    const methods = mockFetch.mock.calls.map(([, init]) => init?.method);
+    expect(methods).toEqual(["PUT", "PATCH"]);
+    expect(mockFetch.mock.calls[1]?.[1]?.body).toBe('{"b":2}');
+  });
+
+  it("uses `errors` as details when the error body has no `details`", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ message: "Validasi gagal", errors: { amount: "wajib" } }, 422),
+    );
+
+    await expect(api.post("/x", {})).rejects.toEqual({
+      status: 422,
+      message: "Validasi gagal",
+      details: { amount: "wajib" },
+    });
+  });
+
+  it("falls back to statusText when the error body is not JSON", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response("<html>bad gateway</html>", { status: 502, statusText: "Bad Gateway" }),
+    );
+
+    await expect(api.get("/x")).rejects.toEqual({ status: 502, message: "Bad Gateway" });
+  });
+});
+
+describe("API Client - baseURL override (bugfix 2026-10-19)", () => {
+  it("uses apiConfig.baseURL by default, and the override when given (token still sent)", async () => {
+    useAuthStore.setState({ accessToken: "tok" });
+    mockFetch.mockImplementation(async () => jsonResponse({ ok: true }));
+
+    await api.get("/items");
+    await api.get("/api/eod/summary", { baseURL: "" });
+
+    const [[defaultUrl], [overrideUrl, init]] = mockFetch.mock.calls as [string, RequestInit][];
+    expect(defaultUrl).toBe("/api/v1/items");
+    expect(overrideUrl).toBe("/api/eod/summary");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
   });
 });

@@ -213,3 +213,45 @@ func TestLoad_InvalidInt_FallsBackToDefault(t *testing.T) {
 		t.Errorf("RateLimitIP = %d, want 20 (default on empty)", cfg.RateLimitIP)
 	}
 }
+
+// T1 (client-ip-trust FR1): TRUSTED_PROXIES parsing; a bad entry fails Load.
+func TestLoad_TrustedProxies(t *testing.T) {
+	cases := []struct {
+		name, raw string
+		want      []string
+		wantErr   bool
+	}{
+		{"unset", "", nil, false},
+		{"blank entries", " , ,", nil, false},
+		{"single IPv4", "172.17.0.1", []string{"172.17.0.1/32"}, false},
+		{"CIDR masked", "10.1.2.3/8", []string{"10.0.0.0/8"}, false},
+		{"mixed with spaces", " 172.17.0.1/32 , 10.0.0.0/8,::1 ", []string{"172.17.0.1/32", "10.0.0.0/8", "::1/128"}, false},
+		{"IPv6 CIDR", "fd00::/8", []string{"fd00::/8"}, false},
+		{"garbage", "172.17.0.1,nginx", nil, true},
+		{"bad prefix", "10.0.0.0/33", nil, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setEnvForTest(t)
+			t.Setenv("TRUSTED_PROXIES", tc.raw)
+			cfg, err := Load("8080")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for %q", tc.raw)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(cfg.TrustedProxies) != len(tc.want) {
+				t.Fatalf("TrustedProxies = %v, want %v", cfg.TrustedProxies, tc.want)
+			}
+			for i, p := range cfg.TrustedProxies {
+				if p.String() != tc.want[i] {
+					t.Errorf("TrustedProxies[%d] = %s, want %s", i, p, tc.want[i])
+				}
+			}
+		})
+	}
+}

@@ -1,0 +1,2 @@
+report_date,vendor_code,vendor,branch_code,branch_name,region_code,deadline_wib,first_received_at_wib,status,late_minutes,receipt_checksum,matched_locations
+2026-10-01,KEJAR,"'=HYPERLINK(""x"")",KJR_01,'+Cabang Plus,JKT,2026-10-01 09:00:00,2026-10-01 10:15:00,late,75,d4e5f6,'-Vault Minus; Vault 雅加达

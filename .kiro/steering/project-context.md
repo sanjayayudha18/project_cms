@@ -87,7 +87,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
 
-**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/forecast` (H+2) · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3a)
+**ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3a)
 
 **Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
 
@@ -103,7 +103,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
   - `menu_features` — Menu_Feature_Catalog. `id` bigint identity PK · `parent_id` bigint self-FK → `menu_features(id)` ON DELETE RESTRICT, nullable (NULL = top-level menu, non-NULL = feature under a menu) · `key` text UNIQUE (stable machine key, e.g. `settings.roles`) · `label` text · `kind` text CHECK IN ('menu','feature') + CHECK hierarchy (`menu`⇔`parent_id IS NULL`) · `sort_order` integer default 0 · `is_active` boolean default true · `created_at`/`updated_at` timestamptz default now(). Index on `parent_id`.
   - `role_permissions` — Role_Permission_Mapping (many-to-many `roles`↔`menu_features`; row presence = grant). `id` bigint identity PK · `role_id` bigint FK → `roles(id)` ON DELETE CASCADE · `menu_feature_id` bigint FK → `menu_features(id)` ON DELETE CASCADE · `granted_by` bigint FK → `users(id)` · `created_at` timestamptz default now(). UNIQUE `(role_id, menu_feature_id)`; indexes on `role_id` and `menu_feature_id`.
 - **Master**: `vendors`, `vendor_pics`, `vendor_vaults`, `locations`, `atms`, `vendor_assignments`
-- **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions`, `forecast_runs`, `forecast_results` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
+- **ATM**: `atm_dsr_uploads`, `atm_dsr_rows`, `replenishment_instructions` — *(proposed, NOT yet approved — see Sec 3a)* `cash_count_schedules`, `cash_count_evidences`
 - **Finance**: `invoice_uploads`, `invoice_items`, `invoice_reconciliation_results`
 - **CIT**: `cit_orders`, `cit_handover_evidences`, `cit_journals`, `cit_dsr_uploads`, `cit_reconciliation_results`
 - **Integration**: `escrow_batch_files`, `escrow_batch_rows`, `escrow_reconciliation_results`
@@ -132,7 +132,7 @@ Any module that needs maker-checker (invoice approval, DSR exception override, e
 > **Per-feature flow diagrams (Mermaid, editable) live in `.claude/feature-flows/<feature>/feature-flow.md`** — read the matching flow before implementing a feature. The nine flows: `01-master-data`, `02-dsr-upload`, `03-atm-cash-forecasting`, `04-pemenuhan-pengambilan-dana`, `05-invoice-reconciliation`, `06-replenishment-validation-reports`, `07-dashboard`, `08-cash-count-vault`, `09-cash-count-selektif-mesin`.
 
 - **Functional requirements (all High)**: FNC 001 ATM Cash Forecasting (DSR intake, replenishment instruction, projection) · FNC 002 Cash Count (scheduling, reconciliation, progress + result report; vault ATM/Cash + selektif mesin) · FNC 003 Dashboard (daily instruction amount + term ID, DSR lateness recap, cash count daily progress + monthly report).
-- **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 10, which is a different calc for a different job):
+- **Forecast / Order ATM (decided 2026-10-08)**: CROWN has no forecast engine. DMAA sends `Order_All_*.xlsx`, `backend_python/dmaa/dmaa_etl.py` loads `dmaa_atm_forecast`; DMAA `amount_replenish` is the final order amount (no in-CROWN formula). Refund comes from DMAA later (`amount_refund = 0` today). Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 10, which is a different calc for a different job):
   `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
   - Fallback: DMAA recommendation exists but DSR missing → compute from DMAA recommendation alone. **Open question in URS** ("apakah rumus ini masih valid?") — confirm with business before treating as final.
   - `Rencana Isi Hari-H` = previous day's order to be filled on H; it reduces the vendor's physical balance.
@@ -202,7 +202,7 @@ Any module that needs maker-checker (invoice approval, DSR exception override, e
 | Replenishment | Instruction + execution to refill ATM cash |
 | Vault | Vendor cash vault holding bank cash |
 | Escrow reconciliation | Match CMS cash position vs Corebanking escrow batch file |
-| Forecast (H+2) | 2-day-ahead cash need → shortage → vendor cash need |
+| Forecast (DMAA) | Order amount per ATM/denom/date received from DMAA; final, not recomputed by CROWN |
 | Cash count | Physical count: vault (vendor) + selective machine |
 | Maker-checker | Two-person approval control |
 | Invoice reconciliation | Validate invoice vs executed CIT/replenishment; approve only, no payment |
@@ -297,7 +297,7 @@ Both run on the **same VM**. Because their active windows don't overlap, each ge
 
 **Handoff rules (NON-NEGOTIABLE):**
 - EOD output is written to **DB = source of truth** (durable, queryable, auditable). Redis only as a cache layer on top, never the store of record for EOD results.
-- Every EOD run is tracked in a run table (`forecast_runs` / an `eod_runs` table): `processing_date`, status (running/success/failed), started_at, finished_at, records_processed, error.
+- Every EOD run is tracked in a run table (an `eod_runs` table): `processing_date`, status (running/success/failed), started_at, finished_at, records_processed, error.
 - Transactional module reads a `processing_date` only after its run is marked **success**. Never read partial/in-progress data.
 - On completion, emit a domain event (`EODCompleted` / `SummaryReady`) — fits the in-process event-driven model.
 - Batch ingests are idempotent per file/`processing_date` (re-run safe).

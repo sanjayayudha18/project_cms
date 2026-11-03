@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useVendor } from "../hooks";
 import { BranchesPanel } from "./BranchesPanel";
+import { DsrLocationMapsPanel } from "./DsrLocationMapsPanel";
 import { InfoTab } from "./InfoTab";
 import { PackagePricesPanel } from "./PackagePricesPanel";
 import { PicsPanel } from "./PicsPanel";
@@ -11,6 +12,7 @@ const TOP_TABS = [
   { id: "branches", label: "Cabang" },
   { id: "vendorWidePics", label: "PIC Vendor-wide" },
   { id: "packagePrices", label: "Harga Paket" },
+  { id: "dsrMaps", label: "Mapping DSR" },
 ] as const;
 
 type TopTab = (typeof TOP_TABS)[number]["id"];
@@ -78,6 +80,8 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
       {tab === "vendorWidePics" && <PicsPanel vendorId={vendorId} branchId={null} />}
 
       {tab === "packagePrices" && <PackagePricesPanel vendorId={vendorId} />}
+
+      {tab === "dsrMaps" && <DsrLocationMapsPanel vendorId={vendorId} />}
     </div>
   );
 }

@@ -35,8 +35,7 @@ type AuditLogFilter struct {
 // Audit Log Viewer. audit_logs stays append-only: no write method is defined
 // here (see internal/audit.Writer for the sole INSERT path).
 //
-// ponytail: uses dbPool; swap for the dbRead pool when DATABASE_REPLICA_URL
-// wiring lands (same TODO convention as cmd/api/main.go's other read services).
+// Wired to the read-replica pool in cmd/api/main.go (CLAUDE.md Sec 6).
 type AuditLogRepository struct {
 	queries *db.Queries
 }

@@ -2,7 +2,7 @@ module github.com/cimb-niaga/cms/backend-exq
 
 go 1.25.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/cimb-niaga/cms/pkg v0.0.0

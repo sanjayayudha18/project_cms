@@ -54,7 +54,7 @@ Security: CSP + security headers are set in both portals' Nginx config (FE-01). 
 
 | Layer | Technology | Version | Purpose |
 |-------|-----------|---------|---------|
-| Language | Go | 1.26 (`go.work`, toolchain go1.26.9) | Backend runtime |
+| Language | Go | 1.26 (`go.work`, toolchain go1.26.10) | Backend runtime |
 | HTTP framework | Chi | v5 | Lightweight router, middleware composition |
 | DB pool | pgx / pgxpool | v5 | Primary + replica pools (in `cmd/api/main.go`) |
 | DB access | sqlc | v1.31.1 (pinned) | SQL-first, type-safe generated Go code |

@@ -1,6 +1,6 @@
 /**
  * Settings hub landing page (/settings): links to the RBAC and admin sub-pages.
- * Tabs filter by category (access vs. master data), a search box filters by
+ * Tabs filter by category (access, master data, export & import), a search box filters by
  * title/description, "Hierarki Pengguna" is featured with an org-chart
  * illustration since it is the foundational entity every approval flow
  * depends on, and the rest render as list-row panels grouped by section
@@ -13,6 +13,7 @@ import { useAuthStore } from "@/lib/auth/store";
 import { cn } from "@/lib/utils/cn";
 import { Link } from "@tanstack/react-router";
 import {
+  ArrowDownUp,
   ArrowRight,
   ArrowUpRight,
   Building2,
@@ -35,9 +36,9 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
-type SettingsCategory = "access" | "master";
+type SettingsCategory = "access" | "master" | "io";
 
 interface HubCard {
   id: string;
@@ -119,22 +120,6 @@ const MASTER_DATA_CARDS: HubCard[] = [
     category: "master",
   },
   {
-    id: "admin-master-data-io",
-    title: "Impor CSV Data Master",
-    description: "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
-    href: "/settings/admin/master-data-io",
-    icon: FileSpreadsheet,
-    category: "master",
-  },
-  {
-    id: "admin-exports",
-    title: "Export Data",
-    description: "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
-    href: "/exports",
-    icon: Download,
-    category: "master",
-  },
-  {
     id: "admin-regions",
     title: "Manajemen Region",
     description: "Kelola region dan status aktifnya.",
@@ -160,9 +145,30 @@ const MASTER_DATA_CARDS: HubCard[] = [
   },
 ];
 
+/** Shown on its own "Export & Import" tab. */
+const IMPORT_EXPORT_CARDS: HubCard[] = [
+  {
+    id: "admin-master-data-io",
+    title: "Impor CSV Data Master",
+    description: "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
+    href: "/settings/admin/master-data-io",
+    icon: FileSpreadsheet,
+    category: "io",
+  },
+  {
+    id: "admin-exports",
+    title: "Export Data",
+    description: "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
+    href: "/exports",
+    icon: Download,
+    category: "io",
+  },
+];
+
 const TABS: { id: SettingsCategory; label: string }[] = [
   { id: "access", label: "Akses & persetujuan" },
   { id: "master", label: "Data master" },
+  { id: "io", label: "Export & Import" },
 ];
 
 function matchesQuery(card: HubCard, query: string): boolean {
@@ -307,15 +313,16 @@ function SectionPanel({
   description: string;
   cards: HubCard[];
 }) {
+  const headingId = useId();
   if (cards.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-[var(--space-3)]">
+    <section aria-labelledby={headingId} className="flex flex-col gap-[var(--space-3)]">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-2">
           <Icon size={18} className="mt-0.5" style={{ color: "var(--n-700)" }} aria-hidden="true" />
           <div className="flex flex-col gap-0.5">
-            <h2 className="text-sm font-semibold" style={{ color: "var(--n-900)" }}>
+            <h2 id={headingId} className="text-sm font-semibold" style={{ color: "var(--n-900)" }}>
               {title}
             </h2>
             <p className="text-xs" style={{ color: "var(--n-600)" }}>
@@ -373,6 +380,7 @@ export function SettingsHubPage() {
   const normalizedQuery = query.trim().toLowerCase();
   const showAccess = activeTab === "access";
   const showMaster = activeTab === "master";
+  const showIO = activeTab === "io";
 
   const showFeatured = showAccess && matchesQuery(FEATURED_CARD, normalizedQuery);
   const rbacCards = showAccess
@@ -390,8 +398,12 @@ export function SettingsHubPage() {
           (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)),
       )
     : [];
+  const importExportCards = showIO
+    ? IMPORT_EXPORT_CARDS.filter((c) => matchesQuery(c, normalizedQuery))
+    : [];
 
-  const hasResults = showFeatured || rbacCards.length > 0 || masterCards.length > 0;
+  const hasResults =
+    showFeatured || rbacCards.length > 0 || masterCards.length > 0 || importExportCards.length > 0;
 
   return (
     <div className="flex max-w-[960px] flex-col gap-6">
@@ -475,6 +487,13 @@ export function SettingsHubPage() {
         title="Data master & admin"
         description="Satu tempat untuk data operasional."
         cards={masterCards}
+      />
+
+      <SectionPanel
+        icon={ArrowDownUp}
+        title="Export & Import"
+        description="Unggah perubahan massal atau unduh data sebagai CSV."
+        cards={importExportCards}
       />
 
       <div className="flex items-center justify-center gap-2 pt-2 pb-4">

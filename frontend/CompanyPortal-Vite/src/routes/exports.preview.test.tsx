@@ -103,7 +103,7 @@ describe("/settings/admin/exports redirect", () => {
   it("has no component", () => expect(options(adminExportsRoute).component).toBeUndefined());
 });
 
-describe("Export Data sidebar item", () => {
+describe("Export Data is not in the sidebar", () => {
   const hasItem = (role: DbRole) => getVisibleNav(role).all.some((i) => i.id === "exports");
 
   it.each<DbRole>([
@@ -113,9 +113,8 @@ describe("Export Data sidebar item", () => {
     "ATM-SPV",
     "BRANCH-ATM-USER",
     "BRANCH-ATM-SPV",
-  ])("is shown for %s", (role) => expect(hasItem(role)).toBe(true));
-
-  it.each<DbRole>(["ACM-USER", "BRANCH-USER", "VENDOR-USER"])("is hidden for %s", (role) =>
-    expect(hasItem(role)).toBe(false),
-  );
+    "ACM-USER",
+    "BRANCH-USER",
+    "VENDOR-USER",
+  ])("is not in the sidebar for %s", (role) => expect(hasItem(role)).toBe(false));
 });

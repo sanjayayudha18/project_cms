@@ -5,7 +5,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  Download,
   FileClock,
   HeartPulse,
   Landmark,
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 
 import type { DbRole } from "@/lib/auth/store";
-import { EXPORTS_PAGE_ROLES } from "./exportRoles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,14 +99,6 @@ export const NAV_CONFIG: NavItem[] = [
     roles: ["*"],
     group: "general",
     badge: "approvals-inbox",
-  },
-  {
-    id: "exports",
-    label: "Export Data",
-    icon: Download,
-    href: "/exports",
-    roles: [...EXPORTS_PAGE_ROLES],
-    group: "general",
   },
   {
     id: "settings",

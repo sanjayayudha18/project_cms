@@ -379,7 +379,7 @@ type ExportJob struct {
 	VendorCode        *string            `json:"vendor_code"`
 	VendorBranchID    *int64             `json:"vendor_branch_id"`
 	BranchCode        *string            `json:"branch_code"`
-	StatusFilter      string             `json:"status_filter"`
+	StatusFilter      *string            `json:"status_filter"`
 	PriceLevel        *string            `json:"price_level"`
 	ParamsHash        string             `json:"params_hash"`
 	FileName          string             `json:"file_name"`
@@ -396,6 +396,8 @@ type ExportJob struct {
 	DownloadedAt      pgtype.Timestamptz `json:"downloaded_at"`
 	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	// Filter laporan (month | date_from,date_to, vendor_id, vendor_branch_id, region_code, status, classification) untuk Kind laporan; NULL untuk Kind master data. Migrasi 035.
+	ReportParams []byte `json:"report_params"`
 }
 
 // Isi file CSV ekspor per potongan (<= 1 MiB). Berisi data pribadi PIC / harga kontrak: dihapus setelah berhasil diunduh, saat gagal, atau 10 menit setelah siap. Migrasi 034.

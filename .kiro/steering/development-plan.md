@@ -24,7 +24,7 @@ Rules:
 
 Overall completion: **~58%** (rough estimate; ~55% on 2026-10-23, ~45-50% on 2026-10-08). "Done" = wired into a route, backed by real queries, tested — never a folder or a mock UI.
 
-Branch: `dev1` is **156 commits ahead** of `main` (`dev1` latest `f98bc89`). Merge `dev1` → `main` is still pending.
+Branch: `dev1` is **159 commits ahead** of `main` (`dev1` latest `b102082`, 2026-11-03). Merge `dev1` → `main` is still pending.
 
 Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`036` (gaps: `022` reserved, `024` dropped; 34 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29; `036_master_data_import_batches_file_name` applied to dev 2026-11-02.
 
@@ -181,12 +181,36 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 | X.3 Tech debt BE (`be-tech-debt/`, `BE_debt.md`) | 🟡 Fase A–G done (CI, coverage gate, migrate runner, logging/`/ready`, limits, PyJWT, file splits) | first GitHub Actions run after push; GCP log-based alert (user); `backend-exq` image hardening |
 | X.4 OpenAPI contract (BE-10, `openapi-contract/`) | ✅ pilot done `a1b78c9` (`/vendor-requests*`, `/vendor/replenish-orders*`) | extend per new module |
 | X.5 CI move to Jenkins (`ci-jenkins/`) | ⏸ on hold (user 2026-10-15); GitHub Actions stays live | resume ~Dec 2026 |
-| X.6 Merge `dev1` → `main` | ⏳ pending (156 commits) | after the open manual checks / code-owner review |
-| X.7 Export Data (`.kiro/specs/vendor-data-export/`) | ✅ built, code complete 2026-10-29 (tasks 1–17 selesai, gate 16 hijau; committed `540ee96`). Export CSV async per vendor / cabang / Harga Paket / master data global, dibangun di **`backend-exq`** (replica pool, `TrustedRealIP`, image non-root, `/api/v1/exports/`); migrasi `034_export_jobs` applied to dev 2026-10-28; kontrak CSV di `pkg/csvexport`; endpoint export lama di `backend/` dihapus (cutover, D15); unduh otomatis + hapus file setelah unduh pertama (D18) | manual browser check (user, task 18: pop-up + unduh otomatis, Log Audit, screen reader, keyboard); `govulncheck` GO-2026-6809 (naik toolchain Go 1.26.10 seluruh workspace + image, open) |
+| X.6 Merge `dev1` → `main` | ⏳ pending (159 commits as of 2026-11-03) | after the open manual checks / code-owner review |
+| X.7 Export Data (`.kiro/specs/vendor-data-export/`) | ✅ built, code complete 2026-10-29 (tasks 1–17 selesai, gate 16 hijau; committed `540ee96`). Export CSV async per vendor / cabang / Harga Paket / master data global, dibangun di **`backend-exq`** (replica pool, `TrustedRealIP`, image non-root, `/api/v1/exports/`); migrasi `034_export_jobs` applied to dev 2026-10-28; kontrak CSV di `pkg/csvexport`; endpoint export lama di `backend/` dihapus (cutover, D15); unduh otomatis + hapus file setelah unduh pertama (D18) | manual browser check (user, task 18: pop-up + unduh otomatis, Log Audit, screen reader, keyboard); `govulncheck` GO-2026-6809 closed 2026-11-03 (toolchain + image Go 1.26.10) |
 | X.8 Report export migration (`.kiro/specs/report-export-migration/`, requirements + design + tasks 2026-10-28 (11 tasks, 25 leaf), D1–D10 = Kiro suggestions; mig `035_export_jobs_reports`, `pkg/reports`) | ✅ built 2026-10-29 (tasks 1–10 selesai, gate 9 hijau; committed `0e2cc18`): CSV DSR telat + replenishment pindah ke `backend-exq` (`/api/v1/exports/reports/*`, Ekspor Saya di `/exports`); `format=csv` di `backend/` dihapus (400); layar JSON tetap di `backend/`; mig `035` applied to dev 2026-10-29 | manual browser check (user, task 11: ekspor per peran, Ekspor Saya, Log Audit `report_exported`, Excel non-ASCII) |
 | X.9 Export menu revamp (`.kiro/specs/export-menu-revamp/`) | ✅ built 2026-10-30 (tasks 1–13 selesai, gate 6 dan 12 hijau; committed `3f56450`). Katalog `/exports` (item sidebar) → halaman pratinjau `/exports/<data>` (tabel + filter + jumlah baris, API pratinjau baru di `backend-exq`) → ekspor sesuai filter tabel lewat `export_jobs` yang ada. Tanpa migrasi, tanpa tabel baru; `pgregory.net/rapid` (test-only) ditambahkan ke `backend-exq/go.mod` atas izin user | manual browser check (user, task 14: katalog per peran, pratinjau + filter + paging, tombol ekspor sesuai filter, pengalihan `/settings/admin/exports`). Follow-up `.kiro/specs/export-preview-simplify/` (2026-10-30, D1–D5 disetujui PO): dropdown Vendor saja (tanpa kotak "Cari vendor"), tombol "Search" menggantikan "Terapkan", catatan pengambilan file dihapus, tombol "Ekspor" tanpa jumlah baris; tanpa perubahan backend. Permintaan gabung ATM + Kelolaan ATM dibatalkan PO (D1). Committed `f98bc89`; cek browser manual (user, task 8 spec) outstanding |
-| X.10 Master-data CSV import revamp (`.kiro/specs/master-data-import-revamp/`) | ✅ built 2026-11-03 (tasks 1–15 selesai; requirements + design disetujui PO 2026-11-02, D1–D12 = saran Kiro; mock UI `ui-mock.html`). Belum di-commit. Approval sebelum update DB sudah berjalan (satu batch = satu approval, apply semua atau tidak); revamp menambah pratinjau per baris, riwayat + detail batch, tombol coba terapkan lagi, tinjauan checker lengkap, notifikasi impor. Mig `036` (`master_data_import_batches.file_name`). Pengecualian scope guard rule 2 (user OK 2026-11-02) | cek browser manual (user, task 16: impor tiap entitas, file berisi kesalahan, file sama dua kali, riwayat + detail, batch stale + retry, tinjauan checker, notifikasi, peran non-admin, keyboard + screen reader) outstanding; commit |
+| X.10 Master-data CSV import revamp (`.kiro/specs/master-data-import-revamp/`) | ✅ built 2026-11-03 (tasks 1–15 selesai; requirements + design disetujui PO 2026-11-02, D1–D12 = saran Kiro; mock UI `ui-mock.html`). Committed `21d7693`. Approval sebelum update DB sudah berjalan (satu batch = satu approval, apply semua atau tidak); revamp menambah pratinjau per baris, riwayat + detail batch, tombol coba terapkan lagi, tinjauan checker lengkap, notifikasi impor. Mig `036` (`master_data_import_batches.file_name`). Pengecualian scope guard rule 2 (user OK 2026-11-02) | cek browser manual (user, task 16: impor tiap entitas, file berisi kesalahan, file sama dua kali, riwayat + detail, batch stale + retry, tinjauan checker, notifikasi, peran non-admin, keyboard + screen reader) outstanding |
 | X.11 graphify-human generator (`graphify-human/`) | 🚧 2026-11-03 (user OK): skrip Python stdlib `graphify-human/generate.py` membaca `features.toml` + `graphify-out/graph.json` + source code, menulis peta fitur Markdown ke `graphify-human/out/`. Tooling dev saja, tidak menyentuh runtime aplikasi | review output pilot 3 fitur, lalu tambah fitur lain di `features.toml` |
+
+---
+
+## FSD v1.0 full review (2026-11-03) — scope captured, NOT scheduled
+
+Source: [`fsd-v1-alignment-2026-10-01.md` §7](../../.claude/docs/fsd-v1-alignment-2026-10-01.md) (full FSD PDF review). Nothing below is approved or built; it only records which phase owns each new FSD item. Scope guard still applies: no item starts without re-prioritization by the user, the AI-DLC question (Sec 4a rule 0), and schema approval.
+
+| FSD item | Owning item | Note |
+| --- | --- | --- |
+| Invoicing trip (§6): price scheme upload (replace, upload date = effective), max trip per paket (3=30, 4=40, 5=50) + Additional Trip price, prorata per day for mid-month activate/deactivate, penalty count from DSR-late flags (2.3) + manual amount, appeal loop max 3 rounds, final → VOC task. ATM master from ESQ daily file via MFT | Phase 3 Finance | **Changes Phase 3 scope**: CROWN computes billing instead of validating a vendor-uploaded invoice. Still no payment execution (SMART out of scope). Money math → Sec 4 #7 |
+| Forecast daily timeline (06:00 → final order 12:30), complain/project upload, duplicate ATM ID dropped + info email, ATM not in forecast → order with blank amount filled by ATM Monitoring, manual adjust 11:45–12:00 | 2.4 (on hold) | Add to the 2.4 spec when it resumes |
+| Master vendor: Service Type, ATM/Cash Escrow, Limit CIS, Region columns; in-app Amber/Red PKS notification to authorized PIC; manual "Terminated" | `vendor-pks-cis-limit` (mig `022`) | Scope guard rule 2 exception needed when it starts |
+| Cash count vault: H > 15 bio (3×), M 5–15 bio (2×), L < 5 bio (1×) per 6 months; variance threshold Rp10 juta (≤ recount, > escalation to Ops & IT Director); D3 approval; BA incl. UTLE + Uang Rusak; onsite or virtual visit; Selisih Cash Count / Cek Escrow formulas | Phase 5 Cash count | Formulas = money/recon (Sec 4 #7) |
+| Cash count selektif mesin: surat tugas multi-ATM, statuses Assigned → … → Ready for Execution, Day 1 inspection + seal BA (points 1–9), Day 2 per-cassette count vs Remaining Bill Counter (points 10–15), CCR review loop, D3 → D2 approval, params Category ATM Anomaly + Checklist Berita Acara | Phase 5 Cash count | Previously "empty in FSD" |
+| 11 cash count reports (§5): Summary Plan Vault, Status, Progress ATM/Cash/Valas, Selisih, Penalty, Temuan Vault, Performance MtM + Rank, Rekap | Phase 5 Cash count | Replica reads; export via `backend-exq` |
+
+**Conflicts to settle with the PO before the owning item starts:**
+1. Order formula step 8 `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)` vs decision 2026-10-08 (DMAA amount is final) — affects 2.4.
+2. Cash count reconciliation: Rec 7 results keyed into CROWN manually — revisit "CROWN computes no cash count deltas" — affects Phase 5.
+3. PKS thresholds: FSD < 8 / Amber < 6 / Red 3 / Green ≥ 9 months vs repo 9 months (A4); status value lists differ — affects `vendor-pks-cis-limit`.
+4. Invoice schedule: "last 3 business days of the first week of next month" vs "3 business days before month end" — affects Phase 3.
+5. Cash count category window: "3 Mths / 1 Mths" vs 6-month average — affects Phase 5.
+
+Still open from the FSD: next step after a Provider rejects a pickup; source of the H-1 escrow balance (SIBS vs Corebanking file).
 
 ---
 
@@ -194,9 +218,9 @@ Vendor Request `approved` = replenishment instruction. Flow end to end: `.claude
 
 | Phase | Item | Gate |
 | --- | --- | --- |
-| 3 Finance | `internal/invoice` (validate + approve only, NO payment), `internal/reconciliation` | Phase 2 data, 0.4 |
+| 3 Finance | `internal/invoice` (FSD §6 invoicing trip: CROWN-computed billing + appeal loop, NO payment — see FSD review above), `internal/reconciliation` | Phase 2 data, 0.4, conflict #4 |
 | 4 Integration | `internal/corebanking` escrow batch ingest | 0.2, 3 |
-| 5 Cash count | `internal/cashcount` (vault + selective machine) | Table names approved; columns in Phase 5 spec. 0.3, 0.4, 4 |
+| 5 Cash count | `internal/cashcount` (vault + selective machine + 11 reports — see FSD review above) | Table names approved; columns in Phase 5 spec. 0.3, 0.4, 4, conflicts #2 + #5 |
 | 6 CIT remainder | Journal, CIT DSR, CIT reconciliation (in `backend/`); export/dashboard queries in `backend-exq` | ATM ops solid |
 | 7 EOD | Extend Python pipeline: Final Realisasi calc, `eod_runs`, `success`-only reads, not-done-before-office-hours email | Phase 2, 0.3 |
 

@@ -57,7 +57,7 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 ---
 
 ### Backend-exq deploy readiness (X.13, 2026-11-04)
-- Spec `.kiro/specs/backend-exq-deploy-readiness/`: siapkan `backend-exq` untuk deploy pertama. Wave 0–1 selesai (belum di-commit): job CI `go-image` di `.github/workflows/ci.yml` membangun image `backend` dan `backend-exq`, lalu memeriksa non-root dan HEALTHCHECK lewat `scripts/ci/check-image.sh`; `.claude/docs/deployment.md` mendapat bagian "Release checklist: first `backend-exq` deployment" dan pernyataan usang tentang `backend-exq` diperbaiki.
+- Spec `.kiro/specs/backend-exq-deploy-readiness/`: siapkan `backend-exq` untuk deploy pertama. Selesai, committed `cf53038`: job CI `go-image` di `.github/workflows/ci.yml` membangun image `backend` dan `backend-exq`, lalu memeriksa non-root dan HEALTHCHECK lewat `scripts/ci/check-image.sh`; `.claude/docs/deployment.md` mendapat bagian "Release checklist: first `backend-exq` deployment" dan pernyataan usang tentang `backend-exq` diperbaiki.
 - `.kiro/steering/development-plan.md`: gap "`backend-exq` image still runs as root without HEALTHCHECK" dihapus (sudah tertutup sejak `540ee96`); baris X.3 dan X.7 diperbarui; baris X.13 ditambahkan.
 - Outstanding: run GitHub Actions pertama belum terjadi (job `go-image` belum pernah jalan di runner); wave 2 (review `ci.yml`, dokumen ini) belum selesai; commit belum dibuat.
 

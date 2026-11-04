@@ -20,7 +20,7 @@ Template:
 - **Root cause**: `zod` ^3.24 (patch hanya ada di 4.6.6+). `seroval` ikut `@tanstack/router-core` (range `^1.6.7`); lockfile CP masih mengunci 1.6.9, lockfile VP memakai router lama (1.170.32).
 - **Fix**: kedua portal `zod` ^3.24.0 → ^4.6.7 dan `@tanstack/react-router` → ^1.170.46 (`router-core` 1.171.39, `seroval`/`seroval-plugins` 1.7.7 lewat lockfile, tanpa `pnpm.overrides`). Migrasi zod 4 di CP: `invalid_type_error:` → `error:` (`vendorRequestCreateForm.ts`, `atmFormSchema.ts`); form dengan `z.coerce` (`RbacDelegationsPage`, `RbacLeavesPage`, `RbacPoliciesPage`) memakai `useForm<z.input, unknown, z.output>` (tipe `*FormInput` baru di `rbac-settings/types.ts`). VP tidak perlu perubahan kode. Lockfile CP juga menggeser `supports-color` 7→10 (churn transitif dari resolusi ulang); lockfile VP mengecil karena router/seroval ter-dedupe.
 - **Tests**: `pnpm audit --prod` = 0 vulnerability di kedua portal. CP: lint, 1866 test, coverage 87.22/82.55/83.91/88.22 (≥ 84/80/80/85), `build` + `check-bundle` (199.2 KB gzip, budget 300), `gen:api` tanpa diff. VP: lint, 250 test, coverage 93.53/84.62/91.59/94.41 (≥ 93/84/90/93), build. Cek browser (form RBAC delegasi/cuti/policy, form Vendor Request, form ATM, routing kedua portal): **outstanding** (Golden Rule #10).
-- **Commit**: belum
+- **Commit**: cb64232
 
 ---
 

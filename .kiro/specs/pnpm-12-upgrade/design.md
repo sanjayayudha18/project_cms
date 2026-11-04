@@ -102,7 +102,7 @@ docker run --rm cp-builder:pnpm12 pnpm --version   # harus 12.16.1
 Tidak ada perubahan yang direncanakan. `pnpm-workspace.yaml` hanya berisi `allowBuilds`, setting yang dikenal pnpm 12 (Req 3.5). Prosedur cek:
 
 1. Sebelum upgrade, simpan daftar kunci di bagian `packages:` Lockfile (format `nama@versi`) ke file sementara di luar repo (`$env:TEMP`).
-2. Sesudah upgrade, `pnpm install --frozen-lockfile` harus lolos dan `git diff --exit-code -- pnpm-lock.yaml` harus bersih (Req 3.1).
+2. Sesudah upgrade, `pnpm install --frozen-lockfile` harus lolos. Diff `pnpm-lock.yaml` hanya boleh berupa boot document pnpm 12 di awal file (D8, ditambah karena pin `packageManager` ≥12); dokumen proyek tidak berubah (Req 3.1). Perbandingan snapshot di langkah 3 hanya membaca dokumen YAML terakhir.
 3. Jalankan satu `pnpm install` tanpa frozen. Bila Lockfile berubah, bandingkan daftar kunci `packages:` dengan snapshot:
    - daftar sama, yang berubah hanya format/peer variant → commit diff di perubahan yang sama (Req 3.3, D3);
    - ada `nama@versi` yang bertambah, hilang, atau berubah → hentikan pekerjaan, kembalikan Lockfile (`git checkout -- pnpm-lock.yaml`), dan lapor ke user (Req 3.4).
@@ -121,7 +121,7 @@ Perintah per portal, dijalankan di folder portal:
 | 3 | `pnpm test` | ✔ | ✔ |
 | 4 | `pnpm run test:coverage` (threshold CP 84/80/80/85, VP 93/84/90/93) | ✔ | ✔ |
 | 5 | `pnpm build` (CP termasuk `scripts/check-bundle.mjs`) | ✔ | ✔ |
-| 6 | `pnpm audit --prod` → 0 vulnerability | ✔ | ✔ |
+| 6 | `pnpm audit --prod` → advisory sama dengan baseline (paritas, D7) | ✔ | ✔ |
 | 7 | `pnpm run gen:api` + `pnpm run gen:api:exq`, lalu `git diff --exit-code -- src/lib/api/` | ✔ | — |
 
 Baseline (pnpm 11.20.0) dan hasil sesudah (pnpm 12.16.1) dicatat dalam tabel yang sama di catatan task: exit code, jumlah test lulus/gagal, empat angka coverage. Hasil sesudah harus exit 0 di setiap perintah, jumlah test lulus sama dengan baseline dengan 0 gagal, dan coverage tidak di bawah threshold (Req 4.1-4.5). Diff kosong di `src/lib/api/` memenuhi Req 4.6.
@@ -201,13 +201,13 @@ Satu-satunya "data" yang dijaga adalah Lockfile: himpunan kunci `nama@versi` di 
 
 ### Property 3: Dependency resolved tidak berubah
 
-*For any* kunci `nama@versi` K di bagian `packages:` Lockfile portal P sebelum upgrade, K ada di Lockfile P sesudah upgrade, dan sebaliknya. `pnpm install --frozen-lockfile` dengan pnpm 12.16.1 tidak mengubah Lockfile.
+*For any* kunci `nama@versi` K di bagian `packages:` dokumen proyek (dokumen YAML terakhir) Lockfile portal P sebelum upgrade, K ada di dokumen proyek Lockfile P sesudah upgrade, dan sebaliknya. `pnpm install --frozen-lockfile` dengan pnpm 12.16.1 tidak mengubah dokumen proyek; satu-satunya tambahan yang diizinkan adalah boot document pnpm 12 (`packageManagerDependencies` + `@pnpm/exe.*@12.16.1`, D8).
 
 **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
 ### Property 4: Paritas gate kualitas
 
-*For any* portal P dan perintah C di QualityGate P, C selesai dengan exit 0 di bawah pnpm 12.16.1. Jumlah test lulus sama dengan baseline pnpm 11.20.0 dengan 0 gagal, coverage tidak di bawah threshold P, dan `pnpm audit --prod` melaporkan 0 vulnerability.
+*For any* portal P dan perintah C di QualityGate P, C selesai dengan exit 0 di bawah pnpm 12.16.1. Jumlah test lulus sama dengan baseline pnpm 11.20.0 dengan 0 gagal, coverage tidak di bawah threshold P, dan `pnpm audit --prod` melaporkan himpunan advisory yang sama dengan baseline (paritas, D7; exit code audit dikecualikan dari syarat exit 0).
 
 **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
 

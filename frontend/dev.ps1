@@ -49,7 +49,7 @@ $portals = @{
 }
 
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    Write-Error "pnpm not found on PATH. Install it first: npm install -g pnpm  (or: corepack enable)"
+    Write-Error "pnpm not found on PATH. Install it first: npm install -g pnpm@12.16.1"
 }
 
 # Resolve which portals to act on.

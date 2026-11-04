@@ -99,8 +99,8 @@ Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 
 
 #### Acceptance Criteria
 
-1. WHEN `pnpm install --frozen-lockfile` dijalankan dengan pnpm 12.16.1 di masing-masing portal, THE install SHALL berhasil tanpa mengubah Lockfile.
-2. THE himpunan pasangan `nama@versi` yang resolved di Lockfile SHALL sama sebelum dan sesudah upgrade.
+1. WHEN `pnpm install --frozen-lockfile` dijalankan dengan pnpm 12.16.1 di masing-masing portal, THE install SHALL berhasil tanpa mengubah dokumen proyek di Lockfile. Satu-satunya tambahan yang boleh adalah boot document pnpm 12 di awal file (`packageManagerDependencies` + `@pnpm/exe.*@12.16.1`), yang di-commit bersama upgrade (D8).
+2. THE himpunan pasangan `nama@versi` yang resolved di dokumen proyek Lockfile (dokumen YAML terakhir) SHALL sama sebelum dan sesudah upgrade.
 3. IF `pnpm install` tanpa frozen menghasilkan diff Lockfile, THEN THE diff SHALL hanya berisi perubahan format/peer variant pnpm 12 dan di-commit dalam perubahan yang sama, sesuai D3.
 4. IF diff Lockfile mengubah versi resolved suatu package, THEN THE pekerjaan SHALL berhenti dan dilaporkan ke user sebelum lanjut.
 5. THE WorkspaceConfig SHALL hanya berisi setting yang dikenal pnpm 12.16.1, dan `allowBuilds` untuk `@biomejs/biome` dan `esbuild` SHALL tetap ada.
@@ -116,7 +116,7 @@ Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 
 2. WHEN QualityGate dijalankan dengan pnpm 12.16.1 di VendorPortal-Vite, THE setiap perintah SHALL selesai dengan exit code 0.
 3. THE jumlah test yang lulus di masing-masing portal SHALL sama dengan hasil sebelum upgrade, dengan 0 gagal.
 4. THE coverage masing-masing portal SHALL tidak di bawah threshold yang berlaku (CP 84/80/80/85, VP 93/84/90/93).
-5. THE `pnpm audit --prod` di kedua portal SHALL melaporkan 0 vulnerability.
+5. THE `pnpm audit --prod` di kedua portal SHALL melaporkan himpunan advisory yang sama dengan baseline pnpm 11.20.0 (paritas, D7): tidak ada advisory baru, tidak ada yang hilang. Baseline 2026-11-03: CP 3 (1 high, 2 moderate: `zod` GHSA-mrhx-c7xc-m3w5, `seroval` GHSA-f86p-h4j2-7qgj + GHSA-9wx9-5pv9-3349), VP 6 (4 high, 2 moderate). Exit code audit tidak dipakai sebagai syarat.
 6. WHEN `pnpm run gen:api` dan `pnpm run gen:api:exq` dijalankan di CompanyPortal-Vite, THE `src/lib/api/schema.d.ts` dan `src/lib/api/exq-schema.d.ts` SHALL tidak berubah.
 
 ### Requirement 5: Setup developer lokal
@@ -152,4 +152,6 @@ Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 
 | D3 | Lockfile: biarkan apa adanya (cukup `--frozen-lockfile` lolos) atau paksa regenerate sekali dengan pnpm 12? | Biarkan apa adanya. Jalankan satu `pnpm install` tanpa frozen untuk cek diff. Bila ada diff format/peer variant, commit di perubahan yang sama supaya churn tidak muncul diam-diam di PR lain. Bila versi resolved berubah, berhenti dan lapor (Req 3.4). | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
 | D4 | `ci.yml` tidak punya job frontend. Tambahkan job frontend (pnpm 12.16.1, lint, test, build) di spec ini? | Tidak di spec ini (YAGNI, satu concern per perubahan). Catat sebagai temuan di `development-plan.md` X.3 dan putuskan terpisah. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
 | D5 | Catat pekerjaan ini sebagai item cross-cutting baru di `development-plan.md` (X.12)? | Ya, X.12 "pnpm 12 upgrade", sesuai scope guard rule 1. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
+| D8 | Task 5.1 (2026-11-03): dengan pin 12.16.1, `pnpm install --frozen-lockfile` exit 0 tapi menambah boot document (+158 baris, 0 dihapus) di awal `pnpm-lock.yaml`: `packageManagerDependencies: pnpm 12.16.1` + 14 `@pnpm/exe.*@12.16.1` dengan hash. Fitur resmi pnpm (https://pnpm.io/lockfile), dokumen proyek tidak berubah. Terima atau matikan (`pmOnFail: ignore`)? | Terima dan commit bersama upgrade: mengunci binary pnpm dengan hash, frozen install gagal bila pin dan Lockfile tidak cocok, dan tanpa commit setiap install mengotori Lockfile. Perbandingan snapshot memakai dokumen terakhir saja. | ✅ DIPUTUSKAN user 2026-11-03 |
+| D7 | Baseline pnpm 11.20.0 (task 2.2/2.3, 2026-11-03): `pnpm audit --prod` sudah merah (CP 3, VP 6 vuln dari dependency aplikasi `zod`, `seroval` via `@tanstack/react-router`). Req 4.5 "0 vulnerability" tidak bisa dipenuhi tanpa upgrade dependency (di luar scope). | Ganti Req 4.5 jadi paritas: himpunan advisory pnpm 12 = baseline. Perbaikan vuln dikerjakan terpisah. | ✅ DIPUTUSKAN user 2026-11-03 |
 | D6 | Developer lain yang memakai pnpm global 10.x atau 11.x di bawah 11.10.0: cukup didokumentasikan, atau perlu pengumuman/checklist khusus? | Cukup dokumentasi (Req 5) plus satu baris di ringkasan commit. Tim kecil dan pin `packageManager` memunculkan error yang jelas. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |

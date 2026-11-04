@@ -71,7 +71,7 @@ Tiga runtime backend berbagi satu database dan satu `JWT_SECRET`. Hanya Go ATM A
 | Styling | Tailwind CSS 4 (`@tailwindcss/vite`), `clsx`, `tailwind-merge` | ^4.0.0 | CP, VP |
 | Ikon | lucide-react | ^0.469.0 | CP, VP |
 | Tipe API | openapi-typescript | 7.13.0 (exact) | CP saja (`pnpm run gen:api`) |
-| Package manager | pnpm | 11.20.0 | CP, VP |
+| Package manager | pnpm | 12.16.1 | CP, VP |
 
 ## A3. Struktur kode
 

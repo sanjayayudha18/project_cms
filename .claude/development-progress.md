@@ -56,6 +56,17 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ---
 
+### pnpm 11.20.0 → 12.16.1 (X.12, 2026-11-03)
+- Upgrade pnpm di CompanyPortal + VendorPortal ke 12.16.1: pin `packageManager` dengan sha512, Dockerfile `npm install -g pnpm@12.16.1` tanpa corepack, pesan `dev.ps1` ikut diperbarui. Tanpa perubahan kode aplikasi.
+- Gate setara baseline: CP 1866 test lulus, coverage 87.25/82.68/83.91/88.26; VP 250 test lulus, coverage 93.53/84.62/91.59/94.41. 0 gagal, threshold tidak turun.
+- Audit paritas (D7): `pnpm audit --prod` sama dengan baseline, bukan perbaikan. CP 3 advisory (`zod`, `seroval`), VP 6 advisory (4 high, 2 moderate). Perbaikan dependency dikerjakan terpisah.
+- Diff Lockfile: hanya boot document pnpm 12 di awal file (`packageManagerDependencies` + `@pnpm/exe.*@12.16.1`), +158/-0 per portal (D8). Dokumen proyek tidak berubah.
+- Docker: build CP dan VP lolos, builder `pnpm --version` = 12.16.1, container `healthy` setelah bugfix HEALTHCHECK.
+- Developer lain: pasang ulang pnpm global dengan `npm install -g pnpm@12.16.1` (D6).
+- Dua bugfix terpisah (HEALTHCHECK `127.0.0.1`, `frontend/dev.ps1` baris 56) dicatat di `.claude/bugfixes.md` (2026-11-03).
+
+---
+
 ## Next Phase
 
 0. **Phase 2.2 split (user 2026-10-08):** 2.2a penetapan branch vault per ATM oleh ACM (`cit-acm-plan/`, next) → 2.2b kirim CIT ke vendor → 2.2c realisasi vs order (`replenishment-realisasi/intent.md`). 2.1 closed (no forecast engine). Also new: 2.4 problem-ATM exclusion. `backend-cit` renamed to `backend-exq` 2026-10-20 (export + dashboard queries; still not deployed, no content yet).

@@ -1,6 +1,6 @@
 # Stage 1: Build
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack install --global pnpm@11.20.0
+RUN npm install -g pnpm@12.16.1
 WORKDIR /app
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile

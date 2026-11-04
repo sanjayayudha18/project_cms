@@ -53,7 +53,7 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 
 # Resolve which portals to act on.
-$selected = if ($Target -eq "all") { @("company", "vendor") } else { @($Target) }
+$selected = @(if ($Target -eq "all") { "company", "vendor" } else { $Target })
 
 # Command to run inside each portal.
 $script = if ($Preview) { "run build; if (`$LASTEXITCODE -eq 0) { pnpm run preview }" } else { "run dev" }

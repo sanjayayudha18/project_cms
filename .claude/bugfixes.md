@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-11-03 — Frontend: `dev.ps1 vendor` menjalankan CompanyPortal (port 5173)
+- **Symptom**: `./dev.ps1 vendor` (dari `frontend/`) menjalankan Vite CompanyPortal di `:5173`, bukan VendorPortal di `:5174`. Judul start kosong (`Starting  - dev server`). `./dev.ps1 company` hanya tampak benar karena script `dev` di `frontend/package.json` default ke CompanyPortal. Ditemukan saat task 8 spec `pnpm-12-upgrade` (Req 5.4). Bugfix terpisah, user memilih jalur bugfix.
+- **Root cause**: `frontend/dev.ps1` baris 56 `$selected = if (...) { @(...) } else { @($Target) }`. Pernyataan `if` PowerShell membuka array satu elemen menjadi string, jadi `$selected` = `"vendor"` (string), `$selected[0]` = `"v"` (karakter pertama), `$portals["v"]` = null. Akibatnya `$portal.Path`/`.Name` kosong, `Push-Location` tidak pindah folder, dan `pnpm run dev` jalan dari `frontend/`. Bukti (HEAD, stub `pnpm`): `DBG selected type=String [0]=[v]` untuk `vendor`, `[0]=[c]` untuk `company`. Caller lain (baris 62–96: `foreach`, `.Count`, `[0]`) hanya butuh array, tidak ada file lain yang memakai variabel ini.
+- **Fix**: `frontend/dev.ps1` baris 56 → `$selected = @(if ($Target -eq "all") { "company", "vendor" } else { $Target })`. Baris lain tidak diubah (termasuk pesan pnpm di baris 52). Patch hanya hunk baris 56: `%TEMP%\devps1-fix.patch`.
+- **Tests**: skrip cek stub (`pnpm` palsu di PATH, salinan script dengan `$root` diperbaiki, tanpa membuka jendela): `company` → `CompanyPortal-Vite (internal)` (cwd `CompanyPortal-Vite`), `vendor` → `VendorPortal-Vite (vendor)` (cwd `VendorPortal-Vite`), `all` → kedua key dengan path benar (dicek sampai pemilihan, tanpa `Start-Process`). Real run: `./dev.ps1 company` → `Local: http://localhost:5173/`, `./dev.ps1 vendor` → `Local: http://localhost:5174/`, tanpa `ERR_PNPM_*`/`ENOEXEC`/`Failed to switch pnpm`; kedua proses dihentikan, port 5173/5174 kosong. Cek browser: tidak relevan (tooling). Tidak ada unit test otomatis untuk script PowerShell ini.
+- **Commit**: <sha>
+
+---
+
 ## 2026-11-03 — Frontend: container CompanyPortal & VendorPortal selalu `unhealthy`
 - **Symptom**: saat task 7 spec `pnpm-12-upgrade`, container CP dan VP berstatus `unhealthy` walau nginx berjalan dan melayani halaman.
 - **Root cause**: `HEALTHCHECK` memakai `wget --spider http://localhost:80/`. Di `nginx:alpine` (tidak di-pin) `localhost` di-resolve ke IPv6 `::1` lebih dulu (`getent hosts localhost` → `::1`), sedangkan `nginx.conf` hanya `listen 80;` (IPv4), jadi koneksi ditolak. Bukan akibat upgrade pnpm (hanya mengubah baris 3, stage builder). Bukti di HEAD: image dibangun dari `git archive HEAD` (pnpm 11.20.0, Lockfile HEAD) → `unhealthy` dalam ±40 dtk; log health: `Connecting to localhost:80 ([::1]:80) / wget: can't connect to remote host: Connection refused`. Di container yang sama `wget --spider http://127.0.0.1:80/` → `remote file exists`; `/etc/hosts` memuat `127.0.0.1 localhost` dan `::1 localhost`.

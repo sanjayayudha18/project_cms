@@ -32,20 +32,20 @@ Route frontend:
 | GET | `/api/v1/dsr/uploads/daily/{fileId}` | _tanpa role guard_ | [`DsrUploadHandler.GetDaily`](../../backend/internal/handler/dsr_upload_handler.go) | [`dsrUploadApi.ts:177`](../../frontend/VendorPortal-Vite/src/features/dsr/dsrUploadApi.ts) |
 | GET | `/api/v1/dsr/uploads/rencana-isi/{fileId}` | _tanpa role guard_ | [`DsrUploadHandler.GetRencanaIsi`](../../backend/internal/handler/dsr_upload_handler.go) | [`dsrUploadApi.ts:182`](../../frontend/VendorPortal-Vite/src/features/dsr/dsrUploadApi.ts) |
 
-Endpoint Python (FastAPI, dipanggil backend Go / proxy, bukan langsung dari browser):
+Endpoint Python (FastAPI). Dipanggil backend Go, atau dari browser lewat proxy Vite/Nginx yang membuang prefix (`/api/eod/*` ke `eod_retry_scheduler`):
 
-| Service | Method | Path | Dependency | File |
-| --- | --- | --- | --- | --- |
-| service_dsr_etl | GET | `/audit` | `require_eod_role` | [`audit.py:15`](../../backend_python/service_dsr_etl/routers/audit.py) |
-| service_dsr_etl | GET | `/health` | - | [`health.py:16`](../../backend_python/service_dsr_etl/routers/health.py) |
-| service_dsr_etl | GET | `/late` | `require_eod_role` | [`late.py:15`](../../backend_python/service_dsr_etl/routers/late.py) |
-| service_dsr_etl | POST | `/process/{file_type}` | `require_auth` | [`process.py:28`](../../backend_python/service_dsr_etl/routers/process.py) |
-| service_dsr_etl | POST | `/process/dsr/dry-run` | `require_auth` | [`process.py:72`](../../backend_python/service_dsr_etl/routers/process.py) |
-| service_dsr_etl | POST | `/process/dsr/commit` | `require_auth` | [`process.py:90`](../../backend_python/service_dsr_etl/routers/process.py) |
-| service_dsr_etl | POST | `/retry/{file_id}` | `require_eod_role` | [`retry.py:12`](../../backend_python/service_dsr_etl/routers/retry.py) |
-| service_dsr_etl | GET | `/status` | `require_eod_role` | [`status.py:19`](../../backend_python/service_dsr_etl/routers/status.py) |
-| service_dsr_etl | GET | `/status/{file_id}/history` | `require_eod_role` | [`status.py:52`](../../backend_python/service_dsr_etl/routers/status.py) |
-| service_dsr_etl | GET | `/summary` | `require_eod_role` | [`summary.py:18`](../../backend_python/service_dsr_etl/routers/summary.py) |
+| Service | Method | Path | Dependency | File | Dipanggil dari frontend |
+| --- | --- | --- | --- | --- | --- |
+| service_dsr_etl | GET | `/audit` | `require_eod_role` | [`audit.py:15`](../../backend_python/service_dsr_etl/routers/audit.py) | - |
+| service_dsr_etl | GET | `/health` | - | [`health.py:16`](../../backend_python/service_dsr_etl/routers/health.py) | - |
+| service_dsr_etl | GET | `/late` | `require_eod_role` | [`late.py:15`](../../backend_python/service_dsr_etl/routers/late.py) | - |
+| service_dsr_etl | POST | `/process/{file_type}` | `require_auth` | [`process.py:28`](../../backend_python/service_dsr_etl/routers/process.py) | - |
+| service_dsr_etl | POST | `/process/dsr/dry-run` | `require_auth` | [`process.py:72`](../../backend_python/service_dsr_etl/routers/process.py) | - |
+| service_dsr_etl | POST | `/process/dsr/commit` | `require_auth` | [`process.py:90`](../../backend_python/service_dsr_etl/routers/process.py) | - |
+| service_dsr_etl | POST | `/retry/{file_id}` | `require_eod_role` | [`retry.py:12`](../../backend_python/service_dsr_etl/routers/retry.py) | - |
+| service_dsr_etl | GET | `/status` | `require_eod_role` | [`status.py:19`](../../backend_python/service_dsr_etl/routers/status.py) | - |
+| service_dsr_etl | GET | `/status/{file_id}/history` | `require_eod_role` | [`status.py:52`](../../backend_python/service_dsr_etl/routers/status.py) | - |
+| service_dsr_etl | GET | `/summary` | `require_eod_role` | [`summary.py:18`](../../backend_python/service_dsr_etl/routers/summary.py) | - |
 
 ## Tabel database
 
@@ -113,25 +113,25 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | File | Dipakai fitur | Memakai fitur | Milik fitur |
 | --- | --- | --- | --- |
 | [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 17 | - | - |
-| [`backend_python/lib/dependencies.py`](../../backend_python/lib/dependencies.py) | 17 | - | - |
-| [`backend_python/lib/services/scheduler_service.py`](../../backend_python/lib/services/scheduler_service.py) | 8 | 2 | - |
-| [`backend_python/lib/database.py`](../../backend_python/lib/database.py) | 8 | - | - |
-| [`backend_python/lib/utils/proxy.py`](../../backend_python/lib/utils/proxy.py) | 6 | - | - |
-| [`backend/internal/handler/atm_portal_handler.go`](../../backend/internal/handler/atm_portal_handler.go) | 3 | - | - |
+| [`backend_python/lib/dependencies.py`](../../backend_python/lib/dependencies.py) | 17 | - | `eod-monitoring` |
+| [`backend_python/lib/services/scheduler_service.py`](../../backend_python/lib/services/scheduler_service.py) | 8 | 2 | `eod-monitoring` |
+| [`backend_python/lib/database.py`](../../backend_python/lib/database.py) | 8 | - | `eod-monitoring` |
+| [`backend_python/lib/utils/proxy.py`](../../backend_python/lib/utils/proxy.py) | 6 | - | `eod-monitoring` |
+| [`backend/internal/handler/atm_portal_handler.go`](../../backend/internal/handler/atm_portal_handler.go) | 3 | - | `atm-portal` |
 | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 2 | - |
-| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 2 | - | - |
-| [`backend_python/lib/utils/timezone.py`](../../backend_python/lib/utils/timezone.py) | 2 | - | - |
-| [`frontend/VendorPortal-Vite/src/routes/_protected.tsx`](../../frontend/VendorPortal-Vite/src/routes/_protected.tsx) | 2 | - | - |
-| [`backend/internal/service/atm_portal.go`](../../backend/internal/service/atm_portal.go) | 1 | - | - |
-| [`backend_python/lib/services/detector.py`](../../backend_python/lib/services/detector.py) | - | 1 | - |
-| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 1 | - | - |
+| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 2 | - | `atm-portal` |
+| [`backend_python/lib/utils/timezone.py`](../../backend_python/lib/utils/timezone.py) | 2 | - | `eod-monitoring` |
+| [`frontend/VendorPortal-Vite/src/routes/_protected.tsx`](../../frontend/VendorPortal-Vite/src/routes/_protected.tsx) | 2 | - | `auth` |
+| [`backend/internal/service/atm_portal.go`](../../backend/internal/service/atm_portal.go) | 1 | - | `atm-portal` |
+| [`backend_python/lib/services/detector.py`](../../backend_python/lib/services/detector.py) | - | 1 | `eod-monitoring` |
+| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 1 | - | `auth` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 
 ## Fitur terkait
 
 - [Master Data Vendor](master-data-vendor.md)
-- `dsr-late-report` (belum dipetakan di features.toml)
+- [Laporan DSR Telat](dsr-late-report.md)
 
 ## Dokumen
 

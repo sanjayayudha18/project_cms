@@ -52,6 +52,9 @@ GO_ROLE_DIRS = ("backend/internal", "backend-exq/internal", "pkg")
 SQLC_QUERY_DIRS = ("backend/queries", "backend-exq/queries")
 MIGRATIONS_DIR = "backend/migrations"
 NAV_FILE = "frontend/CompanyPortal-Vite/src/lib/config/navigation.ts"
+# Frontend path prefixes that Vite/Nginx strip and proxy to a FastAPI service
+# (CompanyPortal vite.config.ts + nginx.conf): (prefix, backend_python service dir).
+PY_PROXIES = (("/api/eod", "eod_retry_scheduler"),)
 
 # Graph relations that mean "file A depends on file B".
 DEP_RELATIONS = {
@@ -189,6 +192,32 @@ def chain_start(text: str, dot: int) -> int:
     return start
 
 
+def split_top(s: str) -> list[str]:
+    """Split on commas at bracket depth 0, skipping string literals."""
+    parts, depth, start, i, n, quote = [], 0, 0, 0, len(s), None
+    while i < n:
+        c = s[i]
+        if quote:
+            if c == "\\" and quote != "`":
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "\"'`":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            parts.append(s[start:i])
+            start = i + 1
+        i += 1
+    if s[start:].strip():
+        parts.append(s[start:])
+    return parts
+
+
 def statement_from(text: str, i: int) -> str:
     """Text from i to the end of the Go statement (newline at bracket depth 0)."""
     depth, j, n = 0, i, len(text)
@@ -307,9 +336,100 @@ def roles_in(fragment: str, role_vars: dict[str, list[str]]) -> list[str]:
         close = match_forward(fragment, m.end() - 1)
         args = fragment[m.end():close]
         roles += STR_RE.findall(args)
-        for v in re.findall(r"([\w.]+)\s*\.\.\.", args):
+        for v in re.findall(r"([\w.]+(?:\[\w+\])?)\s*\.\.\.", args):
             roles += role_vars.get(v.rsplit(".", 1)[-1], [f"?{v}"])
     return roles
+
+
+# ─── Go: route tables iterated with `for ... range` ──────────────────────────
+
+LOOP_RE = re.compile(r"\bfor\s+(\w+)(?:\s*,\s*(\w+))?\s*:?=\s*range\s+(\w+)\s*\{")
+
+
+def range_rows(text: str, var: str) -> list[dict[str, str]]:
+    """String fields of each entry of a package-level route table in the same file.
+
+    `var X = []struct{ path string; ... }{ {"/a", ...}, ... }` -> [{"path": "/a"}, ...]
+    `var X = map[string]T{ "/a": ..., ... }`                   -> [{"": "/a"}, ...] (key)
+    """
+    m = re.search(rf"\bvar\s+{re.escape(var)}\s*=\s*(\[\]struct\s*\{{|map\[string\])", text)
+    if not m:
+        return []
+    fields: list[str] = []
+    i = m.end()
+    if m.group(1).startswith("[]"):
+        close = match_forward(text, i - 1)
+        fields = [ln.split()[0] for ln in re.split(r"[\n;]", text[i:close]) if ln.split()]
+        i = close + 1
+    open_i = text.find("{", i)
+    if open_i < 0:
+        return []
+    rows = []
+    for entry in split_top(text[open_i + 1:match_forward(text, open_i)]):
+        entry = re.sub(r"//[^\n]*", "", entry).strip()
+        if not entry:
+            continue
+        if not fields:  # map: the key is the path
+            key = STR_RE.match(entry)
+            if key:
+                rows.append({"": key.group(1)})
+            continue
+        values = split_top(entry.strip()[1:-1]) if entry.startswith("{") else []
+        row = {}
+        for pos, val in enumerate(values):
+            keyed = re.match(r"\s*(\w+)\s*:\s*(.*)", val, re.S)
+            name, val = (keyed.group(1), keyed.group(2)) if keyed else (fields[pos] if pos < len(fields) else "", val)
+            lit = STR_RE.fullmatch(val.strip())
+            if name and lit:
+                row[name] = lit.group(1)
+        rows.append(row)
+    return rows
+
+
+@dataclass
+class RangeLoop:
+    start: int
+    end: int
+    key_var: str
+    val_var: str
+    rows: list[dict[str, str]]
+
+
+def range_loops(text: str, start: int, end: int) -> list[RangeLoop]:
+    loops = []
+    for m in LOOP_RE.finditer(text, start, end):
+        rows = range_rows(text, m.group(3))
+        if rows:
+            loops.append(RangeLoop(m.end() - 1, match_forward(text, m.end() - 1), m.group(1),
+                                   m.group(2) or "", rows))
+    return loops
+
+
+def loop_paths(expr: str, loop: RangeLoop | None) -> list[str]:
+    """Paths of a chi path argument: a literal, or literal/loop-variable parts joined with `+`."""
+    tokens = [t.strip() for t in expr.split("+")]
+    if len(tokens) == 1 and STR_RE.fullmatch(tokens[0]):
+        return [STR_RE.fullmatch(tokens[0]).group(1)]
+    if not loop:
+        return []
+    out = []
+    for row in loop.rows:
+        path = ""
+        for t in tokens:
+            lit = STR_RE.fullmatch(t)
+            field_ref = re.fullmatch(rf"{re.escape(loop.val_var)}\.(\w+)", t) if loop.val_var else None
+            if lit:
+                path += lit.group(1)
+            elif t == loop.key_var and "" in row:
+                path += row[""]
+            elif field_ref and field_ref.group(1) in row:
+                path += row[field_ref.group(1)]
+            else:
+                path = ""
+                break
+        if path:
+            out.append(path)
+    return out
 
 
 # ─── Go: chi routes ──────────────────────────────────────────────────────────
@@ -374,8 +494,20 @@ class GoModule:
             return recv[1]
         return self.var_type(b.group(1), text)
 
+    def closure_roles(self, chain: str, text: str) -> list[str]:
+        """Roles of local middleware closures called in a chain: `guard := func(...) {...RequireRoles...}`."""
+        roles: list[str] = []
+        for name in dedupe(re.findall(r"\b(\w+)\(", chain)):
+            d = re.search(rf"\b{re.escape(name)}\s*:=\s*func\s*\(", text)
+            if not d:
+                continue
+            body_open = text.find("{", match_forward(text, d.end() - 1))
+            if body_open >= 0:
+                roles += roles_in(text[body_open:match_forward(text, body_open)], self.role_vars)
+        return roles
+
     def chain_roles(self, chain: str, text: str, depth: int = 0) -> list[str]:
-        roles = roles_in(chain, self.role_vars)
+        roles = roles_in(chain, self.role_vars) + self.closure_roles(chain, text)
         base = re.match(r"\s*(\w+)", chain)
         if base and base.group(1) != "r" and depth < 4:
             d = re.search(rf"\b{re.escape(base.group(1))}\s*:?=\s*", text)
@@ -400,6 +532,7 @@ class GoModule:
             return
         pos = start
         use_roles: list[str] = []
+        loops = range_loops(text, start, end)
         for m in CHI_CALL_RE.finditer(text, start, end):
             if m.start() < pos:
                 continue
@@ -427,17 +560,20 @@ class GoModule:
                 self.parse_block(text, file, body_open + 1, match_forward(text, body_open), sub, here,
                                  recv, depth + 1)
                 continue
-            if not path or not path.startswith("/"):
+            parts = split_top(args)
+            loop = next((lp for lp in reversed(loops) if lp.start < m.start() < lp.end), None)
+            paths = [p for p in loop_paths(parts[0].strip(), loop) if p.startswith("/")] if parts else []
+            if not paths:
                 continue
-            rest = a[lit.end():].lstrip().removeprefix(",").strip()
-            full = join_path(prefix, path)
+            rest = ",".join(parts[1:]).strip()
             if kind == "Mount":
                 typ = self.expr_type(rest, text, recv)
                 if typ:
-                    self.parse_routes(typ, full, here, depth + 1)
+                    for p in paths:
+                        self.parse_routes(typ, join_path(prefix, p), here, depth + 1)
                 continue
             handler, files = "", {file}
-            hm = re.fullmatch(r"(\w+)\.(\w+)", rest)
+            hm = re.fullmatch(r"(\w+)\.(\w+)(?:\(.*\))?", rest, re.S)  # h.List or h.requestMaster(...)
             if hm:
                 typ = recv[1] if recv and hm.group(1) == recv[0] else self.var_type(hm.group(1), text)
                 if typ:
@@ -445,7 +581,9 @@ class GoModule:
                     mf = self.method_file.get((typ, hm.group(2)))
                     if mf:
                         files.add(mf)
-            self.endpoints.append(Endpoint(self.name, kind.upper(), full, dedupe(here), handler, files))
+            for p in paths:
+                self.endpoints.append(Endpoint(self.name, kind.upper(), join_path(prefix, p), dedupe(here),
+                                               handler, files))
 
 
 # ─── Python: FastAPI routes ──────────────────────────────────────────────────
@@ -459,6 +597,10 @@ class PyEndpoint:
     deps: list[str]
     file: str
     line: int
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return self.method, norm_path(self.path)
 
 
 def py_endpoints(rel: str) -> list[PyEndpoint]:
@@ -539,6 +681,8 @@ def fe_path(parts, consts: dict[str, str], fns: dict[str, str]) -> tuple[str, bo
             return f"${{{expr}}}", False  # path held in a local variable
         elif out.endswith("/"):
             out += "{p}"
+        elif "?" not in out and re.fullmatch(r"\w+", expr) and not re.search(r"(?i)qs|query|param|search", expr):
+            return f"{out}${{{expr}}}", False  # path tail held in a variable: /exports/preview${path}
         else:
             out += "?"  # query suffix such as ${qs ? `?${qs}` : ""}
     out = re.sub(r"\$\{[^}]*\}", "{p}", out).split("?", 1)[0]
@@ -858,11 +1002,17 @@ class Renderer:
         else:
             L += ["_Tidak ada endpoint Go yang terdeteksi untuk file fitur ini._", ""]
         if ctx["py_endpoints"]:
-            L += ["Endpoint Python (FastAPI, dipanggil backend Go / proxy, bukan langsung dari browser):", "",
-                  "| Service | Method | Path | Dependency | File |", "| --- | --- | --- | --- | --- |"]
+            proxies = ", ".join(f"`{p}/*` ke `{s}`" for p, s in PY_PROXIES)
+            L += ["Endpoint Python (FastAPI). Dipanggil backend Go, atau dari browser lewat proxy "
+                  f"Vite/Nginx yang membuang prefix ({proxies}):", "",
+                  "| Service | Method | Path | Dependency | File | Dipanggil dari frontend |",
+                  "| --- | --- | --- | --- | --- | --- |"]
             for p in ctx["py_endpoints"]:
                 deps = ", ".join(f"`{d}`" for d in p.deps) or "-"
-                L.append(f"| {p.service} | {p.method} | `{cell(p.path)}` | {deps} | {self.file_line(p.file, p.line)} |")
+                callers = ctx["py_callers"].get((p.file, p.line), [])
+                caller_txt = "<br>".join(dedupe(self.file_line(c.file, c.line) for c in callers)) or "-"
+                L.append(f"| {p.service} | {p.method} | `{cell(p.path)}` | {deps} | "
+                         f"{self.file_line(p.file, p.line)} | {caller_txt} |")
             L.append("")
         if ctx["unmatched"]:
             L += ["Panggilan API frontend yang tidak cocok dengan endpoint Go mana pun "
@@ -938,8 +1088,11 @@ class Renderer:
               "| --- | --- | --- | --- | --- | --- | --- |"]
         for f in features:
             c = contexts[f.id]
+            eps = str(len(c["endpoints"]))
+            if c["py_endpoints"]:
+                eps += f" + {len(c['py_endpoints'])} Python"
             L.append(f"| [{cell(f.label)}]({f.id}.md) | {STATUS_LABEL[f.status]} | {', '.join(f.portal) or '-'} | "
-                     f"{cell(f.dev_plan) or '-'} | {len(f.files)} | {len(c['endpoints'])} | {len(c['tables'])} |")
+                     f"{cell(f.dev_plan) or '-'} | {len(f.files)} | {eps} | {len(c['tables'])} |")
         warn_count = sum(len(f.warnings) + len(contexts[f.id]["warnings"]) for f in features)
         if warn_count:
             L += ["", f"Ada {warn_count} peringatan di halaman fitur (bagian **Peringatan**)."]
@@ -972,17 +1125,47 @@ class RouteMatcher:
         )
 
 
-def build_context(feat, all_endpoints, matcher, known, sqlc, nav, graph, excludes, by_id, owners):
+@dataclass
+class PyProxy:
+    prefix: str
+    endpoints: list[PyEndpoint]
+    matcher: RouteMatcher
+
+    def match(self, call: FeCall) -> list[PyEndpoint]:
+        if not call.resolved or not call.path.startswith(self.prefix + "/"):
+            return []
+        stripped = FeCall(call.method, call.path[len(self.prefix):], True, call.file, call.line)
+        keys = set(self.matcher.match(stripped))
+        return [p for p in self.endpoints if p.key in keys]
+
+
+def load_py_proxies() -> list[PyProxy]:
+    out = []
+    for prefix, service in PY_PROXIES:
+        eps = [p for f in files_under(f"backend_python/{service}", ".py") for p in py_endpoints(f)]
+        out.append(PyProxy(prefix, eps, RouteMatcher(eps)))
+    return out
+
+
+def build_context(feat, all_endpoints, matcher, py_proxies, known, sqlc, nav, graph, excludes, by_id, owners):
     warnings: list[str] = []
     calls = [c for f in sorted(feat.files) if f.endswith((".ts", ".tsx")) and f.startswith("frontend/")
              for c in fe_calls(f)]
     callers: dict[tuple[str, str], list[FeCall]] = defaultdict(list)
+    py_callers: dict[tuple[str, int], list[FeCall]] = defaultdict(list)  # (file, line) of the route
+    py_hits: list[PyEndpoint] = []
     unmatched = []
     for c in calls:
         keys = matcher.match(c)
         for k in keys:
             callers[k].append(c)
-        if not keys:
+        if keys:
+            continue
+        hits = [p for proxy in py_proxies for p in proxy.match(c)]
+        for p in hits:
+            py_callers[(p.file, p.line)].append(c)
+        py_hits += hits
+        if not hits:
             unmatched.append(c)
 
     eps = [e for e in all_endpoints if e.files & feat.files or e.key in callers]
@@ -994,6 +1177,8 @@ def build_context(feat, all_endpoints, matcher, known, sqlc, nav, graph, exclude
 
     py_eps = [p for f in sorted(feat.files) if f.startswith("backend_python/") and f.endswith(".py")
               for p in py_endpoints(f)]
+    py_eps = list({(p.file, p.line): p for p in py_eps + py_hits}.values())
+    py_eps.sort(key=lambda p: (p.service, p.file, p.line))
 
     missing_mock = feat.mock_files - feat.files
     for m in sorted(missing_mock):
@@ -1006,6 +1191,7 @@ def build_context(feat, all_endpoints, matcher, known, sqlc, nav, graph, exclude
         "routes": routes,
         "nav": nav_items,
         "py_endpoints": py_eps,
+        "py_callers": py_callers,
         "tables": feature_tables(feat, known, sqlc),
         "related": related_files(feat, graph, excludes) if graph else None,
         "by_id": by_id,
@@ -1062,7 +1248,9 @@ def main() -> int:
         for path in f.files:
             owners[path].append(f.id)
 
-    contexts = {f.id: build_context(f, endpoints, matcher, known, sqlc, nav, graph, excludes, by_id, owners)
+    py_proxies = load_py_proxies()
+    contexts = {f.id: build_context(f, endpoints, matcher, py_proxies, known, sqlc, nav, graph, excludes,
+                                    by_id, owners)
                 for f in features}
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1070,9 +1258,10 @@ def main() -> int:
     written = {"index.md"}
     (out_dir / "index.md").write_text(
         renderer.index(features, contexts, {"head": head, "graph_commit": graph.commit if graph else "",
-                                            "graph_note": graph_note}), encoding="utf-8")
+                                            "graph_note": graph_note}), encoding="utf-8", newline="\n")
     for f in features:
-        (out_dir / f"{f.id}.md").write_text(renderer.feature(f, contexts[f.id]), encoding="utf-8")
+        # LF on every OS so regenerating on Windows does not show CRLF-only diffs.
+        (out_dir / f"{f.id}.md").write_text(renderer.feature(f, contexts[f.id]), encoding="utf-8", newline="\n")
         written.add(f"{f.id}.md")
     # Drop pages of features removed from features.toml (only files this script generated).
     for stale in out_dir.glob("*.md"):

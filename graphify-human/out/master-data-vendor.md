@@ -252,31 +252,31 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 147 | - | - |
 | [`backend/internal/db/db.go`](../../backend/internal/db/db.go) | 60 | - | - |
 | [`backend/internal/db/models.go`](../../backend/internal/db/models.go) | 59 | - | - |
-| [`backend/internal/handler/admin_approval_handler.go`](../../backend/internal/handler/admin_approval_handler.go) | 42 | - | - |
+| [`backend/internal/handler/admin_approval_handler.go`](../../backend/internal/handler/admin_approval_handler.go) | 42 | - | `approval` |
 | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 38 | - |
-| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 29 | - | - |
-| [`backend/internal/handler/auth_handler.go`](../../backend/internal/handler/auth_handler.go) | 25 | - | - |
-| [`backend/internal/handler/admin_user_handler.go`](../../backend/internal/handler/admin_user_handler.go) | 21 | - | - |
-| [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 15 | - | - |
+| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 29 | - | `auth` |
+| [`backend/internal/handler/auth_handler.go`](../../backend/internal/handler/auth_handler.go) | 25 | - | `auth` |
+| [`backend/internal/handler/admin_user_handler.go`](../../backend/internal/handler/admin_user_handler.go) | 21 | - | `admin-users` |
+| [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 15 | - | `auth` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 10 | - |
-| [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx) | - | 9 | - |
+| [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx) | - | 9 | `master-data-atm` |
 | [`backend/internal/handler/unexpected_error.go`](../../backend/internal/handler/unexpected_error.go) | 8 | - | - |
-| [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx) | - | 6 | - |
-| [`backend/internal/service/atm_admin.go`](../../backend/internal/service/atm_admin.go) | 4 | 1 | - |
+| [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx) | - | 6 | `master-data-atm` |
+| [`backend/internal/service/atm_admin.go`](../../backend/internal/service/atm_admin.go) | 4 | 1 | `master-data-atm` |
 | [`backend/internal/service/vendor_request.go`](../../backend/internal/service/vendor_request.go) | 5 | - | `vendor-request` |
-| [`backend/internal/handler/admin_atm_handler.go`](../../backend/internal/handler/admin_atm_handler.go) | - | 4 | - |
-| [`backend/internal/notification/notification.go`](../../backend/internal/notification/notification.go) | 4 | - | - |
-| [`backend/internal/handler/admin_atm_assignment_handler.go`](../../backend/internal/handler/admin_atm_assignment_handler.go) | - | 3 | - |
-| [`backend/internal/handler/approval_handler.go`](../../backend/internal/handler/approval_handler.go) | 1 | 2 | - |
-| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 3 | - | - |
+| [`backend/internal/handler/admin_atm_handler.go`](../../backend/internal/handler/admin_atm_handler.go) | - | 4 | `master-data-atm` |
+| [`backend/internal/notification/notification.go`](../../backend/internal/notification/notification.go) | 4 | - | `notification` |
+| [`backend/internal/handler/admin_atm_assignment_handler.go`](../../backend/internal/handler/admin_atm_assignment_handler.go) | - | 3 | `master-data-atm` |
+| [`backend/internal/handler/approval_handler.go`](../../backend/internal/handler/approval_handler.go) | 1 | 2 | `approval` |
+| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 3 | - | `atm-portal` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 
 ## Fitur terkait
 
-- `master-data-atm` (belum dipetakan di features.toml)
-- `master-data-region` (belum dipetakan di features.toml)
-- `approval` (belum dipetakan di features.toml)
+- [Master Data ATM](master-data-atm.md)
+- [Master Data Region](master-data-region.md)
+- [Approval (maker-checker) dan Pengaturan RBAC](approval.md)
 
 ## Dokumen
 

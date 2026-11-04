@@ -56,6 +56,12 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ---
 
+### graphify-human feature map (X.11, 2026-11-04)
+- `graphify-human/features.toml` diperluas dari pilot 3 fitur ke 26 fitur (semua baris "Built and wired" di development-plan, layar mock, cash count). `py graphify-human/generate.py` menulis `graphify-human/out/index.md` + satu halaman per fitur (peran, endpoint Go/Python + pemanggil frontend, tabel baca/tulis, file inti, file terkait dari graph, dokumen).
+- Perbaikan generator dari review pilot: route chi yang didaftarkan lewat `for ... range` atas tabel path (export `backend-exq`: 11 endpoint yang sebelumnya hilang atau salah path), role guard lewat closure lokal (`guard(kind)` tampil sebagai `exportjob.KindRoles[k]` tidak terbaca, bukan "tanpa role guard"), panggilan `/api/eod/*` dicocokkan ke endpoint `eod_retry_scheduler` lewat proxy, path frontend `.../preview${path}` ditandai dinamis, output selalu LF, kolom Endpoint di index menghitung endpoint Python.
+- Exclude baru: sqlc `backend-exq/internal/repository/*.sql.go`, `db.go`, `models.go`, dan `*schema.d.ts`.
+- Batasan yang diketahui: role per jenis export (`exportjob.KindRoles`) tidak dibaca; panggilan frontend dengan path di variabel (`${path}`, `${url}`) tidak dicocokkan; RequireAuth tanpa RequireRoles tampil sebagai "tanpa role guard".
+
 ### Backend-exq deploy readiness (X.13, 2026-11-04)
 - Spec `.kiro/specs/backend-exq-deploy-readiness/`: siapkan `backend-exq` untuk deploy pertama. Selesai, committed `cf53038`: job CI `go-image` di `.github/workflows/ci.yml` membangun image `backend` dan `backend-exq`, lalu memeriksa non-root dan HEALTHCHECK lewat `scripts/ci/check-image.sh`; `.claude/docs/deployment.md` mendapat bagian "Release checklist: first `backend-exq` deployment" dan pernyataan usang tentang `backend-exq` diperbaiki.
 - `.kiro/steering/development-plan.md`: gap "`backend-exq` image still runs as root without HEALTHCHECK" dihapus (sudah tertutup sejak `540ee96`); baris X.3 dan X.7 diperbarui; baris X.13 ditambahkan.

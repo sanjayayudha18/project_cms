@@ -21,5 +21,5 @@ COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 USER appuser
 EXPOSE 80
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]

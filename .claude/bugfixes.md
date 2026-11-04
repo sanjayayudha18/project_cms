@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-11-03 — Frontend: container CompanyPortal & VendorPortal selalu `unhealthy`
+- **Symptom**: saat task 7 spec `pnpm-12-upgrade`, container CP dan VP berstatus `unhealthy` walau nginx berjalan dan melayani halaman.
+- **Root cause**: `HEALTHCHECK` memakai `wget --spider http://localhost:80/`. Di `nginx:alpine` (tidak di-pin) `localhost` di-resolve ke IPv6 `::1` lebih dulu (`getent hosts localhost` → `::1`), sedangkan `nginx.conf` hanya `listen 80;` (IPv4), jadi koneksi ditolak. Bukan akibat upgrade pnpm (hanya mengubah baris 3, stage builder). Bukti di HEAD: image dibangun dari `git archive HEAD` (pnpm 11.20.0, Lockfile HEAD) → `unhealthy` dalam ±40 dtk; log health: `Connecting to localhost:80 ([::1]:80) / wget: can't connect to remote host: Connection refused`. Di container yang sama `wget --spider http://127.0.0.1:80/` → `remote file exists`; `/etc/hosts` memuat `127.0.0.1 localhost` dan `::1 localhost`.
+- **Fix**: `frontend/CompanyPortal-Vite/Dockerfile` dan `frontend/VendorPortal-Vite/Dockerfile`, hanya baris HEALTHCHECK: `localhost` → `127.0.0.1`. Probe yang sama di `frontend/docker-compose.yml` (baris 15, 34) dan `frontend/VendorPortal-Vite/docker-compose.yml` (baris 8) juga diganti ke `127.0.0.1` (`healthcheck` compose menimpa HEALTHCHECK Dockerfile). `docs/deployment.md` tidak punya probe nginx. Compose belum dijalankan; hanya image Dockerfile yang diverifikasi.
+- **Tests**: tidak ada unit test yang relevan; bukti = Docker HEALTHCHECK. Image `userportal-vite-fe:pnpm12` dan `vendorportal-vite-fe:pnpm12` dibangun ulang, dijalankan tanpa port publish: keduanya `healthy` (cek ke-2, ±20 dtk); builder CP `pnpm --version` = 12.16.1; container dihapus. Cek browser: tidak relevan.
+- **Commit**: <sha>
+
+---
+
 ## 2026-11-03 — Backend: approve/reject approval bisa berhenti setengah jalan
 - **Symptom**: bila proses mati atau audit gagal di tengah `Approve`/`Reject`, step sudah berubah sementara request masih `pending`, atau keputusan tersimpan tanpa audit. Approver yang sama tidak bisa mengulang (`ErrNotAuthorized`/`ErrRequestNotPending`). Ditemukan dari tinjauan kode setelah perbaikan `SubmitForApproval`. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
 - **Root cause**: `approval.Orchestrator.Approve` dan `Reject` menulis step, request, dan audit lewat pool secara terpisah. Berlaku untuk semua `document_type`.

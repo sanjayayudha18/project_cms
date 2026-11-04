@@ -25,7 +25,7 @@ export const PRIORITY_CLASS_VALUES = ["VIP", "Non VIP", "Industri"] as const;
 
 export const atmFormSchema = z.object({
   terminal_id: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
-  location_id: z.number({ invalid_type_error: "Wajib dipilih" }).int().positive("Wajib dipilih"),
+  location_id: z.number({ error: "Wajib dipilih" }).int().positive("Wajib dipilih"),
   machine_type: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
   brand: z.string().min(1, "Wajib diisi").max(50, "Maksimal 50 karakter"),
   model: z.string().min(1, "Wajib diisi").max(100, "Maksimal 100 karakter"),

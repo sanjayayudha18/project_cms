@@ -15,6 +15,16 @@ Template:
 
 ---
 
+## 2026-11-04 — Frontend: `pnpm audit --prod` merah (zod, seroval) di kedua portal
+- **Symptom**: `pnpm audit --prod` melaporkan 3 advisory di CompanyPortal (`zod` <4.6.6 GHSA-mrhx-c7xc-m3w5; `seroval` GHSA-f86p-h4j2-7qgj + GHSA-9wx9-5pv9-3349) dan 6 di VendorPortal (zod + 5 seroval). Sudah merah sebelum upgrade pnpm 12 (spec `pnpm-12-upgrade`, D7). User memilih jalur bugfix.
+- **Root cause**: `zod` ^3.24 (patch hanya ada di 4.6.6+). `seroval` ikut `@tanstack/router-core` (range `^1.6.7`); lockfile CP masih mengunci 1.6.9, lockfile VP memakai router lama (1.170.32).
+- **Fix**: kedua portal `zod` ^3.24.0 → ^4.6.7 dan `@tanstack/react-router` → ^1.170.46 (`router-core` 1.171.39, `seroval`/`seroval-plugins` 1.7.7 lewat lockfile, tanpa `pnpm.overrides`). Migrasi zod 4 di CP: `invalid_type_error:` → `error:` (`vendorRequestCreateForm.ts`, `atmFormSchema.ts`); form dengan `z.coerce` (`RbacDelegationsPage`, `RbacLeavesPage`, `RbacPoliciesPage`) memakai `useForm<z.input, unknown, z.output>` (tipe `*FormInput` baru di `rbac-settings/types.ts`). VP tidak perlu perubahan kode. Lockfile CP juga menggeser `supports-color` 7→10 (churn transitif dari resolusi ulang); lockfile VP mengecil karena router/seroval ter-dedupe.
+- **Tests**: `pnpm audit --prod` = 0 vulnerability di kedua portal. CP: lint, 1866 test, coverage 87.22/82.55/83.91/88.22 (≥ 84/80/80/85), `build` + `check-bundle` (199.2 KB gzip, budget 300), `gen:api` tanpa diff. VP: lint, 250 test, coverage 93.53/84.62/91.59/94.41 (≥ 93/84/90/93), build. Cek browser (form RBAC delegasi/cuti/policy, form Vendor Request, form ATM, routing kedua portal): **outstanding** (Golden Rule #10).
+- **Commit**: belum
+
+---
+
+
 ## 2026-11-03 — Frontend: `dev.ps1 vendor` menjalankan CompanyPortal (port 5173)
 - **Symptom**: `./dev.ps1 vendor` (dari `frontend/`) menjalankan Vite CompanyPortal di `:5173`, bukan VendorPortal di `:5174`. Judul start kosong (`Starting  - dev server`). `./dev.ps1 company` hanya tampak benar karena script `dev` di `frontend/package.json` default ke CompanyPortal. Ditemukan saat task 8 spec `pnpm-12-upgrade` (Req 5.4). Bugfix terpisah, user memilih jalur bugfix.
 - **Root cause**: `frontend/dev.ps1` baris 56 `$selected = if (...) { @(...) } else { @($Target) }`. Pernyataan `if` PowerShell membuka array satu elemen menjadi string, jadi `$selected` = `"vendor"` (string), `$selected[0]` = `"v"` (karakter pertama), `$portals["v"]` = null. Akibatnya `$portal.Path`/`.Name` kosong, `Push-Location` tidak pindah folder, dan `pnpm run dev` jalan dari `frontend/`. Bukti (HEAD, stub `pnpm`): `DBG selected type=String [0]=[v]` untuk `vendor`, `[0]=[c]` untuk `company`. Caller lain (baris 62–96: `foreach`, `.Count`, `[0]`) hanya butuh array, tidak ada file lain yang memakai variabel ini.

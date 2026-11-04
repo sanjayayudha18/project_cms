@@ -10,7 +10,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useCreateDelegation, useDelegations, useRevokeDelegation } from "../hooks/useRbacQueries";
-import { type DelegationFormValues, type RbacDelegation, delegationSchema } from "../types";
+import {
+  type DelegationFormInput,
+  type DelegationFormValues,
+  type RbacDelegation,
+  delegationSchema,
+} from "../types";
 import { FormField, rbacInputClass } from "./FormField";
 import { StatusMessage } from "./StatusMessage";
 import { rbacRowClass, rbacTdClass, rbacThClass, rbacTheadRowClass } from "./tableStyles";
@@ -87,7 +92,7 @@ function CreateDelegationForm() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<DelegationFormValues>({
+  } = useForm<DelegationFormInput, unknown, DelegationFormValues>({
     resolver: zodResolver(delegationSchema),
   });
 

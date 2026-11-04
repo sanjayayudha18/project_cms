@@ -12,7 +12,12 @@ import { AlertTriangle, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useCreatePolicy, usePolicies, useUpdatePolicy } from "../hooks/useRbacQueries";
-import { type PolicyFormValues, type RbacPolicy, policySchema } from "../types";
+import {
+  type PolicyFormInput,
+  type PolicyFormValues,
+  type RbacPolicy,
+  policySchema,
+} from "../types";
 import { FormField, rbacInputClass } from "./FormField";
 import { StatusMessage } from "./StatusMessage";
 import { rbacRowClass, rbacTdClass, rbacThClass, rbacTheadRowClass } from "./tableStyles";
@@ -114,8 +119,10 @@ function PolicyFormFields({
   errors,
 }: {
   idPrefix: string;
-  register: ReturnType<typeof useForm<PolicyFormValues>>["register"];
-  errors: ReturnType<typeof useForm<PolicyFormValues>>["formState"]["errors"];
+  register: ReturnType<typeof useForm<PolicyFormInput, unknown, PolicyFormValues>>["register"];
+  errors: ReturnType<
+    typeof useForm<PolicyFormInput, unknown, PolicyFormValues>
+  >["formState"]["errors"];
 }) {
   return (
     <div className="flex flex-wrap gap-3">
@@ -190,7 +197,7 @@ function CreatePolicyForm() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<PolicyFormValues>({
+  } = useForm<PolicyFormInput, unknown, PolicyFormValues>({
     resolver: zodResolver(policySchema),
   });
 
@@ -230,7 +237,7 @@ function PolicyEditRow({ policy, onDone }: { policy: RbacPolicy; onDone: () => v
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<PolicyFormValues>({
+  } = useForm<PolicyFormInput, unknown, PolicyFormValues>({
     resolver: zodResolver(policySchema),
     defaultValues: {
       document_type: policy.document_type,

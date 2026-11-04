@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useCreateLeave, useLeaves } from "../hooks/useRbacQueries";
-import { type LeaveFormValues, type RbacLeave, leaveSchema } from "../types";
+import { type LeaveFormInput, type LeaveFormValues, type RbacLeave, leaveSchema } from "../types";
 import { FormField, rbacInputClass } from "./FormField";
 import { StatusMessage } from "./StatusMessage";
 import { rbacRowClass, rbacTdClass, rbacThClass, rbacTheadRowClass } from "./tableStyles";
@@ -80,7 +80,7 @@ function CreateLeaveForm() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<LeaveFormValues>({
+  } = useForm<LeaveFormInput, unknown, LeaveFormValues>({
     resolver: zodResolver(leaveSchema),
   });
 

@@ -1,0 +1,14 @@
+services:
+  userportal-vite:
+    build: .
+    image: userportal-vite-fe
+    container_name: userportal-vite
+    ports:
+      - "${USERPORTAL_PORT:-3000}:80"
+
+  vendorportal-vite:
+    build: ./VendorPortal-Vite
+    image: vendorportal-vite-fe
+    container_name: vendorportal-vite
+    ports:
+      - "${VENDORPORTAL_PORT:-3001}:80"

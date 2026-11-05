@@ -248,8 +248,13 @@ Lapisan pengaman di setiap request: request ID, IP client tepercaya, log terstru
 ```mermaid
 flowchart LR
   U[Pengguna internal<br/>dan vendor] --> DNS[Cloud DNS] --> ARMOR[Cloud Armor WAF]
-  ARMOR --> VMFE[Compute Engine<br/>Frontend Nginx]
-  VMFE --> VMBE[Compute Engine<br/>Backend Go + Python]
+  ARMOR --> LB[Cloud Load Balancer]
+  subgraph VM[Satu Compute Engine VM]
+    VMFE[Frontend Nginx]
+    VMBE[Backend Go + Python]
+  end
+  LB --> VMFE
+  LB --> VMBE
   VMBE --> SQLP[(CloudSQL primary)]
   VMBE --> SQLR[(CloudSQL replica)]
   VMBE --> MEM[(Memorystore Redis)]
@@ -260,7 +265,7 @@ flowchart LR
   VMBE -.-> LOG[Cloud Logging<br/>+ Monitoring]
 ```
 
-Saat ini satu VM menjalankan backend. Pemisahan menjadi satu VM per backend direncanakan tahun 2028. Struktur modul Go sudah terpisah, jadi pemisahan itu tidak butuh perubahan kode.
+Target: satu VM Compute Engine menjalankan frontend dan backend; trafik FE dan BE dipisah oleh Load Balancer GCP (keputusan 2026-11-05, detail LB belum dirancang). Rencana pemisahan satu VM per backend tahun 2028 dibatalkan. Fase development saat ini berjalan di PC lokal.
 
 ---
 

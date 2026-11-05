@@ -5,8 +5,8 @@
 
 | # | Product | Role |
 | ---| ---| --- |
-| 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend, ONE VM runs `backend` (8080); `backend-exq` (8081, async export API + worker + janitor) joins the same VM with the export release (X.7–X.9) — see split-VM plan below |
+| 1 | Compute Engine | ONE VM for everything: both frontends (Nginx) + `backend` (8080) + `backend-exq` (8081, from the export release X.7–X.9) + Python EOD |
+| 2 | Cloud Load Balancing | In front of the VM; separates FE and BE traffic (routing detail not designed yet) |
 | 3 | CloudSQL Postgres | Primary (write) |
 | 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
@@ -19,14 +19,13 @@
 | 12 | Cloud Logging | Structured logs |
 | 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
 
-**Current state (now): ONE Compute Engine VM runs `backend` only** (Docker container on 8080) — see `backend/docker-compose.yaml` (Sec 9). `backend-exq` (8081) holds the async export API, worker and janitor (`.kiro/specs/vendor-data-export/`, `report-export-migration/`, `export-menu-revamp/`). Not deployed yet; its first deployment ships with the export release, see "Release checklist: first `backend-exq` deployment". Both backends run as separate containers on the one VM until the 2028 split. The module stays in `go.work` and CI keeps building/testing it.
+**Target topology (decided 2026-11-05, user): ONE Compute Engine VM runs FE and BE**, each as its own Docker container (CompanyPortal + VendorPortal Nginx, `backend` 8080, `backend-exq` 8081, Python EOD). A **GCP Load Balancer** in front of the VM separates FE and BE traffic. The full LB setup (host/path rules, backend services + health checks on `/health`, firewall for the LB ranges, Cloud Armor, `TRUSTED_PROXIES` values) is **not designed yet**; write it here when it is. The earlier plan to split into one VM per backend in 2028 is **dropped**.
+*   Both backends share the **same** CloudSQL primary/replica (#3/#4), the **same** Memorystore Redis (#6, JWT blacklist + rate-limit counters) and the **same** `JWT_SECRET` (#9); `backend` is the only token issuer, `backend-exq` only validates.
+*   `backend-exq` (8081) holds the async export API, worker and janitor (`.kiro/specs/vendor-data-export/`, `report-export-migration/`, `export-menu-revamp/`); its first deployment ships with the export release, see "Release checklist: first `backend-exq` deployment".
 
-**Planned (2028): split into two separate Compute Engine VMs**, one per backend (once `backend-exq` is deployed). This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so deploying the second backend to its own VM later requires **no code change** — just deploy its image to a new VM and repoint its `.env`. When that split happens:
-*   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
-*   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
-*   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
+**Current state (development phase)**: no GCP environment yet; everything runs on the developer's local PC (Sec 2a commands, `backend/docker-compose.yaml`, `frontend/docker-compose.yml`, external Postgres).
 
-**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, run with `-p 1` (packages share one DB), sqlc drift, Python unittest, `python-image` and `go-image` (builds `backend/Dockerfile` and `backend-exq/Dockerfile` from the repo root and fails on a root user or a missing HEALTHCHECK, `scripts/ci/check-image.sh`; build only, no push). There is no frontend or E2E job yet (open item, fe-tech-debt)). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-exq/Dockerfile`, frontend images) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM today, both backends from the export release; one VM per backend from 2028). No `cloudbuild.yaml` is in the repo yet; it is set up with the GCP project (infra, user).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, run with `-p 1` (packages share one DB), sqlc drift, Python unittest, `python-image` and `go-image` (builds `backend/Dockerfile` and `backend-exq/Dockerfile` from the repo root and fails on a root user or a missing HEALTHCHECK, `scripts/ci/check-image.sh`; build only, no push). There is no frontend or E2E job yet (open item, fe-tech-debt)). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-exq/Dockerfile`, frontend images) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to the one Compute Engine VM (FE + BE behind the Load Balancer). No `cloudbuild.yaml` is in the repo yet; it is set up with the GCP project (infra, user).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
@@ -98,7 +97,7 @@ CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data
 *   Production value = the address the backend sees Nginx connect from (Docker network gateway on the VM; check `docker network inspect` or the `RemoteAddr` in the request log), as narrow as possible (`/32`). The start log prints `trusted proxies configured count=N` — `0` behind Nginx is wrong.
 *   **If left empty in prod**, every user is recorded with Nginx's IP and the per-IP login limit (`RATE_LIMIT_IP`, default 20 / 15 min) is shared by everyone → mass login lockout. An invalid entry stops the service at start.
 *   Close port 8080 from outside the VM (firewall / don't publish it) so every request goes through Nginx (defense in depth; the narrow CIDR already stops spoofing from direct callers).
-*   When a GCP Load Balancer / Cloud Armor (#11) is added in front of Nginx: append the LB address ranges to `TRUSTED_PROXIES`; no code change.
+*   The target has a GCP Load Balancer (#2) / Cloud Armor (#11) in front of the VM: append the LB address ranges to `TRUSTED_PROXIES` (exact values come with the LB design); no code change.
 *   `backend-exq` uses it the same way (`TrustedRealIP` in `backend-exq/cmd/api/main.go`): the IP in the export audit rows (`export_requested`, `master_data_exported`, `report_exported`) comes from it. Nginx reaches `backend-exq` over `cms-net`, not through `host.docker.internal`, so its value differs from `backend`'s (see the release checklist). `backend-exq` does not print the `trusted proxies configured` start line. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
 
 **Ukuran pool DB (BE-09, be-tech-debt E4) — usulan, belum diterapkan di GCP**: the pool size is set per URL with `?pool_max_conns=N` on `DATABASE_URL` / `DATABASE_REPLICA_URL` (pgx; without it pgx uses `max(4, NumCPU)`, i.e. 4 on a small VM — too low for 300 concurrent users). Each API prints `db pool pool=primary|replica max_conns=N` at start.
@@ -110,7 +109,7 @@ CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data
 | Local dev | 1 (`backend`) | 100 (Postgres default) | 20 (`.env.example`) | — (replica unset = primary) |
 | Staging | 2 (`backend` + `backend-exq`) | 100 | (100 − 20) / 2 = **40** (start at 20) | 20 |
 | Prod (before the export release) | 1 (`backend`) | read from the chosen tier | (max − 20) / 1, cap 50 | (max_replica − 10) / 1, cap 50 |
-| Prod (from the export release; same VM today, one VM per backend from 2028) | 2 (`backend` + `backend-exq`) | same | (max − 20) / 2, cap 50 | (max_replica − 10) / 2, cap 50 |
+| Prod (from the export release; same VM) | 2 (`backend` + `backend-exq`) | same | (max − 20) / 2, cap 50 | (max_replica − 10) / 2, cap 50 |
 
 *   Start at 20 per pool and raise only when the dashboard p95 (≤ 3 s) shows pool waits; a pool larger than the DB can serve concurrently only moves the queue into Postgres. Re-compute whenever a new instance (another API replica, a new Python service) starts connecting.
 

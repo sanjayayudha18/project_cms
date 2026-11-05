@@ -288,7 +288,7 @@ Response envelope Python: `{status, data, error}` (berbeda dari Go). Host/contai
 | Compose lokal | `backend/docker-compose.yaml` (backend + redis, membuat network `cms-net`, mount `FTP_DATA`), `backend-exq/docker-compose.yaml`, `frontend/docker-compose.yml` (join `cms-net`). Tidak ada compose di root |
 | CI (GitHub Actions) | Matrix Go (`backend`, `backend-exq`, `pkg`): `go vet`, golangci-lint v2.13.0 (`--build-tags integration`), govulncheck v1.8.0, `go test -race`. Integrasi Go dengan service Postgres 18 + `cmd/migrate up`, gagal kalau ada test skip, cek threshold coverage. Cek sqlc drift. Python unittest di Postgres 18 (gagal kalau ada skip). Build image Python |
 | Jenkins | Sudah dispesifikasikan, status on hold (`.claude/sdlc/ci-jenkins/`) |
-| Target GCP | Compute Engine (FE + backend; saat ini satu VM untuk backend, rencana split per backend 2028), CloudSQL primary + replica, Memorystore Redis, Cloud Storage, Artifact Registry, Secret Manager, Cloud DNS, Cloud Armor, Cloud Logging/Monitoring |
+| Target GCP | Compute Engine (satu VM untuk FE + backend, dipisah oleh Load Balancer GCP; detail LB belum dirancang; fase development saat ini di PC lokal), CloudSQL primary + replica, Memorystore Redis, Cloud Storage, Artifact Registry, Secret Manager, Cloud DNS, Cloud Armor, Cloud Logging/Monitoring |
 
 ---
 

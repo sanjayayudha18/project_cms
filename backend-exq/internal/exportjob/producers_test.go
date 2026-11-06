@@ -26,11 +26,11 @@ func ids(after int64, n int) []int64 {
 	return out
 }
 
-func (f *fakeQ) ExportVendorsBatch(_ context.Context, a repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error) {
+func (f *fakeQ) ExportVendorsWithPksBatch(_ context.Context, a repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error) {
 	f.calls = append(f.calls, a)
-	var out []repository.ExportVendorsBatchRow
+	var out []repository.ExportVendorsWithPksBatchRow
 	for _, id := range ids(a.AfterID, f.n) {
-		out = append(out, repository.ExportVendorsBatchRow{ID: id, Code: "V", Name: "n"})
+		out = append(out, repository.ExportVendorsWithPksBatchRow{ID: id, Code: "V", Name: "n"})
 	}
 	return out, f.err
 }
@@ -163,13 +163,13 @@ func TestHeadersMatchCSVExport(t *testing.T) {
 	for name, kind := range map[string]Kind{"vendor": KindVendor} {
 		_ = name
 		want, _ := csvexport.Lookup(csvexport.Vendors)
-		if !slices.Equal(m[kind]["vendor"].Header(), want.Header) {
+		if !slices.Equal(m[kind]["vendor"].Header(), want.ExportHeader()) {
 			t.Error("vendor header differs")
 		}
 	}
 	for _, e := range csvexport.ImportableNames() {
 		want, _ := csvexport.Lookup(e)
-		if !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.Header) {
+		if !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.ExportHeader()) {
 			t.Errorf("%s header differs", e)
 		}
 	}
@@ -193,7 +193,7 @@ func TestScopeAndStatusPerKind(t *testing.T) {
 		want any
 	}{
 		{"vendor profile forces all", Params{Kind: KindVendor, Entity: "vendor", VendorID: i64(7), StatusFilter: "active"},
-			repository.ExportVendorsBatchParams{VendorID: i64(7), Status: "all", BatchSize: PageSize}},
+			repository.ExportVendorsWithPksBatchParams{VendorID: i64(7), Status: "all", BatchSize: PageSize}},
 		{"vendor branches", Params{Kind: KindVendor, Entity: "branches", VendorID: i64(7), StatusFilter: "disabled"},
 			repository.ExportVendorBranchesBatchParams{VendorID: i64(7), Status: "disabled", BatchSize: PageSize}},
 		{"vendor pics no branch", Params{Kind: KindVendor, Entity: "pics", VendorID: i64(7), StatusFilter: "active"},
@@ -205,7 +205,7 @@ func TestScopeAndStatusPerKind(t *testing.T) {
 		{"cabang dsr maps", Params{Kind: KindCabang, Entity: "dsr-location-maps", VendorID: i64(7), BranchID: i64(3), StatusFilter: "active"},
 			repository.ExportDsrLocationMapsBatchParams{VendorID: i64(7), BranchID: i64(3), Status: "active", BatchSize: PageSize}},
 		{"global vendors nil scope", Params{Kind: KindMasterDataGlobal, Entity: csvexport.Vendors, StatusFilter: "active"},
-			repository.ExportVendorsBatchParams{Status: "active", BatchSize: PageSize}},
+			repository.ExportVendorsWithPksBatchParams{Status: "active", BatchSize: PageSize}},
 		{"global atms", Params{Kind: KindMasterDataGlobal, Entity: csvexport.ATMs, StatusFilter: "all"},
 			repository.ExportATMsBatchParams{Status: "all", BatchSize: PageSize}},
 		{"global assignments", Params{Kind: KindMasterDataGlobal, Entity: csvexport.ATMAssignments, StatusFilter: "disabled"},
@@ -251,7 +251,7 @@ func deref(v any) string {
 		return *p
 	}
 	switch x := v.(type) {
-	case repository.ExportVendorsBatchParams:
+	case repository.ExportVendorsWithPksBatchParams:
 		return str(x.AfterID, d(x.VendorID), -2, x.Status, x.BatchSize)
 	case repository.ExportVendorBranchesBatchParams:
 		return str(x.AfterID, d(x.VendorID), -2, x.Status, x.BatchSize)
@@ -301,7 +301,7 @@ func TestPagingAcrossPages(t *testing.T) {
 	}
 	after := []int64{0, PageSize, 2 * PageSize}
 	for i, c := range f.calls {
-		if got := c.(repository.ExportVendorsBatchParams).AfterID; got != after[i] {
+		if got := c.(repository.ExportVendorsWithPksBatchParams).AfterID; got != after[i] {
 			t.Errorf("call %d after_id %d, want %d", i, got, after[i])
 		}
 	}

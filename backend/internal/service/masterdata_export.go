@@ -51,7 +51,10 @@ type exportSpec struct {
 	// columns minus some; each missing column is filled with legacyFill[column].
 	legacyHeaders [][]string
 	legacyFill    map[string]string
-	page          func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) (rows [][]string, lastID int64, err error)
+	// readOnly columns follow header in export files only; the importer accepts
+	// header+readOnly and drops those cells (vendor-export-pks).
+	readOnly []string
+	page     func(ctx context.Context, r MasterDataExportRepo, afterID int64, status string, limit int32) (rows [][]string, lastID int64, err error)
 }
 
 // exportPage converts one repo page into CSV cells and the last row's id (the
@@ -78,7 +81,7 @@ func spec(entity string, page func(ctx context.Context, r MasterDataExportRepo, 
 	if !ok {
 		panic("csvexport: unknown entity " + entity)
 	}
-	return exportSpec{header: e.Header, legacyHeaders: e.LegacyHeaders, legacyFill: e.LegacyFill, page: page}
+	return exportSpec{header: e.Header, legacyHeaders: e.LegacyHeaders, legacyFill: e.LegacyFill, readOnly: e.ReadOnlyColumns, page: page}
 }
 
 // exportSpecs is the contract with the T5.3 importer and T5.2 templates.

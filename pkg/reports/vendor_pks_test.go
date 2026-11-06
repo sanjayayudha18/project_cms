@@ -141,6 +141,43 @@ func TestVendorPksCsvGolden(t *testing.T) {
 	}
 }
 
+// Golden: VendorPksCells output frozen before the VendorPksDetailCells refactor (task 1.3).
+func TestVendorPksCellsGolden(t *testing.T) {
+	d := func(y int, m time.Month, day int) *time.Time {
+		return ptr(time.Date(y, m, day, 0, 0, 0, 0, time.UTC))
+	}
+	tests := []struct {
+		name string
+		row  VendorPksRow
+		want []string
+	}{
+		{"director and pks", VendorPksRow{VendorCode: "ABACUS", VendorName: "PT Abacus",
+			DirectorName: ptr("Budi"), DirectorPhone: ptr("0812"), DirectorEmail: ptr("b@a.id"),
+			PksName: ptr("PKS 2026"), EffectiveDate: d(2026, 1, 1), ExpiryDate: d(2027, 6, 30),
+			ValidityMonths: ptr(int32(18)), RemainingDays: ptr(int32(237)), PksStatus: ptr("aktif")},
+			[]string{"ABACUS", "PT Abacus", "Budi", "0812", "b@a.id", "PKS 2026", "2026-01-01", "2027-06-30", "18", "237", "Aktif"}},
+		{"no director no pks", VendorPksRow{VendorCode: "NEWV", VendorName: "PT Baru", PksStatus: ptr("belum_diisi")},
+			[]string{"NEWV", "PT Baru", "", "", "", "", "", "", "", "", "Belum diisi"}},
+		{"internal without status", VendorPksRow{VendorCode: "ROH", VendorName: "ROH", DirectorName: ptr("Ani")},
+			[]string{"ROH", "ROH", "Ani", "", "", "", "", "", "", "", ""}},
+		{"negative remaining days", VendorPksRow{VendorCode: "K", VendorName: "PT K", PksName: ptr("P"),
+			EffectiveDate: d(2026, 2, 3), ExpiryDate: d(2026, 8, 3), ValidityMonths: ptr(int32(6)),
+			RemainingDays: ptr(int32(-4)), PksStatus: ptr("expired")},
+			[]string{"K", "PT K", "", "", "", "P", "2026-02-03", "2026-08-03", "6", "-4", "Expired"}},
+		{"formula prefixes", VendorPksRow{VendorCode: "=A", VendorName: "@B",
+			DirectorName: ptr("=X"), DirectorPhone: ptr("+62 811"), DirectorEmail: ptr("-x@y.id"), PksName: ptr("@P"),
+			PksStatus: ptr("need_renewal")},
+			[]string{"'=A", "'@B", "'=X", "+62 811", "'-x@y.id", "'@P", "", "", "", "", "Need Renewal"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := VendorPksCells(tt.row); !slices.Equal(got, tt.want) {
+				t.Errorf("got %q\nwant %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVendorPksHeaderStable(t *testing.T) {
 	want := []string{"Kode Vendor", "Nama Perusahaan", "Nama Direktur Utama", "Telepon Direktur Utama",
 		"Email Direktur Utama", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS", "Masa Berlaku (bulan)",

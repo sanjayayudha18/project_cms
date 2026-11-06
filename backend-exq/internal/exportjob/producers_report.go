@@ -289,16 +289,25 @@ func vendorPksProducer(renewalMonths int) Producer {
 }
 
 func vendorPksRow(x repository.ExportVendorPksBatchRow) reports.VendorPksRow {
+	row := pksDetailRow(x.DirectorName, x.DirectorPhone, x.DirectorEmail, x.PksName,
+		x.EffectiveDate, x.ExpiryDate, x.ValidityMonths, x.RemainingDays, x.PksStatus)
+	row.VendorCode, row.VendorName = x.VendorCode, x.VendorName
+	return row
+}
+
+// pksDetailRow is the director + active-PKS part of a vendor row; shared by the
+// vendor_pks report and the vendor master-data export so the empty-cell rule lives here.
+func pksDetailRow(dirName, dirPhone, dirEmail, pksName *string, effective, expiry pgtype.Date,
+	validityMonths, remainingDays int32, pksStatus string) reports.VendorPksRow {
 	row := reports.VendorPksRow{
-		VendorCode: x.VendorCode, VendorName: x.VendorName,
-		DirectorName: x.DirectorName, DirectorPhone: x.DirectorPhone, DirectorEmail: x.DirectorEmail,
-		PksName: x.PksName, EffectiveDate: datePtr(x.EffectiveDate), ExpiryDate: datePtr(x.ExpiryDate),
+		DirectorName: dirName, DirectorPhone: dirPhone, DirectorEmail: dirEmail,
+		PksName: pksName, EffectiveDate: datePtr(effective), ExpiryDate: datePtr(expiry),
 	}
-	if x.ExpiryDate.Valid { // no active PKS: validity, remaining days and status stay empty
-		row.ValidityMonths, row.RemainingDays = &x.ValidityMonths, &x.RemainingDays
+	if expiry.Valid { // no active PKS: validity, remaining days and status stay empty
+		row.ValidityMonths, row.RemainingDays = &validityMonths, &remainingDays
 	}
-	if x.PksStatus != "" {
-		row.PksStatus = &x.PksStatus
+	if pksStatus != "" {
+		row.PksStatus = &pksStatus
 	}
 	return row
 }

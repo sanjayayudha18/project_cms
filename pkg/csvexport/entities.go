@@ -12,10 +12,29 @@ type Entity struct {
 	Header        []string
 	LegacyHeaders [][]string
 	LegacyFill    map[string]string
+	// ReadOnlyColumns follow Header in export files only. The importer accepts
+	// Header+ReadOnlyColumns and drops these cells before validation (vendor-export-pks).
+	ReadOnlyColumns []string
+}
+
+// ExportHeader is Header followed by ReadOnlyColumns (a fresh slice).
+func (e Entity) ExportHeader() []string {
+	return slices.Concat(e.Header, e.ReadOnlyColumns)
+}
+
+// VendorReadOnlyColumns are the director + active-PKS columns appended to the
+// vendor export. Returns a fresh slice so callers cannot mutate the contract.
+func VendorReadOnlyColumns() []string { return slices.Clone(vendorReadOnlyColumns) }
+
+var vendorReadOnlyColumns = []string{
+	"director_name", "director_phone", "director_email",
+	"pks_name", "pks_effective_date", "pks_expiry_date",
+	"pks_validity_months", "pks_remaining_days", "pks_status",
 }
 
 func (e Entity) clone() Entity {
 	e.Header = slices.Clone(e.Header)
+	e.ReadOnlyColumns = slices.Clone(e.ReadOnlyColumns)
 	if e.LegacyHeaders != nil {
 		lh := make([][]string, len(e.LegacyHeaders))
 		for i, h := range e.LegacyHeaders {
@@ -29,8 +48,9 @@ func (e Entity) clone() Entity {
 
 var importable = map[string]Entity{
 	Vendors: {
-		Name:   Vendors,
-		Header: []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		Name:            Vendors,
+		Header:          []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		ReadOnlyColumns: vendorReadOnlyColumns,
 	},
 	VendorBranches: {
 		Name:   VendorBranches,

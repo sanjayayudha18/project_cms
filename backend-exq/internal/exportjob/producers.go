@@ -17,7 +17,7 @@ import (
 // Querier is the subset of *repository.Queries the producers call.
 type Querier interface {
 	ReportQuerier
-	ExportVendorsBatch(ctx context.Context, arg repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error)
+	ExportVendorsWithPksBatch(ctx context.Context, arg repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error)
 	ExportVendorBranchesBatch(ctx context.Context, arg repository.ExportVendorBranchesBatchParams) ([]repository.ExportVendorBranchesBatchRow, error)
 	ExportVendorVaultsBatch(ctx context.Context, arg repository.ExportVendorVaultsBatchParams) ([]repository.ExportVendorVaultsBatchRow, error)
 	ExportVendorPicsBatch(ctx context.Context, arg repository.ExportVendorPicsBatchParams) ([]repository.ExportVendorPicsBatchRow, error)
@@ -134,6 +134,14 @@ func headerOf(name string, exportOnly bool) []string {
 	return e.Header
 }
 
+func exportHeaderOf(name string) []string {
+	e, ok := csvexport.Lookup(name)
+	if !ok {
+		panic("exportjob: csvexport entity missing: " + name) // programming error, caught by tests
+	}
+	return e.ExportHeader()
+}
+
 // wibDate is the WIB calendar date of t as a pgtype.Date (Req 5.8).
 func wibDate(t time.Time) pgtype.Date {
 	y, m, d := t.In(wib).Date()
@@ -145,22 +153,29 @@ func boolStr(b bool) string { return strconv.FormatBool(b) }
 // scope picks the vendor/branch ids a producer passes on; global kinds pass nil.
 func scope(p Params) (vendorID, branchID *int64) { return p.VendorID, p.BranchID }
 
-func vendorsProducer(forceAll bool) Producer {
+func vendorsProducer(forceAll bool, renewalMonths int) Producer {
 	status := func(p Params) string {
 		if forceAll { // Req 4.6: the vendor profile row is always exported
 			return "all"
 		}
 		return p.StatusFilter
 	}
-	return tableProducer[repository.ExportVendorsBatchRow]{
-		header: headerOf(csvexport.Vendors, false),
-		fetch: func(ctx context.Context, q Querier, p Params, _ time.Time, after int64, limit int32) ([]repository.ExportVendorsBatchRow, error) {
+	type row = repository.ExportVendorsWithPksBatchRow
+	return tableProducer[row]{
+		header: exportHeaderOf(csvexport.Vendors),
+		fetch: func(ctx context.Context, q Querier, p Params, asOf time.Time, after int64, limit int32) ([]row, error) {
 			v, _ := scope(p)
-			return q.ExportVendorsBatch(ctx, repository.ExportVendorsBatchParams{AfterID: after, VendorID: v, Status: status(p), BatchSize: limit})
+			return q.ExportVendorsWithPksBatch(ctx, repository.ExportVendorsWithPksBatchParams{
+				Today: wibDate(reports.TodayWIB(asOf)), RenewalMonths: int32(renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
+				AfterID: after, VendorID: v, Status: status(p), BatchSize: limit})
 		},
-		id: func(r repository.ExportVendorsBatchRow) int64 { return r.ID },
-		cells: func(r repository.ExportVendorsBatchRow) []string {
-			return csvexport.VendorCells(csvexport.VendorRow(r))
+		id: func(r row) int64 { return r.ID },
+		cells: func(r row) []string {
+			base := csvexport.VendorCells(csvexport.VendorRow{ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
+				Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive})
+			d := pksDetailRow(r.DirectorName, r.DirectorPhone, r.DirectorEmail, r.PksName,
+				r.EffectiveDate, r.ExpiryDate, r.ValidityMonths, r.RemainingDays, r.PksStatus)
+			return append(base, reports.VendorPksDetailCells(d)...)
 		},
 		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
 			v, _ := scope(p)
@@ -327,7 +342,7 @@ func DefaultProducers() map[Kind]map[string]Producer {
 func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string]Producer {
 	m := map[Kind]map[string]Producer{
 		KindVendor: {
-			"vendor":            vendorsProducer(true),
+			"vendor":            vendorsProducer(true, pksRenewalMonths),
 			"branches":          branchesProducer(),
 			"vaults":            vaultsProducer(),
 			"pics":              picsProducer(),
@@ -341,7 +356,7 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 		},
 		KindHargaPaket: {"package-prices": packagePricesProducer()},
 		KindMasterDataGlobal: {
-			csvexport.Vendors:        vendorsProducer(false),
+			csvexport.Vendors:        vendorsProducer(false, pksRenewalMonths),
 			csvexport.VendorBranches: branchesProducer(),
 			csvexport.VendorVaults:   vaultsProducer(),
 			csvexport.VendorPICs:     picsProducer(),

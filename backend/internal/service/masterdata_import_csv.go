@@ -21,9 +21,14 @@ func cleanCell(s string) string {
 
 // readImportCSV parses the upload: size guard, BOM strip, UTF-8/NUL check, `,` or `;` delimiter
 // (whichever the header line uses -- Excel in an Indonesian locale writes `;`),
-// header validation, empty-row skipping. A non-empty errs means the file is
+// header validation, empty-row skipping. Accepted headers, in order: header
+// (Import_Header), header+readOnly (Export_Header, only when readOnly is
+// non-empty), then legacy. In an Export_Header file a row with exactly
+// len(header)+len(readOnly) cells is cut to its first len(header) cells; any
+// other cell count (len(header) included) is marked badCount so validateRow
+// rejects it with "jumlah kolom". A non-empty errs means the file is
 // unusable as a whole (bad CSV / wrong header) and no row was processed.
-func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill map[string]string) (recs []importRecord, errs []ImportRowError, err error) {
+func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill map[string]string, readOnly []string) (recs []importRecord, errs []ImportRowError, err error) {
 	data, err := io.ReadAll(io.LimitReader(r, MasterDataImportMaxBytes+1))
 	if err != nil {
 		return nil, nil, err
@@ -51,6 +56,7 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 	gotHeader := false
 	var pick []int // legacy header in use: header column -> file column, -1 = fill
 	legacyLen := -1
+	exportLen := -1 // Export_Header in use: row length whose read-only tail is dropped
 	for {
 		rec, rerr := cr.Read()
 		if errors.Is(rerr, io.EOF) {
@@ -70,6 +76,10 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 			if headerMatches(rec, header) {
 				continue
 			}
+			if len(readOnly) > 0 && headerMatches(rec, slices.Concat(header, readOnly)) {
+				exportLen = len(header) + len(readOnly)
+				continue
+			}
 			for _, l := range legacy {
 				if headerMatches(rec, l) {
 					pick, legacyLen = legacyPick(header, l), len(l)
@@ -85,13 +95,21 @@ func readImportCSV(r io.Reader, header []string, legacy [][]string, legacyFill m
 		if empty {
 			continue
 		}
+		badCount := 0
+		if exportLen > 0 {
+			if len(cells) == exportLen {
+				cells = cells[:len(header)]
+			} else {
+				badCount = exportLen
+			}
+		}
 		if len(cells) == legacyLen {
 			cells = expandLegacy(cells, header, pick, legacyFill)
 		}
 		if len(recs) >= MasterDataImportMaxRows {
 			return nil, nil, &ValidationError{Field: "file", Message: fmt.Sprintf("jumlah baris melebihi %d", MasterDataImportMaxRows)}
 		}
-		recs = append(recs, importRecord{line: line, cells: cells})
+		recs = append(recs, importRecord{line: line, cells: cells, badCount: badCount})
 	}
 	if !gotHeader {
 		return nil, []ImportRowError{{Row: 1, Field: "header", Message: "file kosong"}}, nil

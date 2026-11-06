@@ -36,9 +36,9 @@
     "semantic_hash": "82d6233f201596051331a58620326b46"
   },
   "backend/cmd/api/main.go": {
-    "mtime": 1793894976.343232,
-    "seen": 1793895552.2106104,
-    "ast_hash": "0aa9765641409a413316a3ea0a45f4ff",
+    "mtime": 1793895921.4489808,
+    "seen": 1793951594.950007,
+    "ast_hash": "5b2e03db0738b99ce7b774e06a6c9c4b",
     "semantic_hash": ""
   },
   "backend/cmd/hashpw/main.go": {
@@ -90,32 +90,32 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atm_portal.sql.go": {
-    "mtime": 1793873802.6731725,
-    "seen": 1793895552.2106724,
+    "mtime": 1793932934.1011224,
+    "seen": 1793951594.9500568,
     "ast_hash": "6016bd25aead9817c981cce9350d58a3",
     "semantic_hash": "6016bd25aead9817c981cce9350d58a3"
   },
   "backend/internal/db/auth.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2106783,
+    "mtime": 1793932934.1885612,
+    "seen": 1793951594.950062,
     "ast_hash": "c2db2904461edcc8041541ea61dd3637",
     "semantic_hash": ""
   },
   "backend/internal/db/db.go": {
-    "mtime": 1793873802.675284,
-    "seen": 1793895552.2106793,
+    "mtime": 1793932934.206268,
+    "seen": 1793951594.950063,
     "ast_hash": "4b34a92b2dfb13d5f66298ff39484334",
     "semantic_hash": "4b34a92b2dfb13d5f66298ff39484334"
   },
   "backend/internal/db/dmaa_forecast.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.2106805,
+    "mtime": 1793932934.2169363,
+    "seen": 1793951594.9500642,
     "ast_hash": "4bcbe86de9c9fde4f60e500afe602ac9",
     "semantic_hash": "4bcbe86de9c9fde4f60e500afe602ac9"
   },
   "backend/internal/db/models.go": {
-    "mtime": 1793873808.3466067,
-    "seen": 1793895552.210691,
+    "mtime": 1793932934.5710337,
+    "seen": 1793951594.950073,
     "ast_hash": "39aec09577e792be66e67b3d0b4905e3",
     "semantic_hash": ""
   },
@@ -1962,9 +1962,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1793864741.7944057,
-    "seen": 1793895552.2124984,
-    "ast_hash": "54513c82aecf4fcfdac569804090a073",
+    "mtime": 1793933609.5048444,
+    "seen": 1793951594.9515228,
+    "ast_hash": "c02c5d9820f6c7d82923a69a35096a93",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -1974,9 +1974,9 @@
     "semantic_hash": ""
   },
   ".claude/sdlc/README.md": {
-    "mtime": 1793869951.5616927,
-    "seen": 1793895552.212677,
-    "ast_hash": "1269950c8d7e28c09e984475d2d8e0f9",
+    "mtime": 1793933532.3561678,
+    "seen": 1793951594.9516563,
+    "ast_hash": "61575d9cb5af2e55ed0532f6e1759008",
     "semantic_hash": ""
   },
   ".opencode/README.md": {
@@ -2447,12 +2447,6 @@
     "ast_hash": "daf19b496bd71f6b2af7f33ecf213ed7",
     "semantic_hash": ""
   },
-  "login_ui_design/crown-login-red.html": {
-    "mtime": 1787831179.0386648,
-    "seen": 1788250289.318923,
-    "ast_hash": "d45ca437cfd34dda54b7cc41823f295b",
-    "semantic_hash": ""
-  },
   "phyton_101.md": {
     "mtime": 1787293083.1804316,
     "seen": 1788250289.3189237,
@@ -2507,15 +2501,9 @@
     "ast_hash": "9960a24288958394ac50e57ff638b036",
     "semantic_hash": ""
   },
-  "login_ui_design/CROWN IMG.png": {
-    "mtime": 1787831179.0386648,
-    "seen": 1788250289.3189354,
-    "ast_hash": "4ddb486c302dc3c31cdfa3f42ebae085",
-    "semantic_hash": ""
-  },
   "backend/internal/db/dsr.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2106822,
+    "mtime": 1793932934.2403395,
+    "seen": 1793951594.9500654,
     "ast_hash": "1c8bbb4a3ded3f0a7820f5586549887d",
     "semantic_hash": ""
   },
@@ -3090,26 +3078,26 @@
     "semantic_hash": ""
   },
   "backend/internal/db/approval.sql.go": {
-    "mtime": 1793873808.3466067,
-    "seen": 1793895552.2106695,
+    "mtime": 1793932934.0647593,
+    "seen": 1793951594.9500544,
     "ast_hash": "248fcca501c0f12da89398e08dad7c85",
     "semantic_hash": ""
   },
   "backend/internal/db/audit.sql.go": {
-    "mtime": 1793873802.6639037,
-    "seen": 1793895552.210676,
+    "mtime": 1793932934.1549833,
+    "seen": 1793951594.9500606,
     "ast_hash": "70936856744444da4c25e37a433912a0",
     "semantic_hash": ""
   },
   "backend/internal/db/audit_log.sql.go": {
-    "mtime": 1793873802.6742127,
-    "seen": 1793895552.210677,
+    "mtime": 1793932934.173403,
+    "seen": 1793951594.9500613,
     "ast_hash": "a388c1cd48015e7586417c5094ed9340",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_request.sql.go": {
-    "mtime": 1793873802.6758032,
-    "seen": 1793895552.2107153,
+    "mtime": 1793932935.5890932,
+    "seen": 1793951594.950095,
     "ast_hash": "58bc45709e562f675e4c93230b2e71b4",
     "semantic_hash": ""
   },
@@ -3545,396 +3533,6 @@
     "ast_hash": "fe44ccfb5ce4260100e861e9b0da0d4c",
     "semantic_hash": ""
   },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/package.json": {
-    "mtime": 1791369185.130328,
-    "seen": 1791380962.9980502,
-    "ast_hash": "57f4800b4c78c57ace7c048d47557e8d",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/Kit.jsx": {
-    "mtime": 1791369185.1313255,
-    "seen": 1791380962.9980524,
-    "ast_hash": "6a96a84a391fd62922b575b96fca3f09",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/accordion.jsx": {
-    "mtime": 1791369185.1313255,
-    "seen": 1791380962.9980533,
-    "ast_hash": "c6d3ede2d2b21d5f69790ffb0e3d4729",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/alert-dialog.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.9980547,
-    "ast_hash": "96b7a92464b82156ef1e492a130798ce",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/alert.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.998056,
-    "ast_hash": "0c57b500ec9dbdae4bffa54e0613d19b",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/aspect-ratio.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.9980574,
-    "ast_hash": "4fd8ad8d96138041d56c3f03fe150e27",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/avatar.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.9980588,
-    "ast_hash": "8d686a3f133bad6ea0d072f62bbf14dc",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/badge.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.99806,
-    "ast_hash": "cd963c0c656553b16681a6d60069d6e2",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/breadcrumb.jsx": {
-    "mtime": 1791369185.1323173,
-    "seen": 1791380962.998062,
-    "ast_hash": "04299e8f496175af6561e98c13c04657",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/button-group.jsx": {
-    "mtime": 1791369185.1354642,
-    "seen": 1791380962.998063,
-    "ast_hash": "3fe141f34151306fea742b794a343189",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/button.jsx": {
-    "mtime": 1791369185.1354642,
-    "seen": 1791380962.9980648,
-    "ast_hash": "7a42606720d5007be6c58f5c3da3c754",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/calendar.jsx": {
-    "mtime": 1791369185.136481,
-    "seen": 1791380962.9980657,
-    "ast_hash": "d86f64bf2f090d71f30eddfeda16a2de",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/card.jsx": {
-    "mtime": 1791369185.136481,
-    "seen": 1791380962.9980667,
-    "ast_hash": "fb0efdc44de4498666ebbdfc30227e5e",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/carousel.jsx": {
-    "mtime": 1791369185.137483,
-    "seen": 1791380962.9980676,
-    "ast_hash": "3cfcf65b0f57c49640dae8e1aec42f0a",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/chart.jsx": {
-    "mtime": 1791369185.137483,
-    "seen": 1791380962.998069,
-    "ast_hash": "b3d6cf44d1359f21e5948de3e3efb091",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/checkbox.jsx": {
-    "mtime": 1791369185.137483,
-    "seen": 1791380962.9980702,
-    "ast_hash": "c664da9a411aec82293537c3595abc4a",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/collapsible.jsx": {
-    "mtime": 1791369185.1384945,
-    "seen": 1791380962.9980717,
-    "ast_hash": "d104968769456625fcf661ef2cf606d1",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/command.jsx": {
-    "mtime": 1791369185.139289,
-    "seen": 1791380962.998073,
-    "ast_hash": "961cfbab37fa8b4a71fbbc8371da0717",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/context-menu.jsx": {
-    "mtime": 1791369185.139289,
-    "seen": 1791380962.9980745,
-    "ast_hash": "54b051fd16265d88f7a0fcf7a441573c",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/dialog.jsx": {
-    "mtime": 1791369185.139289,
-    "seen": 1791380962.9980762,
-    "ast_hash": "0134960852d84c6534f0ae905c639adb",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/drawer.jsx": {
-    "mtime": 1791369185.139289,
-    "seen": 1791380962.9980776,
-    "ast_hash": "b092737cf21abd6c163a995b8ce29739",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/dropdown-menu.jsx": {
-    "mtime": 1791369185.1417146,
-    "seen": 1791380962.9980793,
-    "ast_hash": "86c37b6f023540c6979f8a65b387bb80",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/empty.jsx": {
-    "mtime": 1791369185.1427321,
-    "seen": 1791380962.9980807,
-    "ast_hash": "52009b62af4512b531aee57ff5ffc676",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/field.jsx": {
-    "mtime": 1791369185.1437304,
-    "seen": 1791380962.9980817,
-    "ast_hash": "bc2e01eb868d6e46b36317c3b8b2d2d5",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/form.jsx": {
-    "mtime": 1791369185.1437304,
-    "seen": 1791380962.9980829,
-    "ast_hash": "b6ea55a77cb42e01b6f27089cec8669b",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/hover-card.jsx": {
-    "mtime": 1791369185.1447306,
-    "seen": 1791380962.9980838,
-    "ast_hash": "bbe6b8a4e71b3a15552a23c36f4b56b3",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input-group.jsx": {
-    "mtime": 1791369185.145729,
-    "seen": 1791380962.998085,
-    "ast_hash": "d5de9d47b806580fb217a4a7c3f06e6c",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input-otp.jsx": {
-    "mtime": 1791369185.1526496,
-    "seen": 1791380962.9980862,
-    "ast_hash": "68ec6fe1e3ed595c7b21e52c6ef43b1b",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input.jsx": {
-    "mtime": 1791369185.1548345,
-    "seen": 1791380962.9980874,
-    "ast_hash": "266fa7882a56c3a0424229f4ba7e0781",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/item.jsx": {
-    "mtime": 1791369185.1558535,
-    "seen": 1791380962.9980886,
-    "ast_hash": "fbc238844f8ba2fcbe4d99aea746ad76",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/kbd.jsx": {
-    "mtime": 1791369185.1568499,
-    "seen": 1791380962.9980898,
-    "ast_hash": "1f30a34e923fb2c9d83fdd6d4f673eeb",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/label.jsx": {
-    "mtime": 1791369185.157325,
-    "seen": 1791380962.998091,
-    "ast_hash": "37822229bc85dcea763ce05e1c7a0a66",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/menubar.jsx": {
-    "mtime": 1791369185.1583946,
-    "seen": 1791380962.9980927,
-    "ast_hash": "eb9f675722147ddfc8e7ad7704860878",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/navigation-menu.jsx": {
-    "mtime": 1791369185.1583946,
-    "seen": 1791380962.9980938,
-    "ast_hash": "a8752a703fb4253452b0516e0a644871",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/pagination.jsx": {
-    "mtime": 1791369185.1593945,
-    "seen": 1791380962.9980953,
-    "ast_hash": "b1d218fc44b545aba18ee035a6832578",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/popover.jsx": {
-    "mtime": 1791369185.1601324,
-    "seen": 1791380962.9980962,
-    "ast_hash": "f1a34487c836304b604836b98850fc6e",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/progress.jsx": {
-    "mtime": 1791369185.1601324,
-    "seen": 1791380962.9980974,
-    "ast_hash": "6852c83964d5e80e6bcf2981771228b7",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/radio-group.jsx": {
-    "mtime": 1791369185.1601324,
-    "seen": 1791380962.9980984,
-    "ast_hash": "f0f94b0ed27f7a2668f8dd1e1d91fe13",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/resizable.jsx": {
-    "mtime": 1791369185.1621385,
-    "seen": 1791380962.998099,
-    "ast_hash": "de932d5a372757e19db646ce5d2d1d63",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/scroll-area.jsx": {
-    "mtime": 1791369185.1631775,
-    "seen": 1791380962.9981003,
-    "ast_hash": "4e037be024301fcff8c88871a3b69384",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/select.jsx": {
-    "mtime": 1791369185.1641724,
-    "seen": 1791380962.9981015,
-    "ast_hash": "420cec1782401a42b4a4cf92afa07be1",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/separator.jsx": {
-    "mtime": 1791369185.165251,
-    "seen": 1791380962.9981024,
-    "ast_hash": "b0534a33ab7b9c2373a6c55185f4577d",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sheet.jsx": {
-    "mtime": 1791369185.1657555,
-    "seen": 1791380962.9981039,
-    "ast_hash": "a95430da53c622a8aec187c5e142d435",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sidebar.jsx": {
-    "mtime": 1791369185.166994,
-    "seen": 1791380962.998105,
-    "ast_hash": "d63e4d84ff35e857253423ceca8d4705",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/skeleton.jsx": {
-    "mtime": 1791369185.166994,
-    "seen": 1791380962.9981065,
-    "ast_hash": "fbf1e3798eed4ed951a13065e90f97d8",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/slider.jsx": {
-    "mtime": 1791369185.1679914,
-    "seen": 1791380962.9981074,
-    "ast_hash": "c14441cdc68f1edf4f531edc50a264f0",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sonner.jsx": {
-    "mtime": 1791369185.1689892,
-    "seen": 1791380962.9981084,
-    "ast_hash": "ec6a8fb37e0af4cb5d4ae0d83ea51ee9",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/spinner.jsx": {
-    "mtime": 1791369185.1689892,
-    "seen": 1791380962.9981093,
-    "ast_hash": "21d714670be17ebc6de648539cfad2e0",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/switch.jsx": {
-    "mtime": 1791369185.1699915,
-    "seen": 1791380962.9981103,
-    "ast_hash": "efd9e8e764be186c510fa32eb4fd7744",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/table.jsx": {
-    "mtime": 1791369185.1699915,
-    "seen": 1791380962.9981115,
-    "ast_hash": "42a0c7f50825bca5cc06120990758bc6",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/tabs.jsx": {
-    "mtime": 1791369185.1699915,
-    "seen": 1791380962.9981124,
-    "ast_hash": "d1209000d49ca113193d9eb334703500",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/textarea.jsx": {
-    "mtime": 1791369185.1699915,
-    "seen": 1791380962.9981139,
-    "ast_hash": "6b88f03704769ffc9b05563d53b27e64",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/toggle-group.jsx": {
-    "mtime": 1791369185.1731708,
-    "seen": 1791380962.9981148,
-    "ast_hash": "f4e47ea6e8e0176cf7181f477f25592b",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/toggle.jsx": {
-    "mtime": 1791369185.1731708,
-    "seen": 1791380962.998116,
-    "ast_hash": "7ceded7613c7132060cfcb81bd9f60d8",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/tooltip.jsx": {
-    "mtime": 1791369185.174541,
-    "seen": 1791380962.9981174,
-    "ast_hash": "ce19f3839d8ecebf2d355e58df1ede13",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/use-mobile.jsx": {
-    "mtime": 1791369185.174541,
-    "seen": 1791380962.9981184,
-    "ast_hash": "b70d5509d00d4dcac66b4b1b98fc4b6a",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/utils.js": {
-    "mtime": 1791369185.175178,
-    "seen": 1791380962.9981194,
-    "ast_hash": "b3e652bde775c4efce3dc96f6a28c9d8",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/App.jsx": {
-    "mtime": 1791369185.1761844,
-    "seen": 1791380962.9981205,
-    "ast_hash": "0b448cbdb036fa2919eaf5591255df50",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/Rail.jsx": {
-    "mtime": 1791369185.1761844,
-    "seen": 1791380962.9981215,
-    "ast_hash": "18f32e9a782ddd7839df046bf0ebf6f3",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/SimpleApp.jsx": {
-    "mtime": 1791369185.1771839,
-    "seen": 1791380962.9981227,
-    "ast_hash": "6faa817a488a7c146bc8151aaa496e26",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/TeamPanel.jsx": {
-    "mtime": 1791369185.1771839,
-    "seen": 1791380962.9981241,
-    "ast_hash": "c2d2332593771921e3798e5e22eae133",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/data.js": {
-    "mtime": 1791369185.1785047,
-    "seen": 1791380962.9981256,
-    "ast_hash": "9368966102d7f29f9de2b6aff342c88c",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/dialogs.jsx": {
-    "mtime": 1791369185.1785047,
-    "seen": 1791380962.9981267,
-    "ast_hash": "14705a2081dda648d8465b491f3b5e97",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/src/ui.jsx": {
-    "mtime": 1791369185.180517,
-    "seen": 1791380962.998128,
-    "ast_hash": "2496307abb82a0088a5a204e27124fdd",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/tests/artifact.spec.js": {
-    "mtime": 1791369185.1831498,
-    "seen": 1791380962.998129,
-    "ast_hash": "c7696a52ff5a42066af4e2e2cd74c06c",
-    "semantic_hash": ""
-  },
   "backend/internal/auth/user_admin.go": {
     "mtime": 1793688385.8620074,
     "seen": 1793795879.1112008,
@@ -3948,26 +3546,26 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atms_admin.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.210675,
+    "mtime": 1793932934.1396315,
+    "seen": 1793951594.9500594,
     "ast_hash": "e090843c50ab87c99199bb8b3ecc528f",
     "semantic_hash": ""
   },
   "backend/internal/db/role_mgmt.sql.go": {
-    "mtime": 1793688755.6567757,
-    "seen": 1793795879.111263,
+    "mtime": 1793932934.64662,
+    "seen": 1793951594.950079,
     "ast_hash": "062a9d5657d07c770c8fd42e9d3357ff",
     "semantic_hash": ""
   },
   "backend/internal/db/users_admin.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.210698,
+    "mtime": 1793932934.6614268,
+    "seen": 1793951594.9500797,
     "ast_hash": "7e599245bb9c50e4b405e3195940ae1e",
     "semantic_hash": ""
   },
   "backend/internal/db/vendors_admin.sql.go": {
-    "mtime": 1793873802.6758032,
-    "seen": 1793895552.2107177,
+    "mtime": 1793932935.6360173,
+    "seen": 1793951594.9500968,
     "ast_hash": "bc5766709b57d30a05c94d1029a7807f",
     "semantic_hash": ""
   },
@@ -3984,15 +3582,15 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_vendor_handler.go": {
-    "mtime": 1791369185.2599604,
-    "seen": 1791380962.9982307,
-    "ast_hash": "93958719a7b818c9cc93dd0a7475c6d1",
+    "mtime": 1793895968.4907167,
+    "seen": 1793951594.9501452,
+    "ast_hash": "40e80bc8bec1ea5e254831a14672e67e",
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_vendor_handler_test.go": {
-    "mtime": 1791369185.260851,
-    "seen": 1791380962.9982324,
-    "ast_hash": "9a60c05c0ca8556985fc000c052b7954",
+    "mtime": 1793925219.1411486,
+    "seen": 1793951594.9501462,
+    "ast_hash": "303bc05bed0188af59c554d9903ff2bd",
     "semantic_hash": ""
   },
   "backend/internal/handler/rbac_list_handler.go": {
@@ -4068,9 +3666,9 @@
     "semantic_hash": ""
   },
   "backend/internal/repository/vendor_admin_repository.go": {
-    "mtime": 1793688755.8651,
-    "seen": 1793795879.111563,
-    "ast_hash": "4611471c1cb437dfe4da3be67ab62c6a",
+    "mtime": 1793895968.488729,
+    "seen": 1793951594.9502945,
+    "ast_hash": "5e670f4929dab2c8600c1477b009476e",
     "semantic_hash": ""
   },
   "backend/internal/repository/vendor_admin_repository_test.go": {
@@ -4146,15 +3744,15 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_admin.go": {
-    "mtime": 1793894973.6168065,
-    "seen": 1793895552.2111146,
-    "ast_hash": "14c91b15e62d2e26e5c864fcac303a8e",
+    "mtime": 1793933099.758475,
+    "seen": 1793951594.9504423,
+    "ast_hash": "e0a56475b15a136abb2941d60d7e7ca2",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_admin_test.go": {
-    "mtime": 1791369185.3376513,
-    "seen": 1791380962.9983776,
-    "ast_hash": "aad5de5c960caa65248ceaab241380de",
+    "mtime": 1793895968.4907167,
+    "seen": 1793951594.950444,
+    "ast_hash": "3172d9b9755b3a591d1104d460b8a9f8",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_request_number_property_test.go": {
@@ -4440,9 +4038,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/AdminVendorsPage.test.tsx": {
-    "mtime": 1791369185.5637138,
-    "seen": 1791380962.998624,
-    "ast_hash": "9657cca294c665db5954fd2215d671e8",
+    "mtime": 1793926908.6865995,
+    "seen": 1793951594.9508214,
+    "ast_hash": "2b01433d5aab82a14b9676d15f82f317",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/VendorFormDialog.test.tsx": {
@@ -4452,21 +4050,21 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts": {
-    "mtime": 1793688386.0990415,
-    "seen": 1793795879.1122832,
-    "ast_hash": "9038b5a0be930b704fdbd0d5f0457d7c",
+    "mtime": 1793925688.7667134,
+    "seen": 1793951594.9508405,
+    "ast_hash": "3cd5aa8f3a3765bcc271c9acf1228320",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/AdminVendorsPage.tsx": {
-    "mtime": 1791369185.5729206,
-    "seen": 1791380962.9986348,
-    "ast_hash": "abf93db29f5bf16f42ca38f1a2434513",
+    "mtime": 1793926660.0987103,
+    "seen": 1793951594.9508436,
+    "ast_hash": "6b969b5e89152adf260f6295fc8f0946",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorFilterBar.tsx": {
-    "mtime": 1791369185.5919843,
-    "seen": 1791380962.9986546,
-    "ast_hash": "535faffb58ff1409bb87d5dc0ae410a4",
+    "mtime": 1793926613.930892,
+    "seen": 1793951594.9508696,
+    "ast_hash": "5ebfcb9937101dc2dbee36df78c03874",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorFormDialog.tsx": {
@@ -4476,21 +4074,21 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorsTable.tsx": {
-    "mtime": 1791369185.6041458,
-    "seen": 1791380962.9986632,
-    "ast_hash": "8fac74a4a424a667437ff4810ce1f59a",
+    "mtime": 1793926654.2948744,
+    "seen": 1793951594.950878,
+    "ast_hash": "88b26b37464f36d423c3b4233f0edca4",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/hooks.ts": {
-    "mtime": 1793688386.1076555,
-    "seen": 1793795879.11233,
-    "ast_hash": "72809d0ee3870bf4e97c9f829f845f39",
+    "mtime": 1793925689.4643407,
+    "seen": 1793951594.950881,
+    "ast_hash": "87cfa0cb22bef6ab57a719952b6ddf10",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/index.ts": {
-    "mtime": 1791369185.6056533,
-    "seen": 1791380962.9986653,
-    "ast_hash": "f5828cd121fdc08d3819576353b45be9",
+    "mtime": 1793939915.2699192,
+    "seen": 1793951594.950882,
+    "ast_hash": "8ca25e7c5492cef849e0fa4838ff4071",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorFormSchema.test.ts": {
@@ -4506,21 +4104,21 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/types.ts": {
-    "mtime": 1793688386.1146586,
-    "seen": 1793795879.1123483,
-    "ast_hash": "de89188e60dbf075c6e69bbb0ad9308b",
+    "mtime": 1793925689.665823,
+    "seen": 1793951594.9508982,
+    "ast_hash": "e07f3627748458a52bc534e2fbbcd8ea",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/useAdminVendorsUrlState.test.ts": {
-    "mtime": 1791369185.612259,
-    "seen": 1791380962.9986768,
-    "ast_hash": "0f67436e3efcd2241cff0e7f57520854",
+    "mtime": 1793932084.40937,
+    "seen": 1793951594.9508991,
+    "ast_hash": "fc644b5694793ebde99fab91d1897161",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/useAdminVendorsUrlState.ts": {
-    "mtime": 1791369185.614207,
-    "seen": 1791380962.9986777,
-    "ast_hash": "7c9a0dacd22e50c6c0a5ef45e9e07db1",
+    "mtime": 1793925689.875575,
+    "seen": 1793951594.9509003,
+    "ast_hash": "18ce399c9c5840d3858e06e621308dfc",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/__tests__/SettingsHubPage.test.tsx": {
@@ -4799,69 +4397,45 @@
     "ast_hash": "6a61113b39544d9fa1a78aa31a140b9a",
     "semantic_hash": ""
   },
-  "UI-design/CMS-Pengaturan.html": {
-    "mtime": 1791369185.1195457,
-    "seen": 1791380962.9992669,
-    "ast_hash": "5de4b7f29c8ec4973d15afb8289ddafc",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/README.md": {
-    "mtime": 1791369185.1264627,
-    "seen": 1791380962.9992685,
-    "ast_hash": "8140ba825437a7675e274806c454eacf",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/hierarki-pengguna-crown.html": {
-    "mtime": 1791369185.1264627,
-    "seen": 1791380962.9992697,
-    "ast_hash": "f98ca8f44c016ba44a586a985bfdf370",
-    "semantic_hash": ""
-  },
-  "UI-design/hierarki-pengguna-crown/kits/shadcn-ui/README.md": {
-    "mtime": 1791369185.1293068,
-    "seen": 1791380962.9992704,
-    "ast_hash": "0d9b2be14061b0e81f73965478c8c565",
-    "semantic_hash": ""
-  },
   "backend/internal/db/atm_assignments_admin.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2106712,
+    "mtime": 1793932934.0814123,
+    "seen": 1793951594.9500556,
     "ast_hash": "9e4c191fb3b1b6548ce7b031e903aab8",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.2106874,
+    "mtime": 1793932934.3112643,
+    "seen": 1793951594.9500704,
     "ast_hash": "75b8a45cc29999bfa9fcb6fe2b96a18c",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data_export.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.210689,
+    "mtime": 1793932934.332608,
+    "seen": 1793951594.950071,
     "ast_hash": "c7a7f5a582caaebd2462417224e7303f",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_branches_admin.sql.go": {
-    "mtime": 1793873802.6736884,
-    "seen": 1793895552.2107048,
+    "mtime": 1793932934.8455684,
+    "seen": 1793951594.9500864,
     "ast_hash": "1fc1c7ebd324e536aaa1fc7ed2585aae",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_packages_admin.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2107077,
+    "mtime": 1793932934.8768272,
+    "seen": 1793951594.9500885,
     "ast_hash": "3a078cdbed69d4eb236ca5fc7ede073a",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pics_admin.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2107105,
+    "mtime": 1793932934.9159493,
+    "seen": 1793951594.9500914,
     "ast_hash": "e490d243418ad238c060163eb6a2f226",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_vaults_admin.sql.go": {
-    "mtime": 1793873802.6742127,
-    "seen": 1793895552.2107167,
+    "mtime": 1793932935.6144884,
+    "seen": 1793951594.950096,
     "ast_hash": "c29fd31b1adf7f6efa09856aaa99be10",
     "semantic_hash": ""
   },
@@ -4932,9 +4506,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_vendor_pic_handler_test.go": {
-    "mtime": 1793688385.880821,
-    "seen": 1793795879.111378,
-    "ast_hash": "d4aef2a5f9897c2d7bee772d059e29b0",
+    "mtime": 1793896187.716327,
+    "seen": 1793951594.9501526,
+    "ast_hash": "72ba3e196e19ff8c82bfca766f3dea17",
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_vendor_vault_handler.go": {
@@ -5106,21 +4680,21 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_export.go": {
-    "mtime": 1793873060.8303907,
-    "seen": 1793895552.2110472,
-    "ast_hash": "766189803d76b336c8d14426f667a31d",
+    "mtime": 1793941298.6551154,
+    "seen": 1793951594.9503899,
+    "ast_hash": "050351f99b0c4bc6dce51af5f4c999d6",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_export_test.go": {
-    "mtime": 1793895077.8250618,
-    "seen": 1793895552.211053,
-    "ast_hash": "0deae31ba7b13c7a659c98b8a0b69f8f",
+    "mtime": 1793896165.701408,
+    "seen": 1793951594.9503937,
+    "ast_hash": "ba4b8baddf189807c795b7ed84a6aed2",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import.go": {
-    "mtime": 1793894994.8248055,
-    "seen": 1793895552.211054,
-    "ast_hash": "0eb3dd6239201abf0394e71b4283193f",
+    "mtime": 1793948621.7818937,
+    "seen": 1793951594.9503946,
+    "ast_hash": "15da193654ed81ce79e33aefe2339b87",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_confirm.go": {
@@ -5178,9 +4752,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_pic_admin_test.go": {
-    "mtime": 1793873410.880735,
-    "seen": 1793895552.2111387,
-    "ast_hash": "8d129f649e099aadc0c0d9cd542cbfa0",
+    "mtime": 1793895964.255622,
+    "seen": 1793951594.9504616,
+    "ast_hash": "25a9eb24b1c9ccffd4a3125783534d69",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_vault_admin.go": {
@@ -5268,9 +4842,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/VendorDetailPage.test.tsx": {
-    "mtime": 1793688386.0971982,
-    "seen": 1793795879.112278,
-    "ast_hash": "aec0ecaa164a3baad04a8d9ad95176c0",
+    "mtime": 1793932069.6544218,
+    "seen": 1793951594.9508357,
+    "ast_hash": "2d352009a3b988131c5ac3a76bfd0de5",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/VendorsTablePending.test.tsx": {
@@ -5280,9 +4854,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorDetailPage.tsx": {
-    "mtime": 1793688386.105386,
-    "seen": 1793795879.1123147,
-    "ast_hash": "3f931b023f2db9d3300eaa448c17b840",
+    "mtime": 1793926676.613565,
+    "seen": 1793951594.9508688,
+    "ast_hash": "283fb7760bc242337a1e553fce2758f9",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/approvals/__tests__/MasterDataReviewDialog.test.tsx": {
@@ -5322,15 +4896,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/approvals/lib/changeDiff.test.ts": {
-    "mtime": 1791369185.6174061,
-    "seen": 1791380962.9986842,
-    "ast_hash": "54b398f2819d86161dd7602fc4ae7ca4",
+    "mtime": 1793932229.7294202,
+    "seen": 1793951594.9509091,
+    "ast_hash": "15ab127a2c0c95240211622fd1b8d693",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/approvals/lib/changeDiff.ts": {
-    "mtime": 1793688386.1216648,
-    "seen": 1793795879.1123645,
-    "ast_hash": "77eefdf1638999f9f07bcc8fa18720bf",
+    "mtime": 1793926857.5609803,
+    "seen": 1793951594.95091,
+    "ast_hash": "4685a45dfd56f8b43a8da18c4c69b455",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/MasterDataIOPage.test.tsx": {
@@ -5394,9 +4968,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1793864741.7944057,
-    "seen": 1793895552.2125041,
-    "ast_hash": "db83731f0eb3e988faf10340d31e8fe9",
+    "mtime": 1793951530.1370673,
+    "seen": 1793951594.9515269,
+    "ast_hash": "9bed9b59b190c125c2cc7e5a40aced61",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -5550,8 +5124,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_package_prices_admin.sql.go": {
-    "mtime": 1793873802.6742127,
-    "seen": 1793895552.2107065,
+    "mtime": 1793932934.862907,
+    "seen": 1793951594.9500878,
     "ast_hash": "3144a0127408d192c8682fe47fc0c160",
     "semantic_hash": ""
   },
@@ -5622,9 +5196,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicsPanel.tsx": {
-    "mtime": 1793688386.1029158,
-    "seen": 1793795879.1123025,
-    "ast_hash": "3a9bf9e0ce7d1a125edfadd392f06922",
+    "mtime": 1793926654.2002604,
+    "seen": 1793951594.950855,
+    "ast_hash": "b818c281668ba53b7dadee52ae9cfa70",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VaultsPanel.tsx": {
@@ -5652,9 +5226,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorPicFormDialog.tsx": {
-    "mtime": 1793688386.1064484,
-    "seen": 1793795879.1123242,
-    "ast_hash": "b814db4327ff277913a8cb535bc09101",
+    "mtime": 1793926992.2948217,
+    "seen": 1793951594.950876,
+    "ast_hash": "20dac8bbfc920f70df9c4358a52f0bf7",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/VendorVaultFormDialog.tsx": {
@@ -5676,9 +5250,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPicFormSchema.ts": {
-    "mtime": 1793688386.1136057,
-    "seen": 1793795879.1123457,
-    "ast_hash": "3572e4f9ca9a4b13b69235085f080c15",
+    "mtime": 1793926983.7162986,
+    "seen": 1793951594.9508953,
+    "ast_hash": "549cb463a34eb5dcef7c38b05711d2a1",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorVaultFormSchema.ts": {
@@ -5735,57 +5309,15 @@
     "ast_hash": "a06c9b8fc4789bc00e1da6fe234d1b08",
     "semantic_hash": ""
   },
-  "UI-design/crown-vendor-detail/src/App.jsx": {
-    "mtime": 1791369185.1195457,
-    "seen": 1791380962.998035,
-    "ast_hash": "374c52ed5a938b2906c400451a46d43c",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/src/components/HargaPaketTab.jsx": {
-    "mtime": 1791369185.1232834,
-    "seen": 1791380962.9980373,
-    "ast_hash": "07df3fb7e8185e0055718859eae15f6d",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/src/components/SimpleTabs.jsx": {
-    "mtime": 1791369185.1243067,
-    "seen": 1791380962.998039,
-    "ast_hash": "1e65b0d16df10b978a7a515aba46754e",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/src/components/Topbar.jsx": {
-    "mtime": 1791369185.1243067,
-    "seen": 1791380962.998042,
-    "ast_hash": "039e769c36b87ea2054b36ca8f3931e9",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/src/components/VendorHeader.jsx": {
-    "mtime": 1791369185.1253011,
-    "seen": 1791380962.9980447,
-    "ast_hash": "641d8a56730893195dc2e41573cb0215",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/src/data.js": {
-    "mtime": 1791369185.1264627,
-    "seen": 1791380962.9980462,
-    "ast_hash": "10abb083c0949541fd84cbd7fba58646",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/update_vendor_package_prices.sql": {
-    "mtime": 1791369185.1264627,
-    "seen": 1791380962.9980485,
-    "ast_hash": "2e761757da63ad91eaa62a523c1f4d42",
-    "semantic_hash": ""
-  },
   "backend/internal/db/regions_admin.sql.go": {
-    "mtime": 1793873802.6736884,
-    "seen": 1793895552.2106938,
+    "mtime": 1793932934.6118057,
+    "seen": 1793951594.950076,
     "ast_hash": "142e111cb3cec70526328e7bc5b5128f",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_branch_atms.sql.go": {
-    "mtime": 1793873802.675284,
-    "seen": 1793895552.2107036,
+    "mtime": 1793932934.8302193,
+    "seen": 1793951594.9500852,
     "ast_hash": "09700a3681ceb296855a38c46fa67ce0",
     "semantic_hash": ""
   },
@@ -5994,15 +5526,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/InfoTab.test.tsx": {
-    "mtime": 1791369185.5764346,
-    "seen": 1791380962.998637,
-    "ast_hash": "5cd1e5208d34bfb5dba30b8b863362b6",
+    "mtime": 1793932229.7294202,
+    "seen": 1793951594.9508476,
+    "ast_hash": "557961245a7aa3359bec06e6c22bcb4e",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/InfoTab.tsx": {
-    "mtime": 1791369185.57681,
-    "seen": 1791380962.9986382,
-    "ast_hash": "64891ab566995628486e26d7fdbdb949",
+    "mtime": 1793926663.913054,
+    "seen": 1793951594.9508488,
+    "ast_hash": "6a1d2adb5065450925b36628d0a269a5",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PackagePricesPanel.test.tsx": {
@@ -6063,12 +5595,6 @@
     "mtime": 1793688386.8698506,
     "seen": 1793795879.1128654,
     "ast_hash": "21bf0abd8a0d75bd619b7eae4d3078db",
-    "semantic_hash": ""
-  },
-  "UI-design/crown-vendor-detail/README.md": {
-    "mtime": 1791369185.1195457,
-    "seen": 1791380962.9992676,
-    "ast_hash": "e31055c36a6b78e076c76ae0dbd4040e",
     "semantic_hash": ""
   },
   "backend/migrations/019_import_jobs.sql": {
@@ -6132,9 +5658,9 @@
     "semantic_hash": ""
   },
   ".claude/docs/data-map.md": {
-    "mtime": 1793688385.5840344,
-    "seen": 1793795879.1131146,
-    "ast_hash": "6faf8d5e2fe8ec417138a4233a82b41c",
+    "mtime": 1793933485.629624,
+    "seen": 1793951594.95153,
+    "ast_hash": "c793fcf97928817030d983ba565fca0b",
     "semantic_hash": ""
   },
   ".claude/docs/decisions.md": {
@@ -6144,9 +5670,9 @@
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
-    "mtime": 1793852423.3602345,
-    "seen": 1793895552.212511,
-    "ast_hash": "d74b506b480d68fdb338190cdb51ab31",
+    "mtime": 1793951531.7436244,
+    "seen": 1793951594.951532,
+    "ast_hash": "d657fce832c42fd0d5a5ab9a16f4e687",
     "semantic_hash": ""
   },
   ".claude/docs/requirements.md": {
@@ -6222,8 +5748,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atm_visit_quota.sql.go": {
-    "mtime": 1793873802.6742127,
-    "seen": 1793895552.2106736,
+    "mtime": 1793932934.1201751,
+    "seen": 1793951594.9500585,
     "ast_hash": "3bcffbf00633c4681d832439c3829939",
     "semantic_hash": ""
   },
@@ -6348,8 +5874,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/notifications.sql.go": {
-    "mtime": 1793873802.675284,
-    "seen": 1793895552.2106926,
+    "mtime": 1793932934.5928073,
+    "seen": 1793951594.9500747,
     "ast_hash": "0b464ab04f8e62a132a2bf17e91a9b53",
     "semantic_hash": ""
   },
@@ -6516,20 +6042,20 @@
     "semantic_hash": ""
   },
   "backend/internal/db/acm_areas_admin.sql.go": {
-    "mtime": 1793873802.6639037,
-    "seen": 1793895552.2106683,
+    "mtime": 1793932934.0425594,
+    "seen": 1793951594.9500537,
     "ast_hash": "234caf6dd1d05c5b243ac0c4688b57e3",
     "semantic_hash": ""
   },
   "backend/internal/db/dsr_location_maps_admin.sql.go": {
-    "mtime": 1793873802.6731725,
-    "seen": 1793895552.210685,
+    "mtime": 1793932934.278335,
+    "seen": 1793951594.9500678,
     "ast_hash": "48e5ede852ec7b2e90909c6a5e3aee1a",
     "semantic_hash": ""
   },
   "backend/internal/db/vault_plans.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2107012,
+    "mtime": 1793932934.6941533,
+    "seen": 1793951594.950083,
     "ast_hash": "576f34523e107101103addbe3127e1b0",
     "semantic_hash": ""
   },
@@ -6774,8 +6300,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_parties.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.2107093,
+    "mtime": 1793932934.8963542,
+    "seen": 1793951594.9500902,
     "ast_hash": "a98023daf94ee58341d6ac95710f8d66",
     "semantic_hash": ""
   },
@@ -7092,14 +6618,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vault_allocations.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.2106998,
+    "mtime": 1793932934.6796565,
+    "seen": 1793951594.950082,
     "ast_hash": "8598fab0577d7e02d483630d21b92231",
     "semantic_hash": ""
   },
   "backend/internal/db/vault_tickets.sql.go": {
-    "mtime": 1793873802.6747565,
-    "seen": 1793895552.2107027,
+    "mtime": 1793932934.8127542,
+    "seen": 1793951594.9500842,
     "ast_hash": "4b0c3842dabbb94dc3cc73a6e3e05c7a",
     "semantic_hash": ""
   },
@@ -7164,14 +6690,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/holidays_admin.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2106864,
+    "mtime": 1793932934.2915413,
+    "seen": 1793951594.950069,
     "ast_hash": "0c0e8e65ece649c37b8aab5d8799e33e",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_realizations.sql.go": {
-    "mtime": 1793873802.6747565,
-    "seen": 1793895552.2107143,
+    "mtime": 1793932935.5721228,
+    "seen": 1793951594.950094,
     "ast_hash": "0235f14fa83c3c1e01d43653464f59d1",
     "semantic_hash": ""
   },
@@ -7230,8 +6756,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/replenish_classifications.sql.go": {
-    "mtime": 1793873802.6721535,
-    "seen": 1793895552.2106955,
+    "mtime": 1793932934.6278436,
+    "seen": 1793951594.9500778,
     "ast_hash": "ccdbabbadc2e2678186497fc76072912",
     "semantic_hash": ""
   },
@@ -7848,9 +7374,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_csv.go": {
-    "mtime": 1793688385.954494,
-    "seen": 1793795879.1117017,
-    "ast_hash": "edce5874657d4efb9bc0204eecf4f392",
+    "mtime": 1793948624.5080066,
+    "seen": 1793951594.950399,
+    "ast_hash": "c496e43e8466c6deb834fe0d3cc40276",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_validate.go": {
@@ -7896,21 +7422,21 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/openapi_contract_test.go": {
-    "mtime": 1793688385.8984413,
-    "seen": 1793795879.1114538,
-    "ast_hash": "e974ccd5a96047b6e1e0576f273882f0",
+    "mtime": 1793925211.0530593,
+    "seen": 1793951594.9501975,
+    "ast_hash": "2112ac5b13f1c2d5631f2b572ca913fd",
     "semantic_hash": ""
   },
   "backend/api/openapi.yaml": {
-    "mtime": 1793688385.845024,
-    "seen": 1793795879.1133745,
-    "ast_hash": "fce3b485c00d5f4e4d95c97217ca0499",
+    "mtime": 1793925192.8695958,
+    "seen": 1793951594.951745,
+    "ast_hash": "c2ca59607b96801c88fbcc10de6a51fa",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/schema.d.ts": {
-    "mtime": 1793759777.4155984,
-    "seen": 1793795879.1127534,
-    "ast_hash": "c19f975db3ac910a5afccd244278f8c7",
+    "mtime": 1793933126.5092938,
+    "seen": 1793951594.9512165,
+    "ast_hash": "c1676c4e871aa68ef113effe11f35798",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/schema.test.ts": {
@@ -8646,9 +8172,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_import_pic_roles_test.go": {
-    "mtime": 1793895104.3577242,
-    "seen": 1793895552.2110736,
-    "ast_hash": "ff8d3936045f6879328c30a2370ea380",
+    "mtime": 1793896129.651433,
+    "seen": 1793951594.950411,
+    "ast_hash": "da95b8f026fd948eebc4d30aff9f6b8b",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/PicRolesDialog.test.tsx": {
@@ -8658,9 +8184,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicRolesDialog.tsx": {
-    "mtime": 1793688386.102387,
-    "seen": 1793795879.1123016,
-    "ast_hash": "2ac6f7f572a6190eff6b6fa80a178e93",
+    "mtime": 1793926659.9476938,
+    "seen": 1793951594.9508538,
+    "ast_hash": "214e24a5828490e0ccd8f5e8027dfeac",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/picRoles.ts": {
@@ -8850,9 +8376,9 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers.go": {
-    "mtime": 1793873363.1877034,
-    "seen": 1793895552.2105448,
-    "ast_hash": "8ae8aae31b337b6622b528204f9a1aa2",
+    "mtime": 1793941303.7678773,
+    "seen": 1793951594.9499502,
+    "ast_hash": "8a546f0bcb61f476a370ec37a2e87757",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_integration_test.go": {
@@ -8862,27 +8388,27 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_property_test.go": {
-    "mtime": 1793688385.8266957,
-    "seen": 1793795879.1110203,
-    "ast_hash": "964a35133d2fdacbe489e65c1206a72b",
+    "mtime": 1793949820.3687623,
+    "seen": 1793951594.949953,
+    "ast_hash": "e04776176a35eaa0344cc0e7b46e5bc9",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_report.go": {
-    "mtime": 1793873356.438734,
-    "seen": 1793895552.2105494,
-    "ast_hash": "0f265acb45febc647db83be10596cfa4",
+    "mtime": 1793941303.7663202,
+    "seen": 1793951594.9499538,
+    "ast_hash": "6fc069c2a98600af9fd1c79fb873f090",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_report_test.go": {
-    "mtime": 1793873376.912684,
-    "seen": 1793895552.2105505,
+    "mtime": 1793941313.4068549,
+    "seen": 1793951594.9499547,
     "ast_hash": "7334acddc97b7fe181e78d40a3fa1420",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/producers_test.go": {
-    "mtime": 1793873376.912684,
-    "seen": 1793895552.2105517,
-    "ast_hash": "5c858aedb73b330ef55d22141f2b3236",
+    "mtime": 1793941339.8725333,
+    "seen": 1793951594.9499557,
+    "ast_hash": "d41319149023743c4246cc87fed5c8df",
     "semantic_hash": ""
   },
   "backend-exq/internal/exportjob/report_params.go": {
@@ -8982,62 +8508,62 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/audit.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105844,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.949984,
     "ast_hash": "8f912e1783db09252060e7b8e72e82e5",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/db.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105856,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.949985,
     "ast_hash": "a02b41b82aa4d50d55e3711e99c3cf2d",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/dsr_late_report.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105865,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.9499857,
     "ast_hash": "9ae3e5198bf624ba5a6f02d9f550af1e",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/export_jobs.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.210588,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.949987,
     "ast_hash": "7eb04ac4873840e9276732fd5d0a931f",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/export_preview.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105892,
-    "ast_hash": "929db39928e07b71aed18cafc7fc8677",
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.9499881,
+    "ast_hash": "3dd4208cf4e6abea679bca677bb5f809",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/master_data_export.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105906,
+    "mtime": 1793949822.8468552,
+    "seen": 1793951594.949989,
     "ast_hash": "42fe53402bea34db99662ba2e0e1df18",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/models.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.210592,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.94999,
     "ast_hash": "32d3b984bb84878da7c29f8928053a7f",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/replenish_classifications.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.210593,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.9499912,
     "ast_hash": "29431dd8532d0d54d2470731a726b821",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/user_role.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105956,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.9499931,
     "ast_hash": "f10c18df622d14c52469385b1a5d0c9c",
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/vendor_export.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.2105968,
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.949994,
     "ast_hash": "83a5c1f346b3fd8b589abc0e98238fa3",
     "semantic_hash": ""
   },
@@ -9054,9 +8580,9 @@
     "semantic_hash": ""
   },
   "backend-exq/queries/export_preview.sql": {
-    "mtime": 1793688385.845024,
-    "seen": 1793795879.1111076,
-    "ast_hash": "a052ef1b2bea19ddf931e47ffe9ab964",
+    "mtime": 1793939919.5300474,
+    "seen": 1793951594.9500005,
+    "ast_hash": "64a12a7a895cca8e1f1e6a3039287051",
     "semantic_hash": ""
   },
   "backend-exq/queries/user_role.sql": {
@@ -9072,14 +8598,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/dsr_late_report.sql.go": {
-    "mtime": 1793873802.6736884,
-    "seen": 1793895552.2106833,
+    "mtime": 1793932934.2577465,
+    "seen": 1793951594.9500668,
     "ast_hash": "386088b8728b24b4a18548a7c5b6e644",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data_import.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.21069,
+    "mtime": 1793932934.5514936,
+    "seen": 1793951594.9500723,
     "ast_hash": "89486a3d7479c3909655a61f4c3e072b",
     "semantic_hash": ""
   },
@@ -9162,15 +8688,15 @@
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_export_golden_test.go": {
-    "mtime": 1793688385.9472723,
-    "seen": 1793795879.1116893,
+    "mtime": 1793949270.8077612,
+    "seen": 1793951594.9503906,
     "ast_hash": "09a9d745bc9a7e78c495e5747d6dfd24",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_export_roundtrip_integration_test.go": {
-    "mtime": 1793688385.9472723,
-    "seen": 1793795879.1116908,
-    "ast_hash": "7322b7586c63aeb2a3fa1eddf46f2c9e",
+    "mtime": 1793949216.987929,
+    "seen": 1793951594.9503915,
+    "ast_hash": "eaa2237be2a006a68a08824eeb61137b",
     "semantic_hash": ""
   },
   "backend/internal/service/masterdata_export_scoped_roundtrip_integration_test.go": {
@@ -9264,9 +8790,9 @@
     "semantic_hash": ""
   },
   "backend_python/dsr_late_notify/test_job_integration.py": {
-    "mtime": 1793688386.03838,
-    "seen": 1793795879.1119735,
-    "ast_hash": "995c0b0dd4827932502c84b36ac84cd0",
+    "mtime": 1793896238.7134523,
+    "seen": 1793951594.950602,
+    "ast_hash": "cf0af7bf8fea66e6b5ccc30159442b55",
     "semantic_hash": ""
   },
   "backend_python/dsr_late_notify/test_message.py": {
@@ -9414,9 +8940,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/api.test.ts": {
-    "mtime": 1793688386.1820765,
-    "seen": 1793795879.1125345,
-    "ast_hash": "11c6ed8ba10980091b5f6bd1dd075003",
+    "mtime": 1793925745.5718853,
+    "seen": 1793951594.951042,
+    "ast_hash": "cb8e82955cbdaf296991cb79093c7e42",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/api.ts": {
@@ -9504,15 +9030,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/status.ts": {
-    "mtime": 1793688386.2299438,
-    "seen": 1793795879.1125715,
-    "ast_hash": "05504d3449e0149ed34b340aea1211d5",
+    "mtime": 1793926615.593304,
+    "seen": 1793951594.9510732,
+    "ast_hash": "1bad8a3dcad85625adacb062ec34964c",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/types.ts": {
-    "mtime": 1793688386.2318525,
-    "seen": 1793795879.1125727,
-    "ast_hash": "01f00ea42ce301577f7bdd46e2eb936f",
+    "mtime": 1793926610.7148292,
+    "seen": 1793951594.9510746,
+    "ast_hash": "33690bf503c2013f10472528ce4cb8b2",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/useBeforeUnloadGuard.ts": {
@@ -9540,9 +9066,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/exq-schema.d.ts": {
-    "mtime": 1793701809.4514694,
-    "seen": 1793795879.1127496,
-    "ast_hash": "92c00721224a76c7e9c3053841401c4e",
+    "mtime": 1793949242.886166,
+    "seen": 1793951594.9512136,
+    "ast_hash": "9affa417c6130b9d79387c90034bc833",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/exq-schema.test.ts": {
@@ -9672,9 +9198,9 @@
     "semantic_hash": ""
   },
   "pkg/csvexport/entities.go": {
-    "mtime": 1793871622.8887568,
-    "seen": 1793895552.2124279,
-    "ast_hash": "6f6694c37a3d15183ec1e859a2ec6825",
+    "mtime": 1793939920.4766705,
+    "seen": 1793951594.9514604,
+    "ast_hash": "5af35f703261d1bafcbff2769fa51730",
     "semantic_hash": ""
   },
   "pkg/csvexport/property_test.go": {
@@ -9810,9 +9336,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/components/PreviewTable.tsx": {
-    "mtime": 1793688386.2073748,
-    "seen": 1793795879.1125548,
-    "ast_hash": "baeb3d7b1d0db32a1eb8ee7f688766ff",
+    "mtime": 1793941297.5870156,
+    "seen": 1793951594.9510584,
+    "ast_hash": "9b009fcd5bcf100ea03e5132cff7b16d",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/datasets.property.test.ts": {
@@ -9822,9 +9348,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/datasets.ts": {
-    "mtime": 1793688386.215981,
-    "seen": 1793795879.112561,
-    "ast_hash": "2ee553fa936ea9bc8c92b54bf584e93f",
+    "mtime": 1793941297.59402,
+    "seen": 1793951594.9510634,
+    "ast_hash": "0677be6a492981c1893a79dd1ea2e01b",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/exports/exportButtonState.property.test.ts": {
@@ -9960,9 +9486,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/master-data-io/components/ImportWizard.tsx": {
-    "mtime": 1793688386.2820313,
-    "seen": 1793795879.1126068,
-    "ast_hash": "9790b35d9f1071f8572b7075542cc70a",
+    "mtime": 1793939896.4536912,
+    "seen": 1793951594.9511037,
+    "ast_hash": "9d3d4a0ec6bc6c6871e20220f21f22da",
     "semantic_hash": ""
   },
   "backend/internal/handler/approval_master_data_detail_paging_test.go": {
@@ -10914,20 +10440,20 @@
     "semantic_hash": ""
   },
   "backend-exq/internal/repository/vendor_pks_report.sql.go": {
-    "mtime": 1793873810.029922,
-    "seen": 1793895552.210598,
+    "mtime": 1793949822.8468552,
+    "seen": 1793951594.9499967,
     "ast_hash": "6bd83edf3310bc7aa5efc3fbb85553a0",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks.sql.go": {
-    "mtime": 1793873802.6747565,
-    "seen": 1793895552.2107117,
+    "mtime": 1793932935.1354408,
+    "seen": 1793951594.9500923,
     "ast_hash": "ca13560a8ab39fefbf3ca95717a27eaf",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks_report.sql.go": {
-    "mtime": 1793873802.670615,
-    "seen": 1793895552.2107131,
+    "mtime": 1793932935.3584745,
+    "seen": 1793951594.9500933,
     "ast_hash": "190b966305f6f95bdfcddab920f3a57e",
     "semantic_hash": ""
   },
@@ -10962,9 +10488,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_pks_admin.go": {
-    "mtime": 1793873572.1360323,
-    "seen": 1793895552.211143,
-    "ast_hash": "023a86542515f200e64b4984102c434f",
+    "mtime": 1793933099.9685106,
+    "seen": 1793951594.9504726,
+    "ast_hash": "88d063eafd4565727f897c10853dc53b",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_pks_admin_test.go": {
@@ -11004,15 +10530,15 @@
     "semantic_hash": ""
   },
   "pkg/reports/vendor_pks.go": {
-    "mtime": 1793871614.8659256,
-    "seen": 1793895552.2124603,
-    "ast_hash": "e88406fc7c533e35c2cf3bcb915ae0ea",
+    "mtime": 1793939946.3304496,
+    "seen": 1793951594.951484,
+    "ast_hash": "f72cdb4671cc3184583e540e5a599119",
     "semantic_hash": ""
   },
   "pkg/reports/vendor_pks_test.go": {
-    "mtime": 1793872330.6650991,
-    "seen": 1793895552.2124612,
-    "ast_hash": "5a6b10b1c97308cd0b6b760d0f287956",
+    "mtime": 1793939909.0213442,
+    "seen": 1793951594.9514856,
+    "ast_hash": "d02ed53957728c49a9bd0a0ced516726",
     "semantic_hash": ""
   },
   ".archives/backend_QC_fixes.md": {
@@ -11229,6 +10755,654 @@
     "mtime": 1788443693.96361,
     "seen": 1793895552.212855,
     "ast_hash": "9f4f5c7c5043eab146c7168bf84dfb1c",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/App.jsx": {
+    "mtime": 1791369185.1195457,
+    "seen": 1793951594.9496622,
+    "ast_hash": "374c52ed5a938b2906c400451a46d43c",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/components/HargaPaketTab.jsx": {
+    "mtime": 1791369185.1232834,
+    "seen": 1793951594.9496646,
+    "ast_hash": "07df3fb7e8185e0055718859eae15f6d",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/components/SimpleTabs.jsx": {
+    "mtime": 1791369185.1243067,
+    "seen": 1793951594.949666,
+    "ast_hash": "1e65b0d16df10b978a7a515aba46754e",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/components/Topbar.jsx": {
+    "mtime": 1791369185.1243067,
+    "seen": 1793951594.9496677,
+    "ast_hash": "039e769c36b87ea2054b36ca8f3931e9",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/components/VendorHeader.jsx": {
+    "mtime": 1791369185.1253011,
+    "seen": 1793951594.9496686,
+    "ast_hash": "641d8a56730893195dc2e41573cb0215",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/src/data.js": {
+    "mtime": 1791369185.1264627,
+    "seen": 1793951594.9496698,
+    "ast_hash": "10abb083c0949541fd84cbd7fba58646",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/update_vendor_package_prices.sql": {
+    "mtime": 1791369185.1264627,
+    "seen": 1793951594.949671,
+    "ast_hash": "2e761757da63ad91eaa62a523c1f4d42",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/package.json": {
+    "mtime": 1791369185.130328,
+    "seen": 1793951594.9496725,
+    "ast_hash": "57f4800b4c78c57ace7c048d47557e8d",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/Kit.jsx": {
+    "mtime": 1791369185.1313255,
+    "seen": 1793951594.949674,
+    "ast_hash": "6a96a84a391fd62922b575b96fca3f09",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/accordion.jsx": {
+    "mtime": 1791369185.1313255,
+    "seen": 1793951594.9496756,
+    "ast_hash": "c6d3ede2d2b21d5f69790ffb0e3d4729",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/alert-dialog.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.9496768,
+    "ast_hash": "96b7a92464b82156ef1e492a130798ce",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/alert.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.9496784,
+    "ast_hash": "0c57b500ec9dbdae4bffa54e0613d19b",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/aspect-ratio.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.9496794,
+    "ast_hash": "4fd8ad8d96138041d56c3f03fe150e27",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/avatar.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.9496803,
+    "ast_hash": "8d686a3f133bad6ea0d072f62bbf14dc",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/badge.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.949682,
+    "ast_hash": "cd963c0c656553b16681a6d60069d6e2",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/breadcrumb.jsx": {
+    "mtime": 1791369185.1323173,
+    "seen": 1793951594.9496832,
+    "ast_hash": "04299e8f496175af6561e98c13c04657",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/button-group.jsx": {
+    "mtime": 1791369185.1354642,
+    "seen": 1793951594.9496844,
+    "ast_hash": "3fe141f34151306fea742b794a343189",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/button.jsx": {
+    "mtime": 1791369185.1354642,
+    "seen": 1793951594.9496856,
+    "ast_hash": "7a42606720d5007be6c58f5c3da3c754",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/calendar.jsx": {
+    "mtime": 1791369185.136481,
+    "seen": 1793951594.9496865,
+    "ast_hash": "d86f64bf2f090d71f30eddfeda16a2de",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/card.jsx": {
+    "mtime": 1791369185.136481,
+    "seen": 1793951594.9496877,
+    "ast_hash": "fb0efdc44de4498666ebbdfc30227e5e",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/carousel.jsx": {
+    "mtime": 1791369185.137483,
+    "seen": 1793951594.9496891,
+    "ast_hash": "3cfcf65b0f57c49640dae8e1aec42f0a",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/chart.jsx": {
+    "mtime": 1791369185.137483,
+    "seen": 1793951594.94969,
+    "ast_hash": "b3d6cf44d1359f21e5948de3e3efb091",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/checkbox.jsx": {
+    "mtime": 1791369185.137483,
+    "seen": 1793951594.949691,
+    "ast_hash": "c664da9a411aec82293537c3595abc4a",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/collapsible.jsx": {
+    "mtime": 1791369185.1384945,
+    "seen": 1793951594.9496925,
+    "ast_hash": "d104968769456625fcf661ef2cf606d1",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/command.jsx": {
+    "mtime": 1791369185.139289,
+    "seen": 1793951594.9496934,
+    "ast_hash": "961cfbab37fa8b4a71fbbc8371da0717",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/context-menu.jsx": {
+    "mtime": 1791369185.139289,
+    "seen": 1793951594.9496946,
+    "ast_hash": "54b051fd16265d88f7a0fcf7a441573c",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/dialog.jsx": {
+    "mtime": 1791369185.139289,
+    "seen": 1793951594.9496958,
+    "ast_hash": "0134960852d84c6534f0ae905c639adb",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/drawer.jsx": {
+    "mtime": 1791369185.139289,
+    "seen": 1793951594.9496965,
+    "ast_hash": "b092737cf21abd6c163a995b8ce29739",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/dropdown-menu.jsx": {
+    "mtime": 1791369185.1417146,
+    "seen": 1793951594.9496975,
+    "ast_hash": "86c37b6f023540c6979f8a65b387bb80",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/empty.jsx": {
+    "mtime": 1791369185.1427321,
+    "seen": 1793951594.949699,
+    "ast_hash": "52009b62af4512b531aee57ff5ffc676",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/field.jsx": {
+    "mtime": 1791369185.1437304,
+    "seen": 1793951594.9497,
+    "ast_hash": "bc2e01eb868d6e46b36317c3b8b2d2d5",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/form.jsx": {
+    "mtime": 1791369185.1437304,
+    "seen": 1793951594.9497013,
+    "ast_hash": "b6ea55a77cb42e01b6f27089cec8669b",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/hover-card.jsx": {
+    "mtime": 1791369185.1447306,
+    "seen": 1793951594.9497027,
+    "ast_hash": "bbe6b8a4e71b3a15552a23c36f4b56b3",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input-group.jsx": {
+    "mtime": 1791369185.145729,
+    "seen": 1793951594.9497037,
+    "ast_hash": "d5de9d47b806580fb217a4a7c3f06e6c",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input-otp.jsx": {
+    "mtime": 1791369185.1526496,
+    "seen": 1793951594.949705,
+    "ast_hash": "68ec6fe1e3ed595c7b21e52c6ef43b1b",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/input.jsx": {
+    "mtime": 1791369185.1548345,
+    "seen": 1793951594.949706,
+    "ast_hash": "266fa7882a56c3a0424229f4ba7e0781",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/item.jsx": {
+    "mtime": 1791369185.1558535,
+    "seen": 1793951594.949707,
+    "ast_hash": "fbc238844f8ba2fcbe4d99aea746ad76",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/kbd.jsx": {
+    "mtime": 1791369185.1568499,
+    "seen": 1793951594.949708,
+    "ast_hash": "1f30a34e923fb2c9d83fdd6d4f673eeb",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/label.jsx": {
+    "mtime": 1791369185.157325,
+    "seen": 1793951594.9497087,
+    "ast_hash": "37822229bc85dcea763ce05e1c7a0a66",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/menubar.jsx": {
+    "mtime": 1791369185.1583946,
+    "seen": 1793951594.9497101,
+    "ast_hash": "eb9f675722147ddfc8e7ad7704860878",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/navigation-menu.jsx": {
+    "mtime": 1791369185.1583946,
+    "seen": 1793951594.9497113,
+    "ast_hash": "a8752a703fb4253452b0516e0a644871",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/pagination.jsx": {
+    "mtime": 1791369185.1593945,
+    "seen": 1793951594.9497123,
+    "ast_hash": "b1d218fc44b545aba18ee035a6832578",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/popover.jsx": {
+    "mtime": 1791369185.1601324,
+    "seen": 1793951594.9497135,
+    "ast_hash": "f1a34487c836304b604836b98850fc6e",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/progress.jsx": {
+    "mtime": 1791369185.1601324,
+    "seen": 1793951594.9497147,
+    "ast_hash": "6852c83964d5e80e6bcf2981771228b7",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/radio-group.jsx": {
+    "mtime": 1791369185.1601324,
+    "seen": 1793951594.9497156,
+    "ast_hash": "f0f94b0ed27f7a2668f8dd1e1d91fe13",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/resizable.jsx": {
+    "mtime": 1791369185.1621385,
+    "seen": 1793951594.949717,
+    "ast_hash": "de932d5a372757e19db646ce5d2d1d63",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/scroll-area.jsx": {
+    "mtime": 1791369185.1631775,
+    "seen": 1793951594.9497178,
+    "ast_hash": "4e037be024301fcff8c88871a3b69384",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/select.jsx": {
+    "mtime": 1791369185.1641724,
+    "seen": 1793951594.9497187,
+    "ast_hash": "420cec1782401a42b4a4cf92afa07be1",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/separator.jsx": {
+    "mtime": 1791369185.165251,
+    "seen": 1793951594.94972,
+    "ast_hash": "b0534a33ab7b9c2373a6c55185f4577d",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sheet.jsx": {
+    "mtime": 1791369185.1657555,
+    "seen": 1793951594.9497206,
+    "ast_hash": "a95430da53c622a8aec187c5e142d435",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sidebar.jsx": {
+    "mtime": 1791369185.166994,
+    "seen": 1793951594.949722,
+    "ast_hash": "d63e4d84ff35e857253423ceca8d4705",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/skeleton.jsx": {
+    "mtime": 1791369185.166994,
+    "seen": 1793951594.9497232,
+    "ast_hash": "fbf1e3798eed4ed951a13065e90f97d8",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/slider.jsx": {
+    "mtime": 1791369185.1679914,
+    "seen": 1793951594.949724,
+    "ast_hash": "c14441cdc68f1edf4f531edc50a264f0",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/sonner.jsx": {
+    "mtime": 1791369185.1689892,
+    "seen": 1793951594.9497247,
+    "ast_hash": "ec6a8fb37e0af4cb5d4ae0d83ea51ee9",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/spinner.jsx": {
+    "mtime": 1791369185.1689892,
+    "seen": 1793951594.9497254,
+    "ast_hash": "21d714670be17ebc6de648539cfad2e0",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/switch.jsx": {
+    "mtime": 1791369185.1699915,
+    "seen": 1793951594.9497266,
+    "ast_hash": "efd9e8e764be186c510fa32eb4fd7744",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/table.jsx": {
+    "mtime": 1791369185.1699915,
+    "seen": 1793951594.9497275,
+    "ast_hash": "42a0c7f50825bca5cc06120990758bc6",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/tabs.jsx": {
+    "mtime": 1791369185.1699915,
+    "seen": 1793951594.9497285,
+    "ast_hash": "d1209000d49ca113193d9eb334703500",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/textarea.jsx": {
+    "mtime": 1791369185.1699915,
+    "seen": 1793951594.9497294,
+    "ast_hash": "6b88f03704769ffc9b05563d53b27e64",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/toggle-group.jsx": {
+    "mtime": 1791369185.1731708,
+    "seen": 1793951594.9497304,
+    "ast_hash": "f4e47ea6e8e0176cf7181f477f25592b",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/toggle.jsx": {
+    "mtime": 1791369185.1731708,
+    "seen": 1793951594.949731,
+    "ast_hash": "7ceded7613c7132060cfcb81bd9f60d8",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/tooltip.jsx": {
+    "mtime": 1791369185.174541,
+    "seen": 1793951594.9497318,
+    "ast_hash": "ce19f3839d8ecebf2d355e58df1ede13",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/use-mobile.jsx": {
+    "mtime": 1791369185.174541,
+    "seen": 1793951594.9497328,
+    "ast_hash": "b70d5509d00d4dcac66b4b1b98fc4b6a",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/src/utils.js": {
+    "mtime": 1791369185.175178,
+    "seen": 1793951594.949734,
+    "ast_hash": "b3e652bde775c4efce3dc96f6a28c9d8",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/App.jsx": {
+    "mtime": 1791369185.1761844,
+    "seen": 1793951594.9497347,
+    "ast_hash": "0b448cbdb036fa2919eaf5591255df50",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/Rail.jsx": {
+    "mtime": 1791369185.1761844,
+    "seen": 1793951594.9497356,
+    "ast_hash": "18f32e9a782ddd7839df046bf0ebf6f3",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/SimpleApp.jsx": {
+    "mtime": 1791369185.1771839,
+    "seen": 1793951594.9497366,
+    "ast_hash": "6faa817a488a7c146bc8151aaa496e26",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/TeamPanel.jsx": {
+    "mtime": 1791369185.1771839,
+    "seen": 1793951594.9497375,
+    "ast_hash": "c2d2332593771921e3798e5e22eae133",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/data.js": {
+    "mtime": 1791369185.1785047,
+    "seen": 1793951594.949739,
+    "ast_hash": "9368966102d7f29f9de2b6aff342c88c",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/dialogs.jsx": {
+    "mtime": 1791369185.1785047,
+    "seen": 1793951594.9497395,
+    "ast_hash": "14705a2081dda648d8465b491f3b5e97",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/src/ui.jsx": {
+    "mtime": 1791369185.180517,
+    "seen": 1793951594.9497406,
+    "ast_hash": "2496307abb82a0088a5a204e27124fdd",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/tests/artifact.spec.js": {
+    "mtime": 1791369185.1831498,
+    "seen": 1793951594.9497414,
+    "ast_hash": "c7696a52ff5a42066af4e2e2cd74c06c",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/exportjob/producers_vendor_pks_test.go": {
+    "mtime": 1793948676.180889,
+    "seen": 1793951594.9499567,
+    "ast_hash": "6bd8762cea693af6886471a93dc4c33d",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/exportjob/vendor_export_access_audit_integration_test.go": {
+    "mtime": 1793949061.0266204,
+    "seen": 1793951594.9499648,
+    "ast_hash": "fd59a3e855be380e0551d70ad691994c",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/exportjob/vendor_export_pks_integration_test.go": {
+    "mtime": 1793949147.6003802,
+    "seen": 1793951594.9499657,
+    "ast_hash": "f852f500ac5b516942e455a7812a128a",
+    "semantic_hash": ""
+  },
+  "backend-exq/internal/repository/vendor_export_pks.sql.go": {
+    "mtime": 1793949822.8488677,
+    "seen": 1793951594.9499953,
+    "ast_hash": "a7f89c578cb614b0f316af75916235f1",
+    "semantic_hash": ""
+  },
+  "backend-exq/queries/vendor_export_pks.sql": {
+    "mtime": 1793939906.4293418,
+    "seen": 1793951594.9500036,
+    "ast_hash": "17e53df4697f43dc64589943a1405fc2",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/admin_vendor_pks_handler.go": {
+    "mtime": 1793895905.997343,
+    "seen": 1793951594.9501538,
+    "ast_hash": "d6dd92628f20834e2f6b26f6e3ae91aa",
+    "semantic_hash": ""
+  },
+  "backend/internal/handler/admin_vendor_pks_handler_test.go": {
+    "mtime": 1793925133.1499834,
+    "seen": 1793951594.9501545,
+    "ast_hash": "d4acd9324e651b26a9b296d47607b938",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/masterdata_import_export_header_test.go": {
+    "mtime": 1793948814.3095956,
+    "seen": 1793951594.9504004,
+    "ast_hash": "40d446cb10acd1d888172503c55155df",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_admin_list_pks_integration_test.go": {
+    "mtime": 1793925176.4783285,
+    "seen": 1793951594.9504433,
+    "ast_hash": "0d7d081000310443bf3d8e2f948d93e3",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_pic_director_integration_test.go": {
+    "mtime": 1793896076.94172,
+    "seen": 1793951594.950463,
+    "ast_hash": "061e1abf52d6daff05631471b7597830",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_pic_roles_test.go": {
+    "mtime": 1793896343.851629,
+    "seen": 1793951594.9504664,
+    "ast_hash": "53fabf4d0372cb0c6a9e4933c1773020",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/DirectorPic.test.tsx": {
+    "mtime": 1793932229.7401187,
+    "seen": 1793951594.9508238,
+    "ast_hash": "826ba9a9dd1ffb15dab6fa7a1b39482c",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/PksDialogs.test.tsx": {
+    "mtime": 1793932229.7401187,
+    "seen": 1793951594.9508288,
+    "ast_hash": "55d29febb87dcd3366ed6bacb776e597",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/PksPanel.test.tsx": {
+    "mtime": 1793931995.145013,
+    "seen": 1793951594.9508297,
+    "ast_hash": "a56fa0aa2c0b2728c6f4113c7d70c799",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/__tests__/VendorListPks.test.tsx": {
+    "mtime": 1793932229.7294202,
+    "seen": 1793951594.9508376,
+    "ast_hash": "38b81c53a9b51b324ad1811ec7b27c0c",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksFormDialog.tsx": {
+    "mtime": 1793926622.8023138,
+    "seen": 1793951594.9508557,
+    "ast_hash": "050a746776705d98b4b3bcdbeab7f69c",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksPanel.tsx": {
+    "mtime": 1793926890.281072,
+    "seen": 1793951594.9508567,
+    "ast_hash": "03c60d31a5e5a13705d552c35698418b",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksReasonDialog.tsx": {
+    "mtime": 1793926645.3921235,
+    "seen": 1793951594.9508574,
+    "ast_hash": "f354210c85af09ce1777ee3da34d41ec",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksStatusBadge.test.tsx": {
+    "mtime": 1793926039.079746,
+    "seen": 1793951594.9508584,
+    "ast_hash": "c1ef2fa6b9b5310dcf5beab1ccdd1aa6",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksStatusBadge.tsx": {
+    "mtime": 1793939962.7212696,
+    "seen": 1793951594.950859,
+    "ast_hash": "c8c4f20f08bd65ca50e996098d9edad0",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/components/pksStatusFromLabel.test.ts": {
+    "mtime": 1793948658.5010064,
+    "seen": 1793951594.9508789,
+    "ast_hash": "3c85148fcb0202259eda084a95224cb1",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/pks.test.ts": {
+    "mtime": 1793926134.101305,
+    "seen": 1793951594.950887,
+    "ast_hash": "4adaeefe975f53e0628c48516fa991ad",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/pks.ts": {
+    "mtime": 1793926134.0987315,
+    "seen": 1793951594.9508882,
+    "ast_hash": "ba459e11e9d219499eb00c70df7c4c0f",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts": {
+    "mtime": 1793925601.9937844,
+    "seen": 1793951594.9508972,
+    "ast_hash": "c04803b7da898fd85e73098807079bcf",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/components/PreviewTable.test.tsx": {
+    "mtime": 1793948658.407521,
+    "seen": 1793951594.9510577,
+    "ast_hash": "7ae5a100a6d6c72c0b5455420f652d60",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/exports/datasets.vendors.test.ts": {
+    "mtime": 1793948671.190644,
+    "seen": 1793951594.9510643,
+    "ast_hash": "5b848a2bfd1975f6701bdc9f6edfc012",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/master-data-io/components/ImportWizard.test.tsx": {
+    "mtime": 1793948658.550019,
+    "seen": 1793951594.9511027,
+    "ast_hash": "40abda6d7ce906ba54a38edb99b58f45",
+    "semantic_hash": ""
+  },
+  "pkg/csvexport/export_header_test.go": {
+    "mtime": 1793941318.0547583,
+    "seen": 1793951594.951461,
+    "ast_hash": "3bf77d6185ade873e5bda0526db6ab63",
+    "semantic_hash": ""
+  },
+  "pkg/reports/vendor_pks_property_test.go": {
+    "mtime": 1793941266.654594,
+    "seen": 1793951594.951485,
+    "ast_hash": "8f07cb424d793a7cb20e0d6b8b4875d0",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/CMS-Pengaturan.html": {
+    "mtime": 1791369185.1195457,
+    "seen": 1793951594.9514918,
+    "ast_hash": "5de4b7f29c8ec4973d15afb8289ddafc",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/crown-vendor-detail/README.md": {
+    "mtime": 1791369185.1195457,
+    "seen": 1793951594.9514925,
+    "ast_hash": "e31055c36a6b78e076c76ae0dbd4040e",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/README.md": {
+    "mtime": 1791369185.1264627,
+    "seen": 1793951594.9514937,
+    "ast_hash": "8140ba825437a7675e274806c454eacf",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/hierarki-pengguna-crown.html": {
+    "mtime": 1791369185.1264627,
+    "seen": 1793951594.9514945,
+    "ast_hash": "f98ca8f44c016ba44a586a985bfdf370",
+    "semantic_hash": ""
+  },
+  ".archives/UI-design/hierarki-pengguna-crown/kits/shadcn-ui/README.md": {
+    "mtime": 1791369185.1293068,
+    "seen": 1793951594.9514954,
+    "ast_hash": "0d9b2be14061b0e81f73965478c8c565",
+    "semantic_hash": ""
+  },
+  ".archives/login_ui_design/crown-login-red.html": {
+    "mtime": 1787831179.0386648,
+    "seen": 1793951594.9515042,
+    "ast_hash": "d45ca437cfd34dda54b7cc41823f295b",
+    "semantic_hash": ""
+  },
+  ".archives/login_ui_design/CROWN IMG.png": {
+    "mtime": 1787831179.0386648,
+    "seen": 1793951594.9517763,
+    "ast_hash": "4ddb486c302dc3c31cdfa3f42ebae085",
     "semantic_hash": ""
   }
 }

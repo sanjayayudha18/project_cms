@@ -120,6 +120,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`backend/internal/handler/admin_user_handler.go`](../../backend/internal/handler/admin_user_handler.go) | 2 | - | `admin-users` |
 | [`backend/internal/handler/vendor_request_response.go`](../../backend/internal/handler/vendor_request_response.go) | 2 | - | `vendor-request` |
 | [`backend/internal/handler/admin_acm_area_handler.go`](../../backend/internal/handler/admin_acm_area_handler.go) | - | 1 | `acm-area` |
+| [`backend/internal/handler/admin_vendor_handler.go`](../../backend/internal/handler/admin_vendor_handler.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/handler/unexpected_error.go`](../../backend/internal/handler/unexpected_error.go) | 1 | - | - |
 | [`backend/internal/notification/notification.go`](../../backend/internal/notification/notification.go) | 1 | - | `notification` |
 | [`backend/internal/service/acm_area_admin.go`](../../backend/internal/service/acm_area_admin.go) | - | 1 | `acm-area` |

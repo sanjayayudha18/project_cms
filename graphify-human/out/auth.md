@@ -113,8 +113,8 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 6 | - |
 | [`backend/internal/handler/admin_dsr_location_map_handler.go`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | - | 5 | `master-data-vendor` |
 | [`backend/internal/auth/set_initial_password.go`](../../backend/internal/auth/set_initial_password.go) | - | 4 | `admin-users` |
+| [`backend/internal/handler/admin_vendor_pks_handler.go`](../../backend/internal/handler/admin_vendor_pks_handler.go) | - | 4 | `master-data-vendor` |
 | [`backend/internal/handler/rbac_list_handler.go`](../../backend/internal/handler/rbac_list_handler.go) | - | 4 | `approval` |
-| [`backend/internal/handler/role_mgmt_handler.go`](../../backend/internal/handler/role_mgmt_handler.go) | - | 4 | `role-management` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

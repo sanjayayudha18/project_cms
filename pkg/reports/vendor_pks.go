@@ -62,14 +62,24 @@ type VendorPksRow struct {
 
 // VendorPksCells is one CSV line; text cells go through CSVSafe, numbers are plain integers.
 func VendorPksCells(r VendorPksRow) []string {
+	cells := []string{csvexport.CSVSafe(r.VendorCode), csvexport.CSVSafe(r.VendorName)}
+	for _, c := range VendorPksDetailCells(r) {
+		cells = append(cells, csvexport.CSVSafe(c))
+	}
+	return cells
+}
+
+// VendorPksDetailCells are the nine raw (NOT CSVSafe'd) cells after code+name: director name/phone/email,
+// PKS name, effective date, expiry date, validity months, remaining days, status label. Nil = empty cell.
+// The caller applies CSVSafe.
+func VendorPksDetailCells(r VendorPksRow) []string {
 	label := ""
 	if r.PksStatus != nil {
 		label = PksStatuses[*r.PksStatus]
 	}
 	return []string{
-		csvexport.CSVSafe(r.VendorCode), csvexport.CSVSafe(r.VendorName),
-		csvexport.CSVSafe(str(r.DirectorName)), csvexport.CSVSafe(str(r.DirectorPhone)), csvexport.CSVSafe(str(r.DirectorEmail)),
-		csvexport.CSVSafe(str(r.PksName)), dateCell(r.EffectiveDate, nil), dateCell(r.ExpiryDate, nil),
+		str(r.DirectorName), str(r.DirectorPhone), str(r.DirectorEmail),
+		str(r.PksName), dateCell(r.EffectiveDate, nil), dateCell(r.ExpiryDate, nil),
 		int32Cell(r.ValidityMonths), int32Cell(r.RemainingDays), label,
 	}
 }

@@ -182,6 +182,9 @@ func (i *MasterDataImporter) Authorize(ctx context.Context) error {
 type importRecord struct {
 	line  int
 	cells []string
+	// badCount > 0: the row's cell count did not match its file's header
+	// (Export_Header rows); validateRow rejects it, expecting badCount cells.
+	badCount int
 }
 
 // importEnv is the database state one dry-run validates against.
@@ -388,7 +391,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	}
 	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}, Changes: []ImportChangePreview{}}}
 
-	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill)
+	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill, spec.readOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -482,6 +485,10 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 			return
 		}
 		add("row", err.Error())
+	}
+	if rec.badCount > 0 {
+		add("row", fmt.Sprintf("jumlah kolom %d, seharusnya %d", len(rec.cells), rec.badCount))
+		return ImportRow{}, errs
 	}
 	if len(rec.cells) != len(header) {
 		add("row", fmt.Sprintf("jumlah kolom %d, seharusnya %d", len(rec.cells), len(header)))

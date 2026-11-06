@@ -4,14 +4,14 @@
 > Dibuat otomatis dari `graphify-human/features.toml`. Jangan edit file ini:
 > ubah `features.toml`, lalu jalankan `py graphify-human/generate.py`.
 
-- Commit kode: `3aff1652d6`
-- Graph dibangun di commit: `3aff1652d6`
+- Commit kode: `357fd65792`
+- Graph dibangun di commit: `357fd65792`
 
 | Fitur | Status | Portal | Dev plan | File inti | Endpoint | Tabel |
 | --- | --- | --- | --- | --- | --- | --- |
 | [Request CIT (Vendor Request)](vendor-request.md) | Built | CompanyPortal | 2.1, 2.2 | 39 | 25 | 19 |
 | [Upload DSR Vendor](dsr-upload.md) | Partial | VendorPortal, CompanyPortal | 1.3 | 27 | 5 + 10 Python | 10 |
-| [Master Data Vendor](master-data-vendor.md) | Built | CompanyPortal | Master data (feature-complete MVP) | 125 | 50 | 15 |
+| [Master Data Vendor](master-data-vendor.md) | Built | CompanyPortal | Master data (feature-complete MVP) | 135 | 54 | 16 |
 | [Login dan Sesi](auth.md) | Built | CompanyPortal, VendorPortal | Platform: Auth | 30 | 5 | 4 |
 | [Manajemen User](admin-users.md) | Built | CompanyPortal | Platform: Admin users | 17 | 8 | 4 |
 | [Manajemen Peran](role-management.md) | Built | CompanyPortal | Platform: Role management | 13 | 4 | 1 |
@@ -29,7 +29,7 @@
 | [Realisasi vs Order](replenishment-realisasi.md) | Built | CompanyPortal, VendorPortal | 2.2c | 17 | 4 | 20 |
 | [Laporan DSR Telat](dsr-late-report.md) | Built | CompanyPortal | 2.3 | 14 | 3 | 11 |
 | [Monitoring EOD / ETL](eod-monitoring.md) | Partial | CompanyPortal | Built: EOD ETL; Phase 7 belum | 37 | 0 + 8 Python | 10 |
-| [Export Data (backend-exq)](export-data.md) | Built | CompanyPortal | X.7, X.8, X.9 | 56 | 18 | 18 |
+| [Export Data (backend-exq)](export-data.md) | Built | CompanyPortal | X.7, X.8, X.9 | 62 | 19 | 19 |
 | [Dashboard](dashboard.md) | Mock | CompanyPortal | Mock frontends (FNC 003) | 11 | 0 | 0 |
 | [Cash Flow Monitoring](cash-flow.md) | Mock | CompanyPortal | Mock frontends | 10 | 0 | 0 |
 | [Invoice dan Rekonsiliasi](invoice-reconciliation.md) | Mock | CompanyPortal, VendorPortal | Phase 3 (parked) | 12 | 0 | 0 |

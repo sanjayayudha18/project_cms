@@ -10,7 +10,7 @@
 | Status | Built |
 | Portal | CompanyPortal |
 | Development plan | X.7, X.8, X.9 |
-| File inti | 56 |
+| File inti | 62 |
 
 ## Ringkasan
 
@@ -43,6 +43,7 @@ Gabungan role di endpoint backend: `exportjob.KindRoles[k]` (tidak terbaca)
 | POST | `/api/v1/exports/reports/dsr-late-summary` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestReport`](../../backend-exq/internal/handler/exports_handler.go) | - |
 | POST | `/api/v1/exports/reports/replenishment-amount-mismatch` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestReport`](../../backend-exq/internal/handler/exports_handler.go) | - |
 | POST | `/api/v1/exports/reports/replenishment-trips` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestReport`](../../backend-exq/internal/handler/exports_handler.go) | - |
+| POST | `/api/v1/exports/reports/vendor-pks` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestReport`](../../backend-exq/internal/handler/exports_handler.go) | - |
 | POST | `/api/v1/exports/vendors/{vendorID}/branches/{branchID}/{entity}` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestMaster`](../../backend-exq/internal/handler/exports_handler.go) | - |
 | POST | `/api/v1/exports/vendors/{vendorID}/package-prices` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestMaster`](../../backend-exq/internal/handler/exports_handler.go) | - |
 | POST | `/api/v1/exports/vendors/{vendorID}/{entity}` _(backend-exq)_ | `exportjob.KindRoles[k]` (tidak terbaca) | [`ExportsHandler.requestMaster`](../../backend-exq/internal/handler/exports_handler.go) | - |
@@ -71,15 +72,16 @@ Panggilan API frontend yang tidak cocok dengan endpoint Go mana pun (bisa proxy 
 | `users` | ya | - | [`user_role.sql`](../../backend-exq/queries/user_role.sql) |
 | `vendor_branches` | ya | - | [`export_jobs.sql`](../../backend-exq/queries/export_jobs.sql), [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export.sql`](../../backend-exq/queries/vendor_export.sql), [`dsr_late_report.sql`](../../backend/queries/dsr_late_report.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`replenish_classifications.sql`](../../backend/queries/replenish_classifications.sql) |
 | `vendor_package_prices` | ya | - | [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export.sql`](../../backend-exq/queries/vendor_export.sql) |
-| `vendor_pics` | ya | - | [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql) |
+| `vendor_pics` | ya | - | [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export_pks.sql`](../../backend-exq/queries/vendor_export_pks.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`vendor_pks_report.sql`](../../backend/queries/vendor_pks_report.sql) |
+| `vendor_pks` | ya | - | [`vendor_export_pks.sql`](../../backend-exq/queries/vendor_export_pks.sql), [`vendor_pks_report.sql`](../../backend/queries/vendor_pks_report.sql) |
 | `vendor_request_tickets` | ya | - | [`replenish_classifications.sql`](../../backend/queries/replenish_classifications.sql) |
 | `vendor_requests` | ya | - | [`replenish_classifications.sql`](../../backend/queries/replenish_classifications.sql) |
 | `vendor_vaults` | ya | - | [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export.sql`](../../backend-exq/queries/vendor_export.sql), [`dsr_late_report.sql`](../../backend/queries/dsr_late_report.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql) |
-| `vendors` | ya | - | [`export_jobs.sql`](../../backend-exq/queries/export_jobs.sql), [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export.sql`](../../backend-exq/queries/vendor_export.sql), [`dsr_late_report.sql`](../../backend/queries/dsr_late_report.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`replenish_classifications.sql`](../../backend/queries/replenish_classifications.sql) |
+| `vendors` | ya | - | [`export_jobs.sql`](../../backend-exq/queries/export_jobs.sql), [`export_preview.sql`](../../backend-exq/queries/export_preview.sql), [`vendor_export.sql`](../../backend-exq/queries/vendor_export.sql), [`vendor_export_pks.sql`](../../backend-exq/queries/vendor_export_pks.sql), [`dsr_late_report.sql`](../../backend/queries/dsr_late_report.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`replenish_classifications.sql`](../../backend/queries/replenish_classifications.sql), [`vendor_pks_report.sql`](../../backend/queries/vendor_pks_report.sql) |
 
 _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), termasuk query sqlc yang dipanggil dari file Go fitur ini._
 
-## File inti (56)
+## File inti (62)
 
 **Backend Go EXQ (:8081)**
 
@@ -99,6 +101,10 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend-exq/internal/exportjob/producers_report.go`](../../backend-exq/internal/exportjob/producers_report.go)
 - [`backend-exq/internal/exportjob/report_params.go`](../../backend-exq/internal/exportjob/report_params.go)
 - [`backend-exq/internal/exportjob/service.go`](../../backend-exq/internal/exportjob/service.go)
+- [`backend-exq/internal/exportjob/testdata/rapid/TestProperty1PreviewPagesEqualFile_vendors-forceAll/TestProperty1PreviewPagesEqualFile_vendors-forceAll-20261106120201-27984.fail`](../../backend-exq/internal/exportjob/testdata/rapid/TestProperty1PreviewPagesEqualFile_vendors-forceAll/TestProperty1PreviewPagesEqualFile_vendors-forceAll-20261106120201-27984.fail)
+- [`backend-exq/internal/exportjob/testdata/rapid/TestProperty1PreviewPagesEqualFile_vendors/TestProperty1PreviewPagesEqualFile_vendors-20261106120201-27984.fail`](../../backend-exq/internal/exportjob/testdata/rapid/TestProperty1PreviewPagesEqualFile_vendors/TestProperty1PreviewPagesEqualFile_vendors-20261106120201-27984.fail)
+- [`backend-exq/internal/exportjob/testdata/rapid/TestProperty3KeysetPageBounded_vendors-forceAll/TestProperty3KeysetPageBounded_vendors-forceAll-20261106120202-27984.fail`](../../backend-exq/internal/exportjob/testdata/rapid/TestProperty3KeysetPageBounded_vendors-forceAll/TestProperty3KeysetPageBounded_vendors-forceAll-20261106120202-27984.fail)
+- [`backend-exq/internal/exportjob/testdata/rapid/TestProperty3KeysetPageBounded_vendors/TestProperty3KeysetPageBounded_vendors-20261106120202-27984.fail`](../../backend-exq/internal/exportjob/testdata/rapid/TestProperty3KeysetPageBounded_vendors/TestProperty3KeysetPageBounded_vendors-20261106120202-27984.fail)
 - [`backend-exq/internal/exportjob/worker.go`](../../backend-exq/internal/exportjob/worker.go)
 - [`backend-exq/internal/handler/exports_handler.go`](../../backend-exq/internal/handler/exports_handler.go)
 - [`backend-exq/internal/handler/handler.go`](../../backend-exq/internal/handler/handler.go)
@@ -138,6 +144,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend-exq/queries/export_preview.sql`](../../backend-exq/queries/export_preview.sql)
 - [`backend-exq/queries/user_role.sql`](../../backend-exq/queries/user_role.sql)
 - [`backend-exq/queries/vendor_export.sql`](../../backend-exq/queries/vendor_export.sql)
+- [`backend-exq/queries/vendor_export_pks.sql`](../../backend-exq/queries/vendor_export_pks.sql)
 
 **pkg (shared Go)**
 
@@ -148,30 +155,32 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`pkg/csvexport/writer.go`](../../pkg/csvexport/writer.go)
 - [`pkg/reports/cells.go`](../../pkg/reports/cells.go)
 - [`pkg/reports/reports.go`](../../pkg/reports/reports.go)
+- [`pkg/reports/vendor_pks.go`](../../pkg/reports/vendor_pks.go)
 
 ## File terkait (dari graph)
 
 | File | Dipakai fitur | Memakai fitur | Milik fitur |
 | --- | --- | --- | --- |
 | [`pkg/response/response.go`](../../pkg/response/response.go) | 10 | - | - |
+| [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/AdminVendorsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/AdminVendorsPage.tsx) | - | 6 | `master-data-vendor` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 5 | - |
 | [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 5 | - | `auth` |
 | [`backend/internal/service/masterdata_export.go`](../../backend/internal/service/masterdata_export.go) | - | 4 | `master-data-vendor` |
 | [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 3 | - | `auth` |
+| [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 2 | - |
 | [`backend/internal/handler/admin_master_data_import_handler.go`](../../backend/internal/handler/admin_master_data_import_handler.go) | - | 2 | `master-data-vendor` |
 | [`backend/internal/service/dsr_late_report.go`](../../backend/internal/service/dsr_late_report.go) | - | 2 | `dsr-late-report` |
-| [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 1 | - |
 | [`backend/internal/service/masterdata_import.go`](../../backend/internal/service/masterdata_import.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/masterdata_import_csv.go`](../../backend/internal/service/masterdata_import_csv.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/masterdata_import_validate.go`](../../backend/internal/service/masterdata_import_validate.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/replenishment_read.go`](../../backend/internal/service/replenishment_read.go) | - | 1 | `replenishment-realisasi` |
+| [`backend/internal/service/vendor_admin.go`](../../backend/internal/service/vendor_admin.go) | - | 1 | `master-data-vendor` |
+| [`backend/internal/service/vendor_pks_admin.go`](../../backend/internal/service/vendor_pks_admin.go) | - | 1 | `master-data-vendor` |
 | [`pkg/auth/token_blacklist.go`](../../pkg/auth/token_blacklist.go) | 1 | - | `auth` |
 | [`pkg/auth/token_service.go`](../../pkg/auth/token_service.go) | 1 | - | `auth` |
 | [`pkg/config/config.go`](../../pkg/config/config.go) | 1 | - | - |
 | [`pkg/health/ready.go`](../../pkg/health/ready.go) | 1 | - | - |
 | [`pkg/middleware/body_limit.go`](../../pkg/middleware/body_limit.go) | 1 | - | - |
-| [`pkg/middleware/client_ip.go`](../../pkg/middleware/client_ip.go) | 1 | - | - |
-| [`pkg/middleware/request_logger.go`](../../pkg/middleware/request_logger.go) | 1 | - | - |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

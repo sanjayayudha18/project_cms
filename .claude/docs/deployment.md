@@ -93,6 +93,11 @@ CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data
 *   Before `migrate up` for `022_vendor_pks.sql`: count `vendor_pic` change requests still `pending`. A pending change that was submitted before `022` becomes `stale` when approved, so the maker must submit it again. Tell the checker first. Dev had 0 pending at apply (2026-11-05).
 *   Migrations `022` and `037` run before the release (order above: `status` → `up` → `status`). `037` needs `022` applied first.
 
+**Release checklist: vendor export PKS (`.kiro/specs/vendor-export-pks/`, 2026-11-06)**
+*   Deploy `backend` before or together with `backend-exq`. Once `backend-exq` ships the new vendor export, the file has 18 columns (9 + 9 read-only). An old `backend` accepts only the 9-column Import_Header and would reject that file. The new `backend` accepts both headers.
+*   No migration. No env change.
+*   Rollback: rolling `backend-exq` back to the old image is safe. Rolling `backend` back while `backend-exq` still exports 18 columns makes imports of that file fail, so roll both back together in that case.
+
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 
 **Python EOD host prerequisite (import_jobs, R2a)**: the VM/container running `backend_python` (ETL scripts + `eod_retry_scheduler` + `service_dsr_etl`) MUST run with `TZ=Asia/Jakarta`. DMAA `file_date` is derived from file mtime in the host timezone; a different TZ makes the DMAA late check misfire. Verify at VM/container setup.

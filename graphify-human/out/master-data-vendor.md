@@ -10,7 +10,7 @@
 | Status | Built |
 | Portal | CompanyPortal |
 | Development plan | Master data (feature-complete MVP) |
-| File inti | 125 |
+| File inti | 135 |
 
 ## Ringkasan
 
@@ -38,48 +38,52 @@ Gabungan role di endpoint backend: ADMIN, ADMIN_PARAM
 | GET | `/api/v1/admin/master-data/import/batches/{id}` | ADMIN, ADMIN_PARAM | [`AdminMasterDataImportHandler.GetBatch`](../../backend/internal/handler/admin_master_data_import_handler.go) | [`api.ts:184`](../../frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts) |
 | POST | `/api/v1/admin/master-data/import/{entity}/confirm` | ADMIN, ADMIN_PARAM | [`AdminMasterDataImportHandler.Confirm`](../../backend/internal/handler/admin_master_data_import_handler.go) | - |
 | POST | `/api/v1/admin/master-data/import/{entity}/dry-run` | ADMIN, ADMIN_PARAM | [`AdminMasterDataImportHandler.DryRun`](../../backend/internal/handler/admin_master_data_import_handler.go) | - |
-| GET | `/api/v1/admin/vendors` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.List`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:56`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Create`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:68`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Get`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:61`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| PUT | `/api/v1/admin/vendors/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Update`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:76`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Disable`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:81`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Enable`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:86`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/branches` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.List`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:131`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/branches` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Create`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:141`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/branches/{branchID}/atms` | ADMIN, ADMIN_PARAM | [`AdminBranchATMHandler.List`](../../backend/internal/handler/admin_branch_atm_handler.go) | [`api.ts:398`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/branches/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Get`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:121`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| PUT | `/api/v1/admin/vendors/{vendorID}/branches/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Update`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:150`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/branches/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Disable`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:161`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/branches/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Enable`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:171`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.List`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`dsrLocationMaps.ts:37`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
+| GET | `/api/v1/admin/vendors` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.List`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:57`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Create`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:69`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Get`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:62`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Update`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:77`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Disable`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:82`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorHandler.Enable`](../../backend/internal/handler/admin_vendor_handler.go) | [`api.ts:87`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/branches` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.List`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:132`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/branches` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Create`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:142`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/branches/{branchID}/atms` | ADMIN, ADMIN_PARAM | [`AdminBranchATMHandler.List`](../../backend/internal/handler/admin_branch_atm_handler.go) | [`api.ts:399`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/branches/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Get`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:122`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/branches/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Update`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:151`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/branches/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Disable`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:162`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/branches/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorBranchHandler.Enable`](../../backend/internal/handler/admin_vendor_branch_handler.go) | [`api.ts:172`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.List`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`dsrLocationMaps.ts:37`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
 | POST | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.Create`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`dsrLocationMaps.ts:58`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
 | GET | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps/unmapped` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.Unmapped`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`dsrLocationMaps.ts:45`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
 | PUT | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps/{id}` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.Update`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`dsrLocationMaps.ts:63`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
 | POST | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.Disable`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`dsrLocationMaps.ts:65`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
 | POST | `/api/v1/admin/vendors/{vendorID}/dsr-location-maps/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminDsrLocationMapHandler.Enable`](../../backend/internal/handler/admin_dsr_location_map_handler.go) | [`dsrLocationMaps.ts:65`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/dsrLocationMaps.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/package-prices` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.List`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:351`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/package-prices` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Create`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:361`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/package-prices` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.List`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:352`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/package-prices` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Create`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:362`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
 | GET | `/api/v1/admin/vendors/{vendorID}/package-prices/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Get`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | - |
-| PUT | `/api/v1/admin/vendors/{vendorID}/package-prices/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Update`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:373`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/package-prices/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Disable`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:384`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/packages` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.List`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:304`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/packages` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Create`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:314`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/package-prices/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Update`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:374`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/package-prices/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPackagePriceHandler.Disable`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | [`api.ts:385`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/packages` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.List`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:305`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/packages` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Create`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:315`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
 | GET | `/api/v1/admin/vendors/{vendorID}/packages/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Get`](../../backend/internal/handler/admin_vendor_package_handler.go) | - |
-| PUT | `/api/v1/admin/vendors/{vendorID}/packages/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Update`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:323`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/packages/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Disable`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:334`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/pics` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.List`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:238`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/pics` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Create`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:248`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/packages/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Update`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:324`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/packages/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPackageHandler.Disable`](../../backend/internal/handler/admin_vendor_package_handler.go) | [`api.ts:335`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/pics` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.List`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:239`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pics` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Create`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:249`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
 | GET | `/api/v1/admin/vendors/{vendorID}/pics/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Get`](../../backend/internal/handler/admin_vendor_pic_handler.go) | - |
-| PUT | `/api/v1/admin/vendors/{vendorID}/pics/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Update`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:257`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/pics/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Disable`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:281`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/pics/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Enable`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:291`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| PUT | `/api/v1/admin/vendors/{vendorID}/pics/{id}/roles` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.SetRoles`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:270`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| GET | `/api/v1/admin/vendors/{vendorID}/vaults` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.List`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:97`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:184`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/vaults` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Create`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:194`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/pics/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Update`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:258`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pics/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Disable`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:282`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pics/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.Enable`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:292`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/pics/{id}/roles` | ADMIN, ADMIN_PARAM | [`AdminVendorPicHandler.SetRoles`](../../backend/internal/handler/admin_vendor_pic_handler.go) | [`api.ts:271`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/pks` | ADMIN, ADMIN_PARAM | [`AdminVendorPksHandler.Get`](../../backend/internal/handler/admin_vendor_pks_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`pksApi.ts:18`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pks` | ADMIN, ADMIN_PARAM | [`AdminVendorPksHandler.Create`](../../backend/internal/handler/admin_vendor_pks_handler.go) | [`pksApi.ts:26`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pks/{pksID}/terminate` | ADMIN, ADMIN_PARAM | [`AdminVendorPksHandler.Terminate`](../../backend/internal/handler/admin_vendor_pks_handler.go) | [`pksApi.ts:35`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/pks/{pksID}/unterminate` | ADMIN, ADMIN_PARAM | [`AdminVendorPksHandler.Unterminate`](../../backend/internal/handler/admin_vendor_pks_handler.go) | [`pksApi.ts:47`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts) |
+| GET | `/api/v1/admin/vendors/{vendorID}/vaults` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.List`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:98`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts)<br>[`api.ts:185`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/vaults` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Create`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:195`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
 | GET | `/api/v1/admin/vendors/{vendorID}/vaults/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Get`](../../backend/internal/handler/admin_vendor_vault_handler.go) | - |
-| PUT | `/api/v1/admin/vendors/{vendorID}/vaults/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Update`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:203`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/vaults/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Disable`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:214`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
-| POST | `/api/v1/admin/vendors/{vendorID}/vaults/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Enable`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:224`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| PUT | `/api/v1/admin/vendors/{vendorID}/vaults/{id}` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Update`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:204`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/vaults/{id}/disable` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Disable`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:215`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
+| POST | `/api/v1/admin/vendors/{vendorID}/vaults/{id}/enable` | ADMIN, ADMIN_PARAM | [`AdminVendorVaultHandler.Enable`](../../backend/internal/handler/admin_vendor_vault_handler.go) | [`api.ts:225`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/api.ts) |
 | GET | `/api/v1/approvals/{id}/master-data` | _tanpa role guard_ | [`ApprovalHandler.MasterDataDetail`](../../backend/internal/handler/approval_handler.go) | - |
 | POST | `/api/v1/approvals/{id}/retry-apply` | _tanpa role guard_ | [`ApprovalHandler.RetryApply`](../../backend/internal/handler/approval_handler.go) | [`api.ts:192`](../../frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts) |
 
@@ -98,18 +102,19 @@ Panggilan API frontend yang tidak cocok dengan endpoint Go mana pun (bisa proxy 
 | `dsr_location_vault_maps` | ya | ya | [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql) |
 | `dsr_uploads` | ya | - | [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql) |
 | `locations` | ya | - | [`atms_admin.sql`](../../backend/queries/atms_admin.sql), [`master_data_import.sql`](../../backend/queries/master_data_import.sql), [`vendor_branch_atms.sql`](../../backend/queries/vendor_branch_atms.sql) |
-| `master_data_change_requests` | ya | ya | [`master_data.sql`](../../backend/queries/master_data.sql) |
+| `master_data_change_requests` | ya | ya | [`master_data.sql`](../../backend/queries/master_data.sql), [`vendor_pks.sql`](../../backend/queries/vendor_pks.sql) |
 | `master_data_import_batches` | ya | ya | [`master_data.sql`](../../backend/queries/master_data.sql) |
-| `users` | ya | - | [`master_data.sql`](../../backend/queries/master_data.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
+| `users` | ya | - | [`master_data.sql`](../../backend/queries/master_data.sql), [`vendor_pks.sql`](../../backend/queries/vendor_pks.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
 | `vendor_branches` | ya | ya | [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`master_data_import.sql`](../../backend/queries/master_data_import.sql), [`vendor_branches_admin.sql`](../../backend/queries/vendor_branches_admin.sql), [`vendor_packages_admin.sql`](../../backend/queries/vendor_packages_admin.sql), [`vendor_vaults_admin.sql`](../../backend/queries/vendor_vaults_admin.sql) |
 | `vendor_package_prices` | ya | ya | [`masterdata_applier_vendor_package_price.go`](../../backend/internal/service/masterdata_applier_vendor_package_price.go), [`master_data_import.sql`](../../backend/queries/master_data_import.sql), [`vendor_package_prices_admin.sql`](../../backend/queries/vendor_package_prices_admin.sql) |
-| `vendor_pics` | ya | ya | [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`vendor_pics_admin.sql`](../../backend/queries/vendor_pics_admin.sql) |
+| `vendor_pics` | ya | ya | [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`vendor_pics_admin.sql`](../../backend/queries/vendor_pics_admin.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
+| `vendor_pks` | ya | ya | [`vendor_pks.sql`](../../backend/queries/vendor_pks.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
 | `vendor_vaults` | ya | ya | [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`vendor_vaults_admin.sql`](../../backend/queries/vendor_vaults_admin.sql) |
-| `vendors` | ya | ya | [`masterdata_applier_vendor_package_price.go`](../../backend/internal/service/masterdata_applier_vendor_package_price.go), [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`master_data_import.sql`](../../backend/queries/master_data_import.sql), [`vendor_package_prices_admin.sql`](../../backend/queries/vendor_package_prices_admin.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
+| `vendors` | ya | ya | [`masterdata_applier_vendor_package_price.go`](../../backend/internal/service/masterdata_applier_vendor_package_price.go), [`dsr_location_maps_admin.sql`](../../backend/queries/dsr_location_maps_admin.sql), [`master_data_export.sql`](../../backend/queries/master_data_export.sql), [`master_data_import.sql`](../../backend/queries/master_data_import.sql), [`vendor_package_prices_admin.sql`](../../backend/queries/vendor_package_prices_admin.sql), [`vendor_pks.sql`](../../backend/queries/vendor_pks.sql), [`vendors_admin.sql`](../../backend/queries/vendors_admin.sql) |
 
 _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), termasuk query sqlc yang dipanggil dari file Go fitur ini._
 
-## File inti (125)
+## File inti (135)
 
 **Backend Go ATM (:8080)**
 
@@ -123,6 +128,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend/internal/handler/admin_vendor_package_handler.go`](../../backend/internal/handler/admin_vendor_package_handler.go)
 - [`backend/internal/handler/admin_vendor_package_price_handler.go`](../../backend/internal/handler/admin_vendor_package_price_handler.go)
 - [`backend/internal/handler/admin_vendor_pic_handler.go`](../../backend/internal/handler/admin_vendor_pic_handler.go)
+- [`backend/internal/handler/admin_vendor_pks_handler.go`](../../backend/internal/handler/admin_vendor_pks_handler.go)
 - [`backend/internal/handler/admin_vendor_vault_handler.go`](../../backend/internal/handler/admin_vendor_vault_handler.go)
 - [`backend/internal/handler/approval_master_data_detail.go`](../../backend/internal/handler/approval_master_data_detail.go)
 - [`backend/internal/repository/branch_atm_repository.go`](../../backend/internal/repository/branch_atm_repository.go)
@@ -135,6 +141,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend/internal/repository/vendor_package_admin_repository.go`](../../backend/internal/repository/vendor_package_admin_repository.go)
 - [`backend/internal/repository/vendor_package_price_admin_repository.go`](../../backend/internal/repository/vendor_package_price_admin_repository.go)
 - [`backend/internal/repository/vendor_pic_admin_repository.go`](../../backend/internal/repository/vendor_pic_admin_repository.go)
+- [`backend/internal/repository/vendor_pks_admin_repository.go`](../../backend/internal/repository/vendor_pks_admin_repository.go)
 - [`backend/internal/repository/vendor_vault_admin_repository.go`](../../backend/internal/repository/vendor_vault_admin_repository.go)
 - [`backend/internal/service/branch_atm.go`](../../backend/internal/service/branch_atm.go)
 - [`backend/internal/service/dsr_location_map_admin.go`](../../backend/internal/service/dsr_location_map_admin.go)
@@ -146,6 +153,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend/internal/service/masterdata_applier_vendor_package.go`](../../backend/internal/service/masterdata_applier_vendor_package.go)
 - [`backend/internal/service/masterdata_applier_vendor_package_price.go`](../../backend/internal/service/masterdata_applier_vendor_package_price.go)
 - [`backend/internal/service/masterdata_applier_vendor_pic.go`](../../backend/internal/service/masterdata_applier_vendor_pic.go)
+- [`backend/internal/service/masterdata_applier_vendor_pks.go`](../../backend/internal/service/masterdata_applier_vendor_pks.go)
 - [`backend/internal/service/masterdata_applier_vendor_vault.go`](../../backend/internal/service/masterdata_applier_vendor_vault.go)
 - [`backend/internal/service/masterdata_approval.go`](../../backend/internal/service/masterdata_approval.go)
 - [`backend/internal/service/masterdata_change.go`](../../backend/internal/service/masterdata_change.go)
@@ -162,6 +170,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`backend/internal/service/vendor_package_price_admin.go`](../../backend/internal/service/vendor_package_price_admin.go)
 - [`backend/internal/service/vendor_pic_admin.go`](../../backend/internal/service/vendor_pic_admin.go)
 - [`backend/internal/service/vendor_pic_roles.go`](../../backend/internal/service/vendor_pic_roles.go)
+- [`backend/internal/service/vendor_pks_admin.go`](../../backend/internal/service/vendor_pks_admin.go)
 - [`backend/internal/service/vendor_vault_admin.go`](../../backend/internal/service/vendor_vault_admin.go)
 
 **Frontend CompanyPortal**
@@ -177,6 +186,10 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PendingCreatesList.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PendingCreatesList.tsx)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicRolesDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicRolesDialog.tsx)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicsPanel.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PicsPanel.tsx)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksFormDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksFormDialog.tsx)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksPanel.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksPanel.tsx)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksReasonDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksReasonDialog.tsx)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksStatusBadge.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PksStatusBadge.tsx)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PriceFilterBar.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/PriceFilterBar.tsx)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/ServerPager.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/ServerPager.tsx)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/SummaryStrip.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/SummaryStrip.tsx)
@@ -198,12 +211,14 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/index.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/index.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/packagePrice.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/packagePrice.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/picRoles.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/picRoles.ts)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/pks.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/pks.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorBranchFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorBranchFormSchema.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorFormSchema.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPackageFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPackageFormSchema.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPackagePriceFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPackagePriceFormSchema.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPicFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorPicFormSchema.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorVaultFormSchema.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/lib/vendorVaultFormSchema.ts)
+- [`frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/pksApi.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/types.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/types.ts)
 - [`frontend/CompanyPortal-Vite/src/features/admin-vendors/useAdminVendorsUrlState.ts`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/useAdminVendorsUrlState.ts)
 - [`frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts`](../../frontend/CompanyPortal-Vite/src/features/master-data-io/api.ts)
@@ -249,21 +264,21 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 
 | File | Dipakai fitur | Memakai fitur | Milik fitur |
 | --- | --- | --- | --- |
-| [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 147 | - | - |
-| [`backend/internal/db/db.go`](../../backend/internal/db/db.go) | 60 | - | - |
-| [`backend/internal/db/models.go`](../../backend/internal/db/models.go) | 59 | - | - |
-| [`backend/internal/handler/admin_approval_handler.go`](../../backend/internal/handler/admin_approval_handler.go) | 42 | - | `approval` |
-| [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 38 | - |
-| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 29 | - | `auth` |
-| [`backend/internal/handler/auth_handler.go`](../../backend/internal/handler/auth_handler.go) | 25 | - | `auth` |
+| [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 157 | - | - |
+| [`backend/internal/db/models.go`](../../backend/internal/db/models.go) | 69 | - | - |
+| [`backend/internal/db/db.go`](../../backend/internal/db/db.go) | 66 | - | - |
+| [`backend/internal/handler/admin_approval_handler.go`](../../backend/internal/handler/admin_approval_handler.go) | 45 | - | `approval` |
+| [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 42 | - |
+| [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 31 | - | `auth` |
+| [`backend/internal/handler/auth_handler.go`](../../backend/internal/handler/auth_handler.go) | 27 | - | `auth` |
 | [`backend/internal/handler/admin_user_handler.go`](../../backend/internal/handler/admin_user_handler.go) | 21 | - | `admin-users` |
 | [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 15 | - | `auth` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 10 | - |
+| [`backend/internal/handler/unexpected_error.go`](../../backend/internal/handler/unexpected_error.go) | 9 | - | - |
 | [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx) | - | 9 | `master-data-atm` |
-| [`backend/internal/handler/unexpected_error.go`](../../backend/internal/handler/unexpected_error.go) | 8 | - | - |
+| [`backend/internal/service/vendor_request.go`](../../backend/internal/service/vendor_request.go) | 8 | - | `vendor-request` |
 | [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx) | - | 6 | `master-data-atm` |
 | [`backend/internal/service/atm_admin.go`](../../backend/internal/service/atm_admin.go) | 4 | 1 | `master-data-atm` |
-| [`backend/internal/service/vendor_request.go`](../../backend/internal/service/vendor_request.go) | 5 | - | `vendor-request` |
 | [`backend/internal/handler/admin_atm_handler.go`](../../backend/internal/handler/admin_atm_handler.go) | - | 4 | `master-data-atm` |
 | [`backend/internal/notification/notification.go`](../../backend/internal/notification/notification.go) | 4 | - | `notification` |
 | [`backend/internal/handler/admin_atm_assignment_handler.go`](../../backend/internal/handler/admin_atm_assignment_handler.go) | - | 3 | `master-data-atm` |

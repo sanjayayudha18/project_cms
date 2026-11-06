@@ -10,6 +10,18 @@ const PKS_BADGES: Record<PksStatus, Pick<BadgeProps, "variant" | "icon" | "label
   belum_diisi: { variant: "neutral", icon: CircleDashed, label: "Belum diisi" },
 };
 
+const PKS_STATUS_BY_LABEL = new Map<string, PksStatus>(
+  (Object.entries(PKS_BADGES) as [PksStatus, { label: string }][]).map(([status, b]) => [
+    b.label,
+    status,
+  ]),
+);
+
+/** Kebalikan label badge: label teks (mis. dari ekspor/pratinjau) -> PksStatus; tak dikenal -> undefined. */
+export function pksStatusFromLabel(label: string): PksStatus | undefined {
+  return PKS_STATUS_BY_LABEL.get(label);
+}
+
 interface PksStatusBadgeProps {
   /** null/undefined = vendor internal (tidak punya status PKS). */
   status: PksStatus | null | undefined;

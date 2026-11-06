@@ -7,8 +7,12 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Sentinel errors for VendorAdminService. Handlers map these to HTTP status
@@ -36,6 +40,7 @@ type VendorAdminRepo interface {
 	GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
 	CountActiveUsers(ctx context.Context, vendorID int64) (int64, error)
+	GetKindAndDirector(ctx context.Context, vendorID int64) (string, *db.GetVendorDirectorPicRow, error)
 }
 
 // VendorAdminService owns validation and uniqueness pre-checks for vendor
@@ -46,11 +51,29 @@ type VendorAdminRepo interface {
 type VendorAdminService struct {
 	repo    VendorAdminRepo
 	changes VendorAdminSubmitter
+	// renewalMonths = VENDOR_PKS_RENEWAL_MONTHS (vendor-pks 6.1); now feeds
+	// "today" (WIB) into the PKS status filter/list (6.2).
+	renewalMonths int
+	now           func() time.Time
+}
+
+// VendorAdminOption tunes optional VendorAdminService settings, so existing
+// two-argument callers (tests, import wiring) stay valid.
+type VendorAdminOption func(*VendorAdminService)
+
+// WithPksRenewalMonths sets the "Need Renewal" threshold in months.
+func WithPksRenewalMonths(months int) VendorAdminOption {
+	return func(s *VendorAdminService) { s.renewalMonths = months }
 }
 
 // NewVendorAdminService creates a VendorAdminService with the given dependencies.
-func NewVendorAdminService(repo VendorAdminRepo, changes VendorAdminSubmitter) *VendorAdminService {
-	return &VendorAdminService{repo: repo, changes: changes}
+// Without WithPksRenewalMonths the threshold is reports.VendorPksRenewalMonthsDefault.
+func NewVendorAdminService(repo VendorAdminRepo, changes VendorAdminSubmitter, opts ...VendorAdminOption) *VendorAdminService {
+	s := &VendorAdminService{repo: repo, changes: changes, renewalMonths: reports.VendorPksRenewalMonthsDefault, now: time.Now}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // CreateVendorRequest holds the data for a POST /api/v1/admin/vendors
@@ -118,15 +141,23 @@ type DisableVendorResult struct {
 	LinkedUsersWarning int64
 }
 
+// pksToday is "today" in Asia/Jakarta as a pg date, for vendor_pks_status().
+func (s *VendorAdminService) pksToday() pgtype.Date {
+	return pgtype.Date{Time: reports.TodayWIB(s.now()), Valid: true}
+}
+
 // List returns a page of vendors matching the given filters (Req 6).
+// Today/RenewalMonths are filled here (vendor-pks 6.2), overriding the caller.
 // Read-only, never writes an audit entry (Req 9.5).
 func (s *VendorAdminService) List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+	arg.Today, arg.RenewalMonths = s.pksToday(), int32(s.renewalMonths) //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
 	return s.repo.List(ctx, arg)
 }
 
 // Count returns the total number of vendors matching the given filters,
 // without pagination (Req 6.6). Read-only, never writes an audit entry.
 func (s *VendorAdminService) Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) {
+	arg.Today, arg.RenewalMonths = s.pksToday(), int32(s.renewalMonths) //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
 	return s.repo.Count(ctx, arg)
 }
 
@@ -134,6 +165,12 @@ func (s *VendorAdminService) Count(ctx context.Context, arg db.CountVendorsAdmin
 // if no matching vendor is found. Read-only, never writes an audit entry.
 func (s *VendorAdminService) Get(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+// GetKindAndDirector returns the extra detail fields (kind + active
+// Director_PIC, nil when none) read from the primary (vendor-pks 6.2).
+func (s *VendorAdminService) GetKindAndDirector(ctx context.Context, id int64) (string, *db.GetVendorDirectorPicRow, error) {
+	return s.repo.GetKindAndDirector(ctx, id)
 }
 
 // Create validates and stages a new vendor (Req 7.1-7.4). The code

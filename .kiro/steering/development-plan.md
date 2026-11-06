@@ -15,7 +15,7 @@ Rules:
 2. **No new master-data features.** Master data (vendors/branches/vaults/PICs/packages/prices/ATMs/regions) is feature-complete for MVP. Only bugfixes allowed. Exceptions: read-only export under X.7 (user OK 2026-10-28); CSV import revamp under X.10 (user OK 2026-11-02).
 3. **Do not touch Phases 3–7** (finance, escrow, cash count, CIT, EOD) until Phase 2 lands, unless the user explicitly re-prioritizes.
 4. **Do not wire mock screens** (see "Mock frontends") ad hoc — each gets wired only as part of its owning phase item.
-5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `037`** (`022` reserved for `vendor-pks-cis-limit`, `024` dropped).
+5. New table/column → note it in `.claude/CLAUDE.md` Sec 3 when applied (schema is mutable in this stage, Sec 0a). Migrations are sequential and applied with `go run ./cmd/migrate up` (never `psql -f`). **Next free: `038`** (`022` + `037` reserved for `vendor-pks`, `024` dropped).
 6. Accepted known gaps (listed below) are **not** to be "fixed along the way".
 
 ---
@@ -26,7 +26,7 @@ Overall completion: **~58%** (rough estimate; ~55% on 2026-10-23, ~45-50% on 202
 
 Branch: `dev1` is **159 commits ahead** of `main` (`dev1` latest `b102082`, 2026-11-03). Merge `dev1` → `main` is still pending.
 
-Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`036` (gaps: `022` reserved, `024` dropped; 34 files), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29; `036_master_data_import_batches_file_name` applied to dev 2026-11-02.
+Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squashed 2026-09-18; old `001`–`040` in `backend/migrations/archives/2026-09-18_pre-baseline/`). Current range `001`–`037` (gap: `024` dropped; 36 files; next free `038`), tracked in `schema_migrations` by the custom runner `backend/cmd/migrate` (BE-03, `88a3139`). Dev baselined `--through 031` on 2026-10-15; `032` applied 2026-10-20; `033_dsr_receipts` applied 2026-10-27; `034_export_jobs` applied 2026-10-28; `035_export_jobs_reports` applied 2026-10-29; `036_master_data_import_batches_file_name` applied to dev 2026-11-02; `022_vendor_pks` + `037_export_jobs_vendor_pks` applied to dev 2026-11-05.
 
 ### Built and wired (verified in code)
 
@@ -63,7 +63,7 @@ Migrations: baseline `001_baseline_schema.sql` + `002_baseline_seed.sql` (squash
 - **Integration:** `internal/corebanking` (escrow ingest).
 - **`backend-exq/`** (renamed from `backend-cit` 2026-10-20, `8b41612`): async export is built (X.7–X.9), dashboard monitoring queries are not. Not deployed yet; first deployment comes with the export release. CIT functions live in `backend/` (decision 2026-10-08).
 - **EOD Final Realisasi** calc + `eod_runs` table + late-completion alert.
-- **Vendor PKS / CIS limit** (`vendor-pks-cis-limit/`, mig `022` reserved): intent draft, awaiting PO.
+- **Vendor PKS** (`.kiro/specs/vendor-pks/`): requirements disetujui PO 2026-11-05 (D1–D31), design + tasks 2026-11-05 (14 task, 42 leaf). Migrasi `022` (PKS + `vendor_pics.is_director`) + `037` (kind ekspor `vendor_pks` + constraint roles direktur) applied to dev 2026-11-05. Tasks 1–13 selesai (dokumentasi 2026-11-06); task 14 cek browser manual oleh user masih outstanding. D32: direktur dicatat sebagai PIC, `vendors` tidak berubah. **Vendor CIS limit** (`vendor-cis-limit/`): split off 2026-11-05, intent draft, not discussed yet.
 - **Unmigrated tables:** `documents`, `invoice_*`, `*_reconciliation_results`, all `cit_*`, all `escrow_*`, `cash_count_schedules`/`cash_count_evidences` (names approved, not migrated). `replenishment_instructions` is dropped: an approved Vendor Request is the instruction.
 
 ### Mock frontends (hardcoded data, not API-backed)

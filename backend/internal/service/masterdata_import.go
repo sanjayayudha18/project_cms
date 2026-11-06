@@ -198,6 +198,10 @@ type importEnv struct {
 	spans     map[string][]importSpan // terminal -> active periods (db rows not in the file + accepted file rows)
 	seenKey   map[string]int
 	seenID    map[int64]int
+	// PIC directors: active director id per vendor code in the DB, and the file
+	// line of the first active director row per vendor code (lazy, PIC import only).
+	dbDirectors   map[string]int64
+	fileDirectors map[string]int
 }
 
 // importNatKey is the natural key of a row, "" when the entity has none (PICs).
@@ -504,13 +508,19 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		}
 	}
 
-	if e.entity == ExportVendorPICs && !creating && strings.TrimSpace(v["roles"]) == "" {
-		v["roles"] = e.cur[id]["roles"] // blank or older file without the column: roles stay as they are
+	if e.entity == ExportVendorPICs {
+		e.resolvePICKeeps(v, id, creating)
 	}
 
 	e.validateFields(v, creating, add, fromErr)
 	if len(errs) > 0 {
 		return ImportRow{}, errs
+	}
+	if e.entity == ExportVendorPICs {
+		e.checkPICDirector(v, id, rec.line, add)
+		if len(errs) > 0 {
+			return ImportRow{}, errs
+		}
 	}
 
 	if !e.checkNatKey(header[1], v, id, rec.line, add) {

@@ -74,11 +74,12 @@ func (q *Queries) CountVendorPicsAdmin(ctx context.Context, arg CountVendorPicsA
 }
 
 const createVendorPicAdmin = `-- name: CreateVendorPicAdmin :one
-INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient, roles)
+INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient, roles, is_director)
 VALUES ($1, $2, $3, $4,
-        $5, $6, $7, $8::text[])
+        $5, $6, $7, $8::text[],
+        $9::boolean)
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at, roles
+          is_notification_recipient, is_active, deleted_at, roles, is_director
 `
 
 type CreateVendorPicAdminParams struct {
@@ -90,6 +91,7 @@ type CreateVendorPicAdminParams struct {
 	Email                   *string  `json:"email"`
 	IsNotificationRecipient bool     `json:"is_notification_recipient"`
 	Roles                   []string `json:"roles"`
+	IsDirector              bool     `json:"is_director"`
 }
 
 type CreateVendorPicAdminRow struct {
@@ -104,6 +106,7 @@ type CreateVendorPicAdminRow struct {
 	IsActive                bool               `json:"is_active"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 	Roles                   []string           `json:"roles"`
+	IsDirector              bool               `json:"is_director"`
 }
 
 func (q *Queries) CreateVendorPicAdmin(ctx context.Context, arg CreateVendorPicAdminParams) (CreateVendorPicAdminRow, error) {
@@ -116,6 +119,7 @@ func (q *Queries) CreateVendorPicAdmin(ctx context.Context, arg CreateVendorPicA
 		arg.Email,
 		arg.IsNotificationRecipient,
 		arg.Roles,
+		arg.IsDirector,
 	)
 	var i CreateVendorPicAdminRow
 	err := row.Scan(
@@ -130,6 +134,7 @@ func (q *Queries) CreateVendorPicAdmin(ctx context.Context, arg CreateVendorPicA
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.Roles,
+		&i.IsDirector,
 	)
 	return i, err
 }
@@ -153,9 +158,30 @@ func (q *Queries) EnableVendorPic(ctx context.Context, id int64) error {
 	return err
 }
 
+const findOtherActiveDirector = `-- name: FindOtherActiveDirector :one
+SELECT id FROM vendor_pics
+WHERE vendor_id = $1 AND is_director AND deleted_at IS NULL
+  AND id <> COALESCE($2::bigint, 0)
+LIMIT 1
+`
+
+type FindOtherActiveDirectorParams struct {
+	VendorID  int64  `json:"vendor_id"`
+	ExcludeID *int64 `json:"exclude_id"`
+}
+
+// Pre-check for 409 (vendor-pks Req 1.5): another active Director_PIC of the
+// vendor. exclude_id NULL = no exclusion. No row = none.
+func (q *Queries) FindOtherActiveDirector(ctx context.Context, arg FindOtherActiveDirectorParams) (int64, error) {
+	row := q.db.QueryRow(ctx, findOtherActiveDirector, arg.VendorID, arg.ExcludeID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getVendorPicAdminByID = `-- name: GetVendorPicAdminByID :one
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at, roles
+       is_notification_recipient, is_active, deleted_at, roles, is_director
 FROM vendor_pics WHERE id = $1
 `
 
@@ -171,6 +197,7 @@ type GetVendorPicAdminByIDRow struct {
 	IsActive                bool               `json:"is_active"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 	Roles                   []string           `json:"roles"`
+	IsDirector              bool               `json:"is_director"`
 }
 
 // Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
@@ -189,12 +216,13 @@ func (q *Queries) GetVendorPicAdminByID(ctx context.Context, id int64) (GetVendo
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.Roles,
+		&i.IsDirector,
 	)
 	return i, err
 }
 
 const getVendorPicRolesForUpdate = `-- name: GetVendorPicRolesForUpdate :one
-SELECT roles FROM vendor_pics
+SELECT roles, is_director FROM vendor_pics
 WHERE id = $1 AND vendor_id = $2 AND deleted_at IS NULL
 FOR UPDATE
 `
@@ -204,19 +232,24 @@ type GetVendorPicRolesForUpdateParams struct {
 	VendorID int64 `json:"vendor_id"`
 }
 
+type GetVendorPicRolesForUpdateRow struct {
+	Roles      []string `json:"roles"`
+	IsDirector bool     `json:"is_director"`
+}
+
 // Row-locks an active PIC of vendor_id before SetVendorPicRoles (immediate
 // apply + audit in tx, vendor-party-scope Req 5.3-5.5). No row = 404.
-func (q *Queries) GetVendorPicRolesForUpdate(ctx context.Context, arg GetVendorPicRolesForUpdateParams) ([]string, error) {
+func (q *Queries) GetVendorPicRolesForUpdate(ctx context.Context, arg GetVendorPicRolesForUpdateParams) (GetVendorPicRolesForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getVendorPicRolesForUpdate, arg.ID, arg.VendorID)
-	var roles []string
-	err := row.Scan(&roles)
-	return roles, err
+	var i GetVendorPicRolesForUpdateRow
+	err := row.Scan(&i.Roles, &i.IsDirector)
+	return i, err
 }
 
 const listVendorPicsAdmin = `-- name: ListVendorPicsAdmin :many
 
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at, roles
+       is_notification_recipient, is_active, deleted_at, roles, is_director
 FROM vendor_pics
 WHERE vendor_id = $1
   AND ($2::bigint IS NULL OR vendor_branch_id = $2::bigint)
@@ -253,6 +286,7 @@ type ListVendorPicsAdminRow struct {
 	IsActive                bool               `json:"is_active"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 	Roles                   []string           `json:"roles"`
+	IsDirector              bool               `json:"is_director"`
 }
 
 // Admin vendor PIC management (plan.md Fase 3, T3.3). Mutations route
@@ -293,6 +327,7 @@ func (q *Queries) ListVendorPicsAdmin(ctx context.Context, arg ListVendorPicsAdm
 			&i.IsActive,
 			&i.DeletedAt,
 			&i.Roles,
+			&i.IsDirector,
 		); err != nil {
 			return nil, err
 		}
@@ -338,10 +373,11 @@ SET vendor_branch_id = $1,
     phone = $4,
     email = $5,
     is_notification_recipient = $6,
+    is_director = $7::boolean,
     updated_at = now()
-WHERE id = $7 AND deleted_at IS NULL
+WHERE id = $8 AND deleted_at IS NULL
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at, roles
+          is_notification_recipient, is_active, deleted_at, roles, is_director
 `
 
 type UpdateVendorPicAdminParams struct {
@@ -351,6 +387,7 @@ type UpdateVendorPicAdminParams struct {
 	Phone                   *string `json:"phone"`
 	Email                   *string `json:"email"`
 	IsNotificationRecipient bool    `json:"is_notification_recipient"`
+	IsDirector              bool    `json:"is_director"`
 	ID                      int64   `json:"id"`
 }
 
@@ -366,6 +403,7 @@ type UpdateVendorPicAdminRow struct {
 	IsActive                bool               `json:"is_active"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 	Roles                   []string           `json:"roles"`
+	IsDirector              bool               `json:"is_director"`
 }
 
 // vendor_id is immutable; roles is never set here (form update keeps the
@@ -379,6 +417,7 @@ func (q *Queries) UpdateVendorPicAdmin(ctx context.Context, arg UpdateVendorPicA
 		arg.Phone,
 		arg.Email,
 		arg.IsNotificationRecipient,
+		arg.IsDirector,
 		arg.ID,
 	)
 	var i UpdateVendorPicAdminRow
@@ -394,6 +433,7 @@ func (q *Queries) UpdateVendorPicAdmin(ctx context.Context, arg UpdateVendorPicA
 		&i.IsActive,
 		&i.DeletedAt,
 		&i.Roles,
+		&i.IsDirector,
 	)
 	return i, err
 }

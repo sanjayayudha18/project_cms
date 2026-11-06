@@ -402,11 +402,70 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '500': { $ref: '#/components/responses/InternalError' }
 
+  /admin/vendors/{vendorID}/pks:
+    get:
+      operationId: getVendorPks
+      tags: [vendor-pks]
+      description: >-
+        ADMIN / ADMIN_PARAM. Active PKS, history and the pending change of one vendor (primary DB).
+        INTERNAL vendor: `pks_status` and `active` are null, `history` is empty.
+      parameters: [ { $ref: '#/components/parameters/VendorID' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorPksDetail' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitVendorPks
+      tags: [vendor-pks]
+      description: >-
+        ADMIN / ADMIN_PARAM. Stages a new PKS (replaces the active one on approval) through
+        maker-checker. 202 = pending approval.
+      parameters: [ { $ref: '#/components/parameters/VendorID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SubmitVendorPksRequest' } } }
+      responses: &pksWriteResponses
+        '202': { description: 'Accepted, pending approval', content: { application/json: { schema: { $ref: '#/components/schemas/ChangeRequestAccepted' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /admin/vendors/{vendorID}/pks/{pksID}/terminate:
+    post:
+      operationId: terminateVendorPks
+      tags: [vendor-pks]
+      description: ADMIN / ADMIN_PARAM. Stages a terminate of the PKS through maker-checker.
+      parameters: [ { $ref: '#/components/parameters/VendorID' }, { $ref: '#/components/parameters/PksID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VendorPksReasonRequest' } } }
+      responses: *pksWriteResponses
+
+  /admin/vendors/{vendorID}/pks/{pksID}/unterminate:
+    post:
+      operationId: unterminateVendorPks
+      tags: [vendor-pks]
+      description: ADMIN / ADMIN_PARAM. Stages the undo of a terminate through maker-checker.
+      parameters: [ { $ref: '#/components/parameters/VendorID' }, { $ref: '#/components/parameters/PksID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/VendorPksReasonRequest' } } }
+      responses: *pksWriteResponses
+
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
 
   parameters:
+    VendorID: { name: vendorID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+    PksID: { name: pksID, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 1000000 } }
     PageSize: { name: page_size, in: query, schema: { type: integer } }
     DsrLateMonth: { name: month, in: query, required: true, description: 'YYYY-MM, not after the current month (WIB)', schema: { type: string, pattern: '^\d{4}-\d{2}$' } }
@@ -441,6 +500,77 @@ components:
       properties:
         field: { type: string }
         message: { type: string }
+    # -- vendor-pks -----------------------------------------------------------
+    ChangeRequestAccepted:
+      type: object
+      additionalProperties: false
+      required: [change_request_id, status, entity_type, op]
+      properties:
+        change_request_id: { type: integer, format: int64 }
+        status: { type: string }
+        entity_type: { type: string }
+        op: { type: string }
+    SubmitVendorPksRequest:
+      type: object
+      additionalProperties: false
+      required: [pks_name, effective_date, expiry_date]
+      properties:
+        pks_name: { type: string, minLength: 1, maxLength: 500 }
+        effective_date: { type: string, format: date }
+        expiry_date: { type: string, format: date, description: 'must be >= effective_date' }
+    VendorPksReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PksStatus: { type: string, enum: [aktif, need_renewal, expired, terminated, belum_diisi] }
+    VendorPksRecord:
+      type: object
+      additionalProperties: false
+      required: [id, pks_name, effective_date, expiry_date, validity_months, created_at, terminated_at, termination_reason]
+      properties:
+        id: { type: integer, format: int64 }
+        pks_name: { type: string }
+        effective_date: { type: string, format: date }
+        expiry_date: { type: string, format: date }
+        validity_months: { type: integer, format: int32 }
+        remaining_days: { type: integer, description: 'only on the active PKS; negative once expired' }
+        created_at: { type: string, format: date-time, nullable: true }
+        replaced_at: { type: string, format: date-time, description: 'history rows only' }
+        replaced_by_pks_id: { type: integer, format: int64, description: 'history rows only' }
+        terminated_at: { type: string, format: date-time, nullable: true }
+        termination_reason: { type: string, nullable: true }
+    VendorPksPending:
+      type: object
+      additionalProperties: false
+      required: [change_request_id, op, payload, maker_id, maker_name, created_at]
+      properties:
+        change_request_id: { type: integer, format: int64 }
+        op: { type: string, enum: [create, disable, enable] }
+        payload: { type: object, additionalProperties: true }
+        maker_id: { type: integer, format: int64 }
+        maker_name: { type: string }
+        created_at: { type: string, format: date-time, nullable: true }
+    VendorPksDetail:
+      type: object
+      additionalProperties: false
+      required: [vendor_id, kind, today, renewal_months, pks_status, active, history, pending]
+      properties:
+        vendor_id: { type: integer, format: int64 }
+        kind: { type: string, enum: [FLM_VENDOR, INTERNAL] }
+        today: { type: string, format: date, description: 'Asia/Jakarta date used for status' }
+        renewal_months: { type: integer }
+        pks_status:
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/PksStatus' } ]
+        active:
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/VendorPksRecord' } ]
+        history: { type: array, items: { $ref: '#/components/schemas/VendorPksRecord' } }
+        pending:
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/VendorPksPending' } ]
     # -- dsr-late-report ------------------------------------------------------
     DsrLateStatus: { type: string, enum: [ok, late, not_sent, pending] }
     DsrLateDailyRow:

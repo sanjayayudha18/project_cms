@@ -19,6 +19,10 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
+// ErrVendorDirectorNoRoles: the Direktur Utama PIC is vendor-level contact only
+// and cannot hold roles (vendor-pks Req 1.6, 409).
+var ErrVendorDirectorNoRoles = errors.New("PIC Direktur Utama tidak boleh memiliki peran")
+
 // picRoleCodes are the allowed vendor_pics.roles values (migration 032 CHECK).
 var picRoleCodes = []string{"cashcount", "replenish", "vault"}
 
@@ -80,13 +84,17 @@ func (s *VendorPicRoleService) SetRoles(ctx context.Context, actorID, vendorID, 
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := db.New(tx)
-	before, err := q.GetVendorPicRolesForUpdate(ctx, db.GetVendorPicRolesForUpdateParams{ID: picID, VendorID: vendorID})
+	beforeRow, err := q.GetVendorPicRolesForUpdate(ctx, db.GetVendorPicRolesForUpdateParams{ID: picID, VendorID: vendorID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrVendorPicNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("loading vendor pic roles: %w", err)
 	}
+	if beforeRow.IsDirector && len(after) > 0 {
+		return nil, ErrVendorDirectorNoRoles
+	}
+	before := beforeRow.Roles
 	if slices.Equal(before, after) {
 		return after, nil
 	}

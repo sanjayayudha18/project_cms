@@ -396,7 +396,7 @@ type ExportJob struct {
 	DownloadedAt      pgtype.Timestamptz `json:"downloaded_at"`
 	ExpiredAt         pgtype.Timestamptz `json:"expired_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	// Filter laporan (month | date_from,date_to, vendor_id, vendor_branch_id, region_code, status, classification) untuk Kind laporan; NULL untuk Kind master data. Migrasi 035.
+	// Filter laporan (month | date_from,date_to, vendor_id, vendor_branch_id, region_code, status, classification; vendor_pks: q, status, pks_status) untuk Kind laporan; NULL untuk Kind master data. Migrasi 035, 037.
 	ReportParams []byte `json:"report_params"`
 }
 
@@ -900,8 +900,31 @@ type VendorPic struct {
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
+	// Direktur Utama vendor (D32). Hanya pencatatan: tanpa login, tanpa roles (037), bukan penerima notifikasi, selalu tingkat vendor (vendor_branch_id NULL). Maksimal satu direktur aktif per vendor (vendor_pics_director_uq).
+	IsDirector bool `json:"is_director"`
 	// Peran PIC: replenish (PIC replenish ATM), vault (PIC penyedia uang), cashcount (PIC cash count). Kosong = kontak saja. Ubah lewat layar = langsung + audit (deviasi GR#3, vendor-party-scope).
 	Roles []string `json:"roles"`
+}
+
+// PKS (perjanjian kerja sama) per vendor dengan riwayat (D1). Satu PKS aktif per vendor (replaced_at IS NULL, vendor_pks_active_uq). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks). pks_name/effective_date/expiry_date tidak pernah di-UPDATE; tidak pernah di-hard-delete. Riwayat batalkan terminate hanya di audit_logs.
+type VendorPk struct {
+	ID            int64       `json:"id"`
+	VendorID      int64       `json:"vendor_id"`
+	PksName       string      `json:"pks_name"`
+	EffectiveDate pgtype.Date `json:"effective_date"`
+	ExpiryDate    pgtype.Date `json:"expiry_date"`
+	// Maker change create (users.id).
+	CreatedBy int64 `json:"created_by"`
+	// NULL = PKS aktif vendor. Diisi saat PKS baru disetujui dan menggantikannya (D17).
+	ReplacedAt pgtype.Timestamptz `json:"replaced_at"`
+	// PKS yang menggantikan baris ini; hanya terisi bila replaced_at terisi.
+	ReplacedByPksID *int64 `json:"replaced_by_pks_id"`
+	// Diisi saat terminate disetujui; dikosongkan lagi (bersama terminated_by + termination_reason) saat batalkan terminate disetujui.
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.

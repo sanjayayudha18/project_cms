@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -141,6 +142,7 @@ func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(str
 		add("phone", "format telepon tidak valid (6-15 digit, boleh diawali +)")
 	}
 	boolCol(v, "is_notification_recipient", "false", creating, add)
+	boolCol(v, "is_director", "false", creating, add)
 	roles, err := parsePicRoles(v["roles"])
 	var ve *ValidationError
 	switch {
@@ -149,6 +151,72 @@ func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(str
 	case roles != nil:
 		v["roles"] = csvexport.PICRolesCell(*roles) // canonical order, so equal sets compare equal to the export
 	}
+	if v["is_director"] == "true" { // same rules as VendorPicAdminService.validate (vendor-pks 5.1)
+		if v["branch_code"] != "" {
+			add("branch_code", "PIC Direktur Utama harus tingkat vendor (kosongkan cabang)")
+		}
+		if v["is_notification_recipient"] == "true" {
+			add("is_notification_recipient", "PIC Direktur Utama tidak boleh menjadi penerima notifikasi")
+		}
+		if roles != nil && len(*roles) > 0 {
+			add("roles", "PIC Direktur Utama tidak memiliki peran")
+		}
+	}
+}
+
+// resolvePICKeeps fills PIC cells the file leaves open: is_director "<keep>"
+// (older header) or blank on update = current value (false on create); roles
+// blank = current on update, and none for a director (never "all roles").
+func (e *importEnv) resolvePICKeeps(v map[string]string, id int64, creating bool) {
+	if d := strings.TrimSpace(v["is_director"]); d == keepCurrentCell || (d == "" && !creating) {
+		v["is_director"] = e.cur[id]["is_director"]
+		if creating || v["is_director"] == "" {
+			v["is_director"] = "false"
+		}
+	}
+	if strings.TrimSpace(v["roles"]) != "" {
+		return
+	}
+	switch {
+	case strings.EqualFold(strings.TrimSpace(v["is_director"]), "true"):
+		v["roles"] = csvexport.PICRolesNone
+	case !creating:
+		v["roles"] = e.cur[id]["roles"] // blank or older file without the column: roles stay as they are
+	}
+}
+
+// checkPICDirector enforces one active director per vendor against the DB and
+// against earlier rows of the same file. An unchanged inactive director row is
+// not checked, so an export of a vendor with an old inactive director round-trips.
+func (e *importEnv) checkPICDirector(v map[string]string, id int64, line int, add func(string, string)) {
+	if v["is_director"] != "true" {
+		return
+	}
+	active := v["is_active"] == "true"
+	if !active && id != 0 && e.cur[id]["is_director"] == "true" {
+		return
+	}
+	if e.dbDirectors == nil {
+		e.dbDirectors, e.fileDirectors = map[string]int64{}, map[string]int{}
+		for cid, r := range e.cur {
+			if r["is_director"] == "true" && r["is_active"] == "true" {
+				e.dbDirectors[r["vendor_code"]] = cid
+			}
+		}
+	}
+	vendor := v["vendor_code"]
+	if other, ok := e.dbDirectors[vendor]; ok && other != id {
+		add("is_director", ErrVendorDirectorExists.Error())
+		return
+	}
+	if !active {
+		return
+	}
+	if first, dup := e.fileDirectors[vendor]; dup {
+		add("is_director", fmt.Sprintf("vendor sudah punya PIC Direktur Utama aktif di baris %d", first))
+		return
+	}
+	e.fileDirectors[vendor] = line
 }
 
 // parsePicRoles reads a roles cell: blank = nil (create: all roles, update:

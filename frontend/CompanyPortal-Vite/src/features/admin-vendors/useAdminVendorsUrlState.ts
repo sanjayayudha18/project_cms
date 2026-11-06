@@ -9,13 +9,16 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import type { VendorStatus } from "./types";
+import type { PksStatus, VendorStatus } from "./types";
+
+const PKS_STATUSES = ["aktif", "need_renewal", "expired", "terminated", "belum_diisi"] as const;
 
 export const ADMIN_VENDORS_SEARCH_SCHEMA = z.object({
   page: z.number().int().min(1).optional(),
   page_size: z.number().int().min(1).max(100).optional(),
   status: z.enum(["active", "disabled", "all"]).optional(),
   q: z.string().max(100).optional(),
+  pks_status: z.enum(PKS_STATUSES).optional(),
 });
 
 export type AdminVendorsSearchParams = z.infer<typeof ADMIN_VENDORS_SEARCH_SCHEMA>;
@@ -25,6 +28,7 @@ export interface AdminVendorsUrlParams {
   page_size: number;
   status: VendorStatus;
   q: string;
+  pks_status?: PksStatus;
 }
 
 const DEFAULTS: AdminVendorsUrlParams = {
@@ -42,6 +46,7 @@ export function parseParams(raw: Record<string, unknown>): AdminVendorsUrlParams
     page_size: typeof raw.page_size === "number" ? raw.page_size : DEFAULTS.page_size,
     status: typeof raw.status === "string" ? (raw.status as VendorStatus) : DEFAULTS.status,
     q: typeof raw.q === "string" ? raw.q : DEFAULTS.q,
+    pks_status: PKS_STATUSES.find((v) => v === raw.pks_status),
   };
 }
 
@@ -51,6 +56,7 @@ export function omitDefaults(params: AdminVendorsUrlParams): AdminVendorsSearchP
   if (params.page_size !== DEFAULTS.page_size) out.page_size = params.page_size;
   if (params.status !== DEFAULTS.status) out.status = params.status;
   if (params.q !== DEFAULTS.q) out.q = params.q;
+  if (params.pks_status) out.pks_status = params.pks_status;
   return out;
 }
 
@@ -83,7 +89,8 @@ export function useAdminVendorsUrlState() {
   }, [debouncedSearch]);
 
   function setParams(partial: Partial<AdminVendorsUrlParams>): void {
-    const next = omitDefaults({ ...params, ...partial });
+    const resetPage = "pks_status" in partial && partial.page === undefined;
+    const next = omitDefaults({ ...params, ...partial, ...(resetPage ? { page: 1 } : {}) });
     navigate({ to: ".", search: next });
   }
 

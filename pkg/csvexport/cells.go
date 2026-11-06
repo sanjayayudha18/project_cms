@@ -30,7 +30,7 @@ type VendorVaultRow struct {
 type VendorPICRow struct {
 	ID                                                   int64
 	VendorCode, BranchCode, Name, Position, Phone, Email string
-	IsNotificationRecipient, IsActive                    bool
+	IsNotificationRecipient, IsActive, IsDirector        bool
 	Roles                                                []string
 }
 
@@ -80,7 +80,7 @@ func VendorVaultCells(r VendorVaultRow) []string {
 
 func VendorPICCells(r VendorPICRow) []string {
 	return []string{id(r.ID), r.VendorCode, r.BranchCode, r.Name, r.Position, r.Phone, r.Email,
-		boolCell(r.IsNotificationRecipient), boolCell(r.IsActive), PICRolesCell(r.Roles)}
+		boolCell(r.IsNotificationRecipient), boolCell(r.IsActive), PICRolesCell(r.Roles), boolCell(r.IsDirector)}
 }
 
 func ATMCells(r ATMRow) []string {

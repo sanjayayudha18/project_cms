@@ -5,6 +5,7 @@ import { DsrLocationMapsPanel } from "./DsrLocationMapsPanel";
 import { InfoTab } from "./InfoTab";
 import { PackagePricesPanel } from "./PackagePricesPanel";
 import { PicsPanel } from "./PicsPanel";
+import { PksPanel } from "./PksPanel";
 import { VendorHeader } from "./VendorHeader";
 
 const TOP_TABS = [
@@ -13,6 +14,7 @@ const TOP_TABS = [
   { id: "vendorWidePics", label: "PIC Vendor-wide" },
   { id: "packagePrices", label: "Harga Paket" },
   { id: "dsrMaps", label: "Mapping DSR" },
+  { id: "pks", label: "PKS" },
 ] as const;
 
 type TopTab = (typeof TOP_TABS)[number]["id"];
@@ -60,12 +62,14 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
   const [tab, setTab] = useState<TopTab>("info");
   const vendorQuery = useVendor(vendorId);
   const vendor = vendorQuery.data;
+  // PKS tab is hidden for internal vendors (ROH has no PKS)
+  const tabs = vendor?.kind === "INTERNAL" ? TOP_TABS.filter((t) => t.id !== "pks") : TOP_TABS;
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <VendorHeader vendor={vendor} vendorId={vendorId} />
 
-      <TabBar label="Detail vendor" tabs={TOP_TABS} active={tab} onChange={setTab} />
+      <TabBar label="Detail vendor" tabs={tabs} active={tab} onChange={setTab} />
 
       {vendorQuery.isError && (
         <p role="alert" className="text-sm text-[var(--danger-fg)]">
@@ -82,6 +86,10 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
       {tab === "packagePrices" && <PackagePricesPanel vendorId={vendorId} />}
 
       {tab === "dsrMaps" && <DsrLocationMapsPanel vendorId={vendorId} />}
+
+      {tab === "pks" && vendor?.kind !== "INTERNAL" && (
+        <PksPanel vendorId={vendorId} vendor={vendor} />
+      )}
     </div>
   );
 }

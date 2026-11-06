@@ -38,8 +38,11 @@ export function PicRolesDialog({ open, onClose, vendorId, pic }: PicRolesDialogP
       toast({ type: "success", message: "Peran PIC diperbarui" });
       onClose();
     } catch (err) {
-      const message =
-        err && typeof err === "object" && "message" in err
+      const isConflict =
+        err && typeof err === "object" && (err as { status?: unknown }).status === 409;
+      const message = isConflict
+        ? "Peran tidak bisa diubah: PIC ini Direktur Utama (hanya pencatatan, tanpa peran PIC)."
+        : err && typeof err === "object" && "message" in err
           ? String((err as { message: unknown }).message)
           : "Terjadi kesalahan yang tidak diketahui";
       toast({ type: "error", message });

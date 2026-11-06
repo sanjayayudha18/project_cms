@@ -11,6 +11,7 @@ import (
 
 	"github.com/cimb-niaga/cms/backend-exq/internal/repository"
 	"github.com/cimb-niaga/cms/pkg/csvexport"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Querier is the subset of *repository.Queries the producers call.
@@ -213,7 +214,11 @@ func picsProducer() Producer {
 		},
 		id: func(r repository.ExportVendorPicsBatchRow) int64 { return r.ID },
 		cells: func(r repository.ExportVendorPicsBatchRow) []string {
-			return csvexport.VendorPICCells(csvexport.VendorPICRow(r))
+			return csvexport.VendorPICCells(csvexport.VendorPICRow{
+				ID: r.ID, VendorCode: r.VendorCode, BranchCode: r.BranchCode, Name: r.Name, Position: r.Position,
+				Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient,
+				IsActive: r.IsActive, IsDirector: r.IsDirector, Roles: r.Roles,
+			})
 		},
 		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
 			v, b := scope(p)
@@ -312,11 +317,14 @@ func packagePricesProducer() Producer {
 }
 
 // DefaultProducers is NewProducers without a DSR start date (DSR report files are header only).
-func DefaultProducers() map[Kind]map[string]Producer { return NewProducers(nil) }
+func DefaultProducers() map[Kind]map[string]Producer {
+	return NewProducers(nil, reports.VendorPksRenewalMonthsDefault)
+}
 
 // NewProducers maps kind -> entity -> producer (design "entity table per Kind"), master data and
 // reports. dsrStart is DSR_LATE_START_DATE; nil = DSR report files are header only.
-func NewProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
+// pksRenewalMonths is VENDOR_PKS_RENEWAL_MONTHS (the vendor_pks export).
+func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string]Producer {
 	m := map[Kind]map[string]Producer{
 		KindVendor: {
 			"vendor":            vendorsProducer(true),
@@ -341,7 +349,7 @@ func NewProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
 			csvexport.ATMAssignments: atmAssignmentsProducer(),
 		},
 	}
-	for k, byEntity := range reportProducers(dsrStart) {
+	for k, byEntity := range reportProducers(dsrStart, pksRenewalMonths) {
 		m[k] = byEntity
 	}
 	return m

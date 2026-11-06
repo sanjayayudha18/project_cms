@@ -377,3 +377,8 @@ func TestErrorsPropagate(t *testing.T) {
 		t.Errorf("ctx err = %v", err)
 	}
 }
+
+// vendor_pks export is covered by task 9.3.
+func (*fakeQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
+	return nil, nil
+}

@@ -61,6 +61,7 @@ var KindSpecs = map[Kind]KindSpec{
 		EntityRef: fixed("replenishment_report")},
 	KindReplenishmentTrips: {Roles: reports.ReplenishmentViewerRoles, DownloadAction: ActionReportExported,
 		EntityRef: fixed("replenishment_report")},
+	KindVendorPks: {Roles: reports.VendorPksViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("vendor_pks_report")},
 }
 
 // KindRoles maps each kind to its allowed roles; used by the route guard and the service.

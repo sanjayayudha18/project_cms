@@ -2,17 +2,20 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 	custommw "github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // fakeVendorAdminServicer implements VendorAdminServicer for httptest, no
@@ -55,6 +58,10 @@ func (f *fakeVendorAdminServicer) Count(context.Context, db.CountVendorsAdminPar
 
 func (f *fakeVendorAdminServicer) Get(context.Context, int64) (*db.GetVendorAdminByIDRow, error) {
 	return f.getResult, f.getErr
+}
+
+func (f *fakeVendorAdminServicer) GetKindAndDirector(context.Context, int64) (string, *db.GetVendorDirectorPicRow, error) {
+	return "FLM_VENDOR", nil, nil
 }
 
 func (f *fakeVendorAdminServicer) Create(_ context.Context, _ int64, req service.CreateVendorRequest, _ string) (db.MasterDataChangeRequest, error) {
@@ -124,6 +131,83 @@ func TestAdminVendorHandler_List_InvalidStatus_BadRequest(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminVendorHandler_List_InvalidPksStatus_BadRequest(t *testing.T) {
+	router, tokenSvc := mountAdminVendorHandler(&fakeVendorAdminServicer{})
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	for _, v := range []string{"xyz", "AKTIF", "all"} {
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("pks_status=%s: expected 400, got %d: %s", v, rec.Code, rec.Body.String())
+		}
+	}
+	for v := range reports.PksStatuses {
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
+		if rec.Code != http.StatusOK {
+			t.Errorf("pks_status=%s: expected 200, got %d: %s", v, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
+	str := func(s string) *string { return &s }
+	i64 := func(n int64) *int64 { return &n }
+	date := func(y int, m time.Month, d int) pgtype.Date {
+		return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+	}
+	svc := &fakeVendorAdminServicer{
+		countResult: 3,
+		listResult: []db.ListVendorsAdminRow{
+			{ // FLM vendor with active PKS + director
+				ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR",
+				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id"),
+				PksID: i64(9), PksName: str("PKS 2026"), PksEffectiveDate: date(2026, 1, 1), PksExpiryDate: date(2027, 12, 31),
+				PksValidityMonths: 24, PksRemainingDays: 420, PksStatus: "aktif",
+			},
+			{ // FLM vendor without PKS: COALESCEd to 0 / '' + 'belum_diisi'
+				ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "FLM_VENDOR", PksStatus: "belum_diisi",
+			},
+			{ // INTERNAL: no PKS, empty status -> pks_status null
+				ID: 3, Code: "C", Name: "C", IsActive: true, Kind: "INTERNAL",
+			},
+		},
+	}
+	router, tokenSvc := mountAdminVendorHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors", token, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Vendors []map[string]any `json:"vendors"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Vendors) != 3 {
+		t.Fatalf("decode: %v, vendors=%d, body=%s", err, len(body.Vendors), rec.Body.String())
+	}
+	v0, v1, v2 := body.Vendors[0], body.Vendors[1], body.Vendors[2]
+
+	if v0["kind"] != "FLM_VENDOR" || v0["pks_status"] != "aktif" {
+		t.Errorf("vendor 0 kind/pks_status = %v/%v", v0["kind"], v0["pks_status"])
+	}
+	dir, _ := v0["director"].(map[string]any)
+	if dir["name"] != "Budi" || dir["phone"] != "0812" || dir["email"] != "b@x.id" {
+		t.Errorf("vendor 0 director = %v", v0["director"])
+	}
+	pks, _ := v0["pks"].(map[string]any)
+	if pks["id"] != float64(9) || pks["pks_name"] != "PKS 2026" || pks["effective_date"] != "2026-01-01" ||
+		pks["expiry_date"] != "2027-12-31" || pks["validity_months"] != float64(24) || pks["remaining_days"] != float64(420) {
+		t.Errorf("vendor 0 pks = %v", v0["pks"])
+	}
+
+	if v1["pks"] != nil || v1["director"] != nil || v1["pks_status"] != "belum_diisi" {
+		t.Errorf("vendor 1 pks/director/pks_status = %v/%v/%v, want nil/nil/belum_diisi", v1["pks"], v1["director"], v1["pks_status"])
+	}
+	if v2["kind"] != "INTERNAL" || v2["pks"] != nil || v2["pks_status"] != nil {
+		t.Errorf("vendor 2 kind/pks/pks_status = %v/%v/%v, want INTERNAL/nil/nil", v2["kind"], v2["pks"], v2["pks_status"])
 	}
 }
 

@@ -54,3 +54,40 @@ describe("InfoTab", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 });
+
+describe("InfoTab Direktur Utama (vendor-pks Req 9.3)", () => {
+  it("shows name, phone and email of the recorded director", () => {
+    render(
+      <InfoTab
+        vendor={{
+          ...vendor,
+          director: { name: "Pak Direktur", phone: "0812", email: "dir@vendor.co.id" },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Direktur Utama" })).toBeInTheDocument();
+    expect(screen.getByText("Pak Direktur")).toBeInTheDocument();
+    expect(screen.getByText("0812")).toBeInTheDocument();
+    expect(screen.getByText("dir@vendor.co.id")).toBeInTheDocument();
+  });
+
+  it("uses a dash for a director's missing phone/email", () => {
+    render(
+      <InfoTab
+        vendor={{ ...vendor, director: { name: "Pak Direktur", phone: null, email: null } }}
+      />,
+    );
+
+    expect(screen.getByText("Pak Direktur")).toBeInTheDocument();
+    // npwp, contact_phone, hq_address + director phone + director email
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("explains where to record the director when none exists", () => {
+    render(<InfoTab vendor={{ ...vendor, director: null }} />);
+
+    expect(screen.getByText("Belum dicatat.")).toBeInTheDocument();
+    expect(screen.getByText(/Catat lewat tab PIC/)).toBeInTheDocument();
+  });
+});

@@ -139,8 +139,8 @@ describe("requestReportExport", () => {
 });
 
 describe("report kind labels", () => {
-  it("labels all 8 kinds in Indonesian and maps report kinds to URL keys", () => {
-    expect(Object.keys(KIND_LABEL)).toHaveLength(8);
+  it("labels all 9 kinds in Indonesian and maps report kinds to URL keys", () => {
+    expect(Object.keys(KIND_LABEL)).toHaveLength(9);
     expect(KIND_LABEL.dsr_late_daily).toBe("Laporan DSR telat (harian)");
     expect(KIND_LABEL.replenishment_trips).toBe("Replenish: trip per ATM");
     expect(REPORT_KEY_BY_KIND.replenishment_amount_mismatch).toBe("replenishment-amount-mismatch");

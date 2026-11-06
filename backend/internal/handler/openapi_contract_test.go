@@ -8,6 +8,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -34,6 +35,7 @@ const (
 	contractVRBase = "/api/v1/vendor-requests"
 	contractVOBase = "/api/v1/vendor/replenish-orders"
 	contractDLBase = "/api/v1/dsr-late-reports"
+	contractPKBase = "/api/v1/admin/vendors/12/pks"
 )
 
 // -- spec loading + validation ----------------------------------------------
@@ -81,9 +83,10 @@ func TestOpenAPIContract_SpecValid(t *testing.T) {
 func TestOpenAPIContract_RouteCoverage(t *testing.T) {
 	doc, _ := loadContract(t)
 	mounted := map[string]chi.Router{
-		"/vendor-requests":         contractVRHandler(&fakeVendorRequestServicer{}, &fakeVaultReviewer{}, contractPartyReader{}).Routes(),
-		"/vendor/replenish-orders": NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
-		"/dsr-late-reports":        NewDsrLateHandler(&contractDsrLate{}).Routes(),
+		"/vendor-requests":              contractVRHandler(&fakeVendorRequestServicer{}, &fakeVaultReviewer{}, contractPartyReader{}).Routes(),
+		"/vendor/replenish-orders":      NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
+		"/dsr-late-reports":             NewDsrLateHandler(&contractDsrLate{}).Routes(),
+		"/admin/vendors/{vendorID}/pks": NewAdminVendorPksHandler(&contractPksSvc{}).Routes(),
 	}
 	for prefix, routes := range mounted {
 		t.Run(prefix, func(t *testing.T) {
@@ -126,6 +129,7 @@ type contractCase struct {
 	parties    contractPartyReader
 	orders     *contractOrderSvc
 	dsrLate    *contractDsrLate
+	pks        *contractPksSvc
 	wantStatus int
 }
 
@@ -216,6 +220,11 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 		dsrLate = &contractDsrLate{}
 	}
 	r.With(custommw.RequireAuth(ts)).Mount(contractDLBase, NewDsrLateHandler(dsrLate).Routes())
+	pks := tc.pks
+	if pks == nil {
+		pks = &contractPksSvc{}
+	}
+	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/admin/vendors/{vendorID}/pks", NewAdminVendorPksHandler(pks).Routes())
 
 	req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 	req.Header.Set("Content-Type", "application/json")
@@ -264,6 +273,63 @@ func (c *contractDsrLate) Warnings(ctx context.Context, a service.Actor, f servi
 		FirstReportDate: &first, LastReportDate: &last}}
 	out.UnresolvedVendors = []service.DsrLateUnresolvedVendor{{VendorLabel: "PT Z", ReceiptCount: 1}}
 	return out, nil
+}
+
+// contractPksSvc is a configurable VendorPksAdminServicer; the submit methods
+// answer with the staged change the real service returns.
+type contractPksSvc struct {
+	detail *service.VendorPksDetail
+	err    error
+}
+
+func (s *contractPksSvc) Get(context.Context, int64) (*service.VendorPksDetail, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.detail != nil {
+		return s.detail, nil
+	}
+	return contractPksFull(), nil
+}
+
+func (s *contractPksSvc) staged(op string) (db.MasterDataChangeRequest, error) {
+	if s.err != nil {
+		return db.MasterDataChangeRequest{}, s.err
+	}
+	return db.MasterDataChangeRequest{ID: 88, Status: "pending", EntityType: "vendor_pks", Op: op}, nil
+}
+
+func (s *contractPksSvc) SubmitNew(context.Context, int64, int64, service.SubmitVendorPksRequest, string) (db.MasterDataChangeRequest, error) {
+	return s.staged("create")
+}
+
+func (s *contractPksSvc) SubmitTerminate(context.Context, int64, int64, int64, string, string) (db.MasterDataChangeRequest, error) {
+	return s.staged("disable")
+}
+
+func (s *contractPksSvc) SubmitUnterminate(context.Context, int64, int64, int64, string, string) (db.MasterDataChangeRequest, error) {
+	return s.staged("enable")
+}
+
+// contractPksFull sets every nullable: active (with remaining days), a terminated
+// history row that was replaced, and a pending change.
+func contractPksFull() *service.VendorPksDetail {
+	t, status, days, reason := contractTime(), "need_renewal", 511, "kinerja buruk"
+	replacedBy := int64(31)
+	return &service.VendorPksDetail{
+		VendorID: 12, Kind: "FLM_VENDOR", Today: "2026-11-05", RenewalMonths: 9, PksStatus: &status,
+		Active: &service.VendorPksRecord{ID: 31, PksName: "PKS 2026", EffectiveDate: "2026-01-01", ExpiryDate: "2027-03-31",
+			ValidityMonths: 15, RemainingDays: &days, CreatedAt: &t},
+		History: []service.VendorPksRecord{{ID: 30, PksName: "PKS 2024", EffectiveDate: "2024-01-01", ExpiryDate: "2025-12-31",
+			ValidityMonths: 24, CreatedAt: &t, ReplacedAt: &t, ReplacedByPksID: &replacedBy, TerminatedAt: &t, TerminationReason: &reason}},
+		Pending: &service.VendorPksPending{ChangeRequestID: 88, Op: "create", Payload: json.RawMessage(`{"vendor_id":12,"pks_name":"PKS 2027"}`),
+			MakerID: 5, MakerName: "Budi", CreatedAt: &t},
+	}
+}
+
+// contractPksInternal is an INTERNAL vendor: no status, no active PKS, empty (non-nil) history.
+func contractPksInternal() *service.VendorPksDetail {
+	return &service.VendorPksDetail{VendorID: 12, Kind: "INTERNAL", Today: "2026-11-05", RenewalMonths: 9, History: []service.VendorPksRecord{}}
 }
 
 // contractPartyReader returns parties as the real service builds them (non-nil slices).
@@ -430,6 +496,43 @@ func contractOrderFull() *service.VendorOrderDetail {
 	}
 }
 
+// contractPksCases covers 200/202/400/401/403/404/409/422/500 of the PKS operations.
+func contractPksCases() []contractCase {
+	pk := contractPKBase
+	createBody := `{"pks_name":"PKS 2027","effective_date":"2027-01-01","expiry_date":"2027-12-31"}`
+	reasonBody := `{"reason":"kinerja buruk"}`
+	fail := func(err error) *contractPksSvc { return &contractPksSvc{err: err} }
+	cases := []contractCase{
+		{name: "pks get", method: http.MethodGet, path: pk, role: "ADMIN", wantStatus: 200},
+		{name: "pks get internal vendor", method: http.MethodGet, path: pk, role: "ADMIN_PARAM",
+			pks: &contractPksSvc{detail: contractPksInternal()}, wantStatus: 200},
+		{name: "pks get no token", method: http.MethodGet, path: pk, wantStatus: 401},
+		{name: "pks get forbidden", method: http.MethodGet, path: pk, role: "ADMIN", pks: fail(service.ErrMasterDataForbidden), wantStatus: 403},
+		{name: "pks get vendor not found", method: http.MethodGet, path: pk, role: "ADMIN", pks: fail(service.ErrVendorNotFound), wantStatus: 404},
+		{name: "pks get bad vendor id", method: http.MethodGet, path: "/api/v1/admin/vendors/abc/pks", role: "ADMIN", wantStatus: 400},
+		{name: "pks get unexpected", method: http.MethodGet, path: pk, role: "ADMIN", pks: fail(errors.New("boom")), wantStatus: 500},
+		{name: "pks create", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN", wantStatus: 202},
+		{name: "pks create bad json", method: http.MethodPost, path: pk, body: "{", role: "ADMIN", wantStatus: 400},
+		{name: "pks create forbidden", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN", pks: fail(service.ErrMasterDataForbidden), wantStatus: 403},
+		{name: "pks create vendor not found", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN", pks: fail(service.ErrVendorNotFound), wantStatus: 404},
+		{name: "pks create pending", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN", pks: fail(service.ErrMasterDataChangePending), wantStatus: 409},
+		{name: "pks create vendor inactive", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN", pks: fail(service.ErrVendorPksVendorInactive), wantStatus: 409},
+		{name: "pks create invalid", method: http.MethodPost, path: pk, body: createBody, role: "ADMIN",
+			pks: fail(&service.ValidationError{Field: "expiry_date", Message: "harus >= tanggal berlaku"}), wantStatus: 422},
+		{name: "pks terminate", method: http.MethodPost, path: pk + "/31/terminate", body: reasonBody, role: "ADMIN", wantStatus: 202},
+		{name: "pks terminate bad pks id", method: http.MethodPost, path: pk + "/abc/terminate", body: reasonBody, role: "ADMIN", wantStatus: 400},
+		{name: "pks terminate not found", method: http.MethodPost, path: pk + "/31/terminate", body: reasonBody, role: "ADMIN", pks: fail(service.ErrVendorPksNotFound), wantStatus: 404},
+		{name: "pks terminate already", method: http.MethodPost, path: pk + "/31/terminate", body: reasonBody, role: "ADMIN", pks: fail(service.ErrVendorPksAlreadyTerminated), wantStatus: 409},
+		{name: "pks terminate replaced", method: http.MethodPost, path: pk + "/31/terminate", body: reasonBody, role: "ADMIN", pks: fail(service.ErrVendorPksNotActive), wantStatus: 409},
+		{name: "pks terminate empty reason", method: http.MethodPost, path: pk + "/31/terminate", body: `{"reason":""}`, role: "ADMIN",
+			pks: fail(&service.ValidationError{Field: "reason", Message: "wajib diisi"}), wantStatus: 422},
+		{name: "pks terminate unexpected", method: http.MethodPost, path: pk + "/31/terminate", body: reasonBody, role: "ADMIN", pks: fail(errors.New("boom")), wantStatus: 500},
+		{name: "pks unterminate", method: http.MethodPost, path: pk + "/31/unterminate", body: reasonBody, role: "ADMIN", wantStatus: 202},
+		{name: "pks unterminate not terminated", method: http.MethodPost, path: pk + "/31/unterminate", body: reasonBody, role: "ADMIN", pks: fail(service.ErrVendorPksNotTerminated), wantStatus: 409},
+	}
+	return cases
+}
+
 func contractCases() []contractCase {
 	vr, vo, dl := contractVRBase, contractVOBase, contractDLBase
 	full, minimal := contractDetailFull(), contractDetailMinimal()
@@ -581,6 +684,7 @@ func contractCases() []contractCase {
 		{name: "dsr late no token", method: http.MethodGet, path: dl + "/daily?month=2026-10", wantStatus: 401},
 		{name: "dsr late vendor role denied", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "VENDOR", wantStatus: 403},
 	}
+	cases = append(cases, contractPksCases()...)
 	// every handleError class once, on a route that reaches it
 	for _, e := range []struct {
 		name   string

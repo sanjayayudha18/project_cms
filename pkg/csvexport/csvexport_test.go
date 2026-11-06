@@ -51,6 +51,68 @@ func TestLookupReturnsCopyAndHidesExportOnly(t *testing.T) {
 	}
 }
 
+func TestVendorPICContract(t *testing.T) {
+	base := []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"}
+	e, ok := Lookup(VendorPICs)
+	if !ok {
+		t.Fatal("vendor-pics must be importable")
+	}
+	if want := append(slices.Clone(base), "roles", "is_director"); !slices.Equal(e.Header, want) {
+		t.Errorf("header %v, want %v", e.Header, want)
+	}
+	if len(e.LegacyHeaders) != 2 ||
+		!slices.Equal(e.LegacyHeaders[0], append(slices.Clone(base), "roles")) ||
+		!slices.Equal(e.LegacyHeaders[1], base) {
+		t.Errorf("legacy headers %v", e.LegacyHeaders)
+	}
+	if len(e.LegacyFill) != 2 || e.LegacyFill["roles"] != "" || e.LegacyFill["is_director"] != KeepCurrentCell {
+		t.Errorf("legacy fill %v", e.LegacyFill)
+	}
+
+	// Mutating a returned copy must not leak into the next Lookup.
+	e.Header[0], e.LegacyHeaders[1][0] = "x", "x"
+	e.LegacyFill["is_director"] = "x"
+	f, _ := Lookup(VendorPICs)
+	if f.Header[0] != "id" || f.LegacyHeaders[1][0] != "id" || f.LegacyFill["is_director"] != KeepCurrentCell {
+		t.Error("Lookup leaked the internal vendor-pics contract")
+	}
+}
+
+func TestVendorPICCellsIsDirector(t *testing.T) {
+	r := VendorPICRow{ID: 7, VendorCode: "V", BranchCode: "B", Name: "N", IsActive: true, Roles: []string{"replenish"}}
+	for _, dir := range []bool{true, false} {
+		r.IsDirector = dir
+		cells := VendorPICCells(r)
+		e, _ := Lookup(VendorPICs)
+		if len(cells) != len(e.Header) {
+			t.Fatalf("cells %d != header %d", len(cells), len(e.Header))
+		}
+		want := "false"
+		if dir {
+			want = "true"
+		}
+		if got := cells[len(cells)-1]; got != want {
+			t.Errorf("is_director cell = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestVendorsContractUnchanged(t *testing.T) {
+	e, _ := Lookup(Vendors)
+	for _, c := range e.Header {
+		if strings.Contains(c, "director") || strings.Contains(c, "pks") {
+			t.Errorf("vendors header must not carry PKS/director column %q", c)
+		}
+	}
+	want, err := os.ReadFile("testdata/headers.golden")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(want), "vendors header: "+strings.Join(e.Header, ",")+"\n") {
+		t.Error("vendors header differs from golden")
+	}
+}
+
 func TestWriterAndTemplate(t *testing.T) {
 	var buf bytes.Buffer
 	w, err := NewWriter(&buf, []string{"a", "b"})

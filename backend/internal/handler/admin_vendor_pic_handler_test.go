@@ -23,6 +23,8 @@ type fakeVendorPicAdminServicer struct {
 	getResult  *service.VendorPic
 	createErr  error
 	updateBody *service.VendorPicUpdatePayload
+	createBody *service.VendorPicUpdatePayload
+	enableErr  error
 	rolesErr   error
 	rolesGot   []string
 }
@@ -39,7 +41,8 @@ func (f *fakeVendorPicAdminServicer) Get(context.Context, int64, int64) (*servic
 func (f *fakeVendorPicAdminServicer) Warnings(context.Context, int64) ([]string, error) {
 	return f.warnings, nil
 }
-func (f *fakeVendorPicAdminServicer) Create(context.Context, int64, int64, service.VendorPicUpdatePayload, string) (db.MasterDataChangeRequest, error) {
+func (f *fakeVendorPicAdminServicer) Create(_ context.Context, _, _ int64, req service.VendorPicUpdatePayload, _ string) (db.MasterDataChangeRequest, error) {
+	f.createBody = &req
 	return db.MasterDataChangeRequest{ID: 7, EntityType: "vendor_pic", Op: "create", Status: "pending"}, f.createErr
 }
 func (f *fakeVendorPicAdminServicer) Update(_ context.Context, _, _, _ int64, req service.VendorPicUpdatePayload, _ string) (db.MasterDataChangeRequest, error) {
@@ -50,7 +53,7 @@ func (f *fakeVendorPicAdminServicer) Disable(context.Context, int64, int64, int6
 	return db.MasterDataChangeRequest{ID: 9, Status: "pending"}, nil
 }
 func (f *fakeVendorPicAdminServicer) Enable(context.Context, int64, int64, int64, string) (db.MasterDataChangeRequest, error) {
-	return db.MasterDataChangeRequest{ID: 10, Status: "pending"}, nil
+	return db.MasterDataChangeRequest{ID: 10, Status: "pending"}, f.enableErr
 }
 
 func (f *fakeVendorPicAdminServicer) SetRoles(_ context.Context, _, _, _ int64, roles []string, _ string) ([]string, error) {
@@ -205,4 +208,65 @@ func TestAdminVendorPicHandler_Get_IncludesRoles(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"roles":["replenish"]`) {
 		t.Fatalf("expected 200 with roles, got %d: %s", rec.Code, rec.Body.String())
 	}
+}
+
+// vendor-pks Req 1.1, 1.10: is_director is read from the create body and returned by list/detail.
+func TestAdminVendorPicHandler_Create_PassesIsDirector(t *testing.T) {
+	svc := &fakeVendorPicAdminServicer{}
+	router, tokenSvc := mountAdminVendorPicHandler(svc)
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/pics", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"name":"Dirut","is_director":true}`)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if svc.createBody == nil || svc.createBody.IsDirector == nil || !*svc.createBody.IsDirector {
+		t.Fatalf("create payload is_director = %+v, want true", svc.createBody)
+	}
+}
+
+func TestAdminVendorPicHandler_Responses_IncludeIsDirector(t *testing.T) {
+	svc := &fakeVendorPicAdminServicer{
+		getResult:  &service.VendorPic{ID: 1, VendorID: 3, IsDirector: true},
+		listResult: []service.VendorPic{{ID: 1, VendorID: 3, IsDirector: true}},
+	}
+	router, tokenSvc := mountAdminVendorPicHandler(svc)
+	for _, path := range []string{"/api/v1/admin/vendors/3/pics/1", "/api/v1/admin/vendors/3/pics"} {
+		rec := doRequest(router, http.MethodGet, path, tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"is_director":true`) {
+			t.Errorf("%s: expected 200 with is_director true, got %d: %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// vendor-pks Req 1.5, 1.6: director conflicts are 409 with an Indonesian message,
+// director-shape violations are 422.
+func TestAdminVendorPicHandler_DirectorErrorMapping(t *testing.T) {
+	t.Run("create: second director 409", func(t *testing.T) {
+		router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{createErr: service.ErrVendorDirectorExists})
+		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/pics", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"name":"Dirut","is_director":true}`)
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), service.ErrVendorDirectorExists.Error()) {
+			t.Fatalf("expected 409 with message, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("create: director with branch 422", func(t *testing.T) {
+		err := &service.ValidationError{Field: "vendor_branch_id", Message: "PIC Direktur Utama harus tingkat vendor (tanpa cabang)"}
+		router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{createErr: err})
+		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/pics", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"name":"Dirut","is_director":true,"vendor_branch_id":9}`)
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("enable: another director active 409", func(t *testing.T) {
+		router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{enableErr: service.ErrVendorDirectorExists})
+		rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/pics/1/enable", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("expected 409, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("roles: director cannot hold roles 409", func(t *testing.T) {
+		router, tokenSvc := mountAdminVendorPicHandler(&fakeVendorPicAdminServicer{rolesErr: service.ErrVendorDirectorNoRoles})
+		rec := doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/pics/1/roles", tokenForRole(t, tokenSvc, 1, "ADMIN"), `{"roles":["vault"]}`)
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), service.ErrVendorDirectorNoRoles.Error()) {
+			t.Fatalf("expected 409 with message, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
 }

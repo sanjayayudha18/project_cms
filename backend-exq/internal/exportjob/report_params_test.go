@@ -3,6 +3,7 @@ package exportjob
 import (
 	"errors"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,5 +170,130 @@ func TestReportParamsHash(t *testing.T) {
 	}
 	if ParamsHash(master) == ParamsHash(a) {
 		t.Error("report hash equals master-data hash")
+	}
+}
+
+// vendor-pks task 9.3: the vendor_pks branch of ParseReportParams.
+func TestParseReportParams_VendorPks(t *testing.T) {
+	q100, q101 := strings.Repeat("ü", 100), strings.Repeat("ü", 101) // runes, not bytes
+	tests := []struct {
+		name  string
+		query url.Values
+		want  ReportParams
+	}{
+		{"defaults", q(), ReportParams{VendorStatus: sp("active")}},
+		{"all filters", q("q", "  Alfa ", "status", "all", "pks_status", "need_renewal"),
+			ReportParams{Q: sp("Alfa"), VendorStatus: sp("all"), PksStatus: sp("need_renewal")}},
+		{"blank q dropped", q("q", "   "), ReportParams{VendorStatus: sp("active")}},
+		{"q 100 runes ok", q("q", q100), ReportParams{Q: sp(q100), VendorStatus: sp("active")}},
+		{"disabled", q("status", "disabled"), ReportParams{VendorStatus: sp("disabled")}},
+		{"foreign params ignored", q("month", "bogus", "vendor_id", "x", "date_from", "x"), ReportParams{VendorStatus: sp("active")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := ParseReportParams(KindVendorPks, tt.query, reportNow)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if p.Kind != KindVendorPks || p.Entity != "vendor_pks" || p.Report == nil {
+				t.Fatalf("got kind=%q entity=%q report=%v", p.Kind, p.Entity, p.Report)
+			}
+			if got, want := string(reportHashBytes(p)), string(reportHashBytes(Params{Kind: KindVendorPks, Entity: "vendor_pks", Report: &tt.want})); got != want {
+				t.Errorf("report = %s; want %s", got, want)
+			}
+		})
+	}
+
+	for _, key := range []string{"aktif", "need_renewal", "expired", "terminated", "belum_diisi"} {
+		if _, err := ParseReportParams(KindVendorPks, q("pks_status", key), reportNow); err != nil {
+			t.Errorf("pks_status %q rejected: %v", key, err)
+		}
+	}
+
+	rejects := []struct {
+		name  string
+		query url.Values
+		field string
+		msg   string
+	}{
+		{"q 101 runes", q("q", q101), "q", "maksimal 100 karakter"},
+		{"status unknown", q("status", "bogus"), "status", "tidak dikenal"},
+		{"status wrong case", q("status", "ACTIVE"), "status", "tidak dikenal"},
+		{"pks_status unknown", q("pks_status", "bogus"), "pks_status", "tidak dikenal"},
+		{"pks_status label not key", q("pks_status", "Aktif"), "pks_status", "tidak dikenal"},
+	}
+	for _, tt := range rejects {
+		t.Run("reject "+tt.name, func(t *testing.T) {
+			_, err := ParseReportParams(KindVendorPks, tt.query, reportNow)
+			var ve *reports.ValidationError
+			if !errors.Is(err, ErrValidation) || !errors.As(err, &ve) {
+				t.Fatalf("err = %v; want ErrValidation wrapping *reports.ValidationError", err)
+			}
+			if ve.Field != tt.field || ve.Message != tt.msg {
+				t.Errorf("got %s/%q; want %s/%q", ve.Field, ve.Message, tt.field, tt.msg)
+			}
+		})
+	}
+}
+
+func TestVendorPksParamsHashAndAudit(t *testing.T) {
+	parse := func(query url.Values) Params {
+		t.Helper()
+		p, err := ParseReportParams(KindVendorPks, query, reportNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	a := parse(q("q", "abc", "status", "all", "pks_status", "expired"))
+	b := parse(q("pks_status", "expired", "status", "all", "q", " abc "))
+	if ParamsHash(a) != ParamsHash(b) || len(ParamsHash(a)) != 64 {
+		t.Error("hash depends on query order / q whitespace, or is not hex sha256")
+	}
+	// Default status spelled out equals the default.
+	if ParamsHash(parse(q())) != ParamsHash(parse(q("status", "active"))) {
+		t.Error("explicit default status changed the hash")
+	}
+	for i, d := range []Params{
+		parse(q("q", "abd", "status", "all", "pks_status", "expired")),
+		parse(q("q", "abc", "status", "active", "pks_status", "expired")),
+		parse(q("q", "abc", "status", "all", "pks_status", "aktif")),
+		parse(q("q", "abc", "status", "all")),
+	} {
+		if ParamsHash(d) == ParamsHash(a) {
+			t.Errorf("diff[%d] collides with a", i)
+		}
+	}
+	// Other report kinds never share the hash, even with an empty filter.
+	other, err := ParseReportParams(KindReplenishmentTrips, q("date_from", "2026-10-01", "date_to", "2026-10-01"), reportNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ParamsHash(other) == ParamsHash(parse(q())) {
+		t.Error("vendor_pks hash equals a replenishment hash")
+	}
+
+	// Audit filter keeps the three keys, absent = nil; file name is vendor-pks-<WIB day>.csv.
+	f := a.Report.legacyFilter(KindVendorPks)
+	if len(f) != 3 || *f["q"].(*string) != "abc" || *f["status"].(*string) != "all" || *f["pks_status"].(*string) != "expired" {
+		t.Errorf("legacyFilter = %v", f)
+	}
+	if f := parse(q()).Report.legacyFilter(KindVendorPks); f["q"].(*string) != nil || f["pks_status"].(*string) != nil {
+		t.Errorf("absent filters must be nil, got %v", f)
+	}
+	late := time.Date(2026, 10, 29, 20, 0, 0, 0, time.UTC) // 03:00 WIB next day
+	if got := reports.VendorPksFileName(late); got != "vendor-pks-20261030.csv" {
+		t.Errorf("file name = %q", got)
+	}
+}
+
+func TestReportKindVendorPks(t *testing.T) {
+	if string(KindVendorPks) != reports.VendorPks || !IsReportKind(KindVendorPks) {
+		t.Error("KindVendorPks must alias reports.VendorPks and be a report kind")
+	}
+	for role, want := range map[string]bool{"ADMIN": true, "ADMIN_PARAM": true, "ATM-SPV": false, "VENDOR-USER": false, "": false} {
+		if allowed(KindVendorPks, role) != want {
+			t.Errorf("allowed(vendor_pks, %q) = %v, want %v", role, !want, want)
+		}
 	}
 }

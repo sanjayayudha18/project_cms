@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { VendorDetailPage } from "../components/VendorDetailPage";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -27,24 +27,44 @@ vi.mock("../../master-data/pending", () => ({
 
 const noopMutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
-const useVendorMock = vi.fn(() => ({
-  isError: false,
-  data: {
-    id: 1,
-    code: "V1",
-    name: "Vendor Satu",
-    legal_name: "PT Vendor Satu",
-    npwp: "012345678901000",
-    contact_email: "",
-    contact_phone: "",
-    hq_address: "",
-    is_active: true,
-    deleted_at: null,
-  },
-}));
+const VENDOR = {
+  id: 1,
+  code: "V1",
+  name: "Vendor Satu",
+  legal_name: "PT Vendor Satu",
+  npwp: "012345678901000",
+  contact_email: "",
+  contact_phone: "",
+  hq_address: "",
+  is_active: true,
+  deleted_at: null,
+  kind: "FLM_VENDOR",
+  director: null,
+};
+const defaultVendor = () => ({ isError: false, data: VENDOR });
+const useVendorMock = vi.fn(defaultVendor);
+
+afterEach(() => {
+  useVendorMock.mockImplementation(defaultVendor);
+});
 
 vi.mock("../hooks", () => ({
   useVendor: (...args: unknown[]) => useVendorMock(...args),
+  useVendorPks: () => ({
+    isLoading: false,
+    isError: false,
+    data: {
+      today: "2026-09-16",
+      renewal_months: 6,
+      pks_status: "belum_diisi",
+      active: null,
+      history: [],
+      pending: null,
+    },
+  }),
+  useSubmitVendorPks: () => noopMutation,
+  useTerminateVendorPks: () => noopMutation,
+  useUnterminateVendorPks: () => noopMutation,
   useVendorBranches: () => ({
     isLoading: false,
     isError: false,
@@ -165,10 +185,34 @@ describe("VendorDetailPage", () => {
     expect(screen.getByText("Belum ada PIC vendor-wide")).toBeTruthy();
   });
 
-  it("presents exactly five tabs in order: Info, Cabang, PIC Vendor-wide, Harga Paket, Mapping DSR", () => {
+  it("FLM vendor: presents six tabs in order, PKS last", () => {
+    render(<VendorDetailPage vendorId={1} />);
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs).toEqual([
+      "Info",
+      "Cabang",
+      "PIC Vendor-wide",
+      "Harga Paket",
+      "Mapping DSR",
+      "PKS",
+    ]);
+  });
+
+  it("INTERNAL vendor: the PKS tab is hidden, the other five stay in order", () => {
+    useVendorMock.mockImplementation(() => ({
+      isError: false,
+      data: { ...VENDOR, kind: "INTERNAL" },
+    }));
     render(<VendorDetailPage vendorId={1} />);
     const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
     expect(tabs).toEqual(["Info", "Cabang", "PIC Vendor-wide", "Harga Paket", "Mapping DSR"]);
+  });
+
+  it("opens the PKS panel from the PKS tab", async () => {
+    render(<VendorDetailPage vendorId={1} />);
+    await userEvent.click(screen.getByRole("tab", { name: "PKS" }));
+    expect(screen.getByRole("region", { name: "PKS aktif" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Catat PKS baru" })).toBeTruthy();
   });
 
   it("shows only the selected tab's panel when switching tabs", async () => {

@@ -53,6 +53,16 @@ func (r *VendorPicAdminRepository) CountNotificationRecipients(ctx context.Conte
 	return r.queries.CountActiveNotificationPics(ctx, vendorID)
 }
 
+// OtherActiveDirectorExists reports whether vendorID has an active Director_PIC
+// other than excludeID (nil = no exclusion). Primary pool (submit-time pre-check).
+func (r *VendorPicAdminRepository) OtherActiveDirectorExists(ctx context.Context, vendorID int64, excludeID *int64) (bool, error) {
+	_, err := r.queries.FindOtherActiveDirector(ctx, db.FindOtherActiveDirectorParams{VendorID: vendorID, ExcludeID: excludeID})
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // CountActiveByBranch returns the number of active (non-disabled) branch-scoped
 // PICs under branchID (vendor-wide PICs, vendor_branch_id IS NULL, are excluded).
 // Backs the branch-disable guard (VendorBranchAdminService.Disable).

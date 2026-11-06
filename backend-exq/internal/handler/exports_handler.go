@@ -100,6 +100,7 @@ var reportRoutes = map[string]exportjob.Kind{
 	"/reports/dsr-late-summary":              exportjob.KindDsrLateSummary,
 	"/reports/replenishment-amount-mismatch": exportjob.KindReplenishmentAmountMismatch,
 	"/reports/replenishment-trips":           exportjob.KindReplenishmentTrips,
+	"/reports/vendor-pks":                    exportjob.KindVendorPks,
 }
 
 // requestReport parses the legacy query filters of a report and creates the job.

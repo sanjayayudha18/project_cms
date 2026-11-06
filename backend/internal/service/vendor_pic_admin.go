@@ -14,6 +14,9 @@ import (
 // ErrVendorPicNotFound is returned when a PIC is missing or belongs to another vendor.
 var ErrVendorPicNotFound = errors.New("vendor pic not found")
 
+// ErrVendorDirectorExists: the vendor already has another active Direktur Utama PIC (409).
+var ErrVendorDirectorExists = errors.New("vendor sudah memiliki PIC Direktur Utama aktif")
+
 // NoNotificationRecipientWarning is surfaced (never blocking) when a vendor
 // has no active PIC flagged is_notification_recipient.
 const NoNotificationRecipientWarning = "vendor belum memiliki PIC aktif penerima notifikasi"
@@ -35,6 +38,7 @@ type VendorPicAdminRepo interface {
 	GetByID(ctx context.Context, id int64) (*db.GetVendorPicAdminByIDRow, error)
 	CountNotificationRecipients(ctx context.Context, vendorID int64) (int64, error)
 	BranchVendorID(ctx context.Context, branchID int64) (*int64, error)
+	OtherActiveDirectorExists(ctx context.Context, vendorID int64, excludeID *int64) (bool, error)
 }
 
 // VendorPicAdminService validates PIC create/update/disable/enable and stages
@@ -63,6 +67,9 @@ type VendorPicUpdatePayload struct {
 	// unchanged; only CSV import sets it on update -- the form handler
 	// clears it (Req 5.7). Non-nil is normalized by validate.
 	Roles *[]string `json:"roles,omitempty"`
+	// IsDirector: nil = unchanged (create: false). A director is vendor-level,
+	// has no roles and is not a notification recipient (vendor-pks Req 1).
+	IsDirector *bool `json:"is_director,omitempty"`
 }
 
 // VendorPicPayload is the jsonb payload VendorPicApplier unmarshals for op=create.
@@ -84,6 +91,7 @@ type VendorPic struct {
 	IsActive                bool
 	DeletedAt               *time.Time
 	Roles                   []string
+	IsDirector              bool
 }
 
 // List returns a page of a vendor's PICs. Read-only, no audit.
@@ -96,7 +104,7 @@ func (s *VendorPicAdminService) List(ctx context.Context, arg db.ListVendorPicsA
 	for i, r := range rows {
 		out[i] = VendorPic{ID: r.ID, VendorID: r.VendorID, VendorBranchID: r.VendorBranchID, Name: r.Name, Position: r.Position,
 			Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient, IsActive: r.IsActive,
-			DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles}
+			DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles, IsDirector: r.IsDirector}
 	}
 	return out, nil
 }
@@ -115,7 +123,7 @@ func (s *VendorPicAdminService) Get(ctx context.Context, vendorID, id int64) (*V
 	}
 	return &VendorPic{ID: r.ID, VendorID: r.VendorID, VendorBranchID: r.VendorBranchID, Name: r.Name, Position: r.Position,
 		Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient, IsActive: r.IsActive,
-		DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles}, nil
+		DeletedAt: timestamptzToPtr(r.DeletedAt), Roles: r.Roles, IsDirector: r.IsDirector}, nil
 }
 
 // Warnings returns non-blocking advisories for a vendor's PIC set: currently
@@ -133,7 +141,7 @@ func (s *VendorPicAdminService) Warnings(ctx context.Context, vendorID int64) ([
 
 // Create validates and stages a new PIC under vendorID.
 func (s *VendorPicAdminService) Create(ctx context.Context, makerID, vendorID int64, req VendorPicUpdatePayload, actorIP string) (db.MasterDataChangeRequest, error) {
-	if err := s.validate(ctx, vendorID, &req); err != nil {
+	if err := s.validate(ctx, vendorID, &req, nil); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_pic", Op: "create",
@@ -149,7 +157,7 @@ func (s *VendorPicAdminService) Update(ctx context.Context, makerID, vendorID, i
 	if before == nil || before.VendorID != vendorID || before.DeletedAt.Valid {
 		return db.MasterDataChangeRequest{}, ErrVendorPicNotFound
 	}
-	if err := s.validate(ctx, vendorID, &req); err != nil {
+	if err := s.validate(ctx, vendorID, &req, before); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_pic", Op: "update", EntityID: &id, Payload: req, Before: before}, actorIP)
@@ -173,13 +181,42 @@ func (s *VendorPicAdminService) toggle(ctx context.Context, makerID, vendorID, i
 	if before == nil || before.VendorID != vendorID {
 		return db.MasterDataChangeRequest{}, ErrVendorPicNotFound
 	}
+	if op == "enable" && before.IsDirector && !before.IsActive {
+		if err := s.checkNoOtherDirector(ctx, vendorID, &id); err != nil {
+			return db.MasterDataChangeRequest{}, err
+		}
+	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_pic", Op: op, EntityID: &id, Before: before}, actorIP)
 }
 
 // validate normalizes (trims, blank optionals -> nil) and validates the
 // payload: name required, email/phone format when present, and an optional
-// branch must belong to vendorID.
-func (s *VendorPicAdminService) validate(ctx context.Context, vendorID int64, p *VendorPicUpdatePayload) error {
+// branch must belong to vendorID. before is the current row on update (nil on
+// create); the effective director flag is the request's, else before's.
+func (s *VendorPicAdminService) validate(ctx context.Context, vendorID int64, p *VendorPicUpdatePayload, before *db.GetVendorPicAdminByIDRow) error {
+	isDirector := before != nil && before.IsDirector
+	if p.IsDirector != nil {
+		isDirector = *p.IsDirector
+	}
+	if isDirector {
+		switch {
+		case p.VendorBranchID != nil:
+			return &ValidationError{Field: "vendor_branch_id", Message: "PIC Direktur Utama harus tingkat vendor (tanpa cabang)"}
+		case p.IsNotificationRecipient:
+			return &ValidationError{Field: "is_notification_recipient", Message: "PIC Direktur Utama tidak boleh menjadi penerima notifikasi"}
+		case p.Roles != nil && len(*p.Roles) > 0:
+			return &ValidationError{Field: "roles", Message: "PIC Direktur Utama tidak memiliki peran"}
+		}
+		p.Roles = &[]string{}
+		var self *int64
+		if before != nil {
+			self = &before.ID
+		}
+		if err := s.checkNoOtherDirector(ctx, vendorID, self); err != nil {
+			return err
+		}
+	}
+
 	p.Name = strings.TrimSpace(p.Name)
 	if p.Name == "" {
 		return &ValidationError{Field: "name", Message: "wajib diisi"}
@@ -212,6 +249,17 @@ func (s *VendorPicAdminService) validate(ctx context.Context, vendorID int64, p 
 		if *owner != vendorID {
 			return &ValidationError{Field: "vendor_branch_id", Message: "cabang bukan milik vendor ini"}
 		}
+	}
+	return nil
+}
+
+func (s *VendorPicAdminService) checkNoOtherDirector(ctx context.Context, vendorID int64, excludeID *int64) error {
+	exists, err := s.repo.OtherActiveDirectorExists(ctx, vendorID, excludeID)
+	if err != nil {
+		return fmt.Errorf("checking active director: %w", err)
+	}
+	if exists {
+		return ErrVendorDirectorExists
 	}
 	return nil
 }

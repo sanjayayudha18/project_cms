@@ -370,6 +370,13 @@ func (s *MasterDataApprovalService) applyOne(ctx context.Context, tx pgx.Tx, act
 
 	entityID, after, applyErr := applier.Apply(ctx, tx, change)
 	if applyErr != nil {
+		// An applier that finds state moved since submit (e.g. a guard or
+		// unique constraint lost to a parallel approve) wraps
+		// ErrMasterDataChangeStale: retire the change as stale, not failed.
+		if errors.Is(applyErr, ErrMasterDataChangeStale) {
+			_ = s.repo.MarkStale(ctx, changeID, applyErr.Error())
+			return ErrMasterDataChangeStale
+		}
 		_ = s.repo.MarkApplyFailed(ctx, changeID, applyErr.Error())
 		return fmt.Errorf("apply change: %w", applyErr)
 	}

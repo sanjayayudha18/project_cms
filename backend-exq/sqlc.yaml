@@ -5,7 +5,8 @@ sql:
     # shared with backend/ (vendor-data-export + report-export-migration design,
     # "Kenapa SQL juga dibagi"): regenerate in BOTH modules when it changes.
     queries: ["queries/", "../backend/queries/master_data_export.sql",
-              "../backend/queries/dsr_late_report.sql", "../backend/queries/replenish_classifications.sql"]
+              "../backend/queries/dsr_late_report.sql", "../backend/queries/replenish_classifications.sql",
+              "../backend/queries/vendor_pks_report.sql"]
     schema: "../backend/migrations/"
     gen:
       go:

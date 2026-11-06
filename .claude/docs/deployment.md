@@ -61,6 +61,7 @@
 | `EXPORT_POLL_INTERVAL` | `2s` (must be > 0) |
 | `EXPORT_JANITOR_INTERVAL` | `30s` (must be > 0 and ≤ 1m) |
 | `DSR_LATE_START_DATE` | Same value as `backend` and `RETRY_DSR_LATE_START_DATE` (see the X.8 checklist). |
+| `VENDOR_PKS_RENEWAL_MONTHS` | Same value as `backend` (default 9, valid 1–24; invalid = the service refuses to start). See the vendor-PKS checklist below. |
 
 An invalid `EXPORT_*`, `TRUSTED_PROXIES` or `DSR_LATE_START_DATE` stops the service at start, so a bad value shows up in the first deploy, not later.
 
@@ -86,6 +87,11 @@ CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data
 *   Migration `035_export_jobs_reports.sql` runs before the release (Order above: `status` → `up` → `status`).
 *   CompanyPortal (task 7) and `backend` with `format=csv` removed (task 8) ship in the same release.
 *   Rollback = redeploy the previous `backend` and CompanyPortal images. Migration `035` is not rolled back (no down migrations, see above).
+
+**Release checklist: vendor PKS (`.kiro/specs/vendor-pks/`, 2026-11-05)**
+*   `VENDOR_PKS_RENEWAL_MONTHS` must have the same value in `backend` and `backend-exq` (default 9, valid 1–24). Nothing checks this automatically; a different value makes the PKS status on the vendor list and in the export disagree. Both services exit at start on any other value.
+*   Before `migrate up` for `022_vendor_pks.sql`: count `vendor_pic` change requests still `pending`. A pending change that was submitted before `022` becomes `stale` when approved, so the maker must submit it again. Tell the checker first. Dev had 0 pending at apply (2026-11-05).
+*   Migrations `022` and `037` run before the release (order above: `status` → `up` → `status`). `037` needs `022` applied first.
 
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 

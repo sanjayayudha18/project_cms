@@ -92,7 +92,8 @@ SELECT p.id,
        COALESCE(p.email, '')::text                  AS email,
        p.is_notification_recipient,
        p.is_active,
-       p.roles
+       p.roles,
+       p.is_director
 FROM vendor_pics p
 JOIN vendors v ON v.id = p.vendor_id
 LEFT JOIN vendor_branches b ON b.id = p.vendor_branch_id

@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -111,7 +112,7 @@ func TestExport_HeaderContract(t *testing.T) {
 		ExportVendors:        {"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
 		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
 		ExportVendorVaults:   {"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
-		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles", "is_director"},
 		ExportATMs:           {"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},
 		ExportATMAssignments: {"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
 	}
@@ -316,5 +317,38 @@ func TestExport_ServiceLayerRBAC(t *testing.T) {
 				t.Errorf("a forbidden export must not query or write anything (bytes=%d calls=%d)", buf.Len(), len(repo.calls))
 			}
 		})
+	}
+}
+
+// vendor-pks Req 2.1: PIC export carries is_director as the last column; a director
+// row is vendor-level with roles "none"; the vendor header gains nothing.
+func TestExport_VendorPICDirectorColumn(t *testing.T) {
+	header, rows, n := export(t, newTestExporter(directorImportRepo{}, 1000), ExportVendorPICs, "all")
+	if n != 4 || len(rows) != 4 {
+		t.Fatalf("want 4 PIC rows, got n=%d rows=%d", n, len(rows))
+	}
+	if header[len(header)-1] != "is_director" {
+		t.Fatalf("is_director must be the last column, header %v", header)
+	}
+	idx := map[string]int{}
+	for i, h := range header {
+		idx[h] = i
+	}
+	for _, r := range rows {
+		isDirector := r[idx["is_director"]]
+		switch r[idx["name"]] {
+		case "Dirut Aktif", "Dirut Lama":
+			if isDirector != "true" || r[idx["branch_code"]] != "" || r[idx["roles"]] != "none" {
+				t.Errorf("director row = %v", r)
+			}
+		default:
+			if isDirector != "false" {
+				t.Errorf("non-director %q exported is_director=%q", r[idx["name"]], isDirector)
+			}
+		}
+	}
+	vh, _, _ := export(t, newTestExporter(&fakeExportRepo{vendors: vendorRows(1)}, 1000), ExportVendors, "all")
+	if slices.Contains(vh, "is_director") || len(vh) != 9 {
+		t.Errorf("vendor header changed: %v", vh)
 	}
 }

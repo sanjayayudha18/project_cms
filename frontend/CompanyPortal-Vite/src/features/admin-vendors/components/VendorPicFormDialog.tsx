@@ -3,7 +3,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { useToast } from "@/lib/hooks/useToast";
 import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { useCreateVendorPic, useUpdateVendorPic } from "../hooks";
@@ -28,6 +28,7 @@ function toDefaultValues(pic: AdminVendorPic | null): VendorPicFormValues {
       phone: "",
       email: "",
       is_notification_recipient: false,
+      is_director: false,
       roles: [...ALL_PIC_ROLES],
     };
   }
@@ -37,6 +38,7 @@ function toDefaultValues(pic: AdminVendorPic | null): VendorPicFormValues {
     phone: pic.phone ?? "",
     email: pic.email ?? "",
     is_notification_recipient: pic.is_notification_recipient,
+    is_director: pic.is_director ?? false,
     roles: pic.roles,
   };
 }
@@ -59,10 +61,26 @@ export function VendorPicFormDialog({
     defaultValues: toDefaultValues(pic),
   });
 
+  const [conflict, setConflict] = useState<string | null>(null);
+  const isDirector = form.watch("is_director");
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog (re)opens for a given pic, not on every render
   useEffect(() => {
-    if (open) form.reset(toDefaultValues(pic));
+    if (open) {
+      form.reset(toDefaultValues(pic));
+      setConflict(null);
+    }
   }, [open, pic]);
+
+  function onDirectorChange(checked: boolean): void {
+    form.setValue("is_director", checked);
+    if (checked) {
+      form.setValue("is_notification_recipient", false);
+      form.setValue("roles", []);
+    } else if (mode === "create") {
+      form.setValue("roles", [...ALL_PIC_ROLES]);
+    }
+  }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
@@ -74,10 +92,13 @@ export function VendorPicFormDialog({
       phone: values.phone || null,
       email: values.email || null,
       is_notification_recipient: values.is_notification_recipient,
+      // Absent = false on the server; only send the flag when set.
+      is_director: values.is_director || undefined,
     };
   }
 
   async function onSubmit(values: VendorPicFormValues): Promise<void> {
+    setConflict(null);
     try {
       if (mode === "create") {
         const res = await createMutation.mutateAsync({ ...toPayload(values), roles: values.roles });
@@ -89,6 +110,10 @@ export function VendorPicFormDialog({
       }
       onClose();
     } catch (err) {
+      if (err && typeof err === "object" && (err as { status?: unknown }).status === 409) {
+        setConflict(String((err as { message?: unknown }).message ?? "Data bentrok"));
+        return;
+      }
       const handled = applyServerFieldError(err, (field, error) =>
         form.setError(field as keyof VendorPicFormValues, error),
       );
@@ -125,12 +150,43 @@ export function VendorPicFormDialog({
           <input type="email" {...form.register("email")} className={inputClass} />
         </Field>
 
+        {conflict && (
+          <p
+            role="alert"
+            className="rounded-[var(--radius-md)] border border-[var(--danger-fg)] px-3 py-2 text-sm text-[var(--danger-fg)]"
+          >
+            {conflict}
+          </p>
+        )}
+
+        {branchId === null && (
+          <div className="flex flex-col gap-1">
+            <label className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--n-800)]">
+              <input
+                type="checkbox"
+                checked={isDirector}
+                onChange={(e) => onDirectorChange(e.target.checked)}
+              />
+              Direktur Utama
+            </label>
+            {isDirector && (
+              <span className="text-xs text-[var(--n-500)]">
+                Hanya untuk pencatatan: tanpa login, tanpa peran PIC, tanpa notifikasi.
+              </span>
+            )}
+          </div>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-[var(--n-800)]">
-          <input type="checkbox" {...form.register("is_notification_recipient")} />
+          <input
+            type="checkbox"
+            disabled={isDirector}
+            {...form.register("is_notification_recipient")}
+          />
           Penerima notifikasi
         </label>
 
-        {mode === "create" && (
+        {mode === "create" && !isDirector && (
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-xs font-medium uppercase tracking-wider text-[var(--n-600)]">
               Peran

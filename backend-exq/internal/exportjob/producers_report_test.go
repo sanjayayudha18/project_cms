@@ -146,7 +146,7 @@ func reportJob(kind Kind, r ReportParams) Params {
 // renderReport runs a producer the way the worker does: csvexport.Writer over the header, emit per row.
 func renderReport(t *testing.T, start *time.Time, q Querier, p Params) (string, error) {
 	t.Helper()
-	pr := NewProducers(start)[p.Kind][p.Entity]
+	pr := NewProducers(start, 9)[p.Kind][p.Entity]
 	if pr == nil {
 		t.Fatalf("no producer for %s/%s", p.Kind, p.Entity)
 	}
@@ -227,7 +227,7 @@ func TestDsrReportWithoutStartDateIsHeaderOnly(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := "\xef\xbb\xbf" + strings.Join(NewProducers(nil)[kind][reportEntities[kind]].Header(), ",") + "\n"; got != want {
+		if want := "\xef\xbb\xbf" + strings.Join(NewProducers(nil, 9)[kind][reportEntities[kind]].Header(), ",") + "\n"; got != want {
 			t.Errorf("%s = %q, want header only", kind, got)
 		}
 		if q.queries != 0 {
@@ -296,7 +296,7 @@ func TestAmountMismatchPagingAndLimit(t *testing.T) {
 		q.amounts[i] = []repository.ReplenishClassificationAmount{{ClassificationID: i, Denom: 50000}}
 	}
 	rows := 0
-	pr := NewProducers(nil)[KindReplenishmentAmountMismatch]["amount_mismatch"]
+	pr := NewProducers(nil, 9)[KindReplenishmentAmountMismatch]["amount_mismatch"]
 	err := pr.Produce(context.Background(), q, reportJob(KindReplenishmentAmountMismatch, ReportParams{DateFrom: &from, DateTo: &to}), time.Now(),
 		func([]string) error { rows++; return nil })
 	if err != nil {
@@ -316,7 +316,7 @@ func TestReportProducerStopsOnCancelAndEmitError(t *testing.T) {
 		reportJob(KindReplenishmentAmountMismatch, ReportParams{DateFrom: &from, DateTo: &to}),
 		reportJob(KindReplenishmentTrips, ReportParams{DateFrom: &from, DateTo: &to}),
 	} {
-		pr := NewProducers(&dsrStart)[p.Kind][p.Entity]
+		pr := NewProducers(&dsrStart, 9)[p.Kind][p.Entity]
 		if err := pr.Produce(context.Background(), goldenReportQ(), p, time.Now(), func([]string) error { return boom }); !errors.Is(err, boom) {
 			t.Errorf("%s emit error = %v", p.Kind, err)
 		}
@@ -328,4 +328,9 @@ func TestReportProducerStopsOnCancelAndEmitError(t *testing.T) {
 			}
 		}
 	}
+}
+
+// vendor_pks export is covered by task 9.3.
+func (*reportQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
+	return nil, nil
 }

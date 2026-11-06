@@ -335,6 +335,11 @@ func stageUpdate(ctx context.Context, maker int64, entity string, row ImportRow,
 		if v["roles"] == env.cur[id]["roles"] {
 			p.Roles = nil // roles not changed by this file: leave them (and any concurrent change) alone
 		}
+		p.IsDirector = nil // director flag not changed by this file: leave it alone
+		if d := v["is_director"]; d != env.cur[id]["is_director"] {
+			isDirector := d == "true"
+			p.IsDirector = &isDirector
+		}
 		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, p, ip)
 	case ExportATMs:
 		_, u := atmFields(v)
@@ -406,8 +411,13 @@ func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
 		branch = &id
 	}
 	roles, _ := parsePicRoles(v["roles"]) // already validated in the dry-run
-	return VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
+	p := VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
 		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true", Roles: roles}
+	if v["is_director"] == "true" {
+		isDirector := true
+		p.IsDirector = &isDirector
+	}
+	return p
 }
 
 func assignmentFields(v map[string]string, env *importEnv) ATMAssignmentUpdatePayload {

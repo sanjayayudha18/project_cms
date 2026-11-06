@@ -10,7 +10,7 @@
 -- branch, i.e. vendor_branch_id IS NULL). vendor_branch_id and
 -- vendor_wide_only are mutually exclusive; caller picks one or neither.
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at, roles
+       is_notification_recipient, is_active, deleted_at, roles, is_director
 FROM vendor_pics
 WHERE vendor_id = sqlc.arg('vendor_id')
   AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
@@ -40,7 +40,7 @@ WHERE vendor_id = sqlc.arg('vendor_id')
 -- name: GetVendorPicAdminByID :one
 -- Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
 SELECT id, vendor_id, vendor_branch_id, name, "position", phone, email,
-       is_notification_recipient, is_active, deleted_at, roles
+       is_notification_recipient, is_active, deleted_at, roles, is_director
 FROM vendor_pics WHERE id = $1;
 
 -- name: CountActiveVendorPicsByBranch :one
@@ -55,11 +55,12 @@ SELECT COUNT(*) FROM vendor_pics
 WHERE vendor_id = $1 AND is_notification_recipient AND deleted_at IS NULL;
 
 -- name: CreateVendorPicAdmin :one
-INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient, roles)
+INSERT INTO vendor_pics (vendor_id, vendor_branch_id, name, "position", phone, email, is_notification_recipient, roles, is_director)
 VALUES (sqlc.arg('vendor_id'), sqlc.narg('vendor_branch_id'), sqlc.arg('name'), sqlc.narg('position'),
-        sqlc.narg('phone'), sqlc.narg('email'), sqlc.arg('is_notification_recipient'), sqlc.arg('roles')::text[])
+        sqlc.narg('phone'), sqlc.narg('email'), sqlc.arg('is_notification_recipient'), sqlc.arg('roles')::text[],
+        sqlc.arg('is_director')::boolean)
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at, roles;
+          is_notification_recipient, is_active, deleted_at, roles, is_director;
 
 -- name: UpdateVendorPicAdmin :one
 -- vendor_id is immutable; roles is never set here (form update keeps the
@@ -72,10 +73,11 @@ SET vendor_branch_id = sqlc.narg('vendor_branch_id'),
     phone = sqlc.narg('phone'),
     email = sqlc.narg('email'),
     is_notification_recipient = sqlc.arg('is_notification_recipient'),
+    is_director = sqlc.arg('is_director')::boolean,
     updated_at = now()
 WHERE id = sqlc.arg('id') AND deleted_at IS NULL
 RETURNING id, vendor_id, vendor_branch_id, name, "position", phone, email,
-          is_notification_recipient, is_active, deleted_at, roles;
+          is_notification_recipient, is_active, deleted_at, roles, is_director;
 
 -- name: DisableVendorPic :exec
 -- Soft-disable only (no_hard_delete_test.go extended in T3.7).
@@ -87,9 +89,17 @@ UPDATE vendor_pics SET is_active = true, deleted_at = NULL WHERE id = $1;
 -- name: GetVendorPicRolesForUpdate :one
 -- Row-locks an active PIC of vendor_id before SetVendorPicRoles (immediate
 -- apply + audit in tx, vendor-party-scope Req 5.3-5.5). No row = 404.
-SELECT roles FROM vendor_pics
+SELECT roles, is_director FROM vendor_pics
 WHERE id = sqlc.arg('id') AND vendor_id = sqlc.arg('vendor_id') AND deleted_at IS NULL
 FOR UPDATE;
+
+-- name: FindOtherActiveDirector :one
+-- Pre-check for 409 (vendor-pks Req 1.5): another active Director_PIC of the
+-- vendor. exclude_id NULL = no exclusion. No row = none.
+SELECT id FROM vendor_pics
+WHERE vendor_id = sqlc.arg('vendor_id') AND is_director AND deleted_at IS NULL
+  AND id <> COALESCE(sqlc.narg('exclude_id')::bigint, 0)
+LIMIT 1;
 
 -- name: SetVendorPicRoles :one
 -- Called from VendorPicRoleService.SetRoles and from VendorPicApplier (update

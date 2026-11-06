@@ -51,6 +51,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// PKS renewal threshold in months (D6): empty = 9. Invalid = refuse to start.
+	pksRenewalMonths, err := reports.ParseVendorPksRenewalMonths(os.Getenv("VENDOR_PKS_RENEWAL_MONTHS"))
+	if err != nil {
+		slog.Error("invalid VENDOR_PKS_RENEWAL_MONTHS", "error", err)
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	// PostgreSQL primary pool
@@ -118,7 +125,7 @@ func main() {
 
 	// Export job pipeline. Worker first: its Wake is the service's wake hook.
 	// One producer table shared by the worker (files) and the previewer (tables), so both read the same rows.
-	producers := exportjob.NewProducers(dsrLateStart)
+	producers := exportjob.NewProducers(dsrLateStart, pksRenewalMonths)
 	worker := exportjob.NewWorker(dbPool, dbReadPool, producers, workerCfg)
 	svc := exportjob.NewService(dbPool, audit.NewWriter(), worker.Wake)
 	previewer := exportjob.NewPreviewer(dbPool, dbReadPool, producers) // scope on primary, rows on replica

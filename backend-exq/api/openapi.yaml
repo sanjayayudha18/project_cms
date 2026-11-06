@@ -248,6 +248,24 @@ paths:
         '429': { $ref: '#/components/responses/TooManyExports' }
         '500': { $ref: '#/components/responses/Internal' }
 
+  /exports/reports/vendor-pks:
+    post:
+      operationId: requestVendorPksExport
+      summary: Request the vendor PKS report export (kind vendor_pks)
+      tags: [exports]
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: status, in: query, schema: { type: string, enum: [active, disabled, all], default: active } }
+        - { name: pks_status, in: query, schema: { type: string, enum: [aktif, need_renewal, expired, terminated, belum_diisi] } }
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
   /exports/master-data/{entity}/template:
     get:
       operationId: downloadImportTemplate
@@ -343,7 +361,7 @@ components:
   schemas:
     StatusFilter: { type: string, enum: [active, disabled, all] }
     PriceLevel: { type: string, enum: [vendor, branch, atm, all] }
-    ExportKind: { type: string, enum: [vendor, cabang, harga_paket, master_data_global, dsr_late_daily, dsr_late_summary, replenishment_amount_mismatch, replenishment_trips] }
+    ExportKind: { type: string, enum: [vendor, cabang, harga_paket, master_data_global, dsr_late_daily, dsr_late_summary, replenishment_amount_mismatch, replenishment_trips, vendor_pks] }
     ReportParams:
       type: object
       description: Validated filter of a report export; keys that do not apply to the kind are absent. Sent again as query string by "Minta ekspor lagi".

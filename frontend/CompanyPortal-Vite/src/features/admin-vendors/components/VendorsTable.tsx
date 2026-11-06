@@ -5,7 +5,16 @@ import { Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
+import { formatMonitoring } from "../lib/pks";
 import type { AdminVendor } from "../types";
+import { PksStatusBadge } from "./PksStatusBadge";
+
+/** "YYYY-MM-DD" → "DD/MM/YYYY" without a Date round trip (no timezone shift); empty → "-". */
+function formatIsoDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 interface VendorsTableProps {
   vendors: AdminVendor[];
@@ -39,6 +48,37 @@ export function VendorsTable({
       ),
     },
     { accessorKey: "name", header: "Nama" },
+    {
+      id: "director",
+      header: "Nama Direktur Utama",
+      cell: ({ row }) => row.original.director?.name ?? "-",
+    },
+    {
+      id: "pks_name",
+      header: "Nama PKS",
+      cell: ({ row }) => row.original.pks?.pks_name ?? "-",
+    },
+    {
+      id: "pks_expiry",
+      header: "Tanggal Expired PKS",
+      cell: ({ row }) => (
+        <span className="tabular-nums">{formatIsoDate(row.original.pks?.expiry_date)}</span>
+      ),
+    },
+    {
+      id: "pks_monitoring",
+      header: "Monitoring PKS",
+      cell: ({ row }) => (
+        <span className="tabular-nums">
+          {formatMonitoring(row.original.pks_status, row.original.pks?.remaining_days)}
+        </span>
+      ),
+    },
+    {
+      id: "pks_status",
+      header: "Status PKS",
+      cell: ({ row }) => <PksStatusBadge status={row.original.pks_status} />,
+    },
     { accessorKey: "contact_email", header: "Email Kontak" },
     { accessorKey: "contact_phone", header: "Telepon" },
     {

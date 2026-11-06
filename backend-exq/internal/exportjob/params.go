@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cimb-niaga/cms/pkg/csvexport"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Kind is the export job type; values match export_jobs.kind.
@@ -152,6 +153,9 @@ func sanitize(s string) string {
 
 // FileName builds the download name (Req 5.2) with the WIB date of now.
 func FileName(p Params, vendorCode, branchCode string, now time.Time) string {
+	if p.Kind == KindVendorPks {
+		return reports.VendorPksFileName(now)
+	}
 	if p.Report != nil {
 		return reportFileName(p.Kind, *p.Report)
 	}

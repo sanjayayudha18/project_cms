@@ -49,10 +49,12 @@ var importable = map[string]Entity{
 	},
 	VendorPICs: {
 		Name:   VendorPICs,
-		Header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+		Header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles", "is_director"},
 		// Older files have no roles column: blank (create = all roles, update = unchanged).
-		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"}},
-		LegacyFill:    map[string]string{"roles": ""},
+		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+			{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
+		},
+		LegacyFill: map[string]string{"roles": "", "is_director": KeepCurrentCell},
 	},
 	ATMs: {
 		Name:   ATMs,

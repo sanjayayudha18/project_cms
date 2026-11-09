@@ -14,7 +14,12 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 ├── development-progress.md      # Tracking status fitur yang dikerjakan oleh Gemini
 ├── lessons-learned.md           # Catatan pembelajaran dari review/insiden
 ├── agents/
-│   └── cms-task-runner.md       # Instruksi subagent eksekutor task per wave
+│   ├── cms-orchestrator.md      # Orchestrator pembuka session baru sesuai task & model di dokumen
+│   ├── cms-task-runner.md       # Instruksi dasar eksekutor task per wave
+│   ├── db-sqlc-architect.md     # Subagent spesialis PostgreSQL, migrasi & sqlc v1.31.1
+│   ├── go-backend-specialist.md # Subagent spesialis Go + Chi v5 (backend/, backend-exq/, pkg/)
+│   ├── react-portal-specialist.md # Subagent spesialis React + Vite & UI/UX kedua portal
+│   └── security-fin-reviewer.md # Subagent auditor keamanan & aturan finansial (read-only)
 ├── rules/
 │   └── GEMINI.md                # Aturan proyek (auto-loaded oleh Antigravity, batas ≤ 24 KB/file)
 ├── skills/
@@ -24,8 +29,18 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │   │   └── SKILL.md             # Checklist 9-langkah entitas master-data (maker-checker)
 │   ├── cms2-bugfix/
 │   │   └── SKILL.md             # Workflow end-to-end perbaikan bug
-│   └── cms-run-wave/
-│       └── SKILL.md             # Dispatcher paralel task per wave menggunakan subagent
+│   ├── cms-run-wave/
+│   │   └── SKILL.md             # Dispatcher paralel task per wave menggunakan subagent
+│   ├── db-migration-sqlc/
+│   │   └── SKILL.md             # Workflow migrasi PostgreSQL, soft-delete & sqlc v1.31.1
+│   ├── go-chi-endpoint/
+│   │   └── SKILL.md             # Checklist pembuatan endpoint Go + Chi v5 & unit test
+│   ├── openapi-frontend-sync/
+│   │   └── SKILL.md             # Sinkronisasi kontrak OpenAPI Go ke TypeScript React
+│   ├── react-ui-ux-craft/
+│   │   └── SKILL.md             # Standar UI/UX React + Vite (4 state wajib, IDR, portal)
+│   └── sql-query-tuning/
+│       └── SKILL.md             # Panduan optimasi query SQL, indexing & routing dbRead
 ├── plugins/
 │   └── .gitkeep                 # Tempat menyimpan bundle plugin lokal
 └── specs/

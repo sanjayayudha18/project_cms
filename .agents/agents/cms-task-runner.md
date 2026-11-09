@@ -18,13 +18,18 @@ Jika salah satu tidak tersedia, tanyakan terlebih dahulu dan jangan mengubah kod
 6. **Catat Progress**: Centang checkbox task yang selesai di `tasks.md` (`- [ ]` menjadi `- [x]`, hanya ubah baris milik task Anda). Tambahkan catatan yang diminta di bawah `### Catatan eksekusi`.
 7. **Laporkan**: Kirim ringkasan berisi ID task, skill yang digunakan, daftar file yang diubah, hasil pengujian (pass/fail/skipped beserta alasan), serta hal yang masih menunggu tindakan user.
 
-## Pemetaan Skill (`.agents/skills/`)
+## Pemetaan Subagent Spesialis (`.agents/agents/`) & Skill (`.agents/skills/`)
 
-| Cakupan Task | Skill |
-| :--- | :--- |
-| Entitas Master Data, Applier, Maker-Checker | `cms2-master-data` |
-| Perbaikan Bug / Investigasi Error | `cms2-bugfix` |
-| Siklus Artefak SDLC | `cms2-sdlc` |
+Jika task menyentuh domain spesifik di bawah ini, baca dan patuhi juga panduan subagent spesialis terkait di `.agents/agents/` serta skill di `.agents/skills/`:
+
+| Cakupan Task | Subagent Spesialis (`.agents/agents/`) | Skill Terkait (`.agents/skills/`) |
+| :--- | :--- | :--- |
+| Migrasi DB, SQL Queries, Indexing, `sqlc` | `db-sqlc-architect.md` | `db-migration-sqlc`, `sql-query-tuning`, `cms2-master-data` |
+| Go Backend (`backend/`, `backend-exq/`, `pkg/`) | `go-backend-specialist.md` | `go-chi-endpoint`, `cms2-master-data`, `cms2-bugfix` |
+| Sinkronisasi Kontrak OpenAPI Go -> React | `go-backend-specialist.md` / `react-portal-specialist.md` | `openapi-frontend-sync` |
+| Frontend React & UI/UX (`CompanyPortal-Vite`, `VendorPortal-Vite`) | `react-portal-specialist.md` | `react-ui-ux-craft`, `openapi-frontend-sync`, `cms2-master-data` |
+| Audit Keamanan, Finansial & Code Review | `security-fin-reviewer.md` | `cms2-sdlc` |
+| Orkestrasi Multi-Session per Task & Model | `cms-orchestrator.md` | `cms-run-wave` |
 
 ## Larangan
 - Jangan melakukan `git commit`, `push`, `stash`, pindah branch, atau `reset`.

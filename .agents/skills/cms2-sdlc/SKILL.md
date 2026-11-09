@@ -31,7 +31,7 @@ Setiap file diawali dengan `# <Judul>` lalu baris `> Status: draft`. Hanya user 
 | :--- | :--- | :--- | :--- |
 | **1 Plan** | `requirements.md` -> `## Introduction` (+ open questions) | PO menyetujui Introduction & menjawab open questions | Tangkap masalah, hasil yang diharapkan, batasan, dan cakupan. Daftarkan open questions tanpa menjawabnya sendiri. |
 | **2 Design** | `requirements.md` (EARS) + `design.md` | PO menyetujui requirements; Engineer menyetujui design | Tulis EARS requirements, kontrak API, model data, Correctness Properties, out-of-scope; tandai area kritis (auth/uang/recon/migrasi/delete). |
-| **3 Build** | `tasks.md` | Engineer menyetujui tasks | Susun daftar task dengan `_Requirements:_`, `_Model:_`, dan `## Task Dependency Graph`. Eksekusi per task/wave dengan diff kecil. |
+| **3 Build** | `tasks.md` | Engineer menyetujui tasks | Susun daftar task dengan `_Requirements:_`, `_Model:_`, `_Skills:_` (sesuai matriks di `cms-orchestrator.md`), dan `## Task Dependency Graph`. Eksekusi per task/wave dengan diff kecil. |
 | **4 Test** | `tasks.md` -> `## Notes` -> `### Test Results` | Build + automated tests hijau | Jalankan perintah verifikasi dari `.agents/rules/GEMINI.md` (`go test ./...`, `golangci-lint`, `pnpm ... test/build/lint`). Catat verifikasi browser manual sebagai `outstanding (user)`. |
 | **5 Deploy** | `review.md` | Code owner melakukan merge | Dokumentasikan `## Review Passes`, `## Findings` (Important vs nit), dan checklist `## Definition of Done`. |
 | **6 Maintain** | `incidents.md` | On-call | Catat `## Signals` dan `## Incident Log` beserta regression test yang ditambahkan. |

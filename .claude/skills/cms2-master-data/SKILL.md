@@ -15,7 +15,7 @@ Role Management, Area ACM admin (apply immediately, audit in same tx). Vendor
 Request / vault plans / vendor parties have their own state machines.
 
 **Before starting**: a new entity or column is a schema change → full SDLC chain
-(`.claude/sdlc/<feature>/`, CLAUDE.md §4a). Ask the user first.
+(spec Kiro `.kiro/specs/<feature>/`, CLAUDE.md §4a). Ask the user first.
 
 ## Reference implementation
 

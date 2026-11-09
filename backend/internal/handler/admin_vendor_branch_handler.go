@@ -93,10 +93,15 @@ func (h *AdminVendorBranchHandler) List(w http.ResponseWriter, r *http.Request) 
 
 	items := make([]map[string]any, len(branches))
 	for i, b := range branches {
+		limit, err := service.DecimalStringPtr(b.CisLimitAmount)
+		if err != nil {
+			writeUnexpectedError(w, err)
+			return
+		}
 		items[i] = map[string]any{
 			"id": b.ID, "vendor_id": b.VendorID, "branch_code": b.BranchCode, "branch_name": b.BranchName,
 			"location_id": b.LocationID, "region": b.Region, "region_code": b.RegionCode, "category": b.Category, "is_active": b.IsActive,
-			"deleted_at": formatTimestamptz(b.DeletedAt),
+			"deleted_at": formatTimestamptz(b.DeletedAt), "cis_limit_amount": limit, "cis_limit_currency": b.CisLimitCurrency,
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -121,10 +126,15 @@ func (h *AdminVendorBranchHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", service.ErrVendorBranchNotFound.Error())
 		return
 	}
+	limit, err := service.DecimalStringPtr(branch.CisLimitAmount)
+	if err != nil {
+		writeUnexpectedError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": branch.ID, "vendor_id": branch.VendorID, "branch_code": branch.BranchCode, "branch_name": branch.BranchName,
 		"location_id": branch.LocationID, "region": branch.Region, "region_code": branch.RegionCode, "category": branch.Category, "is_active": branch.IsActive,
-		"deleted_at": formatTimestamptz(branch.DeletedAt),
+		"deleted_at": formatTimestamptz(branch.DeletedAt), "cis_limit_amount": limit, "cis_limit_currency": branch.CisLimitCurrency,
 	})
 }
 
@@ -135,6 +145,8 @@ type createVendorBranchRequestBody struct {
 	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
+	// CisLimitAmount: decimal string or null (vendor-cis-limit FR1); currency is always IDR (S4).
+	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // Create handles POST / -- stages a new branch for approval (202).
@@ -160,6 +172,7 @@ func (h *AdminVendorBranchHandler) Create(w http.ResponseWriter, r *http.Request
 	change, err := h.svc.Create(r.Context(), authCtx.UserID, service.VendorBranchPayload{
 		VendorID: vendorID, BranchCode: body.BranchCode, BranchName: body.BranchName,
 		LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
+		CisLimitAmount: body.CisLimitAmount,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)
@@ -175,6 +188,8 @@ type updateVendorBranchRequestBody struct {
 	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
+	// CisLimitAmount: decimal string or null (vendor-cis-limit FR1); currency is always IDR (S4).
+	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // Update handles PUT /{id} -- stages a branch update for approval (202).
@@ -199,6 +214,7 @@ func (h *AdminVendorBranchHandler) Update(w http.ResponseWriter, r *http.Request
 
 	change, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.VendorBranchUpdatePayload{
 		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
+		CisLimitAmount: body.CisLimitAmount,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)

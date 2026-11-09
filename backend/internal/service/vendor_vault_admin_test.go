@@ -56,6 +56,13 @@ func TestValidateVaultFields(t *testing.T) {
 		{"lon out of range", func(p *VendorVaultUpdatePayload) { p.Longitude = sp("-180.1") }, "longitude"},
 		{"coords at bounds ok", func(p *VendorVaultUpdatePayload) { p.Latitude = sp("-90"); p.Longitude = sp("180") }, ""},
 		{"nil capacities ok", func(p *VendorVaultUpdatePayload) { p.MinCapacityAmount, p.MaxCapacityAmount = nil, nil }, ""},
+		// vendor-cis-limit FR2.1: escrow optional, exactly 12 digits, not unique.
+		{"escrow 12 digits ok", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("001234567890") }, ""},
+		{"escrow blank ok", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("  ") }, ""},
+		{"escrow 11 digits", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("12345678901") }, "escrow_account"},
+		{"escrow 13 digits", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("1234567890123") }, "escrow_account"},
+		{"escrow letters", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("12345678901A") }, "escrow_account"},
+		{"escrow inner spaces", func(p *VendorVaultUpdatePayload) { p.EscrowAccount = sp("1234 5678 90") }, "escrow_account"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -135,5 +142,18 @@ func TestVendorVaultAdminService_UpdateAndToggle_NotFound(t *testing.T) {
 	}
 	if _, err := svc.Disable(context.Background(), 7, 1, "ip"); !errors.Is(err, ErrVendorVaultNotFound) {
 		t.Errorf("Disable: want ErrVendorVaultNotFound, got %v", err)
+	}
+}
+
+func TestValidateVaultFields_EscrowNormalized(t *testing.T) {
+	for in, want := range map[string]string{" 001234567890 ": "001234567890", "   ": "<nil>", "": "<nil>"} {
+		p := validVaultUpdate()
+		p.EscrowAccount = sp(in)
+		if err := validateVaultFields(&p); err != nil {
+			t.Fatalf("%q: %v", in, err)
+		}
+		if got := showStr(p.EscrowAccount); got != want {
+			t.Errorf("%q: escrow = %s, want %s", in, got, want)
+		}
 	}
 }

@@ -4,6 +4,8 @@
 
 Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` — Phase 0 + replenish ticket). Merge `dev1` → `main` pending.
 
+> **2026-11-09 — standar SDLC diganti (user):** fitur baru memakai spec Kiro hybrid di `.kiro/specs/<feature>/` (requirements → design → tasks + `### Test Results` → `review.md` → `incidents.md`, gate di baris `> Status:`; CLAUDE.md §4a, `.kiro/steering/kiro-spec-standard.md` Sec 7). Fitur yang sudah di `.claude/sdlc/` (mis. `vendor-cis-limit/`, `dsr-late-report/`) diselesaikan di format lama.
+
 ## Overview
 
 | Feature | SDLC folder | Stage | Status | Outstanding |
@@ -33,7 +35,7 @@ Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` —
 | Pengecualian ATM bermasalah + list input FSD (Phase 2.4) | `problem-atm-exclusion/` | 1 Plan (`intent.md` draft 2026-11-02) | ⏳ not built; menyentuh uang + kemungkinan migrasi, jadi wajib AI-DLC penuh | PO jawab 19 open questions + terima intent → spec |
 | Vendor PKS | `.kiro/specs/vendor-pks/` | 3 Build selesai (tasks 1–13; dokumentasi 2026-11-06) | ✅ migrasi `022` + `037` applied to dev 2026-11-05; gate task 12 hijau (3 masalah lama, lihat tasks.md); PKS di tabel `vendor_pks`, Direktur Utama = `vendor_pics.is_director` (D32) | task 14: cek browser manual oleh user (outstanding, belum dicatat) |
 | Kolom PKS + Direktur Utama di ekspor vendor (X.16) | `.kiro/specs/vendor-export-pks/` | 3 Build selesai (tasks 1–7; dokumentasi 2026-11-06) | ✅ built, commit pending (user commits manually). Sembilan kolom baca-saja (direktur + PKS aktif) di CSV vendor `backend-exq` (pratinjau + file); impor `backend` menerima Import_Header dan Export_Header, kolom baca-saja dibuang. Tanpa migrasi. Keputusan user 2026-11-06 (catatan 2.1): baris di file Export_Header yang jumlah selnya bukan 18 ditolak `jumlah kolom`, termasuk baris 9 sel. Gate backend (4) dan frontend (6) hijau | task 8: cek browser manual oleh user (outstanding); deploy `backend` sebelum/bersamaan `backend-exq` |
-| Vendor CIS limit + escrow vault | `vendor-cis-limit/` | 1 Plan (intent draft 2026-11-05) | ⏳ not built; dipisah dari PKS 2026-11-05; 7 open questions | bahas dengan PO setelah PKS |
+| Vendor CIS limit + escrow vault | `vendor-cis-limit/` | 3 Build (plan accepted 2026-11-06) | 🚧 P1–P5 done: migrasi `038` applied to dev 2026-11-06, Limit CIS cabang + escrow vault + peran PIC `bm` + CSV impor/ekspor (BE) | P6 endpoint inquiry |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
 | Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 5 Deploy (review 2026-10-07) | ✅ built (`eb457cf`, review R1–R3 fixed): `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |
 | Forecast / Order ATM (Phase 2.1) | — (re-scoped by user 2026-10-08) | closed | ✅ no engine: DMAA sends the forecast, `backend_python/dmaa/dmaa_etl.py` ingests it, DMAA `amount_replenish` = final order amount; consumed by Forecast Browser → Vendor Request. `internal/forecast` + `forecast_runs/results` dropped | refund: DMAA sends later → extend ETL then (`amount_refund = 0` today); problem-ATM exclusion stays with CROWN → Phase 2.4; CLAUDE.md Sec 3/3a corrected 2026-10-08 |

@@ -51,7 +51,7 @@ func TestVendorPicApplier_CreateRoles_Integration(t *testing.T) {
 	svc, tag, h := harness(t)
 	vendorID := h.seedVendor("ITPR-"+tag, "Vendor PIC Roles "+tag)
 
-	if got := picRoles(t, svc, createPicViaApproval(t, svc, h, vendorID, "Default "+tag, nil)); !slices.Equal(got, AllPicRoles()) {
+	if got := picRoles(t, svc, createPicViaApproval(t, svc, h, vendorID, "Default "+tag, nil)); !slices.Equal(got, DefaultPicRoles()) {
 		t.Errorf("create without roles: roles = %q, want all three", got)
 	}
 	if got := picRoles(t, svc, createPicViaApproval(t, svc, h, vendorID, "Vault "+tag, &[]string{"vault"})); !slices.Equal(got, []string{"vault"}) {
@@ -173,4 +173,37 @@ func TestVendorPicRoleService_SetRoles_Integration(t *testing.T) {
 			t.Errorf("want ErrVendorPicNotFound, got %v", err)
 		}
 	})
+}
+
+// vendor-cis-limit FR3: bm is accepted for a cabang PIC and refused (422, nothing written) for a vendor-wide one.
+func TestVendorPicRoleService_SetRolesBm_Integration(t *testing.T) {
+	svc, tag, h := harness(t)
+	roleSvc := NewVendorPicRoleService(h.pool)
+	ctx := adminCtx(h.makerID)
+
+	vendorID := h.seedVendor("ITPBM-"+tag, "Vendor PIC BM "+tag)
+	branchID := h.seedVendorBranch(vendorID, "ITPBMB-"+tag, "Branch BM "+tag)
+	vendorWide := createPicViaApproval(t, svc, h, vendorID, "Wide "+tag, nil)
+	if err := approveChange(t, svc, h.insertPending("vendor_pic", "create", nil, VendorPicPayload{VendorID: vendorID,
+		VendorPicUpdatePayload: VendorPicUpdatePayload{Name: "Cabang " + tag, VendorBranchID: &branchID}})); err != nil {
+		t.Fatalf("create cabang pic: %v", err)
+	}
+	var branchPic int64
+	if err := dbtx(svc).QueryRow(ctx, `SELECT id FROM vendor_pics WHERE vendor_id = $1 AND name = $2`, vendorID, "Cabang "+tag).Scan(&branchPic); err != nil {
+		t.Fatal(err)
+	}
+	h.vendorPicIDs = append(h.vendorPicIDs, branchPic)
+
+	if got, err := roleSvc.SetRoles(ctx, h.makerID, vendorID, branchPic, []string{"bm", "vault"}, ""); err != nil || !slices.Equal(got, []string{"bm", "vault"}) {
+		t.Fatalf("cabang PIC bm: %v, %v", got, err)
+	}
+	before := picRoles(t, svc, vendorWide)
+	_, err := roleSvc.SetRoles(ctx, h.makerID, vendorID, vendorWide, []string{"bm"}, "")
+	var ve *ValidationError
+	if !errors.As(err, &ve) || ve.Field != "roles" {
+		t.Fatalf("vendor-wide PIC bm: err = %v, want ValidationError on roles", err)
+	}
+	if got := picRoles(t, svc, vendorWide); !slices.Equal(got, before) {
+		t.Errorf("roles changed to %v after refusal, want %v", got, before)
+	}
 }

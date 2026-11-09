@@ -59,13 +59,14 @@ func (q *Queries) CountVendorVaultsAdmin(ctx context.Context, arg CountVendorVau
 const createVendorVaultAdmin = `-- name: CreateVendorVaultAdmin :one
 INSERT INTO vendor_vaults (vendor_branch_id, vault_code, type, category, currency_code,
                            min_capacity_amount, max_capacity_amount, latitude, longitude,
-                           operating_hours, location_id)
+                           operating_hours, location_id, escrow_account)
 VALUES ($1, $2, $3, $3,
         $4, $5, $6,
-        $7, $8, $9, $10)
+        $7, $8, $9, $10,
+        $11)
 RETURNING id, vendor_branch_id, vault_code, category, currency_code,
           min_capacity_amount, max_capacity_amount, latitude, longitude,
-          operating_hours, location_id, is_active, deleted_at
+          operating_hours, location_id, is_active, deleted_at, escrow_account
 `
 
 type CreateVendorVaultAdminParams struct {
@@ -79,6 +80,7 @@ type CreateVendorVaultAdminParams struct {
 	Longitude         pgtype.Numeric `json:"longitude"`
 	OperatingHours    *string        `json:"operating_hours"`
 	LocationID        *int64         `json:"location_id"`
+	EscrowAccount     *string        `json:"escrow_account"`
 }
 
 type CreateVendorVaultAdminRow struct {
@@ -95,6 +97,7 @@ type CreateVendorVaultAdminRow struct {
 	LocationID        *int64             `json:"location_id"`
 	IsActive          bool               `json:"is_active"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	EscrowAccount     *string            `json:"escrow_account"`
 }
 
 // vendor_vaults.type is a legacy NOT NULL column (pre-category); new rows
@@ -111,6 +114,7 @@ func (q *Queries) CreateVendorVaultAdmin(ctx context.Context, arg CreateVendorVa
 		arg.Longitude,
 		arg.OperatingHours,
 		arg.LocationID,
+		arg.EscrowAccount,
 	)
 	var i CreateVendorVaultAdminRow
 	err := row.Scan(
@@ -127,6 +131,7 @@ func (q *Queries) CreateVendorVaultAdmin(ctx context.Context, arg CreateVendorVa
 		&i.LocationID,
 		&i.IsActive,
 		&i.DeletedAt,
+		&i.EscrowAccount,
 	)
 	return i, err
 }
@@ -177,7 +182,7 @@ func (q *Queries) GetVendorBranchVendorID(ctx context.Context, id int64) (int64,
 const getVendorVaultAdminByID = `-- name: GetVendorVaultAdminByID :one
 SELECT id, vendor_branch_id, vault_code, category, currency_code,
        min_capacity_amount, max_capacity_amount, latitude, longitude,
-       operating_hours, location_id, is_active, deleted_at
+       operating_hours, location_id, is_active, deleted_at, escrow_account
 FROM vendor_vaults WHERE id = $1
 `
 
@@ -195,6 +200,7 @@ type GetVendorVaultAdminByIDRow struct {
 	LocationID        *int64             `json:"location_id"`
 	IsActive          bool               `json:"is_active"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	EscrowAccount     *string            `json:"escrow_account"`
 }
 
 // Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
@@ -215,6 +221,7 @@ func (q *Queries) GetVendorVaultAdminByID(ctx context.Context, id int64) (GetVen
 		&i.LocationID,
 		&i.IsActive,
 		&i.DeletedAt,
+		&i.EscrowAccount,
 	)
 	return i, err
 }
@@ -223,7 +230,7 @@ const listVendorVaultsAdmin = `-- name: ListVendorVaultsAdmin :many
 
 SELECT v.id, v.vendor_branch_id, v.vault_code, v.category, v.currency_code,
        v.min_capacity_amount, v.max_capacity_amount, v.latitude, v.longitude,
-       v.operating_hours, v.location_id, v.is_active, v.deleted_at
+       v.operating_hours, v.location_id, v.is_active, v.deleted_at, v.escrow_account
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = $1
@@ -261,6 +268,7 @@ type ListVendorVaultsAdminRow struct {
 	LocationID        *int64             `json:"location_id"`
 	IsActive          bool               `json:"is_active"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	EscrowAccount     *string            `json:"escrow_account"`
 }
 
 // Admin vendor vault management (plan.md Fase 3, T3.2). Mutations route
@@ -300,6 +308,7 @@ func (q *Queries) ListVendorVaultsAdmin(ctx context.Context, arg ListVendorVault
 			&i.LocationID,
 			&i.IsActive,
 			&i.DeletedAt,
+			&i.EscrowAccount,
 		); err != nil {
 			return nil, err
 		}
@@ -322,11 +331,12 @@ SET category = $1,
     longitude = $6,
     operating_hours = $7,
     location_id = $8,
+    escrow_account = $9,
     updated_at = now()
-WHERE id = $9 AND deleted_at IS NULL
+WHERE id = $10 AND deleted_at IS NULL
 RETURNING id, vendor_branch_id, vault_code, category, currency_code,
           min_capacity_amount, max_capacity_amount, latitude, longitude,
-          operating_hours, location_id, is_active, deleted_at
+          operating_hours, location_id, is_active, deleted_at, escrow_account
 `
 
 type UpdateVendorVaultAdminParams struct {
@@ -338,6 +348,7 @@ type UpdateVendorVaultAdminParams struct {
 	Longitude         pgtype.Numeric `json:"longitude"`
 	OperatingHours    *string        `json:"operating_hours"`
 	LocationID        *int64         `json:"location_id"`
+	EscrowAccount     *string        `json:"escrow_account"`
 	ID                int64          `json:"id"`
 }
 
@@ -355,6 +366,7 @@ type UpdateVendorVaultAdminRow struct {
 	LocationID        *int64             `json:"location_id"`
 	IsActive          bool               `json:"is_active"`
 	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	EscrowAccount     *string            `json:"escrow_account"`
 }
 
 // vault_code and vendor_branch_id are immutable. `AND deleted_at IS NULL`
@@ -369,6 +381,7 @@ func (q *Queries) UpdateVendorVaultAdmin(ctx context.Context, arg UpdateVendorVa
 		arg.Longitude,
 		arg.OperatingHours,
 		arg.LocationID,
+		arg.EscrowAccount,
 		arg.ID,
 	)
 	var i UpdateVendorVaultAdminRow
@@ -386,6 +399,7 @@ func (q *Queries) UpdateVendorVaultAdmin(ctx context.Context, arg UpdateVendorVa
 		&i.LocationID,
 		&i.IsActive,
 		&i.DeletedAt,
+		&i.EscrowAccount,
 	)
 	return i, err
 }

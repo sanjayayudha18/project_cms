@@ -89,7 +89,7 @@ UPDATE vendor_pics SET is_active = true, deleted_at = NULL WHERE id = $1;
 -- name: GetVendorPicRolesForUpdate :one
 -- Row-locks an active PIC of vendor_id before SetVendorPicRoles (immediate
 -- apply + audit in tx, vendor-party-scope Req 5.3-5.5). No row = 404.
-SELECT roles, is_director FROM vendor_pics
+SELECT roles, is_director, vendor_branch_id FROM vendor_pics
 WHERE id = sqlc.arg('id') AND vendor_id = sqlc.arg('vendor_id') AND deleted_at IS NULL
 FOR UPDATE;
 

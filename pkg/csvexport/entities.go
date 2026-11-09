@@ -54,18 +54,22 @@ var importable = map[string]Entity{
 	},
 	VendorBranches: {
 		Name:   VendorBranches,
-		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
-		// Older files have no category (and, before migration 026, no
-		// region_code): keep the branch's current value instead of clearing it.
+		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "cis_limit_amount", "is_active"},
+		// Older files have no cis_limit_amount (before migration 038), no category (and, before
+		// migration 026, no region_code): keep the branch's current value instead of clearing it.
 		LegacyHeaders: [][]string{
+			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
 		},
-		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell},
+		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell, "cis_limit_amount": KeepCurrentCell},
 	},
 	VendorVaults: {
 		Name:   VendorVaults,
-		Header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
+		Header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "escrow_account", "is_active"},
+		// Older files have no escrow_account (before migration 038): keep the vault's current value.
+		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"}},
+		LegacyFill:    map[string]string{"escrow_account": KeepCurrentCell},
 	},
 	VendorPICs: {
 		Name:   VendorPICs,

@@ -27,7 +27,7 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 			return 0, nil, fmt.Errorf("unmarshal vendor pic create payload: %w", err)
 		}
 		isDirector := p.IsDirector != nil && *p.IsDirector
-		roles := AllPicRoles()
+		roles := DefaultPicRoles()
 		if p.Roles != nil {
 			roles = *p.Roles
 		}

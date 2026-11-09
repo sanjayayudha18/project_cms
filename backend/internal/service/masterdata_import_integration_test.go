@@ -111,7 +111,7 @@ func TestMasterDataImport_PicRoles_Integration(t *testing.T) {
 		picRow("", code, "Dua "+f.tag, "vault;replenish") +
 		picRow(strconv.FormatInt(existing, 10), code, "Lama Baru "+f.tag, ""))
 
-	if got := roleOf("Kosong " + f.tag); !slices.Equal(got, AllPicRoles()) {
+	if got := roleOf("Kosong " + f.tag); !slices.Equal(got, DefaultPicRoles()) {
 		t.Errorf("create with blank roles = %q, want all three", got)
 	}
 	if got := roleOf("Tanpa " + f.tag); len(got) != 0 {

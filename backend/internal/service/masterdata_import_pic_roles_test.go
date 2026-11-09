@@ -236,3 +236,19 @@ func TestImport_VendorPICDirectorRoundTripUnchanged(t *testing.T) {
 		t.Fatalf("want 4 unchanged, got %+v", p)
 	}
 }
+
+// vendor-cis-limit FR3.3 / S5: the importer accepts bm only on a cabang PIC.
+func TestImport_VendorPICRoleBm(t *testing.T) {
+	csvText := picHeaderRoles +
+		",V1,B1,Indra,,,,,,bm;vault\n" + // row 2: cabang PIC with bm
+		",V1,,Joko,,,,,,bm\n" // row 3: vendor-wide PIC with bm
+
+	res := dryRun(t, ExportVendorPICs, csvText)
+
+	if hasErr(res, 2, "roles") {
+		t.Errorf("row 2 (cabang PIC) must accept bm, errors %+v", res.Preview.Errors)
+	}
+	if !hasErr(res, 3, "roles") {
+		t.Errorf("row 3 (vendor-wide PIC) must reject bm, errors %+v", res.Preview.Errors)
+	}
+}

@@ -179,6 +179,7 @@ SELECT b.id,
        COALESCE(b.region_code, '')::text    AS region_code,
        b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
+       COALESCE(b.cis_limit_amount::text, '')::text AS cis_limit_amount,
        b.is_active
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
@@ -199,15 +200,16 @@ type ExportVendorBranchesBatchParams struct {
 }
 
 type ExportVendorBranchesBatchRow struct {
-	ID         int64  `json:"id"`
-	VendorCode string `json:"vendor_code"`
-	BranchCode string `json:"branch_code"`
-	BranchName string `json:"branch_name"`
-	Region     string `json:"region"`
-	RegionCode string `json:"region_code"`
-	Category   string `json:"category"`
-	LocationID string `json:"location_id"`
-	IsActive   bool   `json:"is_active"`
+	ID             int64  `json:"id"`
+	VendorCode     string `json:"vendor_code"`
+	BranchCode     string `json:"branch_code"`
+	BranchName     string `json:"branch_name"`
+	Region         string `json:"region"`
+	RegionCode     string `json:"region_code"`
+	Category       string `json:"category"`
+	LocationID     string `json:"location_id"`
+	CisLimitAmount string `json:"cis_limit_amount"`
+	IsActive       bool   `json:"is_active"`
 }
 
 func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendorBranchesBatchParams) ([]ExportVendorBranchesBatchRow, error) {
@@ -233,6 +235,7 @@ func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendo
 			&i.RegionCode,
 			&i.Category,
 			&i.LocationID,
+			&i.CisLimitAmount,
 			&i.IsActive,
 		); err != nil {
 			return nil, err
@@ -345,6 +348,7 @@ SELECT vl.id,
        COALESCE(vl.longitude::text, '')::text       AS longitude,
        COALESCE(vl.operating_hours, '')::text       AS operating_hours,
        COALESCE(vl.location_id::text, '')::text     AS location_id,
+       COALESCE(vl.escrow_account, '')::text        AS escrow_account,
        vl.is_active
 FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
@@ -380,6 +384,7 @@ type ExportVendorVaultsBatchRow struct {
 	Longitude         string `json:"longitude"`
 	OperatingHours    string `json:"operating_hours"`
 	LocationID        string `json:"location_id"`
+	EscrowAccount     string `json:"escrow_account"`
 	IsActive          bool   `json:"is_active"`
 }
 
@@ -411,6 +416,7 @@ func (q *Queries) ExportVendorVaultsBatch(ctx context.Context, arg ExportVendorV
 			&i.Longitude,
 			&i.OperatingHours,
 			&i.LocationID,
+			&i.EscrowAccount,
 			&i.IsActive,
 		); err != nil {
 			return nil, err

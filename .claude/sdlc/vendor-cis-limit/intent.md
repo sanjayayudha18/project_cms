@@ -1,6 +1,6 @@
 # Intent: Limit CIS per area vault vendor + escrow vault
 
-Author: user (product owner), ditulis bersama Claude. Status: **draft 2026-11-05 — belum dibahas, menunggu PO**.
+Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-11-06** (user: "Terima, buat spec"); open questions dijawab 2026-11-06.
 Dipisah dari `vendor-pks-cis-limit` (O8, PO 2026-11-05: "Pisah, PKS dulu"); fitur PKS lanjut di `.kiro/specs/vendor-pks/`.
 Stage: 1 Plan. Stage berikut: `spec.md` (setelah intent diterima).
 Menyentuh Sec 4 #7: **skema (kolom baru)** + **uang (limit)** + **maker-checker master data** → wajib AI-DLC penuh.
@@ -32,15 +32,29 @@ escrow (`atms.escrow_account` ada, per ATM); belum ada data saldo escrow SIBS / 
   escrow yang sama bisa dikelola beberapa vendor — tinjau ulang).
 - **O2 (dari vendor-pks)** Service Type = kategori vault yang dipilih user (`vendor_vaults.category`), tanpa kolom baru.
 
-## Open questions (untuk PO, belum dijawab)
-1. "Limit Asuransi" di xlsx = "Limit CIS" di FSD (satu nilai yang sama), atau dua hal berbeda?
-2. Nama BM + Contact BM: siapa BM (Branch Manager vendor per area?), dan apakah cukup memakai `vendor_pics` (peran baru)
-   atau kolom baru?
-3. Kolom "Location" di Detail inquiry = lokasi area vault (`vendor_branches.location_id`) atau lokasi vault?
-4. No Rek ATM / No Rek Cash = `escrow_account` vault ATM / vault CASH (A2)?
-5. Posisi Saldo SIBS + status Covered / Over: masuk fitur ini (butuh ingest saldo escrow) atau tetap ditunda (A6)?
-6. "Rules Parameterize" + sheet Menu Input Parameter (TBA): parameter apa saja?
-7. Filter "Status Asuransi" + "generate report" (ekspor CSV) untuk Detail inquiry: masuk fitur ini?
+## Open questions (semua dijawab 2026-11-06)
+1. ~~"Limit Asuransi" di xlsx = "Limit CIS" di FSD (satu nilai yang sama), atau dua hal berbeda?~~
+   **Dijawab 2026-11-06 (user):** sama, satu nilai → satu kolom `vendor_branches.cis_limit_amount` per area vault vendor.
+2. ~~Nama BM + Contact BM: siapa BM (Branch Manager vendor per area?), dan apakah cukup memakai `vendor_pics` (peran baru)
+   atau kolom baru?~~
+   **Dijawab 2026-11-06 (user):** BM = Branch Manager vendor per area vault; pakai `vendor_pics` yang terikat ke cabang itu
+   dengan peran baru `bm` di `vendor_pics.roles` (CHECK ⊆ {replenish, vault, cashcount} dari migrasi 032 perlu diperluas).
+   Tanpa kolom baru di `vendor_branches`.
+> Pertanyaan 3–7 + tinjauan Q7: user 2026-11-06 *"semua open question saya ikuti saran"* → jawaban = saran Claude.
+3. ~~Kolom "Location" di Detail inquiry = lokasi area vault (`vendor_branches.location_id`) atau lokasi vault?~~
+   **Dijawab:** lokasi area vault (`vendor_branches.location_id`); satu baris inquiry per area vault vendor (grain = Limit CIS).
+4. ~~No Rek ATM / No Rek Cash = `escrow_account` vault ATM / vault CASH (A2)?~~
+   **Dijawab:** ya — No Rek ATM = `escrow_account` vault aktif kategori `ATM`, No Rek Cash = vault aktif kategori `CASH` di
+   area itu. Lebih dari satu vault per kategori → semua nomor ditampilkan; tidak ada → kosong.
+5. ~~Posisi Saldo SIBS + status Covered / Over: masuk fitur ini atau tetap ditunda (A6)?~~
+   **Dijawab:** tetap ditunda (A6) sampai ingest saldo escrow harian ada. Kolom Posisi Saldo + Status tidak dibangun sekarang.
+6. ~~"Rules Parameterize" + sheet Menu Input Parameter (TBA): parameter apa saja?~~
+   **Dijawab:** ditunda bersama #5 (rules hanya dipakai untuk status Covered / Over). Aturan awal tetap A5.
+7. ~~Filter "Status Asuransi" + "generate report" untuk Detail inquiry: masuk fitur ini?~~
+   **Dijawab:** filter Status Asuransi ditunda bersama #5 (bergantung pada status). Layar Detail inquiry masuk fitur ini
+   (cari per Nama Perusahaan, read replica); "generate report" (CSV) ditunda ke fase monitoring.
+- **Tinjauan Q7 (`escrow_account` unik):** **Dijawab:** tidak unik (FSD cash count: satu escrow bisa dikelola beberapa
+  vendor). Tetap opsional + validasi 12 digit angka.
 
 ## Out of scope (sementara)
 - PKS vendor + data direktur → `.kiro/specs/vendor-pks/`.

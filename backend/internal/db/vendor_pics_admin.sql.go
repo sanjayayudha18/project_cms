@@ -222,7 +222,7 @@ func (q *Queries) GetVendorPicAdminByID(ctx context.Context, id int64) (GetVendo
 }
 
 const getVendorPicRolesForUpdate = `-- name: GetVendorPicRolesForUpdate :one
-SELECT roles, is_director FROM vendor_pics
+SELECT roles, is_director, vendor_branch_id FROM vendor_pics
 WHERE id = $1 AND vendor_id = $2 AND deleted_at IS NULL
 FOR UPDATE
 `
@@ -233,8 +233,9 @@ type GetVendorPicRolesForUpdateParams struct {
 }
 
 type GetVendorPicRolesForUpdateRow struct {
-	Roles      []string `json:"roles"`
-	IsDirector bool     `json:"is_director"`
+	Roles          []string `json:"roles"`
+	IsDirector     bool     `json:"is_director"`
+	VendorBranchID *int64   `json:"vendor_branch_id"`
 }
 
 // Row-locks an active PIC of vendor_id before SetVendorPicRoles (immediate
@@ -242,7 +243,7 @@ type GetVendorPicRolesForUpdateRow struct {
 func (q *Queries) GetVendorPicRolesForUpdate(ctx context.Context, arg GetVendorPicRolesForUpdateParams) (GetVendorPicRolesForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getVendorPicRolesForUpdate, arg.ID, arg.VendorID)
 	var i GetVendorPicRolesForUpdateRow
-	err := row.Scan(&i.Roles, &i.IsDirector)
+	err := row.Scan(&i.Roles, &i.IsDirector, &i.VendorBranchID)
 	return i, err
 }
 

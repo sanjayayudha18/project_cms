@@ -237,6 +237,15 @@ func (s *VendorPicAdminService) validate(ctx context.Context, vendorID int64, p 
 		}
 		p.Roles = &roles
 	}
+	effective := p.Roles
+	if effective == nil && before != nil {
+		effective = &before.Roles // update without roles keeps the current ones
+	}
+	if effective != nil {
+		if err := checkBmNeedsBranch(*effective, p.VendorBranchID != nil); err != nil {
+			return err
+		}
+	}
 
 	if p.VendorBranchID != nil {
 		owner, err := s.repo.BranchVendorID(ctx, *p.VendorBranchID)

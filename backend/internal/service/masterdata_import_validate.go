@@ -107,6 +107,11 @@ func (e *importEnv) validateVendorBranch(v map[string]string, add func(string, s
 	if !validVendorBranchCategories[v["category"]] {
 		add("category", "harus ATM, CASH, atau ATM_CASH")
 	}
+	if n, err := normalizeCisLimit(optStr(v["cis_limit_amount"])); err != nil {
+		fromErr(err)
+	} else {
+		v["cis_limit_amount"] = notesOrEmpty(n)
+	}
 	e.location(v, add, false)
 }
 
@@ -117,11 +122,11 @@ func (e *importEnv) validateVault(v map[string]string, add func(string, string),
 	}
 	p := VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
 		MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
-		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"])}
+		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"]), EscrowAccount: optStr(v["escrow_account"])}
 	if err := validateVaultFields(&p); err != nil {
 		fromErr(err)
 	} else {
-		v["category"], v["currency_code"] = p.Category, p.CurrencyCode
+		v["category"], v["currency_code"], v["escrow_account"] = p.Category, p.CurrencyCode, notesOrEmpty(p.EscrowAccount)
 	}
 	e.location(v, add, false)
 }
@@ -150,6 +155,9 @@ func (e *importEnv) validatePIC(v map[string]string, creating bool, add func(str
 		add("roles", ve.Message)
 	case roles != nil:
 		v["roles"] = csvexport.PICRolesCell(*roles) // canonical order, so equal sets compare equal to the export
+		if err := checkBmNeedsBranch(*roles, v["branch_code"] != ""); err != nil {
+			add("roles", err.(*ValidationError).Message)
+		}
 	}
 	if v["is_director"] == "true" { // same rules as VendorPicAdminService.validate (vendor-pks 5.1)
 		if v["branch_code"] != "" {

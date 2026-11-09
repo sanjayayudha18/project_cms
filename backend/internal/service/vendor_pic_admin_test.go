@@ -175,6 +175,7 @@ func TestNormalizePicRoles(t *testing.T) {
 	}{
 		{[]string{}, []string{}, false},
 		{[]string{" vault", "cashcount", "replenish "}, []string{"cashcount", "replenish", "vault"}, false},
+		{[]string{"vault", "bm"}, []string{"bm", "vault"}, false}, // vendor-cis-limit FR3.1
 		{[]string{"Vault"}, nil, true}, // codes are case-sensitive, as in the DB CHECK
 		{[]string{""}, nil, true},
 		{[]string{"replenish", " replenish"}, nil, true},
@@ -185,8 +186,9 @@ func TestNormalizePicRoles(t *testing.T) {
 			t.Errorf("normalizePicRoles(%q) = %q, %v; want %q, err=%v", tc.in, got, err, tc.want, tc.wantErr)
 		}
 	}
-	if got := AllPicRoles(); !slices.Equal(got, []string{"cashcount", "replenish", "vault"}) {
-		t.Errorf("AllPicRoles() = %q", got)
+	// bm is never a default (vendor-cis-limit FR3.1).
+	if got := DefaultPicRoles(); !slices.Equal(got, []string{"cashcount", "replenish", "vault"}) {
+		t.Errorf("DefaultPicRoles() = %q", got)
 	}
 }
 
@@ -289,5 +291,37 @@ func TestVendorPicAdminService_CreateDirectorPayload(t *testing.T) {
 	p := sub.lastRequest.Payload.(VendorPicPayload)
 	if p.IsDirector == nil || !*p.IsDirector || p.Roles == nil || len(*p.Roles) != 0 || p.VendorBranchID != nil || p.IsNotificationRecipient {
 		t.Errorf("director payload wrong: %+v", p)
+	}
+}
+
+// vendor-cis-limit FR3.3 / S5: bm only for a PIC bound to a cabang -- also when an update
+// moves a bm PIC to vendor level while keeping its roles.
+func TestVendorPicAdminService_BmNeedsBranch(t *testing.T) {
+	owner := int64(3)
+	branch := int64(11)
+	cases := []struct {
+		name      string
+		branchID  *int64
+		roles     *[]string
+		before    *db.GetVendorPicAdminByIDRow
+		wantError bool
+	}{
+		{"create cabang PIC with bm ok", &branch, &[]string{"bm"}, nil, false},
+		{"create vendor-wide PIC with bm", nil, &[]string{"bm", "vault"}, nil, true},
+		{"create vendor-wide PIC without bm ok", nil, &[]string{"vault"}, nil, false},
+		{"update to vendor level keeps bm roles", nil, nil, &db.GetVendorPicAdminByIDRow{ID: 5, VendorID: 3, VendorBranchID: &branch, Roles: []string{"bm"}}, true},
+		{"update to vendor level dropping bm ok", nil, &[]string{"vault"}, &db.GetVendorPicAdminByIDRow{ID: 5, VendorID: 3, VendorBranchID: &branch, Roles: []string{"bm"}}, false},
+		{"update cabang PIC keeps bm ok", &branch, nil, &db.GetVendorPicAdminByIDRow{ID: 5, VendorID: 3, VendorBranchID: &branch, Roles: []string{"bm"}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := VendorPicUpdatePayload{Name: "Budi", VendorBranchID: tc.branchID, Roles: tc.roles}
+			err := NewVendorPicAdminService(&fakeVendorPicAdminRepo{branchVendorID: &owner}, &fakeVendorBranchSubmitter{}).
+				validate(context.Background(), 3, &p, tc.before)
+			var ve *ValidationError
+			if got := errors.As(err, &ve) && ve.Field == "roles"; got != tc.wantError {
+				t.Fatalf("err = %v, want roles error = %v", err, tc.wantError)
+			}
+		})
 	}
 }

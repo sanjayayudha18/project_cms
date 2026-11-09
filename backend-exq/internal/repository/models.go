@@ -832,6 +832,10 @@ type VendorBranch struct {
 	Category string `json:"category"`
 	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
 	RegionCode *string `json:"region_code"`
+	// Limit CIS (= Limit Asuransi) area vault vendor, dalam cis_limit_currency. NULL = belum diisi. Master-data maker-checker. Migrasi 038.
+	CisLimitAmount pgtype.Numeric `json:"cis_limit_amount"`
+	// Mata uang cis_limit_amount (ISO 4217). Hanya IDR untuk sekarang (vendor-cis-limit S4). Migrasi 038.
+	CisLimitCurrency string `json:"cis_limit_currency"`
 }
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
@@ -902,7 +906,7 @@ type VendorPic struct {
 	DeletedAt               pgtype.Timestamptz `json:"deleted_at"`
 	// Direktur Utama vendor (D32). Hanya pencatatan: tanpa login, tanpa roles (037), bukan penerima notifikasi, selalu tingkat vendor (vendor_branch_id NULL). Maksimal satu direktur aktif per vendor (vendor_pics_director_uq).
 	IsDirector bool `json:"is_director"`
-	// Peran PIC: replenish (PIC replenish ATM), vault (PIC penyedia uang), cashcount (PIC cash count). Kosong = kontak saja. Ubah lewat layar = langsung + audit (deviasi GR#3, vendor-party-scope).
+	// Peran PIC: replenish (PIC replenish ATM), vault (PIC penyedia uang), cashcount (PIC cash count), bm (Branch Manager area, hanya PIC cabang; migrasi 038). Kosong = kontak saja. Ubah lewat layar = langsung + audit (deviasi GR#3, vendor-party-scope).
 	Roles []string `json:"roles"`
 }
 
@@ -1155,4 +1159,6 @@ type VendorVault struct {
 	// ATM, CASH, atau ATM_CASH (melayani keduanya). Diisi dari daftar master vendor di migrasi 008; sebelumnya biner dengan seluruh baris di-backfill ke ATM.
 	Category  string             `json:"category"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	// Nomor rekening escrow vault (12 digit, teks). Opsional, tidak unik: satu escrow bisa dikelola beberapa vendor. Master-data maker-checker. Migrasi 038.
+	EscrowAccount *string `json:"escrow_account"`
 }

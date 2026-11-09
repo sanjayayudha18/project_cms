@@ -92,7 +92,7 @@ func assertDirectorInvariants(t testing.TB, svc *MasterDataApprovalService, vend
 	}
 	lists := [][]string{vendorWide}
 	for _, b := range queryInt64s(t, svc, `SELECT id FROM vendor_branches WHERE vendor_id = $1`, vendorID) {
-		for _, role := range AllPicRoles() {
+		for _, role := range DefaultPicRoles() {
 			l, err := queries.ListVendorBranchNotificationPicEmails(ctx, db.ListVendorBranchNotificationPicEmailsParams{BranchID: b, PicRole: role})
 			if err != nil {
 				t.Fatalf("ListVendorBranchNotificationPicEmails: %v", err)
@@ -132,7 +132,7 @@ func TestVendorPicDirector_RandomOps_Invariants_Integration(t *testing.T) {
 			director: rapid.Bool().Draw(rt, "director"),
 			recip:    rapid.Bool().Draw(rt, "recipient"),
 			hasMail:  rapid.Bool().Draw(rt, "has_mail"),
-			roles:    rapid.SliceOfNDistinct(rapid.SampledFrom(AllPicRoles()), 0, 3, func(s string) string { return s }).Draw(rt, "roles"),
+			roles:    rapid.SliceOfNDistinct(rapid.SampledFrom(DefaultPicRoles()), 0, 3, func(s string) string { return s }).Draw(rt, "roles"),
 		}
 	})
 

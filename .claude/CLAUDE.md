@@ -204,28 +204,28 @@ Always-on rules (money/recon — never re-derive):
 
 * * *
 ## 4a. AI-Native SDLC (per-feature artifact chain)
-> Ref: Claude Academy "AI-Native SDLC Playbook". Full how-to + templates: [`.claude/sdlc/README.md`](./sdlc/README.md). Reference example: `.claude/sdlc/vendor-upload-dsr/`.
+> **Standard (changed 2026-11-09, user): hybrid Kiro + gates.** New features use a Kiro spec in `.kiro/specs/<feature>/`; format, headings, traceability checklist and the stage/gate map: [`.kiro/steering/kiro-spec-standard.md`](../.kiro/steering/kiro-spec-standard.md) (Sec 7 there). Ref: Claude Academy "AI-Native SDLC Playbook". Reference examples: `.kiro/specs/vendor-pks/`, `.kiro/specs/done/`.
 
-Every non-trivial feature lives in `.claude/sdlc/<feature>/` and moves through 6 stages. Each stage produces **one committed file** that the next stage reads. Together those files are the audit trail.
+Every non-trivial feature moves through 6 stages, recorded in the spec folder. Every file carries a `> Status: draft | accepted YYYY-MM-DD (<role>)` line under its title; only a human sets `accepted`. Together those files are the audit trail.
 
-| Stage | Artifact | Human gate (AI never self-approves) | AI does |
+| Stage | Artifact (`.kiro/specs/<feature>/`) | Human gate (AI never self-approves) | AI does |
 | ---| ---| ---| --- |
-| 1 Plan | `intent.md` | Product owner accepts | Capture problem/outcome/constraints in the originator's words; list open questions, don't answer them |
-| 2 Design | `spec.md` | Product owner accepts | Requirements (FR/NFR), API, data model, out-of-scope; flag Sec 4 #7 items (auth/money/recon/migration/delete) |
-| 3 Build | `plan.md` | Engineer accepts plan | Plan mode first: files, order, risks, proof → then small diffs; keep `plan.md` in sync with the diff |
-| 4 Test | `tests.md` | Build + tests green | Feedback loop: run `go test ./...` / `npm test` / typecheck / build, fix until green; trace tests → spec reqs |
+| 1 Plan | `requirements.md` → `## Introduction` | Product owner accepts Introduction; open questions answered | Capture problem/outcome/constraints in the originator's words; list open questions, don't answer them |
+| 2 Design | `requirements.md` (EARS) + `design.md` | PO accepts requirements; engineer accepts design | Requirements, API, data model, Correctness Properties, out-of-scope; flag Sec 4 #7 items (auth/money/recon/migration/delete) |
+| 3 Build | `tasks.md` | Engineer accepts tasks | Tasks with `_Requirements:_`, Model Split, Task Dependency Graph → then small diffs; keep `tasks.md` in sync with the diff |
+| 4 Test | `tasks.md` → `## Notes` → `### Test Results` | Build + tests green | Feedback loop: run `go test ./...` / `npm test` / typecheck / build, fix until green; trace tests → requirements/properties |
 | 5 Deploy | `review.md` | Code owner merges | Review passes (bugs / security / compliance), Important vs nit, Sec 11 DoD checklist |
-| 6 Maintain | `incidents.md` | On-call | Log incidents, add a regression test/eval per incident; a breach → new `intent.md` (loop closes) |
+| 6 Maintain | `incidents.md` | On-call | Log incidents, add a regression test/eval per incident; a breach → new spec (loop closes) |
 
 **Rules for the AI:**
-0. **Ask first, every time.** For any feature addition or fix, before writing code ask the user: *"Perlu dibuat AI-DLC baru (`.claude/sdlc/<feature>/`) atau cukup dokumentasi bug fix?"* Wait for the answer. Bug-fix documentation goes in [bugfixes.md](./bugfixes.md) (newest first, use its template). Don't decide it yourself. Rule 3 below is only the default you suggest; the user makes the call. Anything touching Sec 4 #7 or the schema always gets the full chain.
-1. Before coding a feature, check `.claude/sdlc/<feature>/`. Missing → start at `intent.md`. Never skip a stage or start the next one before the previous artifact is accepted by a human.
+0. **Ask first, every time.** For any feature addition or fix, before writing code ask the user: *"Perlu dibuat spec Kiro baru (`.kiro/specs/<feature>/`) atau cukup dokumentasi bug fix?"* Wait for the answer. Bug-fix documentation goes in [bugfixes.md](./bugfixes.md) (newest first, use its template). Don't decide it yourself. Rule 3 below is only the default you suggest; the user makes the call. Anything touching Sec 4 #7 or the schema always gets the full chain.
+1. Before coding a feature, check `.kiro/specs/<feature>/` (and `.claude/sdlc/<feature>/` for legacy, rule 7). Missing → start at `requirements.md` `## Introduction`. Never skip a stage or start the next one before the previous artifact is accepted by a human.
 2. Work only from the latest accepted artifact. If code and artifact disagree, STOP and ask. Don't silently fix either one.
 3. Small fixes/typos/single-file bugs are exempt, so there's no artifact chain for them. Anything touching Sec 4 #7 or the schema is never exempt.
-4. Manual browser verification is the user's job (Golden Rule #10). Record it in `tests.md` as "outstanding" and never mark it done.
-5. When a stage finishes, update the feature row in `.claude/sdlc/README.md` → "Current features" and in `development-progress.md`.
+4. Manual browser verification is the user's job (Golden Rule #10). Record it in `### Test Results` as "outstanding (user)" and never mark it done.
+5. When a stage finishes, update the feature row in `development-progress.md`.
 6. Lessons from incidents/reviews go to `.claude/lessons-learned.md`. A durable rule goes into this file, as a versioned change, reviewed like code.
-7. Legacy `.kiro/specs/*` (requirements/design/tasks) stay valid for features already started there. New features use `.claude/sdlc/`.
+7. Features started in `.claude/sdlc/<feature>/` (old 6-file chain intent → spec → plan → tests → review → incidents, how-to in [`.claude/sdlc/README.md`](./sdlc/README.md)) finish there; don't migrate them. New features use `.kiro/specs/`.
 
 * * *
 ## 5\. Cross-Cutting Domain Rules (NON-NEGOTIABLE)
@@ -409,8 +409,8 @@ Both run on the **same VM**. Their windows **partly overlap**: the Python schedu
 
 * * *
 ## 15\. Where docs live
-*   Legacy feature specs + steering docs: `.kiro/` (`.kiro/specs/<feature>/`, `.kiro/steering/`) — still valid for features started there (Sec 4a rule 7).
-*   New feature artifacts: `.claude/sdlc/<feature>/` (Sec 4a).
+*   Feature specs (standard since 2026-11-09) + steering docs: `.kiro/` (`.kiro/specs/<feature>/`, `.kiro/steering/`) — Sec 4a.
+*   Legacy feature artifacts: `.claude/sdlc/<feature>/` — only for features already started there (Sec 4a rule 7).
 *   Detail moved out of this file (read on demand): `.claude/docs/` — `requirements.md` (URS), `data-map.md` (table/column notes), `decisions.md` (decision log), `deployment.md` (GCP). Keep this file to always-on rules; put long history there.
 *   Path-scoped rules (auto-loaded by path): `.claude/rules/` — `frontend-ui.md` for `frontend/**`.
 *   Project skills (loaded on `/name` or when the task matches): `.claude/skills/` — `cms2-master-data` (maker-checker checklist for master-data entities), `cms2-sdlc` (start/advance a feature through the Sec 4a stages, skill per stage), `cms2-bugfix` (diagnose → failing test → fix → log in `bugfixes.md`).

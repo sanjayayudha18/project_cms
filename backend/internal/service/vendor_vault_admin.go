@@ -63,6 +63,8 @@ type VendorVaultUpdatePayload struct {
 	Longitude         *string `json:"longitude"`
 	OperatingHours    *string `json:"operating_hours"`
 	LocationID        *int64  `json:"location_id"`
+	// EscrowAccount: nomor escrow 12 digit, nil = NULL, tidak unik (vendor-cis-limit FR2).
+	EscrowAccount *string `json:"escrow_account"`
 }
 
 // VendorVaultPayload is the create request shape and the jsonb payload
@@ -86,13 +88,14 @@ type VendorVault struct {
 	Longitude         *string
 	OperatingHours    *string
 	LocationID        *int64
+	EscrowAccount     *string
 	IsActive          bool
 	DeletedAt         *time.Time
 }
 
-func newVendorVault(id, branchID int64, code, category, currency string, minC, maxC, lat, lon pgtype.Numeric, hours *string, locID *int64, active bool, deleted pgtype.Timestamptz) (VendorVault, error) {
+func newVendorVault(id, branchID int64, code, category, currency string, minC, maxC, lat, lon pgtype.Numeric, hours *string, locID *int64, escrow *string, active bool, deleted pgtype.Timestamptz) (VendorVault, error) {
 	v := VendorVault{ID: id, VendorBranchID: branchID, VaultCode: code, Category: category, CurrencyCode: currency,
-		OperatingHours: hours, LocationID: locID, IsActive: active, DeletedAt: timestamptzToPtr(deleted)}
+		OperatingHours: hours, LocationID: locID, EscrowAccount: escrow, IsActive: active, DeletedAt: timestamptzToPtr(deleted)}
 	var err error
 	for _, f := range []struct {
 		dst **string
@@ -113,7 +116,7 @@ func (s *VendorVaultAdminService) List(ctx context.Context, arg db.ListVendorVau
 	}
 	out := make([]VendorVault, len(rows))
 	for i, r := range rows {
-		if out[i], err = newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.IsActive, r.DeletedAt); err != nil {
+		if out[i], err = newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.EscrowAccount, r.IsActive, r.DeletedAt); err != nil {
 			return nil, fmt.Errorf("vault %d: %w", r.ID, err)
 		}
 	}
@@ -131,7 +134,7 @@ func (s *VendorVaultAdminService) Get(ctx context.Context, id int64) (*VendorVau
 	if err != nil || r == nil {
 		return nil, err
 	}
-	v, err := newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.IsActive, r.DeletedAt)
+	v, err := newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.EscrowAccount, r.IsActive, r.DeletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +216,9 @@ func (s *VendorVaultAdminService) toggle(ctx context.Context, makerID, id int64,
 // category ATM|CASH|ATM_CASH, currency = 3 uppercase letters, capacities >= 0 with
 // min <= max, coordinates within range. Decimals are checked via big.Rat --
 // never float.
+// escrowAccountRe mirrors vendor_vaults_escrow_account_chk (migration 038).
+var escrowAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
+
 func validateVaultFields(p *VendorVaultUpdatePayload) error {
 	p.Category = strings.TrimSpace(p.Category)
 	p.CurrencyCode = strings.ToUpper(strings.TrimSpace(p.CurrencyCode))
@@ -221,6 +227,17 @@ func validateVaultFields(p *VendorVaultUpdatePayload) error {
 	}
 	if !currencyCodeRe.MatchString(p.CurrencyCode) {
 		return &ValidationError{Field: "currency_code", Message: "wajib 3 huruf (mis. IDR)"}
+	}
+	if p.EscrowAccount != nil {
+		e := strings.TrimSpace(*p.EscrowAccount)
+		switch {
+		case e == "":
+			p.EscrowAccount = nil
+		case !escrowAccountRe.MatchString(e):
+			return &ValidationError{Field: "escrow_account", Message: "harus tepat 12 digit angka"}
+		default:
+			p.EscrowAccount = &e
+		}
 	}
 
 	minC, err := parseDecimalField("min_capacity_amount", p.MinCapacityAmount)

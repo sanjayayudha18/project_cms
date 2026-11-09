@@ -99,6 +99,12 @@ var importKeyColumns = map[string][]string{
 // buildChangePreview describes one validated row; nil for an unchanged row. It
 // compares the normalized cells (row.Cells) with cur over header[1:], like rowOp
 // and checkUpdate, so normalization never shows up as a change.
+// keepCurrentCols are the columns an older header leaves as KeepCurrentCell (csvexport LegacyFill).
+var keepCurrentCols = map[string][]string{
+	ExportVendorBranches: {"region_code", "category", "cis_limit_amount"},
+	ExportVendorVaults:   {"escrow_account"},
+}
+
 func buildChangePreview(entity string, header []string, row ImportRow, cur map[string]string) *ImportChangePreview {
 	if row.Op == ImportOpUnchanged {
 		return nil
@@ -507,11 +513,9 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		return ImportRow{}, errs
 	}
 	creating := id == 0
-	if e.entity == ExportVendorBranches {
-		for _, col := range []string{"region_code", "category"} {
-			if v[col] == keepCurrentCell {
-				v[col] = e.cur[id][col] // older file without the column: keep the current value ("" when creating)
-			}
+	for _, col := range keepCurrentCols[e.entity] {
+		if v[col] == keepCurrentCell {
+			v[col] = e.cur[id][col] // older file without the column: keep the current value ("" when creating)
 		}
 	}
 

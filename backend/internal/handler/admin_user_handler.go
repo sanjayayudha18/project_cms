@@ -15,6 +15,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/userrules"
 
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
 )
@@ -151,7 +152,7 @@ func (h *AdminUserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	if row == nil {
+	if row == nil || isServiceAccount(row) {
 		writeError(w, http.StatusNotFound, "not_found", "Pengguna tidak ditemukan")
 		return
 	}
@@ -253,6 +254,10 @@ func (h *AdminUserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.rejectServiceAccount(w, r, id) {
+		return
+	}
+
 	var body updateUserRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
@@ -300,7 +305,7 @@ func (h *AdminUserHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	if existing == nil {
+	if existing == nil || isServiceAccount(existing) {
 		writeError(w, http.StatusNotFound, "not_found", "Pengguna tidak ditemukan")
 		return
 	}
@@ -334,7 +339,7 @@ func (h *AdminUserHandler) Enable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	if existing == nil {
+	if existing == nil || isServiceAccount(existing) {
 		writeError(w, http.StatusNotFound, "not_found", "Pengguna tidak ditemukan")
 		return
 	}
@@ -367,6 +372,10 @@ func (h *AdminUserHandler) SetInitialPassword(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if h.rejectServiceAccount(w, r, targetUserID) {
+		return
+	}
+
 	var req setInitialPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_body", "Request body tidak valid")
@@ -382,6 +391,29 @@ func (h *AdminUserHandler) SetInitialPassword(w http.ResponseWriter, r *http.Req
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Password awal berhasil diset"})
+}
+
+// isServiceAccount reports whether row is an ext-user-api service account
+// (auth_source='service'); AdminUserAPI treats those as nonexistent (Req 9.5).
+func isServiceAccount(row *db.GetUserAdminByIDRow) bool {
+	return row.AuthSource == userrules.AuthSourceService
+}
+
+// rejectServiceAccount is the pre-check for Update and SetInitialPassword:
+// it writes 404 not_found and returns true when id is a service account.
+// A missing row falls through so the service keeps its own not-found
+// response unchanged (Req 12.3).
+func (h *AdminUserHandler) rejectServiceAccount(w http.ResponseWriter, r *http.Request, id int64) bool {
+	row, err := h.userAdminSvc.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		return true
+	}
+	if row != nil && isServiceAccount(row) {
+		writeError(w, http.StatusNotFound, "not_found", "Pengguna tidak ditemukan")
+		return true
+	}
+	return false
 }
 
 // handleSetInitialPasswordError maps SetInitialPassword errors to HTTP responses.

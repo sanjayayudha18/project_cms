@@ -5,6 +5,8 @@
 package db
 
 import (
+	"net/netip"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -37,6 +39,27 @@ type AcmAreaRegion struct {
 	RegionCode string             `json:"region_code"`
 	CreatedBy  int64              `json:"created_by"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Aplikasi eksternal (OAuth2 client credentials, ext-user-api, dilayani backend-extapi). secret_hash = bcrypt; secret asli tidak pernah disimpan.
+type ApiClient struct {
+	ID         int64  `json:"id"`
+	ClientID   string `json:"client_id"`
+	Name       string `json:"name"`
+	SecretHash string `json:"secret_hash"`
+	// Naik setiap rotate; token dengan claim ver lama ditolak.
+	CredentialVersion int32    `json:"credential_version"`
+	Scopes            []string `json:"scopes"`
+	// Allowlist role yang boleh diberikan client (D12). CHECK = cermin pkg/userrules.PrivilegedRoles.
+	AssignableRoles []string           `json:"assignable_roles"`
+	AllowedCidrs    []netip.Prefix     `json:"allowed_cidrs"`
+	ServiceUserID   int64              `json:"service_user_id"`
+	IsActive        bool               `json:"is_active"`
+	CreatedBy       int64              `json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	SecretRotatedAt pgtype.Timestamptz `json:"secret_rotated_at"`
+	DisabledAt      pgtype.Timestamptz `json:"disabled_at"`
 }
 
 // Explicit fallback: while from_user_id cannot act (see user_leaves), to_user_id acts in their place. Overlap-range rejection is enforced at the admin endpoint layer (Task 8), not here.
@@ -758,7 +781,7 @@ type User struct {
 	FullName   string  `json:"full_name"`
 	Email      string  `json:"email"`
 	IsKaryawan bool    `json:"is_karyawan"`
-	// ldap | local
+	// ldap | local | local_dev | service (akun layanan ext-user-api, tidak bisa login)
 	AuthSource string `json:"auth_source"`
 	// Only for auth_source=local
 	PasswordHash *string `json:"password_hash"`

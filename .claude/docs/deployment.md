@@ -98,6 +98,84 @@ CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data
 *   No migration. No env change.
 *   Rollback: rolling `backend-exq` back to the old image is safe. Rolling `backend` back while `backend-exq` still exports 18 columns makes imports of that file fail, so roll both back together in that case.
 
+**Release checklist: first `backend-extapi` deployment (`.kiro/specs/ext-user-api/`, Req 12.2)**
+
+`backend-extapi` (port 8082, `backend-extapi/Dockerfile`, `backend-extapi/docker-compose.yaml`) is the external OAuth2 client-credentials API (IDM → create/update/disable users). It validates its own tokens with `EXT_JWT_SECRET`; it never holds the internal `JWT_SECRET` (the service refuses to start if `JWT_SECRET` is set). Deploy today is manual on Docker; CI/CD for this module is out of scope (D23).
+
+*Before the release*
+*   The release's `backend` image must be the running `backend` (it carries the service-account guards in admin user code); `backend-extapi` goes live only after it.
+*   Network path IDM → CROWN = **placeholder (D7, undecided)**: (a) private link/VPN + firewall to the IDM source IP only, or (b) internet through the Load Balancer + Cloud Armor + TLS. Needs the IDM source IP/CIDR and infra confirmation. Do not publish 8082 beyond what the chosen path needs; the per-client CIDR check (`--cidrs`) is the second layer, not a replacement.
+*   Secrets (Secret Manager in GCP, shell env locally): `DATABASE_URL`, `REDIS_URL`, `EXT_JWT_SECRET` (≥ 32 bytes, **different** from `JWT_SECRET`). Never in argv, tickets or logs.
+
+*`.env` for `backend-extapi` (copy `backend-extapi/.env.example`)*
+
+| Variable | Value |
+|---|---|
+| `APP_ENV` / `PORT` | `production` / `8082` (HEALTHCHECK expects 8082) |
+| `TRUSTED_PROXIES` | Address the service sees its proxy connect from (Nginx/LB; exact value comes with the D7/LB design), as narrow as possible. Empty = every audit row and the per-IP token limit see the proxy's IP, and the client CIDR check judges the proxy, not IDM. Invalid = refuses to start. |
+| `DATABASE_URL` | Cloud SQL **primary** (the service writes). Add `?pool_max_conns=N` and count it as one more instance in the pool table ("Ukuran pool DB"). Optionally the limited login below. |
+| `REDIS_URL` | The same Redis as `backend` (`cms-redis` on `cms-net`). |
+| `EXT_JWT_SECRET` | Signing key for external tokens (≥ 32 bytes). Not `JWT_SECRET`. |
+| `LOG_LEVEL` | `info` |
+| Optional, defaults in code | `EXT_TOKEN_ISSUER` (`crown`), `EXT_TOKEN_TTL` (`15m`, 1m–1h), `EXT_TOKEN_FAIL_WINDOW` (`15m`), `EXT_TOKEN_FAIL_LIMIT` (`10`), `EXT_API_RATE_PER_MINUTE` (`60`). Out-of-range values stop the service at start. |
+
+*Order*
+1.  Migration `039_ext_api_clients.sql` (procedure "Database migrations at deploy": `status` → `up` → `status`), outside 07:00–20:00 WIB, before any new image starts. It adds `api_clients` and role `EXT-CLIENT`.
+2.  Redis and `cms-net` up (`cd backend && docker compose up -d`).
+3.  New `backend` image.
+4.  Start `backend-extapi` (from `backend-extapi/`, with `.env` in place):
+    ```bash
+    docker compose up -d --build
+    ```
+5.  Create the IDM client (the secret is printed **once**, to stdout; `--actor` = an active APPACCESS username, used for audit):
+    ```bash
+    docker compose run --rm backend-extapi ./extclient create --name "IDM" --scopes users:read,users:write --roles <non-privileged roles IDM may assign> --cidrs <IDM-source-CIDR> --actor <appaccess-username>
+    ```
+    Privileged roles are rejected. An empty `--cidrs` means the client gets no token until `set-grants --cidrs` is run (the CLI warns). `list` shows clients without secrets. Other commands: `rotate`, `disable`, `enable`, `set-grants` (`--client-id` and `--actor` required).
+6.  Hand over the IDM package through a secure channel, secret separately from the rest: `client_id`, `client_secret`, base URL (placeholder per environment), `backend-extapi/api/openapi.yaml`, `backend-extapi/api/panduan-integrasi-idm.md`.
+
+*Verify*
+*   `GET /health` on `:8082` returns 200 and `docker ps` shows `cms-backend-extapi` `healthy`.
+*   One token request from the IDM source address succeeds; from another address it fails with the generic `invalid_client`.
+*   A test user create then disable through the API; `audit_logs` shows the service user as actor.
+*   The end-to-end check with IDM is the user's (Golden Rule #10); not recorded here.
+
+*Start / stop*
+*   Start: step 4. Stop the API only: `docker compose stop backend-extapi` (from `backend-extapi/`); IDM calls fail, tokens are not revoked.
+*   Cut IDM off without stopping the service: `docker compose run --rm backend-extapi ./extclient disable --client-id <id> --actor <appaccess-username>`; `enable` reverses it.
+
+*Secret rotation*
+*   Client secret: `extclient rotate --client-id <id> --actor <appaccess-username>` prints the new secret once. The **old secret and every token issued before the rotation are rejected immediately**, so agree a window with IDM first and hand the new secret over securely.
+*   `EXT_JWT_SECRET`: change it in Secret Manager/`.env`, then `docker compose up -d --force-recreate backend-extapi`. Every outstanding token is invalidated; IDM just requests a new one. Never reuse `JWT_SECRET`.
+
+*Rollback*
+*   Stop `backend-extapi` (or `disable` the client) and redeploy the previous `backend` image if needed. Migration `039` stays (additive, no down migrations); a disabled client and its inactive `svc-*` user remain as inert rows.
+
+*Optional: least-privilege DB logins (service and CLI)*
+
+By default both use the same login as `backend`. To limit blast radius, create two logins and point the service's `DATABASE_URL` and the CLI's `DATABASE_URL` (operator shell / `docker compose run`) at them. Run once as a DB admin after `039`; passwords come from Secret Manager, never pasted into the script:
+
+```sql
+-- Service login: user create/update/disable + client lookup + audit.
+CREATE ROLE crown_extapi LOGIN PASSWORD :'extapi_password';
+GRANT USAGE ON SCHEMA public TO crown_extapi;
+GRANT SELECT, INSERT, UPDATE ON users TO crown_extapi;
+GRANT SELECT ON roles TO crown_extapi;
+GRANT SELECT, UPDATE ON api_clients TO crown_extapi;
+GRANT INSERT ON audit_logs TO crown_extapi;
+GRANT USAGE ON SEQUENCE users_id_seq, audit_logs_id_seq TO crown_extapi;
+
+-- CLI login: manages api_clients and their service users.
+CREATE ROLE crown_extclient LOGIN PASSWORD :'extclient_password';
+GRANT USAGE ON SCHEMA public TO crown_extclient;
+GRANT SELECT, INSERT, UPDATE ON users, api_clients TO crown_extclient;
+GRANT SELECT ON roles TO crown_extclient;
+GRANT INSERT ON audit_logs TO crown_extclient;
+GRANT USAGE ON SEQUENCE users_id_seq, api_clients_id_seq, audit_logs_id_seq TO crown_extclient;
+```
+
+Run it with `psql -v extapi_password=… -v extclient_password=… -f grants.sql`, the file kept outside the repo. Neither role gets `DELETE`, DDL, or any other table. The grants were derived from the tables the module's queries touch (`users`, `roles`, `api_clients`, `audit_logs`), not tested: confirm the sequence names (`\ds`), then exercise one token, one user create and one `extclient create` on dev; a `permission denied` names the missing grant. The logins are not created by migrations, and `migrate up` keeps using the owner login.
+
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 
 **Python EOD host prerequisite (import_jobs, R2a)**: the VM/container running `backend_python` (ETL scripts + `eod_retry_scheduler` + `service_dsr_etl`) MUST run with `TZ=Asia/Jakarta`. DMAA `file_date` is derived from file mtime in the host timezone; a different TZ makes the DMAA late check misfire. Verify at VM/container setup.

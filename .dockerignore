@@ -7,6 +7,7 @@
 !pkg/
 !backend/
 !backend-exq/
+!backend-extapi/
 
 # Never ship secrets or local build output, even inside allowed folders.
 **/.env

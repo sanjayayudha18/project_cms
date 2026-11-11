@@ -32,6 +32,62 @@ func newLoggedRouter(t *testing.T) (*chi.Mux, *bytes.Buffer) {
 	return r, &buf
 }
 
+func lastHTTPLine(t *testing.T, buf *bytes.Buffer) map[string]any {
+	t.Helper()
+	for _, l := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		var m map[string]any
+		if json.Unmarshal([]byte(l), &m) == nil && m["msg"] == "http_request" {
+			return m
+		}
+	}
+	t.Fatalf("no http_request line in %q", buf.String())
+	return nil
+}
+
+func TestRequestLoggerClientID(t *testing.T) {
+	serve := func(h http.HandlerFunc, hdr map[string]string) map[string]any {
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewJSONHandler(&buf, nil))
+		req := httptest.NewRequest(http.MethodGet, "/x", nil)
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		RequestLogger(logger)(h).ServeHTTP(httptest.NewRecorder(), req)
+		return lastHTTPLine(t, &buf)
+	}
+
+	t.Run("holder filled adds client_id", func(t *testing.T) {
+		line := serve(func(_ http.ResponseWriter, r *http.Request) {
+			LogFieldsFrom(r.Context()).ClientID = "idm-prod"
+		}, nil)
+		if line["client_id"] != "idm-prod" {
+			t.Errorf("client_id = %v", line["client_id"])
+		}
+	})
+	t.Run("holder empty keeps the original attribute set", func(t *testing.T) {
+		line := serve(func(http.ResponseWriter, *http.Request) {}, nil)
+		// time, level, msg + method, route, path, status, duration_ms, bytes, request_id, remote_ip
+		if len(line) != 11 {
+			t.Errorf("attribute set changed: %v", line)
+		}
+		if _, ok := line["client_id"]; ok {
+			t.Errorf("unexpected client_id: %v", line)
+		}
+	})
+	t.Run("never read from request headers", func(t *testing.T) {
+		line := serve(func(http.ResponseWriter, *http.Request) {},
+			map[string]string{"X-Client-Id": "evil", "Client-Id": "evil"})
+		if _, ok := line["client_id"]; ok {
+			t.Errorf("client_id taken from header: %v", line)
+		}
+	})
+	t.Run("LogFieldsFrom without logger is nil", func(t *testing.T) {
+		if LogFieldsFrom(httptest.NewRequest(http.MethodGet, "/", nil).Context()) != nil {
+			t.Error("want nil")
+		}
+	})
+}
+
 func TestRequestLogger(t *testing.T) {
 	tests := []struct {
 		name      string

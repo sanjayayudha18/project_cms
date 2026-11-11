@@ -75,12 +75,13 @@ Middleware baseline (both backends): `TrustedRealIP(TRUSTED_PROXIES)` (client IP
 
 ## Backend Topology
 
-Two Go modules in a workspace (`go.work`: `backend`, `backend-exq`, `pkg`), sharing `pkg/`:
+Three backend modules in a workspace (`go.work`: `backend`, `backend-exq`, `backend-extapi`, plus `pkg`), sharing `pkg/`:
 
 | Service | Module | Port | Role |
 |---------|--------|------|------|
 | ATM backend | `backend/` | 8080 | ATM operations, **CIT functions** (decision 2026-10-08), auth issuer, master data, approval, notification, vendor request flow |
 | EXQ backend | `backend-exq/` | 8081 | Async export jobs (`/api/v1/exports/*`: API, worker, janitor; OpenAPI `backend-exq/api/openapi.yaml`, FE types via `gen:api:exq`) + dashboard monitoring queries (replica reads). Renamed from `backend-cit` on 2026-10-20. Has content since spec `vendor-data-export`; first deployment comes with that release (not yet deployed) |
+| EXT backend | `backend-extapi/` | 8082 | External user API for CIMB IDM (`/api/ext/v1/*`, OAuth2 client credentials; `/health`, `/ready`). Holds `EXT_JWT_SECRET` and refuses to start if `JWT_SECRET` is set; OpenAPI `backend-extapi/api/openapi.yaml`; CLI `cmd/extclient`. Spec `ext-user-api`, built but not deployed. Never imports `backend/` or `backend-exq/`, and they never import it |
 
 - `pkg/` is shared infra (`auth`, `middleware`, `config`, `response`, `health`, `csvexport`, `reports`). No dependency on either backend. There is no `pkg/database`. `pkg/csvexport` is the shared CSV contract (`CSVSafe`, `Writer`, 6 master-data entities) used by `backend/` (import/export) and `backend-exq/` (export jobs). `pkg/reports` is the shared report CSV contract (Report_Kind, viewer roles, parameter validators, cells, file names; spec `report-export-migration`) used by `backend/` (screens) and `backend-exq/` (report exports).
 - ATM backend keeps flat JSON responses for wire compatibility, including the CIT endpoints built there. `backend-exq` uses the `pkg/response` envelope.

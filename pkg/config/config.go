@@ -103,6 +103,12 @@ func Load(defaultPort string) (*Config, error) {
 	return cfg, nil
 }
 
+// ParseTrustedProxies is the exported form of parseTrustedProxies, for
+// services that read their own proxy list (e.g. backend-extapi).
+func ParseTrustedProxies(raw string) ([]netip.Prefix, error) {
+	return parseTrustedProxies(raw)
+}
+
 // parseTrustedProxies parses a comma-separated list of CIDRs or single IPs
 // (a bare IP becomes /32 or /128). Blank entries are skipped.
 func parseTrustedProxies(raw string) ([]netip.Prefix, error) {

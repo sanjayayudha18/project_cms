@@ -14,6 +14,7 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 ├── development-progress.md      # Tracking status fitur yang dikerjakan oleh Gemini
 ├── lessons-learned.md           # Catatan pembelajaran dari review/insiden
 ├── agents/
+│   ├── cms2-sdlc.md             # Agent perancang & pengawal 6-tahap AI-Native SDLC
 │   ├── cms-orchestrator.md      # Orchestrator pembuka session baru sesuai task & model di dokumen
 │   ├── cms-task-runner.md       # Instruksi dasar eksekutor task per wave
 │   ├── db-sqlc-architect.md     # Subagent spesialis PostgreSQL, migrasi & sqlc v1.31.1
@@ -43,6 +44,8 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │       └── SKILL.md             # Panduan optimasi query SQL, indexing & routing dbRead
 ├── plugins/
 │   └── .gitkeep                 # Tempat menyimpan bundle plugin lokal
+├── SDLC/
+│   └── gemini-sdlc.md           # Panduan 6-stage AI-Native SDLC (intent -> spec -> plan -> tests -> review -> incidents)
 └── specs/
     ├── README.md                # Panduan siklus hidup spec fitur di .agents/specs/
     └── done/

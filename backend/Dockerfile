@@ -8,6 +8,7 @@ COPY backend/ ./backend/
 # go.work lists backend-exq as a workspace module — Go needs its go.mod/go.sum
 # present to resolve the workspace, even though this build never imports it.
 COPY backend-exq/go.mod backend-exq/go.sum ./backend-exq/
+COPY backend-extapi/go.mod backend-extapi/go.sum ./backend-extapi/
 WORKDIR /src/backend
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/api ./cmd/api
 

@@ -21,6 +21,7 @@ Dokumen ini menjadi panduan bagi **Orchestrator Agent** yang bertugas membaca do
 
    | Indikator File / Kata Kunci pada Task | Subagent Spesialis (`.agents/agents/`) | Skills yang Di-assign Otomatis (`.agents/skills/`) | `Role` pada `invoke_subagent` | `TypeName` |
    | :--- | :--- | :--- | :--- | :--- |
+   | `.agents/specs/<feature>/` (`requirements.md`, `design.md`, `tasks.md`, `review.md`, `incidents.md`) | `cms2-sdlc.md` | `cms2-sdlc`, `graphify` | `"CMS2 SDLC Architect"` | `"self"` |
    | `migrations/`, `queries/*.sql`, `sqlc.yaml`, `internal/db/`, index, tabel baru | `db-sqlc-architect.md` | `db-migration-sqlc` (+ `sql-query-tuning` jika menyentuh reporting/index/export) | `"DB & sqlc Architect"` | `"self"` |
    | `internal/handler/`, `internal/service/`, `internal/repository/`, `cmd/api/main.go` | `go-backend-specialist.md` | `go-chi-endpoint` (+ `cms2-master-data` jika menyentuh `applier` / `Submit` / `approval_requests`) | `"Go Backend Specialist"` | `"self"` |
    | Entitas master data (`vendors`, `vendor_branches`, `vendor_vaults`, `vendor_pics`, `atms`, `dsr_location_vault_maps`, dll.) | `go-backend-specialist.md` / `react-portal-specialist.md` | `cms2-master-data` (+ `go-chi-endpoint` di BE / `react-ui-ux-craft` di FE) | `"Master Data Specialist"` | `"self"` |

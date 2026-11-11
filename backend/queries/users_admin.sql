@@ -15,7 +15,9 @@ SELECT u.id, u.username, u.full_name, u.email, r.role, u.is_karyawan,
 FROM users u
 JOIN roles r ON r.id = u.role_id
 LEFT JOIN vendor_branches vb ON vb.id = u.vendor_branch_id
-WHERE (sqlc.narg('q')::text IS NULL
+-- ext-user-api Req 9.5: service accounts (auth_source='service') are never listed.
+WHERE u.auth_source <> 'service'
+  AND (sqlc.narg('q')::text IS NULL
         OR u.username ILIKE '%' || sqlc.narg('q')::text || '%'
         OR u.full_name ILIKE '%' || sqlc.narg('q')::text || '%'
         OR u.email ILIKE '%' || sqlc.narg('q')::text || '%')
@@ -34,7 +36,8 @@ LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 SELECT COUNT(*)
 FROM users u
 JOIN roles r ON r.id = u.role_id
-WHERE (sqlc.narg('q')::text IS NULL
+WHERE u.auth_source <> 'service'
+  AND (sqlc.narg('q')::text IS NULL
         OR u.username ILIKE '%' || sqlc.narg('q')::text || '%'
         OR u.full_name ILIKE '%' || sqlc.narg('q')::text || '%'
         OR u.email ILIKE '%' || sqlc.narg('q')::text || '%')
@@ -148,8 +151,9 @@ LEFT JOIN vendor_branches vb ON vb.id = w.vendor_branch_id;
 SELECT id, role FROM roles WHERE role = $1;
 
 -- name: ListRoles :many
--- Populates the Role select in User_Form_Dialog (Req 11.2).
-SELECT id, role FROM roles ORDER BY role;
+-- Populates the Role select in User_Form_Dialog (Req 11.2). EXT-CLIENT is
+-- hidden: it belongs to service accounts only (ext-user-api Req 9.6).
+SELECT id, role FROM roles WHERE role <> 'EXT-CLIENT' ORDER BY role;
 
 -- name: VendorExistsAdmin :one
 -- Reference check for vendor_id on user create/update (Req 3.7, 4.7) — only
@@ -159,8 +163,9 @@ SELECT EXISTS(SELECT 1 FROM vendors WHERE id = $1 AND deleted_at IS NULL) AS exi
 
 -- name: UserAdminExists :one
 -- Reference check for supervisor_id on user create/update (Req 3.7, 4.7) —
--- only an active (non-disabled) user is a valid supervisor.
-SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exists;
+-- only an active (non-disabled) user is a valid supervisor. A service account
+-- is never a valid supervisor (ext-user-api Req 9.5).
+SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND auth_source <> 'service') AS exists;
 
 -- name: VendorBranchBelongsToVendor :one
 -- vendor-party-scope Req 2.4: vendor_branch_id must be an ACTIVE branch of

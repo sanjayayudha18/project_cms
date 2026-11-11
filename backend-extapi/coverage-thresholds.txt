@@ -1,0 +1,10 @@
+# Minimum statement coverage per package (`go test -tags integration -cover`, needs DATABASE_URL).
+# Format: full import path, then percent. Only ever raise. cmd/* and internal/repository
+# (sqlc-generated) are excluded, like backend-exq. Packages are added by their own tasks.
+github.com/cimb-niaga/cms/backend-extapi/internal/audit 90
+github.com/cimb-niaga/cms/backend-extapi/internal/config 90
+github.com/cimb-niaga/cms/backend-extapi/internal/extauth 90
+github.com/cimb-niaga/cms/backend-extapi/internal/extuser 90
+github.com/cimb-niaga/cms/backend-extapi/internal/extuser/pgstore 85
+github.com/cimb-niaga/cms/backend-extapi/internal/handler 85
+github.com/cimb-niaga/cms/backend-extapi/cmd/extclient 80

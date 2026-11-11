@@ -24,6 +24,7 @@ Jika task menyentuh domain spesifik di bawah ini, baca dan patuhi juga panduan s
 
 | Cakupan Task | Subagent Spesialis (`.agents/agents/`) | Skill Terkait (`.agents/skills/`) |
 | :--- | :--- | :--- |
+| Perencanaan & Penyusunan Spec 6-Tahap SDLC (`.agents/specs/<feature>/`) | `cms2-sdlc.md` | `cms2-sdlc`, `graphify` |
 | Migrasi DB, SQL Queries, Indexing, `sqlc` | `db-sqlc-architect.md` | `db-migration-sqlc`, `sql-query-tuning`, `cms2-master-data` |
 | Go Backend (`backend/`, `backend-exq/`, `pkg/`) | `go-backend-specialist.md` | `go-chi-endpoint`, `cms2-master-data`, `cms2-bugfix` |
 | Sinkronisasi Kontrak OpenAPI Go -> React | `go-backend-specialist.md` / `react-portal-specialist.md` | `openapi-frontend-sync` |

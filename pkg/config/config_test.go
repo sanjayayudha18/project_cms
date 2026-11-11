@@ -214,6 +214,28 @@ func TestLoad_InvalidInt_FallsBackToDefault(t *testing.T) {
 	}
 }
 
+func TestParseTrustedProxies_Exported(t *testing.T) {
+	got, err := ParseTrustedProxies(" 172.17.0.1 , 10.1.2.3/8,::1 ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"172.17.0.1/32", "10.0.0.0/8", "::1/128"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i, p := range got {
+		if p.String() != want[i] {
+			t.Errorf("[%d] = %s, want %s", i, p, want[i])
+		}
+	}
+	if got, err := ParseTrustedProxies(""); err != nil || len(got) != 0 {
+		t.Errorf("empty: got %v, %v", got, err)
+	}
+	if _, err := ParseTrustedProxies("nginx"); err == nil {
+		t.Error("expected error for garbage entry")
+	}
+}
+
 // T1 (client-ip-trust FR1): TRUSTED_PROXIES parsing; a bad entry fails Load.
 func TestLoad_TrustedProxies(t *testing.T) {
 	cases := []struct {

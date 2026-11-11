@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
@@ -33,6 +34,9 @@ type fakeVendorBranchAdminServicer struct {
 	updateErr    error
 	disableErr   error
 	enableErr    error
+
+	lastCreate service.VendorBranchPayload
+	lastUpdate service.VendorBranchUpdatePayload
 }
 
 func (f *fakeVendorBranchAdminServicer) List(context.Context, db.ListVendorBranchesAdminParams) ([]db.ListVendorBranchesAdminRow, error) {
@@ -47,11 +51,13 @@ func (f *fakeVendorBranchAdminServicer) Get(context.Context, int64) (*db.GetVend
 	return f.getResult, f.getErr
 }
 
-func (f *fakeVendorBranchAdminServicer) Create(context.Context, int64, service.VendorBranchPayload, string) (db.MasterDataChangeRequest, error) {
+func (f *fakeVendorBranchAdminServicer) Create(_ context.Context, _ int64, p service.VendorBranchPayload, _ string) (db.MasterDataChangeRequest, error) {
+	f.lastCreate = p
 	return f.createResult, f.createErr
 }
 
-func (f *fakeVendorBranchAdminServicer) Update(context.Context, int64, int64, service.VendorBranchUpdatePayload, string) (db.MasterDataChangeRequest, error) {
+func (f *fakeVendorBranchAdminServicer) Update(_ context.Context, _, _ int64, p service.VendorBranchUpdatePayload, _ string) (db.MasterDataChangeRequest, error) {
+	f.lastUpdate = p
 	return f.updateResult, f.updateErr
 }
 
@@ -139,6 +145,41 @@ func TestAdminVendorBranchHandler_Get_NotFound(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// vendor-cis-limit FR1: limit is read as a decimal string + currency, and passed through on create/update.
+func TestAdminVendorBranchHandler_CisLimit_GetAndSubmit(t *testing.T) {
+	var limit pgtype.Numeric
+	if err := limit.Scan("2500000000.00"); err != nil {
+		t.Fatal(err)
+	}
+	svc := &fakeVendorBranchAdminServicer{
+		getResult:    &db.GetVendorBranchAdminByIDRow{ID: 9, VendorID: 3, CisLimitAmount: limit, CisLimitCurrency: "IDR"},
+		listResult:   []db.ListVendorBranchesAdminRow{{ID: 9, VendorID: 3, CisLimitAmount: limit, CisLimitCurrency: "IDR"}},
+		createResult: db.MasterDataChangeRequest{ID: 1, Status: "pending"},
+		updateResult: db.MasterDataChangeRequest{ID: 2, Status: "pending"},
+	}
+	router, tokenSvc := mountAdminVendorBranchHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	for _, path := range []string{"/api/v1/admin/vendors/3/branches/9", "/api/v1/admin/vendors/3/branches"} {
+		rec := doRequest(router, http.MethodGet, path, token, "")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cis_limit_amount":"2500000000.00"`) ||
+			!strings.Contains(rec.Body.String(), `"cis_limit_currency":"IDR"`) {
+			t.Errorf("GET %s: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/branches", token,
+		`{"branch_code":"BR1","branch_name":"B","category":"ATM","cis_limit_amount":"1000"}`)
+	if rec.Code != http.StatusAccepted || svc.lastCreate.CisLimitAmount == nil || *svc.lastCreate.CisLimitAmount != "1000" {
+		t.Errorf("create: %d, limit %v", rec.Code, svc.lastCreate.CisLimitAmount)
+	}
+	rec = doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/branches/9", token,
+		`{"branch_name":"B","category":"ATM","cis_limit_amount":"750.50"}`)
+	if rec.Code != http.StatusAccepted || svc.lastUpdate.CisLimitAmount == nil || *svc.lastUpdate.CisLimitAmount != "750.50" {
+		t.Errorf("update: %d, limit %v", rec.Code, svc.lastUpdate.CisLimitAmount)
 	}
 }
 

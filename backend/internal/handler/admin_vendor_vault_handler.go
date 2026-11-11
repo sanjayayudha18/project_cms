@@ -53,7 +53,7 @@ func vaultToResponse(v service.VendorVault) map[string]any {
 	return map[string]any{
 		"id": v.ID, "vendor_branch_id": v.VendorBranchID, "vault_code": v.VaultCode, "category": v.Category,
 		"currency_code": v.CurrencyCode, "min_capacity_amount": v.MinCapacityAmount, "max_capacity_amount": v.MaxCapacityAmount,
-		"latitude": v.Latitude, "longitude": v.Longitude, "operating_hours": v.OperatingHours, "location_id": v.LocationID,
+		"latitude": v.Latitude, "longitude": v.Longitude, "operating_hours": v.OperatingHours, "location_id": v.LocationID, "escrow_account": v.EscrowAccount,
 		"is_active": v.IsActive, "deleted_at": formatTimePtr(v.DeletedAt),
 	}
 }

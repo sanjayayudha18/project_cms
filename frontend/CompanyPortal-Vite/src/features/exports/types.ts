@@ -7,13 +7,18 @@ export type StatusFilter = components["schemas"]["StatusFilter"];
 export type ExportPreview = components["schemas"]["ExportPreview"];
 export type PriceLevel = components["schemas"]["PriceLevel"];
 
-export type ReportParams = components["schemas"]["ReportParams"];
+// vendor-pks adds q + pks_status, which the generated ReportParams does not list yet.
+export type ReportParams = components["schemas"]["ReportParams"] & {
+  q?: string;
+  pks_status?: string;
+};
 /** URL segment of `POST /exports/reports/{report}`. */
 export type ReportKey =
   | "dsr-late-daily"
   | "dsr-late-summary"
   | "replenishment-amount-mismatch"
-  | "replenishment-trips";
+  | "replenishment-trips"
+  | "vendor-pks";
 
 export type MasterDataEntity = components["parameters"]["MasterDataEntity"];
 export type VendorEntity = "vendor" | "branches" | "vaults" | "pics" | "dsr-location-maps";

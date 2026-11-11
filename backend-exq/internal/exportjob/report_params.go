@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
@@ -16,7 +18,14 @@ const (
 	KindDsrLateSummary              Kind = reports.DsrLateSummary
 	KindReplenishmentAmountMismatch Kind = reports.ReplenishmentAmountMismatch
 	KindReplenishmentTrips          Kind = reports.ReplenishmentTrips
+	KindVendorPks                   Kind = reports.VendorPks
 )
+
+// vendorPksQMax is the longest accepted free-text search (same bound as the vendor list screen).
+const vendorPksQMax = 100
+
+// vendorStatuses are the accepted vendor_pks `status` values (vendor list filter).
+var vendorStatuses = map[string]bool{"active": true, "disabled": true, "all": true}
 
 // ReportParams is the validated filter of one report export (stored in export_jobs.report_params).
 // Fields that do not apply to the kind stay nil.
@@ -29,6 +38,9 @@ type ReportParams struct {
 	RegionCode     *string `json:"region_code,omitempty"`      // replenishment
 	Status         *string `json:"status,omitempty"`           // dsr_late_daily
 	Classification *string `json:"classification,omitempty"`   // amount mismatch
+	Q              *string `json:"q,omitempty"`                // vendor_pks: code/name search
+	VendorStatus   *string `json:"vendor_status,omitempty"`    // vendor_pks: active|disabled|all
+	PksStatus      *string `json:"pks_status,omitempty"`       // vendor_pks: key of reports.PksStatuses
 }
 
 // reportEntities maps each report kind to the legacy `report` value stored as export_jobs.entity.
@@ -37,6 +49,7 @@ var reportEntities = map[Kind]string{
 	KindDsrLateSummary:              "summary",
 	KindReplenishmentAmountMismatch: "amount_mismatch",
 	KindReplenishmentTrips:          "trips",
+	KindVendorPks:                   "vendor_pks",
 }
 
 // IsReportKind reports whether k is one of the four report kinds.
@@ -55,6 +68,8 @@ func ParseReportParams(kind Kind, q url.Values, now time.Time) (Params, error) {
 	switch kind {
 	case KindDsrLateDaily, KindDsrLateSummary:
 		err = r.parseDsr(kind, q, now)
+	case KindVendorPks:
+		err = r.parseVendorPks(q)
 	default:
 		err = r.parseReplenishment(kind, q)
 	}
@@ -85,6 +100,30 @@ func (r *ReportParams) parseDsr(kind Kind, q url.Values, now time.Time) error {
 			return &reports.ValidationError{Field: "status", Message: "tidak dikenal"}
 		}
 		r.Status = &s
+	}
+	return nil
+}
+
+func (r *ReportParams) parseVendorPks(q url.Values) error {
+	if s := strings.TrimSpace(q.Get("q")); s != "" {
+		if utf8.RuneCountInString(s) > vendorPksQMax {
+			return &reports.ValidationError{Field: "q", Message: "maksimal 100 karakter"}
+		}
+		r.Q = &s
+	}
+	st := q.Get("status")
+	if st == "" {
+		st = "active"
+	}
+	if !vendorStatuses[st] {
+		return &reports.ValidationError{Field: "status", Message: "tidak dikenal"}
+	}
+	r.VendorStatus = &st
+	if ps := q.Get("pks_status"); ps != "" {
+		if _, ok := reports.PksStatuses[ps]; !ok {
+			return &reports.ValidationError{Field: "pks_status", Message: "tidak dikenal"}
+		}
+		r.PksStatus = &ps
 	}
 	return nil
 }
@@ -156,6 +195,8 @@ func reportHashBytes(p Params) []byte {
 // (absent = null), plus status (daily) and classification (amount mismatch), which it did not (Req 5.4).
 func (r ReportParams) legacyFilter(kind Kind) map[string]any {
 	switch kind {
+	case KindVendorPks:
+		return map[string]any{"q": r.Q, "status": r.VendorStatus, "pks_status": r.PksStatus}
 	case KindDsrLateDaily, KindDsrLateSummary:
 		m := map[string]any{"month": r.Month, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID}
 		if kind == KindDsrLateDaily {

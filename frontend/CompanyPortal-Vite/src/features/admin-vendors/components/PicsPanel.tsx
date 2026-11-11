@@ -4,7 +4,7 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { DataTable } from "@/components/ui/DataTable";
 import { useToast } from "@/lib/hooks/useToast";
 import type { ColumnDef } from "@tanstack/react-table";
-import { BellRing, CheckCircle, XCircle } from "lucide-react";
+import { BadgeCheck, BellRing, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { PendingApprovalBadge } from "../../master-data/PendingApprovalBadge";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
@@ -71,7 +71,18 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
   }
 
   const columns: ColumnDef<AdminVendorPic, unknown>[] = [
-    { accessorKey: "name", header: "Nama" },
+    {
+      accessorKey: "name",
+      header: "Nama",
+      cell: ({ row }) => (
+        <span className="inline-flex flex-wrap items-center gap-1">
+          {row.original.name}
+          {row.original.is_director && (
+            <Badge variant="info" icon={BadgeCheck} label="Direktur Utama" />
+          )}
+        </span>
+      ),
+    },
     {
       accessorKey: "position",
       header: "Jabatan",
@@ -127,13 +138,15 @@ export function PicsPanel({ vendorId, branchId }: PicsPanelProps) {
             >
               Ubah
             </Button>
-            <Button
-              variant="secondary"
-              disabled={isPending || !pic.is_active}
-              onClick={() => setRolesPic(pic)}
-            >
-              Ubah peran
-            </Button>
+            {!pic.is_director && (
+              <Button
+                variant="secondary"
+                disabled={isPending || !pic.is_active}
+                onClick={() => setRolesPic(pic)}
+              >
+                Ubah peran
+              </Button>
+            )}
             {pic.is_active ? (
               <Button
                 variant="danger"

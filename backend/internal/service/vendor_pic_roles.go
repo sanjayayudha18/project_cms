@@ -19,11 +19,28 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
-// picRoleCodes are the allowed vendor_pics.roles values (migration 032 CHECK).
-var picRoleCodes = []string{"cashcount", "replenish", "vault"}
+// ErrVendorDirectorNoRoles: the Direktur Utama PIC is vendor-level contact only
+// and cannot hold roles (vendor-pks Req 1.6, 409).
+var ErrVendorDirectorNoRoles = errors.New("PIC Direktur Utama tidak boleh memiliki peran")
 
-// AllPicRoles is the default role set of a PIC created without roles (Req 5.6).
-func AllPicRoles() []string { return slices.Clone(picRoleCodes) }
+// picRoleCodes are the allowed vendor_pics.roles values (CHECK of migrations 032 + 038), sorted.
+// bm = Branch Manager area vault (vendor-cis-limit FR3), only for a PIC bound to a cabang.
+var picRoleCodes = []string{"bm", "cashcount", "replenish", "vault"}
+
+// defaultPicRoles: the three party roles of 032; bm is never a default.
+var defaultPicRoles = []string{"cashcount", "replenish", "vault"}
+
+// DefaultPicRoles is the role set of a PIC created without roles (Req 5.6).
+func DefaultPicRoles() []string { return slices.Clone(defaultPicRoles) }
+
+// checkBmNeedsBranch refuses bm on a vendor-level PIC (vendor-cis-limit S5; DB CHECK
+// vendor_pics_bm_branch_chk is the last net).
+func checkBmNeedsBranch(roles []string, hasBranch bool) error {
+	if !hasBranch && slices.Contains(roles, "bm") {
+		return &ValidationError{Field: "roles", Message: "peran bm hanya untuk PIC cabang"}
+	}
+	return nil
+}
 
 // normalizePicRoles trims each code, rejects unknown or duplicate codes, and
 // returns them sorted. Empty is allowed (PIC is a contact only, Req 5.1).
@@ -32,7 +49,7 @@ func normalizePicRoles(raw []string) ([]string, error) {
 	for _, r := range raw {
 		code := strings.TrimSpace(r)
 		if !slices.Contains(picRoleCodes, code) {
-			return nil, &ValidationError{Field: "roles", Message: fmt.Sprintf("peran %q tidak dikenal (replenish, vault, cashcount)", code)}
+			return nil, &ValidationError{Field: "roles", Message: fmt.Sprintf("peran %q tidak dikenal (replenish, vault, cashcount, bm)", code)}
 		}
 		if slices.Contains(out, code) {
 			return nil, &ValidationError{Field: "roles", Message: fmt.Sprintf("peran %q duplikat", code)}
@@ -80,13 +97,20 @@ func (s *VendorPicRoleService) SetRoles(ctx context.Context, actorID, vendorID, 
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := db.New(tx)
-	before, err := q.GetVendorPicRolesForUpdate(ctx, db.GetVendorPicRolesForUpdateParams{ID: picID, VendorID: vendorID})
+	beforeRow, err := q.GetVendorPicRolesForUpdate(ctx, db.GetVendorPicRolesForUpdateParams{ID: picID, VendorID: vendorID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrVendorPicNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("loading vendor pic roles: %w", err)
 	}
+	if beforeRow.IsDirector && len(after) > 0 {
+		return nil, ErrVendorDirectorNoRoles
+	}
+	if err := checkBmNeedsBranch(after, beforeRow.VendorBranchID != nil); err != nil {
+		return nil, err
+	}
+	before := beforeRow.Roles
 	if slices.Equal(before, after) {
 		return after, nil
 	}

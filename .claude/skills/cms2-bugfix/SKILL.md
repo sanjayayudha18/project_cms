@@ -10,9 +10,9 @@ Source of truth: CLAUDE.md §4a (rule 0 + rule 3) and the template at the top of
 
 ## Step 0 — route, every time
 
-Ask (CLAUDE.md §4a rule 0): *"Perlu dibuat AI-DLC baru (`.claude/sdlc/<feature>/`)
+Ask (CLAUDE.md §4a rule 0): *"Perlu dibuat spec Kiro baru (`.kiro/specs/<feature>/`)
 atau cukup dokumentasi bug fix?"* and wait.
-- Suggest **AI-DLC** (→ `/cms2-sdlc`) when the fix touches auth, money/journal,
+- Suggest **spec Kiro** (→ `/cms2-sdlc`) when the fix touches auth, money/journal,
   reconciliation, migration/schema, or deletes (§4 #7), changes an API contract,
   or spans many files. The user still decides; if they pick bugfix for a §4 #7
   area, say so in the log entry ("Auth (Sec 4 #7) di-flag; user memilih dokumentasi bugfix").

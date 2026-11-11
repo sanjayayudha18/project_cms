@@ -1,0 +1,106 @@
+import { Banknote, Wifi, Route, AlertTriangle } from 'lucide-react';
+import { formatIDR } from '@/lib/formatters';
+import kpiData from '@/data/dashboard-kpi.json';
+
+/**
+ * MetricStrip — displays 4 KPI cards in a responsive grid.
+ *
+ * Layout:
+ * - >1080px: 4-column grid with vertical dividers
+ * - 760–1080px: 2×2 grid with border-bottom on first row
+ * - <760px: single column with border-bottom separators
+ *
+ * @validates Requirements 3.3, 3.4, 3.5, 8.4, 10.3
+ */
+
+interface MetricCardData {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  meta: string;
+}
+
+const metrics: MetricCardData[] = [
+  {
+    label: 'Managed Cash',
+    icon: <Banknote size={14} />,
+    value: formatIDR(kpiData.managedCash),
+    meta: `↑ ${kpiData.managedCashChange}% from yesterday`,
+  },
+  {
+    label: 'ATM Availability',
+    icon: <Wifi size={14} />,
+    value: `${kpiData.atmAvailability}%`,
+    meta: `${kpiData.atmOnline.toLocaleString()} of ${kpiData.atmTotal.toLocaleString()} online`,
+  },
+  {
+    label: "Today's Routes",
+    icon: <Route size={14} />,
+    value: `${kpiData.todayRoutes}`,
+    meta: `${kpiData.routesCompleted} completed, ${kpiData.routesActive} active`,
+  },
+  {
+    label: 'Exceptions',
+    icon: <AlertTriangle size={14} />,
+    value: `${kpiData.exceptions}`,
+    meta: `${kpiData.exceptionsHigh} high priority before ${kpiData.exceptionsCutoffHour}:00`,
+  },
+];
+
+export function MetricStrip() {
+  return (
+    <div
+      className="mt-6 bg-[var(--n-0)] border border-[var(--n-200)] rounded-[var(--radius-lg)]
+        grid grid-cols-1 min-[760px]:grid-cols-2 min-[1080px]:grid-cols-4"
+    >
+      {metrics.map((metric, index) => (
+        <div
+          key={metric.label}
+          className={`p-5 ${getCardBorderClasses(index)}`}
+        >
+          <div className="flex items-center gap-1.5 text-xs text-[var(--n-500)]">
+            {metric.icon}
+            <span>{metric.label}</span>
+          </div>
+          <div className="mt-1 text-2xl font-bold tabular-nums text-[var(--n-900)]">
+            {metric.value}
+          </div>
+          <div className="mt-1 text-xs text-[var(--n-500)]">
+            {metric.meta}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Compute border classes for responsive dividers between metric cards.
+ *
+ * Desktop (4-col): vertical border-right on first 3 cards.
+ * Tablet (2×2): border-bottom on first 2 cards, border-right on 1st and 3rd.
+ * Mobile (1-col): border-bottom on all except last.
+ */
+function getCardBorderClasses(index: number): string {
+  const classes: string[] = [];
+
+  // Mobile: border-bottom on all except last
+  if (index < 3) {
+    classes.push('border-b border-[var(--n-200)] min-[760px]:border-b-0');
+  }
+
+  // Tablet (2×2): border-bottom on top row (indices 0, 1), border-right on left column (indices 0, 2)
+  if (index < 2) {
+    classes.push('min-[760px]:border-b min-[760px]:border-[var(--n-200)] min-[1080px]:border-b-0');
+  }
+  if (index % 2 === 0) {
+    classes.push('min-[760px]:border-r min-[760px]:border-[var(--n-200)] min-[1080px]:border-r-0');
+  }
+
+  // Desktop (4-col): vertical border-right on first 3
+  if (index < 3) {
+    classes.push('min-[1080px]:border-r min-[1080px]:border-[var(--n-200)]');
+  }
+
+  return classes.join(' ');
+}

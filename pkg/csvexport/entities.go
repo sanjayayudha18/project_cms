@@ -12,10 +12,29 @@ type Entity struct {
 	Header        []string
 	LegacyHeaders [][]string
 	LegacyFill    map[string]string
+	// ReadOnlyColumns follow Header in export files only. The importer accepts
+	// Header+ReadOnlyColumns and drops these cells before validation (vendor-export-pks).
+	ReadOnlyColumns []string
+}
+
+// ExportHeader is Header followed by ReadOnlyColumns (a fresh slice).
+func (e Entity) ExportHeader() []string {
+	return slices.Concat(e.Header, e.ReadOnlyColumns)
+}
+
+// VendorReadOnlyColumns are the director + active-PKS columns appended to the
+// vendor export. Returns a fresh slice so callers cannot mutate the contract.
+func VendorReadOnlyColumns() []string { return slices.Clone(vendorReadOnlyColumns) }
+
+var vendorReadOnlyColumns = []string{
+	"director_name", "director_phone", "director_email",
+	"pks_name", "pks_effective_date", "pks_expiry_date",
+	"pks_validity_months", "pks_remaining_days", "pks_status",
 }
 
 func (e Entity) clone() Entity {
 	e.Header = slices.Clone(e.Header)
+	e.ReadOnlyColumns = slices.Clone(e.ReadOnlyColumns)
 	if e.LegacyHeaders != nil {
 		lh := make([][]string, len(e.LegacyHeaders))
 		for i, h := range e.LegacyHeaders {
@@ -29,30 +48,37 @@ func (e Entity) clone() Entity {
 
 var importable = map[string]Entity{
 	Vendors: {
-		Name:   Vendors,
-		Header: []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		Name:            Vendors,
+		Header:          []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		ReadOnlyColumns: vendorReadOnlyColumns,
 	},
 	VendorBranches: {
 		Name:   VendorBranches,
-		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
-		// Older files have no category (and, before migration 026, no
-		// region_code): keep the branch's current value instead of clearing it.
+		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "cis_limit_amount", "is_active"},
+		// Older files have no cis_limit_amount (before migration 038), no category (and, before
+		// migration 026, no region_code): keep the branch's current value instead of clearing it.
 		LegacyHeaders: [][]string{
+			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
 		},
-		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell},
+		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell, "cis_limit_amount": KeepCurrentCell},
 	},
 	VendorVaults: {
 		Name:   VendorVaults,
-		Header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
+		Header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "escrow_account", "is_active"},
+		// Older files have no escrow_account (before migration 038): keep the vault's current value.
+		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"}},
+		LegacyFill:    map[string]string{"escrow_account": KeepCurrentCell},
 	},
 	VendorPICs: {
 		Name:   VendorPICs,
-		Header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+		Header: []string{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles", "is_director"},
 		// Older files have no roles column: blank (create = all roles, update = unchanged).
-		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"}},
-		LegacyFill:    map[string]string{"roles": ""},
+		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles"},
+			{"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active"},
+		},
+		LegacyFill: map[string]string{"roles": "", "is_director": KeepCurrentCell},
 	},
 	ATMs: {
 		Name:   ATMs,

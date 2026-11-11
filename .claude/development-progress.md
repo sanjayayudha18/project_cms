@@ -1,8 +1,10 @@
 # Development Progress — CMS2 Cash Management System
 
-**Last Updated:** 2026-11-02
+**Last Updated:** 2026-11-10
 
 Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` — Phase 0 + replenish ticket). Merge `dev1` → `main` pending.
+
+> **2026-11-09 — standar SDLC diganti (user):** fitur baru memakai spec Kiro hybrid di `.kiro/specs/<feature>/` (requirements → design → tasks + `### Test Results` → `review.md` → `incidents.md`, gate di baris `> Status:`; CLAUDE.md §4a, `.kiro/steering/kiro-spec-standard.md` Sec 7). Fitur yang sudah di `.claude/sdlc/` (mis. `vendor-cis-limit/`, `dsr-late-report/`) diselesaikan di format lama.
 
 ## Overview
 
@@ -31,7 +33,10 @@ Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` —
 | Export preview simplify (follow-up X.9: pratinjau `/exports/<data>`) | `export-preview-simplify/` (Kiro spec `.kiro/specs/export-preview-simplify/`) | 5 Deploy (tasks 1–7 selesai, gate task 6 hijau 2026-10-30) | ✅ built, committed `f98bc89`; tanpa perubahan backend, migrasi, atau dependency. CompanyPortal `features/exports`: dropdown Vendor saja (tanpa "Cari vendor"), tombol "Search" (ganti "Terapkan"), catatan pengambilan file dihapus, tombol "Ekspor" tanpa jumlah baris (total tetap di kepala halaman). `export-menu-revamp` Req 5.1 dan 5.9 digantikan. Permintaan gabung ATM + Kelolaan ATM dibatalkan PO (D1) | manual browser check (user, task 8: `/exports/vendor-pics`, `/exports/package-prices`, ekspor CSV, keyboard) |
 | Master-data CSV import revamp (X.10: pratinjau per baris, riwayat + detail batch, tinjauan checker, notifikasi impor) | Kiro spec `.kiro/specs/master-data-import-revamp/` | 5 Deploy (tasks 1–15 selesai, 2026-11-03) | ✅ built, belum di-commit; mig `036` (`master_data_import_batches.file_name`) applied to dev 2026-11-02. Approval sebelum update DB tetap (satu batch = satu approval) | cek browser manual (user, task 16) outstanding; commit |
 | Pengecualian ATM bermasalah + list input FSD (Phase 2.4) | `problem-atm-exclusion/` | 1 Plan (`intent.md` draft 2026-11-02) | ⏳ not built; menyentuh uang + kemungkinan migrasi, jadi wajib AI-DLC penuh | PO jawab 19 open questions + terima intent → spec |
-| Vendor PKS / CIS limit | `vendor-pks-cis-limit/` | 1 Plan (intent draft 2026-10-05) | ⏳ not built; columns approved 2026-10-05 (CLAUDE.md Sec 3), migration `022` not created | PO accept intent → spec → migration 022 |
+| Vendor PKS | `.kiro/specs/vendor-pks/` | 3 Build selesai (tasks 1–13; dokumentasi 2026-11-06) | ✅ migrasi `022` + `037` applied to dev 2026-11-05; gate task 12 hijau (3 masalah lama, lihat tasks.md); PKS di tabel `vendor_pks`, Direktur Utama = `vendor_pics.is_director` (D32) | task 14: cek browser manual oleh user (outstanding, belum dicatat) |
+| Kolom PKS + Direktur Utama di ekspor vendor (X.16) | `.kiro/specs/vendor-export-pks/` | 3 Build selesai (tasks 1–7; dokumentasi 2026-11-06) | ✅ built, commit pending (user commits manually). Sembilan kolom baca-saja (direktur + PKS aktif) di CSV vendor `backend-exq` (pratinjau + file); impor `backend` menerima Import_Header dan Export_Header, kolom baca-saja dibuang. Tanpa migrasi. Keputusan user 2026-11-06 (catatan 2.1): baris di file Export_Header yang jumlah selnya bukan 18 ditolak `jumlah kolom`, termasuk baris 9 sel. Gate backend (4) dan frontend (6) hijau | task 8: cek browser manual oleh user (outstanding); deploy `backend` sebelum/bersamaan `backend-exq` |
+| Vendor CIS limit + escrow vault | `vendor-cis-limit/` | 3 Build (plan accepted 2026-11-06) | 🚧 P1–P5 done: migrasi `038` applied to dev 2026-11-06, Limit CIS cabang + escrow vault + peran PIC `bm` + CSV impor/ekspor (BE) | P6 endpoint inquiry |
+| External user API untuk IDM (X.17) | `.kiro/specs/ext-user-api/` (Kiro spec) | 3 Build (in progress; waves 0–10 selesai, belum di-commit) | 🚧 Build in progress (gate task 12 + manual check 13 outstanding). Modul `backend-extapi/` (port 8082, `/api/ext/v1/*`, CLI `extclient`), `pkg/userrules`, mig `039` applied to dev 2026-11-10 (role `EXT-CLIENT`, `users.auth_source='service'`, tabel `api_clients`). Deviasi GR#3 (D18) | gate task 12 (gate lokal, D23) dan cek manual task 13 oleh user outstanding; commit (user) |
 | Read-replica routing (Phase 0.1) | — (`bugfixes.md` 2026-10-07) | done | ✅ Go `main.go` + vendor/ATM admin repos split; Python `db_read_pool` for monitoring APIs; tests green | manual smoke of list pages + EOD monitoring (user) |
 | Notifikasi in-app + SMTP (Phase 0.3) | `notification/` | 5 Deploy (review 2026-10-07) | ✅ built (`eb457cf`, review R1–R3 fixed): `internal/notification`, `/api/v1/notifications`, outbox worker (stdlib SMTP), CompanyPortal bell, VendorPortal API; over-quota = first consumer; mig 025 applied to dev | review; manual browser check (user); real SMTP send |
 | Forecast / Order ATM (Phase 2.1) | — (re-scoped by user 2026-10-08) | closed | ✅ no engine: DMAA sends the forecast, `backend_python/dmaa/dmaa_etl.py` ingests it, DMAA `amount_replenish` = final order amount; consumed by Forecast Browser → Vendor Request. `internal/forecast` + `forecast_runs/results` dropped | refund: DMAA sends later → extend ETL then (`amount_refund = 0` today); problem-ATM exclusion stays with CROWN → Phase 2.4; CLAUDE.md Sec 3/3a corrected 2026-10-08 |
@@ -56,6 +61,28 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 
 ---
 
+### graphify-human feature map (X.11, 2026-11-04)
+- `graphify-human/features.toml` diperluas dari pilot 3 fitur ke 26 fitur (semua baris "Built and wired" di development-plan, layar mock, cash count). `py graphify-human/generate.py` menulis `graphify-human/out/index.md` + satu halaman per fitur (peran, endpoint Go/Python + pemanggil frontend, tabel baca/tulis, file inti, file terkait dari graph, dokumen).
+- Perbaikan generator dari review pilot: route chi yang didaftarkan lewat `for ... range` atas tabel path (export `backend-exq`: 11 endpoint yang sebelumnya hilang atau salah path), role guard lewat closure lokal (`guard(kind)` tampil sebagai `exportjob.KindRoles[k]` tidak terbaca, bukan "tanpa role guard"), panggilan `/api/eod/*` dicocokkan ke endpoint `eod_retry_scheduler` lewat proxy, path frontend `.../preview${path}` ditandai dinamis, output selalu LF, kolom Endpoint di index menghitung endpoint Python.
+- Exclude baru: sqlc `backend-exq/internal/repository/*.sql.go`, `db.go`, `models.go`, dan `*schema.d.ts`.
+- Batasan yang diketahui: role per jenis export (`exportjob.KindRoles`) tidak dibaca; panggilan frontend dengan path di variabel (`${path}`, `${url}`) tidak dicocokkan; RequireAuth tanpa RequireRoles tampil sebagai "tanpa role guard".
+
+### Backend-exq deploy readiness (X.13, 2026-11-04)
+- Spec `.kiro/specs/backend-exq-deploy-readiness/`: siapkan `backend-exq` untuk deploy pertama. Selesai, committed `cf53038`: job CI `go-image` di `.github/workflows/ci.yml` membangun image `backend` dan `backend-exq`, lalu memeriksa non-root dan HEALTHCHECK lewat `scripts/ci/check-image.sh`; `.claude/docs/deployment.md` mendapat bagian "Release checklist: first `backend-exq` deployment" dan pernyataan usang tentang `backend-exq` diperbaiki.
+- `.kiro/steering/development-plan.md`: gap "`backend-exq` image still runs as root without HEALTHCHECK" dihapus (sudah tertutup sejak `540ee96`); baris X.3 dan X.7 diperbarui; baris X.13 ditambahkan.
+- Outstanding: run GitHub Actions pertama belum terjadi (job `go-image` belum pernah jalan di runner); wave 2 (review `ci.yml`, dokumen ini) belum selesai; commit belum dibuat.
+
+### pnpm 11.20.0 → 12.16.1 (X.12, 2026-11-03)
+- Upgrade pnpm di CompanyPortal + VendorPortal ke 12.16.1: pin `packageManager` dengan sha512, Dockerfile `npm install -g pnpm@12.16.1` tanpa corepack, pesan `dev.ps1` ikut diperbarui. Tanpa perubahan kode aplikasi.
+- Gate setara baseline: CP 1866 test lulus, coverage 87.25/82.68/83.91/88.26; VP 250 test lulus, coverage 93.53/84.62/91.59/94.41. 0 gagal, threshold tidak turun.
+- Audit paritas (D7): `pnpm audit --prod` sama dengan baseline, bukan perbaikan. CP 3 advisory (`zod`, `seroval`), VP 6 advisory (4 high, 2 moderate). Perbaikan dependency dikerjakan terpisah.
+- Diff Lockfile: hanya boot document pnpm 12 di awal file (`packageManagerDependencies` + `@pnpm/exe.*@12.16.1`), +158/-0 per portal (D8). Dokumen proyek tidak berubah.
+- Docker: build CP dan VP lolos, builder `pnpm --version` = 12.16.1, container `healthy` setelah bugfix HEALTHCHECK.
+- Developer lain: pasang ulang pnpm global dengan `npm install -g pnpm@12.16.1` (D6).
+- Dua bugfix terpisah (HEALTHCHECK `127.0.0.1`, `frontend/dev.ps1` baris 56) dicatat di `.claude/bugfixes.md` (2026-11-03).
+
+---
+
 ## Next Phase
 
 0. **Phase 2.2 split (user 2026-10-08):** 2.2a penetapan branch vault per ATM oleh ACM (`cit-acm-plan/`, next) → 2.2b kirim CIT ke vendor → 2.2c realisasi vs order (`replenishment-realisasi/intent.md`). 2.1 closed (no forecast engine). Also new: 2.4 problem-ATM exclusion. `backend-cit` renamed to `backend-exq` 2026-10-20 (export + dashboard queries; still not deployed, no content yet).
@@ -63,5 +90,5 @@ Manual browser verification is always the user's job (Golden Rule #10) and stays
 2. Finish `perbaikan-rbac` acceptance: approve/reject/apply-failure states, double-submit + cross-tab conflict (check backend rejects duplicates first), per-entity CRUD tests.
 3. `notification/` (0.3): commit review fixes R1–R3 → code owner merge; user: browser check of bell + VendorPortal page; real SMTP send once relay creds exist. 0.4 + 0.5 deferred.
 4. Build `dsr-late-report` per `plan.md` (accepted 2026-10-27): P1 migration 033 (`migrate up` only with user OK), then P2 ∥ P3, P4 → P5 → P7, P6 in parallel, P8, P9.
-5. `vendor-pks-cis-limit`: spec → migration 022.
+5. `vendor-pks`: migrasi `022` + `037` sudah applied (2026-11-05); tinggal task 14 (cek browser manual oleh user). `vendor-cis-limit` menyusul (nomor migrasi berikutnya `038`).
 6. Session follow-ups (separate features): idle timeout (warn T-5m), session audit events, admin force-logout.

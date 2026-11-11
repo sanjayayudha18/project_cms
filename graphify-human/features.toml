@@ -1,6 +1,10 @@
 # graphify-human: peta fitur yang dibaca manusia.
 #
-# DRAFT pilot (2026-10-23), 3 fitur.
+# Pilot 3 fitur (2026-10-23), diperluas ke semua fitur di development-plan.md
+# "Built and wired" + layar mock (2026-11-04).
+#
+# Fitur baru: tambah satu blok [[feature]], lalu jalankan generator. Satu file
+# boleh dimiliki lebih dari satu fitur (kolom "Milik fitur" di halaman fitur).
 #
 # Jalankan dari root repo:  py graphify-human/generate.py   (Python 3.13+, stdlib saja)
 # Hasil: graphify-human/out/index.md + satu <id>.md per fitur.
@@ -29,8 +33,11 @@ globs = [
   "**/__tests__/**",
   "**/test_*.py",
   "backend/internal/db/*.sql.go",   # sqlc generated
+  "backend-exq/internal/repository/*.sql.go",   # sqlc generated
+  "backend-exq/internal/repository/db.go",
+  "backend-exq/internal/repository/models.go",
   "**/routeTree.gen.ts",
-  "**/schema.d.ts",
+  "**/*schema.d.ts",                 # schema.d.ts + exq-schema.d.ts (openapi-typescript)
   "**/tsconfig*.json",
   "**/package.json",
   "**/biome.json",
@@ -177,4 +184,654 @@ docs = [
   ".kiro/specs/.done/admin-user-vendor-management/",
   ".kiro/specs/.done/vendor-detail-revamp/",
   ".claude/sdlc/.done/vendor-pricing/",
+]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Platform
+# ═════════════════════════════════════════════════════════════════════════════
+
+[[feature]]
+id = "auth"
+label = "Login dan Sesi"
+summary = """
+Login internal (CompanyPortal) dan vendor (VendorPortal) menghasilkan JWT yang
+sama dengan role dan auth_source di klaim. Password lokal punya masa berlaku
+90 hari, kunci akun setelah 3 kali gagal, dan wajib ganti password saat login
+pertama. Sesi absolut 1 jam. Role vendor ditolak di CompanyPortal.
+"""
+status = "built"
+dev_plan = "Platform: Auth"
+portal = ["CompanyPortal", "VendorPortal"]
+files = [
+  # Frontend internal
+  "frontend/CompanyPortal-Vite/src/routes/_auth.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/_auth/login.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/login.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/_protected.tsx",
+  "frontend/CompanyPortal-Vite/src/lib/auth/**",
+  # Frontend vendor
+  "frontend/VendorPortal-Vite/src/features/auth/**",
+  "frontend/VendorPortal-Vite/src/routes/_auth.tsx",
+  "frontend/VendorPortal-Vite/src/routes/login.tsx",
+  "frontend/VendorPortal-Vite/src/routes/_protected.tsx",
+  # Backend Go
+  "backend/internal/handler/auth_handler.go",
+  "backend/internal/auth/service.go",
+  "backend/internal/auth/local_provider.go",
+  "backend/internal/auth/change_password.go",
+  "backend/internal/repository/auth_repository.go",
+  "backend/queries/auth.sql",
+  # pkg (dipakai kedua backend)
+  "pkg/auth/**",
+  "pkg/middleware/rbac.go",
+  "pkg/middleware/rate_limiter.go",
+]
+related = ["admin-users", "role-management"]
+docs = [
+  ".kiro/specs/.done/user-login/",
+  ".kiro/specs/.done/Auth-Local-Lifecycle/",
+  ".kiro/specs/.done/revamp-vendor-loginpage/",
+  ".claude/sdlc/.done/user-session/",
+  ".claude/sdlc/.done/fe-auth-unify/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "admin-users"
+label = "Manajemen User"
+summary = """
+APPACCESS dan ADMIN membuat, mengubah, menonaktifkan, dan mengaktifkan user.
+User lokal baru mendapat password sementara dengan wajib ganti saat login.
+Nonaktif hanya soft-delete. User vendor diberi role vendor dan cakupan cabang.
+"""
+status = "built"
+dev_plan = "Platform: Admin users"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/admin-users/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/users.tsx",
+  "backend/internal/handler/admin_user_handler.go",
+  "backend/internal/auth/user_admin.go",
+  "backend/internal/auth/set_initial_password.go",
+  "backend/internal/auth/deactivate_user.go",
+  "backend/internal/repository/user_admin_repository.go",
+  "backend/queries/users_admin.sql",
+]
+related = ["auth", "role-management", "send-to-vendor"]
+docs = [
+  ".kiro/specs/.done/admin-user-vendor-management/",
+  ".kiro/specs/.done/vendor-party-scope/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "role-management"
+label = "Manajemen Peran"
+summary = """
+Katalog menu/fitur dan pemetaan role ke menu/fitur. Perubahan langsung berlaku
+tanpa maker-checker (deviasi Golden Rule #3 yang terdokumentasi); penggantinya
+audit_logs di transaksi DB yang sama. Role baru lahir tanpa akses.
+"""
+status = "built"
+dev_plan = "Platform: Role management"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/role-management/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/roles.tsx",
+  "backend/internal/handler/role_mgmt_handler.go",
+  "backend/internal/rolemgmt/**",
+]
+related = ["auth", "audit-log"]
+docs = [".kiro/specs/.done/role-management/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "approval"
+label = "Approval (maker-checker) dan Pengaturan RBAC"
+summary = """
+Orkestrator maker-checker bersama: submit, approve, reject sesuai rantai atasan,
+level approval, delegasi, dan cuti. Inbox Approval untuk checker, termasuk
+tinjauan perubahan master data dan coba terapkan lagi. Pengaturan RBAC
+mengelola atasan, kebijakan approval, delegasi, dan cuti.
+"""
+status = "built"
+dev_plan = "Platform: Approval"
+portal = ["CompanyPortal"]
+files = [
+  # Frontend
+  "frontend/CompanyPortal-Vite/src/features/approvals/**",
+  "frontend/CompanyPortal-Vite/src/features/rbac-settings/**",
+  "frontend/CompanyPortal-Vite/src/routes/approvals.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/settings.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/settings/rbac/**",
+  # Backend Go
+  "backend/internal/handler/approval_handler.go",
+  "backend/internal/handler/approval_master_data_detail.go",
+  "backend/internal/handler/approval_retry_apply.go",
+  "backend/internal/handler/admin_approval_handler.go",
+  "backend/internal/handler/rbac_list_handler.go",
+  "backend/internal/approval/**",
+  "backend/internal/repository/approval_policy_store.go",
+  "backend/internal/repository/rbac_read_repository.go",
+  "backend/queries/approval.sql",
+]
+related = ["master-data-vendor", "audit-log", "vendor-request"]
+docs = [
+  ".kiro/specs/.done/RBAC-Setup/",
+  ".kiro/specs/.done/rbac-settings-menu/",
+  ".claude/sdlc/.done/perbaikan-rbac/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "audit-log"
+label = "Log Audit"
+summary = """
+Writer append-only untuk audit_logs (siapa, apa, sebelum/sesudah, kapan, IP)
+yang dipakai semua modul, ditambah layar penampil Log Audit dengan filter.
+"""
+status = "built"
+dev_plan = "Platform: Audit"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/audit-log/**",
+  "frontend/CompanyPortal-Vite/src/routes/audit-logs.tsx",
+  "backend/internal/handler/audit_log_handler.go",
+  "backend/internal/service/audit_log_read.go",
+  "backend/internal/repository/audit_log_repository.go",
+  "backend/internal/audit/**",
+  "backend/queries/audit_log.sql",
+  "backend/queries/audit.sql",
+]
+related = ["approval", "role-management"]
+docs = [".kiro/specs/.done/audit-log-viewer/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "notification"
+label = "Notifikasi (in-app dan email)"
+summary = """
+Notifikasi in-app (lonceng CompanyPortal, halaman Notifikasi VendorPortal) dan
+email lewat outbox notification_emails yang dikirim worker SMTP di cmd/api.
+Job Python (replenish_classify, dsr_late_notify) menulis tabel yang sama.
+"""
+status = "built"
+dev_plan = "0.3"
+portal = ["CompanyPortal", "VendorPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/notifications/**",
+  "frontend/VendorPortal-Vite/src/features/notifications/**",
+  "frontend/VendorPortal-Vite/src/routes/notifications.tsx",
+  "backend/internal/handler/notification_handler.go",
+  "backend/internal/notification/**",
+  "backend/queries/notifications.sql",
+]
+related = ["replenishment-realisasi", "dsr-late-report", "vault-plan"]
+docs = [".claude/sdlc/.done/notification/"]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Master data (selain vendor)
+# ═════════════════════════════════════════════════════════════════════════════
+
+[[feature]]
+id = "master-data-atm"
+label = "Master Data ATM"
+summary = """
+Admin mengelola ATM dan kelolaan ATM (assignment ke vendor/cabang). Semua
+perubahan lewat maker-checker. terminal_id tidak bisa diubah setelah dibuat.
+Nonaktif hanya soft-delete.
+"""
+status = "built"
+dev_plan = "Master data (feature-complete MVP)"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/admin-atms/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/atms.tsx",
+  "backend/internal/handler/admin_atm_handler.go",
+  "backend/internal/handler/admin_atm_assignment_handler.go",
+  "backend/internal/service/atm_admin.go",
+  "backend/internal/service/atm_assignment_admin.go",
+  "backend/internal/service/atm_assignment_source.go",
+  "backend/internal/service/masterdata_applier_atm.go",
+  "backend/internal/service/masterdata_applier_atm_assignment.go",
+  "backend/internal/repository/atm_admin_repository.go",
+  "backend/internal/repository/atm_assignment_admin_repository.go",
+  "backend/queries/atms_admin.sql",
+  "backend/queries/atm_assignments_admin.sql",
+]
+related = ["master-data-vendor", "master-data-region", "atm-portal", "approval"]
+docs = [
+  ".kiro/specs/.done/admin-atm-management/",
+  ".claude/sdlc/.done/atm-package-source/",
+  ".claude/feature-flows/01-master-data/feature-flow.md",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "master-data-region"
+label = "Master Data Region"
+summary = """
+Admin mengelola region. Langsung berlaku dengan audit (tanpa maker-checker).
+"""
+status = "built"
+dev_plan = "1.1"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/admin-regions/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/regions.tsx",
+  "backend/internal/handler/admin_region_handler.go",
+  "backend/internal/service/region_admin.go",
+  "backend/internal/repository/region_admin_repository.go",
+  "backend/queries/regions_admin.sql",
+]
+related = ["master-data-atm", "acm-area"]
+docs = [".kiro/specs/.done/region-management/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "acm-area"
+label = "Area ACM"
+summary = """
+ADMIN menetapkan area ACM per region. Area menentukan request mana yang bisa
+dilihat dan dikerjakan ACM-USER / ACM-SPV di Penetapan Vault.
+"""
+status = "built"
+dev_plan = "2.2a"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/admin-acm-areas/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/acm-areas.tsx",
+  "backend/internal/handler/admin_acm_area_handler.go",
+  "backend/internal/service/acm_area_admin.go",
+  "backend/queries/acm_areas_admin.sql",
+]
+related = ["vault-plan", "master-data-region"]
+docs = [".claude/sdlc/.done/cit-vault-select/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "holiday"
+label = "Hari Libur"
+summary = """
+ADMIN mengelola kalender hari libur. Dipakai klasifikasi realisasi vs order
+(hari kerja). Langsung berlaku dengan audit di transaksi yang sama.
+"""
+status = "built"
+dev_plan = "2.2c"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/admin-holidays/**",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/holidays.tsx",
+  "backend/internal/handler/admin_holiday_handler.go",
+  "backend/internal/service/holiday_admin.go",
+  "backend/queries/holidays_admin.sql",
+]
+related = ["replenishment-realisasi"]
+docs = [".claude/sdlc/.done/replenishment-realisasi/"]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Operasional ATM
+# ═════════════════════════════════════════════════════════════════════════════
+
+[[feature]]
+id = "atm-portal"
+label = "ATM Portal (monitoring)"
+summary = """
+Daftar ATM dan profil per terminal (posisi kas, paket vendor, riwayat) untuk
+monitoring. Hanya baca, dari read replica.
+"""
+status = "built"
+dev_plan = "Built: ATM portal"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/atm-portal/**",
+  "frontend/CompanyPortal-Vite/src/routes/atm-portal.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/atm-portal.$terminalId.tsx",
+  "backend/internal/handler/atm_portal_handler.go",
+  "backend/internal/service/atm_portal.go",
+  "backend/internal/service/atm_portal_cashpos.go",
+  "backend/internal/service/atm_portal_profile.go",
+  "backend/queries/atm_portal.sql",
+  "backend_python/itm/cashpos/**",
+]
+related = ["master-data-atm", "eod-monitoring"]
+docs = [
+  ".kiro/specs/.done/atm-portal/",
+  ".kiro/specs/.done/atm-profile/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "dmaa-forecast"
+label = "Forecast DMAA"
+summary = """
+DMAA mengirim file Order_All_*.xlsx; ETL Python memuatnya ke dmaa_files dan
+dmaa_atm_forecast (idempoten per SHA-256). amount_replenish dari DMAA adalah
+nominal order final; CROWN tidak punya mesin forecast. Layar penampil hanya baca.
+"""
+status = "built"
+dev_plan = "2.1"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/dmaa-forecast/**",
+  "frontend/CompanyPortal-Vite/src/routes/forecasting/**",
+  "backend/internal/handler/dmaa_forecast_handler.go",
+  "backend/internal/service/dmaa_forecast.go",
+  "backend/queries/dmaa_forecast.sql",
+  "backend_python/dmaa/dmaa_etl.py",
+]
+related = ["vendor-request", "eod-monitoring"]
+docs = [
+  ".claude/feature-flows/03-atm-cash-forecasting/feature-flow.md",
+  ".kiro/specs/.done/dmaa-forecast-viewer/",
+  ".kiro/specs/.done/update-cit-forecast-browser/",
+  ".claude/sdlc/.done/forecast-browser-summary/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "vault-plan"
+label = "Penetapan Vault (ACM)"
+summary = """
+ACM membagi nominal Request CIT ke vault (CASH / ATM_CASH); setiap alokasi
+mendapat tiket pemenuhan vault. ATM-SPV meninjau penetapan vault di halaman
+Request CIT (approve / reject).
+"""
+status = "built"
+dev_plan = "2.2a"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/vault-plan/**",
+  "frontend/CompanyPortal-Vite/src/routes/cit/vault-plans.tsx",
+  "backend/internal/handler/vault_plan_handler.go",
+  "backend/internal/handler/vendor_request_vault_handler.go",
+  "backend/internal/service/vault_*.go",
+  "backend/queries/vault_*.sql",
+]
+related = ["vendor-request", "acm-area", "send-to-vendor"]
+docs = [
+  ".claude/feature-flows/10-order-atm-lifecycle/feature-flow.md",
+  ".claude/sdlc/.done/cit-acm-plan/",
+  ".claude/sdlc/.done/cit-vault-select/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "send-to-vendor"
+label = "Order ke Vendor (VendorPortal)"
+summary = """
+Request CIT yang siap dikirim ke vendor. Di VendorPortal, cabang replenish dan
+cabang vault menerima atau menolak order sesuai peran akun vendor
+(VENDOR-ATM-USER / VENDOR-VAULT-USER / VENDOR-USER) dan cakupan cabangnya.
+Panel Status Vendor dan Kembalikan ke pembuat ada di CompanyPortal.
+"""
+status = "built"
+dev_plan = "2.2b, 2.2d"
+portal = ["VendorPortal", "CompanyPortal"]
+files = [
+  "frontend/VendorPortal-Vite/src/features/orders/**",
+  "frontend/VendorPortal-Vite/src/routes/orders.tsx",
+  "frontend/VendorPortal-Vite/src/routes/orders.$id.tsx",
+  "frontend/VendorPortal-Vite/src/lib/vendorRoles.ts",
+  "backend/internal/handler/vendor_order_handler.go",
+  "backend/internal/handler/vendor_request_vendor_handler.go",
+  "backend/internal/service/vendor_order.go",
+  "backend/internal/service/vendor_party.go",
+  "backend/internal/vendorrole/**",
+  "backend/queries/vendor_parties.sql",
+]
+related = ["vendor-request", "vault-plan", "replenishment-realisasi", "admin-users"]
+docs = [
+  ".claude/feature-flows/10-order-atm-lifecycle/feature-flow.md",
+  ".claude/sdlc/.done/cit-send-vendor/",
+  ".claude/sdlc/.done/vendor-party-scope/",
+  ".kiro/specs/.done/vendor-party-scope/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "replenishment-realisasi"
+label = "Realisasi vs Order"
+summary = """
+Job Python replenish_classify (setelah file itm_replenish, cron 09:15 WIB, atau
+jalan manual) mengklasifikasi realisasi terhadap order dalam hari kerja:
+sesuai jadwal, maju, mundur, tidak dilakukan, tanpa order. Vendor melapor
+tanggal dan nominal realisasi; data ITM yang menang. Laporan di CompanyPortal.
+"""
+status = "built"
+dev_plan = "2.2c"
+portal = ["CompanyPortal", "VendorPortal"]
+files = [
+  # Frontend
+  "frontend/CompanyPortal-Vite/src/features/replenishment/**",
+  "frontend/CompanyPortal-Vite/src/routes/replenishment.tsx",
+  "frontend/VendorPortal-Vite/src/features/realizations/**",
+  "frontend/VendorPortal-Vite/src/routes/realizations.tsx",
+  "frontend/VendorPortal-Vite/src/features/orders/RealizationPanel.tsx",
+  # Backend Go
+  "backend/internal/handler/replenishment_handler.go",
+  "backend/internal/service/replenishment_read.go",
+  "backend/internal/service/replenish_realization_rules.go",
+  "backend/internal/service/vendor_order_realization.go",
+  "backend/queries/replenish_classifications.sql",
+  "backend/queries/vendor_realizations.sql",
+  # Python
+  "backend_python/replenish_classify/**",
+  "backend_python/itm/replenish/**",
+]
+related = ["send-to-vendor", "holiday", "notification", "export-data"]
+docs = [
+  ".claude/feature-flows/06-replenishment-validation-reports/feature-flow.md",
+  ".claude/sdlc/.done/replenishment-realisasi/",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "dsr-late-report"
+label = "Laporan DSR Telat"
+summary = """
+Laporan bulanan DSR telat / tidak kirim per cabang vendor (batas 09:00 WIB,
+dasar penalti FLM), ditambah tampilan harian, ringkasan, dan peringatan.
+Notifikasi telat jam 09:00 dari job Python dsr_late_notify. Sumber data:
+dsr_receipts (append-only) yang ditulis ETL DSR saat commit.
+"""
+status = "built"
+dev_plan = "2.3"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/dsr-late-report/**",
+  "frontend/CompanyPortal-Vite/src/routes/dsr-late-report.tsx",
+  "backend/internal/handler/dsr_late_report_handler.go",
+  "backend/internal/service/dsr_late_report.go",
+  "backend/internal/repository/dsr_late_report_repository.go",
+  "backend/queries/dsr_late_report.sql",
+  "backend_python/dsr_late_notify/**",
+]
+related = ["dsr-upload", "notification", "export-data"]
+docs = [".claude/sdlc/dsr-late-report/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "eod-monitoring"
+label = "Monitoring EOD / ETL"
+summary = """
+Runtime Python EOD: scheduler retry (eod_retry_scheduler, :8091) memindai file
+DMAA / ITM, menjadwalkan retry, dan mencatat audit. Halaman Monitoring EOD
+(ADMIN / ADMIN_PARAM) menampilkan status file, ringkasan, telat, dan retry.
+Belum ada eod_runs dan hitung Final Realisasi (Phase 7).
+"""
+status = "partial"
+dev_plan = "Built: EOD ETL; Phase 7 belum"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/eod-monitoring/**",
+  "frontend/CompanyPortal-Vite/src/routes/eod-monitoring.tsx",
+  "backend_python/eod_retry_scheduler/**",
+  "backend_python/lib/services/**",
+  "backend_python/lib/utils/**",
+  "backend_python/lib/database.py",
+  "backend_python/lib/dependencies.py",
+  "backend_python/lib/schemas.py",
+  "backend_python/lib/import_jobs.py",
+]
+related = ["dmaa-forecast", "dsr-upload", "replenishment-realisasi", "atm-portal"]
+docs = [
+  ".kiro/specs/.done/eod-monitoring-frontend/",
+  ".kiro/specs/.done/eod-retry-scheduler/",
+  ".claude/sdlc/.done/import-export-jobs/",
+]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Export (backend-exq)
+# ═════════════════════════════════════════════════════════════════════════════
+
+[[feature]]
+id = "export-data"
+label = "Export Data (backend-exq)"
+summary = """
+Export CSV async di backend-exq (:8081, replica): katalog dan pratinjau data
+dengan filter, lalu job export_jobs yang dikerjakan worker; file diunduh otomatis
+dan dihapus setelah unduhan pertama. Mencakup master data dan laporan (DSR telat,
+replenishment). Kontrak CSV di pkg/csvexport dan pkg/reports.
+"""
+status = "built"
+dev_plan = "X.7, X.8, X.9"
+portal = ["CompanyPortal"]
+files = [
+  # Frontend
+  "frontend/CompanyPortal-Vite/src/features/exports/**",
+  "frontend/CompanyPortal-Vite/src/routes/exports.tsx",
+  "frontend/CompanyPortal-Vite/src/routes/settings/admin/exports.tsx",
+  "frontend/CompanyPortal-Vite/src/lib/config/exportRoles.ts",
+  "frontend/CompanyPortal-Vite/src/lib/download.ts",
+  # backend-exq
+  "backend-exq/cmd/api/main.go",
+  "backend-exq/internal/exportjob/**",
+  "backend-exq/internal/handler/**",
+  "backend-exq/internal/audit/**",
+  "backend-exq/internal/repository/repository.go",
+  "backend-exq/queries/*.sql",
+  # pkg
+  "pkg/csvexport/**",
+  "pkg/reports/**",
+]
+related = ["master-data-vendor", "master-data-atm", "dsr-late-report", "replenishment-realisasi"]
+docs = [
+  ".kiro/specs/.done/vendor-data-export/",
+  ".kiro/specs/.done/report-export-migration/",
+  ".kiro/specs/.done/export-menu-revamp/",
+  ".kiro/specs/.done/export-preview-simplify/",
+  ".kiro/specs/.done/backend-exq-deploy-readiness/",
+]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Layar mock (data hardcoded, belum ada API). Dihubungkan oleh fase pemiliknya.
+# ═════════════════════════════════════════════════════════════════════════════
+
+[[feature]]
+id = "dashboard"
+label = "Dashboard"
+summary = """
+Halaman awal CompanyPortal dengan banner "Data contoh". MetricStrip,
+AttentionPanel, dan ringkasan masih data hardcoded.
+"""
+status = "mock"
+dev_plan = "Mock frontends (FNC 003)"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/dashboard/**",
+  "frontend/CompanyPortal-Vite/src/routes/index.tsx",
+]
+mock_files = ["frontend/CompanyPortal-Vite/src/features/dashboard/**"]
+related = ["cash-flow"]
+docs = [".claude/feature-flows/07-dashboard/feature-flow.md"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "cash-flow"
+label = "Cash Flow Monitoring"
+summary = """
+Ringkasan arus kas per vendor dan level ATM. Data dari konstanta mock;
+endpoint /api/v1/cash-flow/summary belum dibuat.
+"""
+status = "mock"
+dev_plan = "Mock frontends"
+portal = ["CompanyPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/cash-flow/**",
+  "frontend/CompanyPortal-Vite/src/routes/cash-flow.tsx",
+]
+mock_files = ["frontend/CompanyPortal-Vite/src/features/cash-flow/useCashFlowData.ts"]
+related = ["dashboard"]
+docs = [".kiro/specs/.done/cash-flow-monitoring/"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "invoice-reconciliation"
+label = "Invoice dan Rekonsiliasi"
+summary = """
+Belum dibuat (Phase 3). Yang ada hanya layar contoh: halaman hub /invoice,
+komponen invoice dan rekonsiliasi di CompanyPortal, dan halaman invoice di
+VendorPortal (tidak punya route). FSD §6 mengubah scope: CROWN menghitung tagihan
+trip, bukan memvalidasi invoice unggahan vendor. Tanpa eksekusi pembayaran.
+"""
+status = "mock"
+dev_plan = "Phase 3 (parked)"
+portal = ["CompanyPortal", "VendorPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/invoice/**",
+  "frontend/CompanyPortal-Vite/src/features/reconciliation/**",
+  "frontend/CompanyPortal-Vite/src/routes/invoice/index.tsx",
+  "frontend/VendorPortal-Vite/src/features/invoices/**",
+]
+mock_files = [
+  "frontend/CompanyPortal-Vite/src/features/invoice/**",
+  "frontend/CompanyPortal-Vite/src/features/reconciliation/**",
+  "frontend/VendorPortal-Vite/src/features/invoices/**",
+]
+related = ["replenishment-realisasi", "master-data-vendor"]
+docs = [".claude/feature-flows/05-invoice-reconciliation/feature-flow.md"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "cit-tracker"
+label = "CIT Tracker, Jadwal, dan Bukti Serah Terima"
+summary = """
+Layar contoh CIT: pelacak order CIT di CompanyPortal, serta jadwal replenishment
+dan bukti serah terima di VendorPortal (tidak punya route). Sisa CIT (jurnal,
+DSR CIT, rekonsiliasi CIT) ada di Phase 6.
+"""
+status = "mock"
+dev_plan = "Phase 6 (parked)"
+portal = ["CompanyPortal", "VendorPortal"]
+files = [
+  "frontend/CompanyPortal-Vite/src/features/cit/**",
+  "frontend/VendorPortal-Vite/src/features/schedule/**",
+  "frontend/VendorPortal-Vite/src/features/evidence/**",
+]
+mock_files = [
+  "frontend/CompanyPortal-Vite/src/features/cit/**",
+  "frontend/VendorPortal-Vite/src/features/schedule/**",
+  "frontend/VendorPortal-Vite/src/features/evidence/**",
+]
+related = ["send-to-vendor", "vendor-request"]
+docs = [".claude/feature-flows/04-pemenuhan-pengambilan-dana/feature-flow.md"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+[[feature]]
+id = "cash-count"
+label = "Cash Count (vault dan selektif mesin)"
+summary = """
+Belum dibuat (Phase 5). Hanya halaman hub /cash-count dengan kartu modul.
+Nama tabel cash_count_schedules dan cash_count_evidences sudah disetujui,
+kolomnya diputuskan di spec Phase 5.
+"""
+status = "not_built"
+dev_plan = "Phase 5 (parked)"
+portal = ["CompanyPortal"]
+files = ["frontend/CompanyPortal-Vite/src/routes/cash-count/index.tsx"]
+related = ["dsr-upload"]
+docs = [
+  ".claude/feature-flows/08-cash-count-vault/feature-flow.md",
+  ".claude/feature-flows/09-cash-count-selektif-mesin/feature-flow.md",
 ]

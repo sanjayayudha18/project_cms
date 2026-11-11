@@ -29,6 +29,17 @@ vi.mock("../hooks", () => ({
   useUpdateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
+vi.mock("../../exports", () => ({
+  useExportFlow: () => ({
+    request: vi.fn(),
+    isRequesting: false,
+    requestError: null,
+    dialogProps: {},
+  }),
+  ExportProgressDialog: () => null,
+  ReportExportNotice: () => null,
+}));
+
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {

@@ -26,12 +26,12 @@ const itemSchema = z.object({
   flm_vendor: z.string().optional(),
   flm_vendor_region: z.string().optional(),
   denom: z
-    .number({ invalid_type_error: "Wajib berupa angka" })
+    .number({ error: "Wajib berupa angka" })
     .int("Harus bilangan bulat")
     .positive("Harus lebih besar dari 0"),
   amount_refund: z.number().optional(),
   amount_replenish: z
-    .number({ invalid_type_error: "Wajib berupa angka" })
+    .number({ error: "Wajib berupa angka" })
     .int("Harus bilangan bulat")
     .min(AMOUNT_MIN, `Minimal ${AMOUNT_MIN}`)
     .max(AMOUNT_MAX, `Maksimal ${formatThousands(AMOUNT_MAX)}`),

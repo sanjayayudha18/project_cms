@@ -99,6 +99,12 @@ var importKeyColumns = map[string][]string{
 // buildChangePreview describes one validated row; nil for an unchanged row. It
 // compares the normalized cells (row.Cells) with cur over header[1:], like rowOp
 // and checkUpdate, so normalization never shows up as a change.
+// keepCurrentCols are the columns an older header leaves as KeepCurrentCell (csvexport LegacyFill).
+var keepCurrentCols = map[string][]string{
+	ExportVendorBranches: {"region_code", "category", "cis_limit_amount"},
+	ExportVendorVaults:   {"escrow_account"},
+}
+
 func buildChangePreview(entity string, header []string, row ImportRow, cur map[string]string) *ImportChangePreview {
 	if row.Op == ImportOpUnchanged {
 		return nil
@@ -182,6 +188,9 @@ func (i *MasterDataImporter) Authorize(ctx context.Context) error {
 type importRecord struct {
 	line  int
 	cells []string
+	// badCount > 0: the row's cell count did not match its file's header
+	// (Export_Header rows); validateRow rejects it, expecting badCount cells.
+	badCount int
 }
 
 // importEnv is the database state one dry-run validates against.
@@ -198,6 +207,10 @@ type importEnv struct {
 	spans     map[string][]importSpan // terminal -> active periods (db rows not in the file + accepted file rows)
 	seenKey   map[string]int
 	seenID    map[int64]int
+	// PIC directors: active director id per vendor code in the DB, and the file
+	// line of the first active director row per vendor code (lazy, PIC import only).
+	dbDirectors   map[string]int64
+	fileDirectors map[string]int
 }
 
 // importNatKey is the natural key of a row, "" when the entity has none (PICs).
@@ -384,7 +397,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	}
 	res := &ImportResult{Preview: ImportPreview{Entity: entity, Errors: []ImportRowError{}, Changes: []ImportChangePreview{}}}
 
-	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill)
+	recs, fileErrs, err := readImportCSV(r, spec.header, spec.legacyHeaders, spec.legacyFill, spec.readOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -479,6 +492,10 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		}
 		add("row", err.Error())
 	}
+	if rec.badCount > 0 {
+		add("row", fmt.Sprintf("jumlah kolom %d, seharusnya %d", len(rec.cells), rec.badCount))
+		return ImportRow{}, errs
+	}
 	if len(rec.cells) != len(header) {
 		add("row", fmt.Sprintf("jumlah kolom %d, seharusnya %d", len(rec.cells), len(header)))
 		return ImportRow{}, errs
@@ -496,21 +513,25 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 		return ImportRow{}, errs
 	}
 	creating := id == 0
-	if e.entity == ExportVendorBranches {
-		for _, col := range []string{"region_code", "category"} {
-			if v[col] == keepCurrentCell {
-				v[col] = e.cur[id][col] // older file without the column: keep the current value ("" when creating)
-			}
+	for _, col := range keepCurrentCols[e.entity] {
+		if v[col] == keepCurrentCell {
+			v[col] = e.cur[id][col] // older file without the column: keep the current value ("" when creating)
 		}
 	}
 
-	if e.entity == ExportVendorPICs && !creating && strings.TrimSpace(v["roles"]) == "" {
-		v["roles"] = e.cur[id]["roles"] // blank or older file without the column: roles stay as they are
+	if e.entity == ExportVendorPICs {
+		e.resolvePICKeeps(v, id, creating)
 	}
 
 	e.validateFields(v, creating, add, fromErr)
 	if len(errs) > 0 {
 		return ImportRow{}, errs
+	}
+	if e.entity == ExportVendorPICs {
+		e.checkPICDirector(v, id, rec.line, add)
+		if len(errs) > 0 {
+			return ImportRow{}, errs
+		}
 	}
 
 	if !e.checkNatKey(header[1], v, id, rec.line, add) {

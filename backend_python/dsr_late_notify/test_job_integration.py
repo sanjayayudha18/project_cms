@@ -176,6 +176,32 @@ class DsrLateNotifyTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([tuple(r) for r in audit], [("dsr_late_notify", "skipped"), ("dsr_late_notify", "success")])
         self.assertEqual(await c.fetchval("SELECT count(*) FROM audit_logs WHERE created_at = now()"), 0)
 
+    # vendor-pks Req 1.4/1.9: the Direktur Utama PIC (vendor-level, no roles, not a
+    # recipient) never receives the DSR-late email; the DB refuses any other shape.
+    async def test_director_pic_not_in_recipients(self):
+        vendor = self.ids["vendor"]["FLM"]
+        await self.conn.execute("""
+            INSERT INTO vendor_pics (vendor_id, name, email, is_notification_recipient, roles, is_director)
+            VALUES ($1, 'Dirut', 'dirut@vendor.test', false, '{}', true)""", vendor)
+        await self.pic("pic.wide@vendor.test", ["replenish"])
+
+        s = await self.notify()
+        self.assertEqual(s.status, "sent")
+        sent_to = {r["to_address"] for r in await self.conn.fetch(
+            "SELECT to_address FROM notification_emails WHERE created_at = now()")}
+        self.assertIn("pic.wide@vendor.test", sent_to)
+        self.assertNotIn("dirut@vendor.test", sent_to)
+        self.assertEqual(s.pic_emails, 1)
+
+        for roles, recipient in ((["vault"], False), ([], True)):
+            with self.subTest(roles=roles, recipient=recipient):
+                await self.conn.execute("SAVEPOINT director_shape")
+                with self.assertRaises(asyncpg.CheckViolationError):
+                    await self.conn.execute("""
+                        INSERT INTO vendor_pics (vendor_id, name, email, is_notification_recipient, roles, is_director)
+                        VALUES ($1, 'Dirut2', 'dirut2@vendor.test', $2, $3, true)""", vendor, recipient, roles)
+                await self.conn.execute("ROLLBACK TO SAVEPOINT director_shape")
+
     async def test_email_pending_when_smtp_on(self):
         await self.pic("pic.wide@vendor.test", ["vault"])
         self.assertEqual((await self.notify(email_enabled=True)).status, "sent")

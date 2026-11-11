@@ -19,6 +19,7 @@ export const KIND_LABEL: Record<ExportKind, string> = {
   dsr_late_summary: "Laporan DSR telat (rekap bulanan)",
   replenishment_amount_mismatch: "Replenish: selisih nominal",
   replenishment_trips: "Replenish: trip per ATM",
+  vendor_pks: "PKS vendor",
 };
 
 /** Report kind -> `/exports/reports/{report}` segment. */
@@ -27,6 +28,7 @@ export const REPORT_KEY_BY_KIND: Partial<Record<ExportKind, ReportKey>> = {
   dsr_late_summary: "dsr-late-summary",
   replenishment_amount_mismatch: "replenishment-amount-mismatch",
   replenishment_trips: "replenishment-trips",
+  vendor_pks: "vendor-pks",
 };
 
 export const isReportKind = (k: ExportKind): boolean => k in REPORT_KEY_BY_KIND;

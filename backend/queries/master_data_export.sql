@@ -43,6 +43,7 @@ SELECT b.id,
        COALESCE(b.region_code, '')::text    AS region_code,
        b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
+       COALESCE(b.cis_limit_amount::text, '')::text AS cis_limit_amount,
        b.is_active
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
@@ -67,6 +68,7 @@ SELECT vl.id,
        COALESCE(vl.longitude::text, '')::text       AS longitude,
        COALESCE(vl.operating_hours, '')::text       AS operating_hours,
        COALESCE(vl.location_id::text, '')::text     AS location_id,
+       COALESCE(vl.escrow_account, '')::text        AS escrow_account,
        vl.is_active
 FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
@@ -92,7 +94,8 @@ SELECT p.id,
        COALESCE(p.email, '')::text                  AS email,
        p.is_notification_recipient,
        p.is_active,
-       p.roles
+       p.roles,
+       p.is_director
 FROM vendor_pics p
 JOIN vendors v ON v.id = p.vendor_id
 LEFT JOIN vendor_branches b ON b.id = p.vendor_branch_id

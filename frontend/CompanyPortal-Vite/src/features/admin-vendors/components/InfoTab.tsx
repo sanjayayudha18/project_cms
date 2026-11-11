@@ -39,6 +39,27 @@ export function InfoTab({ vendor }: { vendor: AdminVendor }) {
       </div>
 
       <div className="rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-5">
+        <h3 className="mb-4 text-sm font-semibold text-[var(--n-900)]">Direktur Utama</h3>
+        {vendor.director ? (
+          <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-3 text-sm">
+            <dt className="font-medium text-[var(--n-600)]">Nama</dt>
+            <dd className="text-[var(--n-900)]">{vendor.director.name}</dd>
+            <dt className="font-medium text-[var(--n-600)]">Telepon</dt>
+            <dd className="tabular-nums text-[var(--n-900)]">{vendor.director.phone || "—"}</dd>
+            <dt className="font-medium text-[var(--n-600)]">Email</dt>
+            <dd className="text-[var(--n-900)]">{vendor.director.email || "—"}</dd>
+          </dl>
+        ) : (
+          <p className="text-sm text-[var(--n-900)]">
+            Belum dicatat.{" "}
+            <span className="text-[var(--n-500)]">
+              Catat lewat tab PIC dengan mencentang "Direktur Utama".
+            </span>
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-[var(--n-200)] bg-[var(--n-0)] p-5">
         <h3 className="mb-4 text-sm font-semibold text-[var(--n-900)]">Alamat Kantor Pusat</h3>
         <p className="text-sm text-[var(--n-900)]">{vendor.hq_address || "—"}</p>
         <p className="mt-4 text-xs text-[var(--n-500)]">

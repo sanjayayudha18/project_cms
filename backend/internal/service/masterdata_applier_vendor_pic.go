@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
@@ -23,16 +26,21 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor pic create payload: %w", err)
 		}
-		roles := AllPicRoles()
+		isDirector := p.IsDirector != nil && *p.IsDirector
+		roles := DefaultPicRoles()
 		if p.Roles != nil {
 			roles = *p.Roles
+		}
+		if isDirector {
+			roles = []string{} // a director never has roles (vendor-pks Req 1.4)
 		}
 		created, err := q.CreateVendorPicAdmin(ctx, db.CreateVendorPicAdminParams{
 			VendorID: p.VendorID, VendorBranchID: p.VendorBranchID, Name: p.Name, Position: p.Position,
 			Phone: p.Phone, Email: p.Email, IsNotificationRecipient: p.IsNotificationRecipient, Roles: roles,
+			IsDirector: isDirector,
 		})
 		if err != nil {
-			return 0, nil, fmt.Errorf("create vendor pic: %w", err)
+			return 0, nil, directorConstraintErr("create vendor pic", err)
 		}
 		return created.ID, created, nil
 
@@ -44,14 +52,32 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor pic update payload: %w", err)
 		}
+		cur, err := q.GetVendorPicAdminByID(ctx, *change.EntityID)
+		if err != nil {
+			return 0, nil, fmt.Errorf("load vendor pic: %w", err)
+		}
+		isDirector := cur.IsDirector
+		if p.IsDirector != nil {
+			isDirector = *p.IsDirector
+		}
+		becomesDirector := isDirector && !cur.IsDirector
+		if becomesDirector {
+			// roles must be empty before is_director flips (vendor_pics_director_roles_chk).
+			if _, err := q.SetVendorPicRoles(ctx, db.SetVendorPicRolesParams{Roles: []string{}, ID: cur.ID, VendorID: cur.VendorID}); err != nil {
+				return 0, nil, directorConstraintErr("clear director roles", err)
+			}
+		}
 		updated, err := q.UpdateVendorPicAdmin(ctx, db.UpdateVendorPicAdminParams{
 			ID: *change.EntityID, VendorBranchID: p.VendorBranchID, Name: p.Name, Position: p.Position,
 			Phone: p.Phone, Email: p.Email, IsNotificationRecipient: p.IsNotificationRecipient,
+			IsDirector: isDirector,
 		})
 		if err != nil {
-			return 0, nil, fmt.Errorf("update vendor pic: %w", err)
+			return 0, nil, directorConstraintErr("update vendor pic", err)
 		}
-		if p.Roles != nil {
+		if becomesDirector {
+			updated.Roles = []string{}
+		} else if p.Roles != nil && !isDirector {
 			set, err := q.SetVendorPicRoles(ctx, db.SetVendorPicRolesParams{Roles: *p.Roles, ID: updated.ID, VendorID: updated.VendorID})
 			if err != nil {
 				return 0, nil, fmt.Errorf("set vendor pic roles: %w", err)
@@ -74,13 +100,25 @@ func (VendorPicApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 			return 0, nil, fmt.Errorf("enable requires entity_id")
 		}
 		if err := q.EnableVendorPic(ctx, *change.EntityID); err != nil {
-			return 0, nil, fmt.Errorf("enable vendor pic: %w", err)
+			return 0, nil, directorConstraintErr("enable vendor pic", err)
 		}
 		return *change.EntityID, map[string]bool{"is_active": true}, nil
 
 	default:
 		return 0, nil, fmt.Errorf("unsupported op=%s for entity_type=vendor_pic", change.Op)
 	}
+}
+
+// directorConstraintErr maps a director unique/check violation (another active
+// director appeared, or the row no longer fits the director shape) to
+// ErrMasterDataChangeStale so applyOne retires the change as stale (vendor-pks 7.3).
+func directorConstraintErr(op string, err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && (pgErr.Code == "23505" || pgErr.Code == "23514") &&
+		strings.HasPrefix(pgErr.ConstraintName, "vendor_pics_director") {
+		return fmt.Errorf("%s: %w: %v", op, ErrMasterDataChangeStale, err)
+	}
+	return fmt.Errorf("%s: %w", op, err)
 }
 
 // CurrentState implements Applier: same db.GetVendorPicAdminByIDRow shape

@@ -274,7 +274,7 @@ func (f *t61Fix) run(kind Kind, q url.Values, start *time.Time, asOf time.Time, 
 	if reader == nil {
 		reader = pgReader{pool: f.pool}
 	}
-	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, reader, NewProducers(start), WorkerConfig{})
+	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, reader, NewProducers(start, 9), WorkerConfig{})
 	w.now = func() time.Time { return asOf }
 	st, err := w.produce(ctx, job)
 	if err != nil {

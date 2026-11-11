@@ -58,7 +58,7 @@ func (VendorVaultApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Master
 		created, err := q.CreateVendorVaultAdmin(ctx, db.CreateVendorVaultAdminParams{
 			VendorBranchID: p.VendorBranchID, VaultCode: p.VaultCode, Category: p.Category, CurrencyCode: p.CurrencyCode,
 			MinCapacityAmount: minC, MaxCapacityAmount: maxC, Latitude: lat, Longitude: lon,
-			OperatingHours: p.OperatingHours, LocationID: p.LocationID,
+			OperatingHours: p.OperatingHours, LocationID: p.LocationID, EscrowAccount: p.EscrowAccount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor vault: %w", err)
@@ -80,7 +80,7 @@ func (VendorVaultApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Master
 		updated, err := q.UpdateVendorVaultAdmin(ctx, db.UpdateVendorVaultAdminParams{
 			ID: *change.EntityID, Category: p.Category, CurrencyCode: p.CurrencyCode,
 			MinCapacityAmount: minC, MaxCapacityAmount: maxC, Latitude: lat, Longitude: lon,
-			OperatingHours: p.OperatingHours, LocationID: p.LocationID,
+			OperatingHours: p.OperatingHours, LocationID: p.LocationID, EscrowAccount: p.EscrowAccount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor vault: %w", err)

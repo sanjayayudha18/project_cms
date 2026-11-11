@@ -299,7 +299,7 @@ func stageCreate(ctx context.Context, maker int64, entity string, v map[string]s
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
 		_, err = s.Branches.Create(ctx, maker, VendorBranchPayload{VendorID: env.vendors[v["vendor_code"]], BranchCode: v["branch_code"],
-			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
+			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"], CisLimitAmount: optStr(v["cis_limit_amount"])}, ip)
 	case ExportVendorVaults:
 		_, err = s.Vaults.Create(ctx, maker, env.vendors[v["vendor_code"]], VendorVaultPayload{
 			VendorBranchID: env.branches[v["vendor_code"]+"|"+v["branch_code"]], VaultCode: v["vault_code"],
@@ -327,13 +327,18 @@ func stageUpdate(ctx context.Context, maker int64, entity string, row ImportRow,
 		_, err = s.Vendors.Update(ctx, maker, id, UpdateVendorRequest{Name: v["name"], LegalName: &legal, NPWP: &npwp,
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
-		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
+		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"], CisLimitAmount: optStr(v["cis_limit_amount"])}, ip)
 	case ExportVendorVaults:
 		_, err = s.Vaults.Update(ctx, maker, id, vaultFields(v), ip)
 	case ExportVendorPICs:
 		p := picFields(v, env)
 		if v["roles"] == env.cur[id]["roles"] {
 			p.Roles = nil // roles not changed by this file: leave them (and any concurrent change) alone
+		}
+		p.IsDirector = nil // director flag not changed by this file: leave it alone
+		if d := v["is_director"]; d != env.cur[id]["is_director"] {
+			isDirector := d == "true"
+			p.IsDirector = &isDirector
 		}
 		_, err = s.PICs.Update(ctx, maker, env.vendors[v["vendor_code"]], id, p, ip)
 	case ExportATMs:
@@ -396,7 +401,8 @@ func vaultFields(v map[string]string) VendorVaultUpdatePayload {
 	return VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
 		MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
 		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"]),
-		OperatingHours: optStr(v["operating_hours"]), LocationID: optInt64(v["location_id"])}
+		OperatingHours: optStr(v["operating_hours"]), LocationID: optInt64(v["location_id"]),
+		EscrowAccount: optStr(v["escrow_account"])}
 }
 
 func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
@@ -406,8 +412,13 @@ func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {
 		branch = &id
 	}
 	roles, _ := parsePicRoles(v["roles"]) // already validated in the dry-run
-	return VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
+	p := VendorPicUpdatePayload{VendorBranchID: branch, Name: v["name"], Position: optStr(v["position"]),
 		Phone: optStr(v["phone"]), Email: optStr(v["email"]), IsNotificationRecipient: v["is_notification_recipient"] == "true", Roles: roles}
+	if v["is_director"] == "true" {
+		isDirector := true
+		p.IsDirector = &isDirector
+	}
+	return p
 }
 
 func assignmentFields(v map[string]string, env *importEnv) ATMAssignmentUpdatePayload {

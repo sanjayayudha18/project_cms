@@ -247,6 +247,7 @@ func main() {
 		"vendor_package_price": service.VendorPackagePriceApplier{},
 		"atm_assignment":       service.ATMAssignmentApplier{},
 		"dsr_location_map":     service.DsrLocationMapApplier{},
+		"vendor_pks":           service.VendorPksApplier{},
 	}
 	masterDataChangeRepo := repository.NewMasterDataChangeRepository(dbPool)
 
@@ -297,7 +298,13 @@ func main() {
 	// return 202; VendorApplier applies it once approved. Mounted before the
 	// /vendors/{vendorID}/... sub-resources below, as before.
 	vendorAdminRepo := repository.NewVendorAdminRepository(dbPool, dbReadPool)
-	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, masterDataChangeService)
+	// vendor-pks 6.1: "Need Renewal" threshold; must equal backend-exq's value. renewalMonths is also used by 8.1.
+	renewalMonths, err := reports.ParseVendorPksRenewalMonths(getenvDefault("VENDOR_PKS_RENEWAL_MONTHS", ""))
+	if err != nil {
+		slog.Error("invalid VENDOR_PKS_RENEWAL_MONTHS", "error", err)
+		os.Exit(1)
+	}
+	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, masterDataChangeService, service.WithPksRenewalMonths(renewalMonths))
 	adminVendorHandler := handler.NewAdminVendorHandler(vendorAdminService)
 	masterDataAdmin.Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
 
@@ -345,6 +352,10 @@ func main() {
 	vendorPicAdminService := service.NewVendorPicAdminService(vendorPicAdminRepo, masterDataChangeService)
 	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService, service.NewVendorPicRoleService(dbPool))
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
+
+	// ADMIN/ADMIN_PARAM-only: PKS vendor (spec vendor-pks 8.1), maker-checker; reads on primary.
+	vendorPksAdminService := service.NewVendorPksAdminService(repository.NewVendorPksAdminRepository(dbPool), masterDataChangeService, renewalMonths)
+	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pks", handler.NewAdminVendorPksHandler(vendorPksAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same
 	// maker-checker-native flow; price is a decimal string (numeric(20,2)).

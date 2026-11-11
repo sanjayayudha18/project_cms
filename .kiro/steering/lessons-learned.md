@@ -200,6 +200,8 @@ When upgrading pnpm across major versions (e.g., 9→11), the lockfile format ch
 
 Also: `corepack prepare` and `corepack install --global` can both fail in `node:22-alpine` for pnpm 11.x. Use `npm install -g pnpm@<exact-version>` in Dockerfiles for reliable installs.
 
+> **Status pnpm 12 (2026-11-03):** The lockfile mismatch is still a valid pattern. Correction: pnpm 11 in this repo keeps writing `lockfileVersion: '9.0'`, not `10.0`, and pnpm 12 keeps `9.0` too. The corepack sentence still applies: both Dockerfiles now use `npm install -g pnpm@12.16.1`.
+
 ### pnpm 11 Docker builds: must COPY `pnpm-workspace.yaml` before `pnpm install`
 pnpm 11 no longer reads config from `package.json#pnpm`. All settings (including `allowBuilds` for postinstall scripts) moved to `pnpm-workspace.yaml`. In Dockerfiles, the COPY line before `pnpm install` MUST include `pnpm-workspace.yaml`:
 ```dockerfile
@@ -207,6 +209,22 @@ COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 ```
 Without it, pnpm sees no build allowlist and fails with `ERR_PNPM_IGNORED_BUILDS` for packages like `@biomejs/biome` and `esbuild`. The `pnpm.onlyBuiltDependencies` field in `package.json` does nothing in pnpm 11 — use `allowBuilds` in `pnpm-workspace.yaml` instead.
+
+> **Status pnpm 12 (2026-11-03):** Still applies. pnpm 12 reads `allowBuilds` from `pnpm-workspace.yaml`, as before.
+
+### pnpm 11 → 12 upgrade (2026-11-03)
+Both portals now pin `packageManager` to `pnpm@12.16.1`. What to know:
+- A `pnpm-workspace.yaml` setting that pnpm 12 does not know fails with `ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS` once a pnpm version is pinned. Check every key before you change the pin. This repo only sets `allowBuilds`, which pnpm 12 knows.
+- The lockfile stays `lockfileVersion: '9.0'`. A cyclic dependency graph can cause one peer-variant diff on the first install that re-resolves. Commit that diff in the upgrade PR. `--frozen-lockfile` uses the lockfile as it is.
+- `pnpm install --frozen-lockfile false` and `--resolution-only` are rejected. Use `--no-frozen-lockfile` and `pnpm peers check` instead.
+- `ENOEXEC` / "Failed to switch pnpm": an old global pnpm tries to run the pnpm 12 shim, which has no shebang. Install pnpm 12 globally with `npm install -g pnpm@12.16.1`, and check `where.exe pnpm` for a second copy. Do not delete the pnpm cache. `pnpm self-update` to 12 only works from pnpm 11.10.0 or newer.
+- Dockerfile: `npm install -g pnpm@<exact-version>`, no corepack.
+- Boot document: a `packageManager` pin of pnpm 12 or newer makes pnpm write the first YAML document in `pnpm-lock.yaml` (`packageManagerDependencies` plus `@pnpm/exe.*` per platform, with hashes). It does this even with `--frozen-lockfile` when the document is missing. Commit it together with the pin. Any tool that parses the lockfile must read the last document for the project graph.
+- Symptom on this machine: global pnpm 11.9.0 → 12.16.1 via `npm install -g` ran with no `ENOEXEC`, and the install is in one location, `%AppData%\npm`.
+- `pnpm exec esbuild` fails with "Command esbuild not found". esbuild is only a transitive dependency of vite, so there is no `.bin` shim (same in pnpm 11). Check it with `require` through vite, or with `pnpm build`.
+- A baseline `pnpm audit --prod` can already be red from advisories in app dependencies. Compare the set of advisory IDs (parity), not the exit code.
+
+### Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b`
 
 ### Docker production build: use `tsc -b tsconfig.app.json`, not `tsc -b`
 

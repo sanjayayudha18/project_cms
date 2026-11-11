@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -22,15 +23,23 @@ type ReportQuerier interface {
 	ListReplenishClassifications(ctx context.Context, arg repository.ListReplenishClassificationsParams) ([]repository.ListReplenishClassificationsRow, error)
 	ListReplenishClassificationAmounts(ctx context.Context, ids []int64) ([]repository.ReplenishClassificationAmount, error)
 	ReportReplenishTrips(ctx context.Context, arg repository.ReportReplenishTripsParams) ([]repository.ReportReplenishTripsRow, error)
+	ExportVendorPksBatch(ctx context.Context, arg repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error)
 }
 
 var _ ReportQuerier = (*repository.Queries)(nil)
+
+func reportHeader(kind Kind) []string {
+	if kind == KindVendorPks {
+		return slices.Clone(reports.VendorPksHeader)
+	}
+	return reports.Header(string(kind))
+}
 
 type reportFn func(ctx context.Context, q Querier, r ReportParams, asOf time.Time, emit func([]string) error) error
 
 // reportProducer fails a job without report_params before running fn.
 func reportProducer(kind Kind, fn reportFn) Producer {
-	return producer{reports.Header(string(kind)), func(ctx context.Context, q Querier, p Params, asOf time.Time, emit func([]string) error) error {
+	return producer{reportHeader(kind), func(ctx context.Context, q Querier, p Params, asOf time.Time, emit func([]string) error) error {
 		if p.Report == nil {
 			return fmt.Errorf("%w: %s", errNoReportParams, kind)
 		}
@@ -40,12 +49,13 @@ func reportProducer(kind Kind, fn reportFn) Producer {
 
 // reportProducers maps the four report kinds (entity = legacy `report` value). dsrStart nil
 // (DSR_LATE_START_DATE unset) = DSR files are header only (Req 1.5).
-func reportProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
+func reportProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string]Producer {
 	return map[Kind]map[string]Producer{
 		KindDsrLateDaily:                {"daily": reportProducer(KindDsrLateDaily, dsrDailyFn(dsrStart))},
 		KindDsrLateSummary:              {"summary": reportProducer(KindDsrLateSummary, dsrSummaryFn(dsrStart))},
 		KindReplenishmentAmountMismatch: {"amount_mismatch": reportProducer(KindReplenishmentAmountMismatch, amountMismatchFn)},
 		KindReplenishmentTrips:          {"trips": reportProducer(KindReplenishmentTrips, tripsFn)},
+		KindVendorPks:                   {"vendor_pks": vendorPksProducer(pksRenewalMonths)},
 	}
 }
 
@@ -241,4 +251,63 @@ func tripsFn(ctx context.Context, q Querier, r ReportParams, _ time.Time, emit f
 		}
 	}
 	return nil
+}
+
+// vendorPksProducer: one line per vendor (name, id keyset) with its active PKS and director, as of
+// the WIB day of the job. renewalMonths = VENDOR_PKS_RENEWAL_MONTHS. Status/remaining days are
+// computed in SQL (vendor_pks_status), so the file equals the vendor list screen.
+func vendorPksProducer(renewalMonths int) Producer {
+	return reportProducer(KindVendorPks, func(ctx context.Context, q Querier, r ReportParams, asOf time.Time, emit func([]string) error) error {
+		status := "active"
+		if r.VendorStatus != nil {
+			status = *r.VendorStatus
+		}
+		arg := repository.ExportVendorPksBatchParams{
+			Today: wibDate(reports.TodayWIB(asOf)), RenewalMonths: int32(renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
+			Q: r.Q, Status: status, PksStatus: r.PksStatus, BatchSize: PageSize,
+		}
+		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			rows, err := q.ExportVendorPksBatch(ctx, arg)
+			if err != nil {
+				return fmt.Errorf("export vendor pks after id %d: %w", arg.AfterID, err)
+			}
+			for _, x := range rows {
+				if err := emit(reports.VendorPksCells(vendorPksRow(x))); err != nil {
+					return err
+				}
+			}
+			if len(rows) < PageSize {
+				return nil
+			}
+			last := rows[len(rows)-1]
+			arg.AfterName, arg.AfterID = last.VendorName, last.ID
+		}
+	})
+}
+
+func vendorPksRow(x repository.ExportVendorPksBatchRow) reports.VendorPksRow {
+	row := pksDetailRow(x.DirectorName, x.DirectorPhone, x.DirectorEmail, x.PksName,
+		x.EffectiveDate, x.ExpiryDate, x.ValidityMonths, x.RemainingDays, x.PksStatus)
+	row.VendorCode, row.VendorName = x.VendorCode, x.VendorName
+	return row
+}
+
+// pksDetailRow is the director + active-PKS part of a vendor row; shared by the
+// vendor_pks report and the vendor master-data export so the empty-cell rule lives here.
+func pksDetailRow(dirName, dirPhone, dirEmail, pksName *string, effective, expiry pgtype.Date,
+	validityMonths, remainingDays int32, pksStatus string) reports.VendorPksRow {
+	row := reports.VendorPksRow{
+		DirectorName: dirName, DirectorPhone: dirPhone, DirectorEmail: dirEmail,
+		PksName: pksName, EffectiveDate: datePtr(effective), ExpiryDate: datePtr(expiry),
+	}
+	if expiry.Valid { // no active PKS: validity, remaining days and status stay empty
+		row.ValidityMonths, row.RemainingDays = &validityMonths, &remainingDays
+	}
+	if pksStatus != "" {
+		row.PksStatus = &pksStatus
+	}
+	return row
 }

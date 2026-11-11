@@ -208,6 +208,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/reports/vendor-pks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request the vendor PKS report export (kind vendor_pks) */
+        post: operations["requestVendorPksExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/master-data/{entity}/template": {
         parameters: {
             query?: never;
@@ -285,7 +302,7 @@ export interface components {
         /** @enum {string} */
         PriceLevel: "vendor" | "branch" | "atm" | "all";
         /** @enum {string} */
-        ExportKind: "vendor" | "cabang" | "harga_paket" | "master_data_global" | "dsr_late_daily" | "dsr_late_summary" | "replenishment_amount_mismatch" | "replenishment_trips";
+        ExportKind: "vendor" | "cabang" | "harga_paket" | "master_data_global" | "dsr_late_daily" | "dsr_late_summary" | "replenishment_amount_mismatch" | "replenishment_trips" | "vendor_pks";
         /** @description Validated filter of a report export; keys that do not apply to the kind are absent. Sent again as query string by "Minta ekspor lagi". */
         ReportParams: {
             /** @description YYYY-MM (DSR) */
@@ -831,6 +848,28 @@ export interface operations {
                 date_to?: components["parameters"]["ReportDateTo"];
                 vendor_id?: components["parameters"]["ReportVendorID"];
                 region_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["JobExisting"];
+            202: components["responses"]["JobCreated"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyExports"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    requestVendorPksExport: {
+        parameters: {
+            query?: {
+                q?: string;
+                status?: "active" | "disabled" | "all";
+                pks_status?: "aktif" | "need_renewal" | "expired" | "terminated" | "belum_diisi";
             };
             header?: never;
             path?: never;

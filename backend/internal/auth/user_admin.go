@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/mail"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -15,12 +14,13 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/auth"
+	"github.com/cimb-niaga/cms/pkg/userrules"
 )
 
 // pgUniqueViolation is the Postgres error code for a unique-constraint
 // violation, used as the create/update fallback when the pre-check misses a
 // race (design.md "Error -> HTTP mapping").
-const pgUniqueViolation = "23505"
+const pgUniqueViolation = userrules.PgUniqueViolation
 
 // Sentinel/structured errors for UserAdminService, distinct from
 // pkg/auth.ValidationError (422 field validation) per design.md's error
@@ -57,26 +57,12 @@ func isUserAdminActor(role string) bool {
 
 // ConflictError represents a 409 uniqueness conflict on a specific field
 // (username/email/employee_id, Req 3.5, 4.5).
-type ConflictError struct {
-	Field   string
-	Message string
-}
-
-func (e *ConflictError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Field, e.Message)
-}
+type ConflictError = userrules.ConflictError
 
 // ReferenceError represents a 400 "invalid_reference" error: role/vendor_id/
 // supervisor_id was supplied but does not resolve to an existing record
 // (Req 3.6, 3.7, 4.7).
-type ReferenceError struct {
-	Field   string
-	Message string
-}
-
-func (e *ReferenceError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Field, e.Message)
-}
+type ReferenceError = userrules.ReferenceError
 
 // UserAdminRepo is the repository surface UserAdminService needs.
 // *repository.UserAdminRepository satisfies this automatically. Narrow so
@@ -218,7 +204,7 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, actorRole 
 	if username == "" {
 		return db.CreateUserAdminRow{}, &auth.ValidationError{Field: "username", Message: "wajib diisi"}
 	}
-	if err := validateProfile(fullName, email, role); err != nil {
+	if err := userrules.ValidateProfile(fullName, email, role); err != nil {
 		return db.CreateUserAdminRow{}, err
 	}
 	if err := vendorFields(role, authSource, req.VendorID, req.VendorBranchID); err != nil {
@@ -231,16 +217,16 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, actorRole 
 	}
 
 	existingID, err := s.repo.FindByUsername(ctx, username)
-	if err := uniqueness("username", existingID, err); err != nil {
+	if err := userrules.Uniqueness("username", existingID, err); err != nil {
 		return db.CreateUserAdminRow{}, err
 	}
 	existingID, err = s.repo.FindByEmail(ctx, email)
-	if err := uniqueness("email", existingID, err); err != nil {
+	if err := userrules.Uniqueness("email", existingID, err); err != nil {
 		return db.CreateUserAdminRow{}, err
 	}
 	if employeeID != "" {
 		existingID, err = s.repo.FindByEmployeeID(ctx, employeeID)
-		if err := uniqueness("employee_id", existingID, err); err != nil {
+		if err := userrules.Uniqueness("employee_id", existingID, err); err != nil {
 			return db.CreateUserAdminRow{}, err
 		}
 	}
@@ -255,7 +241,7 @@ func (s *UserAdminService) Create(ctx context.Context, actorID int64, actorRole 
 
 	created, err := s.repo.Create(ctx, db.CreateUserAdminParams{
 		RoleID:             roleID,
-		EmployeeID:         nilIfEmpty(employeeID),
+		EmployeeID:         userrules.NilIfEmpty(employeeID),
 		Username:           username,
 		FullName:           fullName,
 		Email:              email,
@@ -304,7 +290,8 @@ func (s *UserAdminService) Update(ctx context.Context, actorID int64, actorRole 
 	if err != nil {
 		return db.UpdateUserAdminRow{}, fmt.Errorf("loading user: %w", err)
 	}
-	if before == nil || before.DeletedAt.Valid {
+	// Service accounts (ext-user-api) are invisible to AdminUserAPI (Req 9.5).
+	if before == nil || before.DeletedAt.Valid || before.AuthSource == userrules.AuthSourceService {
 		return db.UpdateUserAdminRow{}, auth.ErrUserNotFound
 	}
 
@@ -315,7 +302,7 @@ func (s *UserAdminService) Update(ctx context.Context, actorID int64, actorRole 
 	fullName := strings.TrimSpace(req.FullName)
 	email := strings.TrimSpace(req.Email)
 	role := strings.TrimSpace(req.Role)
-	if err := validateProfile(fullName, email, role); err != nil {
+	if err := userrules.ValidateProfile(fullName, email, role); err != nil {
 		return db.UpdateUserAdminRow{}, err
 	}
 	branchID := before.VendorBranchID
@@ -353,7 +340,7 @@ func (s *UserAdminService) Update(ctx context.Context, actorID int64, actorRole 
 		Email:          email,
 		RoleID:         roleID,
 		IsKaryawan:     req.IsKaryawan,
-		EmployeeID:     nilIfEmpty(employeeID),
+		EmployeeID:     userrules.NilIfEmpty(employeeID),
 		VendorID:       req.VendorID,
 		VendorBranchID: branchID,
 		SupervisorID:   req.SupervisorID,
@@ -388,13 +375,13 @@ func changesImmutable(req UpdateUserRequest, before *db.GetUserAdminByIDRow) boo
 func (s *UserAdminService) uniqueOnUpdate(ctx context.Context, id int64, before *db.GetUserAdminByIDRow, email, employeeID string) error {
 	if email != before.Email {
 		existingID, err := s.repo.FindByEmailExcludingID(ctx, email, id)
-		if err := uniqueness("email", existingID, err); err != nil {
+		if err := userrules.Uniqueness("email", existingID, err); err != nil {
 			return err
 		}
 	}
 	if employeeID != "" && (before.EmployeeID == nil || employeeID != *before.EmployeeID) {
 		existingID, err := s.repo.FindByEmployeeIDExcludingID(ctx, employeeID, id)
-		if err := uniqueness("employee_id", existingID, err); err != nil {
+		if err := userrules.Uniqueness("employee_id", existingID, err); err != nil {
 			return err
 		}
 	}
@@ -411,22 +398,6 @@ func mapUserUpdateError(err error) error {
 		return &ConflictError{Field: field, Message: "sudah digunakan"}
 	}
 	return fmt.Errorf("updating user: %w", err)
-}
-
-// validateProfile checks the fields Create and Update share, in the order the
-// form shows them (first failing field wins).
-func validateProfile(fullName, email, role string) error {
-	switch {
-	case fullName == "":
-		return &auth.ValidationError{Field: "full_name", Message: "wajib diisi"}
-	case email == "":
-		return &auth.ValidationError{Field: "email", Message: "wajib diisi"}
-	case !isValidEmail(email):
-		return &auth.ValidationError{Field: "email", Message: "format email tidak valid"}
-	case role == "":
-		return &auth.ValidationError{Field: "role", Message: "wajib diisi"}
-	}
-	return nil
 }
 
 // vendorFields enforces the vendor-role rules that need no DB (vendor-party-
@@ -504,21 +475,13 @@ func localCredentials(authSource string, vendorID *int64, temporaryPassword stri
 	return nil, &auth.ValidationError{Field: "auth_source", Message: "harus ldap atau local"}
 }
 
-// uniqueness turns a FindByXxx lookup result into a 409 when another user
-// already holds the value.
-func uniqueness(field string, existingID *int64, err error) error {
-	if err != nil {
-		return fmt.Errorf("checking %s uniqueness: %w", field, err)
-	}
-	if existingID != nil {
-		return &ConflictError{Field: field, Message: "sudah digunakan"}
-	}
-	return nil
-}
-
 // resolveReferences resolves the role name to its id and checks that the
 // optional vendor/supervisor exist (Req 3.6, 3.7, 4.7).
 func (s *UserAdminService) resolveReferences(ctx context.Context, role string, vendorID, supervisorID *int64) (int64, error) {
+	// The service-account role is reserved for ext-user-api clients (Req 9.6).
+	if role == userrules.ServiceRole {
+		return 0, &ReferenceError{Field: "role", Message: "tidak dapat diberikan"}
+	}
 	roleRow, err := s.repo.GetRoleByName(ctx, role)
 	if err != nil {
 		return 0, fmt.Errorf("resolving role: %w", err)
@@ -568,31 +531,5 @@ func conflictFieldFromPgError(err error) (field string, ok bool) {
 	if !errors.As(err, &pgErr) || pgErr.Code != pgUniqueViolation {
 		return "", false
 	}
-	switch pgErr.ConstraintName {
-	case "users_username_key":
-		return "username", true
-	case "users_email_key":
-		return "email", true
-	case "users_employee_id_key":
-		return "employee_id", true
-	default:
-		return "unknown", true
-	}
-}
-
-// nilIfEmpty converts an already-trimmed string into a *string for the
-// nullable employee_id column, nil meaning "not provided" rather than an
-// empty string.
-func nilIfEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-// isValidEmail is a basic format check via the stdlib RFC 5322 parser (Req
-// 3.2, 4.1). Good enough for a format guard; it is not a deliverability check.
-func isValidEmail(s string) bool {
-	_, err := mail.ParseAddress(s)
-	return err == nil
+	return userrules.ConflictFieldFromConstraint(pgErr.ConstraintName), true
 }

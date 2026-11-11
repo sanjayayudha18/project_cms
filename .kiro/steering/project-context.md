@@ -70,6 +70,7 @@ CMS2/
   backend-cit/               # CIT backend — own go.mod, port 8081
     cmd/api/main.go          # health check + RequireAuth-protected route group; validates tokens, issues none
     internal/<module>/       # CIT-specific: cit, journal, dsr, reconciliation, integration, handler, service, repository
+  backend-extapi/            # External user API for CIMB IDM (spec ext-user-api) — own go.mod, port 8082; /api/ext/v1/* only; depends on pkg/ only, never imports backend/ or backend-exq/ (and they never import it)
 ```
 
 **ATM's `internal/handler` keeps its existing flat JSON response shape** (e.g. `{"access_token":...}`) for wire compatibility with `CompanyPortal-Vite`/`VendorPortal-Vite` — it does NOT use `pkg/response`'s envelope. New CIT endpoints in `backend-cit` should use `pkg/response`.

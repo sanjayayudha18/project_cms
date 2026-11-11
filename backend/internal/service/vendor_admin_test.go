@@ -52,6 +52,10 @@ func (f *fakeVendorAdminRepo) FindByCode(ctx context.Context, code string) (*int
 	return nil, nil
 }
 
+func (f *fakeVendorAdminRepo) GetKindAndDirector(context.Context, int64) (string, *db.GetVendorDirectorPicRow, error) {
+	return "FLM_VENDOR", nil, nil
+}
+
 func (f *fakeVendorAdminRepo) CountActiveUsers(ctx context.Context, vendorID int64) (int64, error) {
 	if f.countActiveUsersFunc != nil {
 		return f.countActiveUsersFunc(ctx, vendorID)

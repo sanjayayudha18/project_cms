@@ -134,7 +134,11 @@ func scopedRows(t *testing.T, ctx context.Context, q *db.Queries, entity string,
 				t.Fatalf("%s: %v", entity, err)
 			}
 			for _, r := range rows {
-				page, last = append(page, csvexport.VendorPICCells(csvexport.VendorPICRow(r))), r.ID
+				page, last = append(page, csvexport.VendorPICCells(csvexport.VendorPICRow{
+					ID: r.ID, VendorCode: r.VendorCode, BranchCode: r.BranchCode, Name: r.Name, Position: r.Position,
+					Phone: r.Phone, Email: r.Email, IsNotificationRecipient: r.IsNotificationRecipient,
+					IsActive: r.IsActive, IsDirector: r.IsDirector, Roles: r.Roles,
+				})), r.ID
 			}
 		}
 		out = append(out, page...)

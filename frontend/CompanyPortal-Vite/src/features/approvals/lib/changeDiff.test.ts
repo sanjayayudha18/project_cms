@@ -72,3 +72,78 @@ describe("formatValue / humanizeField / changeSubject", () => {
     expect(changeSubject({ payload: {}, before: null, entity_id: 4 })).toBe("#4");
   });
 });
+
+describe("vendor_pks labels and diff (vendor-pks Req 10.1, 11.4)", () => {
+  it("labels the entity and the per-entity op wording", async () => {
+    const { ENTITY_LABELS, OP_LABELS, opLabel } = await import("./changeDiff");
+
+    expect(ENTITY_LABELS.vendor_pks).toBe("PKS vendor");
+    expect(opLabel("vendor_pks", "disable")).toBe("Terminate PKS");
+    expect(opLabel("vendor_pks", "enable")).toBe("Batalkan terminate");
+    expect(opLabel("vendor_pks", "create")).toBe(OP_LABELS.create);
+    expect(opLabel("vendor", "disable")).toBe(OP_LABELS.disable);
+  });
+
+  it("terminate diff names the PKS (from the snapshot) and the reason", () => {
+    const diff = diffFields({
+      entity_type: "vendor_pks",
+      op: "disable",
+      payload: { vendor_id: 42, reason: "Kontrak diputus" },
+      before: { pks_name: "PKS 2026" },
+    });
+
+    expect(diff).toEqual([
+      {
+        field: "pks_name",
+        label: "Nama PKS",
+        before: "PKS 2026",
+        after: "PKS 2026",
+        changed: false,
+      },
+      { field: "reason", label: "Alasan", before: "—", after: "Kontrak diputus", changed: true },
+    ]);
+  });
+
+  it("cancel-terminate diff has the same shape", () => {
+    const diff = diffFields({
+      entity_type: "vendor_pks",
+      op: "enable",
+      payload: { reason: "Salah input" },
+      before: { pks_name: "PKS 2026" },
+    });
+
+    expect(diff.map((d) => d.field)).toEqual(["pks_name", "reason"]);
+    expect(diff[1].after).toBe("Salah input");
+  });
+
+  it("other entities keep the plain is_active diff for disable", () => {
+    const diff = diffFields({
+      entity_type: "vendor",
+      op: "disable",
+      payload: {},
+      before: { is_active: true },
+    });
+
+    expect(diff).toHaveLength(1);
+    expect(diff[0].field).toBe("is_active");
+  });
+
+  it("labels is_director on a PIC diff as 'Direktur Utama'", () => {
+    const diff = diffFields({
+      entity_type: "vendor_pic",
+      op: "update",
+      payload: { is_director: true },
+      before: { is_director: false },
+    });
+
+    expect(diff).toEqual([
+      {
+        field: "is_director",
+        label: "Direktur Utama",
+        before: "Tidak",
+        after: "Ya",
+        changed: true,
+      },
+    ]);
+  });
+});

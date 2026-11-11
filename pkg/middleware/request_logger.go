@@ -24,7 +24,10 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
-			next.ServeHTTP(ww, r)
+			// Empty holder that downstream auth middleware may fill; read after
+			// the handler returns.
+			fields := &LogFields{}
+			next.ServeHTTP(ww, r.WithContext(WithLogFields(r.Context(), fields)))
 
 			status := ww.Status()
 			if status == 0 { // handler wrote nothing: net/http sends 200
@@ -54,7 +57,7 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			// Background ctx: the request ctx may already be cancelled (Timeout,
 			// client gone) and the line must still be written.
-			logger.LogAttrs(context.Background(), level, "http_request",
+			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("route", route),
 				slog.String("path", r.URL.Path),
@@ -63,7 +66,31 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.String("request_id", chimw.GetReqID(r.Context())),
 				slog.String("remote_ip", remoteIP),
-			)
+			}
+			if fields.ClientID != "" {
+				attrs = append(attrs, slog.String("client_id", fields.ClientID))
+			}
+			logger.LogAttrs(context.Background(), level, "http_request", attrs...)
 		})
 	}
+}
+
+// LogFields carries extra log attributes filled by middleware after
+// RequestLogger runs. Values come only from verified server-side state, never
+// from request headers.
+type LogFields struct {
+	ClientID string
+}
+
+type logFieldsKey struct{}
+
+// WithLogFields stores f in ctx.
+func WithLogFields(ctx context.Context, f *LogFields) context.Context {
+	return context.WithValue(ctx, logFieldsKey{}, f)
+}
+
+// LogFieldsFrom returns the holder placed by RequestLogger, or nil.
+func LogFieldsFrom(ctx context.Context) *LogFields {
+	f, _ := ctx.Value(logFieldsKey{}).(*LogFields)
+	return f
 }

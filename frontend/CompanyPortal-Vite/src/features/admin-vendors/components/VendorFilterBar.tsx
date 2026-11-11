@@ -1,5 +1,14 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
+import type { PksStatus } from "../types";
 import type { AdminVendorsUrlParams } from "../useAdminVendorsUrlState";
+
+const PKS_STATUS_OPTIONS: { value: PksStatus; label: string }[] = [
+  { value: "aktif", label: "Aktif" },
+  { value: "need_renewal", label: "Need Renewal" },
+  { value: "expired", label: "Expired" },
+  { value: "terminated", label: "Terminated" },
+  { value: "belum_diisi", label: "Belum diisi" },
+];
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Aktif" },
@@ -52,6 +61,16 @@ export function VendorFilterBar({
           })
         }
         placeholder="Aktif"
+      />
+
+      <FilterSelect
+        label="Status PKS"
+        options={PKS_STATUS_OPTIONS}
+        value={params.pks_status ?? null}
+        onChange={(value) =>
+          onParamsChange({ pks_status: (value as PksStatus | null) ?? undefined })
+        }
+        placeholder="Semua"
       />
     </div>
   );

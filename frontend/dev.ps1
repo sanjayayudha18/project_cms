@@ -49,11 +49,11 @@ $portals = @{
 }
 
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    Write-Error "pnpm not found on PATH. Install it first: npm install -g pnpm  (or: corepack enable)"
+    Write-Error "pnpm not found on PATH. Install it first: npm install -g pnpm@12.16.1"
 }
 
 # Resolve which portals to act on.
-$selected = if ($Target -eq "all") { @("company", "vendor") } else { @($Target) }
+$selected = @(if ($Target -eq "all") { "company", "vendor" } else { $Target })
 
 # Command to run inside each portal.
 $script = if ($Preview) { "run build; if (`$LASTEXITCODE -eq 0) { pnpm run preview }" } else { "run dev" }

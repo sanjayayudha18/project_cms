@@ -5,8 +5,8 @@
 
 | # | Product | Role |
 | ---| ---| --- |
-| 1 | Compute Engine | Frontend (internal + vendor) |
-| 2 | Compute Engine | Backend, currently ONE VM running `backend/` (port 8080) only; `backend-exq/` (8081) is not deployed until it has content (decision 2026-10-08) — see split-VM plan below |
+| 1 | Compute Engine | ONE VM for everything: both frontends (Nginx) + `backend` (8080) + `backend-exq` (8081, from the export release X.7–X.9) + Python EOD |
+| 2 | Cloud Load Balancing | In front of the VM; separates FE and BE traffic (routing detail not designed yet) |
 | 3 | CloudSQL Postgres | Primary (write) |
 | 4 | CloudSQL Postgres | Read replica (reporting/dashboard) |
 | 5 | Cloud Storage | Uploads/exports/escrow batch files |
@@ -19,14 +19,13 @@
 | 12 | Cloud Logging | Structured logs |
 | 13 | Cloud Monitoring | Metrics/alerts (incl. replica lag) |
 
-**Current state (now): ONE Compute Engine VM runs `backend` only** (Docker container on 8080) — see `backend/docker-compose.yaml` (Sec 9). `backend-exq` (8081) is **not deployed**: it holds only empty `doc.go` files (CIT functions are built in `backend/`, decision 2026-10-08) and was renamed from `backend-cit` to `backend-exq` on 2026-10-20 (export + dashboard monitoring queries). It enters the deploy only once `backend-exq` has real content. The module stays in `go.work` and CI keeps building/testing it.
+**Target topology (decided 2026-11-05, user): ONE Compute Engine VM runs FE and BE**, each as its own Docker container (CompanyPortal + VendorPortal Nginx, `backend` 8080, `backend-exq` 8081, Python EOD). A **GCP Load Balancer** in front of the VM separates FE and BE traffic. The full LB setup (host/path rules, backend services + health checks on `/health`, firewall for the LB ranges, Cloud Armor, `TRUSTED_PROXIES` values) is **not designed yet**; write it here when it is. The earlier plan to split into one VM per backend in 2028 is **dropped**.
+*   Both backends share the **same** CloudSQL primary/replica (#3/#4), the **same** Memorystore Redis (#6, JWT blacklist + rate-limit counters) and the **same** `JWT_SECRET` (#9); `backend` is the only token issuer, `backend-exq` only validates.
+*   `backend-exq` (8081) holds the async export API, worker and janitor (`.kiro/specs/vendor-data-export/`, `report-export-migration/`, `export-menu-revamp/`); its first deployment ships with the export release, see "Release checklist: first `backend-exq` deployment".
 
-**Planned (2028): split into two separate Compute Engine VMs**, one per backend (once `backend-exq` is deployed). This is *why* the codebase was split into a Go workspace with a shared `pkg/` module (Sec 3) well ahead of the actual VM split: each backend already has its own `go.mod`/Dockerfile/image and zero import-time dependency on the other, so deploying the second backend to its own VM later requires **no code change** — just deploy its image to a new VM and repoint its `.env`. When that split happens:
-*   Both VMs must reach the **same** CloudSQL primary/replica (#3/#4) and the **same** Memorystore Redis (#6) — Redis is shared for JWT blacklist + rate-limit counters (`pkg/auth`, `pkg/middleware`), so a second Redis instance would desync those.
-*   `JWT_SECRET` must be identical on both VMs via Secret Manager (#9) — CIT only *validates* tokens (`pkg/auth.TokenService`), it never issues them; ATM is the sole issuer.
-*   Firewall/VPC rules must allow the CIT VM the same egress to CloudSQL + Memorystore as the ATM VM.
+**Current state (development phase)**: no GCP environment yet; everything runs on the developer's local PC (Sec 2a commands, `backend/docker-compose.yaml`, `frontend/docker-compose.yml`, external Postgres).
 
-**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, run with `-p 1` (packages share one DB), sqlc drift, Python unittest; frontend + E2E jobs added by fe-tech-debt E1 / be-tech-debt B5). CD = Cloud Build -> build image (`backend/Dockerfile`; `backend-exq/Dockerfile` is added only when `backend-exq` is deployed) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to Compute Engine (one VM, `backend` only, today; one VM per backend from 2028).
+**Pipeline**: CI = GitHub Actions `.github/workflows/ci.yml` on push/PR to `main`/`dev1` (Go vet + golangci-lint + govulncheck + `go test -race` per module, integration tests on Postgres 18 with all migrations and no skips, run with `-p 1` (packages share one DB), sqlc drift, Python unittest, `python-image` and `go-image` (builds `backend/Dockerfile` and `backend-exq/Dockerfile` from the repo root and fails on a root user or a missing HEALTHCHECK, `scripts/ci/check-image.sh`; build only, no push). There is no frontend or E2E job yet (open item, fe-tech-debt)). CD = Cloud Build -> build images (`backend/Dockerfile`, `backend-exq/Dockerfile`, frontend images) -> push to Artifact Registry with immutable tag (git SHA, not latest) -> deploy to the one Compute Engine VM (FE + BE behind the Load Balancer). No `cloudbuild.yaml` is in the repo yet; it is set up with the GCP project (infra, user).
 **Rollback**: keep previous image SHA deployable, per service.
 
 **Database migrations at deploy (BE-03, be-tech-debt D1–D3)**: migrations are a separate deploy step, never run by the API at start. Runner = `backend/cmd/migrate`, tracked in table `schema_migrations` (created by the runner).
@@ -39,11 +38,143 @@
 *   **New environment** (staging/prod first time): empty database → `up` builds everything from `001`. An environment that was migrated by hand before the runner existed → `baseline --through NNN` once (NNN = last file verified present), then `status`; dev was baselined this way (CLAUDE.md Sec 12).
 *   Long data migrations (backfills) still follow Sec 14: never inside 07:00–20:00.
 
+**Release checklist: first `backend-exq` deployment (X.7–X.9, `.kiro/specs/backend-exq-deploy-readiness/`)**
+
+*Before the release (infra, outside the repo)*
+*   Add `backend-exq/Dockerfile` to the Cloud Build pipeline (image `cms-backend-exq`, git SHA tag). There is no `cloudbuild.yaml` in the repo yet.
+*   Create the `backend-exq` secrets in Secret Manager (`DATABASE_URL`, `DATABASE_REPLICA_URL`, `JWT_SECRET`, `REDIS_URL`).
+*   Do not expose port 8081 outside the VM (drop the `8081:8081` publish in `backend-exq/docker-compose.yaml` or firewall it). Every request goes through Nginx.
+
+*`.env` for `backend-exq` (every variable in `backend-exq/.env.example`, active lines and `# NAME=` lines)*
+
+| Variable | Production value |
+|---|---|
+| `APP_ENV` | `production` |
+| `PORT` | `8081` (Nginx and the HEALTHCHECK expect it) |
+| `TRUSTED_PROXIES` | The address Nginx connects from **on `cms-net`**: the `cms-net` subnet (`docker network inspect cms-net`, `IPAM.Config[0].Subnet`) or the CompanyPortal container's fixed IP. Not the Docker gateway used for `backend`. Empty = every export audit row records Nginx's IP. Invalid = the service refuses to start. |
+| `DATABASE_URL` | Cloud SQL **primary**, with `?pool_max_conns=N` (pool table under "Ukuran pool DB" below, 2 instances) |
+| `DATABASE_REPLICA_URL` | Cloud SQL **replica**, with `?pool_max_conns=N` (commented out in `.env.example`; uncomment it). Unset = reads fall back to the primary (start log warns). |
+| `JWT_SECRET` | Exactly the same secret as `backend` (`backend-exq` only validates tokens). |
+| `REDIS_URL` | The same Redis as `backend` (JWT blacklist); `cms-redis` on `cms-net`. |
+| `LOG_LEVEL` | `info` |
+| `EXPORT_WORKERS` | `2` (allowed 1–8) |
+| `EXPORT_POLL_INTERVAL` | `2s` (must be > 0) |
+| `EXPORT_JANITOR_INTERVAL` | `30s` (must be > 0 and ≤ 1m) |
+| `DSR_LATE_START_DATE` | Same value as `backend` and `RETRY_DSR_LATE_START_DATE` (see the X.8 checklist). |
+| `VENDOR_PKS_RENEWAL_MONTHS` | Same value as `backend` (default 9, valid 1–24; invalid = the service refuses to start). See the vendor-PKS checklist below. |
+
+An invalid `EXPORT_*`, `TRUSTED_PROXIES` or `DSR_LATE_START_DATE` stops the service at start, so a bad value shows up in the first deploy, not later.
+
+*Order*
+1.  Migrations `034_export_jobs` and `035_export_jobs_reports` (procedure "Database migrations at deploy": `status` → `up` → `status`), before any new image starts.
+2.  Redis and the `cms-net` network up (`backend/docker-compose.yaml` creates both).
+3.  `backend` (new image: old export endpoints removed).
+4.  `backend-exq`.
+5.  CompanyPortal (new image: export routes point to `/api/v1/exports/`).
+
+CompanyPortal, `backend` and `backend-exq` ship in the same release (vendor-data-export D15): the new CompanyPortal needs `backend-exq`, and the new `backend` no longer serves the old export endpoints.
+
+*Verify*
+*   `GET /health` on `backend-exq` returns 200; `docker ps` shows the container `healthy`.
+*   `GET /ready` returns 200 with `db`, `redis` (and `db_replica` when set) all `ok`.
+*   One test export through Nginx CompanyPortal (a master-data export as ADMIN): the file downloads, the `http_request` log line in `backend-exq` shows the user's `remote_ip`, and Log Audit (`export_requested`) shows the same IP, not Nginx's.
+
+*Rollback*
+*   Redeploy the previous `backend` and CompanyPortal images together, then stop `backend-exq`. Migrations `034`/`035` stay (no down migrations; they are additive).
+
 **Release checklist: report export (X.8, `.kiro/specs/report-export-migration/`, 2026-10-29)**
 *   `DSR_LATE_START_DATE` must have the same value in `backend`, `backend-exq` and `backend_python` (`RETRY_DSR_LATE_START_DATE`). Nothing checks this automatically: a different value makes the DSR late screen and its CSV disagree. Empty = report off in all three.
 *   Migration `035_export_jobs_reports.sql` runs before the release (Order above: `status` → `up` → `status`).
 *   CompanyPortal (task 7) and `backend` with `format=csv` removed (task 8) ship in the same release.
 *   Rollback = redeploy the previous `backend` and CompanyPortal images. Migration `035` is not rolled back (no down migrations, see above).
+
+**Release checklist: vendor PKS (`.kiro/specs/vendor-pks/`, 2026-11-05)**
+*   `VENDOR_PKS_RENEWAL_MONTHS` must have the same value in `backend` and `backend-exq` (default 9, valid 1–24). Nothing checks this automatically; a different value makes the PKS status on the vendor list and in the export disagree. Both services exit at start on any other value.
+*   Before `migrate up` for `022_vendor_pks.sql`: count `vendor_pic` change requests still `pending`. A pending change that was submitted before `022` becomes `stale` when approved, so the maker must submit it again. Tell the checker first. Dev had 0 pending at apply (2026-11-05).
+*   Migrations `022` and `037` run before the release (order above: `status` → `up` → `status`). `037` needs `022` applied first.
+
+**Release checklist: vendor export PKS (`.kiro/specs/vendor-export-pks/`, 2026-11-06)**
+*   Deploy `backend` before or together with `backend-exq`. Once `backend-exq` ships the new vendor export, the file has 18 columns (9 + 9 read-only). An old `backend` accepts only the 9-column Import_Header and would reject that file. The new `backend` accepts both headers.
+*   No migration. No env change.
+*   Rollback: rolling `backend-exq` back to the old image is safe. Rolling `backend` back while `backend-exq` still exports 18 columns makes imports of that file fail, so roll both back together in that case.
+
+**Release checklist: first `backend-extapi` deployment (`.kiro/specs/ext-user-api/`, Req 12.2)**
+
+`backend-extapi` (port 8082, `backend-extapi/Dockerfile`, `backend-extapi/docker-compose.yaml`) is the external OAuth2 client-credentials API (IDM → create/update/disable users). It validates its own tokens with `EXT_JWT_SECRET`; it never holds the internal `JWT_SECRET` (the service refuses to start if `JWT_SECRET` is set). Deploy today is manual on Docker; CI/CD for this module is out of scope (D23).
+
+*Before the release*
+*   The release's `backend` image must be the running `backend` (it carries the service-account guards in admin user code); `backend-extapi` goes live only after it.
+*   Network path IDM → CROWN = **placeholder (D7, undecided)**: (a) private link/VPN + firewall to the IDM source IP only, or (b) internet through the Load Balancer + Cloud Armor + TLS. Needs the IDM source IP/CIDR and infra confirmation. Do not publish 8082 beyond what the chosen path needs; the per-client CIDR check (`--cidrs`) is the second layer, not a replacement.
+*   Secrets (Secret Manager in GCP, shell env locally): `DATABASE_URL`, `REDIS_URL`, `EXT_JWT_SECRET` (≥ 32 bytes, **different** from `JWT_SECRET`). Never in argv, tickets or logs.
+
+*`.env` for `backend-extapi` (copy `backend-extapi/.env.example`)*
+
+| Variable | Value |
+|---|---|
+| `APP_ENV` / `PORT` | `production` / `8082` (HEALTHCHECK expects 8082) |
+| `TRUSTED_PROXIES` | Address the service sees its proxy connect from (Nginx/LB; exact value comes with the D7/LB design), as narrow as possible. Empty = every audit row and the per-IP token limit see the proxy's IP, and the client CIDR check judges the proxy, not IDM. Invalid = refuses to start. |
+| `DATABASE_URL` | Cloud SQL **primary** (the service writes). Add `?pool_max_conns=N` and count it as one more instance in the pool table ("Ukuran pool DB"). Optionally the limited login below. |
+| `REDIS_URL` | The same Redis as `backend` (`cms-redis` on `cms-net`). |
+| `EXT_JWT_SECRET` | Signing key for external tokens (≥ 32 bytes). Not `JWT_SECRET`. |
+| `LOG_LEVEL` | `info` |
+| Optional, defaults in code | `EXT_TOKEN_ISSUER` (`crown`), `EXT_TOKEN_TTL` (`15m`, 1m–1h), `EXT_TOKEN_FAIL_WINDOW` (`15m`), `EXT_TOKEN_FAIL_LIMIT` (`10`), `EXT_API_RATE_PER_MINUTE` (`60`). Out-of-range values stop the service at start. |
+
+*Order*
+1.  Migration `039_ext_api_clients.sql` (procedure "Database migrations at deploy": `status` → `up` → `status`), outside 07:00–20:00 WIB, before any new image starts. It adds `api_clients` and role `EXT-CLIENT`.
+2.  Redis and `cms-net` up (`cd backend && docker compose up -d`).
+3.  New `backend` image.
+4.  Start `backend-extapi` (from `backend-extapi/`, with `.env` in place):
+    ```bash
+    docker compose up -d --build
+    ```
+5.  Create the IDM client (the secret is printed **once**, to stdout; `--actor` = an active APPACCESS username, used for audit):
+    ```bash
+    docker compose run --rm backend-extapi ./extclient create --name "IDM" --scopes users:read,users:write --roles <non-privileged roles IDM may assign> --cidrs <IDM-source-CIDR> --actor <appaccess-username>
+    ```
+    Privileged roles are rejected. An empty `--cidrs` means the client gets no token until `set-grants --cidrs` is run (the CLI warns). `list` shows clients without secrets. Other commands: `rotate`, `disable`, `enable`, `set-grants` (`--client-id` and `--actor` required).
+6.  Hand over the IDM package through a secure channel, secret separately from the rest: `client_id`, `client_secret`, base URL (placeholder per environment), `backend-extapi/api/openapi.yaml`, `backend-extapi/api/panduan-integrasi-idm.md`.
+
+*Verify*
+*   `GET /health` on `:8082` returns 200 and `docker ps` shows `cms-backend-extapi` `healthy`.
+*   One token request from the IDM source address succeeds; from another address it fails with the generic `invalid_client`.
+*   A test user create then disable through the API; `audit_logs` shows the service user as actor.
+*   The end-to-end check with IDM is the user's (Golden Rule #10); not recorded here.
+
+*Start / stop*
+*   Start: step 4. Stop the API only: `docker compose stop backend-extapi` (from `backend-extapi/`); IDM calls fail, tokens are not revoked.
+*   Cut IDM off without stopping the service: `docker compose run --rm backend-extapi ./extclient disable --client-id <id> --actor <appaccess-username>`; `enable` reverses it.
+
+*Secret rotation*
+*   Client secret: `extclient rotate --client-id <id> --actor <appaccess-username>` prints the new secret once. The **old secret and every token issued before the rotation are rejected immediately**, so agree a window with IDM first and hand the new secret over securely.
+*   `EXT_JWT_SECRET`: change it in Secret Manager/`.env`, then `docker compose up -d --force-recreate backend-extapi`. Every outstanding token is invalidated; IDM just requests a new one. Never reuse `JWT_SECRET`.
+
+*Rollback*
+*   Stop `backend-extapi` (or `disable` the client) and redeploy the previous `backend` image if needed. Migration `039` stays (additive, no down migrations); a disabled client and its inactive `svc-*` user remain as inert rows.
+
+*Optional: least-privilege DB logins (service and CLI)*
+
+By default both use the same login as `backend`. To limit blast radius, create two logins and point the service's `DATABASE_URL` and the CLI's `DATABASE_URL` (operator shell / `docker compose run`) at them. Run once as a DB admin after `039`; passwords come from Secret Manager, never pasted into the script:
+
+```sql
+-- Service login: user create/update/disable + client lookup + audit.
+CREATE ROLE crown_extapi LOGIN PASSWORD :'extapi_password';
+GRANT USAGE ON SCHEMA public TO crown_extapi;
+GRANT SELECT, INSERT, UPDATE ON users TO crown_extapi;
+GRANT SELECT ON roles TO crown_extapi;
+GRANT SELECT, UPDATE ON api_clients TO crown_extapi;
+GRANT INSERT ON audit_logs TO crown_extapi;
+GRANT USAGE ON SEQUENCE users_id_seq, audit_logs_id_seq TO crown_extapi;
+
+-- CLI login: manages api_clients and their service users.
+CREATE ROLE crown_extclient LOGIN PASSWORD :'extclient_password';
+GRANT USAGE ON SCHEMA public TO crown_extclient;
+GRANT SELECT, INSERT, UPDATE ON users, api_clients TO crown_extclient;
+GRANT SELECT ON roles TO crown_extclient;
+GRANT INSERT ON audit_logs TO crown_extclient;
+GRANT USAGE ON SEQUENCE users_id_seq, api_clients_id_seq, audit_logs_id_seq TO crown_extclient;
+```
+
+Run it with `psql -v extapi_password=… -v extclient_password=… -f grants.sql`, the file kept outside the repo. Neither role gets `DELETE`, DDL, or any other table. The grants were derived from the tables the module's queries touch (`users`, `roles`, `api_clients`, `audit_logs`), not tested: confirm the sequence names (`\ds`), then exercise one token, one user create and one `extclient create` on dev; a `permission denied` names the missing grant. The logins are not created by migrations, and `migrate up` keeps using the owner login.
 
 **EOD monitoring routing (S6)**: the internal frontend's nginx sends `/api/eod/*` to `eod_retry_scheduler` on the VM (`host.docker.internal:8091`, prefix stripped), everything else under `/api/` to the Go API `:8080`. That service must run with `RETRY_AUTH_MODE=jwt` and `RETRY_AUTH_SECRET` equal to the Go `JWT_SECRET` (Secret Manager) and refuses to start otherwise.
 
@@ -55,19 +186,19 @@
 *   Production value = the address the backend sees Nginx connect from (Docker network gateway on the VM; check `docker network inspect` or the `RemoteAddr` in the request log), as narrow as possible (`/32`). The start log prints `trusted proxies configured count=N` — `0` behind Nginx is wrong.
 *   **If left empty in prod**, every user is recorded with Nginx's IP and the per-IP login limit (`RATE_LIMIT_IP`, default 20 / 15 min) is shared by everyone → mass login lockout. An invalid entry stops the service at start.
 *   Close port 8080 from outside the VM (firewall / don't publish it) so every request goes through Nginx (defense in depth; the narrow CIDR already stops spoofing from direct callers).
-*   When a GCP Load Balancer / Cloud Armor (#11) is added in front of Nginx: append the LB address ranges to `TRUSTED_PROXIES`; no code change.
-*   `backend-exq` reads the variable but does not use it yet. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
+*   The target has a GCP Load Balancer (#2) / Cloud Armor (#11) in front of the VM: append the LB address ranges to `TRUSTED_PROXIES` (exact values come with the LB design); no code change.
+*   `backend-exq` uses it the same way (`TrustedRealIP` in `backend-exq/cmd/api/main.go`): the IP in the export audit rows (`export_requested`, `master_data_exported`, `report_exported`) comes from it. Nginx reaches `backend-exq` over `cms-net`, not through `host.docker.internal`, so its value differs from `backend`'s (see the release checklist). `backend-exq` does not print the `trusted proxies configured` start line. Python EOD services: set `RETRY_TRUSTED_PROXIES` / `DSR_ETL_TRUSTED_PROXIES` to the same value (uvicorn `forwarded_allow_ips` via `lib/utils/proxy.py`; empty = proxy headers off, invalid = fail start). Only `eod_retry_scheduler` sits behind Nginx today; `service_dsr_etl` is called by the Go API, so leave it empty unless that changes.
 
 **Ukuran pool DB (BE-09, be-tech-debt E4) — usulan, belum diterapkan di GCP**: the pool size is set per URL with `?pool_max_conns=N` on `DATABASE_URL` / `DATABASE_REPLICA_URL` (pgx; without it pgx uses `max(4, NumCPU)`, i.e. 4 on a small VM — too low for 300 concurrent users). Each API prints `db pool pool=primary|replica max_conns=N` at start.
 *   Formula per Cloud SQL instance: `pool_max_conns = (max_connections − cadangan) / jumlah instance` that connect with a Go pool. `max_connections` = `SHOW max_connections;` on that instance (Cloud SQL derives it from the tier's memory unless the flag is set). `cadangan` = `superuser_reserved_connections` (3) + Python EOD (`eod_retry_scheduler` + `service_dsr_etl` + ETL scripts, ~10) + ops/psql/migrations (~5) ≈ **20**.
-*   Primary and replica are separate instances: compute each with its own `max_connections`. Only `backend` uses the replica pool; `backend-exq` uses the primary only.
+*   Primary and replica are separate instances: compute each with its own `max_connections`. Both APIs open a replica pool when `DATABASE_REPLICA_URL` is set (`backend-exq`: export worker + preview rows; job and scope reads stay on the primary).
 
 | Env | Instances on primary | Example `max_connections` | `pool_max_conns` primary | `pool_max_conns` replica |
 | --- | --- | --- | --- | --- |
 | Local dev | 1 (`backend`) | 100 (Postgres default) | 20 (`.env.example`) | — (replica unset = primary) |
-| Staging | 1 (`backend`) | 100 | (100 − 20) / 1 = **80** (start at 20) | 20 |
-| Prod (1 VM today) | 1 (`backend`) | read from the chosen tier | (max − 20) / 1, cap 50 | (max_replica − 10) / 1, cap 50 |
-| Prod (after `backend-exq` is deployed, e.g. 2028 VM per backend) | 2 (`backend` + `backend-exq`) | same | (max − 20) / 2, cap 50 | (max_replica − 10) / 2, cap 50 |
+| Staging | 2 (`backend` + `backend-exq`) | 100 | (100 − 20) / 2 = **40** (start at 20) | 20 |
+| Prod (before the export release) | 1 (`backend`) | read from the chosen tier | (max − 20) / 1, cap 50 | (max_replica − 10) / 1, cap 50 |
+| Prod (from the export release; same VM) | 2 (`backend` + `backend-exq`) | same | (max − 20) / 2, cap 50 | (max_replica − 10) / 2, cap 50 |
 
 *   Start at 20 per pool and raise only when the dashboard p95 (≤ 3 s) shows pool waits; a pool larger than the DB can serve concurrently only moves the queue into Postgres. Re-compute whenever a new instance (another API replica, a new Python service) starts connecting.
 

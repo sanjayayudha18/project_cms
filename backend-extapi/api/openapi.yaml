@@ -1,0 +1,621 @@
+openapi: 3.0.3
+info:
+  title: CROWN External User API
+  version: 1.0.0
+  description: |
+    API for an external identity-management (IDM) system to create, update,
+    disable and re-enable CROWN users, authenticated with OAuth2 client credentials.
+
+    **Versioning.** The version is part of the path (`/api/ext/v1`). A breaking
+    change (removed or renamed field, changed type, changed auth) is published
+    under a new path (`/api/ext/v2`); `v1` keeps working until it is retired
+    with notice. Adding optional fields or endpoints is not breaking, so clients
+    must ignore unknown response fields.
+
+    **DELETE is a soft-delete.** `DELETE /users/{id}` deactivates the user
+    (login blocked, row kept for audit). It never removes data. Use
+    `POST /users/{id}/enable` to reactivate. Deleting an already disabled user
+    succeeds (204) and changes nothing.
+
+    **Managed users.** Only users created for this integration (LDAP-authenticated
+    internal users) are visible and changeable. Privileged roles (ADMIN,
+    APPACCESS, ADMIN_PARAM and service accounts) can never be assigned or touched.
+    Each client may assign only the roles on its own allowlist.
+
+    **Access token.** Obtain a token from `POST /oauth/token` using HTTP Basic
+    client credentials, then send `Authorization: Bearer <token>`. Tokens are
+    short-lived (default 15 minutes); request a new one when you get 401
+    `invalid_token`. Requests must come from the source IPs registered for the
+    client.
+
+    **Rate limits.** Authenticated calls are limited per client per minute
+    (default 60). Failed token requests are limited per client and per source IP
+    (default 10 per 15 minutes). When exceeded the API answers 429 with a
+    `Retry-After` header (seconds).
+
+    **Retry after a timeout.** Create is not idempotent. After a timeout, check
+    `GET /users?username=...` before sending the create again.
+
+    All values in the examples are fake.
+servers:
+  - url: /api/ext/v1
+security:
+  - oauth2: []
+tags:
+  - name: Token
+  - name: Users
+paths:
+  /oauth/token:
+    post:
+      tags: [Token]
+      operationId: issueToken
+      summary: Issue an access token (client credentials)
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [client_credentials]
+                scope:
+                  type: string
+                  description: Space-delimited subset of the client's scopes. Omit to receive every scope the client holds.
+                  example: users:read users:write
+      responses:
+        "200":
+          description: Token issued.
+          headers:
+            Cache-Control:
+              schema: {type: string, example: no-store}
+            Pragma:
+              schema: {type: string, example: no-cache}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          description: |
+            `invalid_request` (not form-encoded, malformed, `client_secret` in body, repeated parameter),
+            `unsupported_grant_type`, or `invalid_scope`.
+          headers:
+            Cache-Control:
+              schema: {type: string, example: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "401":
+          description: |
+            `invalid_client`. Same body for unknown client, wrong secret, disabled client
+            or source IP not allowed.
+          headers:
+            WWW-Authenticate:
+              schema: {type: string, example: 'Basic realm="crown-ext"'}
+            Cache-Control:
+              schema: {type: string, example: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "429":
+          description: Too many failed token requests (`rate_limited`).
+          headers:
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+            Cache-Control:
+              schema: {type: string, example: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "500":
+          description: "`server_error`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "503":
+          description: "`service_unavailable` (rate-limit store down; the request is refused)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+  /users:
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a user
+      description: Creates an LDAP-authenticated user without a password. Requires scope `users:write`.
+      security:
+        - oauth2: [users:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtUserCreate"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            Location:
+              schema: {type: string, example: /api/ext/v1/users/1001}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    get:
+      tags: [Users]
+      operationId: findUserByUsername
+      summary: Find a user by exact username
+      description: Requires scope `users:read`. Disabled users are returned too.
+      security:
+        - oauth2: [users:read]
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: jdoe
+      responses:
+        "200":
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get a user by id
+      description: Requires scope `users:read`. Disabled users are returned too.
+      security:
+        - oauth2: [users:read]
+      responses:
+        "200":
+          description: The user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    put:
+      tags: [Users]
+      operationId: updateUser
+      summary: Replace the editable fields of an active user
+      description: |
+        Full replacement: omitted optional fields are cleared. `username` cannot change.
+        A disabled user answers 404 (enable it first). Requires scope `users:write`.
+      security:
+        - oauth2: [users:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtUserUpdate"
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+    delete:
+      tags: [Users]
+      operationId: disableUser
+      summary: Disable (soft-delete) a user
+      description: |
+        Soft-delete: the user is deactivated and can no longer sign in; nothing is removed.
+        Idempotent: an already disabled user also answers 204. Reactivate with
+        `POST /users/{id}/enable`. Requires scope `users:write`.
+      security:
+        - oauth2: [users:write]
+      responses:
+        "204":
+          description: Disabled (or already disabled).
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /users/{id}/enable:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Users]
+      operationId: enableUser
+      summary: Re-enable a disabled user
+      description: "Idempotent: an already active user is returned unchanged. No request body. Requires scope `users:write`."
+      security:
+        - oauth2: [users:write]
+      responses:
+        "200":
+          description: The active user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 client credentials. Send the access token as a Bearer token in the Authorization header.
+      flows:
+        clientCredentials:
+          tokenUrl: /api/ext/v1/oauth/token
+          scopes:
+            users:read: Read users (GET)
+            users:write: Create, update, disable and enable users
+    basicAuth:
+      type: http
+      scheme: basic
+      description: client_id as username and client_secret as password (both form-urlencoded before Basic encoding, RFC 6749 section 2.3.1). Used only on the token endpoint.
+  headers:
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+        minimum: 1
+        example: 30
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1001
+  responses:
+    BadRequest:
+      description: |
+        `bad_request` (invalid path id, malformed JSON, unknown field, wrong type, several JSON values, bad query),
+        or `invalid_reference` (unknown role or supervisor).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: "`invalid_token`: missing, malformed, expired or revoked token (also after the client's secret was rotated)."
+      headers:
+        WWW-Authenticate:
+          schema: {type: string, example: 'Bearer error="invalid_token"'}
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: |
+        `insufficient_scope` (token lacks the scope; sets `WWW-Authenticate: Bearer error="insufficient_scope"`),
+        `ip_not_allowed` (source IP not registered for the client), or
+        `role_not_allowed` (role not on the client's allowlist, or the target user holds a privileged role).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: "`not_found`: no such user, or not a user this integration may see."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: "`conflict`: username, email or employee_id already used (`message` names the field)."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnsupportedMediaType:
+      description: "`unsupported_media_type`: Content-Type must be application/json."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationFailed:
+      description: "`validation_error`: a field is missing or malformed; `field` names it."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    RateLimited:
+      description: "`rate_limited`: too many requests for this client."
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InternalError:
+      description: "`internal_error`. No internal detail is returned."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unavailable:
+      description: "`service_unavailable`: the rate-limit store is down and the request is refused. Retry later."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, scope]
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiJ9.fake.fake
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Lifetime in seconds.
+          example: 900
+        scope:
+          type: string
+          description: Granted scopes, space-delimited.
+          example: users:read users:write
+    OAuthError:
+      type: object
+      required: [error, error_description]
+      properties:
+        error:
+          type: string
+          enum:
+            - invalid_request
+            - unsupported_grant_type
+            - invalid_client
+            - invalid_scope
+            - rate_limited
+            - service_unavailable
+            - server_error
+        error_description:
+          type: string
+          example: client authentication failed
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum:
+            - bad_request
+            - invalid_reference
+            - invalid_token
+            - insufficient_scope
+            - ip_not_allowed
+            - role_not_allowed
+            - not_found
+            - method_not_allowed
+            - conflict
+            - unsupported_media_type
+            - rate_limited
+            - internal_error
+            - service_unavailable
+        message:
+          type: string
+          example: user not found
+    ValidationError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [validation_error]
+        message:
+          type: string
+          example: wajib diisi
+        field:
+          type: string
+          example: email
+    ExtUserCreate:
+      type: object
+      additionalProperties: false
+      required: [username, full_name, email, role]
+      properties:
+        username:
+          type: string
+          example: jdoe
+        full_name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.invalid
+        role:
+          type: string
+          description: Must be on the client's assignable-role allowlist and never a privileged role.
+          example: ATM-USER
+        employee_id:
+          type: string
+          description: Optional; unique when present.
+          example: E0001
+        supervisor_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Id of an active managed user.
+          example: 1000
+        approval_level:
+          type: integer
+          format: int32
+          nullable: true
+          example: 1
+    ExtUserUpdate:
+      type: object
+      additionalProperties: false
+      required: [full_name, email, role]
+      properties:
+        full_name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane.doe@example.invalid
+        role:
+          type: string
+          example: ATM-USER
+        employee_id:
+          type: string
+          example: E0001
+        supervisor_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1000
+        approval_level:
+          type: integer
+          format: int32
+          nullable: true
+          example: 1
+    ExtUser:
+      type: object
+      required: [id, username, full_name, email, role, employee_id, supervisor_id, approval_level, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1001
+        username:
+          type: string
+          example: jdoe
+        full_name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          example: jane.doe@example.invalid
+        role:
+          type: string
+          example: ATM-USER
+        employee_id:
+          type: string
+          nullable: true
+          example: E0001
+        supervisor_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1000
+        approval_level:
+          type: integer
+          format: int32
+          nullable: true
+          example: 1
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T03:04:05Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T03:04:05Z"

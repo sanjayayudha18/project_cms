@@ -15,6 +15,34 @@ Template:
 
 ---
 
+## 2026-11-04 — Frontend: `pnpm audit --prod` merah (zod, seroval) di kedua portal
+- **Symptom**: `pnpm audit --prod` melaporkan 3 advisory di CompanyPortal (`zod` <4.6.6 GHSA-mrhx-c7xc-m3w5; `seroval` GHSA-f86p-h4j2-7qgj + GHSA-9wx9-5pv9-3349) dan 6 di VendorPortal (zod + 5 seroval). Sudah merah sebelum upgrade pnpm 12 (spec `pnpm-12-upgrade`, D7). User memilih jalur bugfix.
+- **Root cause**: `zod` ^3.24 (patch hanya ada di 4.6.6+). `seroval` ikut `@tanstack/router-core` (range `^1.6.7`); lockfile CP masih mengunci 1.6.9, lockfile VP memakai router lama (1.170.32).
+- **Fix**: kedua portal `zod` ^3.24.0 → ^4.6.7 dan `@tanstack/react-router` → ^1.170.46 (`router-core` 1.171.39, `seroval`/`seroval-plugins` 1.7.7 lewat lockfile, tanpa `pnpm.overrides`). Migrasi zod 4 di CP: `invalid_type_error:` → `error:` (`vendorRequestCreateForm.ts`, `atmFormSchema.ts`); form dengan `z.coerce` (`RbacDelegationsPage`, `RbacLeavesPage`, `RbacPoliciesPage`) memakai `useForm<z.input, unknown, z.output>` (tipe `*FormInput` baru di `rbac-settings/types.ts`). VP tidak perlu perubahan kode. Lockfile CP juga menggeser `supports-color` 7→10 (churn transitif dari resolusi ulang); lockfile VP mengecil karena router/seroval ter-dedupe.
+- **Tests**: `pnpm audit --prod` = 0 vulnerability di kedua portal. CP: lint, 1866 test, coverage 87.22/82.55/83.91/88.22 (≥ 84/80/80/85), `build` + `check-bundle` (199.2 KB gzip, budget 300), `gen:api` tanpa diff. VP: lint, 250 test, coverage 93.53/84.62/91.59/94.41 (≥ 93/84/90/93), build. Cek browser (form RBAC delegasi/cuti/policy, form Vendor Request, form ATM, routing kedua portal): **outstanding** (Golden Rule #10).
+- **Commit**: cb64232
+
+---
+
+
+## 2026-11-03 — Frontend: `dev.ps1 vendor` menjalankan CompanyPortal (port 5173)
+- **Symptom**: `./dev.ps1 vendor` (dari `frontend/`) menjalankan Vite CompanyPortal di `:5173`, bukan VendorPortal di `:5174`. Judul start kosong (`Starting  - dev server`). `./dev.ps1 company` hanya tampak benar karena script `dev` di `frontend/package.json` default ke CompanyPortal. Ditemukan saat task 8 spec `pnpm-12-upgrade` (Req 5.4). Bugfix terpisah, user memilih jalur bugfix.
+- **Root cause**: `frontend/dev.ps1` baris 56 `$selected = if (...) { @(...) } else { @($Target) }`. Pernyataan `if` PowerShell membuka array satu elemen menjadi string, jadi `$selected` = `"vendor"` (string), `$selected[0]` = `"v"` (karakter pertama), `$portals["v"]` = null. Akibatnya `$portal.Path`/`.Name` kosong, `Push-Location` tidak pindah folder, dan `pnpm run dev` jalan dari `frontend/`. Bukti (HEAD, stub `pnpm`): `DBG selected type=String [0]=[v]` untuk `vendor`, `[0]=[c]` untuk `company`. Caller lain (baris 62–96: `foreach`, `.Count`, `[0]`) hanya butuh array, tidak ada file lain yang memakai variabel ini.
+- **Fix**: `frontend/dev.ps1` baris 56 → `$selected = @(if ($Target -eq "all") { "company", "vendor" } else { $Target })`. Baris lain tidak diubah (termasuk pesan pnpm di baris 52). Patch hanya hunk baris 56: `%TEMP%\devps1-fix.patch`.
+- **Tests**: skrip cek stub (`pnpm` palsu di PATH, salinan script dengan `$root` diperbaiki, tanpa membuka jendela): `company` → `CompanyPortal-Vite (internal)` (cwd `CompanyPortal-Vite`), `vendor` → `VendorPortal-Vite (vendor)` (cwd `VendorPortal-Vite`), `all` → kedua key dengan path benar (dicek sampai pemilihan, tanpa `Start-Process`). Real run: `./dev.ps1 company` → `Local: http://localhost:5173/`, `./dev.ps1 vendor` → `Local: http://localhost:5174/`, tanpa `ERR_PNPM_*`/`ENOEXEC`/`Failed to switch pnpm`; kedua proses dihentikan, port 5173/5174 kosong. Cek browser: tidak relevan (tooling). Tidak ada unit test otomatis untuk script PowerShell ini.
+- **Commit**: 1e7bb47
+
+---
+
+## 2026-11-03 — Frontend: container CompanyPortal & VendorPortal selalu `unhealthy`
+- **Symptom**: saat task 7 spec `pnpm-12-upgrade`, container CP dan VP berstatus `unhealthy` walau nginx berjalan dan melayani halaman.
+- **Root cause**: `HEALTHCHECK` memakai `wget --spider http://localhost:80/`. Di `nginx:alpine` (tidak di-pin) `localhost` di-resolve ke IPv6 `::1` lebih dulu (`getent hosts localhost` → `::1`), sedangkan `nginx.conf` hanya `listen 80;` (IPv4), jadi koneksi ditolak. Bukan akibat upgrade pnpm (hanya mengubah baris 3, stage builder). Bukti di HEAD: image dibangun dari `git archive HEAD` (pnpm 11.20.0, Lockfile HEAD) → `unhealthy` dalam ±40 dtk; log health: `Connecting to localhost:80 ([::1]:80) / wget: can't connect to remote host: Connection refused`. Di container yang sama `wget --spider http://127.0.0.1:80/` → `remote file exists`; `/etc/hosts` memuat `127.0.0.1 localhost` dan `::1 localhost`.
+- **Fix**: `frontend/CompanyPortal-Vite/Dockerfile` dan `frontend/VendorPortal-Vite/Dockerfile`, hanya baris HEALTHCHECK: `localhost` → `127.0.0.1`. Probe yang sama di `frontend/docker-compose.yml` (baris 15, 34) dan `frontend/VendorPortal-Vite/docker-compose.yml` (baris 8) juga diganti ke `127.0.0.1` (`healthcheck` compose menimpa HEALTHCHECK Dockerfile). `docs/deployment.md` tidak punya probe nginx. Compose belum dijalankan; hanya image Dockerfile yang diverifikasi.
+- **Tests**: tidak ada unit test yang relevan; bukti = Docker HEALTHCHECK. Image `userportal-vite-fe:pnpm12` dan `vendorportal-vite-fe:pnpm12` dibangun ulang, dijalankan tanpa port publish: keduanya `healthy` (cek ke-2, ±20 dtk); builder CP `pnpm --version` = 12.16.1; container dihapus. Cek browser: tidak relevan.
+- **Commit**: e5180ac
+
+---
+
 ## 2026-11-03 — Backend: approve/reject approval bisa berhenti setengah jalan
 - **Symptom**: bila proses mati atau audit gagal di tengah `Approve`/`Reject`, step sudah berubah sementara request masih `pending`, atau keputusan tersimpan tanpa audit. Approver yang sama tidak bisa mengulang (`ErrNotAuthorized`/`ErrRequestNotPending`). Ditemukan dari tinjauan kode setelah perbaikan `SubmitForApproval`. Maker-checker (Sec 4 #7) di-flag; user memilih dokumentasi bugfix.
 - **Root cause**: `approval.Orchestrator.Approve` dan `Reject` menulis step, request, dan audit lewat pool secara terpisah. Berlaku untuk semua `document_type`.

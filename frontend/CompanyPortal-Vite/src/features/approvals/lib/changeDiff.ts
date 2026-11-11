@@ -14,6 +14,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   atm: "ATM",
   atm_assignment: "Kelolaan ATM",
   dsr_location_map: "Mapping lokasi DSR",
+  vendor_pks: "PKS vendor",
 };
 
 export const OP_LABELS: Record<MasterDataOp, string> = {
@@ -21,6 +22,20 @@ export const OP_LABELS: Record<MasterDataOp, string> = {
   update: "Ubah",
   disable: "Nonaktifkan",
   enable: "Aktifkan",
+};
+
+/** Per-entity wording where disable/enable are not "Nonaktifkan"/"Aktifkan". */
+const ENTITY_OP_LABELS: Record<string, Partial<Record<MasterDataOp, string>>> = {
+  vendor_pks: { disable: "Terminate PKS", enable: "Batalkan terminate" },
+};
+
+export function opLabel(entityType: string, op: MasterDataOp): string {
+  return ENTITY_OP_LABELS[entityType]?.[op] ?? OP_LABELS[op];
+}
+
+/** Fields whose raw name reads badly after humanizeField. */
+const FIELD_LABELS: Record<string, string> = {
+  is_director: "Direktur Utama",
 };
 
 export interface FieldDiff {
@@ -58,8 +73,17 @@ export function formatValue(value: unknown): string {
  * - disable/enable: a single is_active row (the payload only carries the flip).
  */
 export function diffFields(
-  change: Pick<MasterDataChange, "op" | "payload" | "before">,
+  change: Pick<MasterDataChange, "op" | "payload" | "before"> & { entity_type?: string },
 ): FieldDiff[] {
+  if (change.entity_type === "vendor_pks" && (change.op === "disable" || change.op === "enable")) {
+    // Terminate / cancel terminate: show which PKS and why (payload carries only vendor_id + reason).
+    const pks = formatValue(change.before?.pks_name ?? change.payload?.pks_name);
+    const reason = formatValue(change.payload?.reason);
+    return [
+      { field: "pks_name", label: "Nama PKS", before: pks, after: pks, changed: false },
+      { field: "reason", label: "Alasan", before: EMPTY, after: reason, changed: true },
+    ];
+  }
   if (change.op === "disable" || change.op === "enable") {
     const enabling = change.op === "enable";
     return [
@@ -77,7 +101,13 @@ export function diffFields(
   return Object.keys(payload).map((field) => {
     const after = formatValue(payload[field]);
     const prev = change.op === "create" ? EMPTY : formatValue(before[field]);
-    return { field, label: humanizeField(field), before: prev, after, changed: after !== prev };
+    return {
+      field,
+      label: FIELD_LABELS[field] ?? humanizeField(field),
+      before: prev,
+      after,
+      changed: after !== prev,
+    };
   });
 }
 

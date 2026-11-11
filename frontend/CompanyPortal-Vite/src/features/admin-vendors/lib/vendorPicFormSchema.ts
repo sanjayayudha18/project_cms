@@ -8,19 +8,39 @@
 
 import { z } from "zod";
 
-export const vendorPicFormSchema = z.object({
-  name: z.string().min(1, "Wajib diisi").max(200, "Maksimal 200 karakter"),
-  position: z.string().max(100, "Maksimal 100 karakter"),
-  phone: z.string().max(50, "Maksimal 50 karakter"),
-  email: z
-    .string()
-    .max(200, "Maksimal 200 karakter")
-    .refine((v) => v === "" || z.string().email().safeParse(v).success, {
-      message: "Format email tidak valid",
-    }),
-  is_notification_recipient: z.boolean(),
-  /** Hanya dipakai saat create; update lewat form tidak mengubah peran (Req 5.7). */
-  roles: z.array(z.string()),
-});
+export const vendorPicFormSchema = z
+  .object({
+    name: z.string().min(1, "Wajib diisi").max(200, "Maksimal 200 karakter"),
+    position: z.string().max(100, "Maksimal 100 karakter"),
+    phone: z.string().max(50, "Maksimal 50 karakter"),
+    email: z
+      .string()
+      .max(200, "Maksimal 200 karakter")
+      .refine((v) => v === "" || z.string().email().safeParse(v).success, {
+        message: "Format email tidak valid",
+      }),
+    is_notification_recipient: z.boolean(),
+    /** Direktur Utama: hanya pencatatan, tanpa peran dan tanpa notifikasi. */
+    is_director: z.boolean().optional(),
+    /** Hanya dipakai saat create; update lewat form tidak mengubah peran (Req 5.7). */
+    roles: z.array(z.string()),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.is_director) return;
+    if (v.is_notification_recipient) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["is_notification_recipient"],
+        message: "Direktur Utama tidak bisa menjadi penerima notifikasi",
+      });
+    }
+    if (v.roles.length > 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["roles"],
+        message: "Direktur Utama tidak boleh punya peran PIC",
+      });
+    }
+  });
 
 export type VendorPicFormValues = z.infer<typeof vendorPicFormSchema>;

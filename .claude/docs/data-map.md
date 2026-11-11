@@ -108,7 +108,21 @@ Plan/spec: `.claude/sdlc/notification/`. Migration `025_notifications.sql`, appl
 *   `notification_emails` — outbox, one row per unique (lowercased) address; `notification_id` NULL for `vendor_pics` recipients (email only, `is_notification_recipient = true`). `status` `pending|sent|failed|skipped` (`skipped` = `SMTP_HOST` empty), `attempts`, `last_error` (≤ 500 chars, no credentials), `next_attempt_at`, `sent_at`. Partial index on `next_attempt_at WHERE status = 'pending'`; claimed `FOR UPDATE SKIP LOCKED`.
 *   Retention: worker hard-deletes `notifications` older than 90 days and final-status `notification_emails` older than 90 days, once per 24 h (pending rows are never purged).
 
+## Vendor PKS (migrations 022, 037)
+
+Spec: `.kiro/specs/vendor-pks/` (design "Data Models", D1–D32). Migrations `022_vendor_pks.sql` and `037_export_jobs_vendor_pks.sql` applied to dev DB 2026-11-05 via `go run ./cmd/migrate up` (`migrate status`: 36 applied, 0 pending, no MISMATCH). Before the apply, 0 `vendor_pic` changes were `pending`, so none became `stale`.
+
+*   **`vendor_pks`**: identity PK. `vendor_id` FK → `vendors(id)` ON DELETE RESTRICT. `pks_name` text (1–500 chars after trim); CHECK `expiry_date >= effective_date`. `created_by` FK → `users(id)`. History: `replaced_at` + `replaced_by_pks_id` (self FK). Termination: `terminated_at` + `terminated_by` + `termination_reason`, all NULL or all set (reason 1–500 chars).
+*   **Indexes**: `vendor_pks_active_uq` UNIQUE on `vendor_id` WHERE `replaced_at IS NULL` (one active PKS per vendor); `vendor_pks_vendor_idx` on `vendor_id`.
+*   **Writes**: only through master-data maker-checker (`entity_type = vendor_pks`, `master_data_change_requests` + `approval_requests`). `master_data_change_requests_vendor_pks_pending_uq` allows one pending change per `payload->>'vendor_id'`. Rows are never hard-deleted: a PKS is replaced or terminated.
+*   **Status is computed, not stored**: SQL functions `vendor_pks_status(kind, expiry, terminated_at, today, renewal_months)` and `vendor_pks_validity_months(effective, expiry)`. Renewal window = env `VENDOR_PKS_RENEWAL_MONTHS` (default 9, valid 1–24). The same value must be set in `backend` and `backend-exq`; startup exits on any other value.
+*   **Direktur Utama** = `vendor_pics.is_director` (migration 022): `boolean NOT NULL DEFAULT false`; `vendor_pics_director_uq` UNIQUE on `vendor_id` WHERE `is_director AND deleted_at IS NULL` (one director per vendor); CHECK: a director has no branch and `is_notification_recipient = false`. Migration 037 adds `vendor_pics_director_roles_chk` (`NOT is_director OR roles = '{}'`). A director is a record only: no login, no roles, never a notification recipient. The `vendors` table is unchanged (D32).
+*   **Export**: `export_jobs.kind = 'vendor_pks'` (migration 037), report params `q`, `status`, `pks_status`. Served by `backend-exq` at `POST /exports/reports/vendor-pks`.
+*   **Query note (sqlc v1.31.1)**: `ListVendorsAdmin` and `ExportVendorPksBatch` wrap `validity_months` and `remaining_days` in COALESCE to 0, and `pks_status` to `''`, because sqlc types these function/cast results as NOT NULL. A NULL meaning is "no active PKS" (`pks_id IS NULL`) or an INTERNAL vendor. The status filter uses the raw function, not the COALESCEd column.
+
 ## Proposed — FSD v1.0 (2026-10-01) — NOT approved, NOT migrated
+
+> **Update 2026-11-05**: the PKS rows in section A below (`vendors.director_*`, `vendors.pks_*`) are superseded by `vendor_pks` and `vendor_pics.is_director` (section above, D32). The `vendor_branches.cis_limit_*` and `vendor_vaults.escrow_account` rows are not migrated yet; they belong to the split-off `vendor-cis-limit` intent.
 
 Source: FSD "DSR End To End Cash Management" v1.0 field tables (Master Vendor, Master Kelolaan ATM, Monitoring Limit CIS, Parameter Cash Count, Cash Count Planning). Status: proposal awaiting user approval → then migration `021+` via an AI-DLC chain. Reuse existing tables first; new tables only where nothing fits.
 

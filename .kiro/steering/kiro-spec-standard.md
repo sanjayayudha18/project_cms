@@ -18,9 +18,13 @@ Spec ditulis dalam bahasa Indonesian (mengikuti spec yang ada); heading kanonis 
   requirements.md
   design.md
   tasks.md
+  review.md         (tahap 5, ditambahkan setelah build; lihat Sec 7)
+  incidents.md      (tahap 6, dibuat saat insiden pertama; lihat Sec 7)
 ```
 
 Spec selesai dipindah ke `.kiro/specs/done/`.
+
+**Baris status (wajib, semua file di atas):** tepat di bawah judul `#`, satu baris `> Status: draft` atau `> Status: accepted YYYY-MM-DD (<peran penyetuju>)`. Hanya manusia yang mengubah ke `accepted`; AI tidak pernah menyetujui sendiri. Baris ini bukan heading, jadi tidak mengganggu validator.
 
 ## 2. `requirements.md`
 
@@ -77,3 +81,23 @@ Cara cepat memeriksa cakupan: daftar semua ID `N.M` dari requirements (hitung it
 
 - Tulis berurutan requirements → design → tasks, tunggu persetujuan user di antara dokumen kecuali user meminta lanjut (lihat memory `cms2-kiro-spec-location`).
 - Saat review "pastikan tidak ada section yang missing", periksa **ketiga** sumber aturan: validator Kiro (section ini), `model-recommendation.md`, dan checklist traceability. Lolos satu tidak berarti lolos yang lain.
+
+## 7. Standar hybrid CMS2: tahap SDLC + gate (keputusan user 2026-11-09)
+
+Spec Kiro adalah standar SDLC CMS2 untuk fitur baru (CLAUDE.md §4a). Enam tahap AI-Native SDLC dipetakan ke file berikut; setiap gate dicatat di baris `> Status:` file-nya.
+
+| Tahap | File | Gate manusia | Isi minimal |
+|---|---|---|---|
+| 1 Plan | `requirements.md` → `## Introduction` | PO menyetujui Introduction + open questions dijawab | Masalah dengan kata-kata pemohon, outcome, batasan, open questions (AI mendaftar, tidak menjawab) |
+| 2 Design | `requirements.md` (EARS) + `design.md` | PO menyetujui requirements; engineer menyetujui design | Sec 2–3 di atas; tandai area CLAUDE.md §4 #7 (auth/uang/rekon/migrasi/delete) |
+| 3 Build | `tasks.md` | Engineer menyetujui tasks | Sec 4 di atas |
+| 4 Test | `tasks.md` → `## Notes` → `### Test Results` | Build + test hijau | Perintah yang dijalankan + hasil (tanggal, angka lulus/coverage), trace ke Requirement/Property; cek browser manual = **outstanding (user)**, tidak pernah ditandai selesai |
+| 5 Deploy | `review.md` | Code owner merge | `## Review Passes` (bugs / security / compliance), `## Findings` (R1…Rn, Important vs nit, status), `## Definition of Done` (checklist CLAUDE.md §11) |
+| 6 Maintain | `incidents.md` | On-call | `## Signals`, `## Incident Log` (tanggal, gejala, akar masalah, test regresi yang ditambahkan); pelanggaran → spec baru (loop tertutup) |
+
+Aturan:
+- Satu tahap pada satu waktu; tahap berikutnya baru mulai setelah file sebelumnya `accepted`.
+- Kode dan spec tidak cocok → STOP, tanya. Jangan diam-diam memperbaiki salah satunya.
+- Saat tahap selesai: perbarui `.claude/development-progress.md`.
+- Pelajaran dari review/insiden → `.claude/lessons-learned.md`.
+- Fitur yang dimulai di `.claude/sdlc/<feature>/` (format lama) diselesaikan di sana; tidak dimigrasi.

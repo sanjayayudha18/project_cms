@@ -502,6 +502,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/vendors/{vendorID}/pks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ADMIN / ADMIN_PARAM. Active PKS, history and the pending change of one vendor (primary DB). INTERNAL vendor: `pks_status` and `active` are null, `history` is empty. */
+        get: operations["getVendorPks"];
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a new PKS (replaces the active one on approval) through maker-checker. 202 = pending approval. */
+        post: operations["submitVendorPks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vendors/{vendorID}/pks/{pksID}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a terminate of the PKS through maker-checker. */
+        post: operations["terminateVendorPks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/vendors/{vendorID}/pks/{pksID}/unterminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages the undo of a terminate through maker-checker. */
+        post: operations["unterminateVendorPks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -514,6 +566,86 @@ export interface components {
         FieldError: {
             field: string;
             message: string;
+        };
+        ChangeRequestAccepted: {
+            /** Format: int64 */
+            change_request_id: number;
+            status: string;
+            entity_type: string;
+            op: string;
+        };
+        SubmitVendorPksRequest: {
+            pks_name: string;
+            /** Format: date */
+            effective_date: string;
+            /**
+             * Format: date
+             * @description must be >= effective_date
+             */
+            expiry_date: string;
+        };
+        VendorPksReasonRequest: {
+            reason: string;
+        };
+        /** @enum {string} */
+        PksStatus: "aktif" | "need_renewal" | "expired" | "terminated" | "belum_diisi";
+        VendorPksRecord: {
+            /** Format: int64 */
+            id: number;
+            pks_name: string;
+            /** Format: date */
+            effective_date: string;
+            /** Format: date */
+            expiry_date: string;
+            /** Format: int32 */
+            validity_months: number;
+            /** @description only on the active PKS; negative once expired */
+            remaining_days?: number;
+            /** Format: date-time */
+            created_at: string | null;
+            /**
+             * Format: date-time
+             * @description history rows only
+             */
+            replaced_at?: string;
+            /**
+             * Format: int64
+             * @description history rows only
+             */
+            replaced_by_pks_id?: number;
+            /** Format: date-time */
+            terminated_at: string | null;
+            termination_reason: string | null;
+        };
+        VendorPksPending: {
+            /** Format: int64 */
+            change_request_id: number;
+            /** @enum {string} */
+            op: "create" | "disable" | "enable";
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            maker_id: number;
+            maker_name: string;
+            /** Format: date-time */
+            created_at: string | null;
+        };
+        VendorPksDetail: {
+            /** Format: int64 */
+            vendor_id: number;
+            /** @enum {string} */
+            kind: "FLM_VENDOR" | "INTERNAL";
+            /**
+             * Format: date
+             * @description Asia/Jakarta date used for status
+             */
+            today: string;
+            renewal_months: number;
+            pks_status: components["schemas"]["PksStatus"] | null;
+            active: components["schemas"]["VendorPksRecord"] | null;
+            history: components["schemas"]["VendorPksRecord"][];
+            pending: components["schemas"]["VendorPksPending"] | null;
         };
         /** @enum {string} */
         DsrLateStatus: "ok" | "late" | "not_sent" | "pending";
@@ -1247,6 +1379,8 @@ export interface components {
         };
     };
     parameters: {
+        VendorID: number;
+        PksID: number;
         Page: number;
         PageSize: number;
         /** @description YYYY-MM, not after the current month (WIB) */
@@ -2163,6 +2297,134 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getVendorPks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorPksDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitVendorPks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitVendorPksRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    terminateVendorPks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+                pksID: components["parameters"]["PksID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorPksReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unterminateVendorPks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendorID: components["parameters"]["VendorID"];
+                pksID: components["parameters"]["PksID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorPksReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
             500: components["responses"]["InternalError"];
         };
     };

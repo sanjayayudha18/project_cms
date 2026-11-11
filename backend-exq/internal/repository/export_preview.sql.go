@@ -206,6 +206,8 @@ type CountVendorsParams struct {
 //
 // CHANGE THESE TOGETHER WITH THE BATCH QUERIES (backend/queries/master_data_export.sql
 // and backend-exq/queries/vendor_export.sql). Property 2 (task 3.3) catches drift.
+// Twin = ExportVendorsWithPksBatch (backend-exq/queries/vendor_export_pks.sql); its director/PKS
+// LEFT JOINs never multiply rows (partial unique indexes), so they are omitted here.
 func (q *Queries) CountVendors(ctx context.Context, arg CountVendorsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countVendors, arg.VendorID, arg.Status)
 	var column_1 int64

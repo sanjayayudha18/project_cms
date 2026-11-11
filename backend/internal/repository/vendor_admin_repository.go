@@ -73,3 +73,20 @@ func (r *VendorAdminRepository) FindByCode(ctx context.Context, code string) (*i
 func (r *VendorAdminRepository) CountActiveUsers(ctx context.Context, vendorID int64) (int64, error) {
 	return r.queries.CountActiveUsersByVendor(ctx, &vendorID)
 }
+
+// GetKindAndDirector returns the vendor's kind and its active Director_PIC
+// (nil when none) from the primary (vendor-pks 6.2). Vendor missing -> pgx.ErrNoRows.
+func (r *VendorAdminRepository) GetKindAndDirector(ctx context.Context, vendorID int64) (string, *db.GetVendorDirectorPicRow, error) {
+	v, err := r.queries.GetVendorPksVendor(ctx, vendorID)
+	if err != nil {
+		return "", nil, err
+	}
+	d, err := r.queries.GetVendorDirectorPic(ctx, vendorID)
+	if err == pgx.ErrNoRows {
+		return v.Kind, nil, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	return v.Kind, &d, nil
+}

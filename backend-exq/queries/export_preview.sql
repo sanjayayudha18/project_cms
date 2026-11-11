@@ -8,6 +8,8 @@
 -- and backend-exq/queries/vendor_export.sql). Property 2 (task 3.3) catches drift.
 
 -- name: CountVendors :one
+-- Twin = ExportVendorsWithPksBatch (backend-exq/queries/vendor_export_pks.sql); its director/PKS
+-- LEFT JOINs never multiply rows (partial unique indexes), so they are omitted here.
 SELECT count(*)::bigint
 FROM vendors v
 WHERE (sqlc.narg('vendor_id')::bigint IS NULL OR v.id = sqlc.narg('vendor_id')::bigint)

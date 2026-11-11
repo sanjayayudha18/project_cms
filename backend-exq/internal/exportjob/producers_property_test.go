@@ -44,7 +44,7 @@ func (e propEntry[R]) matches(vendor, branch *int64, status string) bool {
 // ORDER BY id LIMIT n`. Unset Querier methods (Count*, reports) panic if called.
 type propQ struct {
 	Querier
-	vendors     []propEntry[repository.ExportVendorsBatchRow]
+	vendors     []propEntry[repository.ExportVendorsWithPksBatchRow]
 	branches    []propEntry[repository.ExportVendorBranchesBatchRow]
 	vaults      []propEntry[repository.ExportVendorVaultsBatchRow]
 	pics        []propEntry[repository.ExportVendorPicsBatchRow]
@@ -70,7 +70,7 @@ func propPage[R any](q *propQ, es []propEntry[R], after int64, limit int32, vend
 	return out
 }
 
-func (q *propQ) ExportVendorsBatch(_ context.Context, a repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error) {
+func (q *propQ) ExportVendorsWithPksBatch(_ context.Context, a repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error) {
 	return propPage(q, q.vendors, a.AfterID, a.BatchSize, a.VendorID, nil, a.Status), nil
 }
 
@@ -121,7 +121,12 @@ func propRow[R any](t *rapid.T) R {
 			f.SetString(propText.Draw(t, "str"))
 		case reflect.Bool:
 			f.SetBool(rapid.Bool().Draw(t, "bool"))
-		case reflect.Int64:
+		case reflect.Pointer: // nullable director/PKS text: nil or random text
+			if f.Type().Elem().Kind() == reflect.String && rapid.Bool().Draw(t, "hasPtr") {
+				s := propText.Draw(t, "ptr")
+				f.Set(reflect.ValueOf(&s))
+			}
+		case reflect.Int64, reflect.Int32, reflect.Struct: // ids, PKS numbers, dates stay zero
 			// ID is overwritten by propTable
 		case reflect.Slice:
 			f.Set(reflect.ValueOf(rapid.SliceOfN(propText, 0, 3).Draw(t, "strs")))
@@ -164,11 +169,11 @@ type propCase struct {
 
 func propCases() []propCase {
 	return []propCase{
-		{"vendors", vendorsProducer(false), func(t *rapid.T, q *propQ, n int) {
-			q.vendors = propTable[repository.ExportVendorsBatchRow](t, n)
+		{"vendors", vendorsProducer(false, 9), func(t *rapid.T, q *propQ, n int) {
+			q.vendors = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
 		}},
-		{"vendors-forceAll", vendorsProducer(true), func(t *rapid.T, q *propQ, n int) {
-			q.vendors = propTable[repository.ExportVendorsBatchRow](t, n)
+		{"vendors-forceAll", vendorsProducer(true, 9), func(t *rapid.T, q *propQ, n int) {
+			q.vendors = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
 		}},
 		{"branches", branchesProducer(), func(t *rapid.T, q *propQ, n int) {
 			q.branches = propTable[repository.ExportVendorBranchesBatchRow](t, n)

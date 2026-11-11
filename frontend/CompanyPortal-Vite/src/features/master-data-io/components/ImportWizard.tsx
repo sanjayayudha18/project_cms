@@ -155,6 +155,12 @@ export function ImportWizard() {
             Teks (Data → Dari Teks/CSV), atau awali nilai dengan tanda petik satu (').
           </li>
           <li>Baris tidak bisa mengubah data dan status aktif sekaligus.</li>
+          {entity === "vendors" && (
+            <li>
+              File ekspor vendor berisi kolom Direktur Utama dan PKS. Kolom itu hanya untuk dibaca
+              dan diabaikan saat impor. Ubah PKS di tab PKS dan direktur di data PIC.
+            </li>
+          )}
         </ul>
       </section>
 

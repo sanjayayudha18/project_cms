@@ -6,9 +6,31 @@
  * ADMIN/ADMIN_PARAM-only.
  */
 
+import type { components } from "@/lib/api/schema";
 import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 
 export type VendorStatus = "active" | "disabled" | "all";
+
+export type VendorKind = "FLM_VENDOR" | "INTERNAL";
+export type PksStatus = components["schemas"]["PksStatus"];
+export type VendorPksRecord = components["schemas"]["VendorPksRecord"];
+
+/** Direktur Utama = the vendor-wide PIC flagged is_director; null when none recorded. */
+export interface VendorDirector {
+  name: string;
+  phone: string | null;
+  email: string | null;
+}
+
+/** Active PKS summary on the list; null when the vendor has no active PKS. */
+export interface VendorPksSummary {
+  id: number;
+  pks_name: string;
+  effective_date: string;
+  expiry_date: string;
+  validity_months: number;
+  remaining_days: number;
+}
 
 export interface AdminVendor {
   id: number;
@@ -21,6 +43,12 @@ export interface AdminVendor {
   hq_address: string;
   is_active: boolean;
   deleted_at: string | null;
+  kind: VendorKind;
+  director: VendorDirector | null;
+  /** List only (absent on detail). null = no active PKS. */
+  pks?: VendorPksSummary | null;
+  /** List only (absent on detail). null = INTERNAL vendor. */
+  pks_status?: PksStatus | null;
 }
 
 export interface AdminVendorsListParams {
@@ -28,6 +56,7 @@ export interface AdminVendorsListParams {
   page_size: number;
   status?: VendorStatus;
   q?: string;
+  pks_status?: PksStatus;
 }
 
 export interface AdminVendorsListResponse {
@@ -176,6 +205,8 @@ export interface AdminVendorPic {
   phone: string | null;
   email: string | null;
   is_notification_recipient: boolean;
+  /** Direktur Utama: record only, no login, no roles, no notifications. */
+  is_director: boolean;
   /** Peran PIC: replenish | vault | cashcount; kosong = hanya kontak. */
   roles: string[];
   is_active: boolean;
@@ -209,6 +240,7 @@ export interface VendorPicFormPayload {
   phone: string | null;
   email: string | null;
   is_notification_recipient: boolean;
+  is_director?: boolean;
 }
 
 /** Hanya create yang membawa peran; update lewat form tidak mengubahnya (Req 5.7). */

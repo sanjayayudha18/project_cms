@@ -171,6 +171,7 @@ export const delegationSchema = z
   });
 
 export type DelegationFormValues = z.infer<typeof delegationSchema>;
+export type DelegationFormInput = z.input<typeof delegationSchema>;
 
 export const leaveSchema = z
   .object({
@@ -185,6 +186,7 @@ export const leaveSchema = z
   });
 
 export type LeaveFormValues = z.infer<typeof leaveSchema>;
+export type LeaveFormInput = z.input<typeof leaveSchema>;
 
 const decimalAmount = z
   .string()
@@ -211,3 +213,4 @@ export const policySchema = z
   });
 
 export type PolicyFormValues = z.infer<typeof policySchema>;
+export type PolicyFormInput = z.input<typeof policySchema>;

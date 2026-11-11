@@ -60,8 +60,8 @@ func mountAdminVendorVaultHandler(svc VendorVaultAdminServicer) (http.Handler, *
 }
 
 func TestAdminVendorVaultHandler_List_DecimalStringsInResponse(t *testing.T) {
-	maxC := "9000000000.00"
-	svc := &fakeVendorVaultAdminServicer{listResult: []service.VendorVault{{ID: 1, VaultCode: "V1", Category: "ATM", CurrencyCode: "IDR", MaxCapacityAmount: &maxC, IsActive: true}}}
+	maxC, escrow := "9000000000.00", "001234567890"
+	svc := &fakeVendorVaultAdminServicer{listResult: []service.VendorVault{{ID: 1, VaultCode: "V1", Category: "ATM", CurrencyCode: "IDR", MaxCapacityAmount: &maxC, EscrowAccount: &escrow, IsActive: true}}}
 	router, tokenSvc := mountAdminVendorVaultHandler(svc)
 
 	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors/3/vaults", tokenForRole(t, tokenSvc, 1, "ADMIN"), "")
@@ -69,7 +69,8 @@ func TestAdminVendorVaultHandler_List_DecimalStringsInResponse(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if body := rec.Body.String(); !strings.Contains(body, `"max_capacity_amount":"9000000000.00"`) || !strings.Contains(body, `"vault_code":"V1"`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"max_capacity_amount":"9000000000.00"`) || !strings.Contains(body, `"vault_code":"V1"`) ||
+		!strings.Contains(body, `"escrow_account":"001234567890"`) {
 		t.Errorf("expected exact decimal string + vault row, got: %s", body)
 	}
 }

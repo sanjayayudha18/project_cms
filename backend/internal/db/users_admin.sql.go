@@ -15,7 +15,8 @@ const countUsersAdmin = `-- name: CountUsersAdmin :one
 SELECT COUNT(*)
 FROM users u
 JOIN roles r ON r.id = u.role_id
-WHERE ($1::text IS NULL
+WHERE u.auth_source <> 'service'
+  AND ($1::text IS NULL
         OR u.username ILIKE '%' || $1::text || '%'
         OR u.full_name ILIKE '%' || $1::text || '%'
         OR u.email ILIKE '%' || $1::text || '%')
@@ -304,7 +305,7 @@ func (q *Queries) GetUserAdminByID(ctx context.Context, id int64) (GetUserAdminB
 }
 
 const listRoles = `-- name: ListRoles :many
-SELECT id, role FROM roles ORDER BY role
+SELECT id, role FROM roles WHERE role <> 'EXT-CLIENT' ORDER BY role
 `
 
 type ListRolesRow struct {
@@ -312,7 +313,8 @@ type ListRolesRow struct {
 	Role string `json:"role"`
 }
 
-// Populates the Role select in User_Form_Dialog (Req 11.2).
+// Populates the Role select in User_Form_Dialog (Req 11.2). EXT-CLIENT is
+// hidden: it belongs to service accounts only (ext-user-api Req 9.6).
 func (q *Queries) ListRoles(ctx context.Context) ([]ListRolesRow, error) {
 	rows, err := q.db.Query(ctx, listRoles)
 	if err != nil {
@@ -342,7 +344,8 @@ SELECT u.id, u.username, u.full_name, u.email, r.role, u.is_karyawan,
 FROM users u
 JOIN roles r ON r.id = u.role_id
 LEFT JOIN vendor_branches vb ON vb.id = u.vendor_branch_id
-WHERE ($1::text IS NULL
+WHERE u.auth_source <> 'service'
+  AND ($1::text IS NULL
         OR u.username ILIKE '%' || $1::text || '%'
         OR u.full_name ILIKE '%' || $1::text || '%'
         OR u.email ILIKE '%' || $1::text || '%')
@@ -392,6 +395,7 @@ type ListUsersAdminRow struct {
 // and status — the caller resolves absent status to 'active' before calling
 // (Resolved Decision 5), so this query only ever sees 'active' | 'disabled' | 'all'.
 // Ordered full_name ASC, id ASC (Req 2.7 stable tiebreaker).
+// ext-user-api Req 9.5: service accounts (auth_source='service') are never listed.
 func (q *Queries) ListUsersAdmin(ctx context.Context, arg ListUsersAdminParams) ([]ListUsersAdminRow, error) {
 	rows, err := q.db.Query(ctx, listUsersAdmin,
 		arg.Q,
@@ -609,11 +613,12 @@ func (q *Queries) UpdateUserAdmin(ctx context.Context, arg UpdateUserAdminParams
 }
 
 const userAdminExists = `-- name: UserAdminExists :one
-SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL) AS exists
+SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND deleted_at IS NULL AND auth_source <> 'service') AS exists
 `
 
 // Reference check for supervisor_id on user create/update (Req 3.7, 4.7) —
-// only an active (non-disabled) user is a valid supervisor.
+// only an active (non-disabled) user is a valid supervisor. A service account
+// is never a valid supervisor (ext-user-api Req 9.5).
 func (q *Queries) UserAdminExists(ctx context.Context, id int64) (bool, error) {
 	row := q.db.QueryRow(ctx, userAdminExists, id)
 	var exists bool

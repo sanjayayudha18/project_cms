@@ -1,3 +1,15 @@
+# Check Usage
+
+Untuk melihat CPU/RAM secara live (tekan Ctrl+C untuk berhenti):
+docker stats
+
+Untuk sekali lihat saja:
+docker stats --no-stream
+
+Untuk melihat pemakaian disk Docker:
+docker system df
+
+
 # 1st time create img
 
 cd frontend

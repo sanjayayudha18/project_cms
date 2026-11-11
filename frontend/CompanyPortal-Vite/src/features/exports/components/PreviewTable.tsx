@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { NoticeBanner } from "@/components/ui/NoticeBanner";
+import { PksStatusBadge, pksStatusFromLabel } from "@/features/admin-vendors";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CircleAlert, CircleCheck, CircleOff, Loader2, TableProperties } from "lucide-react";
 import { useMemo } from "react";
@@ -44,6 +45,10 @@ function buildColumns(dataset: MasterDataset, columns: string[]): ColumnDef<Row,
           ) : (
             <Badge variant="neutral" icon={CircleOff} label="Nonaktif" />
           );
+        }
+        if (name === "pks_status") {
+          const status = pksStatusFromLabel(v);
+          return status ? <PksStatusBadge status={status} /> : v;
         }
         return money ? <span className="font-mono">{v}</span> : v;
       },

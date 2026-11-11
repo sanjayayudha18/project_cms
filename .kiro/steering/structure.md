@@ -12,6 +12,7 @@ CMS2/
 │   ├── config/                   # Env config loader, Load(defaultPort)
 │   ├── response/                 # {success,data} JSON envelope (used by backend-exq only)
 │   ├── csvexport/                # Shared CSV contract: CSVSafe, Writer, 6 master-data entities (backend + backend-exq)
+│   ├── userrules/                # Shared user rules: PrivilegedRoles, ValidateProfile, uniqueness (backend + backend-extapi; spec ext-user-api)
 │   └── database/                 # pgxpool: primary (write) + replica (read)
 │
 ├── backend/                      # ATM backend — own go.mod, port 8080
@@ -52,6 +53,16 @@ CMS2/
 │   ├── go.mod
 │   └── go.sum
 │
+├── backend-extapi/               # External user API for CIMB IDM — own go.mod, port 8082 (spec ext-user-api)
+│   ├── api/                      # OpenAPI 3.0.3 contract (openapi.yaml, embed.go) + panduan-integrasi-idm.md
+│   ├── cmd/
+│   │   ├── api/main.go           # /api/ext/v1/* (OAuth2 client credentials), /health, /ready; holds EXT_JWT_SECRET
+│   │   └── extclient/            # CLI: membuat dan merotasi kredensial client (api_clients)
+│   ├── internal/                 # audit, config, extauth (token, secret, rate limit), extuser (+ pgstore), handler, repository
+│   ├── queries/                  # sqlc SQL: api_clients, audit, ext_users
+│   ├── go.mod
+│   └── go.sum
+
 ├── frontend/
 │   ├── CompanyPortal-Vite/       # Internal app (LDAP login)
 │   │   ├── src/
@@ -86,6 +97,7 @@ CMS2/
 ## Key Architecture Rules
 
 - `pkg/` depends on neither backend. `backend/` and `backend-exq/` depend on `pkg/` only — never on each other. Compiler-enforced acyclic. (`backend-exq` also reads the shared SQL file `backend/queries/master_data_export.sql` through sqlc codegen; no Go import.)
+- `backend-extapi/` depends on `pkg/` only. `backend/` and `backend-exq/` never import it, and it never imports them. The `/api/ext` route exists only in `backend-extapi`.
 - `backend/migrations/` is the sole owner of ALL DB migrations (including CIT tables). `backend_python/` reads/writes the same schema but never owns migrations.
 - ATM backend keeps existing flat JSON response shape for wire compatibility. `backend-exq` uses `pkg/response` envelope. Python services use their own `{status, data, error}` envelope.
 - Each backend builds and deploys as an independent artifact (separate Compute Engine in prod).

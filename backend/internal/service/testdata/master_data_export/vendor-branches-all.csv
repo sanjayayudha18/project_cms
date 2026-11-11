@@ -1,4 +1,4 @@
-﻿id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active
-1,VA,VA_001,Alpha Medan,Sumatera,MDN,ATM_CASH,12,true
-3,VA,VA_002,Alpha Lama,,,,,false
-4,VC,VC_001,"'@Cabang, Bandung",Jawa Barat,BDG,CASH,,true
+﻿id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,cis_limit_amount,is_active
+1,VA,VA_001,Alpha Medan,Sumatera,MDN,ATM_CASH,12,2500000000.00,true
+3,VA,VA_002,Alpha Lama,,,,,,false
+4,VC,VC_001,"'@Cabang, Bandung",Jawa Barat,BDG,CASH,,,true

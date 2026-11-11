@@ -144,32 +144,32 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | --- | --- | --- | --- |
 | [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 45 | - | - |
 | [`backend/internal/db/db.go`](../../backend/internal/db/db.go) | 20 | - | - |
-| [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 11 | - | - |
+| [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 11 | - | `auth` |
 | [`backend/internal/db/models.go`](../../backend/internal/db/models.go) | 9 | - | - |
-| [`backend/internal/service/replenishment_read.go`](../../backend/internal/service/replenishment_read.go) | - | 9 | - |
-| [`backend/internal/service/vendor_order_realization.go`](../../backend/internal/service/vendor_order_realization.go) | 3 | 6 | - |
+| [`backend/internal/service/replenishment_read.go`](../../backend/internal/service/replenishment_read.go) | - | 9 | `replenishment-realisasi` |
+| [`backend/internal/service/vendor_order_realization.go`](../../backend/internal/service/vendor_order_realization.go) | 3 | 6 | `replenishment-realisasi` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 8 | - |
-| [`backend/internal/handler/atm_portal_handler.go`](../../backend/internal/handler/atm_portal_handler.go) | 7 | - | - |
-| [`backend/internal/handler/notification_handler.go`](../../backend/internal/handler/notification_handler.go) | - | 6 | - |
-| [`backend/internal/service/holiday_admin.go`](../../backend/internal/service/holiday_admin.go) | - | 6 | - |
-| [`backend/internal/service/vendor_order.go`](../../backend/internal/service/vendor_order.go) | - | 6 | - |
-| [`backend/internal/handler/admin_holiday_handler.go`](../../backend/internal/handler/admin_holiday_handler.go) | - | 5 | - |
-| [`backend/internal/handler/vault_plan_handler.go`](../../backend/internal/handler/vault_plan_handler.go) | - | 5 | - |
-| [`backend/internal/handler/vendor_request_vault_handler.go`](../../backend/internal/handler/vendor_request_vault_handler.go) | 1 | 4 | - |
-| [`backend/internal/handler/vendor_request_vendor_handler.go`](../../backend/internal/handler/vendor_request_vendor_handler.go) | 1 | 4 | - |
-| [`backend/internal/service/acm_area_admin.go`](../../backend/internal/service/acm_area_admin.go) | - | 5 | - |
-| [`backend/internal/service/vault_plan.go`](../../backend/internal/service/vault_plan.go) | - | 5 | - |
+| [`backend/internal/handler/atm_portal_handler.go`](../../backend/internal/handler/atm_portal_handler.go) | 7 | - | `atm-portal` |
+| [`backend/internal/handler/notification_handler.go`](../../backend/internal/handler/notification_handler.go) | - | 6 | `notification` |
+| [`backend/internal/service/holiday_admin.go`](../../backend/internal/service/holiday_admin.go) | - | 6 | `holiday` |
+| [`backend/internal/service/vendor_order.go`](../../backend/internal/service/vendor_order.go) | - | 6 | `send-to-vendor` |
+| [`backend/internal/handler/admin_holiday_handler.go`](../../backend/internal/handler/admin_holiday_handler.go) | - | 5 | `holiday` |
+| [`backend/internal/handler/vault_plan_handler.go`](../../backend/internal/handler/vault_plan_handler.go) | - | 5 | `vault-plan` |
+| [`backend/internal/handler/vendor_request_vault_handler.go`](../../backend/internal/handler/vendor_request_vault_handler.go) | 1 | 4 | `vault-plan` |
+| [`backend/internal/handler/vendor_request_vendor_handler.go`](../../backend/internal/handler/vendor_request_vendor_handler.go) | 1 | 4 | `send-to-vendor` |
+| [`backend/internal/service/acm_area_admin.go`](../../backend/internal/service/acm_area_admin.go) | - | 5 | `acm-area` |
+| [`backend/internal/service/vault_plan.go`](../../backend/internal/service/vault_plan.go) | - | 5 | `vault-plan` |
 | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 4 | - |
-| [`backend/internal/service/vault_plan_actions.go`](../../backend/internal/service/vault_plan_actions.go) | 1 | 3 | - |
-| [`backend/internal/service/vault_plan_create.go`](../../backend/internal/service/vault_plan_create.go) | 2 | 2 | - |
+| [`backend/internal/service/vault_plan_actions.go`](../../backend/internal/service/vault_plan_actions.go) | 1 | 3 | `vault-plan` |
+| [`backend/internal/service/vault_plan_create.go`](../../backend/internal/service/vault_plan_create.go) | 2 | 2 | `vault-plan` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 
 ## Fitur terkait
 
-- `vault-plan` (belum dipetakan di features.toml)
-- `send-to-vendor` (belum dipetakan di features.toml)
-- `dmaa-forecast` (belum dipetakan di features.toml)
+- [Penetapan Vault (ACM)](vault-plan.md)
+- [Order ke Vendor (VendorPortal)](send-to-vendor.md)
+- [Forecast DMAA](dmaa-forecast.md)
 
 ## Dokumen
 

@@ -71,9 +71,10 @@ export const EXPORT_DATASETS: ExportDataset[] = [
   master({
     id: "vendors",
     label: "Vendor",
-    description: "Daftar vendor beserta kontak dan alamat kantor pusat.",
+    description:
+      "Daftar vendor beserta kontak, alamat kantor pusat, Direktur Utama, dan PKS aktif.",
     filters: { vendor: "none", branch: false, priceLevel: false },
-    numericColumns: ["id"],
+    numericColumns: ["id", "pks_validity_months", "pks_remaining_days"],
   }),
   master({
     id: "vendor-branches",

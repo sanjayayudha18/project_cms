@@ -9,7 +9,7 @@
 -- vendor_branch_id (optional branch drill-down, NULL = all branches).
 SELECT v.id, v.vendor_branch_id, v.vault_code, v.category, v.currency_code,
        v.min_capacity_amount, v.max_capacity_amount, v.latitude, v.longitude,
-       v.operating_hours, v.location_id, v.is_active, v.deleted_at
+       v.operating_hours, v.location_id, v.is_active, v.deleted_at, v.escrow_account
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
 WHERE b.vendor_id = sqlc.arg('vendor_id')
@@ -44,7 +44,7 @@ SELECT COUNT(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND deleted_at IS
 -- Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
 SELECT id, vendor_branch_id, vault_code, category, currency_code,
        min_capacity_amount, max_capacity_amount, latitude, longitude,
-       operating_hours, location_id, is_active, deleted_at
+       operating_hours, location_id, is_active, deleted_at, escrow_account
 FROM vendor_vaults WHERE id = $1;
 
 -- name: FindVendorVaultAdminByCode :one
@@ -60,13 +60,14 @@ SELECT vendor_id FROM vendor_branches WHERE id = $1;
 -- mirror category into it.
 INSERT INTO vendor_vaults (vendor_branch_id, vault_code, type, category, currency_code,
                            min_capacity_amount, max_capacity_amount, latitude, longitude,
-                           operating_hours, location_id)
+                           operating_hours, location_id, escrow_account)
 VALUES (sqlc.arg('vendor_branch_id'), sqlc.arg('vault_code'), sqlc.arg('category'), sqlc.arg('category'),
         sqlc.arg('currency_code'), sqlc.narg('min_capacity_amount'), sqlc.narg('max_capacity_amount'),
-        sqlc.narg('latitude'), sqlc.narg('longitude'), sqlc.narg('operating_hours'), sqlc.narg('location_id'))
+        sqlc.narg('latitude'), sqlc.narg('longitude'), sqlc.narg('operating_hours'), sqlc.narg('location_id'),
+        sqlc.narg('escrow_account'))
 RETURNING id, vendor_branch_id, vault_code, category, currency_code,
           min_capacity_amount, max_capacity_amount, latitude, longitude,
-          operating_hours, location_id, is_active, deleted_at;
+          operating_hours, location_id, is_active, deleted_at, escrow_account;
 
 -- name: UpdateVendorVaultAdmin :one
 -- vault_code and vendor_branch_id are immutable. `AND deleted_at IS NULL`
@@ -81,11 +82,12 @@ SET category = sqlc.arg('category'),
     longitude = sqlc.narg('longitude'),
     operating_hours = sqlc.narg('operating_hours'),
     location_id = sqlc.narg('location_id'),
+    escrow_account = sqlc.narg('escrow_account'),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND deleted_at IS NULL
 RETURNING id, vendor_branch_id, vault_code, category, currency_code,
           min_capacity_amount, max_capacity_amount, latitude, longitude,
-          operating_hours, location_id, is_active, deleted_at;
+          operating_hours, location_id, is_active, deleted_at, escrow_account;
 
 -- name: DisableVendorVault :exec
 -- Soft-disable only (no_hard_delete_test.go extended in T3.7).

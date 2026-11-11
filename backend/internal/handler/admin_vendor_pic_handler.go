@@ -64,6 +64,7 @@ func picToResponse(p service.VendorPic) map[string]any {
 		"position": p.Position, "phone": p.Phone, "email": p.Email,
 		"is_notification_recipient": p.IsNotificationRecipient, "is_active": p.IsActive,
 		"deleted_at": formatTimePtr(p.DeletedAt), "roles": p.Roles,
+		"is_director": p.IsDirector,
 	}
 }
 
@@ -292,6 +293,10 @@ func (h *AdminVendorPicHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", service.ErrVendorPicNotFound.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):
 		writeForbidden(w, "Anda tidak berhak mengubah master data")
+	case errors.Is(err, service.ErrVendorDirectorExists):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorDirectorExists.Error())
+	case errors.Is(err, service.ErrVendorDirectorNoRoles):
+		writeError(w, http.StatusConflict, "conflict", service.ErrVendorDirectorNoRoles.Error())
 	case errors.Is(err, service.ErrMasterDataChangePending):
 		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangePending.Error())
 	default:

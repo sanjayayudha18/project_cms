@@ -12,6 +12,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/middleware"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // VendorAdminServicer is the subset of service.VendorAdminService the
@@ -21,6 +22,7 @@ type VendorAdminServicer interface {
 	List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
 	Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
 	Get(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
+	GetKindAndDirector(ctx context.Context, id int64) (string, *db.GetVendorDirectorPicRow, error)
 	// Mutations stage a maker-checker change request (T4.1) and return it
 	// pending; the vendor row itself changes only after approval.
 	Create(ctx context.Context, actorID int64, req service.CreateVendorRequest, actorIP string) (db.MasterDataChangeRequest, error)
@@ -75,8 +77,17 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		qParam = &v
 	}
 
+	var pksStatus *string
+	if v := q.Get("pks_status"); v != "" {
+		if _, ok := reports.PksStatuses[v]; !ok {
+			writeError(w, http.StatusBadRequest, "bad_request", "pks_status tidak valid")
+			return
+		}
+		pksStatus = &v
+	}
+
 	listArg := db.ListVendorsAdminParams{
-		Q: qParam, Status: status,
+		Q: qParam, Status: status, PksStatus: pksStatus,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	}
 	rows, err := h.svc.List(r.Context(), listArg)
@@ -84,7 +95,7 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status})
+	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status, PksStatus: pksStatus})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
@@ -116,7 +127,18 @@ func (h *AdminVendorHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Vendor tidak ditemukan")
 		return
 	}
-	writeJSON(w, http.StatusOK, getVendorRowToResponse(*row))
+	kind, dir, err := h.svc.GetKindAndDirector(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		return
+	}
+	resp := getVendorRowToResponse(*row)
+	resp["kind"] = kind
+	resp["director"] = nil
+	if dir != nil {
+		resp["director"] = directorResponse(dir.Name, dir.Phone, dir.Email)
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 type createVendorAdminRequestBody struct {
@@ -279,11 +301,32 @@ func (h *AdminVendorHandler) handleVendorAdminError(w http.ResponseWriter, err e
 
 // --- response mapping ------------------------------------------------------
 
+func directorResponse(name string, phone, email *string) map[string]any {
+	return map[string]any{"name": name, "phone": phone, "email": email}
+}
+
 func listVendorRowToResponse(r db.ListVendorsAdminRow) map[string]any {
+	// ListVendorsAdmin COALESCEs the PKS columns (0 / ''); restore NULLs here:
+	// pks = null without an active PKS, pks_status = null for INTERNAL vendors.
+	var director, pks, pksStatus any
+	if r.DirectorName != nil {
+		director = directorResponse(*r.DirectorName, r.DirectorPhone, r.DirectorEmail)
+	}
+	if r.PksID != nil {
+		pks = map[string]any{
+			"id": *r.PksID, "pks_name": r.PksName,
+			"effective_date": formatPgDate(r.PksEffectiveDate), "expiry_date": formatPgDate(r.PksExpiryDate),
+			"validity_months": r.PksValidityMonths, "remaining_days": r.PksRemainingDays,
+		}
+	}
+	if r.PksStatus != "" {
+		pksStatus = r.PksStatus
+	}
 	return map[string]any{
 		"id": r.ID, "code": r.Code, "name": r.Name, "legal_name": r.LegalName, "npwp": r.Npwp, "contact_email": r.ContactEmail,
 		"contact_phone": r.ContactPhone, "hq_address": r.HqAddress, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt),
+		"kind":       r.Kind, "director": director, "pks": pks, "pks_status": pksStatus,
 	}
 }
 

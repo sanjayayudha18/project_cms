@@ -59,6 +59,7 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	// vendor_request_realizations: resubmit menimpa (upsert); replenish_classifications: tiket
 	// nonaktif -> void. Baris anak *_amounts boleh replace-all (bukan bukti sendiri).
 	// dsr_receipts (dsr-late-report, migration 033): append-only, bukti waktu terima DSR pertama.
+	// vendor_pks (vendor-pks, migration 022): riwayat PKS; diganti = replaced_at, terminate = terminated_*.
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
@@ -67,6 +68,7 @@ func TestQueries_NoHardDelete(t *testing.T) {
 		"vendor_request_vault_tickets",
 		"holidays", "vendor_request_realizations", "replenish_classifications",
 		"dsr_receipts",
+		"vendor_pks",
 	}
 
 	for _, f := range files {
@@ -99,6 +101,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 		"vendor_request_vault_tickets",
 		"holidays", "vendor_request_realizations", "replenish_classifications",
 		"dsr_receipts",
+		"vendor_pks",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)
@@ -116,6 +119,69 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 		}
 		if re.MatchString("DELETE FROM " + table + "_archive WHERE id = $1") {
 			t.Errorf("pattern must not flag look-alike table %s_archive", table)
+		}
+	}
+}
+
+// vendorPksImmutableSet finds an assignment to a vendor_pks column that must never
+// change after insert (spec vendor-pks, D1): only replaced_* and terminated_* move.
+var (
+	vendorPksUpdate       = regexp.MustCompile(`(?is)\bUPDATE\s+(public\.)?vendor_pks\s+SET\s+(.*?)(\bWHERE\b|\bRETURNING\b|;|$)`)
+	vendorPksImmutableSet = regexp.MustCompile(`(?i)\b(pks_name|effective_date|expiry_date)\s*=`)
+)
+
+func updatesVendorPksImmutable(sql string) bool {
+	for _, m := range vendorPksUpdate.FindAllStringSubmatch(sql, -1) {
+		if vendorPksImmutableSet.MatchString(m[2]) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestQueries_VendorPksImmutableColumns: no queries/*.sql file UPDATEs
+// vendor_pks.pks_name / effective_date / expiry_date (Property 5, Req 3.9).
+func TestQueries_VendorPksImmutableColumns(t *testing.T) {
+	files, err := filepath.Glob("../../queries/*.sql")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("glob queries/*.sql: %v (found %d)", err, len(files))
+	}
+	sawVendorPksUpdate := false
+	for _, f := range files {
+		content, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		sqlOnly := stripSQLLineComments(content)
+		if vendorPksUpdate.MatchString(sqlOnly) {
+			sawVendorPksUpdate = true
+		}
+		if updatesVendorPksImmutable(sqlOnly) {
+			t.Errorf("%s UPDATEs pks_name/effective_date/expiry_date of vendor_pks — forbidden; a new PKS replaces the old one", f)
+		}
+	}
+	if !sawVendorPksUpdate {
+		t.Error("no UPDATE vendor_pks found in queries/ — the scan would pass vacuously; check the pattern")
+	}
+}
+
+func TestVendorPksImmutablePattern_ActuallyFires(t *testing.T) {
+	for _, sql := range []string{
+		"UPDATE vendor_pks SET pks_name = $2 WHERE id = $1;",
+		"update public.vendor_pks\nset terminated_at = now(), Expiry_Date=$2\nwhere id = $1",
+		"UPDATE vendor_pks SET effective_date = $2 RETURNING id;",
+	} {
+		if !updatesVendorPksImmutable(sql) {
+			t.Errorf("pattern failed to flag %q", sql)
+		}
+	}
+	for _, sql := range []string{
+		"UPDATE vendor_pks SET replaced_at = $2 WHERE id = $1 AND expiry_date = $3;",
+		"UPDATE vendor_pks_archive SET pks_name = $2;",
+		"SELECT pks_name = $1 FROM vendor_pks;",
+	} {
+		if updatesVendorPksImmutable(sql) {
+			t.Errorf("pattern must not flag %q", sql)
 		}
 	}
 }

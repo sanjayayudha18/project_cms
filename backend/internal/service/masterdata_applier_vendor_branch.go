@@ -50,8 +50,6 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			Region:     p.Region,
 			RegionCode: p.RegionCode,
 			Category:   p.Category,
-			// nil = NULL; validated at submit, DB CHECK guards the rest (vendor-cis-limit FR1).
-			CisLimitAmount: p.CisLimitAmount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor branch: %w", err)
@@ -73,8 +71,6 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 			Region:     p.Region,
 			RegionCode: p.RegionCode,
 			Category:   p.Category,
-			// nil = NULL; validated at submit, DB CHECK guards the rest (vendor-cis-limit FR1).
-			CisLimitAmount: p.CisLimitAmount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor branch: %w", err)

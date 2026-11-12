@@ -60,6 +60,35 @@ func (r *VendorVaultAdminRepository) FindByCode(ctx context.Context, code string
 	return &id, nil
 }
 
+// FindByBranchAndName returns the id of the vault with (vendor_branch_id, vault_name)
+// (incl. soft-deleted); nil, nil if none.
+func (r *VendorVaultAdminRepository) FindByBranchAndName(ctx context.Context, branchID int64, vaultName string) (*int64, error) {
+	id, err := r.queries.FindVendorVaultAdminByBranchAndName(ctx, db.FindVendorVaultAdminByBranchAndNameParams{
+		VendorBranchID: branchID,
+		VaultName:      vaultName,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &id, nil
+}
+
+// GenerateNextVaultName generates the next <vendorPrefix>_<area>_V<3-digit> vault_name
+// for branchID using the database function public.next_vendor_vault_name.
+func (r *VendorVaultAdminRepository) GenerateNextVaultName(ctx context.Context, branchID int64) (string, error) {
+	name, err := r.queries.GenerateNextVendorVaultName(ctx, branchID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return name, nil
+}
+
 // CountActiveByBranch returns the number of active (non-disabled) vaults under branchID.
 // Backs the branch-disable guard (VendorBranchAdminService.Disable).
 func (r *VendorVaultAdminRepository) CountActiveByBranch(ctx context.Context, branchID int64) (int64, error) {

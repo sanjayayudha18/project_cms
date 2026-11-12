@@ -149,15 +149,23 @@ export type VendorVaultCategory = "ATM" | "CASH" | "ATM_CASH";
 export interface AdminVendorVault {
   id: number;
   vendor_branch_id: number;
+  branch_name?: string;
+  region: string | null;
   vault_code: string;
+  vault_name: string;
   category: VendorVaultCategory;
   currency_code: string;
-  min_capacity_amount: string | null;
-  max_capacity_amount: string | null;
-  latitude: string | null;
-  longitude: string | null;
+  alamat: string | null;
+  min_balance: string | null;
+  max_balance: string | null;
+  cis_limit_amount: string | null;
+  cis_limit_currency?: string;
+  latitude?: string | null;
+  longitude?: string | null;
   operating_hours: string | null;
-  location_id: number | null;
+  location_id?: number | null;
+  escrow_cash: string | null;
+  escrow_atm: string | null;
   is_active: boolean;
   deleted_at: string | null;
 }
@@ -179,19 +187,21 @@ export interface AdminVendorVaultsListResponse {
 }
 
 export interface VendorVaultFormPayload {
+  vault_name: string | null;
   category: VendorVaultCategory;
   currency_code: string;
-  min_capacity_amount: string | null;
-  max_capacity_amount: string | null;
-  latitude: string | null;
-  longitude: string | null;
+  alamat: string | null;
+  min_balance: string | null;
+  max_balance: string | null;
+  cis_limit_amount: string | null;
   operating_hours: string | null;
-  location_id: number | null;
+  escrow_cash: string | null;
+  escrow_atm: string | null;
 }
 
 export interface CreateVendorVaultPayload extends VendorVaultFormPayload {
   vendor_branch_id: number;
-  vault_code: string;
+  vault_code?: string;
 }
 
 export type UpdateVendorVaultPayload = VendorVaultFormPayload;

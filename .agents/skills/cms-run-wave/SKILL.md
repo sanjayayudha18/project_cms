@@ -22,7 +22,7 @@ Skill ini menjalankan satu *wave* paralel (atau daftar task terpilih) dari bagia
 2. **Cek Gate Wave Sebelumnya**: Pastikan seluruh task pada wave sebelum `N` sudah berstatus `[x]`. Jika masih ada yang `[ ]`, tampilkan daftarnya kepada user dan berhenti (kecuali user menginstruksikan untuk tetap lanjut).
 3. **Petakan Model, Subagent Spesialis & Skill per Task**:
    - Periksa baris `_Model:_` pada task (atau warisi dari parent task-nya) dan petakan ke parameter `Model` pada tool `invoke_subagent` Antigravity:
-     - Deep Reasoning / Argon (`Argon` / `Gemini 4 Argon`) -> `Model: "inherit"` (mewarisi model Argon dari session utama) atau `"pro"` jika session utama bukan Argon
+     - Model Codename / Deep Reasoning (`Gemini 4 Argon (High)` / `Argon High` / `Gemini 4 Argon` / `Argon`, atau `Carbon` bila di-assign manual oleh user) -> `Model: "inherit"` (mewarisi `Argon (High/Medium)` atau `Carbon` dari session utama; beri catatan pengingat ke user pada langkah konfirmasi jika dropdown model session utama saat ini belum sesuai) atau fallback `"pro"`
      - Kompleks / Arsitektur / High effort (`Opus` / `Pro` / `High`) -> `Model: "pro"`
      - Standar / Implementasi menengah (`Sonnet` / `Flash` / `Medium`) -> `Model: "flash"`
      - Ringan / Boilerplate (`Haiku` / `Flash Lite` / `Low`) -> `Model: "flash_lite"`
@@ -35,7 +35,10 @@ Skill ini menjalankan satu *wave* paralel (atau daftar task terpilih) dari bagia
      - Lintas layer / umum -> `cms-task-runner.md`
    - Lewati (dan beri tahu user) task yang sudah `[x]` atau task yang ditandai sebagai pengecekan manual user.
    - Pilih skill yang relevan dari `.agents/skills/` berdasarkan area yang disentuh oleh task (misalnya `cms2-master-data` jika menyentuh maker-checker master data).
-4. **Konfirmasi ke User**: Tampilkan tabel rencana eksekusi wave (`Task ID` · `Judul` · `Spesialis` · `Model Subagent` · `Skills`) dan tunggu persetujuan user.
+4. **Konfirmasi ke User & Gate Dropdown Model**:
+   - Tampilkan tabel rencana eksekusi wave (`Task ID` · `Judul` · `Spesialis` · `Model Dokumen -> Parameter Subagent` · `Skills`) dan tunggu persetujuan user.
+   - Jika di dalam wave terdapat task yang meminta **`Carbon`** atau **`Argon`** (yang dipetakan ke `Model: "inherit"`), tampilkan pengingat agar user menyetel dropdown *Model Selection* ke **`Gemini 4 Carbon`** atau **`Gemini 4 Argon`** sebelum membalas *"Lanjut"* (task `Flash` tetap dipanggil dengan `Model: "flash"` agar hemat kuota).
+   - Jika satu wave memiliki task **`Argon` sekaligus `Carbon`**, pecah peluncurannya menjadi 2 kloter konfirmasi (**Kloter A: `Argon` + `Flash`**, lalu **Kloter B: `Carbon`**).
 5. **Dispatch Session Subagent Baru**: Setelah user menyetujui, panggil tool `invoke_subagent` (`TypeName: "self"` untuk implementasi atau `"research"` untuk audit read-only, `Workspace: "inherit"`, serta `Model` sesuai pemetaan di atas) untuk setiap task di dalam wave tersebut dengan prompt:
    > Bertindaklah sebagai subagent spesialis pada session baru ini: baca dan patuhi `.agents/rules/GEMINI.md`, `.agents/agents/cms-task-runner.md`, serta `.agents/agents/<spesialis>.md`.
    > - `spec`: `<path-spec>`

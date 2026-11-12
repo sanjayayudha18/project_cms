@@ -20,8 +20,14 @@ export type ReportKey =
   | "replenishment-trips"
   | "vendor-pks";
 
-export type MasterDataEntity = components["parameters"]["MasterDataEntity"];
-export type VendorEntity = "vendor" | "branches" | "vaults" | "pics" | "dsr-location-maps";
+export type MasterDataEntity = components["parameters"]["MasterDataEntity"] | "vendor-pks";
+export type VendorEntity =
+  | "vendor"
+  | "branches"
+  | "vaults"
+  | "pics"
+  | "dsr-location-maps"
+  | "vendor-pks";
 export type BranchEntity = "vaults" | "pics" | "dsr-location-maps";
 
 export type ListExportJobsResponse =

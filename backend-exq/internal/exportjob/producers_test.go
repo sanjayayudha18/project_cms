@@ -26,6 +26,14 @@ func ids(after int64, n int) []int64 {
 	return out
 }
 
+func (f *fakeQ) ExportVendorsBatch(_ context.Context, a repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error) {
+	f.calls = append(f.calls, a)
+	var out []repository.ExportVendorsBatchRow
+	for _, id := range ids(a.AfterID, f.n) {
+		out = append(out, repository.ExportVendorsBatchRow{ID: id, Code: "V", Name: itoa(id)})
+	}
+	return out, f.err
+}
 func (f *fakeQ) ExportVendorsWithPksBatch(_ context.Context, a repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error) {
 	f.calls = append(f.calls, a)
 	var out []repository.ExportVendorsWithPksBatchRow
@@ -46,7 +54,12 @@ func (f *fakeQ) ExportVendorVaultsBatch(_ context.Context, a repository.ExportVe
 	f.calls = append(f.calls, a)
 	var out []repository.ExportVendorVaultsBatchRow
 	for _, id := range ids(a.AfterID, f.n) {
-		out = append(out, repository.ExportVendorVaultsBatchRow{ID: id, VaultCode: "VL"})
+		out = append(out, repository.ExportVendorVaultsBatchRow{
+			ID: id, VaultCode: "VL", BranchName: "Abacus Bali", VaultName: "ABA_Bali_V001",
+			Category: "ATM_CASH", OperatingHours: "08:00-17:00", CurrencyCode: "IDR",
+			Region: "Bali", Alamat: "Jl. Sunset Road", MinBalance: "100.00", MaxBalance: "200.00",
+			CisLimitAmount: "300.00", EscrowCash: "001234567890", EscrowAtm: "009876543210", IsActive: true,
+		})
 	}
 	return out, f.err
 }
@@ -182,6 +195,9 @@ func TestHeadersMatchCSVExport(t *testing.T) {
 		if !slices.Equal(m[kind][e].Header(), want.Header) {
 			t.Errorf("%s header differs", e)
 		}
+		if e == csvexport.VendorPks && !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.Header) {
+			t.Errorf("global %s header differs", e)
+		}
 	}
 }
 
@@ -193,7 +209,9 @@ func TestScopeAndStatusPerKind(t *testing.T) {
 		want any
 	}{
 		{"vendor profile forces all", Params{Kind: KindVendor, Entity: "vendor", VendorID: i64(7), StatusFilter: "active"},
-			repository.ExportVendorsWithPksBatchParams{VendorID: i64(7), Status: "all", BatchSize: PageSize}},
+			repository.ExportVendorsBatchParams{VendorID: i64(7), Status: "all", BatchSize: PageSize}},
+		{"vendor pks scoped", Params{Kind: KindVendor, Entity: csvexport.VendorPks, VendorID: i64(7), StatusFilter: "disabled"},
+			repository.ExportVendorsWithPksBatchParams{VendorID: i64(7), Status: "disabled", BatchSize: PageSize}},
 		{"vendor branches", Params{Kind: KindVendor, Entity: "branches", VendorID: i64(7), StatusFilter: "disabled"},
 			repository.ExportVendorBranchesBatchParams{VendorID: i64(7), Status: "disabled", BatchSize: PageSize}},
 		{"vendor pics no branch", Params{Kind: KindVendor, Entity: "pics", VendorID: i64(7), StatusFilter: "active"},
@@ -205,6 +223,8 @@ func TestScopeAndStatusPerKind(t *testing.T) {
 		{"cabang dsr maps", Params{Kind: KindCabang, Entity: "dsr-location-maps", VendorID: i64(7), BranchID: i64(3), StatusFilter: "active"},
 			repository.ExportDsrLocationMapsBatchParams{VendorID: i64(7), BranchID: i64(3), Status: "active", BatchSize: PageSize}},
 		{"global vendors nil scope", Params{Kind: KindMasterDataGlobal, Entity: csvexport.Vendors, StatusFilter: "active"},
+			repository.ExportVendorsBatchParams{Status: "active", BatchSize: PageSize}},
+		{"global vendor pks nil scope", Params{Kind: KindMasterDataGlobal, Entity: csvexport.VendorPks, StatusFilter: "active"},
 			repository.ExportVendorsWithPksBatchParams{Status: "active", BatchSize: PageSize}},
 		{"global atms", Params{Kind: KindMasterDataGlobal, Entity: csvexport.ATMs, StatusFilter: "all"},
 			repository.ExportATMsBatchParams{Status: "all", BatchSize: PageSize}},
@@ -251,6 +271,8 @@ func deref(v any) string {
 		return *p
 	}
 	switch x := v.(type) {
+	case repository.ExportVendorsBatchParams:
+		return str(x.AfterID, d(x.VendorID), -2, x.Status, x.BatchSize)
 	case repository.ExportVendorsWithPksBatchParams:
 		return str(x.AfterID, d(x.VendorID), -2, x.Status, x.BatchSize)
 	case repository.ExportVendorBranchesBatchParams:
@@ -293,7 +315,7 @@ func TestPagingAcrossPages(t *testing.T) {
 	}
 	for i, r := range rows {
 		if r[0] != itoa(int64(i+1)) {
-			t.Fatalf("row %d id %s", i, r[0])
+			t.Fatalf("row %d name %s", i, r[0])
 		}
 	}
 	if len(f.calls) != 3 {
@@ -301,8 +323,20 @@ func TestPagingAcrossPages(t *testing.T) {
 	}
 	after := []int64{0, PageSize, 2 * PageSize}
 	for i, c := range f.calls {
-		if got := c.(repository.ExportVendorsWithPksBatchParams).AfterID; got != after[i] {
+		if got := c.(repository.ExportVendorsBatchParams).AfterID; got != after[i] {
 			t.Errorf("call %d after_id %d, want %d", i, got, after[i])
+		}
+	}
+
+	// Vaults: sequential `no` (1..2*PageSize+5) stays continuous across page boundaries in Produce.
+	fv := &fakeQ{n: 2*PageSize + 5}
+	vrows := run(t, fv, Params{Kind: KindMasterDataGlobal, Entity: csvexport.VendorVaults, StatusFilter: "all"}, time.Now())
+	if len(vrows) != 2*PageSize+5 {
+		t.Fatalf("vault rows = %d", len(vrows))
+	}
+	for i, r := range vrows {
+		if r[0] != itoa(int64(i+1)) {
+			t.Fatalf("vault row %d no = %s, want %s", i, r[0], itoa(int64(i+1)))
 		}
 	}
 }
@@ -328,6 +362,29 @@ func TestCellsMatchCSVExport(t *testing.T) {
 	want := csvexport.VendorPICCells(csvexport.VendorPICRow{ID: 1, Name: "p", Roles: []string{"vault"}})
 	if !slices.Equal(got, want) {
 		t.Errorf("cells = %v, want %v", got, want)
+	}
+
+	gotVault := run(t, &fakeQ{n: 1}, Params{Kind: KindMasterDataGlobal, Entity: csvexport.VendorVaults, StatusFilter: "all"}, time.Now())[0]
+	wantVault := csvexport.VendorVaultCells(csvexport.VendorVaultRow{
+		No: 1, BranchName: "Abacus Bali", VaultName: "ABA_Bali_V001", Category: "ATM_CASH",
+		OperatingHours: "08:00-17:00", CurrencyCode: "IDR", Region: "Bali", Alamat: "Jl. Sunset Road",
+		MinBalance: "100.00", MaxBalance: "200.00", CisLimitAmount: "300.00",
+		EscrowCash: "001234567890", EscrowAtm: "009876543210", IsActive: true,
+	})
+	if len(gotVault) != 14 || !slices.Equal(gotVault, wantVault) {
+		t.Errorf("vault cells = %v, want %v", gotVault, wantVault)
+	}
+
+	gotBranch := run(t, &fakeQ{n: 1}, Params{Kind: KindMasterDataGlobal, Entity: csvexport.VendorBranches, StatusFilter: "all"}, time.Now())[0]
+	wantBranch := csvexport.VendorBranchCells(csvexport.VendorBranchRow{ID: 1, BranchCode: "B"})
+	if len(gotBranch) != 9 || !slices.Equal(gotBranch, wantBranch) {
+		t.Errorf("branch cells = %v, want %v", gotBranch, wantBranch)
+	}
+
+	gotVendor := run(t, &fakeQ{n: 1}, Params{Kind: KindMasterDataGlobal, Entity: csvexport.Vendors, StatusFilter: "all"}, time.Now())[0]
+	wantVendor := csvexport.VendorCells(csvexport.VendorRow{Name: "1"})
+	if len(gotVendor) != 7 || !slices.Equal(gotVendor, wantVendor) {
+		t.Errorf("vendor cells = %v, want %v", gotVendor, wantVendor)
 	}
 }
 

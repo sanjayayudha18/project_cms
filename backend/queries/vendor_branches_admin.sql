@@ -1,16 +1,17 @@
--- Admin vendor branch management (plan.md Fase 3, T3.1). Mutations route
--- through the master-data maker-checker engine (Fase 2, D1) -- these
--- create/update/disable/enable queries are only ever run by
--- VendorBranchApplier inside the apply-on-approve transaction, never
--- directly by VendorBranchAdminService.
+-- Admin vendor branch management (plan.md Fase 3, T3.1; cis_limit moved to vendor_vaults in migration 040).
+-- Mutations route through the master-data maker-checker engine (Fase 2, D1) -- these
+-- create/update/disable/enable queries are only ever run by VendorBranchApplier
+-- inside the apply-on-approve transaction on primary pool (`db`), never directly by VendorBranchAdminService.
+-- Topology:
+--   * ListVendorBranchesAdmin / CountVendorBranchesAdmin -> `dbRead` (replica).
+--   * GetVendorBranchAdminByID / FindVendorBranchAdminByCode -> `db` (primary).
 
 -- name: ListVendorBranchesAdmin :many
 -- Scoped to one vendor (Req: /api/v1/admin/vendors/{id}/branches). Filters:
 -- q (case-insensitive substring across branch_code/branch_name) and status
 -- ('active' | 'disabled' | 'all') -- caller resolves absent status to
 -- 'active' (mirrors ListVendorsAdmin's convention).
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-       cis_limit_amount, cis_limit_currency
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at
 FROM vendor_branches
 WHERE vendor_id = sqlc.arg('vendor_id')
   AND (sqlc.narg('q')::text IS NULL
@@ -41,8 +42,7 @@ WHERE vendor_id = sqlc.arg('vendor_id')
 -- name: GetVendorBranchAdminByID :one
 -- Includes soft-deleted rows -- used both for the read endpoint and as the
 -- "before" snapshot / CurrentState staleness check (T2.5).
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-       cis_limit_amount, cis_limit_currency
+SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at
 FROM vendor_branches WHERE id = $1;
 
 -- name: FindVendorBranchAdminByCode :one
@@ -51,12 +51,10 @@ FROM vendor_branches WHERE id = $1;
 SELECT id FROM vendor_branches WHERE branch_code = $1;
 
 -- name: CreateVendorBranchAdmin :one
-INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region, region_code, category, cis_limit_amount)
+INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region, region_code, category)
 VALUES (sqlc.arg('vendor_id'), sqlc.arg('branch_code'), sqlc.arg('branch_name'),
-        sqlc.narg('location_id'), sqlc.narg('region'), sqlc.narg('region_code'), sqlc.arg('category'),
-        CAST(sqlc.narg('cis_limit_amount')::text AS numeric))
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-          cis_limit_amount, cis_limit_currency;
+        sqlc.narg('location_id'), sqlc.narg('region'), sqlc.narg('region_code'), sqlc.arg('category'))
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at;
 
 -- name: UpdateVendorBranchAdmin :one
 -- branch_code is immutable (not editable here, mirrors vendors.code /
@@ -69,11 +67,9 @@ SET branch_name = sqlc.arg('branch_name'),
     region = sqlc.narg('region'),
     region_code = sqlc.narg('region_code'),
     category = sqlc.arg('category'),
-    cis_limit_amount = CAST(sqlc.narg('cis_limit_amount')::text AS numeric),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND deleted_at IS NULL
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-          cis_limit_amount, cis_limit_currency;
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at;
 
 -- name: DisableVendorBranch :exec
 -- Soft-disable only: is_active=false, deleted_at=now(). No hard DELETE

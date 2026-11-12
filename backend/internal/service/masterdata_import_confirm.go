@@ -299,10 +299,19 @@ func stageCreate(ctx context.Context, maker int64, entity string, v map[string]s
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
 		_, err = s.Branches.Create(ctx, maker, VendorBranchPayload{VendorID: env.vendors[v["vendor_code"]], BranchCode: v["branch_code"],
-			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"], CisLimitAmount: optStr(v["cis_limit_amount"])}, ip)
+			BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
 	case ExportVendorVaults:
-		_, err = s.Vaults.Create(ctx, maker, env.vendors[v["vendor_code"]], VendorVaultPayload{
-			VendorBranchID: env.branches[v["vendor_code"]+"|"+v["branch_code"]], VaultCode: v["vault_code"],
+		branchID := env.branchesByName[v["branch_name"]]
+		if branchID == 0 {
+			branchID = env.branches[v["vendor_code"]+"|"+v["branch_code"]]
+		}
+		vendorCode := v["vendor_code"]
+		if vendorCode == "" {
+			vendorCode = env.branchVendorCode[branchID]
+		}
+		vaultCode := firstNonEmpty(v["vault_code"], v["vault_name"])
+		_, err = s.Vaults.Create(ctx, maker, env.vendors[vendorCode], VendorVaultPayload{
+			VendorBranchID: branchID, VaultCode: vaultCode,
 			VendorVaultUpdatePayload: vaultFields(v)}, ip)
 	case ExportVendorPICs:
 		_, err = s.PICs.Create(ctx, maker, env.vendors[v["vendor_code"]], picFields(v, env), ip)
@@ -327,7 +336,7 @@ func stageUpdate(ctx context.Context, maker int64, entity string, row ImportRow,
 		_, err = s.Vendors.Update(ctx, maker, id, UpdateVendorRequest{Name: v["name"], LegalName: &legal, NPWP: &npwp,
 			ContactEmail: v["contact_email"], ContactPhone: v["contact_phone"], HqAddress: v["hq_address"]}, ip)
 	case ExportVendorBranches:
-		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"], CisLimitAmount: optStr(v["cis_limit_amount"])}, ip)
+		_, err = s.Branches.Update(ctx, maker, id, VendorBranchUpdatePayload{BranchName: v["branch_name"], LocationID: optInt64(v["location_id"]), Region: optStr(v["region"]), RegionCode: optStr(v["region_code"]), Category: v["category"]}, ip)
 	case ExportVendorVaults:
 		_, err = s.Vaults.Update(ctx, maker, id, vaultFields(v), ip)
 	case ExportVendorPICs:
@@ -398,11 +407,33 @@ func stageToggle(ctx context.Context, maker int64, entity string, row ImportRow,
 }
 
 func vaultFields(v map[string]string) VendorVaultUpdatePayload {
-	return VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
-		MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
-		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"]),
-		OperatingHours: optStr(v["operating_hours"]), LocationID: optInt64(v["location_id"]),
-		EscrowAccount: optStr(v["escrow_account"])}
+	escrowCash := optStr(v["escrow_cash"])
+	escrowAtm := optStr(v["escrow_atm"])
+	if _, isLegacy := v["escrow_account"]; isLegacy {
+		if v["escrow_account"] == "" {
+			escrowCash = nil
+			escrowAtm = nil
+		} else if strings.EqualFold(v["category"], "ATM") {
+			escrowAtm = optStr(v["escrow_account"])
+		} else {
+			escrowCash = optStr(v["escrow_account"])
+		}
+	}
+	return VendorVaultUpdatePayload{
+		VaultName:      optStr(v["vault_name"]),
+		Category:       v["category"],
+		CurrencyCode:   v["currency_code"],
+		Alamat:         optStr(v["alamat"]),
+		MinBalance:     optStr(firstNonEmpty(v["min_balance"], v["min_capacity_amount"])),
+		MaxBalance:     optStr(firstNonEmpty(v["max_balance"], v["max_capacity_amount"])),
+		CisLimitAmount: optStr(v["cis_limit_amount"]),
+		Latitude:       optStr(v["latitude"]),
+		Longitude:      optStr(v["longitude"]),
+		OperatingHours: optStr(v["operating_hours"]),
+		LocationID:     optInt64(v["location_id"]),
+		EscrowCash:     escrowCash,
+		EscrowAtm:      escrowAtm,
+	}
 }
 
 func picFields(v map[string]string, env *importEnv) VendorPicUpdatePayload {

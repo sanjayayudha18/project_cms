@@ -295,8 +295,16 @@ func vendorPksRow(x repository.ExportVendorPksBatchRow) reports.VendorPksRow {
 	return row
 }
 
+// vendorPksMasterCells builds the 11 raw cells for the master-data vendor-pks preview/export
+// (vendor_code, vendor_name + the 9 director/PKS columns).
+func vendorPksMasterCells(x repository.ExportVendorsWithPksBatchRow) []string {
+	d := pksDetailRow(x.DirectorName, x.DirectorPhone, x.DirectorEmail, x.PksName,
+		x.EffectiveDate, x.ExpiryDate, x.ValidityMonths, x.RemainingDays, x.PksStatus)
+	return append([]string{x.Code, x.Name}, reports.VendorPksDetailCells(d)...)
+}
+
 // pksDetailRow is the director + active-PKS part of a vendor row; shared by the
-// vendor_pks report and the vendor master-data export so the empty-cell rule lives here.
+// vendor_pks report and the vendor-pks master-data export so the empty-cell rule lives here.
 func pksDetailRow(dirName, dirPhone, dirEmail, pksName *string, effective, expiry pgtype.Date,
 	validityMonths, remainingDays int32, pksStatus string) reports.VendorPksRow {
 	row := reports.VendorPksRow{

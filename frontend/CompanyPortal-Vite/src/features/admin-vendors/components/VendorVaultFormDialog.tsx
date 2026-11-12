@@ -30,31 +30,33 @@ interface VendorVaultFormDialogProps {
 function toDefaultValues(vault: AdminVendorVault | null): VendorVaultFormValues {
   if (!vault) {
     return {
-      vault_code: "",
+      vault_name: "",
       category: "ATM",
       currency_code: "IDR",
-      min_capacity_amount: "",
-      max_capacity_amount: "",
-      latitude: "",
-      longitude: "",
+      alamat: "",
+      min_balance: "",
+      max_balance: "",
+      cis_limit_amount: "",
+      escrow_cash: "",
+      escrow_atm: "",
       operating_hours: "",
-      location_id: "",
     };
   }
   return {
-    vault_code: vault.vault_code,
+    vault_name: vault.vault_name ?? vault.vault_code ?? "",
     category: vault.category,
     currency_code: vault.currency_code,
-    min_capacity_amount: vault.min_capacity_amount ?? "",
-    max_capacity_amount: vault.max_capacity_amount ?? "",
-    latitude: vault.latitude ?? "",
-    longitude: vault.longitude ?? "",
+    alamat: vault.alamat ?? "",
+    min_balance: vault.min_balance ?? "",
+    max_balance: vault.max_balance ?? "",
+    cis_limit_amount: vault.cis_limit_amount ?? "",
+    escrow_cash: vault.escrow_cash ?? "",
+    escrow_atm: vault.escrow_atm ?? "",
     operating_hours: vault.operating_hours ?? "",
-    location_id: vault.location_id ? String(vault.location_id) : "",
   };
 }
 
-/** Create/edit form for a vault under one branch (Kode vault immutable once created). */
+/** Create/edit form for a vault under one branch. */
 export function VendorVaultFormDialog({
   open,
   onClose,
@@ -80,25 +82,29 @@ export function VendorVaultFormDialog({
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   function toUpdatePayload(values: VendorVaultFormValues): UpdateVendorVaultPayload {
+    const trimmedName = values.vault_name.trim();
     return {
+      vault_name: trimmedName || null,
       category: values.category,
       currency_code: values.currency_code.toUpperCase(),
-      min_capacity_amount: values.min_capacity_amount || null,
-      max_capacity_amount: values.max_capacity_amount || null,
-      latitude: values.latitude || null,
-      longitude: values.longitude || null,
-      operating_hours: values.operating_hours || null,
-      location_id: values.location_id ? Number(values.location_id) : null,
+      alamat: values.alamat.trim() || null,
+      min_balance: values.min_balance.trim() || null,
+      max_balance: values.max_balance.trim() || null,
+      cis_limit_amount: values.cis_limit_amount.trim() || null,
+      escrow_cash: values.escrow_cash.trim() || null,
+      escrow_atm: values.escrow_atm.trim() || null,
+      operating_hours: values.operating_hours.trim() || null,
     };
   }
 
   async function onSubmit(values: VendorVaultFormValues): Promise<void> {
     try {
       if (mode === "create") {
+        const updatePayload = toUpdatePayload(values);
         const payload: CreateVendorVaultPayload = {
           vendor_branch_id: branchId,
-          vault_code: values.vault_code,
-          ...toUpdatePayload(values),
+          vault_code: updatePayload.vault_name ?? "",
+          ...updatePayload,
         };
         const res = await createMutation.mutateAsync(payload);
         toast({ type: "success", message: pendingApprovalMessage(res) });
@@ -112,9 +118,10 @@ export function VendorVaultFormDialog({
       }
       onClose();
     } catch (err) {
-      const handled = applyServerFieldError(err, (field, error) =>
-        form.setError(field as keyof VendorVaultFormValues, error),
-      );
+      const handled = applyServerFieldError(err, (field, error) => {
+        const targetField = field === "vault_code" ? "vault_name" : field;
+        form.setError(targetField as keyof VendorVaultFormValues, error);
+      });
       if (!handled) {
         const message =
           err && typeof err === "object" && "message" in err
@@ -128,10 +135,10 @@ export function VendorVaultFormDialog({
   return (
     <Dialog open={open} onClose={onClose} title={mode === "create" ? "Tambah Vault" : "Ubah Vault"}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <Field label="Kode Vault" error={form.formState.errors.vault_code?.message}>
+        <Field label="Nama Vault" error={form.formState.errors.vault_name?.message}>
           <input
-            {...form.register("vault_code")}
-            disabled={mode === "edit"}
+            {...form.register("vault_name")}
+            placeholder="Otomatis jika dikosongkan (mis. ABA_Bali_V001)"
             className={inputClass}
           />
         </Field>
@@ -150,30 +157,50 @@ export function VendorVaultFormDialog({
           <input {...form.register("currency_code")} className={inputClass} />
         </Field>
 
+        <Field label="Alamat" error={form.formState.errors.alamat?.message}>
+          <input {...form.register("alamat")} className={inputClass} />
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Kapasitas Min" error={form.formState.errors.min_capacity_amount?.message}>
-            <input {...form.register("min_capacity_amount")} className={inputClass} />
+          <Field label="Min Balance" error={form.formState.errors.min_balance?.message}>
+            <input {...form.register("min_balance")} inputMode="decimal" className={inputClass} />
           </Field>
-          <Field label="Kapasitas Maks" error={form.formState.errors.max_capacity_amount?.message}>
-            <input {...form.register("max_capacity_amount")} className={inputClass} />
+          <Field label="Max Balance" error={form.formState.errors.max_balance?.message}>
+            <input {...form.register("max_balance")} inputMode="decimal" className={inputClass} />
           </Field>
         </div>
 
+        <Field label="Limit CIS" error={form.formState.errors.cis_limit_amount?.message}>
+          <input
+            {...form.register("cis_limit_amount")}
+            inputMode="decimal"
+            className={inputClass}
+          />
+        </Field>
+
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Latitude" error={form.formState.errors.latitude?.message}>
-            <input {...form.register("latitude")} className={inputClass} />
+          <Field label="Escrow Cash" error={form.formState.errors.escrow_cash?.message}>
+            <input
+              {...form.register("escrow_cash")}
+              inputMode="numeric"
+              maxLength={12}
+              placeholder="12 digit angka"
+              className={`${inputClass} font-mono`}
+            />
           </Field>
-          <Field label="Longitude" error={form.formState.errors.longitude?.message}>
-            <input {...form.register("longitude")} className={inputClass} />
+          <Field label="Escrow ATM" error={form.formState.errors.escrow_atm?.message}>
+            <input
+              {...form.register("escrow_atm")}
+              inputMode="numeric"
+              maxLength={12}
+              placeholder="12 digit angka"
+              className={`${inputClass} font-mono`}
+            />
           </Field>
         </div>
 
         <Field label="Jam Operasional" error={form.formState.errors.operating_hours?.message}>
           <input {...form.register("operating_hours")} className={inputClass} />
-        </Field>
-
-        <Field label="ID Lokasi (opsional)" error={form.formState.errors.location_id?.message}>
-          <input {...form.register("location_id")} inputMode="numeric" className={inputClass} />
         </Field>
 
         <div className="flex justify-end gap-3 pt-2">

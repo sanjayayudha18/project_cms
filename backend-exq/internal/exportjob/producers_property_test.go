@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -40,11 +41,12 @@ func (e propEntry[R]) matches(vendor, branch *int64, status string) bool {
 	return true
 }
 
-// propQ answers the eight Export*Batch queries like `WHERE id > after AND <scope>
+// propQ answers the Export*Batch queries like `WHERE id > after AND <scope>
 // ORDER BY id LIMIT n`. Unset Querier methods (Count*, reports) panic if called.
 type propQ struct {
 	Querier
-	vendors     []propEntry[repository.ExportVendorsWithPksBatchRow]
+	vendors     []propEntry[repository.ExportVendorsBatchRow]
+	vendorPks   []propEntry[repository.ExportVendorsWithPksBatchRow]
 	branches    []propEntry[repository.ExportVendorBranchesBatchRow]
 	vaults      []propEntry[repository.ExportVendorVaultsBatchRow]
 	pics        []propEntry[repository.ExportVendorPicsBatchRow]
@@ -70,8 +72,12 @@ func propPage[R any](q *propQ, es []propEntry[R], after int64, limit int32, vend
 	return out
 }
 
-func (q *propQ) ExportVendorsWithPksBatch(_ context.Context, a repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error) {
+func (q *propQ) ExportVendorsBatch(_ context.Context, a repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error) {
 	return propPage(q, q.vendors, a.AfterID, a.BatchSize, a.VendorID, nil, a.Status), nil
+}
+
+func (q *propQ) ExportVendorsWithPksBatch(_ context.Context, a repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error) {
+	return propPage(q, q.vendorPks, a.AfterID, a.BatchSize, a.VendorID, nil, a.Status), nil
 }
 
 func (q *propQ) ExportVendorBranchesBatch(_ context.Context, a repository.ExportVendorBranchesBatchParams) ([]repository.ExportVendorBranchesBatchRow, error) {
@@ -169,11 +175,14 @@ type propCase struct {
 
 func propCases() []propCase {
 	return []propCase{
-		{"vendors", vendorsProducer(false, 9), func(t *rapid.T, q *propQ, n int) {
-			q.vendors = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
+		{"vendors", vendorsProducer(false), func(t *rapid.T, q *propQ, n int) {
+			q.vendors = propTable[repository.ExportVendorsBatchRow](t, n)
 		}},
-		{"vendors-forceAll", vendorsProducer(true, 9), func(t *rapid.T, q *propQ, n int) {
-			q.vendors = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
+		{"vendors-forceAll", vendorsProducer(true), func(t *rapid.T, q *propQ, n int) {
+			q.vendors = propTable[repository.ExportVendorsBatchRow](t, n)
+		}},
+		{"vendor-pks", vendorPksMasterProducer(9), func(t *rapid.T, q *propQ, n int) {
+			q.vendorPks = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
 		}},
 		{"branches", branchesProducer(), func(t *rapid.T, q *propQ, n int) {
 			q.branches = propTable[repository.ExportVendorBranchesBatchRow](t, n)
@@ -243,6 +252,16 @@ func TestProperty1PreviewPagesEqualFile(t *testing.T) {
 				rows, last, err := prod.Page(ctx, q, p, asOf, after, limit)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if c.name == "vaults" {
+					for j, r := range rows {
+						if wantNo := strconv.Itoa(j + 1); r[0] != wantNo {
+							t.Fatalf("page %d row %d no = %q, want %q", i, j, r[0], wantNo)
+						}
+						r = slices.Clone(r)
+						r[0] = strconv.Itoa(len(preview) + j + 1)
+						rows[j] = r
+					}
 				}
 				preview = append(preview, rows...)
 				after = last

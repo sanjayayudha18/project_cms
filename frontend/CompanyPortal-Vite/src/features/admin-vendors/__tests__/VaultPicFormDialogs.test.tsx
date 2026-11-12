@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe("VendorVaultFormDialog", () => {
-  it("creates a vault for the context branch; optionals → null, currency upper-cased", async () => {
+  it("creates a vault for the context branch; optionals → null, currency upper-cased, vault_name auto-generated when blank", async () => {
     m.createVault.mockResolvedValue(ACCEPTED);
     const onClose = vi.fn();
     render(
@@ -52,24 +52,31 @@ describe("VendorVaultFormDialog", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "Tambah Vault" })).toBeInTheDocument();
-    set("Kode Vault", "VLT-JKT-1");
+    expect(screen.queryByText("Latitude")).not.toBeInTheDocument();
+    expect(screen.queryByText("Longitude")).not.toBeInTheDocument();
+    expect(screen.queryByText("ID Lokasi (opsional)")).not.toBeInTheDocument();
     set("Kategori", "CASH");
     set("Mata Uang", "idr");
-    set("Kapasitas Maks", "5000000000.00");
+    set("Alamat", "Jl. Raya Kuta No. 10");
+    set("Max Balance", "5000000000.00");
+    set("Limit CIS", "2500000000.00");
+    set("Escrow Cash", "001234567890");
     await save();
 
     await waitFor(() => expect(m.createVault).toHaveBeenCalledTimes(1));
     expect(m.createVault).toHaveBeenCalledWith({
       vendor_branch_id: 3,
-      vault_code: "VLT-JKT-1",
+      vault_code: "",
+      vault_name: null,
       category: "CASH",
       currency_code: "IDR",
-      min_capacity_amount: null,
-      max_capacity_amount: "5000000000.00",
-      latitude: null,
-      longitude: null,
+      alamat: "Jl. Raya Kuta No. 10",
+      min_balance: null,
+      max_balance: "5000000000.00",
+      cis_limit_amount: "2500000000.00",
+      escrow_cash: "001234567890",
+      escrow_atm: null,
       operating_hours: null,
-      location_id: null,
     });
     expect(useToastStore.getState().toasts[0]).toMatchObject({
       type: "success",
@@ -78,19 +85,22 @@ describe("VendorVaultFormDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("edit is prefilled, keeps the vault code locked and sends no code", async () => {
+  it("edit is prefilled and submits updated vault fields", async () => {
     m.updateVault.mockResolvedValue(ACCEPTED);
     const vault = {
       id: 9,
-      vault_code: "VLT-OLD",
+      vault_code: "ABA_Bali_V001",
+      vault_name: "ABA_Bali_V001",
+      region: "Bali",
       category: "ATM_CASH",
       currency_code: "IDR",
-      min_capacity_amount: "100.00",
-      max_capacity_amount: null,
-      latitude: "-6.2",
-      longitude: "106.8",
+      alamat: "Jl. Sunset Road",
+      min_balance: "100.00",
+      max_balance: null,
+      cis_limit_amount: "1000000.00",
+      escrow_cash: "001234567890",
+      escrow_atm: "998877665544",
       operating_hours: "08-17",
-      location_id: 15,
     };
     render(
       <VendorVaultFormDialog
@@ -103,9 +113,11 @@ describe("VendorVaultFormDialog", () => {
     );
 
     expect(screen.getByRole("dialog", { name: "Ubah Vault" })).toBeInTheDocument();
-    await waitFor(() => expect(control("Kode Vault")).toHaveValue("VLT-OLD"));
-    expect(control("Kode Vault")).toBeDisabled();
-    expect(control("ID Lokasi (opsional)")).toHaveValue("15");
+    await waitFor(() => expect(control("Nama Vault")).toHaveValue("ABA_Bali_V001"));
+    expect(control("Alamat")).toHaveValue("Jl. Sunset Road");
+    expect(control("Limit CIS")).toHaveValue("1000000.00");
+    expect(control("Escrow Cash")).toHaveValue("001234567890");
+    expect(control("Escrow ATM")).toHaveValue("998877665544");
     set("Jam Operasional", "24 jam");
     await save();
 
@@ -113,28 +125,33 @@ describe("VendorVaultFormDialog", () => {
     expect(m.updateVault).toHaveBeenCalledWith({
       vaultId: 9,
       payload: {
+        vault_name: "ABA_Bali_V001",
         category: "ATM_CASH",
         currency_code: "IDR",
-        min_capacity_amount: "100.00",
-        max_capacity_amount: null,
-        latitude: "-6.2",
-        longitude: "106.8",
+        alamat: "Jl. Sunset Road",
+        min_balance: "100.00",
+        max_balance: null,
+        cis_limit_amount: "1000000.00",
+        escrow_cash: "001234567890",
+        escrow_atm: "998877665544",
         operating_hours: "24 jam",
-        location_id: 15,
       },
     });
   });
 
-  it("validates the code and currency client-side", async () => {
+  it("validates currency, Limit CIS, and escrow client-side", async () => {
     render(
       <VendorVaultFormDialog open onClose={vi.fn()} vendorId={42} branchId={3} vault={null} />,
     );
 
     set("Mata Uang", "ID1");
+    set("Limit CIS", "0");
+    set("Escrow Cash", "123");
     await save();
 
-    expect(await screen.findByText("Wajib diisi")).toBeInTheDocument();
-    expect(screen.getByText("Hanya huruf")).toBeInTheDocument();
+    expect(await screen.findByText("Hanya huruf")).toBeInTheDocument();
+    expect(screen.getByText("Harus angka desimal > 0, maksimal 2 desimal")).toBeInTheDocument();
+    expect(screen.getByText("Harus tepat 12 digit angka")).toBeInTheDocument();
     expect(m.createVault).not.toHaveBeenCalled();
   });
 
@@ -163,7 +180,7 @@ describe("VendorVaultFormDialog", () => {
         <VendorVaultFormDialog open onClose={onClose} vendorId={42} branchId={3} vault={null} />,
       );
 
-      set("Kode Vault", "VLT-1");
+      set("Nama Vault", "ABA_Bali_V001");
       await save();
 
       if (where === "field") {

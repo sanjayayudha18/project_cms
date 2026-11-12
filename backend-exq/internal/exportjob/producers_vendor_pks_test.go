@@ -14,9 +14,10 @@ import (
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
-// Feature: vendor-export-pks, Property 1 (unit part): the nine read-only cells at the end of a
-// vendor export row equal reports.VendorPksDetailCells of the same data; the first nine are the
-// importable vendor cells.
+// Feature: vendor-vaults-export-revamp, Property 1 (unit part):
+// - vendorPksMasterProducer (entity vendor-pks) emits 11 columns: vendor_code, vendor_name + the nine
+//   director/PKS cells from reports.VendorPksDetailCells.
+// - vendorsProducer (entity vendors) emits 7 vendor profile columns without id, code, director, or PKS.
 
 func optText(label string) *rapid.Generator[*string] {
 	return rapid.Custom(func(t *rapid.T) *string {
@@ -70,17 +71,23 @@ func TestProperty1VendorTailEqualsPksDetailCells(t *testing.T) {
 			want.PksStatus = &s
 		}
 		wantTail := reports.VendorPksDetailCells(want)
-		wantHead := csvexport.VendorCells(csvexport.VendorRow{ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
-			Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive})
+		wantHead := []string{r.Code, r.Name}
 
-		q := &propQ{vendors: []propEntry[repository.ExportVendorsWithPksBatchRow]{{id: 1, row: r, active: r.IsActive}}}
-		prod := vendorsProducer(false, 9)
+		q := &propQ{
+			vendorPks: []propEntry[repository.ExportVendorsWithPksBatchRow]{{id: 1, row: r, active: r.IsActive}},
+			vendors: []propEntry[repository.ExportVendorsBatchRow]{{id: 1, row: repository.ExportVendorsBatchRow{
+				ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
+				Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone,
+				HqAddress: r.HqAddress, IsActive: r.IsActive,
+			}, active: r.IsActive}},
+		}
+		prod := vendorPksMasterProducer(9)
 		rows, _, err := prod.(PreviewProducer).Page(context.Background(), q, Params{StatusFilter: "all"}, asOf, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 1 || len(rows[0]) != len(prod.Header()) {
-			t.Fatalf("got %d rows, want 1 row of %d cells", len(rows), len(prod.Header()))
+		if len(rows) != 1 || len(rows[0]) != len(prod.Header()) || len(prod.Header()) != 11 {
+			t.Fatalf("got %d rows, want 1 row of 11 cells (header=%d)", len(rows), len(prod.Header()))
 		}
 		n := len(wantHead)
 		if !slices.Equal(rows[0][:n], wantHead) {
@@ -88,6 +95,20 @@ func TestProperty1VendorTailEqualsPksDetailCells(t *testing.T) {
 		}
 		if !slices.Equal(rows[0][n:], wantTail) || len(wantTail) != 9 {
 			t.Fatalf("tail = %q, want %q", rows[0][n:], wantTail)
+		}
+
+		// Vendors producer emits 7 profile columns without id, code, director, or PKS.
+		vProd := vendorsProducer(false)
+		vRows, _, err := vProd.(PreviewProducer).Page(context.Background(), q, Params{StatusFilter: "all"}, asOf, 0, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantProfile := csvexport.VendorCells(csvexport.VendorRow{
+			Name: r.Name, LegalName: r.LegalName, Npwp: r.Npwp,
+			ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive,
+		})
+		if len(vRows) != 1 || len(vProd.Header()) != 7 || !slices.Equal(vRows[0], wantProfile) {
+			t.Fatalf("vendor profile row = %q, want %q", vRows, wantProfile)
 		}
 	})
 }
@@ -105,7 +126,7 @@ func TestVendorsProducerTodayIsWIBDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeQ{n: 1}
-			rows, _, err := vendorsProducer(false, 7).(PreviewProducer).Page(context.Background(), f, Params{StatusFilter: "active"}, tt.asOf, 0, 10)
+			rows, _, err := vendorPksMasterProducer(7).(PreviewProducer).Page(context.Background(), f, Params{StatusFilter: "active"}, tt.asOf, 0, 10)
 			if err != nil || len(rows) != 1 {
 				t.Fatalf("rows=%d err=%v", len(rows), err)
 			}

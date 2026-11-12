@@ -22,8 +22,9 @@ import (
 // t.Cleanup and a last step fails the test on leftovers. Skips when DATABASE_URL is empty (p11Pool).
 
 const (
-	t94Months = 9
-	t94Cols   = 18 // 9 import columns + 9 read-only columns
+	t94Months     = 9
+	t94VendorCols = 7  // 7 vendor profile columns
+	t94PksCols    = 11 // vendor_code, vendor_name + 9 director/PKS columns
 )
 
 // 2026-07-01 08:00 WIB.
@@ -168,6 +169,23 @@ func (f *t94Fix) produce(p Params) [][]string {
 	return rows
 }
 
+func (f *t94Fix) producePks(p Params) [][]string {
+	f.t.Helper()
+	pr := NewProducers(nil, t94Months)[KindMasterDataGlobal][csvexport.VendorPks]
+	if p.VendorID != nil {
+		pr = NewProducers(nil, t94Months)[KindVendor][csvexport.VendorPks]
+	}
+	var rows [][]string
+	err := pr.Produce(context.Background(), f.q, p, t94AsOf, func(c []string) error {
+		rows = append(rows, slices.Clone(c))
+		return nil
+	})
+	if err != nil {
+		f.t.Fatalf("producePks: %v", err)
+	}
+	return rows
+}
+
 // oldVendors reads ExportVendorsBatch (the importer's comparison query) in one page.
 func (f *t94Fix) oldVendors(vendorID *int64, status string) []repository.ExportVendorsBatchRow {
 	f.t.Helper()
@@ -180,12 +198,12 @@ func (f *t94Fix) oldVendors(vendorID *int64, status string) []repository.ExportV
 }
 
 func t94OldCells(r repository.ExportVendorsBatchRow) []string {
-	return csvexport.VendorCells(csvexport.VendorRow{ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
+	return csvexport.VendorCells(csvexport.VendorRow{Name: r.Name, LegalName: r.LegalName,
 		Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive})
 }
 
-// Property 2: the first nine cells equal csvexport.VendorCells of ExportVendorsBatch, same ids, same order,
-// one line per vendor (no duplicates from the PKS/director joins).
+// Property 2: the seven vendor profile cells equal csvexport.VendorCells of ExportVendorsBatch, same order,
+// one line per vendor.
 func TestVendorExportPks_ImportColumnsMatchOldQuery(t *testing.T) {
 	f := newT94Fix(t)
 	one := f.ids["T94A"]
@@ -207,18 +225,18 @@ func TestVendorExportPks_ImportColumnsMatchOldQuery(t *testing.T) {
 				t.Fatalf("rows = %d, want %d (one line per vendor)", len(got), len(old))
 			}
 			for i, r := range old {
-				if len(got[i]) != t94Cols {
-					t.Fatalf("row %d has %d cells, want %d", i, len(got[i]), t94Cols)
+				if len(got[i]) != t94VendorCols {
+					t.Fatalf("row %d has %d cells, want %d", i, len(got[i]), t94VendorCols)
 				}
-				if want := t94OldCells(r); !slices.Equal(got[i][:len(want)], want) {
-					t.Fatalf("row %d (id %d) import cells\ngot:  %q\nwant: %q", i, r.ID, got[i][:len(want)], want)
+				if want := t94OldCells(r); !slices.Equal(got[i], want) {
+					t.Fatalf("row %d (id %d) import cells\ngot:  %q\nwant: %q", i, r.ID, got[i], want)
 				}
 			}
 		})
 	}
 }
 
-// Property 1 (DB part) + the fixture rules: read-only cells (after CSVSafe) equal cells 3-11 of the
+// Property 1 (DB part) + the fixture rules: vendor-pks cells (after CSVSafe) equal cells 3-11 of the
 // vendor_pks report for the same vendor, As_Of_Date and renewal months.
 func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	f := newT94Fix(t)
@@ -238,11 +256,11 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	}
 
 	byCode := map[string][]string{}
-	for _, row := range f.produce(Params{StatusFilter: "all"}) {
-		if len(row) != t94Cols {
-			t.Fatalf("row has %d cells, want %d", len(row), t94Cols)
+	for _, row := range f.producePks(Params{StatusFilter: "all"}) {
+		if len(row) != t94PksCols {
+			t.Fatalf("row has %d cells, want %d", len(row), t94PksCols)
 		}
-		code := row[1] // cell 0 is the id
+		code := row[0] // cell 0 is vendor_code
 		if _, ok := f.ids[code]; !ok {
 			continue // real dev vendor
 		}
@@ -250,7 +268,7 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 			t.Fatalf("vendor %s exported more than once (replaced PKS must not show)", code)
 		}
 		ro := make([]string, 0, 9)
-		for _, c := range row[9:] {
+		for _, c := range row[2:] {
 			ro = append(ro, csvexport.CSVSafe(c))
 		}
 		byCode[code] = ro

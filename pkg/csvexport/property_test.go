@@ -3,10 +3,13 @@ package csvexport
 import (
 	"bytes"
 	"encoding/csv"
+	"fmt"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+
+	"pgregory.net/rapid"
 )
 
 // Property 5: CSVSafe is safe and reversible.
@@ -83,10 +86,14 @@ func FuzzWriterRoundTrip(f *testing.F) {
 	})
 }
 
-func TestImportableNamesCoverSixEntities(t *testing.T) {
+func TestImportableAndExportOnlyNames(t *testing.T) {
 	want := []string{ATMAssignments, ATMs, VendorBranches, VendorPICs, VendorVaults, Vendors}
 	if got := ImportableNames(); !slices.Equal(got, want) {
 		t.Errorf("ImportableNames = %v, want %v", got, want)
+	}
+	wantExportOnly := []string{DSRLocationMaps, PackagePrices, VendorPks}
+	if got := ExportOnlyNames(); !slices.Equal(got, wantExportOnly) {
+		t.Errorf("ExportOnlyNames = %v, want %v", got, wantExportOnly)
 	}
 	golden := mustRead(t, "testdata/headers.golden")
 	for _, n := range want {
@@ -95,9 +102,14 @@ func TestImportableNamesCoverSixEntities(t *testing.T) {
 		}
 	}
 	// legacy headers are covered by golden for the entities that have them.
-	for _, n := range []string{VendorBranches, VendorPICs, ATMAssignments} {
-		if !strings.Contains(golden, n+" legacy[0]: ") || !strings.Contains(golden, n+" legacy fill: ") {
-			t.Errorf("headers.golden lacks legacy data for %s", n)
+	for _, n := range []string{VendorBranches, VendorPICs, VendorVaults, Vendors, ATMAssignments} {
+		if !strings.Contains(golden, n+" legacy[0]: ") {
+			t.Errorf("headers.golden lacks legacy[0] for %s", n)
+		}
+	}
+	for _, n := range []string{VendorBranches, VendorPICs, VendorVaults, ATMAssignments} {
+		if !strings.Contains(golden, n+" legacy fill: ") {
+			t.Errorf("headers.golden lacks legacy fill for %s", n)
 		}
 	}
 }
@@ -120,28 +132,32 @@ func TestWriteTemplateEveryImportable(t *testing.T) {
 	}
 }
 
-func TestCellsMatchHeaderAndIDFirst(t *testing.T) {
-	cases := map[string][]string{
-		Vendors:        VendorCells(VendorRow{ID: 7}),
-		VendorBranches: VendorBranchCells(VendorBranchRow{ID: 7}),
-		VendorVaults:   VendorVaultCells(VendorVaultRow{ID: 7}),
-		VendorPICs:     VendorPICCells(VendorPICRow{ID: 7}),
-		ATMs:           ATMCells(ATMRow{ID: 7}),
-		ATMAssignments: ATMAssignmentCells(ATMAssignmentRow{ID: 7}),
+func TestCellsMatchHeaderAndFirstColumn(t *testing.T) {
+	cases := map[string]struct {
+		cells     []string
+		firstCol  string
+		firstCell string
+	}{
+		Vendors:        {VendorCells(VendorRow{Name: "Vendor Tujuh"}), "name", "Vendor Tujuh"},
+		VendorBranches: {VendorBranchCells(VendorBranchRow{ID: 7}), "id", "7"},
+		VendorVaults:   {VendorVaultCells(VendorVaultRow{No: 7}), "no", "7"},
+		VendorPICs:     {VendorPICCells(VendorPICRow{ID: 7}), "id", "7"},
+		ATMs:           {ATMCells(ATMRow{ID: 7}), "id", "7"},
+		ATMAssignments: {ATMAssignmentCells(ATMAssignmentRow{ID: 7}), "id", "7"},
 	}
 	if len(cases) != len(ImportableNames()) {
 		t.Fatalf("cells cases (%d) do not cover every importable entity", len(cases))
 	}
-	for n, cells := range cases {
+	for n, tc := range cases {
 		e, ok := Lookup(n)
 		if !ok {
 			t.Fatalf("no entity %s", n)
 		}
-		if len(cells) != len(e.Header) {
-			t.Errorf("%s: %d cells, header has %d", n, len(cells), len(e.Header))
+		if len(tc.cells) != len(e.Header) {
+			t.Errorf("%s: %d cells, header has %d", n, len(tc.cells), len(e.Header))
 		}
-		if e.Header[0] != "id" || cells[0] != "7" {
-			t.Errorf("%s: id not first (header[0]=%q cells[0]=%q)", n, e.Header[0], cells[0])
+		if e.Header[0] != tc.firstCol || tc.cells[0] != tc.firstCell {
+			t.Errorf("%s: unexpected first col (header[0]=%q cells[0]=%q, want %q/%q)", n, e.Header[0], tc.cells[0], tc.firstCol, tc.firstCell)
 		}
 	}
 	if got := VendorPICCells(VendorPICRow{})[9]; got != PICRolesNone {
@@ -150,6 +166,116 @@ func TestCellsMatchHeaderAndIDFirst(t *testing.T) {
 	if got := VendorPICCells(VendorPICRow{Roles: []string{"replenish", "vault"}})[9]; got != "replenish;vault" {
 		t.Errorf("roles cell = %q", got)
 	}
+}
+
+// Property 1 & 2 (vendor-vaults-export-revamp): cell builders align with entity headers
+// and preserve exact decimal money strings (numeric(20,2)) and 12-digit escrow identifiers
+// without float conversion or truncation.
+func TestProperty_RevampedCellsAlignAndPreserveMoneyStrings(t *testing.T) {
+	decimalGen := rapid.Custom(func(t *rapid.T) string {
+		if rapid.Bool().Draw(t, "empty") {
+			return ""
+		}
+		whole := rapid.Int64Range(1, 999_999_999_999_999_999).Draw(t, "whole")
+		frac := rapid.IntRange(0, 99).Draw(t, "frac")
+		return fmt.Sprintf("%d.%02d", whole, frac)
+	})
+	escrowGen := rapid.Custom(func(t *rapid.T) string {
+		if rapid.Bool().Draw(t, "empty") {
+			return ""
+		}
+		return rapid.StringMatching(`^[0-9]{12}$`).Draw(t, "escrow12")
+	})
+	cleanTextGen := rapid.Custom(func(t *rapid.T) string {
+		s := rapid.StringN(0, 24, -1).Draw(t, "text")
+		s = strings.TrimPrefix(s, "'")
+		return strings.ReplaceAll(s, "\r\n", "\n")
+	})
+
+	rapid.Check(t, func(t *rapid.T) {
+		vaultRow := VendorVaultRow{
+			No:             rapid.Int64Range(1, 1_000_000).Draw(t, "no"),
+			BranchName:     cleanTextGen.Draw(t, "branchName"),
+			VaultName:      rapid.StringMatching(`^[A-Z]{3}_[A-Za-z0-9_]+_V[0-9]{3}$`).Draw(t, "vaultName"),
+			Category:       rapid.SampledFrom([]string{"ATM", "CASH", "ATM_CASH"}).Draw(t, "cat"),
+			OperatingHours: cleanTextGen.Draw(t, "hours"),
+			CurrencyCode:   "IDR",
+			Region:         cleanTextGen.Draw(t, "region"),
+			Alamat:         cleanTextGen.Draw(t, "alamat"),
+			MinBalance:     decimalGen.Draw(t, "minBal"),
+			MaxBalance:     decimalGen.Draw(t, "maxBal"),
+			CisLimitAmount: decimalGen.Draw(t, "cisLimit"),
+			EscrowCash:     escrowGen.Draw(t, "escrowCash"),
+			EscrowAtm:      escrowGen.Draw(t, "escrowAtm"),
+			IsActive:       rapid.Bool().Draw(t, "active"),
+		}
+		vaultEntity, _ := Lookup(VendorVaults)
+		vaultCells := VendorVaultCells(vaultRow)
+		if len(vaultCells) != len(vaultEntity.Header) {
+			t.Fatalf("vault cells len %d != header len %d", len(vaultCells), len(vaultEntity.Header))
+		}
+		if vaultCells[8] != vaultRow.MinBalance || vaultCells[9] != vaultRow.MaxBalance || vaultCells[10] != vaultRow.CisLimitAmount {
+			t.Fatalf("money string mutated: got (%q, %q, %q)", vaultCells[8], vaultCells[9], vaultCells[10])
+		}
+		if vaultCells[11] != vaultRow.EscrowCash || vaultCells[12] != vaultRow.EscrowAtm {
+			t.Fatalf("escrow string mutated: got (%q, %q)", vaultCells[11], vaultCells[12])
+		}
+
+		// Round-trip through CSV Writer preserves exact decimals and 12-digit leading zeros.
+		var buf bytes.Buffer
+		w, err := NewWriter(&buf, vaultEntity.Header)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Write(vaultCells); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Flush(); err != nil {
+			t.Fatal(err)
+		}
+		recs, err := csv.NewReader(strings.NewReader(strings.TrimPrefix(buf.String(), BOM))).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(recs) != 2 || !slices.Equal(recs[0], vaultEntity.Header) {
+			t.Fatalf("unexpected CSV header/rows: %v", recs)
+		}
+		for i, got := range recs[1] {
+			if UnCSVSafe(got) != vaultCells[i] {
+				t.Fatalf("col %d (%s): got %q, want %q", i, vaultEntity.Header[i], UnCSVSafe(got), vaultCells[i])
+			}
+		}
+
+		branchEntity, _ := Lookup(VendorBranches)
+		branchCells := VendorBranchCells(VendorBranchRow{
+			ID:         rapid.Int64Range(1, 100_000).Draw(t, "branchID"),
+			VendorCode: "ABA",
+			BranchCode: "ABA_DPS",
+			BranchName: cleanTextGen.Draw(t, "bName"),
+			Region:     cleanTextGen.Draw(t, "bRegion"),
+			RegionCode: "DPS",
+			Category:   "ATM_CASH",
+			LocationID: "5",
+			IsActive:   rapid.Bool().Draw(t, "bActive"),
+		})
+		if len(branchCells) != len(branchEntity.Header) {
+			t.Fatalf("branch cells len %d != header len %d", len(branchCells), len(branchEntity.Header))
+		}
+
+		vendorEntity, _ := Lookup(Vendors)
+		vendorCells := VendorCells(VendorRow{
+			Name:         cleanTextGen.Draw(t, "vName"),
+			LegalName:    cleanTextGen.Draw(t, "vLegal"),
+			Npwp:         "012345678901234",
+			ContactEmail: "ops@vendor.co.id",
+			ContactPhone: "+62 812-3456",
+			HqAddress:    cleanTextGen.Draw(t, "vAddr"),
+			IsActive:     rapid.Bool().Draw(t, "vActive"),
+		})
+		if len(vendorCells) != len(vendorEntity.Header) {
+			t.Fatalf("vendor cells len %d != header len %d", len(vendorCells), len(vendorEntity.Header))
+		}
+	})
 }
 
 func mustRead(t *testing.T, p string) string {

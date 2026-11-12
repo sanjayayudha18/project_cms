@@ -172,14 +172,13 @@ func (q *Queries) ExportATMsBatch(ctx context.Context, arg ExportATMsBatchParams
 
 const exportVendorBranchesBatch = `-- name: ExportVendorBranchesBatch :many
 SELECT b.id,
-       v.code                               AS vendor_code,
+       v.code                                  AS vendor_code,
        b.branch_code,
        b.branch_name,
-       COALESCE(b.region, '')::text         AS region,
-       COALESCE(b.region_code, '')::text    AS region_code,
+       COALESCE(b.region, '')::text            AS region,
+       COALESCE(b.region_code, '')::text       AS region_code,
        b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
-       COALESCE(b.cis_limit_amount::text, '')::text AS cis_limit_amount,
        b.is_active
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
@@ -200,18 +199,18 @@ type ExportVendorBranchesBatchParams struct {
 }
 
 type ExportVendorBranchesBatchRow struct {
-	ID             int64  `json:"id"`
-	VendorCode     string `json:"vendor_code"`
-	BranchCode     string `json:"branch_code"`
-	BranchName     string `json:"branch_name"`
-	Region         string `json:"region"`
-	RegionCode     string `json:"region_code"`
-	Category       string `json:"category"`
-	LocationID     string `json:"location_id"`
-	CisLimitAmount string `json:"cis_limit_amount"`
-	IsActive       bool   `json:"is_active"`
+	ID         int64  `json:"id"`
+	VendorCode string `json:"vendor_code"`
+	BranchCode string `json:"branch_code"`
+	BranchName string `json:"branch_name"`
+	Region     string `json:"region"`
+	RegionCode string `json:"region_code"`
+	Category   string `json:"category"`
+	LocationID string `json:"location_id"`
+	IsActive   bool   `json:"is_active"`
 }
 
+// Routing: dbRead (export / preview) or db primary (CSV importer current-state snapshot).
 func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendorBranchesBatchParams) ([]ExportVendorBranchesBatchRow, error) {
 	rows, err := q.db.Query(ctx, exportVendorBranchesBatch,
 		arg.AfterID,
@@ -235,7 +234,6 @@ func (q *Queries) ExportVendorBranchesBatch(ctx context.Context, arg ExportVendo
 			&i.RegionCode,
 			&i.Category,
 			&i.LocationID,
-			&i.CisLimitAmount,
 			&i.IsActive,
 		); err != nil {
 			return nil, err
@@ -337,18 +335,24 @@ func (q *Queries) ExportVendorPicsBatch(ctx context.Context, arg ExportVendorPic
 
 const exportVendorVaultsBatch = `-- name: ExportVendorVaultsBatch :many
 SELECT vl.id,
-       v.code                                       AS vendor_code,
+       v.code                                           AS vendor_code,
        b.branch_code,
        vl.vault_code,
-       COALESCE(vl.category, '')::text              AS category,
-       COALESCE(vl.currency_code, '')::text         AS currency_code,
-       COALESCE(vl.min_capacity_amount::text, '')::text AS min_capacity_amount,
-       COALESCE(vl.max_capacity_amount::text, '')::text AS max_capacity_amount,
-       COALESCE(vl.latitude::text, '')::text        AS latitude,
-       COALESCE(vl.longitude::text, '')::text       AS longitude,
-       COALESCE(vl.operating_hours, '')::text       AS operating_hours,
-       COALESCE(vl.location_id::text, '')::text     AS location_id,
-       COALESCE(vl.escrow_account, '')::text        AS escrow_account,
+       b.branch_name,
+       vl.vault_name,
+       COALESCE(vl.category, '')::text                  AS category,
+       COALESCE(vl.operating_hours, '')::text           AS operating_hours,
+       COALESCE(vl.currency_code, '')::text             AS currency_code,
+       COALESCE(b.region, '')::text                     AS region,
+       COALESCE(vl.alamat, '')::text                    AS alamat,
+       COALESCE(vl.min_balance::text, '')::text         AS min_balance,
+       COALESCE(vl.max_balance::text, '')::text         AS max_balance,
+       COALESCE(vl.cis_limit_amount::text, '')::text    AS cis_limit_amount,
+       COALESCE(vl.escrow_cash, '')::text               AS escrow_cash,
+       COALESCE(vl.escrow_atm, '')::text                AS escrow_atm,
+       COALESCE(vl.latitude::text, '')::text            AS latitude,
+       COALESCE(vl.longitude::text, '')::text           AS longitude,
+       COALESCE(vl.location_id::text, '')::text         AS location_id,
        vl.is_active
 FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
@@ -372,22 +376,31 @@ type ExportVendorVaultsBatchParams struct {
 }
 
 type ExportVendorVaultsBatchRow struct {
-	ID                int64  `json:"id"`
-	VendorCode        string `json:"vendor_code"`
-	BranchCode        string `json:"branch_code"`
-	VaultCode         string `json:"vault_code"`
-	Category          string `json:"category"`
-	CurrencyCode      string `json:"currency_code"`
-	MinCapacityAmount string `json:"min_capacity_amount"`
-	MaxCapacityAmount string `json:"max_capacity_amount"`
-	Latitude          string `json:"latitude"`
-	Longitude         string `json:"longitude"`
-	OperatingHours    string `json:"operating_hours"`
-	LocationID        string `json:"location_id"`
-	EscrowAccount     string `json:"escrow_account"`
-	IsActive          bool   `json:"is_active"`
+	ID             int64  `json:"id"`
+	VendorCode     string `json:"vendor_code"`
+	BranchCode     string `json:"branch_code"`
+	VaultCode      string `json:"vault_code"`
+	BranchName     string `json:"branch_name"`
+	VaultName      string `json:"vault_name"`
+	Category       string `json:"category"`
+	OperatingHours string `json:"operating_hours"`
+	CurrencyCode   string `json:"currency_code"`
+	Region         string `json:"region"`
+	Alamat         string `json:"alamat"`
+	MinBalance     string `json:"min_balance"`
+	MaxBalance     string `json:"max_balance"`
+	CisLimitAmount string `json:"cis_limit_amount"`
+	EscrowCash     string `json:"escrow_cash"`
+	EscrowAtm      string `json:"escrow_atm"`
+	Latitude       string `json:"latitude"`
+	Longitude      string `json:"longitude"`
+	LocationID     string `json:"location_id"`
+	IsActive       bool   `json:"is_active"`
 }
 
+// Routing: dbRead (export / preview) or db primary (CSV importer current-state snapshot).
+// Includes vendor_code/branch_code/vault_code/latitude/longitude/location_id alongside the
+// 14 revamped export columns so CSV importer LegacyHeaders stay supported without extra queries.
 func (q *Queries) ExportVendorVaultsBatch(ctx context.Context, arg ExportVendorVaultsBatchParams) ([]ExportVendorVaultsBatchRow, error) {
 	rows, err := q.db.Query(ctx, exportVendorVaultsBatch,
 		arg.AfterID,
@@ -408,15 +421,21 @@ func (q *Queries) ExportVendorVaultsBatch(ctx context.Context, arg ExportVendorV
 			&i.VendorCode,
 			&i.BranchCode,
 			&i.VaultCode,
+			&i.BranchName,
+			&i.VaultName,
 			&i.Category,
+			&i.OperatingHours,
 			&i.CurrencyCode,
-			&i.MinCapacityAmount,
-			&i.MaxCapacityAmount,
+			&i.Region,
+			&i.Alamat,
+			&i.MinBalance,
+			&i.MaxBalance,
+			&i.CisLimitAmount,
+			&i.EscrowCash,
+			&i.EscrowAtm,
 			&i.Latitude,
 			&i.Longitude,
-			&i.OperatingHours,
 			&i.LocationID,
-			&i.EscrowAccount,
 			&i.IsActive,
 		); err != nil {
 			return nil, err

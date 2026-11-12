@@ -227,9 +227,9 @@ func (f *invariantFixture) seed() {
 	f.packageCode = f.tag + "P"
 	f.assignmentStart = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
 
-	f.vendorID = f.seedVendor(f.vendorCode, "Vendor")
-	f.branchID = f.scanID(`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, category) VALUES ($1, $2, 'Cabang', 'ATM_CASH') RETURNING id`, f.vendorID, f.branchCode)
-	f.vaultID = f.scanID(`INSERT INTO vendor_vaults (vendor_branch_id, vault_code, type, category, currency_code) VALUES ($1, $2, 'CASH', 'CASH', 'IDR') RETURNING id`, f.branchID, f.vaultCode)
+	f.vendorID = f.seedVendor(f.vendorCode, f.tag+"Vendor")
+	f.branchID = f.scanID(`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, category) VALUES ($1, $2, $3, 'ATM_CASH') RETURNING id`, f.vendorID, f.branchCode, f.tag+"Cabang")
+	f.vaultID = f.scanID(`INSERT INTO vendor_vaults (vendor_branch_id, vault_code, vault_name, type, category, currency_code) VALUES ($1, $2, $2, 'CASH', 'CASH', 'IDR') RETURNING id`, f.branchID, f.vaultCode)
 	f.picID = f.scanID(`INSERT INTO vendor_pics (vendor_id, name, roles) VALUES ($1, 'PIC', '{vault}') RETURNING id`, f.vendorID)
 	atm := func(terminal string) int64 {
 		return f.scanID(`INSERT INTO atms (terminal_id, location_id, machine_type, brand, model, operation_hours, deployment_type, priority_class)
@@ -480,36 +480,36 @@ var invariantEntities = []invariantEntity{
 		name: service.ExportVendors, wantCreate: 1, wantOther: 1,
 		rows: func(f *invariantFixture) []map[string]string {
 			return []map[string]string{
-				{"code": f.tag + "N", "name": "Baru"},
-				{"id": id(f.vendorID), "code": f.vendorCode, "name": "Diubah", "is_active": "true"},
+				{"name": f.tag + "Baru", "legal_name": "PT Baru"},
+				{"name": f.tag + "Vendor", "legal_name": "PT Diubah", "is_active": "true"},
 			}
 		},
 		applied: func(f *invariantFixture) int {
-			return f.count(`SELECT count(*) FROM vendors WHERE (code = $1 AND name = 'Baru') OR (id = $2 AND name = 'Diubah')`, f.tag+"N", f.vendorID)
+			return f.count(`SELECT count(*) FROM vendors WHERE (name = $1 AND legal_name = 'PT Baru') OR (id = $2 AND legal_name = 'PT Diubah')`, f.tag+"Baru", f.vendorID)
 		},
 	},
 	{
 		name: service.ExportVendorBranches, wantCreate: 1, wantOther: 1,
 		rows: func(f *invariantFixture) []map[string]string {
 			return []map[string]string{
-				{"vendor_code": f.vendorCode, "branch_code": f.tag + "BN", "branch_name": "Baru", "category": "CASH"},
-				{"id": id(f.branchID), "vendor_code": f.vendorCode, "branch_code": f.branchCode, "branch_name": "Diubah", "category": "ATM_CASH", "is_active": "true"},
+				{"vendor_code": f.vendorCode, "branch_code": f.tag + "BN", "branch_name": f.tag + "Baru", "category": "CASH"},
+				{"id": id(f.branchID), "vendor_code": f.vendorCode, "branch_code": f.branchCode, "branch_name": f.tag + "Diubah", "category": "ATM_CASH", "is_active": "true"},
 			}
 		},
 		applied: func(f *invariantFixture) int {
-			return f.count(`SELECT count(*) FROM vendor_branches WHERE vendor_id = $1 AND ((branch_code = $2 AND branch_name = 'Baru') OR (id = $3 AND branch_name = 'Diubah'))`, f.vendorID, f.tag+"BN", f.branchID)
+			return f.count(`SELECT count(*) FROM vendor_branches WHERE vendor_id = $1 AND ((branch_code = $2 AND branch_name = $3) OR (id = $4 AND branch_name = $5))`, f.vendorID, f.tag+"BN", f.tag+"Baru", f.branchID, f.tag+"Diubah")
 		},
 	},
 	{
 		name: service.ExportVendorVaults, wantCreate: 1, wantOther: 1,
 		rows: func(f *invariantFixture) []map[string]string {
 			return []map[string]string{
-				{"vendor_code": f.vendorCode, "branch_code": f.branchCode, "vault_code": f.tag + "VN", "category": "ATM", "currency_code": "IDR"},
-				{"id": id(f.vaultID), "vendor_code": f.vendorCode, "branch_code": f.branchCode, "vault_code": f.vaultCode, "category": "CASH", "currency_code": "IDR", "operating_hours": "08-17", "is_active": "true"},
+				{"branch_name": f.tag + "Cabang", "vault_name": f.tag + "VN", "category": "ATM", "currency_code": "IDR"},
+				{"branch_name": f.tag + "Cabang", "vault_name": f.vaultCode, "category": "CASH", "currency_code": "IDR", "operating_hours": "08-17", "is_active": "true"},
 			}
 		},
 		applied: func(f *invariantFixture) int {
-			return f.count(`SELECT count(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND (vault_code = $2 OR (id = $3 AND operating_hours = '08-17'))`, f.branchID, f.tag+"VN", f.vaultID)
+			return f.count(`SELECT count(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND (vault_name = $2 OR (id = $3 AND operating_hours = '08-17'))`, f.branchID, f.tag+"VN", f.vaultID)
 		},
 	},
 	{
@@ -658,10 +658,11 @@ func TestImportInvariant_P1_NoEntityChangeBeforeFinalApproval_Integration(t *tes
 // the staleness here is real (the target row moved), not a doctored "before".
 func TestImportInvariant_P2_AllOrNothing_Integration(t *testing.T) {
 	batchFile := func(f *invariantFixture) (string, []int64) {
-		ids := []int64{f.seedVendor(f.tag+"S0", "Satu"), f.seedVendor(f.tag+"S1", "Dua"), f.seedVendor(f.tag+"S2", "Tiga")}
-		rows := []map[string]string{{"code": f.tag + "NEW", "name": "Baru"}}
-		for i, vid := range ids {
-			rows = append(rows, map[string]string{"id": id(vid), "code": fmt.Sprintf("%sS%d", f.tag, i), "name": fmt.Sprintf("Diubah %d", i), "is_active": "true"})
+		names := []string{f.tag + "Satu", f.tag + "Dua", f.tag + "Tiga"}
+		ids := []int64{f.seedVendor(f.tag+"S0", names[0]), f.seedVendor(f.tag+"S1", names[1]), f.seedVendor(f.tag+"S2", names[2])}
+		rows := []map[string]string{{"name": f.tag + "Baru", "legal_name": "PT Baru"}}
+		for i := range ids {
+			rows = append(rows, map[string]string{"name": names[i], "legal_name": fmt.Sprintf("PT Diubah %d", i), "is_active": "true"})
 		}
 		return csvFile(f.t, service.ExportVendors, rows...), ids
 	}
@@ -672,7 +673,7 @@ func TestImportInvariant_P2_AllOrNothing_Integration(t *testing.T) {
 			file, ids := batchFile(f)
 			batchID, requestID := f.confirm(service.ExportVendors, file)
 
-			f.exec(`UPDATE vendors SET name = 'Diubah di luar' WHERE id = $1`, ids[staleAt])
+			f.exec(`UPDATE vendors SET legal_name = 'Diubah di luar' WHERE id = $1`, ids[staleAt])
 			before := f.snapshot()
 
 			res := f.approve(f.approver1, requestID)
@@ -712,7 +713,8 @@ func TestImportInvariant_P2_AllOrNothing_Integration(t *testing.T) {
 			}
 
 			// The rows are free again: a corrected file for the moved vendor stages as a new batch.
-			again, _ := f.confirm(service.ExportVendors, csvFile(t, service.ExportVendors, map[string]string{"id": id(ids[staleAt]), "code": fmt.Sprintf("%sS%d", f.tag, staleAt), "name": "Diperbaiki", "is_active": "true"}))
+			staleName := []string{f.tag + "Satu", f.tag + "Dua", f.tag + "Tiga"}[staleAt]
+			again, _ := f.confirm(service.ExportVendors, csvFile(t, service.ExportVendors, map[string]string{"name": staleName, "legal_name": "PT Diperbaiki", "is_active": "true"}))
 			if again == batchID {
 				t.Errorf("a new file reused the stale batch")
 			}
@@ -730,11 +732,11 @@ func TestImportInvariant_P2_AllOrNothing_Integration(t *testing.T) {
 		if n := f.count(`SELECT count(*) FROM master_data_change_requests WHERE batch_id = $1 AND error IS NOT NULL`, batchID); n != 0 {
 			t.Errorf("%d rows of a clean batch carry an error", n)
 		}
-		if n := f.count(`SELECT count(*) FROM vendors WHERE code = $1 AND name = 'Baru'`, f.tag+"NEW"); n != 1 {
+		if n := f.count(`SELECT count(*) FROM vendors WHERE name = $1 AND legal_name = 'PT Baru'`, f.tag+"Baru"); n != 1 {
 			t.Errorf("the created vendor is missing")
 		}
 		for i, vid := range ids {
-			if n := f.count(`SELECT count(*) FROM vendors WHERE id = $1 AND name = $2`, vid, fmt.Sprintf("Diubah %d", i)); n != 1 {
+			if n := f.count(`SELECT count(*) FROM vendors WHERE id = $1 AND legal_name = $2`, vid, fmt.Sprintf("PT Diubah %d", i)); n != 1 {
 				t.Errorf("vendor %d was not updated", i)
 			}
 		}
@@ -754,7 +756,7 @@ func TestImportInvariant_P3_ConcurrentConfirm_Integration(t *testing.T) {
 
 	raced, failedCalls := 0, 0
 	for i := range iterations {
-		file := csvFile(t, service.ExportVendors, map[string]string{"code": fmt.Sprintf("%sC%d", f.tag, i), "name": "Bersamaan"})
+		file := csvFile(t, service.ExportVendors, map[string]string{"name": fmt.Sprintf("%sC%d", f.tag, i)})
 		sum := sha256.Sum256([]byte(file))
 		hash := hex.EncodeToString(sum[:])
 
@@ -890,20 +892,20 @@ func runNotifyScenario(f *invariantFixture) (notifyOutcome, notifyBatches) {
 	var requests []int64
 
 	var reqA int64
-	b.applied, reqA = confirm("confirm applied", map[string]string{"id": id(f.vendorID), "code": f.vendorCode, "name": "Diterapkan", "is_active": "true"})
+	b.applied, reqA = confirm("confirm applied", map[string]string{"name": f.tag + "Vendor", "legal_name": "PT Diterapkan", "is_active": "true"})
 	record("step 1", f.approve(f.approver1, reqA))
 	record("step 2", f.approve(f.approver2, reqA))
 	requests = append(requests, reqA)
 
 	var reqB int64
-	b.rejected, reqB = confirm("confirm rejected", map[string]string{"code": f.tag + "RJ", "name": "Ditolak"})
+	b.rejected, reqB = confirm("confirm rejected", map[string]string{"name": f.tag + "RJ", "legal_name": "Ditolak"})
 	record("reject", f.reject(f.approver1, reqB))
 	requests = append(requests, reqB)
 
-	staleID := f.seedVendor(f.tag+"ST", "Stale")
+	staleID := f.seedVendor(f.tag+"ST", f.tag+"Stale")
 	var reqC int64
-	b.stale, reqC = confirm("confirm stale", map[string]string{"id": id(staleID), "code": f.tag + "ST", "name": "Tidak jadi", "is_active": "true"})
-	f.exec(`UPDATE vendors SET name = 'Diubah di luar' WHERE id = $1`, staleID)
+	b.stale, reqC = confirm("confirm stale", map[string]string{"name": f.tag + "Stale", "legal_name": "Tidak jadi", "is_active": "true"})
+	f.exec(`UPDATE vendors SET legal_name = 'Diubah di luar' WHERE id = $1`, staleID)
 	record("stale step 1", f.approve(f.approver1, reqC))
 	record("stale step 2", f.approve(f.approver2, reqC))
 	requests = append(requests, reqC)
@@ -911,7 +913,7 @@ func runNotifyScenario(f *invariantFixture) (notifyOutcome, notifyBatches) {
 	// The state a failed commit leaves behind (it cannot be forced from outside
 	// a real tx): approved everywhere, error recorded, nothing applied.
 	var reqD int64
-	b.retried, reqD = confirm("confirm retried", map[string]string{"code": f.tag + "RT", "name": "Dicoba lagi"})
+	b.retried, reqD = confirm("confirm retried", map[string]string{"name": f.tag + "RT", "legal_name": "Dicoba lagi"})
 	f.exec(`UPDATE approval_requests SET status = 'approved' WHERE id = $1`, reqD)
 	f.exec(`UPDATE approval_steps SET status = 'approved', acted_by_id = assigned_approver_id, acted_at = now() WHERE request_id = $1`, reqD)
 	f.exec(`UPDATE master_data_change_requests SET status = 'approved', error = 'commit failed' WHERE batch_id = $1`, b.retried)
@@ -947,7 +949,7 @@ func runNotifyScenario(f *invariantFixture) (notifyOutcome, notifyBatches) {
 	}
 	sort.Strings(out.Audit)
 
-	vrows, err := f.pool.Query(f.ctx, `SELECT replace(code, $1, '') || '=' || name || '/' || is_active::text FROM vendors WHERE code LIKE $1 || '%' ORDER BY code`, f.tag)
+	vrows, err := f.pool.Query(f.ctx, `SELECT replace(code, $1, '') || '=' || coalesce(legal_name, '') || '/' || is_active::text FROM vendors WHERE code LIKE $1 || '%' ORDER BY code`, f.tag)
 	if err != nil {
 		f.t.Fatal(err)
 	}

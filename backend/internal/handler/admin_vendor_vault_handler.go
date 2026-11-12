@@ -50,11 +50,32 @@ func (h *AdminVendorVaultHandler) Routes() chi.Router {
 }
 
 func vaultToResponse(v service.VendorVault) map[string]any {
+	cisCurrency := v.CisLimitCurrency
+	if cisCurrency == "" {
+		cisCurrency = "IDR"
+	}
 	return map[string]any{
-		"id": v.ID, "vendor_branch_id": v.VendorBranchID, "vault_code": v.VaultCode, "category": v.Category,
-		"currency_code": v.CurrencyCode, "min_capacity_amount": v.MinCapacityAmount, "max_capacity_amount": v.MaxCapacityAmount,
-		"latitude": v.Latitude, "longitude": v.Longitude, "operating_hours": v.OperatingHours, "location_id": v.LocationID, "escrow_account": v.EscrowAccount,
-		"is_active": v.IsActive, "deleted_at": formatTimePtr(v.DeletedAt),
+		"id":                 v.ID,
+		"vendor_branch_id":   v.VendorBranchID,
+		"branch_name":        v.BranchName,
+		"region":             v.Region,
+		"vault_code":         v.VaultCode,
+		"vault_name":         v.VaultName,
+		"category":           v.Category,
+		"currency_code":      v.CurrencyCode,
+		"alamat":             v.Alamat,
+		"min_balance":        v.MinBalance,
+		"max_balance":        v.MaxBalance,
+		"cis_limit_amount":   v.CisLimitAmount,
+		"cis_limit_currency": cisCurrency,
+		"latitude":           v.Latitude,
+		"longitude":          v.Longitude,
+		"operating_hours":    v.OperatingHours,
+		"location_id":        v.LocationID,
+		"escrow_cash":        v.EscrowCash,
+		"escrow_atm":         v.EscrowAtm,
+		"is_active":          v.IsActive,
+		"deleted_at":         formatTimePtr(v.DeletedAt),
 	}
 }
 
@@ -223,7 +244,7 @@ func (h *AdminVendorVaultHandler) handleError(w http.ResponseWriter, err error) 
 	case errors.Is(err, service.ErrVendorVaultNotFound):
 		writeError(w, http.StatusNotFound, "not_found", service.ErrVendorVaultNotFound.Error())
 	case errors.Is(err, service.ErrVendorVaultCodeConflict):
-		writeError(w, http.StatusConflict, "conflict", service.ErrVendorVaultCodeConflict.Error())
+		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):
 		writeForbidden(w, "Anda tidak berhak mengubah master data")
 	case errors.Is(err, service.ErrMasterDataChangePending):

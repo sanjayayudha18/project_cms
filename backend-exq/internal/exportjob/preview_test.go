@@ -337,3 +337,49 @@ func TestPreviewerHasNoAuditWriter(t *testing.T) {
 		}
 	}
 }
+
+func TestPreviewRevampedProducersAndVendorPks(t *testing.T) {
+	fq := &fakeQ{n: 2}
+	v := &Previewer{
+		scope:     &fakeScope{},
+		reader:    fixedReader{fq},
+		producers: DefaultProducers(),
+		now:       func() time.Time { return time.Date(2026, 10, 30, 8, 0, 0, 0, wib) },
+	}
+	admin := Actor{UserID: 1, Role: "ADMIN"}
+
+	// 1. /exports/vendor-pks global and vendor-scoped preview
+	for _, p := range []Params{
+		{Kind: KindMasterDataGlobal, Entity: "vendor-pks", StatusFilter: "active"},
+		{Kind: KindVendor, Entity: "vendor-pks", VendorID: i64(7), StatusFilter: "active"},
+	} {
+		got, err := v.Preview(context.Background(), admin, p, 0, 10)
+		if err != nil {
+			t.Fatalf("%s/%s preview: %v", p.Kind, p.Entity, err)
+		}
+		if len(got.Columns) != 11 || got.Columns[0] != "vendor_code" || got.Columns[10] != "pks_status" {
+			t.Fatalf("vendor-pks columns = %v", got.Columns)
+		}
+		if len(got.Rows) != 2 || got.Total != 2 {
+			t.Fatalf("vendor-pks rows=%d total=%d", len(got.Rows), got.Total)
+		}
+	}
+
+	// 2. /exports/vendor-vaults preview (14 columns starting with no = 1, 2)
+	gotVaults, err := v.Preview(context.Background(), admin, Params{Kind: KindMasterDataGlobal, Entity: "vendor-vaults", StatusFilter: "all"}, 0, 10)
+	if err != nil {
+		t.Fatalf("vendor-vaults preview: %v", err)
+	}
+	if len(gotVaults.Columns) != 14 || gotVaults.Columns[0] != "no" || gotVaults.Rows[0][0] != "1" || gotVaults.Rows[1][0] != "2" {
+		t.Fatalf("vendor-vaults preview = %+v", gotVaults)
+	}
+
+	// 3. /exports/vendors preview (7 profile columns starting with name)
+	gotVendors, err := v.Preview(context.Background(), admin, Params{Kind: KindMasterDataGlobal, Entity: "vendors", StatusFilter: "all"}, 0, 10)
+	if err != nil {
+		t.Fatalf("vendors preview: %v", err)
+	}
+	if len(gotVendors.Columns) != 7 || gotVendors.Columns[0] != "name" {
+		t.Fatalf("vendors preview = %+v", gotVendors)
+	}
+}

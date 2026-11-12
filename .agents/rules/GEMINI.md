@@ -66,8 +66,9 @@ Seluruh pekerjaan fitur dan perbaikan bug yang dijalankan menggunakan Gemini/Ant
    - **Tracking Progress**: `.agents/development-progress.md`
    - **Lessons Learned**: `.agents/lessons-learned.md`
 3. **Area Kritis (Wajib Spec & Gate Manusia)**: Perubahan yang menyentuh autentikasi, perhitungan uang/jurnal, rekonsiliasi, migrasi skema database, atau penghapusan data wajib melalui persetujuan user terlebih dahulu.
-4. **Saran Langkah Selanjutnya**: Setelah selesai melakukan task, jika memungkinkan berikan user saran apa yang bisa dilakukan selanjutnya.
-5. **Eksplorasi Kode dengan Graphify**: Sebelum membaca banyak file kode atau melakukan grepping luas, manfaatkan knowledge graph di `graphify-out/`. Gunakan `graphify query "<pertanyaan>"`, `graphify path "<A>" "<B>"`, atau `graphify explain "<konsep>"` untuk menelusuri simbol, relasi, dan dependensi kode secara efisien. Setelah mengubah kode, jalankan `graphify update .` untuk memperbarui graph.
+4. **Satu Dokumen SDLC per Langkah (Sequential Gate)**: Tulis artefak SDLC **satu per satu** secara berurutan. Selesaikan `requirements.md` terlebih dahulu dan tunggu review/persetujuan user (`accepted`) sebelum menulis `design.md`; selesaikan `design.md` dan tunggu persetujuan user sebelum menulis `tasks.md`, dan seterusnya. **Dilarang keras** membuat dua file artefak tahap berbeda (misalnya `requirements.md` dan `design.md`) sekaligus dalam satu giliran.
+5. **Saran Langkah Selanjutnya**: Setelah selesai melakukan task, jika memungkinkan berikan user saran apa yang bisa dilakukan selanjutnya.
+6. **Eksplorasi Kode dengan Graphify**: Sebelum membaca banyak file kode atau melakukan grepping luas, manfaatkan knowledge graph di `graphify-out/`. Gunakan `graphify query "<pertanyaan>"`, `graphify path "<A>" "<B>"`, atau `graphify explain "<konsep>"` untuk menelusuri simbol, relasi, dan dependensi kode secara efisien. Setelah mengubah kode, jalankan `graphify update .` untuk memperbarui graph.
 
 ---
 

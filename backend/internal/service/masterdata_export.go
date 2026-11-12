@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/pkg/csvexport"
@@ -84,6 +85,33 @@ func spec(entity string, page func(ctx context.Context, r MasterDataExportRepo, 
 	return exportSpec{header: e.Header, legacyHeaders: e.LegacyHeaders, legacyFill: e.LegacyFill, readOnly: e.ReadOnlyColumns, page: page}
 }
 
+func vendorExportRow(x db.ExportVendorsBatchRow) csvexport.VendorRow {
+	return csvexport.VendorRow{
+		Name: x.Name, LegalName: x.LegalName, Npwp: x.Npwp,
+		ContactEmail: x.ContactEmail, ContactPhone: x.ContactPhone, HqAddress: x.HqAddress,
+		IsActive: x.IsActive,
+	}
+}
+
+func vendorVaultExportRow(no int64, x db.ExportVendorVaultsBatchRow) csvexport.VendorVaultRow {
+	return csvexport.VendorVaultRow{
+		No:             no,
+		BranchName:     x.BranchName,
+		VaultName:      x.VaultName,
+		Category:       x.Category,
+		OperatingHours: x.OperatingHours,
+		CurrencyCode:   x.CurrencyCode,
+		Region:         x.Region,
+		Alamat:         x.Alamat,
+		MinBalance:     x.MinBalance,
+		MaxBalance:     x.MaxBalance,
+		CisLimitAmount: x.CisLimitAmount,
+		EscrowCash:     x.EscrowCash,
+		EscrowAtm:      x.EscrowAtm,
+		IsActive:       x.IsActive,
+	}
+}
+
 // exportSpecs is the contract with the T5.3 importer and T5.2 templates.
 // Headers, legacy headers and cell formats come from pkg/csvexport (one source
 // for export and import, Req 14.3/14.4); only the repo paging lives here.
@@ -92,7 +120,7 @@ var exportSpecs = map[string]exportSpec{
 	ExportVendors: spec(ExportVendors, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 		rows, err := r.Vendors(ctx, after, status, limit)
 		return exportPage(rows, err, func(x db.ExportVendorsBatchRow) int64 { return x.ID }, func(x db.ExportVendorsBatchRow) []string {
-			return csvexport.VendorCells(csvexport.VendorRow(x))
+			return csvexport.VendorCells(vendorExportRow(x))
 		})
 	}),
 	ExportVendorBranches: spec(ExportVendorBranches, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
@@ -103,9 +131,15 @@ var exportSpecs = map[string]exportSpec{
 	}),
 	ExportVendorVaults: spec(ExportVendorVaults, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 		rows, err := r.VendorVaults(ctx, after, status, limit)
-		return exportPage(rows, err, func(x db.ExportVendorVaultsBatchRow) int64 { return x.ID }, func(x db.ExportVendorVaultsBatchRow) []string {
-			return csvexport.VendorVaultCells(csvexport.VendorVaultRow(x))
-		})
+		if err != nil {
+			return nil, 0, err
+		}
+		out := make([][]string, len(rows))
+		var last int64
+		for i, x := range rows {
+			out[i], last = csvexport.VendorVaultCells(vendorVaultExportRow(int64(i+1), x)), x.ID
+		}
+		return out, last, nil
 	}),
 	ExportVendorPICs: spec(ExportVendorPICs, func(ctx context.Context, r MasterDataExportRepo, after int64, status string, limit int32) ([][]string, int64, error) {
 		rows, err := r.VendorPICs(ctx, after, status, limit)
@@ -182,7 +216,10 @@ func (e *MasterDataExporter) Write(ctx context.Context, entity, status string, w
 				return total, err
 			}
 		}
-		for _, row := range rows {
+		for i, row := range rows {
+			if entity == ExportVendorVaults && total > 0 {
+				row[0] = strconv.Itoa(total + i + 1)
+			}
 			if err := cw.Write(row); err != nil {
 				return total, err
 			}

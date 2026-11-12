@@ -30,10 +30,12 @@ vi.mock("../components/VendorVaultFormDialog", () => ({
     vault,
   }: {
     open: boolean;
-    vault: { vault_code: string } | null;
+    vault: { vault_name?: string; vault_code: string } | null;
   }) =>
     open ? (
-      <output data-testid="form">{vault ? `edit ${vault.vault_code}` : "create"}</output>
+      <output data-testid="form">
+        {vault ? `edit ${vault.vault_name || vault.vault_code}` : "create"}
+      </output>
     ) : null,
 }));
 
@@ -41,22 +43,32 @@ import { VaultsPanel } from "../components/VaultsPanel";
 
 const ACTIVE = {
   id: 1,
-  vault_code: "VLT-A",
+  vault_code: "ABA_Bali_V001",
+  vault_name: "ABA_Bali_V001",
+  region: "Bali",
   category: "CASH",
-  max_capacity_amount: "5000000000.00",
+  max_balance: "5000000000.00",
+  cis_limit_amount: "2500000000.00",
+  escrow_cash: "001234567890",
+  escrow_atm: "998877665544",
   operating_hours: "08-17",
   is_active: true,
 };
 const INACTIVE = {
   id: 2,
-  vault_code: "VLT-B",
+  vault_code: "ABA_Bali_V002",
+  vault_name: "ABA_Bali_V002",
+  region: null,
   category: "ATM",
-  max_capacity_amount: null,
+  max_balance: null,
+  cis_limit_amount: null,
+  escrow_cash: null,
+  escrow_atm: null,
   operating_hours: null,
   is_active: false,
 };
 
-const rowOf = (code: string) => screen.getByText(code).closest("tr") as HTMLElement;
+const rowOf = (name: string) => screen.getByText(name).closest("tr") as HTMLElement;
 
 beforeEach(() => {
   m.query = { isLoading: false, isError: false, data: { vaults: [ACTIVE, INACTIVE], total: 2 } };
@@ -68,30 +80,35 @@ beforeEach(() => {
 });
 
 describe("VaultsPanel", () => {
-  it("lists vaults with category, capacity, hours ('—' when missing) and a status label", () => {
+  it("lists vaults with vault_name, category, region, max_balance, cis_limit_amount, escrow, hours and status", () => {
     render(<VaultsPanel vendorId={42} branchId={3} />);
 
-    const a = within(rowOf("VLT-A"));
+    const a = within(rowOf("ABA_Bali_V001"));
     expect(a.getByText("CASH")).toBeInTheDocument();
+    expect(a.getByText("Bali")).toBeInTheDocument();
     expect(a.getByText("5000000000.00")).toBeInTheDocument();
+    expect(a.getByText("2500000000.00")).toBeInTheDocument();
+    expect(a.getByText("001234567890")).toBeInTheDocument();
+    expect(a.getByText("998877665544")).toBeInTheDocument();
+    expect(a.getByText("08-17")).toBeInTheDocument();
     expect(a.getByText("Aktif")).toBeInTheDocument();
-    const b = within(rowOf("VLT-B"));
-    expect(b.getAllByText("—")).toHaveLength(2);
+    const b = within(rowOf("ABA_Bali_V002"));
+    expect(b.getAllByText("—")).toHaveLength(6);
     expect(b.getByText("Nonaktif")).toBeInTheDocument();
   });
 
   it("lists only this branch's pending vault creates and locks a pending row", () => {
     m.pendingIds = new Set([2]);
     m.pendingCreates = [
-      { id: 90, payload: { vendor_branch_id: 3, vault_code: "VLT-NEW" } },
-      { id: 91, payload: { vendor_branch_id: 8, vault_code: "VLT-OTHER" } },
+      { id: 90, payload: { vendor_branch_id: 3, vault_name: "ABA_Bali_V003" } },
+      { id: 91, payload: { vendor_branch_id: 8, vault_name: "ABA_Jakarta_V001" } },
     ];
     render(<VaultsPanel vendorId={42} branchId={3} />);
 
     const list = screen.getByRole("region", { name: "Pengajuan baru menunggu approval" });
-    expect(list).toHaveTextContent("VLT-NEW");
-    expect(list).not.toHaveTextContent("VLT-OTHER");
-    const b = within(rowOf("VLT-B"));
+    expect(list).toHaveTextContent("ABA_Bali_V003");
+    expect(list).not.toHaveTextContent("ABA_Jakarta_V001");
+    const b = within(rowOf("ABA_Bali_V002"));
     expect(b.getByText("Menunggu approval")).toBeInTheDocument();
     expect(b.getByRole("button", { name: "Aktifkan" })).toBeDisabled();
   });
@@ -103,9 +120,9 @@ describe("VaultsPanel", () => {
     const user = userEvent.setup();
     render(<VaultsPanel vendorId={42} branchId={3} />);
 
-    await user.click(within(rowOf("VLT-A")).getByRole("button", { name: "Nonaktifkan" }));
+    await user.click(within(rowOf("ABA_Bali_V001")).getByRole("button", { name: "Nonaktifkan" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent('Nonaktifkan vault "VLT-A"?');
+    expect(dialog).toHaveTextContent('Nonaktifkan vault "ABA_Bali_V001"?');
     await user.click(within(dialog).getByRole("button", { name: "Nonaktifkan" }));
 
     expect(m.disable).toHaveBeenCalledWith(1, expect.anything());
@@ -123,9 +140,9 @@ describe("VaultsPanel", () => {
     const user = userEvent.setup();
     render(<VaultsPanel vendorId={42} branchId={3} />);
 
-    await user.click(within(rowOf("VLT-B")).getByRole("button", { name: "Aktifkan" }));
+    await user.click(within(rowOf("ABA_Bali_V002")).getByRole("button", { name: "Aktifkan" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveTextContent('Aktifkan kembali vault "VLT-B"?');
+    expect(dialog).toHaveTextContent('Aktifkan kembali vault "ABA_Bali_V002"?');
     await user.click(within(dialog).getByRole("button", { name: "Aktifkan" }));
 
     expect(useToastStore.getState().toasts[0]).toMatchObject({
@@ -140,8 +157,8 @@ describe("VaultsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Tambah Vault" }));
     expect(screen.getByTestId("form")).toHaveTextContent("create");
-    await user.click(within(rowOf("VLT-A")).getByRole("button", { name: "Ubah" }));
-    expect(screen.getByTestId("form")).toHaveTextContent("edit VLT-A");
+    await user.click(within(rowOf("ABA_Bali_V001")).getByRole("button", { name: "Ubah" }));
+    expect(screen.getByTestId("form")).toHaveTextContent("edit ABA_Bali_V001");
   });
 
   it("shows loading, error and empty states", () => {

@@ -31,7 +31,7 @@ func (fakeImportRepo) Vendors(_ context.Context, after int64, _ string, limit in
 }
 
 func (fakeImportRepo) VendorBranches(_ context.Context, after int64, _ string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
-	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", Category: "ATM", LocationID: "5", CisLimitAmount: "2500000000.00", IsActive: true}}
+	all := []db.ExportVendorBranchesBatchRow{{ID: 1, VendorCode: "V1", BranchCode: "B1", BranchName: "Cabang 1", Region: "Jakarta", RegionCode: "JKT", Category: "ATM", LocationID: "5", IsActive: true}}
 	return page(all, after, limit, func(r db.ExportVendorBranchesBatchRow) int64 { return r.ID }), nil
 }
 

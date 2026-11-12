@@ -83,14 +83,14 @@ var (
 		{ID: 5, Code: "VC", Name: "PT Cahaya — Utama ✓", LegalName: "-cmd", ContactPhone: "(021) 555-1234", IsActive: true},
 	}
 	goldenBranches = []db.ExportVendorBranchesBatchRow{
-		{ID: 1, VendorCode: "VA", BranchCode: "VA_001", BranchName: "Alpha Medan", Region: "Sumatera", RegionCode: "MDN", Category: "ATM_CASH", LocationID: "12", CisLimitAmount: "2500000000.00", IsActive: true},
+		{ID: 1, VendorCode: "VA", BranchCode: "VA_001", BranchName: "Alpha Medan", Region: "Sumatera", RegionCode: "MDN", Category: "ATM_CASH", LocationID: "12", IsActive: true},
 		{ID: 3, VendorCode: "VA", BranchCode: "VA_002", BranchName: "Alpha Lama", IsActive: false},
 		{ID: 4, VendorCode: "VC", BranchCode: "VC_001", BranchName: "@Cabang, Bandung", Region: "Jawa Barat", RegionCode: "BDG", Category: "CASH", IsActive: true},
 	}
 	goldenVaults = []db.ExportVendorVaultsBatchRow{
-		{ID: 1, VendorCode: "VA", BranchCode: "VA_001", VaultCode: "VA_001_V1", Category: "ATM_CASH", CurrencyCode: "IDR", MinCapacityAmount: "1000000.00", MaxCapacityAmount: "5000000000.00", Latitude: "-6.200000", Longitude: "106.816666", OperatingHours: "24 jam", LocationID: "12", EscrowAccount: "001234567890", IsActive: true},
-		{ID: 2, VendorCode: "VA", BranchCode: "VA_002", VaultCode: "VA_002_V1", Category: "CASH", CurrencyCode: "IDR", IsActive: false},
-		{ID: 7, VendorCode: "VC", BranchCode: "VC_001", VaultCode: "VC_001_V1", Category: "ATM", CurrencyCode: "IDR", MinCapacityAmount: "0.00", MaxCapacityAmount: "999999999999999999.99", OperatingHours: "+abc", IsActive: true},
+		{ID: 1, VendorCode: "VA", BranchCode: "VA_001", BranchName: "Alpha Medan", VaultCode: "VA_001_V1", VaultName: "VA_001_V1", Region: "Sumatera", Category: "ATM_CASH", OperatingHours: "24 jam", CurrencyCode: "IDR", Alamat: "Jl. Gatot Subroto No. 10, Medan", MinBalance: "1000000.00", MaxBalance: "5000000000.00", CisLimitAmount: "2500000000.00", Latitude: "-6.200000", Longitude: "106.816666", LocationID: "12", EscrowCash: "001234567890", EscrowAtm: "001234567891", IsActive: true},
+		{ID: 2, VendorCode: "VA", BranchCode: "VA_002", BranchName: "Alpha Lama", VaultCode: "VA_002_V1", VaultName: "VA_002_V1", Category: "CASH", CurrencyCode: "IDR", IsActive: false},
+		{ID: 7, VendorCode: "VC", BranchCode: "VC_001", BranchName: "@Cabang, Bandung", VaultCode: "VC_001_V1", VaultName: "VC_001_V1", Region: "Jawa Barat", Category: "ATM", OperatingHours: "+abc", CurrencyCode: "IDR", MinBalance: "0.00", MaxBalance: "999999999999999999.99", IsActive: true},
 	}
 	goldenPICs = []db.ExportVendorPicsBatchRow{
 		{ID: 1, VendorCode: "VA", Name: "Budi Contoh", Position: "Kepala Operasional", Phone: "+62 812-3456-7890", Email: "budi@alpha.example", IsNotificationRecipient: true, IsActive: true, Roles: []string{"replenish", "vault", "cashcount"}},

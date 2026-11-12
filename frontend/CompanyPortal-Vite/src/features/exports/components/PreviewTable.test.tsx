@@ -4,7 +4,7 @@ import { type MasterDataset, findMasterDataset } from "../datasets";
 import type { ExportPreview } from "../types";
 import { PreviewTable } from "./PreviewTable";
 
-const dataset = findMasterDataset("vendors") as MasterDataset;
+const dataset = findMasterDataset("vendor-pks") as MasterDataset;
 
 const COLUMNS = ["id", "name", "pks_status", "pks_validity_months", "pks_remaining_days"];
 

@@ -55,13 +55,13 @@ type Params struct {
 func entitiesFor(k Kind) []string {
 	switch k {
 	case KindVendor:
-		return []string{"vendor", "branches", "vaults", "pics", "dsr-location-maps"}
+		return []string{"vendor", "branches", "vaults", "pics", "dsr-location-maps", csvexport.VendorPks}
 	case KindCabang:
 		return []string{"vaults", "pics", "dsr-location-maps"}
 	case KindHargaPaket:
 		return []string{"package-prices"}
 	case KindMasterDataGlobal:
-		return csvexport.ImportableNames()
+		return append(csvexport.ImportableNames(), csvexport.VendorPks)
 	}
 	return nil
 }

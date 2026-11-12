@@ -1,2 +1,2 @@
-﻿id,vendor_code,branch_code,vault_code,category,currency_code,min_capacity_amount,max_capacity_amount,latitude,longitude,operating_hours,location_id,escrow_account,is_active
-2,VA,VA_002,VA_002_V1,CASH,IDR,,,,,,,,false
+﻿no,branch_name,vault_name,category,operating_hours,currency_code,region,alamat,min_balance,max_balance,cis_limit_amount,escrow_cash,escrow_atm,is_active
+1,Alpha Lama,VA_002_V1,CASH,,IDR,,,,,,,,false

@@ -59,18 +59,18 @@ func (e *importEnv) location(v map[string]string, add func(string, string), requ
 	}
 }
 
-func (e *importEnv) validateFields(v map[string]string, creating bool, add func(string, string), fromErr func(error)) {
+func (e *importEnv) validateFields(v map[string]string, creating, hasIDCol bool, add func(string, string), fromErr func(error)) {
 	boolCol(v, "is_active", "true", creating, add)
 	if creating && v["is_active"] == "false" {
 		add("is_active", "data baru harus true (nonaktifkan lewat perubahan terpisah)")
 	}
 	switch e.entity {
 	case ExportVendors:
-		validateVendor(v, add, fromErr)
+		validateVendor(v, hasIDCol, add, fromErr)
 	case ExportVendorBranches:
 		e.validateVendorBranch(v, add, fromErr)
 	case ExportVendorVaults:
-		e.validateVault(v, add, fromErr)
+		e.validateVault(v, creating, hasIDCol, add, fromErr)
 	case ExportVendorPICs:
 		e.validatePIC(v, creating, add)
 	case ExportATMs:
@@ -80,8 +80,12 @@ func (e *importEnv) validateFields(v map[string]string, creating bool, add func(
 	}
 }
 
-func validateVendor(v map[string]string, add func(string, string), fromErr func(error)) {
-	requiredCols(v, add, "code", "name")
+func validateVendor(v map[string]string, hasIDCol bool, add func(string, string), fromErr func(error)) {
+	if hasIDCol {
+		requiredCols(v, add, "code", "name")
+	} else {
+		requiredCols(v, add, "name")
+	}
 	if v["contact_email"] != "" && !isValidEmail(v["contact_email"]) {
 		add("contact_email", "format email tidak valid")
 	}
@@ -107,26 +111,78 @@ func (e *importEnv) validateVendorBranch(v map[string]string, add func(string, s
 	if !validVendorBranchCategories[v["category"]] {
 		add("category", "harus ATM, CASH, atau ATM_CASH")
 	}
-	if n, err := normalizeCisLimit(optStr(v["cis_limit_amount"])); err != nil {
-		fromErr(err)
-	} else {
-		v["cis_limit_amount"] = notesOrEmpty(n)
-	}
 	e.location(v, add, false)
 }
 
-func (e *importEnv) validateVault(v map[string]string, add func(string, string), fromErr func(error)) {
+func (e *importEnv) validateVault(v map[string]string, creating, hasIDCol bool, add func(string, string), fromErr func(error)) {
+	if !hasIDCol {
+		requiredCols(v, add, "branch_name", "vault_name")
+		if v["branch_name"] != "" {
+			activeBranchID := e.branchesByName[v["branch_name"]]
+			anyBranchID := e.allBranchesByName[v["branch_name"]]
+			if activeBranchID == 0 && (creating || v["is_active"] == "true" || anyBranchID == 0) {
+				add("branch_name", "cabang tidak ditemukan atau nonaktif")
+			}
+		}
+		p := VendorVaultUpdatePayload{
+			VaultName:      optStr(v["vault_name"]),
+			Category:       v["category"],
+			CurrencyCode:   v["currency_code"],
+			Alamat:         optStr(v["alamat"]),
+			MinBalance:     optStr(v["min_balance"]),
+			MaxBalance:     optStr(v["max_balance"]),
+			CisLimitAmount: optStr(v["cis_limit_amount"]),
+			OperatingHours: optStr(v["operating_hours"]),
+			EscrowCash:     optStr(v["escrow_cash"]),
+			EscrowAtm:      optStr(v["escrow_atm"]),
+		}
+		if err := validateVaultFields(&p); err != nil {
+			fromErr(err)
+		} else {
+			v["vault_name"] = notesOrEmpty(p.VaultName)
+			v["category"] = p.Category
+			v["currency_code"] = p.CurrencyCode
+			v["alamat"] = notesOrEmpty(p.Alamat)
+			v["min_balance"] = notesOrEmpty(p.MinBalance)
+			v["max_balance"] = notesOrEmpty(p.MaxBalance)
+			v["cis_limit_amount"] = notesOrEmpty(p.CisLimitAmount)
+			v["operating_hours"] = notesOrEmpty(p.OperatingHours)
+			v["escrow_cash"] = notesOrEmpty(p.EscrowCash)
+			v["escrow_atm"] = notesOrEmpty(p.EscrowAtm)
+		}
+		return
+	}
+
 	requiredCols(v, add, "vendor_code", "branch_code", "vault_code")
 	if v["vendor_code"] != "" && v["branch_code"] != "" && e.branches[v["vendor_code"]+"|"+v["branch_code"]] == 0 {
 		add("branch_code", "cabang tidak ditemukan atau nonaktif")
 	}
-	p := VendorVaultUpdatePayload{Category: v["category"], CurrencyCode: v["currency_code"],
-		MinCapacityAmount: optStr(v["min_capacity_amount"]), MaxCapacityAmount: optStr(v["max_capacity_amount"]),
-		Latitude: optStr(v["latitude"]), Longitude: optStr(v["longitude"]), EscrowAccount: optStr(v["escrow_account"])}
+	p := VendorVaultUpdatePayload{
+		Category:       v["category"],
+		CurrencyCode:   v["currency_code"],
+		MinBalance:     optStr(v["min_capacity_amount"]),
+		MaxBalance:     optStr(v["max_capacity_amount"]),
+		Latitude:       optStr(v["latitude"]),
+		Longitude:      optStr(v["longitude"]),
+		OperatingHours: optStr(v["operating_hours"]),
+		EscrowCash:     optStr(v["escrow_account"]),
+	}
 	if err := validateVaultFields(&p); err != nil {
+		var ve *ValidationError
+		if errors.As(err, &ve) {
+			switch ve.Field {
+			case "min_balance":
+				ve = &ValidationError{Field: "min_capacity_amount", Message: strings.ReplaceAll(ve.Message, "saldo maksimum", "kapasitas maksimum")}
+			case "max_balance":
+				ve = &ValidationError{Field: "max_capacity_amount", Message: ve.Message}
+			case "escrow_cash":
+				ve = &ValidationError{Field: "escrow_account", Message: ve.Message}
+			}
+			err = ve
+		}
 		fromErr(err)
 	} else {
-		v["category"], v["currency_code"], v["escrow_account"] = p.Category, p.CurrencyCode, notesOrEmpty(p.EscrowAccount)
+		v["category"], v["currency_code"], v["escrow_account"] = p.Category, p.CurrencyCode, notesOrEmpty(p.EscrowCash)
 	}
 	e.location(v, add, false)
 }

@@ -25,6 +25,7 @@ const MASTER: Record<string, string> = {
   "vendor-branches": "Cabang vendor",
   "vendor-vaults": "Vault",
   "vendor-pics": "PIC vendor",
+  "vendor-pks": "PKS vendor",
   "dsr-location-maps": "Pemetaan lokasi DSR",
   "package-prices": "Harga paket",
   atms: "ATM",
@@ -49,18 +50,18 @@ const hrefOf = (nameStart: string) =>
 afterEach(() => useAuthStore.setState({ user: null }));
 
 describe("ExportCatalogPage", () => {
-  it("ADMIN sees all eight master datasets and both reports", () => {
+  it("ADMIN sees all nine master datasets and both reports", () => {
     renderAs("ADMIN");
     expect(screen.getByRole("heading", { name: "Data master" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Laporan" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link")).toHaveLength(10);
+    expect(screen.getAllByRole("link")).toHaveLength(11);
   });
 
   it("ADMIN_PARAM sees only master data (no Laporan group)", () => {
     renderAs("ADMIN_PARAM");
     expect(screen.getByRole("heading", { name: "Data master" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Laporan" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link")).toHaveLength(8);
+    expect(screen.getAllByRole("link")).toHaveLength(9);
   });
 
   it.each<[DbRole, string[]]>([
@@ -98,6 +99,6 @@ describe("ExportCatalogPage", () => {
       expect(link).toHaveFocus();
     }
     const master = screen.getByRole("region", { name: "Data master" });
-    expect(within(master).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(master).getAllByRole("listitem")).toHaveLength(9);
   });
 });

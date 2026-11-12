@@ -53,28 +53,6 @@ func normalizeBranchRegionCode(in *string) (*string, error) {
 	return &code, nil
 }
 
-// cisLimitRe: positive-looking decimal, at most 18 integer digits and 2 decimals = numeric(20,2).
-var cisLimitRe = regexp.MustCompile(`^[0-9]{1,18}(\.[0-9]{1,2})?$`)
-
-// normalizeCisLimit trims a Limit CIS amount (vendor-cis-limit FR1.2); blank = NULL. Must be > 0,
-// checked as text (never float); the DB CHECK vendor_branches_cis_limit_amount_chk is the last net.
-func normalizeCisLimit(in *string) (*string, error) {
-	if in == nil {
-		return nil, nil
-	}
-	s := strings.TrimSpace(*in)
-	if s == "" {
-		return nil, nil
-	}
-	if !cisLimitRe.MatchString(s) {
-		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus angka desimal, maksimal 18 digit dan 2 angka di belakang titik"}
-	}
-	if strings.Trim(s, "0.") == "" {
-		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus lebih besar dari 0"}
-	}
-	return &s, nil
-}
-
 // DecimalStringPtr renders a nullable numeric as an exact decimal string (nil for NULL) for handlers
 // that map db rows straight to JSON (money as string, QC F7).
 func DecimalStringPtr(n pgtype.Numeric) (*string, error) {
@@ -139,8 +117,6 @@ type VendorBranchPayload struct {
 	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
-	// CisLimitAmount: Limit CIS decimal string, nil = NULL (vendor-cis-limit FR1). Currency stays IDR (S4).
-	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // VendorBranchUpdatePayload is update's payload shape. branch_code and
@@ -152,8 +128,6 @@ type VendorBranchUpdatePayload struct {
 	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"` // nil = cleared (form always sends the current value)
 	Category   string  `json:"category"`
-	// CisLimitAmount: nil = cleared (form always sends the current value, like region_code).
-	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // List returns a page of a vendor's branches matching the given filters.
@@ -195,9 +169,6 @@ func (s *VendorBranchAdminService) Create(ctx context.Context, makerID int64, re
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
-	if req.CisLimitAmount, err = normalizeCisLimit(req.CisLimitAmount); err != nil {
-		return db.MasterDataChangeRequest{}, err
-	}
 
 	existing, err := s.repo.FindByCode(ctx, req.BranchCode)
 	if err != nil {
@@ -237,9 +208,6 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
-	if req.CisLimitAmount, err = normalizeCisLimit(req.CisLimitAmount); err != nil {
-		return db.MasterDataChangeRequest{}, err
-	}
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{
 		EntityType: "vendor_branch",

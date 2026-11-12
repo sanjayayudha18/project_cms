@@ -55,9 +55,9 @@ func seedScopedFixture(t *testing.T, h *testHelpers, tag string) scopedFixture {
 	vault := func(branchID int64, code, category string, min, max, lat, lon, hours *string, active bool) {
 		var id int64
 		err := h.pool.QueryRow(h.ctx, `INSERT INTO vendor_vaults
-			(vendor_branch_id, vault_code, type, category, currency_code, min_capacity_amount, max_capacity_amount,
+			(vendor_branch_id, vault_code, vault_name, type, category, currency_code, min_balance, max_balance,
 			 latitude, longitude, operating_hours, is_active, deleted_at)
-			VALUES ($1, $2, $3, $3, 'IDR', $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8, $9,
+			VALUES ($1, $2, $2, $3, $3, 'IDR', $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8, $9,
 			        CASE WHEN $9 THEN NULL ELSE now() END) RETURNING id`,
 			branchID, code, category, min, max, lat, lon, hours, active).Scan(&id)
 		if err != nil {
@@ -110,7 +110,7 @@ func scopedRows(t *testing.T, ctx context.Context, q *db.Queries, entity string,
 				t.Fatalf("%s: %v", entity, err)
 			}
 			for _, r := range rows {
-				page, last = append(page, csvexport.VendorCells(csvexport.VendorRow(r))), r.ID
+				page, last = append(page, csvexport.VendorCells(vendorExportRow(r))), r.ID
 			}
 		case csvexport.VendorBranches:
 			rows, err := q.ExportVendorBranchesBatch(ctx, db.ExportVendorBranchesBatchParams{AfterID: after, VendorID: vendorID, Status: "all", BatchSize: 1000})
@@ -126,7 +126,8 @@ func scopedRows(t *testing.T, ctx context.Context, q *db.Queries, entity string,
 				t.Fatalf("%s: %v", entity, err)
 			}
 			for _, r := range rows {
-				page, last = append(page, csvexport.VendorVaultCells(csvexport.VendorVaultRow(r))), r.ID
+				rowNo := int64(len(out) + len(page) + 1)
+				page, last = append(page, csvexport.VendorVaultCells(vendorVaultExportRow(rowNo, r))), r.ID
 			}
 		case csvexport.VendorPICs:
 			rows, err := q.ExportVendorPicsBatch(ctx, db.ExportVendorPicsBatchParams{AfterID: after, VendorID: vendorID, BranchID: branchID, Status: "all", BatchSize: 1000})

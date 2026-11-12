@@ -18,6 +18,7 @@ const (
 const (
 	DSRLocationMaps = "dsr-location-maps"
 	PackagePrices   = "package-prices"
+	VendorPks       = "vendor-pks"
 )
 
 // BOM lets Excel open the file as UTF-8. The importer strips it.

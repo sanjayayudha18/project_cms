@@ -855,10 +855,6 @@ type VendorBranch struct {
 	Category string `json:"category"`
 	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
 	RegionCode *string `json:"region_code"`
-	// Limit CIS (= Limit Asuransi) area vault vendor, dalam cis_limit_currency. NULL = belum diisi. Master-data maker-checker. Migrasi 038.
-	CisLimitAmount pgtype.Numeric `json:"cis_limit_amount"`
-	// Mata uang cis_limit_amount (ISO 4217). Hanya IDR untuk sekarang (vendor-cis-limit S4). Migrasi 038.
-	CisLimitCurrency string `json:"cis_limit_currency"`
 }
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
@@ -1166,10 +1162,12 @@ type VendorVault struct {
 	VendorBranchID int64  `json:"vendor_branch_id"`
 	VaultCode      string `json:"vault_code"`
 	// Type of vault (e.g. main, transit, buffer)
-	Type              string         `json:"type"`
-	Amount            pgtype.Numeric `json:"amount"`
-	MaxCapacityAmount pgtype.Numeric `json:"max_capacity_amount"`
-	MinCapacityAmount pgtype.Numeric `json:"min_capacity_amount"`
+	Type   string         `json:"type"`
+	Amount pgtype.Numeric `json:"amount"`
+	// Saldo maksimum vault dalam currency_code (numeric(20,2), tanpa float). Rename dari max_capacity_amount pada migrasi 040.
+	MaxBalance pgtype.Numeric `json:"max_balance"`
+	// Saldo minimum vault dalam currency_code (numeric(20,2), tanpa float). Rename dari min_capacity_amount pada migrasi 040.
+	MinBalance pgtype.Numeric `json:"min_balance"`
 	// ISO 4217 currency code (e.g. IDR, USD)
 	CurrencyCode   string             `json:"currency_code"`
 	IsActive       bool               `json:"is_active"`
@@ -1182,6 +1180,16 @@ type VendorVault struct {
 	// ATM, CASH, atau ATM_CASH (melayani keduanya). Diisi dari daftar master vendor di migrasi 008; sebelumnya biner dengan seluruh baris di-backfill ke ATM.
 	Category  string             `json:"category"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-	// Nomor rekening escrow vault (12 digit, teks). Opsional, tidak unik: satu escrow bisa dikelola beberapa vendor. Master-data maker-checker. Migrasi 038.
-	EscrowAccount *string `json:"escrow_account"`
+	// Nama tampilan/identitas vault pada cabang (format default <vendorPrefix>_<area>_V<3-digit>, contoh: ABA_Bali_V001). Unik per cabang. Migrasi 040.
+	VaultName string `json:"vault_name"`
+	// Alamat fisik vault vendor (opsional). Master-data maker-checker. Migrasi 040.
+	Alamat *string `json:"alamat"`
+	// Limit CIS (= Limit Asuransi) per vault dalam cis_limit_currency (numeric(20,2) > 0, NULL = belum diisi). Dipindahkan dari vendor_branches pada migrasi 040.
+	CisLimitAmount pgtype.Numeric `json:"cis_limit_amount"`
+	// Mata uang cis_limit_amount (ISO 4217, default IDR). Dipindahkan dari vendor_branches pada migrasi 040.
+	CisLimitCurrency string `json:"cis_limit_currency"`
+	// Nomor rekening escrow Cash vault (12 digit angka, opsional, tidak unik). Master-data maker-checker. Migrasi 040.
+	EscrowCash *string `json:"escrow_cash"`
+	// Nomor rekening escrow ATM vault (12 digit angka, opsional, tidak unik). Master-data maker-checker. Migrasi 040.
+	EscrowAtm *string `json:"escrow_atm"`
 }

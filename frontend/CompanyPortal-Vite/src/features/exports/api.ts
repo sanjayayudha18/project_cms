@@ -90,6 +90,8 @@ export function masterPath(p: MasterExportParams): string {
       })}`;
     case "master_data_global":
       return `/master-data/${p.entity}${qs({ status: p.status })}`;
+    case "cash_count_pics":
+      return `/cash-count-pics${qs({ status: p.status })}`;
   }
 }
 

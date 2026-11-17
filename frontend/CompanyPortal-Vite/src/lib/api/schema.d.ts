@@ -554,6 +554,334 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cash-count/category-params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description CC-CWM / ADMIN. The active parameter set (null before any is seeded) and the superseded history. */
+        get: operations["listCashCountCategoryParams"];
+        put?: never;
+        /** @description CC-CWM. Proposes a new parameter set; on approval it supersedes the active one in the same transaction. 409 when another proposal is pending. */
+        post: operations["submitCashCountCategoryParams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/anomaly-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description CC-CCR / ADMIN. Kategori ATM Anomaly; `status` defaults to active. */
+        get: operations["listCashCountAnomalyCategories"];
+        put?: never;
+        /** @description CC-CCR. Stages a new category through maker-checker. */
+        post: operations["submitCashCountAnomalyCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/anomaly-categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description CC-CCR. Stages a name/description change (code is immutable). */
+        put: operations["updateCashCountAnomalyCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/anomaly-categories/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CCR. Stages a soft-disable. */
+        post: operations["disableCashCountAnomalyCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/anomaly-categories/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CCR. Stages a re-enable. */
+        post: operations["enableCashCountAnomalyCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/checklist-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description CC-CCR / ADMIN. Berita Acara checklist items; empty until the user fills them (AC-5.1-07). */
+        get: operations["listCashCountChecklistItems"];
+        put?: never;
+        /** @description CC-CCR. Stages a new item (SELECTED_MACHINE needs `day`, NON_MACHINE must not have one). */
+        post: operations["submitCashCountChecklistItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/checklist-items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description CC-CCR. Stages a day / point / text change (category is immutable). */
+        put: operations["updateCashCountChecklistItem"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/checklist-items/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CCR. Stages a soft-disable. */
+        post: operations["disableCashCountChecklistItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/checklist-items/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CCR. Stages a re-enable. */
+        post: operations["enableCashCountChecklistItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description CC-CWM / ADMIN. Areas with their region codes. */
+        get: operations["listCashCountAreas"];
+        put?: never;
+        /** @description CC-CWM. Stages a new area; one region code belongs to one active area. */
+        post: operations["submitCashCountArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/areas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description CC-CWM. Stages a name + full region set change (code is immutable). */
+        put: operations["updateCashCountArea"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/areas/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM. Stages a soft-disable; 409 while an active executor PIC still points at the area. */
+        post: operations["disableCashCountArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/areas/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM. Stages a re-enable (regions are re-attached with an update). */
+        post: operations["enableCashCountArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/pics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description CC-CWM / ADMIN. Mapping PIC (coordinator per region, executor per area). */
+        get: operations["listCashCountPics"];
+        put?: never;
+        /** @description CC-CWM. Stages a new mapping. The user must be active, LDAP and hold CC-COORDINATOR (coordinator) or CC-EXECUTOR (executor); re-checked on apply (409 when it changed meanwhile). */
+        post: operations["submitCashCountPic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/pics/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description CC-CWM. Stages a user / target change (pic_role is immutable). */
+        put: operations["updateCashCountPic"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/pics/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM. Stages a soft-disable ("hapus" never deletes). */
+        post: operations["disableCashCountPic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/pics/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM. Stages a re-enable. */
+        post: operations["enableCashCountPic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/import/{entity}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM only. Validates a mapping-PIC CSV (`entity` = cash-count-pics, replace-all: active mappings absent from the file are previewed as `disable`). Nothing is written; row problems are part of the 200 answer. */
+        post: operations["dryRunCashCountImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cash-count/import/{entity}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description CC-CWM only. Stages the file as ONE batch under one approval (all-or-nothing). 202 = new batch, 200 = the same file (SHA-256) was already staged, nothing new is created. */
+        post: operations["confirmCashCountImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1312,6 +1640,220 @@ export interface components {
             can_report: boolean;
             completion_rejection_reason: string | null;
         };
+        CashCountCategoryParamsSet: {
+            /** Format: int64 */
+            id: number;
+            /** @description exact decimal IDR (never float); LOW below it, MEDIUM from it (inclusive) */
+            medium_min_amount: string | null;
+            /** @description exact decimal IDR; MEDIUM up to it (inclusive), HIGH above */
+            medium_max_amount: string | null;
+            /** @enum {string} */
+            currency_code: "IDR";
+            onsite_high: number;
+            onsite_medium: number;
+            onsite_low: number;
+            /** @enum {integer} */
+            period_months: 6;
+            /** Format: int64 */
+            created_by: number;
+            /** Format: date-time */
+            effective_from: string | null;
+            /** Format: date-time */
+            superseded_at: string | null;
+        };
+        CashCountCategoryParamsList: {
+            active: components["schemas"]["CashCountCategoryParamsSet"] | null;
+            history: components["schemas"]["CashCountCategoryParamsSet"][];
+        };
+        CashCountCategoryParamsRequest: {
+            /** @description decimal text, > 0, at most 2 decimals */
+            medium_min_amount: string;
+            /** @description decimal text, > medium_min_amount */
+            medium_max_amount: string;
+            /** @enum {string} */
+            currency_code: "IDR";
+            onsite_high: number;
+            onsite_medium: number;
+            onsite_low: number;
+        };
+        CashCountAnomalyCategory: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            description: string | null;
+            is_active: boolean;
+            /** Format: date-time */
+            deleted_at: string | null;
+        };
+        CashCountAnomalyCategoryList: {
+            categories: components["schemas"]["CashCountAnomalyCategory"][];
+        };
+        CashCountAnomalyCategoryCreate: {
+            code: string;
+            name: string;
+            description?: string;
+        };
+        CashCountAnomalyCategoryUpdate: {
+            name: string;
+            description?: string;
+        };
+        CashCountChecklistItem: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            category: "SELECTED_MACHINE" | "NON_MACHINE";
+            /**
+             * @description DAY1 = mesin, DAY2 = vault; only for SELECTED_MACHINE
+             * @enum {string|null}
+             */
+            day: "DAY1" | "DAY2" | null;
+            /** Format: int32 */
+            point_no: number;
+            item_text: string;
+            is_active: boolean;
+            /** Format: date-time */
+            deleted_at: string | null;
+        };
+        CashCountChecklistItemList: {
+            items: components["schemas"]["CashCountChecklistItem"][];
+        };
+        CashCountChecklistItemCreate: {
+            /** @enum {string} */
+            category: "SELECTED_MACHINE" | "NON_MACHINE";
+            /** @enum {string|null} */
+            day?: "DAY1" | "DAY2" | null;
+            /** Format: int32 */
+            point_no: number;
+            item_text: string;
+        };
+        CashCountChecklistItemUpdate: {
+            /** @enum {string|null} */
+            day?: "DAY1" | "DAY2" | null;
+            /** Format: int32 */
+            point_no: number;
+            item_text: string;
+        };
+        CashCountArea: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            region_codes: string[];
+            is_active: boolean;
+            /** Format: date-time */
+            deleted_at: string | null;
+        };
+        CashCountAreaList: {
+            areas: components["schemas"]["CashCountArea"][];
+        };
+        CashCountAreaCreate: {
+            code: string;
+            name: string;
+            region_codes: string[];
+        };
+        CashCountAreaUpdate: {
+            name: string;
+            region_codes: string[];
+        };
+        CashCountPic: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            pic_role: "COORDINATOR" | "EXECUTOR";
+            /** Format: int64 */
+            user_id: number;
+            username: string;
+            full_name: string;
+            /** @description COORDINATOR only */
+            region_code: string | null;
+            /**
+             * Format: int64
+             * @description EXECUTOR only
+             */
+            area_id: number | null;
+            area_code: string | null;
+            area_name: string | null;
+            is_active: boolean;
+            /** Format: date-time */
+            deleted_at: string | null;
+        };
+        CashCountPicList: {
+            pics: components["schemas"]["CashCountPic"][];
+        };
+        CashCountPicCreate: {
+            /** @enum {string} */
+            pic_role: "COORDINATOR" | "EXECUTOR";
+            /** Format: int64 */
+            user_id: number;
+            /** @description required for COORDINATOR */
+            region_code?: string | null;
+            /**
+             * Format: int64
+             * @description required for EXECUTOR
+             */
+            area_id?: number | null;
+        };
+        CashCountPicUpdate: {
+            /** Format: int64 */
+            user_id: number;
+            region_code?: string | null;
+            /** Format: int64 */
+            area_id?: number | null;
+        };
+        CashCountImportUpload: {
+            /**
+             * Format: binary
+             * @description CSV with header pic_role,username,region_code,area_code
+             */
+            file: string;
+        };
+        CashCountImportFieldChange: {
+            field: string;
+            before: string;
+            after: string;
+        };
+        CashCountImportChange: {
+            /** @description file line, header = 1; 0 for an implicit disable */
+            row: number;
+            /** @enum {string} */
+            op: "create" | "update" | "enable" | "disable";
+            key: string;
+            fields: components["schemas"]["CashCountImportFieldChange"][] | null;
+        };
+        CashCountImportRowError: {
+            row: number;
+            field: string;
+            message: string;
+        };
+        CashCountImportPreview: {
+            entity: string;
+            total_rows: number;
+            valid_rows: number;
+            creates: number;
+            updates: number;
+            unchanged: number;
+            errors: components["schemas"]["CashCountImportRowError"][] | null;
+            errors_truncated: boolean;
+            data_updates: number;
+            enables: number;
+            disables: number;
+            changes: components["schemas"]["CashCountImportChange"][] | null;
+        };
+        CashCountImportConfirm: {
+            /** Format: int64 */
+            batch_id: number;
+            rows: number;
+            /** Format: int64 */
+            approval_request_id: number | null;
+            existing: boolean;
+            entity: string;
+        };
+        CashCountImportInvalid: {
+            error: string;
+            message: string;
+            errors: components["schemas"]["CashCountImportRowError"][];
+        };
     };
     responses: {
         /** @description Malformed id, query or body */
@@ -1368,6 +1910,24 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
+        /** @description Upload over the size limit */
+        PayloadTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description No file field, nothing to import, or row errors (validation_failed + errors[]) */
+        ImportUnprocessable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["CashCountImportInvalid"];
+            };
+        };
         /** @description Unexpected error */
         InternalError: {
             headers: {
@@ -1390,6 +1950,11 @@ export interface components {
         VendorRequestID: number;
         /** @description vendor party id (not the request id) */
         PartyID: number;
+        CashCountID: number;
+        /** @description default active */
+        CashCountStatus: "active" | "disabled" | "all";
+        /** @description cash-count-pics is the only entity this route group accepts */
+        CashCountImportEntity: string;
     };
     requestBodies: never;
     headers: never;
@@ -2425,6 +2990,734 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCashCountCategoryParams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountCategoryParamsList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitCashCountCategoryParams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountCategoryParamsRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCashCountAnomalyCategories: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["CashCountStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountAnomalyCategoryList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitCashCountAnomalyCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountAnomalyCategoryCreate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateCashCountAnomalyCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountAnomalyCategoryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    disableCashCountAnomalyCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    enableCashCountAnomalyCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCashCountChecklistItems: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["CashCountStatus"];
+                category?: "SELECTED_MACHINE" | "NON_MACHINE";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountChecklistItemList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitCashCountChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountChecklistItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateCashCountChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountChecklistItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    disableCashCountChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    enableCashCountChecklistItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCashCountAreas: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["CashCountStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountAreaList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitCashCountArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountAreaCreate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateCashCountArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountAreaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    disableCashCountArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    enableCashCountArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCashCountPics: {
+        parameters: {
+            query?: {
+                /** @description default active */
+                status?: components["parameters"]["CashCountStatus"];
+                pic_role?: "COORDINATOR" | "EXECUTOR";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountPicList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitCashCountPic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountPicCreate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateCashCountPic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashCountPicUpdate"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    disableCashCountPic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    enableCashCountPic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["CashCountID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    dryRunCashCountImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description cash-count-pics is the only entity this route group accepts */
+                entity: components["parameters"]["CashCountImportEntity"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CashCountImportUpload"];
+            };
+        };
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountImportPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["ImportUnprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    confirmCashCountImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description cash-count-pics is the only entity this route group accepts */
+                entity: components["parameters"]["CashCountImportEntity"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CashCountImportUpload"];
+            };
+        };
+        responses: {
+            /** @description Already staged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountImportConfirm"];
+                };
+            };
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashCountImportConfirm"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["ImportUnprocessable"];
             500: components["responses"]["InternalError"];
         };
     };

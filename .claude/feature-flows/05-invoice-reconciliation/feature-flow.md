@@ -4,7 +4,7 @@ Sumber: URS v0.3 Phase 1 · ATM Cash Forecasting §2 "Pembayaran invoice vendor 
 Modul: `internal/invoice`, `internal/reconciliation`, `internal/approval`
 
 ## Aturan
-- CMS hanya **validasi & approve**, TIDAK mengeksekusi pembayaran.
+- **Diubah 2026-11-12 (user):** CROWN **menghitung** tagihan trip (FSD §6, `.document/DSR End To End Cash Management V01.md`), bukan memvalidasi invoice upload vendor. Tetap TIDAK mengeksekusi pembayaran. Diagram di bawah adalah alur lama (URS v0.3); acuan baru = FSD §6.
 - Upload idempotent per file hash.
 
 ## Flow

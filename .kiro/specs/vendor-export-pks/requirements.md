@@ -174,6 +174,6 @@ Status: ✅ **DIPUTUSKAN PO 2026-11-06, D1–D8 mengikuti saran Kiro.** Kolom "D
 
 ## Dependency & Scope Note
 
-- **Scope guard:** `development-plan.md` rule 2 melarang fitur master data baru kecuali dengan izin user, dan rule 1 meminta item tercatat di rencana. Fitur ini butuh izin user sebelum build dan entri baru (usul: **X.16**) di tabel cross-cutting `development-plan.md`.
+- **Scope guard:** `.claude/dev-plan/dev-plan.md` rule 2 melarang fitur master data baru kecuali dengan izin user, dan rule 1 meminta item tercatat di rencana. Fitur ini butuh izin user sebelum build dan entri baru (usul: **X.16**) di tabel cross-cutting `.claude/dev-plan/dev-plan.md`.
 - Bergantung pada spec yang sudah dibangun: `vendor-pks` (data PKS, Director_PIC, VendorPksReport), `vendor-data-export` (export jobs), `export-menu-revamp` + `export-preview-simplify` (halaman pratinjau), `master-data-import-revamp` (impor).
 - Deploy: `backend` versi baru harus jalan sebelum atau bersamaan dengan `backend-exq` versi baru. File dengan Export_Header ditolak oleh `backend` versi lama.

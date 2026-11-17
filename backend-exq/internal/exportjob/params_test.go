@@ -2,6 +2,7 @@ package exportjob
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -84,9 +85,14 @@ func TestParseParams(t *testing.T) {
 
 func TestParseParams_AllGlobalEntitiesAndNoAliasing(t *testing.T) {
 	names := csvexport.ImportableNames()
-	if len(names) != 6 {
-		t.Fatalf("want 6 importable entities, got %d", len(names))
+	if len(names) != 7 {
+		t.Fatalf("want 7 importable entities, got %d", len(names))
 	}
+	// Mapping PIC cash count is importable but never part of the global (ADMIN) kind (AC-5.1-14).
+	if _, err := ParseParams(KindMasterDataGlobal, csvexport.CashCountPICs, nil, nil, "", ""); !errors.Is(err, ErrUnknownEntity) {
+		t.Errorf("global %s: want ErrUnknownEntity, got %v", csvexport.CashCountPICs, err)
+	}
+	names = slices.DeleteFunc(names, func(n string) bool { return n == csvexport.CashCountPICs })
 	for _, n := range append(names, csvexport.VendorPks) {
 		if _, err := ParseParams(KindMasterDataGlobal, n, nil, nil, "", ""); err != nil {
 			t.Errorf("%s: %v", n, err)

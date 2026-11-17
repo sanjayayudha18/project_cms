@@ -51,6 +51,8 @@ export type ExportRequestParams =
       status?: StatusFilter;
     }
   | { kind: "master_data_global"; entity: MasterDataEntity; status?: StatusFilter }
+  // Cash count PIC mapping (CC-CWM only): POST /exports/cash-count-pics, not under /master-data.
+  | { kind: "cash_count_pics"; status?: StatusFilter }
   | { kind: "report"; report: ReportKey; params: ReportParams };
 
 /** Every export kind except `report` (those have their own screens, no preview). */

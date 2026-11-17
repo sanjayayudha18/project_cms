@@ -5,7 +5,7 @@ Stage: 1 Plan. Stage berikut: `spec.md` (setelah intent diterima).
 Menyentuh Sec 4 #7: **skema (tabel baru `documents`, migrasi baru)** + **file upload (trust boundary)** → wajib AI-DLC penuh.
 
 ## Problem
-Beberapa modul berikutnya perlu menyimpan file lampiran, tapi belum ada tempat penyimpanan bersama (`.kiro/steering/development-plan.md` 0.4):
+Beberapa modul berikutnya perlu menyimpan file lampiran, tapi belum ada tempat penyimpanan bersama (`.claude/dev-plan/dev-plan.md` 0.4):
 
 - **Cash count** (Phase 5, `docs/requirements.md`): Berita Acara digital, checklist, **foto bukti**, dual e-sign; dokumen final bisa diunduh/dicetak.
 - **Invoice** (Phase 3): vendor upload invoice + dokumen pendukung.

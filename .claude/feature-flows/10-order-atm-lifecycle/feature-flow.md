@@ -14,7 +14,7 @@ Modul: `backend_python/dmaa/dmaa_etl.py` (ingest DMAA), vendor request / `intern
 - 12:30 — Final Replenishment Order terbit
 
 ## Order amount (diputuskan 2026-10-08)
-- **CROWN tidak menghitung forecast.** Angka order = `amount_replenish` dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), **sudah final**.
+- **Diubah 2026-11-12 (user):** forecast tetap dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), tapi angkanya **tidak lagi final**. CROWN akan menyesuaikan dengan DSR vendor per FSD §3 langkah 8 (belum dibangun; kode saat ini masih memakai angka DMAA apa adanya).
 - Rumus FSD `Forecast Amount − Saldo DSR + Forecast Refund` (2026-10-01) **tidak dipakai** di CROWN.
 - Refund: dikirim DMAA nanti; sampai itu `amount_refund = 0`.
 - Exclude ATM bermasalah + list input FSD (complaint/project/problem/adjustment) tetap tugas CROWN (Phase 2.4, belum dibangun).
@@ -114,4 +114,4 @@ flowchart TD
 ## Catatan / open questions
 - Berapa level approval berjenjang pada tahap 2? (URS hanya menyebut "berjenjang")
 - Fallback forecast saat DSR telat/absen belum didefinisikan FSD
-- CIT backend (`backend-cit`) masih skeleton — tahap 3 dibangun di fase CIT (lihat development-plan)
+- CIT backend (`backend-cit`) masih skeleton — tahap 3 dibangun di fase CIT (lihat dev-plan)

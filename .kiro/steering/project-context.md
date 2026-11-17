@@ -32,16 +32,16 @@ This project has a knowledge graph at `graphify-out/` with god nodes, community 
 
 ## 0a. Development Stage & DB Schema Policy
 
-**Current phase**: Early development (MVP/greenfield). Schema is **MUTABLE** — database changes (new tables, columns, migrations) are expected and encouraged as requirements evolve. No need to wait for formal approval on schema changes during this stage, though structural decisions that affect the module/table map (Sec 2) should still be flagged here after they are applied.
+**Current phase**: Early development (greenfield) — **no longer an MVP** (user 2026-11-12): the target is the full FSD v1.0 scope (Sec 1 Goal). Schema is **MUTABLE** — database changes (new tables, columns, migrations) are expected and encouraged as requirements evolve. No need to wait for formal approval on schema changes during this stage, though structural decisions that affect the module/table map (Sec 2) should still be flagged here after they are applied.
 
-> This relaxes Golden Rule #2's "propose table/column FIRST" gate for the current stage: apply the change, then record it in Sec 2. The gate returns once the schema stabilizes post-MVP.
+> This relaxes Golden Rule #2's "propose table/column FIRST" gate for the current stage: apply the change, then record it in Sec 2. The gate returns once the schema stabilizes before the first production release.
 
 ---
 
 ## 1. Overview
 
 - **Name**: CROWN THE Cash Management System
-- **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
+- **Goal**: E2E ATM cash management, scope = FSD v1.0 §A (user 2026-11-12, **no longer an MVP**): (1) vendor & master data management, (2) DMAA forecast intake, (3) daily ATM cash forecasting — DMAA + vendor DSR → nominal adjustment → final replenishment order, (4) ATM replenish order fulfilment, (5) cash count schedule & execution (vault + selective machine), (6) invoicing trip ATM replenish. Payment in SMART is out of scope. Also parked in the plan: escrow reconciliation vs Corebanking, CIT journal/reconciliation, EOD Final Realisasi.
 - **Stage**: Greenfield, vibe-coded with AI.
 - **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
   - **Implemented** (migration `027_seed_appaccess_role.sql`, 2026-09-09): `APPACCESS` — sole authority for account provisioning (set initial passwords, force first-login change) + configuring CRUD mapping & RBAC delegation (maker-checker), distinct from `ADMIN`/`ADMIN_PARAM`. 10th role. See `.kiro/specs/Auth-Local-Lifecycle/task.md` Tasks 1 & 6. Not yet verified against a live DB (external Postgres unreachable this session) — run the migration and confirm `SELECT * FROM roles WHERE role='APPACCESS'` before relying on it in production.
@@ -90,7 +90,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 
 **ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3a)
 
-**Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
+**Finance**: `internal/invoice` (invoicing trip, FSD v1.0 §6: CROWN computes the vendor trip billing + vendor review/appeal + approval — NO payment execution) · `internal/reconciliation`
 
 **CIT**: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
 
@@ -133,7 +133,7 @@ Any module that needs maker-checker (invoice approval, DSR exception override, e
 > **Per-feature flow diagrams (Mermaid, editable) live in `.claude/feature-flows/<feature>/feature-flow.md`** — read the matching flow before implementing a feature. The nine flows: `01-master-data`, `02-dsr-upload`, `03-atm-cash-forecasting`, `04-pemenuhan-pengambilan-dana`, `05-invoice-reconciliation`, `06-replenishment-validation-reports`, `07-dashboard`, `08-cash-count-vault`, `09-cash-count-selektif-mesin`.
 
 - **Functional requirements (all High)**: FNC 001 ATM Cash Forecasting (DSR intake, replenishment instruction, projection) · FNC 002 Cash Count (scheduling, reconciliation, progress + result report; vault ATM/Cash + selektif mesin) · FNC 003 Dashboard (daily instruction amount + term ID, DSR lateness recap, cash count daily progress + monthly report).
-- **Forecast / Order ATM (decided 2026-10-08)**: CROWN has no forecast engine. DMAA sends `Order_All_*.xlsx`, `backend_python/dmaa/dmaa_etl.py` loads `dmaa_atm_forecast`; DMAA `amount_replenish` is the final order amount (no in-CROWN formula). Refund comes from DMAA later (`amount_refund = 0` today). Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 10, which is a different calc for a different job):
+- **Forecast / Order ATM (decided 2026-11-12, user; supersedes 2026-10-08)**: CROWN runs no forecasting model of its own — the DMAA team sends `Order_All_*.xlsx` (ready 06:00), `backend_python/dmaa/dmaa_etl.py` loads `dmaa_files` + `dmaa_atm_forecast`. DMAA `amount_replenish` is **no longer the final order amount**: CROWN adjusts it with the vendor DSR and forms the final replenishment order per FSD v1.0 §3 (`.document/DSR End To End Cash Management V01.md`): step 8 `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)` at 09:30–10:00 (Plan Replenish = the H-1 forecast file), complaint/project upload with duplicate-ATM-ID drop + info email, blank-amount orders filled by ATM Monitoring, manual adjust 11:45–12:00, final order shown 12:30. **Not built** — today's Vendor Request still takes the DMAA amount as is; needs a full Kiro spec (money, Sec 4 #7), dev-plan 2.4a. Refund: `amount_refund = 0` until DMAA sends it. Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 10, which is a different calc for a different job):
   `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
   - Fallback: DMAA recommendation exists but DSR missing → compute from DMAA recommendation alone. **Open question in URS** ("apakah rumus ini masih valid?") — confirm with business before treating as final.
   - `Rencana Isi Hari-H` = previous day's order to be filled on H; it reduces the vendor's physical balance.
@@ -174,7 +174,7 @@ Any module that needs maker-checker (invoice approval, DSR exception override, e
 
 - **Auth split**: Internal → LDAP bind (no local password). Vendor → local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth_source in claims. Vendors scoped to own assignments only. Vendor roles include `Vendor CIT` (upload CIT DSR) and `Vendor CIT Supervisor` (supervise/approve CIT DSR uploads for the same vendor) — supervisor != uploader on the maker-checker gate.
 - **Maker-checker**: any create/update/delete on financial or master data → `approval_requests` (pending → approved/rejected). Effect applies only after approval. Maker != checker.
-- **Invoice**: CMS validates & approves only. Does NOT trigger/execute payment. Terminal = approved (handed off downstream).
+- **Invoice (decided 2026-11-12, user)**: CROWN **computes** the monthly trip invoice per vendor per FSD v1.0 §6 (`.document/DSR End To End Cash Management V01.md`): price scheme upload (replaces the previous one, upload date = effective date), ATM master from ESQ, trips per ATM vs package minimum, prorata for mid-month activate/deactivate, penalties; vendor reviews and may appeal, then approval. Does NOT trigger/execute payment (SMART, outside CROWN). Terminal = finalised invoice, downloaded by VOC.
 - **Escrow reconciliation**: source = batch file from Corebanking. Ingest → parse into `escrow_batch_rows` → reconcile vs CMS cash position → store deltas. Idempotent per file hash.
 - **Audit**: every state change writes `audit_logs` (who, what, before/after, when, ip).
 - **RBAC**: enforce at middleware AND service layer.
@@ -203,10 +203,10 @@ Any module that needs maker-checker (invoice approval, DSR exception override, e
 | Replenishment | Instruction + execution to refill ATM cash |
 | Vault | Vendor cash vault holding bank cash |
 | Escrow reconciliation | Match CMS cash position vs Corebanking escrow batch file |
-| Forecast (DMAA) | Order amount per ATM/denom/date received from DMAA; final, not recomputed by CROWN |
+| Forecast (DMAA) | Forecast per ATM/denom/date received from DMAA; CROWN adjusts it with the DSR into the final replenishment order (2026-11-12) |
 | Cash count | Physical count: vault (vendor) + selective machine |
 | Maker-checker | Two-person approval control |
-| Invoice reconciliation | Validate invoice vs executed CIT/replenishment; approve only, no payment |
+| Invoicing trip | CROWN computes the vendor trip invoice from executed replenishment (FSD §6); appeal + approve, no payment |
 
 ---
 
@@ -327,7 +327,7 @@ Both run on the **same VM**. Because their active windows don't overlap, each ge
 ## 12. Resolved Decisions
 
 - Escrow integration: batch file → `internal/corebanking` ingest → reconciliation.
-- Invoice payment: validate & approve only. No payment execution.
+- Invoice (2026-11-12, user): CROWN computes trip billing + appeal loop (FSD v1.0 §6). No payment execution.
 - Frontends: two separate SPAs. Internal = LDAP; Vendor = local creds in CMS.
 - Email: company SMTP relay.
 - DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.

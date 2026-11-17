@@ -1,6 +1,6 @@
 # graphify-human: peta fitur yang dibaca manusia.
 #
-# Pilot 3 fitur (2026-10-23), diperluas ke semua fitur di development-plan.md
+# Pilot 3 fitur (2026-10-23), diperluas ke semua fitur di .claude/dev-plan/dev-plan.md
 # "Built and wired" + layar mock (2026-11-04).
 #
 # Fitur baru: tambah satu blok [[feature]], lalu jalankan generator. Satu file
@@ -20,7 +20,7 @@
 # Aturan isi:
 #   - `files` = glob relatif ke root repo. Test, kode generated, dan config
 #     selalu dibuang otomatis walau cocok dengan glob (lihat [exclude]).
-#   - `status` diisi manual dari development-plan.md:
+#   - `status` diisi manual dari .claude/dev-plan/dev-plan.md:
 #       built | partial | mock | not_built
 #   - `mock_files` = file yang masih data hardcoded; tetap tampil, ditandai "mock".
 #   - Nama fitur bahasa Indonesia, nama teknis (file, tabel, endpoint) tetap asli.
@@ -141,7 +141,7 @@ cabang, dan pemetaan lokasi DSR. Semua perubahan lewat maker-checker: disimpan
 sebagai change request (202), diterapkan setelah approved. Termasuk impor/ekspor CSV.
 """
 status = "built"
-dev_plan = "Master data (feature-complete MVP)"
+dev_plan = "Master data (feature-complete for current scope)"
 portal = ["CompanyPortal"]
 files = [
   # Frontend
@@ -382,7 +382,7 @@ perubahan lewat maker-checker. terminal_id tidak bisa diubah setelah dibuat.
 Nonaktif hanya soft-delete.
 """
 status = "built"
-dev_plan = "Master data (feature-complete MVP)"
+dev_plan = "Master data (feature-complete for current scope)"
 portal = ["CompanyPortal"]
 files = [
   "frontend/CompanyPortal-Vite/src/features/admin-atms/**",

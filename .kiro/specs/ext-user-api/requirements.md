@@ -54,7 +54,7 @@ Hasil yang diinginkan: IDM bisa membuat, mengubah, dan menonaktifkan user CROWN 
 - `backend/api/openapi.yaml` (OpenAPI 3.0.3, `servers: /api/v1`, `bearerAuth`) belum mencakup `/admin/users`. Dites oleh `backend/internal/handler/openapi_contract_test.go` (kin-openapi, `RouteCoverage`, `Responses`, `RejectsDrift`).
 
 **Migrasi**
-- File terakhir `038_vendor_cis_limit.sql`. Nomor bebas berikutnya **`039`** (`development-plan.md` masih menulis `038`, sudah basi).
+- File terakhir `038_vendor_cis_limit.sql`. Nomor bebas berikutnya **`039`** (`.claude/dev-plan/dev-plan.md` masih menulis `038`, sudah basi).
 
 ### Ruang lingkup
 
@@ -298,7 +298,7 @@ Status: D1–D6 ✅ diputuskan PO 2026-11-10 (lihat Introduction). D8–D21 ✅ 
 
 ## Dependency & Scope Note
 
-- **Scope guard:** item baru **X.17** di tabel cross-cutting `development-plan.md` (user OK 2026-11-10 untuk membuka item dan menulis spec). Build menunggu persetujuan requirements, design, dan tasks.
+- **Scope guard:** item baru **X.17** di tabel cross-cutting `.claude/dev-plan/dev-plan.md` (user OK 2026-11-10 untuk membuka item dan menulis spec). Build menunggu persetujuan requirements, design, dan tasks.
 - **Stack:** tidak butuh library baru. JWT (`golang-jwt/jwt/v5`), bcrypt/`crypto/rand`, Redis (`go-redis/v9`), dan kin-openapi sudah ada. Bila design memilih argon2 untuk hash secret, itu dependensi baru dan butuh persetujuan (GR#1).
 - **Migrasi:** `039` untuk tabel ApiClient dan role akun layanan, tetap di `backend/migrations/` (satu-satunya pemilik migrasi). ExtApiService membaca skema yang sama lewat sqlc, seperti `backend-exq`.
 - **Topologi (D22):** modul workspace ketiga. `structure.md`, `tech.md`, `project-context.md`, dan `.claude/CLAUDE.md` diperbarui (aturan "backend tidak saling import" berlaku juga untuk `backend-extapi`).

@@ -162,15 +162,16 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | File | Dipakai fitur | Memakai fitur | Milik fitur |
 | --- | --- | --- | --- |
 | [`pkg/response/response.go`](../../pkg/response/response.go) | 10 | - | - |
+| [`backend/internal/service/masterdata_export.go`](../../backend/internal/service/masterdata_export.go) | - | 6 | `master-data-vendor` |
 | [`frontend/CompanyPortal-Vite/src/features/admin-vendors/components/AdminVendorsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-vendors/components/AdminVendorsPage.tsx) | - | 6 | `master-data-vendor` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 5 | - |
 | [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 5 | - | `auth` |
-| [`backend/internal/service/masterdata_export.go`](../../backend/internal/service/masterdata_export.go) | - | 4 | `master-data-vendor` |
+| [`backend/internal/service/masterdata_import.go`](../../backend/internal/service/masterdata_import.go) | - | 4 | `master-data-vendor` |
 | [`pkg/middleware/rbac.go`](../../pkg/middleware/rbac.go) | 3 | - | `auth` |
+| [`backend-extapi/cmd/extclient/main.go`](../../backend-extapi/cmd/extclient/main.go) | 2 | - | - |
 | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 2 | - |
 | [`backend/internal/handler/admin_master_data_import_handler.go`](../../backend/internal/handler/admin_master_data_import_handler.go) | - | 2 | `master-data-vendor` |
 | [`backend/internal/service/dsr_late_report.go`](../../backend/internal/service/dsr_late_report.go) | - | 2 | `dsr-late-report` |
-| [`backend/internal/service/masterdata_import.go`](../../backend/internal/service/masterdata_import.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/masterdata_import_csv.go`](../../backend/internal/service/masterdata_import_csv.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/masterdata_import_validate.go`](../../backend/internal/service/masterdata_import_validate.go) | - | 1 | `master-data-vendor` |
 | [`backend/internal/service/replenishment_read.go`](../../backend/internal/service/replenishment_read.go) | - | 1 | `replenishment-realisasi` |
@@ -180,7 +181,6 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`pkg/auth/token_service.go`](../../pkg/auth/token_service.go) | 1 | - | `auth` |
 | [`pkg/config/config.go`](../../pkg/config/config.go) | 1 | - | - |
 | [`pkg/health/ready.go`](../../pkg/health/ready.go) | 1 | - | - |
-| [`pkg/middleware/body_limit.go`](../../pkg/middleware/body_limit.go) | 1 | - | - |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

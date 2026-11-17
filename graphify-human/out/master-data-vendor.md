@@ -9,7 +9,7 @@
 | ID | `master-data-vendor` |
 | Status | Built |
 | Portal | CompanyPortal |
-| Development plan | Master data (feature-complete MVP) |
+| Development plan | Master data (feature-complete for current scope) |
 | File inti | 135 |
 
 ## Ringkasan
@@ -275,15 +275,15 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`frontend/CompanyPortal-Vite/src/routes/_protected.tsx`](../../frontend/CompanyPortal-Vite/src/routes/_protected.tsx) | 15 | - | `auth` |
 | [`frontend/CompanyPortal-Vite/src/routeTree.ts`](../../frontend/CompanyPortal-Vite/src/routeTree.ts) | - | 10 | - |
 | [`backend/internal/handler/unexpected_error.go`](../../backend/internal/handler/unexpected_error.go) | 9 | - | - |
+| [`backend/internal/service/vendor_request.go`](../../backend/internal/service/vendor_request.go) | 9 | - | `vendor-request` |
 | [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/ATMAssignmentsDialog.tsx) | - | 9 | `master-data-atm` |
-| [`backend/internal/service/vendor_request.go`](../../backend/internal/service/vendor_request.go) | 8 | - | `vendor-request` |
 | [`frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx`](../../frontend/CompanyPortal-Vite/src/features/admin-atms/components/AdminATMsPage.tsx) | - | 6 | `master-data-atm` |
+| [`pkg/csvexport/cells.go`](../../pkg/csvexport/cells.go) | 6 | - | `export-data` |
 | [`backend/internal/service/atm_admin.go`](../../backend/internal/service/atm_admin.go) | 4 | 1 | `master-data-atm` |
 | [`backend/internal/handler/admin_atm_handler.go`](../../backend/internal/handler/admin_atm_handler.go) | - | 4 | `master-data-atm` |
 | [`backend/internal/notification/notification.go`](../../backend/internal/notification/notification.go) | 4 | - | `notification` |
-| [`backend/internal/handler/admin_atm_assignment_handler.go`](../../backend/internal/handler/admin_atm_assignment_handler.go) | - | 3 | `master-data-atm` |
-| [`backend/internal/handler/approval_handler.go`](../../backend/internal/handler/approval_handler.go) | 1 | 2 | `approval` |
-| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 3 | - | `atm-portal` |
+| [`backend/internal/service/atm_portal_profile.go`](../../backend/internal/service/atm_portal_profile.go) | 4 | - | `atm-portal` |
+| [`pkg/csvexport/entities.go`](../../pkg/csvexport/entities.go) | 4 | - | `export-data` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

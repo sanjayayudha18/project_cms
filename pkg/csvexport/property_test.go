@@ -87,7 +87,7 @@ func FuzzWriterRoundTrip(f *testing.F) {
 }
 
 func TestImportableAndExportOnlyNames(t *testing.T) {
-	want := []string{ATMAssignments, ATMs, VendorBranches, VendorPICs, VendorVaults, Vendors}
+	want := []string{ATMAssignments, ATMs, CashCountPICs, VendorBranches, VendorPICs, VendorVaults, Vendors}
 	if got := ImportableNames(); !slices.Equal(got, want) {
 		t.Errorf("ImportableNames = %v, want %v", got, want)
 	}
@@ -144,6 +144,8 @@ func TestCellsMatchHeaderAndFirstColumn(t *testing.T) {
 		VendorPICs:     {VendorPICCells(VendorPICRow{ID: 7}), "id", "7"},
 		ATMs:           {ATMCells(ATMRow{ID: 7}), "id", "7"},
 		ATMAssignments: {ATMAssignmentCells(ATMAssignmentRow{ID: 7}), "id", "7"},
+		// No Cells helper: backend-exq builds the 4 cells inline (producers.go).
+		CashCountPICs: {[]string{"COORDINATOR", "u", "JKT", ""}, "pic_role", "COORDINATOR"},
 	}
 	if len(cases) != len(ImportableNames()) {
 		t.Fatalf("cells cases (%d) do not cover every importable entity", len(cases))

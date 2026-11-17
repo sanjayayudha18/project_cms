@@ -19,6 +19,9 @@ const (
 	DSRLocationMaps = "dsr-location-maps"
 	PackagePrices   = "package-prices"
 	VendorPks       = "vendor-pks"
+	// CashCountPICs: mapping PIC cash count (ScDD 5.1). Importable (replace-all, AC-5.1-11);
+	// export header = upload columns (AC-5.1-12).
+	CashCountPICs = "cash-count-pics"
 )
 
 // BOM lets Excel open the file as UTF-8. The importer strips it.

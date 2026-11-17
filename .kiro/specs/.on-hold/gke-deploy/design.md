@@ -577,7 +577,7 @@ Jendela: di luar 07:00–20:00 WIB dan di luar 05:00–09:00 WIB, mis. 22:00–0
 | `.kiro/steering/tech.md` | baris Container/Cloud: GKE + Kustomize; `deploy/k8s/`; Jenkins | 14.4 |
 | `.kiro/steering/structure.md` | folder `deploy/k8s/`, `scripts/k8s/`, `backend/Dockerfile.migrate` | 14.4 |
 | `.kiro/steering/project-context.md` Sec 8–9 | catatan "usang, lihat deployment.md" | 14.4 |
-| `.kiro/steering/development-plan.md` | X.14 status; X.13 "committed `cf53038`" | 14.4 |
+| `.claude/dev-plan/dev-plan.md` | X.14 status; X.13 "committed `cf53038`" | 14.4 |
 | `.claude/sdlc/.done/ci-jenkins/spec.md` | catatan kepala: FR5/S4 digantikan `deploy/k8s/deploy.sh` | 14.5 |
 | `.kiro/specs/backend-exq-deploy-readiness/requirements.md` | catatan kepala: Req 3–4 berlaku sampai cutover | 14.5 |
 | `backend_python/Dockerfile` | komentar mount `/FTP_DATA` | 14.6 |
@@ -749,6 +749,6 @@ Keputusan yang muncul saat menulis design, di luar D1–D31. Status: **menunggu 
 | `.claude/docs/deployment.md` | ubah | 4.6, 5.7, 5.9, 7.6, 8.7, 10, 11, 12, 13, 14.1 |
 | `.claude/CLAUDE.md` | ubah | 14.2 |
 | `.claude/docs/decisions.md` | ubah | 14.3 |
-| `.kiro/steering/{tech,structure,project-context,development-plan}.md` | ubah | 14.4 |
+| `.kiro/steering/{tech,structure,project-context}.md`, `.claude/dev-plan/dev-plan.md` | ubah | 14.4 |
 | `.claude/sdlc/.done/ci-jenkins/spec.md`, `.kiro/specs/backend-exq-deploy-readiness/requirements.md` | ubah (catatan kepala) | 14.5 |
 | `.claude/development-progress.md` | ubah (1 entri) | konvensi |

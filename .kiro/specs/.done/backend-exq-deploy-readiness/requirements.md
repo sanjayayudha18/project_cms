@@ -2,7 +2,7 @@
 
 > Status: **requirements disetujui PO 2026-11-04** (D1–D7 mengikuti saran Kiro). Design: `design.md`.
 > Tambahan setelah persetujuan, ditemukan saat menulis design (2026-11-04): definisi Root_User mencakup bentuk `user:grup`, Req 2.3 menghitung `HEALTHCHECK NONE` sebagai tidak ada, dan Req 3.6 (paragraf "Pipeline" mengklaim job frontend + E2E sudah ada, padahal belum).
-> Item rencana: X.3 (tech debt BE) dan prasyarat rilis X.7/X.8/X.9 di `.kiro/steering/development-plan.md`.
+> Item rencana: X.3 (tech debt BE) dan prasyarat rilis X.7/X.8/X.9 di `.claude/dev-plan/dev-plan.md`.
 
 ## Introduction
 
@@ -27,12 +27,12 @@ Fitur ekspor (X.7 `vendor-data-export`, X.8 `report-export-migration`, X.9 `expo
 | `deployment.md` bagian "IP client & proxy tepercaya" | `backend-exq` membaca `TRUSTED_PROXIES` tetapi belum memakainya | `TrustedRealIP` sudah dipasang; IP di audit ekspor bergantung padanya |
 | `deployment.md` bagian "Ukuran pool DB" | Hanya `backend` yang memakai pool replica; `backend-exq` hanya primary | `backend-exq` juga membuat pool replica bila `DATABASE_REPLICA_URL` diisi |
 | `backend-exq/.env.example` | Komentar `REDIS_URL` merujuk "root docker-compose.yml" | File itu tidak ada; Redis dan `cms-net` dibuat oleh `backend/docker-compose.yaml` |
-| `.kiro/steering/development-plan.md` known gaps | "`backend-exq` image still runs as root without HEALTHCHECK" | Sudah non-root dengan HEALTHCHECK sejak `540ee96` |
+| `.claude/dev-plan/dev-plan.md` known gaps | "`backend-exq` image still runs as root without HEALTHCHECK" | Sudah non-root dengan HEALTHCHECK sejak `540ee96` |
 
 ### Ruang lingkup
 
 - Job CI baru yang membuild image `backend` dan `backend-exq`, lalu memeriksa bahwa image berjalan sebagai non-root dan punya HEALTHCHECK.
-- Perbaikan pernyataan usang tentang `backend-exq` di `deployment.md`, `backend-exq/.env.example`, dan `development-plan.md`.
+- Perbaikan pernyataan usang tentang `backend-exq` di `deployment.md`, `backend-exq/.env.example`, dan `.claude/dev-plan/dev-plan.md`.
 - Checklist rilis untuk deploy pertama `backend-exq` di `deployment.md`.
 
 ### Tidak termasuk
@@ -56,7 +56,7 @@ Tidak ada perubahan logika uang, rekonsiliasi, maker-checker, atau migrasi data.
 - **DeploymentDoc**: `.claude/docs/deployment.md`.
 - **EXQ_ReleaseChecklist**: bagian baru di DeploymentDoc untuk deploy pertama `backend-exq`.
 - **EXQ_EnvExample**: `backend-exq/.env.example`.
-- **DevelopmentPlan**: `.kiro/steering/development-plan.md`.
+- **DevelopmentPlan**: `.claude/dev-plan/dev-plan.md`.
 - **Root_User**: nilai `Config.User` pada image yang membuat proses berjalan sebagai root: kosong, `root`, `0`, atau bentuk `user:grup` yang bagian user-nya `root` atau `0` (mis. `root:root`, `0:0`).
 
 ## Requirements
@@ -122,7 +122,7 @@ Tidak ada perubahan logika uang, rekonsiliasi, maker-checker, atau migrasi data.
 
 ### Requirement 6: Development plan sesuai kondisi
 
-**User Story:** Sebagai PO, saya ingin `development-plan.md` tidak lagi mencatat gap yang sudah tertutup, supaya prioritas berikutnya diambil dari data yang benar.
+**User Story:** Sebagai PO, saya ingin `.claude/dev-plan/dev-plan.md` tidak lagi mencatat gap yang sudah tertutup, supaya prioritas berikutnya diambil dari data yang benar.
 
 #### Acceptance Criteria
 

@@ -7,6 +7,8 @@ import { atmPortalRoute } from "./routes/atm-portal";
 import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { auditLogsRoute } from "./routes/audit-logs";
 import { cashCountRoute } from "./routes/cash-count/index";
+import { cashCountParametersRoute } from "./routes/cash-count/parameters";
+import { cashCountPicsRoute } from "./routes/cash-count/pics";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
 import { dsrLateReportRoute } from "./routes/dsr-late-report";
@@ -61,6 +63,8 @@ export const routeTree = rootRoute.addChildren([
     dmaaForecastRoute,
     invoiceRoute,
     cashCountRoute,
+    cashCountParametersRoute,
+    cashCountPicsRoute,
     eodMonitoringRoute,
     auditLogsRoute,
     settingsRoute,

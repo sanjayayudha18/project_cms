@@ -25,7 +25,7 @@ Tidak termasuk: cakupan per region; laporan realisasi parsial per cabang; notifi
 - **Auth/RBAC**: role baru + cakupan data vendor berubah di semua endpoint vendor dan guard kedua portal; `ADMIN_PARAM` kehilangan akses `/api/v1/admin/users` (D8). Risiko utama: tiket role lain atau cabang lain bocor ke akun yang salah, atau akun internal masuk VendorPortal.
 - **Skema**: migrasi `032_vendor_party_scope.sql` (role baru, FK komposit `users`, kolom peran `vendor_pics`). `022` tetap dicadangkan untuk vendor-pks-cis-limit.
 - **Deviasi terdokumentasi dari Golden Rule #3**: perubahan **peran PIC** lewat layar langsung berlaku (tanpa maker-checker) + audit dalam tx yang sama. Wajib dicatat di CLAUDE.md Sec 12.
-- **Pengecualian scope guard** (development-plan rule 2, "No new master-data features"): perubahan PIC vendor diizinkan eksplisit oleh PO untuk fitur ini.
+- **Pengecualian scope guard** (dev-plan rule 2, "No new master-data features"): perubahan PIC vendor diizinkan eksplisit oleh PO untuk fitur ini.
 
 ### Keputusan PO (2026-10-20)
 

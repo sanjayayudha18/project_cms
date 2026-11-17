@@ -155,7 +155,7 @@ Dependensi lintas grup: Sonnet 3.2 butuh Sonnet 4.1 (interface). Sonnet 7 butuh 
   - _Model: Sonnet, Medium — triase kegagalan gate._
 
 - [x] 15. Dokumentasi
-  - `.claude/CLAUDE.md` Sec 3 (kolom `master_data_import_batches.file_name`, mig `036`); `.kiro/steering/development-plan.md` (X.10 status, next free migration `037`, snapshot); `.claude/development-progress.md`; `.kiro/steering/rbac-role-feature-matrix.md` (judul menu "Impor CSV Data Master"); ganti status spec di header `requirements.md`/`design.md`.
+  - `.claude/CLAUDE.md` Sec 3 (kolom `master_data_import_batches.file_name`, mig `036`); `.claude/dev-plan/dev-plan.md` (X.10 status, next free migration `037`, snapshot); `.claude/development-progress.md`; `.kiro/steering/rbac-role-feature-matrix.md` (judul menu "Impor CSV Data Master"); ganti status spec di header `requirements.md`/`design.md`.
   - _Requirements: 2.1, 10.3_
   - _Model: Haiku, Low — edit dokumen mekanis._
 

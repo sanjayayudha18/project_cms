@@ -15,7 +15,7 @@ Order harian sekarang murni dari file DMAA. `backend_python/dmaa/dmaa_etl.py` me
 - Nominal DMAA tidak bisa diganti lewat list adjustment yang eksplisit.
 - Aturan URS "tidak ada order tambahan bila ATM sudah punya order emergency/adhoc sampai H-1 atau aktif di H0" tidak ditegakkan.
 
-Keputusan user 2026-10-08 menetapkan pekerjaan ini tugas CROWN, bukan DMAA. Roadmap: Phase 2.4 (`development-plan.md`). Sumber: URS v0.3 Phase 1 "ATM Cash Forecasting Harian" butir 1-2, FSD v1.0 (`.claude/docs/fsd-v1-alignment-2026-10-01.md` §5), `.claude/feature-flows/03-atm-cash-forecasting/feature-flow.md`.
+Keputusan user 2026-10-08 menetapkan pekerjaan ini tugas CROWN, bukan DMAA. Roadmap: Phase 2.4 (`.claude/dev-plan/dev-plan.md`). Sumber: URS v0.3 Phase 1 "ATM Cash Forecasting Harian" butir 1-2, FSD v1.0 (`.claude/docs/fsd-v1-alignment-2026-10-01.md` §5), `.claude/feature-flows/03-atm-cash-forecasting/feature-flow.md`.
 
 ### Kondisi kode saat ini (dicek 2026-11-02)
 

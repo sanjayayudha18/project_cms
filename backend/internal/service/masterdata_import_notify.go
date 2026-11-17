@@ -37,6 +37,7 @@ var importEntityLabels = map[string]string{
 	ExportVendorPICs:     "PIC vendor",
 	ExportATMs:           "ATM",
 	ExportATMAssignments: "Kelolaan ATM",
+	ExportCashCountPICs:  "Mapping PIC cash count",
 }
 
 // importNotifyQuerier is what the notifier reads from the DB on top of what

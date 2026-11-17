@@ -182,6 +182,15 @@ func TestHeadersMatchCSVExport(t *testing.T) {
 	}
 	for _, e := range csvexport.ImportableNames() {
 		want, _ := csvexport.Lookup(e)
+		if e == csvexport.CashCountPICs { // own kind, never global (AC-5.1-14)
+			if !slices.Equal(m[KindCashCountPics][e].Header(), want.ExportHeader()) {
+				t.Errorf("%s header differs", e)
+			}
+			if _, inGlobal := m[KindMasterDataGlobal][e]; inGlobal {
+				t.Errorf("%s must not be in the global kind", e)
+			}
+			continue
+		}
 		if !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.ExportHeader()) {
 			t.Errorf("%s header differs", e)
 		}
@@ -439,3 +448,13 @@ func TestErrorsPropagate(t *testing.T) {
 func (*fakeQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
 	return nil, nil
 }
+
+func (f *fakeQ) ExportCashCountPicsBatch(_ context.Context, a repository.ExportCashCountPicsBatchParams) ([]repository.ExportCashCountPicsBatchRow, error) {
+	f.calls = append(f.calls, a)
+	var out []repository.ExportCashCountPicsBatchRow
+	for _, id := range ids(a.AfterID, f.n) {
+		out = append(out, repository.ExportCashCountPicsBatchRow{ID: id, PicRole: "COORDINATOR", Username: "u", RegionCode: "JKT"})
+	}
+	return out, f.err
+}
+func (f *fakeQ) CountCashCountPics(context.Context, string) (int64, error) { return int64(f.n), f.err }

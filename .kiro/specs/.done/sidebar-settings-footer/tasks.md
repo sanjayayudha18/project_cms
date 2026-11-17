@@ -56,7 +56,7 @@ Urutan: ubah penanda lokasi di NavConfig dulu (type `NavPlacement` dipakai kompo
   - `pnpm --dir frontend/CompanyPortal-Vite run lint`, `run test:coverage` (84/80/80/85), `run build`.
   - `pnpm --dir frontend/CompanyPortal-Vite exec tsc -b tsconfig.test.json`: tidak ada error baru di file yang disentuh (baseline di design.md Testing Strategy; 138 error lama di file lain bukan cakupan spec ini).
   - Tambah catatan "disupersede oleh `sidebar-settings-footer`" di `app-shell-revamp/requirements.md` untuk Req 2.3, 4.3 (EnvBadge), 5.1–5.4, 10.1–10.3.
-  - Perbarui baris X.1 di `development-plan.md` (Status snapshot) bahwa follow-up ini selesai.
+  - Perbarui baris X.1 di `.claude/dev-plan/dev-plan.md` (Status snapshot) bahwa follow-up ini selesai.
   - Cek browser manual oleh user: Expanded/Rail, ADMIN vs ATM-USER, tooltip Pengaturan di Rail tidak terpotong tepi Sidebar.
   - Status 2026-10-27: ✅ lint, test:coverage (85.7/81.62/82.17/86.77), build + `check-bundle.mjs`, tsc test 138 (= baseline), catatan supersede, baris X.1. ⏳ **Outstanding (user, GR#10): cek browser manual** — karena itu task 4 belum dicentang.
   - _Requirements: 4.2_
@@ -66,7 +66,7 @@ Urutan: ubah penanda lokasi di NavConfig dulu (type `NavPlacement` dipakai kompo
 
 - D2 ✅ (PO 2026-10-27): EnvBadge dihapus di semua lingkungan, tanpa teks info lingkungan.
 - D4 ✅ (PO 2026-10-27): catatan supersede di `app-shell-revamp/requirements.md` dikerjakan di task 4.
-- Masuk di bawah X.1 (app-shell-revamp) di `development-plan.md`; tidak perlu item baru.
+- Masuk di bawah X.1 (app-shell-revamp) di `.claude/dev-plan/dev-plan.md`; tidak perlu item baru.
 - Tidak menyentuh VendorPortal, backend, atau route guard `/settings`.
 
 ### Definition of Done

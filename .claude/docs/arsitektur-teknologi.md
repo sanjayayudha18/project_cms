@@ -300,4 +300,4 @@ Response envelope Python: `{status, data, error}` (berbeda dari Go). Host/contai
 - **Versi TanStack Router berbeda** antar portal (CP ^1.170.44, VP ^1.93.0), dan VendorPortal belum memakai kontrak OpenAPI.
 - **Zustand terpasang di VendorPortal tapi tidak dipakai** (auth VP memakai React Context).
 - **Frontend belum masuk CI.**
-- Beberapa layar masih mock (lihat A9) dan baru disambungkan oleh item fase pemiliknya di `development-plan.md`.
+- Beberapa layar masih mock (lihat A9) dan baru disambungkan oleh item fase pemiliknya di `.claude/dev-plan/dev-plan.md`.

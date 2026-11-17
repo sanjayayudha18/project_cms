@@ -23,6 +23,9 @@ type KindSpec struct {
 
 var masterDataAdmin = []string{"ADMIN", "ADMIN_PARAM"}
 
+// cashCountPicRoles: the maker of cash_count_pic (CC-CWM, see entityMakerRoles); ADMIN is not one (AC-5.1-14).
+var cashCountPicRoles = []string{"CC-CWM"}
+
 func idOrZero(p *int64) int64 {
 	if p == nil {
 		return 0
@@ -54,6 +57,8 @@ var KindSpecs = map[Kind]KindSpec{
 	KindCabang:           {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: branchRef},
 	KindHargaPaket:       {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: priceRef},
 	KindMasterDataGlobal: {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: globalRef},
+
+	KindCashCountPics: {Roles: cashCountPicRoles, DownloadAction: ActionMasterDataExported, EntityRef: globalRef},
 
 	KindDsrLateDaily:   {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},
 	KindDsrLateSummary: {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},

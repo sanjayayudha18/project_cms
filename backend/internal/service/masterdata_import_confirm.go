@@ -37,6 +37,8 @@ type ImportServices struct {
 	PICs        *VendorPicAdminService
 	ATMs        *ATMAdminService
 	Assignments *ATMAssignmentAdminService
+	// CashCountPICs stages the replace-all mapping PIC import (ScDD 5.1); nil = not wired.
+	CashCountPICs *CashCountPicAdminService
 }
 
 // ImportBatchStore stages a whole import file atomically. *repository.MasterDataImportBatchRepository satisfies it.
@@ -107,13 +109,13 @@ func (c *importCollector) Submit(_ context.Context, _ int64, req SubmitRequest, 
 // attempt died between staging and submitting). Nothing changes until the
 // approval passes; then every row is applied in one transaction.
 func (i *MasterDataImporter) Confirm(ctx context.Context, makerID int64, entity, fileName string, r io.Reader, actorIP string) (*ImportConfirmResult, error) {
-	if err := authorizeMasterDataMaker(ctx, makerID); err != nil {
+	if err := authorizeMasterDataMakerFor(ctx, makerID, importEntityType(entity)); err != nil {
 		return nil, err
 	}
 	if i.confirm == nil {
 		return nil, errors.New("import confirm is not configured")
 	}
-	if _, ok := exportSpecs[entity]; !ok {
+	if _, ok := exportSpecs[entity]; !ok && entity != ExportCashCountPICs {
 		return nil, ErrExportUnknownEntity
 	}
 	data, err := io.ReadAll(io.LimitReader(r, MasterDataImportMaxBytes+1))
@@ -252,7 +254,7 @@ func rowRejection(row int, err error) error {
 		return &ImportInvalidError{Errors: []ImportRowError{{Row: row, Field: ve.Field, Message: ve.Message}}}
 	}
 	for _, known := range []error{ErrVendorCodeConflict, ErrATMTerminalIDConflict, ErrATMAssignmentOverlap, ErrATMAssignmentDuplicate, ErrATMAssignmentSourceInvalid,
-		ErrVendorVaultCodeConflict, ErrATMNotFound, ErrATMInvalidReference} {
+		ErrVendorVaultCodeConflict, ErrATMNotFound, ErrATMInvalidReference, ErrCashCountPicConflict, ErrCashCountPicNotFound} {
 		if errors.Is(err, known) {
 			return &ImportInvalidError{Errors: []ImportRowError{{Row: row, Field: "row", Message: err.Error()}}}
 		}
@@ -274,6 +276,9 @@ func optInt64(s string) *int64 {
 // stageRow runs one validated row through the matching entity service (which
 // re-validates and records its change on the collector).
 func stageRow(ctx context.Context, makerID int64, entity string, row ImportRow, env *importEnv, s ImportServices, ip string) error {
+	if entity == ExportCashCountPICs {
+		return stageCashCountPic(ctx, makerID, row, s, ip)
+	}
 	switch {
 	case row.Op == ImportOpCreate:
 		return stageCreate(ctx, makerID, entity, row.Cells, env, s, ip)

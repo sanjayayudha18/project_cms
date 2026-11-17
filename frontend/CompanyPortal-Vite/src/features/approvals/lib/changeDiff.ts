@@ -15,6 +15,11 @@ export const ENTITY_LABELS: Record<string, string> = {
   atm_assignment: "Kelolaan ATM",
   dsr_location_map: "Mapping lokasi DSR",
   vendor_pks: "PKS vendor",
+  cash_count_category_params: "Parameter kategori cash count",
+  cash_count_anomaly_category: "Kategori anomali cash count",
+  cash_count_checklist_item: "Item checklist cash count",
+  cash_count_area: "Area cash count",
+  cash_count_pic: "PIC cash count",
 };
 
 export const OP_LABELS: Record<MasterDataOp, string> = {

@@ -364,7 +364,7 @@ COMMENT ON COLUMN public.master_data_import_batches.file_name IS
 COMMIT;
 ```
 
-Diterapkan dengan `go run ./cmd/migrate up` (Req 10.3). Setelah diterapkan, catat di `.claude/CLAUDE.md` Sec 3 dan `development-plan.md` (next free → `037`).
+Diterapkan dengan `go run ./cmd/migrate up` (Req 10.3). Setelah diterapkan, catat di `.claude/CLAUDE.md` Sec 3 dan `.claude/dev-plan/dev-plan.md` (next free → `037`).
 
 ### Tidak ada tabel baru
 
@@ -500,4 +500,4 @@ Browser: impor tiap entitas, riwayat, detail, retry (dengan memaksa commit gagal
 - `src/features/rbac-settings/components/SettingsHubPage.tsx`
 
 **Docs**
-- `.claude/CLAUDE.md` Sec 3 (kolom baru), `.kiro/steering/development-plan.md` (X.10, next free migration), `.claude/development-progress.md`, `.kiro/steering/rbac-role-feature-matrix.md` (judul menu)
+- `.claude/CLAUDE.md` Sec 3 (kolom baru), `.claude/dev-plan/dev-plan.md` (X.10, next free migration), `.claude/development-progress.md`, `.kiro/steering/rbac-role-feature-matrix.md` (judul menu)

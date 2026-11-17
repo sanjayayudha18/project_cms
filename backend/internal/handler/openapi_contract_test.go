@@ -87,11 +87,21 @@ func TestOpenAPIContract_RouteCoverage(t *testing.T) {
 		"/vendor/replenish-orders":      NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
 		"/dsr-late-reports":             NewDsrLateHandler(&contractDsrLate{}).Routes(),
 		"/admin/vendors/{vendorID}/pks": NewAdminVendorPksHandler(&contractPksSvc{}).Routes(),
+		// cash-count (ScDD 5.1): the import mount only documents dry-run/confirm, not the batch history
+		"/cash-count/category-params":    NewCashCountCategoryParamsHandler(ccParamsSvc{}).Routes(),
+		"/cash-count/anomaly-categories": NewCashCountAnomalyCategoryHandler(ccAnomalySvc{}).Routes(),
+		"/cash-count/checklist-items":    NewCashCountChecklistItemHandler(ccChecklistSvc{}).Routes(),
+		"/cash-count/areas":              NewCashCountAreaHandler(ccAreaSvc{}).Routes(),
+		"/cash-count/pics":               NewCashCountPicHandler(ccPicSvc{}).Routes(),
+		"/cash-count/import":             NewAdminMasterDataImportHandler(ccImportSvc{}).Routes(),
 	}
 	for prefix, routes := range mounted {
 		t.Run(prefix, func(t *testing.T) {
 			var code []string
 			err := chi.Walk(routes, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+				if prefix == "/cash-count/import" && strings.HasPrefix(route, "/batches") {
+					return nil
+				}
 				code = append(code, method+" "+strings.TrimSuffix(prefix+route, "/"))
 				return nil
 			})
@@ -130,13 +140,15 @@ type contractCase struct {
 	orders     *contractOrderSvc
 	dsrLate    *contractDsrLate
 	pks        *contractPksSvc
+	cc         *contractCC // cash-count fakes (cash_count_contract_test.go)
+	ctype      string      // Content-Type override (multipart uploads); "" = JSON
 	wantStatus int
 }
 
 func TestOpenAPIContract_Responses(t *testing.T) {
 	doc, router := loadContract(t)
 	covered := map[string]bool{}
-	for _, tc := range contractCases() {
+	for _, tc := range contractCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			rec, req := serveContractCase(t, tc)
 			if route, _, err := router.FindRoute(req); err == nil {
@@ -226,8 +238,13 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 	}
 	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/admin/vendors/{vendorID}/pks", NewAdminVendorPksHandler(pks).Routes())
 
+	mountCashCount(r, ts, tc.cc, false)
+
 	req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 	req.Header.Set("Content-Type", "application/json")
+	if tc.ctype != "" {
+		req.Header.Set("Content-Type", tc.ctype)
+	}
 	switch tc.role {
 	case "":
 	case "VENDOR":
@@ -533,7 +550,7 @@ func contractPksCases() []contractCase {
 	return cases
 }
 
-func contractCases() []contractCase {
+func contractCases(t *testing.T) []contractCase {
 	vr, vo, dl := contractVRBase, contractVOBase, contractDLBase
 	full, minimal := contractDetailFull(), contractDetailMinimal()
 	detail := func(d *service.VendorRequestDetail) *fakeVendorRequestServicer {
@@ -619,7 +636,7 @@ func contractCases() []contractCase {
 		{name: "vault assignments", method: http.MethodGet, path: vr + "/1/vault-assignments", role: "ATM-USER",
 			vault: &fakeVaultReviewer{review: contractVaultPlan()}, wantStatus: 200},
 		{name: "vault assignments minimal plan", method: http.MethodGet, path: vr + "/1/vault-assignments", role: "ATM-USER",
-			vault: &fakeVaultReviewer{review: &service.VaultPlanDetail{Plan: db.GetVaultPlanRow{ID: 4}, Allocations: []service.VaultAllocationView{}}},
+			vault:      &fakeVaultReviewer{review: &service.VaultPlanDetail{Plan: db.GetVaultPlanRow{ID: 4}, Allocations: []service.VaultAllocationView{}}},
 			wantStatus: 200},
 		{name: "vault assignments no plan", method: http.MethodGet, path: vr + "/1/vault-assignments", role: "ATM-USER", wantStatus: 200},
 		{name: "vault approve", method: http.MethodPost, path: vr + "/1/vault-approve", role: "ATM-SPV", vr: detail(full), wantStatus: 200},
@@ -646,7 +663,7 @@ func contractCases() []contractCase {
 		{name: "orders list bad status", method: http.MethodGet, path: vo + "?party_status=x", role: "VENDOR", wantStatus: 422},
 		{name: "order get full", method: http.MethodGet, path: vo + "/7", role: "VENDOR", wantStatus: 200},
 		{name: "order get minimal", method: http.MethodGet, path: vo + "/7", role: "VENDOR",
-			orders: &contractOrderSvc{detail: &service.VendorOrderDetail{VendorOrderSummary: service.VendorOrderSummary{ID: 7, Role: "vault", Status: "pending", Currency: "IDR"}}},
+			orders:     &contractOrderSvc{detail: &service.VendorOrderDetail{VendorOrderSummary: service.VendorOrderSummary{ID: 7, Role: "vault", Status: "pending", Currency: "IDR"}}},
 			wantStatus: 200},
 		{name: "order get not found", method: http.MethodGet, path: vo + "/7", role: "VENDOR",
 			orders: &contractOrderSvc{err: service.ErrVendorOrderNotFound}, wantStatus: 404},
@@ -685,6 +702,7 @@ func contractCases() []contractCase {
 		{name: "dsr late vendor role denied", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "VENDOR", wantStatus: 403},
 	}
 	cases = append(cases, contractPksCases()...)
+	cases = append(cases, contractCashCountCases(t)...)
 	// every handleError class once, on a route that reaches it
 	for _, e := range []struct {
 		name   string

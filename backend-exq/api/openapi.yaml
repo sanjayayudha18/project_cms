@@ -172,6 +172,39 @@ paths:
         '500': { $ref: '#/components/responses/Internal' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
+  /exports/cash-count-pics:
+    post:
+      operationId: requestCashCountPicsExport
+      summary: Request the cash count PIC mapping export (kind cash_count_pics, role CC-CWM)
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+      responses:
+        '200': { $ref: '#/components/responses/JobExisting' }
+        '202': { $ref: '#/components/responses/JobCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyExports' }
+        '500': { $ref: '#/components/responses/Internal' }
+
+  /exports/preview/cash-count-pics:
+    get:
+      operationId: previewCashCountPicsExport
+      summary: Preview page of the rows requestCashCountPicsExport would export
+      tags: [exports]
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/PreviewAfter'
+        - $ref: '#/components/parameters/PreviewLimit'
+      responses:
+        '200': { $ref: '#/components/responses/Preview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/Internal' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   /exports/reports/dsr-late-daily:
     post:
       operationId: requestDsrLateDailyExport

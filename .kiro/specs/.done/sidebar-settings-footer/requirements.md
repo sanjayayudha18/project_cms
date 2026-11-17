@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Penyesuaian kecil pada shell CompanyPortal-Vite hasil `app-shell-revamp` (X.1 di `development-plan.md`):
+Penyesuaian kecil pada shell CompanyPortal-Vite hasil `app-shell-revamp` (X.1 di `.claude/dev-plan/dev-plan.md`):
 
 1. Menu **Pengaturan** pindah dari grup ikon Topbar ke **bagian paling bawah Sidebar** (footer, di atas tombol "Ciutkan menu").
 2. Kartu **EnvBadge** ("LINGKUNGAN" / "PRODUKSI · v0.1.0") di footer Sidebar dihapus.

@@ -17,7 +17,12 @@ type PendingEntityType =
   | "vendor_pic"
   | "vendor_package"
   | "vendor_package_price"
-  | "dsr_location_map";
+  | "dsr_location_map"
+  | "cash_count_category_params"
+  | "cash_count_anomaly_category"
+  | "cash_count_checklist_item"
+  | "cash_count_area"
+  | "cash_count_pic";
 
 interface PendingChange {
   id: number;

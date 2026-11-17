@@ -1,8 +1,8 @@
 # Assessment — Cash Management: Cash Count, Monitoring & Balance Recap
 
 > Development-readiness assessment for the **Cash Count** module (`internal/cashcount`) and its two companion concerns — **monitoring** (daily progress + monthly report) and **balance recap** (3-way reconciliation + vendor performance).
-> Status: draft assessment · Date: 2026-09-28 · Target phase: **Phase 5** (`development-plan.md`, currently parked).
-> Sources: URS v0.3 Phase 1 (FNC 002 + FNC 003), `feature-flows/08-cash-count-vault`, `feature-flows/09-cash-count-selektif-mesin`, `project-context.md`, `development-plan.md`, `rbac-role-feature-matrix.md`, and inspection of the actual code.
+> Status: draft assessment · Date: 2026-09-28 · Target phase: **Phase 5** (`.claude/dev-plan/dev-plan.md`, currently parked).
+> Sources: URS v0.3 Phase 1 (FNC 002 + FNC 003), `feature-flows/08-cash-count-vault`, `feature-flows/09-cash-count-selektif-mesin`, `project-context.md`, `.claude/dev-plan/dev-plan.md`, `rbac-role-feature-matrix.md`, and inspection of the actual code.
 
 ---
 
@@ -16,7 +16,7 @@ This is the **Cash Count** function (URS FNC 002) plus the slice of the **Dashbo
 
 **Current state:** the module is **not built**. Backend `internal/cashcount` does not exist (`backend/internal/` holds only approval, audit, auth, db, handler, repository, rolemgmt, service). No cash-count tables are migrated (`cash_count_schedules` / `cash_count_evidences` names are approved-as-proposal only; migrations stop at `018`, next free `019`). The frontend has a real route `/cash-count` (`routes/cash-count/index.tsx`) but it renders six **disabled** module cards (Penjadwalan, Analisis Tier Saldo, Pelaksanaan (BA), Checklist, Rekonsiliasi, Rekapitulasi) — no `features/cash-count` folder, no API, no data. Nav entries and cash-count roles exist in the RBAC matrix. What is real: the requirements, two feature-flow diagrams, the roadmap item, the route shell, and the RBAC wiring.
 
-**Readiness to start:** ⚠️ **Not ready to work on now.** Per `development-plan.md` this is **Phase 5 (parked)**, gated behind Phase 2 (ATM ops), Phase 0.3/0.4 (notification + document infra), and **Phase 4** (`internal/corebanking` escrow ingest) — the escrow feed is a hard input for both the tier analysis and the 3-way reconciliation, and it does not exist yet.
+**Readiness to start:** ⚠️ **Not ready to work on now.** Per `.claude/dev-plan/dev-plan.md` this is **Phase 5 (parked)**, gated behind Phase 2 (ATM ops), Phase 0.3/0.4 (notification + document infra), and **Phase 4** (`internal/corebanking` escrow ingest) — the escrow feed is a hard input for both the tier analysis and the 3-way reconciliation, and it does not exist yet.
 
 ---
 
@@ -90,7 +90,7 @@ To be confirmed & migrated (starting at `019`); money = numeric/integer minor un
 - **Supervision instruction** table/columns — for selective machine counts (who issued, target ATMs).
 - References to `documents` (surat tugas, final bundle), `notifications`, and `audit_logs` (every transition).
 
-> All names/columns above are **proposals**. Cash-count column design is explicitly deferred to the Phase 5 spec (`development-plan.md` Resolved decision #4). Submit final schema to `project-context.md` Sec 2 when applied (schema is mutable at this stage, Sec 0a). **STOP & flag** on the money/count and reconciliation tables.
+> All names/columns above are **proposals**. Cash-count column design is explicitly deferred to the Phase 5 spec (`.claude/dev-plan/dev-plan.md` Resolved decision #4). Submit final schema to `project-context.md` Sec 2 when applied (schema is mutable at this stage, Sec 0a). **STOP & flag** on the money/count and reconciliation tables.
 
 ---
 
@@ -131,7 +131,7 @@ escrow status (per escrow): not_complete -> on_progress -> complete
 
 ## 8. Recommendations & Model per Stage
 
-Suggested order (aligned with `development-plan.md`; do not start before Phase 2 + Phase 4 land):
+Suggested order (aligned with `.claude/dev-plan/dev-plan.md`; do not start before Phase 2 + Phase 4 land):
 
 1. **Clear the blockers first** — Phase 2 (ATM ops) → Phase 0.3/0.4 (notification + document) → Phase 4 (escrow ingest). Do not start Phase 5 before the escrow feed exists.
 2. **Answer the open questions**, especially the risk-tier formula and escrow field contract.

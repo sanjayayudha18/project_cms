@@ -72,7 +72,7 @@ Jalankan saat menulis maupun me-review spec:
 - [ ] Setiap keputusan PO (D1…Dn) tercermin di requirement dan task yang relevan.
 - [ ] Model Split cocok dengan catatan `_Model:_` per task; setiap task muncul tepat di satu grup.
 - [ ] Task Dependency Graph memuat **setiap** leaf task (termasuk checkpoint, test opsional `*`, dan task penutup) tepat satu kali, tanpa ID hantu, dan setiap task berada di wave setelah semua dependensinya. Cek: daftar semua checkbox `- [ ] N.` / `- [ ] N.M` di `## Tasks` (parent dengan sub-task diganti sub-task-nya), bandingkan dengan gabungan ID di `waves`; selisih harus kosong di dua arah.
-- [ ] Nomor migrasi yang dirujuk belum terpakai di `backend/migrations/` (cek file terakhir; `development-plan.md` bisa basi).
+- [ ] Nomor migrasi yang dirujuk belum terpakai di `backend/migrations/` (cek file terakhir; `.claude/dev-plan/dev-plan.md` bisa basi).
 - [ ] Grep folder spec untuk istilah/ID lama setelah rename. Catatan: sub-nomor criteria tampil sebagai nomor list (`5.`), jadi `grep "14.5"` bisa kosong walau criterion ada; hitung item di bawah heading requirement.
 
 Cara cepat memeriksa cakupan: daftar semua ID `N.M` dari requirements (hitung item list per `### Requirement N`), lalu bandingkan dengan gabungan semua angka di baris `_Requirements:_` tasks.md. Selisihnya = requirement yang missing.

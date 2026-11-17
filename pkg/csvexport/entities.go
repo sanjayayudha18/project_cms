@@ -108,6 +108,12 @@ var importable = map[string]Entity{
 		LegacyHeaders: [][]string{{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"}},
 		LegacyFill:    map[string]string{"package_source": AssignmentSourceBranch},
 	},
+	// Mapping PIC cash count (ScDD 5.1): upload = replace-all, export via backend-exq kind
+	// cash_count_pics only (never the global master-data kind).
+	CashCountPICs: {
+		Name:   CashCountPICs,
+		Header: []string{"pic_role", "username", "region_code", "area_code"},
+	},
 }
 
 var exportOnly = map[string]Entity{

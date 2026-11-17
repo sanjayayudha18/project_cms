@@ -59,7 +59,7 @@ Pola rujukan: `FilterSelect` yang sudah dipakai `BranchSelect` untuk `VendorSele
   - _Model: Sonnet, Effort: Medium — triase kegagalan lint/coverage._
 
 - [x] 7. Dokumen
-  - `.kiro/steering/development-plan.md`: follow-up `export-preview-simplify` di bawah X.9 (D5) + status snapshot
+  - `.claude/dev-plan/dev-plan.md`: follow-up `export-preview-simplify` di bawah X.9 (D5) + status snapshot
   - `.claude/development-progress.md`: entri perubahan
   - `.kiro/specs/export-menu-revamp/requirements.md`: catatan di kepala bahwa Req 5.1 dan 5.9 digantikan `export-preview-simplify`
   - _Requirements: 3.1, 4.1_

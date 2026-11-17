@@ -120,6 +120,19 @@ Spec: `.kiro/specs/vendor-pks/` (design "Data Models", D1–D32). Migrations `02
 *   **Export**: `export_jobs.kind = 'vendor_pks'` (migration 037), report params `q`, `status`, `pks_status`. Served by `backend-exq` at `POST /exports/reports/vendor-pks`.
 *   **Query note (sqlc v1.31.1)**: `ListVendorsAdmin` and `ExportVendorPksBatch` wrap `validity_months` and `remaining_days` in COALESCE to 0, and `pks_status` to `''`, because sqlc types these function/cast results as NOT NULL. A NULL meaning is "no active PKS" (`pks_id IS NULL`) or an INTERNAL vendor. The status filter uses the raw function, not the COALESCEd column.
 
+## Cash count parameters (migration 041)
+
+Source: ScDD phase 5.1 `.claude/dev-plan/plan-perscope/dev-phase-perscope/5-cash-count/5.1-parameter.md` (gate 1 accepted 2026-11-12). File: `backend/migrations/041_cash_count_parameters.sql` (one tx, forward-only). Applied to dev 2026-11-13 via `go run ./cmd/migrate up` (40 applied, 0 pending). Next free number: `042`. The shapes below replace the draft in section B (items 2–3) of the FSD proposal.
+
+- **Roles and menus**: 7 roles `CC-CWM`, `CC-COORDINATOR`, `CC-EXECUTOR`, `CC-CCR`, `CC-RECON`, `CC-D3`, `CC-D2`. Menus `cash-count.parameters` ("Parameter Cash Count") and `cash-count.pic-mapping` ("Mapping PIC") sit under the existing `cash-count` menu (id 7).
+- **`cash_count_category_params`**: one row = one whole set, not one row per category, so the H/M/L boundaries cannot gap or overlap. Columns: `medium_min_amount`, `medium_max_amount` numeric(20,2); `currency_code` fixed `IDR`; `onsite_high`/`onsite_medium`/`onsite_low` smallint 0–6; `period_months` fixed 6; `created_by`, `effective_from`, `superseded_at`. CHECK min > 0 and min < max. Partial unique on `superseded_at IS NULL` = exactly one active set. Seed: 5.000.000.000,00 / 15.000.000.000,00, onsite 3/2/1. Versioned, so it is excluded from `no_hard_delete_test.go`.
+- **`cash_count_anomaly_categories`**: `code` unique (`^[A-Z0-9_]{2,20}$`), `name` 1–100, `description` optional ≤ 500, soft delete.
+- **`cash_count_checklist_items`**: `category` `SELECTED_MACHINE` | `NON_MACHINE`; `day` `DAY1` | `DAY2`, required only for `SELECTED_MACHINE`; `point_no` > 0; `item_text` 1–500. Partial unique on (category, day, point_no) WHERE active. **No seed rows** (AC-07): the table is empty until the user fills it.
+- **`cash_count_areas`** + **`cash_count_area_regions`**: `region_code` is the PK of the link table, so one region belongs to at most one area. The link table is rewritten by the area applier and is excluded from `no_hard_delete_test.go` (same as `branch_coverage_areas`). Region source = `vendor_branches.region_code`, not `regions`. Disabling an area also deletes its link rows.
+- **`cash_count_pics`**: `pic_role` `COORDINATOR` (needs `region_code`, no `area_id`) or `EXECUTOR` (needs `area_id`, no `region_code`), enforced by CHECK. Partial unique on active (role, user, region/area).
+- **`export_jobs`**: kind `cash_count_pics` added to `export_jobs_kind_chk`.
+- Extra FKs/indexes/triggers beyond the design: `region_code` format CHECK on `cash_count_pics` (same as `vendor_branches`), `superseded_at >= effective_from`, FK indexes, `set_updated_at` trigger, `btrim` on names and codes.
+
 ## Proposed — FSD v1.0 (2026-10-01) — NOT approved, NOT migrated
 
 > **Update 2026-11-05**: the PKS rows in section A below (`vendors.director_*`, `vendors.pks_*`) are superseded by `vendor_pks` and `vendor_pics.is_director` (section above, D32). The `vendor_branches.cis_limit_*` and `vendor_vaults.escrow_account` rows are not migrated yet; they belong to the split-off `vendor-cis-limit` intent.

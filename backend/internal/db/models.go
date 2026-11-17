@@ -214,6 +214,74 @@ type BranchCoverageArea struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type CashCountAnomalyCategory struct {
+	ID          int64              `json:"id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	IsActive    bool               `json:"is_active"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountArea struct {
+	ID        int64              `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountAreaRegion struct {
+	RegionCode string             `json:"region_code"`
+	AreaID     int64              `json:"area_id"`
+	CreatedBy  int64              `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Set ambang kategori vault H/M/L cash count (5.1). saldo < medium_min -> LOW; medium_min <= saldo <= medium_max -> MEDIUM; saldo > medium_max -> HIGH. onsite_* = kunjungan onsite per period_months (6). Berversi: superseded_at NULL = set aktif. Migrasi 041.
+type CashCountCategoryParam struct {
+	ID              int64              `json:"id"`
+	MediumMinAmount pgtype.Numeric     `json:"medium_min_amount"`
+	MediumMaxAmount pgtype.Numeric     `json:"medium_max_amount"`
+	CurrencyCode    string             `json:"currency_code"`
+	OnsiteHigh      int16              `json:"onsite_high"`
+	OnsiteMedium    int16              `json:"onsite_medium"`
+	OnsiteLow       int16              `json:"onsite_low"`
+	PeriodMonths    int16              `json:"period_months"`
+	CreatedBy       int64              `json:"created_by"`
+	EffectiveFrom   pgtype.Timestamptz `json:"effective_from"`
+	SupersededAt    pgtype.Timestamptz `json:"superseded_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type CashCountChecklistItem struct {
+	ID        int64              `json:"id"`
+	Category  string             `json:"category"`
+	Day       *string            `json:"day"`
+	PointNo   int16              `json:"point_no"`
+	ItemText  string             `json:"item_text"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountPic struct {
+	ID         int64              `json:"id"`
+	PicRole    string             `json:"pic_role"`
+	UserID     int64              `json:"user_id"`
+	RegionCode *string            `json:"region_code"`
+	AreaID     *int64             `json:"area_id"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Kantor cabang CIMB tempat ATM internal berdiri. Diisi dari 300 baris ROH_0xx di vendor_branches (migrasi 010). Bukan cabang vendor. Migrasi 009.
 type CimbBranch struct {
 	ID         int64  `json:"id"`

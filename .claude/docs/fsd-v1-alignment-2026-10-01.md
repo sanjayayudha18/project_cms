@@ -8,7 +8,7 @@ Source document: `DSR End To End Cash Management V01.docx` (repo root) — FSD "
 
 | # | Topic | Before (URS) | Now (FSD) | Code impact |
 |---|---|---|---|---|
-| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | None — **superseded 2026-10-08**: CROWN does no forecasting; DMAA `amount_replenish` is final (CLAUDE.md Sec 3a) |
+| 1 | Order ATM formula | `(Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)` | `Forecast Replenish = Forecast Amount − Saldo DSR + Forecast Refund` | FSD step 8 applies again — **decided 2026-11-12** (user): CROWN adjusts the DMAA nominal with the DSR (CLAUDE.md Sec 3a); the 2026-10-08 "DMAA final" decision is superseded |
 | 2 | Cash count reconciliation | In-system 3-way (cash count vs escrow H-1 vs proofing) | CROWN builds the recap report → reconciliation runs externally in **Rec 7** | None (`internal/cashcount` not built) |
 | 3 | Master data upload | Upsert, all-or-nothing batch, one approval | **Replace-all**; rejected records corrected + re-uploaded; checker approves only clean data | **Yes** — `backend/internal/service/masterdata_import*.go`; needs AI-DLC (Sec 4 #7) |
 | 4 | Pemenuhan dana | Surat tugas, KTP/NIP, maker-checker on officer data | Head approval → ACM Branch Coordinator (escrow H-1, manual pindah buku in BDS) → Vendor Receiver/Provider pickup with employee ID + plate validation | None (not built) |
@@ -26,7 +26,7 @@ Source document: `DSR End To End Cash Management V01.docx` (repo root) — FSD "
 | `.claude/feature-flows/03-atm-cash-forecasting/feature-flow.md` | Formula + diagram |
 | `.claude/feature-flows/04-pemenuhan-pengambilan-dana/feature-flow.md` | Rewritten to the FSD flow |
 | `.claude/feature-flows/08-cash-count-vault/feature-flow.md` | Rules, category flow, scheduling flow, Rec 7 flow |
-| `.kiro/steering/development-plan.md` | Phase 2.1 formula + 2026-09-25 decision marked superseded |
+| `.claude/dev-plan/dev-plan.md` | Phase 2.1 formula + 2026-09-25 decision marked superseded |
 
 ## 3. Proposed schema (NOT approved, NOT migrated)
 
@@ -122,7 +122,7 @@ The PDF is a fuller version of FSD v1.0 (1-Sept-2026). Items below were **not** 
 - **Master vendor / kelolaan**: columns Service Type, ATM Escrow, Cash Escrow, Limit CIS (Ops-editable), Region; in-app notification of Amber/Red PKS to authorized PIC only; manual "Terminated" by company name.
 
 ### 7.2 Conflicts with what is recorded
-1. Order formula step 8 = `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)`, Plan Replenish from the H-1 forecast file — conflicts with the 2026-10-08 decision (DMAA amount is final).
+1. Order formula step 8 = `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)`, Plan Replenish from the H-1 forecast file — **resolved 2026-11-12** (user): FSD step 8 applies, the 2026-10-08 "DMAA final" decision is superseded.
 2. Cash count reconciliation: §3 has ATM Digital & Reconciliation entering results in CROWN, §4 says results come from Rec 7 → Rec 7 results are **keyed into CROWN manually** (partial answer to open question #2); the note "CROWN computes no cash count deltas" needs revisiting.
 3. PKS: flow says check < 8 months, Amber < 6, Red 3, Green ≥ 9; repo has 9 months (A4). Status value lists differ between table (Active/Expired/Terminated) and field description (Draft … Dihentikan).
 4. Invoice schedule wording (see 7.1).

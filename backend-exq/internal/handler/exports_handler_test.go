@@ -368,12 +368,16 @@ func (f *fakePreview) Preview(context.Context, exportjob.Actor, exportjob.Params
 // Preview routes carry the same role guard as their POST twins: a report role is
 // refused on both before any service call; an admin reaches the previewer.
 func TestPreviewRoutesGuardedLikePost(t *testing.T) {
-	paths := []string{"/vendors/1/vendor", "/vendors/1/branches/2/vaults", "/vendors/1/package-prices", "/master-data/vendors"}
+	paths := []string{"/vendors/1/vendor", "/vendors/1/branches/2/vaults", "/vendors/1/package-prices", "/master-data/vendors", "/cash-count-pics"}
 	if len(paths) != len(masterRoutes) {
 		t.Fatalf("paths cover %d routes, masterRoutes has %d", len(paths), len(masterRoutes))
 	}
 	for _, p := range paths {
 		t.Run(p, func(t *testing.T) {
+			allowed := "ADMIN" // the PIC mapping kind belongs to its maker role (AC-5.1-14)
+			if p == "/cash-count-pics" {
+				allowed = "CC-CWM"
+			}
 			for _, role := range []string{"ATM-SPV", "VENDOR-USER"} {
 				f, pv := &fakeSvc{}, &fakePreview{}
 				r := chi.NewRouter()
@@ -398,7 +402,7 @@ func TestPreviewRoutesGuardedLikePost(t *testing.T) {
 			r := chi.NewRouter()
 			r.Use(func(next http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					ctx := middleware.WithAuthContext(req.Context(), &middleware.AuthContext{UserID: 7, Role: "ADMIN"})
+					ctx := middleware.WithAuthContext(req.Context(), &middleware.AuthContext{UserID: 7, Role: allowed})
 					next.ServeHTTP(w, req.WithContext(ctx))
 				})
 			})

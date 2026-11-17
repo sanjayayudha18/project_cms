@@ -180,7 +180,7 @@ Stage: 3 Build. Kerja dipecah menjadi **9 slice**; tiap slice = satu diff kecil,
 > CLAUDE.md Sec 3 (bullet "CIT — kirim ke vendor") + Sec 12 (keputusan + deviasi state machine vendor) + baseline migrasi
 > `029_`; `docs/data-map.md` (§ Send to vendor (migration 029)); `docs/decisions.md` (Phase 2.2b); `tests.md` (commands +
 > trace FR → test, manual browser = outstanding); `development-progress.md`, `sdlc/README.md` (stage 4),
-> `.kiro/steering/development-plan.md` (2.2a committed, 2.2b built); `graphify update .` dijalankan. Stage 4 selesai; berikut:
+> `.claude/dev-plan/dev-plan.md` (2.2a committed, 2.2b built); `graphify update .` dijalankan. Stage 4 selesai; berikut:
 > `review.md` (stage 5).
 - CLAUDE.md Sec 3 (tabel/status baru, mig 029) + Sec 12 (keputusan + deviasi state machine vendor); `docs/data-map.md`;
   `development-progress.md`; `sdlc/README.md`; `tests.md` (trace FR → test; cek manual browser = outstanding, user).

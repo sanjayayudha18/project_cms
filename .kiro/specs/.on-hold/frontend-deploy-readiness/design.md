@@ -11,7 +11,7 @@ Perubahan hanya di konfigurasi deploy frontend:
 2. **Image (D2, D3).** `FROM` di-pin dengan tag persis + digest. Nama image dibentuk dari `FE_REGISTRY` + `IMAGE_TAG` dengan default lokal (`companyportal-vite-fe:local`).
 3. **Produksi (D3, D4).** File baru `frontend/docker-compose.prod.yml` mewajibkan `FE_REGISTRY`, `IMAGE_TAG`, `FE_BIND_ADDR`, menghapus `build:` dan mengganti mapping port. TLS diakhiri di GCP external Application Load Balancer.
 4. **Kebersihan (D5, D6).** `VendorPortal-Vite/docker-compose.yml` dihapus. Job CI `fe-image` membuild kedua image, menjalankan `check-image.sh` dan `nginx -t`.
-5. **Dokumen.** `deployment.md` mendapat bagian deploy frontend dan nilai `TRUSTED_PROXIES` yang baru. `development-plan.md` X.15.
+5. **Dokumen.** `deployment.md` mendapat bagian deploy frontend dan nilai `TRUSTED_PROXIES` yang baru. `.claude/dev-plan/dev-plan.md` X.15.
 
 Lokal tetap: `docker compose -f frontend/docker-compose.yml up` di Docker Desktop tidak butuh env atau file tambahan; `vite.config.ts` dan `dev.ps1` tidak disentuh.
 
@@ -239,7 +239,7 @@ Isi bagian baru:
 - **Rollback:** set `IMAGE_TAG` ke SHA sebelumnya, `pull`, `up -d --no-build`.
 - **TLS/LB:** external Application LB, sertifikat Google-managed per domain (Cloud DNS #10), Cloud Armor (#11) di backend service, redirect HTTP → HTTPS di LB, instance group dengan named port `cp=3001`, `vp=3002`, health check HTTP `/` di port tersebut; firewall VPC ingress tcp:3001,3002 hanya dari `35.191.0.0/16` dan `130.211.0.0/22`. HTTPS wajib karena cookie refresh `Secure` dan HSTS. Catatan: bila CP nanti memakai **internal** Application LB, rentang sumbernya adalah proxy-only subnet, dan `TRUSTED_PROXIES` disesuaikan.
 
-### DevelopmentPlan (`.kiro/steering/development-plan.md`) — Req 9.5
+### DevelopmentPlan (`.claude/dev-plan/dev-plan.md`) — Req 9.5
 
 Baris X.15 sudah ditambahkan saat requirements disetujui; diperbarui saat design/tasks disetujui dan saat implementasi selesai.
 
@@ -363,5 +363,5 @@ Lainnya:
 | `.github/workflows/ci.yml` | job `fe-image` |
 | `.claude/docs/deployment.md` | bagian baru + bagian yang disebut di DeploymentDoc |
 | `.kiro/specs/.on-hold/gke-deploy/design.md`, `tasks.md` | catatan file dihapus |
-| `.kiro/steering/development-plan.md` | X.15 |
+| `.claude/dev-plan/dev-plan.md` | X.15 |
 | `.kiro/specs/frontend-deploy-readiness/evidence.md` | baru, bukti probe dan verifikasi |

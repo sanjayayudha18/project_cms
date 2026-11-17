@@ -21,6 +21,7 @@ const (
 	KindCabang           Kind = "cabang"
 	KindHargaPaket       Kind = "harga_paket"
 	KindMasterDataGlobal Kind = "master_data_global"
+	KindCashCountPics    Kind = "cash_count_pics"
 )
 
 // Status is the export job state; values match export_jobs.status.
@@ -60,8 +61,11 @@ func entitiesFor(k Kind) []string {
 		return []string{"vaults", "pics", "dsr-location-maps"}
 	case KindHargaPaket:
 		return []string{"package-prices"}
+	case KindCashCountPics:
+		return []string{csvexport.CashCountPICs}
 	case KindMasterDataGlobal:
-		return append(csvexport.ImportableNames(), csvexport.VendorPks)
+		// Mapping PIC cash count is importable but exported only by KindCashCountPics (CC-CWM, AC-5.1-14).
+		return append(slices.DeleteFunc(csvexport.ImportableNames(), func(n string) bool { return n == csvexport.CashCountPICs }), csvexport.VendorPks)
 	}
 	return nil
 }
@@ -86,7 +90,7 @@ func ParseParams(kind Kind, entity string, vendorID, branchID *int64, status, pr
 	if (vendorID != nil && *vendorID <= 0) || (branchID != nil && *branchID <= 0) {
 		return Params{}, fmt.Errorf("%w: ids must be > 0", ErrValidation)
 	}
-	vendorNeeded := kind != KindMasterDataGlobal
+	vendorNeeded := kind != KindMasterDataGlobal && kind != KindCashCountPics
 	branchNeeded := kind == KindCabang
 	branchAllowed := branchNeeded || kind == KindHargaPaket
 	if vendorNeeded != (vendorID != nil) || (branchID != nil && !branchAllowed) || (branchNeeded && branchID == nil) {

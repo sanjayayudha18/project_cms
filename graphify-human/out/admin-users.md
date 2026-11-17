@@ -80,7 +80,8 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 
 | File | Dipakai fitur | Memakai fitur | Milik fitur |
 | --- | --- | --- | --- |
-| [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 26 | - | - |
+| [`backend/internal/handler/error_response.go`](../../backend/internal/handler/error_response.go) | 27 | - | - |
+| [`pkg/userrules/userrules.go`](../../pkg/userrules/userrules.go) | 7 | - | - |
 | [`backend/cmd/api/main.go`](../../backend/cmd/api/main.go) | - | 5 | - |
 | [`backend/internal/handler/admin_approval_handler.go`](../../backend/internal/handler/admin_approval_handler.go) | 5 | - | `approval` |
 | [`backend/internal/handler/auth_handler.go`](../../backend/internal/handler/auth_handler.go) | 5 | - | `auth` |
@@ -99,7 +100,6 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`backend/internal/handler/admin_vendor_package_handler.go`](../../backend/internal/handler/admin_vendor_package_handler.go) | - | 2 | `master-data-vendor` |
 | [`backend/internal/handler/admin_vendor_package_price_handler.go`](../../backend/internal/handler/admin_vendor_package_price_handler.go) | - | 2 | `master-data-vendor` |
 | [`backend/internal/handler/admin_vendor_pic_handler.go`](../../backend/internal/handler/admin_vendor_pic_handler.go) | - | 2 | `master-data-vendor` |
-| [`backend/internal/handler/admin_vendor_vault_handler.go`](../../backend/internal/handler/admin_vendor_vault_handler.go) | - | 2 | `master-data-vendor` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

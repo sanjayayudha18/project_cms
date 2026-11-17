@@ -6,18 +6,18 @@
 
 Upgrade pnpm 11.20.0 → 12.16.1 di CompanyPortal-Vite (CP) dan VendorPortal-Vite (VP). Urutan kerja:
 
-1. Catat item X.12 di `development-plan.md` dulu (scope guard rule 1).
+1. Catat item X.12 di `.claude/dev-plan/dev-plan.md` dulu (scope guard rule 1).
 2. Ambil baseline dengan pnpm 11.20.0: snapshot Lockfile dan QualityGate kedua portal.
 3. Pasang pnpm 12.16.1 global, lalu ganti pin `packageManager`, baris install di Dockerfile, dan pesan `dev.ps1`.
 4. Verifikasi Lockfile (Property 3), jalankan ulang QualityGate (Property 4, 5), lalu Docker build (Property 6).
 5. Dokumen (Property 7) dan laporan akhir.
 
-Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker builds: must COPY `pnpm-workspace.yaml`". Tidak ada kode aplikasi yang berubah. Jangan menimpa perubahan yang belum di-commit di `development-plan.md`, `navigation.ts`, dan `exports.preview.test.tsx`.
+Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker builds: must COPY `pnpm-workspace.yaml`". Tidak ada kode aplikasi yang berubah. Jangan menimpa perubahan yang belum di-commit di `.claude/dev-plan/dev-plan.md`, `navigation.ts`, dan `exports.preview.test.tsx`.
 
 ### Model Split
 
 **Sonnet-runnable**
-- 1. Catat X.12 + temuan CI di `development-plan.md` — Haiku, Low (Haiku)
+- 1. Catat X.12 + temuan CI di `.claude/dev-plan/dev-plan.md` — Haiku, Low (Haiku)
 - 2. Baseline pnpm 11.20.0 — Sonnet, Medium
 - 3. Pasang pnpm 12.16.1 global — Sonnet, Low
 - 4. Ganti pin, Dockerfile, `dev.ps1` — Sonnet, Low (needs 2, 3)
@@ -33,7 +33,7 @@ Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker 
 
 ## Tasks
 
-- [x] 1. Catat item X.12 dan temuan CI di `development-plan.md`
+- [x] 1. Catat item X.12 dan temuan CI di `.claude/dev-plan/dev-plan.md`
   - Tambah baris X.12 "pnpm 12 upgrade (`.kiro/specs/pnpm-12-upgrade/`)" di tabel Cross-cutting items: status 🚧, langkah berikutnya "implementasi tasks 2-10".
   - Di baris X.3, tambah temuan: `.github/workflows/ci.yml` tidak punya job frontend (spec `fe-tech-debt` menyebutnya), item terbuka di luar spec ini (D4).
   - Edit dengan `str_replace` pada baris terkait saja. File ini punya perubahan yang belum di-commit, jangan ditimpa.
@@ -150,7 +150,7 @@ Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker 
     - _Requirements: 5.2, 5.3, 6.2, 6.3_
   - [x] 9.3 Changelog dan status X.12
     - Tambah entri di `.claude/development-progress.md`: upgrade pnpm 12.16.1, hasil gate, ringkasan diff Lockfile (atau "tidak ada diff"), dan satu baris untuk developer lain: pasang ulang pnpm global dengan `npm install -g pnpm@12.16.1` (D6).
-    - Update baris X.12 di `development-plan.md`: status ✅ built, langkah berikutnya commit.
+    - Update baris X.12 di `.claude/dev-plan/dev-plan.md`: status ✅ built, langkah berikutnya commit.
     - _Requirements: 6.4, 6.5_
   - [x] 9.4 Cek Property 7 (2026-11-03: kelima dokumen menyebut 12.16.1; blok entri pnpm 12 di dua lessons-learned identik, 54 baris, `diff` kosong)
     - Semua dokumen di tabel "Dokumen yang diubah" menyebut pnpm 12.16.1. `Compare-Object` teks entri pnpm 12 di dua file lessons-learned → kosong.
@@ -160,7 +160,7 @@ Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker 
 - [ ] 10. Checkpoint akhir dan laporan ke user
   - Ulangi cek Property 1-7 secara ringkas dan kumpulkan hasilnya.
   - Laporkan ke user: tabel baseline vs pnpm 12 (exit code, jumlah test, coverage, audit) per portal, status Docker build, diff Lockfile, dan daftar file yang berubah.
-  - Commit hanya setelah user OK, dengan conventional commit (misalnya `build(frontend): upgrade pnpm 11.20.0 -> 12.16.1`). Stage per nama file: file di tabel "Files touched" design plus folder `.kiro/specs/pnpm-12-upgrade/`. Perubahan lain yang belum di-commit (`navigation.ts`, `exports.preview.test.tsx`) tidak ikut. `development-plan.md` sudah punya perubahan lain sebelum spec ini; tanyakan ke user apakah file itu di-commit utuh atau hanya hunk X.12/X.3.
+  - Commit hanya setelah user OK, dengan conventional commit (misalnya `build(frontend): upgrade pnpm 11.20.0 -> 12.16.1`). Stage per nama file: file di tabel "Files touched" design plus folder `.kiro/specs/pnpm-12-upgrade/`. Perubahan lain yang belum di-commit (`navigation.ts`, `exports.preview.test.tsx`) tidak ikut. `.claude/dev-plan/dev-plan.md` sudah punya perubahan lain sebelum spec ini; tanyakan ke user apakah file itu di-commit utuh atau hanya hunk X.12/X.3.
   - _Requirements: 1.3, 2.4, 3.2, 4.3, 6.5_
   - _Model: Sonnet, Effort: Medium — merangkum hasil dan memastikan semua property terpenuhi sebelum commit._
 
@@ -195,7 +195,7 @@ Pola rujukan: lessons-learned "pnpm major upgrade + Docker" dan "pnpm 11 Docker 
 - **Wave 8:** 6.1 dan 6.2 (gate pnpm 12), setelah 5.3 dan baseline 2.2/2.3.
 - **Wave 9:** 7.1 dan 7.2 (Docker build), setelah Lockfile final di 5.2.
 - **Wave 10:** 7.3 (diff Dockerfile) dan 8 (cek `dev.ps1`).
-- **Wave 11:** 9.1, 9.2, 9.3 (file berbeda), setelah gate dan Docker selesai. 9.3 menyentuh `development-plan.md` yang sama dengan task 1, sudah di wave berbeda.
+- **Wave 11:** 9.1, 9.2, 9.3 (file berbeda), setelah gate dan Docker selesai. 9.3 menyentuh `.claude/dev-plan/dev-plan.md` yang sama dengan task 1, sudah di wave berbeda.
 - **Wave 12:** 9.4 (cek Property 7), setelah 9.1-9.3.
 - **Wave 13:** 10 (checkpoint akhir), setelah semua task.
 

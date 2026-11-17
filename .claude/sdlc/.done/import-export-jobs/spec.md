@@ -211,7 +211,7 @@ perubahan yang terlihat klien hanya: nilai `file_id` berupa string angka (bukan 
 
 - **C1** Batas stale **per sumber**: 15 menit default (ingest baru), batas sendiri untuk sumber ETL batch
   (usulan 60 menit) karena retry executor menjalankan ETL per `file_type`, bukan per file (FR8).
-- **C2** Replica untuk API Python **ditunda** — dicatat sebagai item di `development-plan.md` Phase 0.1;
+- **C2** Replica untuk API Python **ditunda** — dicatat sebagai item di `.claude/dev-plan/dev-plan.md` Phase 0.1;
   API Python tetap membaca primary di fitur ini (NFR2).
 - **C3** Cek SLA juga membaca tabel sumber lama (`dmaa_files`, `itm_*_files`, `dsr_uploads`) — FR14.
 - **C4** Kunci idempotensi `(source, file_hash)` disetujui — file identik di tanggal berbeda = duplikat (FR2).

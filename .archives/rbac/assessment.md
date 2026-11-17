@@ -2,7 +2,7 @@
 
 > Source-of-truth assessment for the CMS **RBAC + approval hierarchy** stack: role-string authorization, the data-driven `role_permissions` catalog, and the maker-checker approval engine (`internal/approval` + `internal/audit` + `internal/rolemgmt`).
 > Status: source-of-truth assessment · Date: 2026-09-28 · Phase: **implemented** (RBAC-Setup Tasks 1-9, role-management, rbac-settings-menu — all in `.kiro/specs/done/`).
-> Sources: `rbac-design.md`, `rbac-role-feature-matrix.md`, `project-context.md` (Sec 2, 4, 12), `development-plan.md`, `.kiro/specs/done/{RBAC-Setup,role-management,rbac-settings-menu}`, and inspection of the actual code (`backend/internal/{approval,audit,rolemgmt}`, `backend/cmd/api/main.go`, `pkg/middleware/rbac.go`, `backend/migrations/`, `frontend/CompanyPortal-Vite/src/lib/config/navigation.ts`).
+> Sources: `rbac-design.md`, `rbac-role-feature-matrix.md`, `project-context.md` (Sec 2, 4, 12), `.claude/dev-plan/dev-plan.md`, `.kiro/specs/done/{RBAC-Setup,role-management,rbac-settings-menu}`, and inspection of the actual code (`backend/internal/{approval,audit,rolemgmt}`, `backend/cmd/api/main.go`, `pkg/middleware/rbac.go`, `backend/migrations/`, `frontend/CompanyPortal-Vite/src/lib/config/navigation.ts`).
 
 ---
 

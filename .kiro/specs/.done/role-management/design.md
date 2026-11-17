@@ -80,7 +80,7 @@ List reads (roles + permissions, catalog)        → Replica_Pool
 Runtime permission evaluation (middleware)        → Replica_Pool
 ```
 
-> Catatan implementasi: pool replica (`dbRead`) belum di-wire (Phase 0.1 di development-plan; `main.go` masih pakai `dbPool` tunggal dengan komentar `ponytail:`). Repository ini mengekspos `db` (primary) dan `dbRead` (replica) sebagai konstruktor terpisah; sampai replica di-wire, keduanya menunjuk `dbPool` yang sama, mengikuti konvensi TODO `ponytail:` yang ada di `VendorAdminRepository`.
+> Catatan implementasi: pool replica (`dbRead`) belum di-wire (Phase 0.1 di dev-plan; `main.go` masih pakai `dbPool` tunggal dengan komentar `ponytail:`). Repository ini mengekspos `db` (primary) dan `dbRead` (replica) sebagai konstruktor terpisah; sampai replica di-wire, keduanya menunjuk `dbPool` yang sama, mengikuti konvensi TODO `ponytail:` yang ada di `VendorAdminRepository`.
 
 ---
 

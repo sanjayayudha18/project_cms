@@ -11,11 +11,11 @@ to use per stage** and the gate discipline. If they disagree, CLAUDE.md wins.
 
 ## Step 0 — every time, before anything
 
-1. Ask (CLAUDE.md §4a rule 0): *"Perlu dibuat spec Kiro baru (`.kiro/specs/<feature>/`)
-   atau cukup dokumentasi bug fix?"* Wait. Bug fix → `.claude/bugfixes.md`
-   (newest first, its template), not this skill.
+1. Ask (CLAUDE.md §4a rule 0): Kiro spec / ScDD / bug-fix documentation, with your
+   suggestion from the ScDD entry checklist. Wait. Bug fix → `.claude/bugfixes.md`
+   (newest first, its template); ScDD → skill `cms2-scope`; neither uses this skill.
    Anything touching auth, money/journal, reconciliation, migration/schema, or
-   deletes → always the full chain.
+   deletes → always a full gated chain (Kiro, or ScDD with its §4 #7 gate).
 2. Check `.kiro/specs/<feature>/` (and `.kiro/specs/done/`). If yes, find the
    **latest file with `> Status: accepted`** and continue from the next stage.
    A feature still in `.claude/sdlc/<feature>/` → legacy chain (`.claude/sdlc/README.md`), finish it there.

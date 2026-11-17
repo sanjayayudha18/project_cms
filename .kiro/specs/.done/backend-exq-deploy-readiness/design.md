@@ -7,7 +7,7 @@
 Spec ini tidak mengubah kode aplikasi. Ada dua jenis perubahan:
 
 1. **CI** (Req 1, 2). Job baru `go-image` di `.github/workflows/ci.yml` membuild image `backend` dan `backend-exq` dari root repo. Setelah itu skrip `scripts/ci/check-image.sh` memeriksa bahwa image tidak berjalan sebagai root dan punya HEALTHCHECK. Skrip punya test fixture sendiri (`scripts/ci/check-image.test.sh`) yang juga dijalankan di CI.
-2. **Dokumen** (Req 3–6). Pernyataan usang tentang `backend-exq` di `.claude/docs/deployment.md`, `backend-exq/.env.example`, dan `.kiro/steering/development-plan.md` diperbaiki. `deployment.md` juga mendapat bagian baru "Release checklist: first `backend-exq` deployment".
+2. **Dokumen** (Req 3–6). Pernyataan usang tentang `backend-exq` di `.claude/docs/deployment.md`, `backend-exq/.env.example`, dan `.claude/dev-plan/dev-plan.md` diperbaiki. `deployment.md` juga mendapat bagian baru "Release checklist: first `backend-exq` deployment".
 
 Pola yang diikuti:
 - Job `python-image` yang sudah ada (build saja, tanpa push, tanpa secret).
@@ -239,7 +239,7 @@ Nama variabel, nilai default, dan urutannya tidak berubah (Req 5.2).
 
 ### Dokumen: DevelopmentPlan (Req 6)
 
-Di `.kiro/steering/development-plan.md`:
+Di `.claude/dev-plan/dev-plan.md`:
 - Bagian "Accepted known gaps": hapus bullet "`backend-exq` image still runs as root without HEALTHCHECK (BE-06 open item; not deployed)" (Req 6.1).
 - Baris X.3, kolom Next: ganti "`backend-exq` image hardening" dengan "`go-image` CI job + release checklist (`backend-exq-deploy-readiness`)". Kalimat bahwa `.github/workflows/ci.yml` belum punya job frontend tetap (Req 6.2, 6.3).
 - Baris X.7, kolom Next: tambahkan "deploy pertama `backend-exq` mengikuti 'Release checklist: first `backend-exq` deployment' di `.claude/docs/deployment.md`" (Req 6.2).
@@ -318,5 +318,5 @@ Tidak ada tabel baru, kolom baru, atau migrasi. Spec ini merujuk migrasi `034` d
 | `scripts/ci/check-image.test.sh` | baru | 2 |
 | `.claude/docs/deployment.md` | ubah | 3, 4 |
 | `backend-exq/.env.example` | ubah (1 baris komentar) | 5 |
-| `.kiro/steering/development-plan.md` | ubah | 6 |
+| `.claude/dev-plan/dev-plan.md` | ubah | 6 |
 | `.claude/development-progress.md` | ubah (1 entri) | 6 |

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
 // Golden files that pin the export's bytes BEFORE it moves to pkg/csvexport +
@@ -157,8 +158,18 @@ func TestExportGolden_Bytes(t *testing.T) {
 // Task 1.2: header, legacy headers and legacy fill of every entity, one line each.
 func TestExportGolden_Headers(t *testing.T) {
 	var b strings.Builder
-	for _, entity := range exportEntityNames() {
-		spec := exportSpecs[entity]
+	for _, entity := range csvexport.ImportableNames() {
+		spec, ok := exportSpecs[entity]
+		if entity == ExportCashCountPICs {
+			// Importable (replace-all) but no ADMIN sync export (AC-5.1-14): contract from csvexport only.
+			if ok {
+				t.Errorf("%s must not be in exportSpecs (sync export is ADMIN-only)", entity)
+			}
+			e, _ := csvexport.Lookup(entity)
+			spec = exportSpec{header: e.Header}
+		} else if !ok {
+			t.Errorf("%s missing from exportSpecs", entity)
+		}
 		fmt.Fprintf(&b, "%s header: %s\n", entity, strings.Join(spec.header, ","))
 		for i, h := range spec.legacyHeaders {
 			fmt.Fprintf(&b, "%s legacy[%d]: %s\n", entity, i, strings.Join(h, ","))

@@ -9,7 +9,7 @@
 | ID | `master-data-atm` |
 | Status | Built |
 | Portal | CompanyPortal |
-| Development plan | Master data (feature-complete MVP) |
+| Development plan | Master data (feature-complete for current scope) |
 | File inti | 24 |
 
 ## Ringkasan

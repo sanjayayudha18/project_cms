@@ -97,6 +97,7 @@ var importKeyColumns = map[string][]string{
 	ExportVendorPICs:     {"vendor_code", "branch_code", "name"},
 	ExportATMs:           {"terminal_id"},
 	ExportATMAssignments: {"terminal_id", "effective_start_date"},
+	ExportCashCountPICs:  {"pic_role", "username", "region_code", "area_code"},
 }
 
 // buildChangePreview describes one validated row; nil for an unchanged row. It
@@ -201,6 +202,8 @@ type MasterDataImportRepo interface {
 type MasterDataImporter struct {
 	repo    MasterDataImportRepo
 	confirm *ImportConfirmDeps // set by WithConfirm; nil = dry-run only
+	// cashCountPics backs the replace-all import of mapping PIC; set by WithCashCountPics.
+	cashCountPics CashCountPicImportRepo
 }
 
 // NewMasterDataImporter creates a MasterDataImporter over repo.
@@ -645,8 +648,11 @@ func parseEntityImportCSV(entity string, spec exportSpec, r io.Reader) (activeHe
 // what an import would do. It never writes. Problems with the data come back in
 // Preview.Errors; only infrastructure failures and oversize files are Go errors.
 func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Reader) (*ImportResult, error) {
-	if err := i.Authorize(ctx); err != nil {
+	if err := authorizeMasterDataImport(ctx, entity); err != nil {
 		return nil, err
+	}
+	if entity == ExportCashCountPICs {
+		return i.dryRunCashCountPics(ctx, r)
 	}
 	spec, ok := exportSpecs[entity]
 	if !ok {
@@ -705,6 +711,13 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 	}
 	res.Preview.ErrorsTruncated = dropped > 0
 	res.Preview.ValidRows = len(res.Rows)
+	res.tally(entity, activeHeader, env.cur)
+	return res, nil
+}
+
+// tally counts res.Rows into the preview and lists their changes (only when the
+// file has no errors). cur holds the current row by id, for the before values.
+func (res *ImportResult) tally(entity string, header []string, cur map[int64]map[string]string) {
 	for _, row := range res.Rows {
 		switch row.Op {
 		case ImportOpCreate:
@@ -714,7 +727,7 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 		default:
 			res.Preview.Unchanged++
 		}
-		ch := buildChangePreview(entity, activeHeader, row, env.cur[row.ID])
+		ch := buildChangePreview(entity, header, row, cur[row.ID])
 		if ch == nil {
 			continue
 		}
@@ -730,7 +743,6 @@ func (i *MasterDataImporter) DryRun(ctx context.Context, entity string, r io.Rea
 			res.Preview.Changes = append(res.Preview.Changes, *ch)
 		}
 	}
-	return res, nil
 }
 
 // validateRow validates one record: per-field rules (reusing the same pure

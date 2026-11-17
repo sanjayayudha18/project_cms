@@ -2,6 +2,7 @@ atm-assignments header: id,terminal_id,vendor_code,branch_code,package_source,pa
 atm-assignments legacy[0]: id,terminal_id,vendor_code,branch_code,package_code,effective_start_date,effective_end_date,is_active
 atm-assignments legacy fill: package_source=branch
 atms header: id,terminal_id,location_id,machine_type,brand,model,operation_hours,deployment_type,capacity_amount,low_threshold_amount,critical_threshold_amount,blacklisted,escrow_account,priority_class,is_active
+cash-count-pics header: pic_role,username,region_code,area_code
 vendor-branches header: id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,is_active
 vendor-branches legacy[0]: id,vendor_code,branch_code,branch_name,region,region_code,category,location_id,cis_limit_amount,is_active
 vendor-branches legacy[1]: id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active

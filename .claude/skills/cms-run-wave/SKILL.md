@@ -1,11 +1,13 @@
 ---
 name: cms-run-wave
-description: Dispatch one wave from a CMS2 spec's "## Task Dependency Graph" — one new Claude session per task, each on the model + effort its `_Model:` line names, each following the cms-task-runner agent. Use when the user says "jalankan wave N <spec>" / "run wave N".
+description: Dispatch one wave from a CMS2 spec's "## Task Dependency Graph" (or a ScDD phase file's "### Task Dependency Graph") — one new Claude session per task, each on the model + effort its `_Model:` line names, each following the cms-task-runner agent. Use when the user says "jalankan wave N <spec>" / "run wave N".
 ---
 
 Run this from an Opus session: a new session can only use a model the same as or cheaper than its caller, so Opus tasks need an Opus caller.
 
-Input: spec folder (e.g. `.kiro/specs/vendor-pks/`) + wave number. Missing → ask.
+Input: spec folder (e.g. `.kiro/specs/vendor-pks/`) or ScDD phase file (e.g. `.claude/dev-plan/plan-perscope/dev-phase-perscope/5-cash-count/5.1-parameter.md`) + wave number. Missing → ask.
+
+ScDD phase file: read "`tasks.md`" below as that file's `## Tasks` and the graph as its `### Task Dependency Graph`; its `> Status:` must be `accepted …` (else stop); session name uses the file stem (`5.1-parameter-t<id>`, dots → dashes). Everything else is the same.
 
 1. Read `tasks.md`: the JSON block under "## Task Dependency Graph" gives the wave's task ids.
 2. Gate: every task of earlier waves must be `[x]`. Not → list the open ones and stop (unless the user says to go anyway).

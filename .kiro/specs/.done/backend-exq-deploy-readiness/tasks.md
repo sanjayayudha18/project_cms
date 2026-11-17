@@ -14,7 +14,7 @@ Pola yang diikuti: job `python-image` (build saja), `backend/scripts/check-cover
 - 3. `deployment.md`: perbaiki pernyataan usang — Sonnet, Low
 - 4. `deployment.md`: checklist rilis deploy pertama `backend-exq` — Sonnet, Medium (needs 3)
 - 5. `backend-exq/.env.example`: komentar `REDIS_URL` — Haiku, Low (Haiku)
-- 6. `development-plan.md` + `development-progress.md` — Haiku, Low (Haiku) (needs 2.1, 4)
+- 6. `.claude/dev-plan/dev-plan.md` + `development-progress.md` — Haiku, Low (Haiku) (needs 2.1, 4)
 - 7. Checkpoint: grep dokumen + cakupan diff — Sonnet, Medium (needs 1–6)
 - 8. Commit + run GitHub Actions pertama — Haiku, Low (Haiku) (needs 7)
 
@@ -67,8 +67,8 @@ Pola yang diikuti: job `python-image` (build saja), `backend/scripts/check-cover
   - _Requirements: 5.1, 5.2_
   - _Model: Haiku, Effort: Low — satu baris komentar._
 
-- [x] 6. `development-plan.md` dan `development-progress.md`
-  - `development-plan.md`: hapus known gap "`backend-exq` image still runs as root without HEALTHCHECK"; kolom Next X.3 dan X.7 sesuai design; baris cross-cutting baru untuk spec ini. Kalimat "`.github/workflows/ci.yml` belum punya job frontend" tetap ada (D1).
+- [x] 6. `.claude/dev-plan/dev-plan.md` dan `development-progress.md`
+  - `.claude/dev-plan/dev-plan.md`: hapus known gap "`backend-exq` image still runs as root without HEALTHCHECK"; kolom Next X.3 dan X.7 sesuai design; baris cross-cutting baru untuk spec ini. Kalimat "`.github/workflows/ci.yml` belum punya job frontend" tetap ada (D1).
   - `.claude/development-progress.md`: satu entri untuk spec ini.
   - _Requirements: 6.1, 6.2, 6.3_
   - _Model: Haiku, Effort: Low — pembaruan dokumen mekanis._

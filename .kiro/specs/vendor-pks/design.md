@@ -653,7 +653,7 @@ Change `vendor_pic` yang pending saat `022` diterapkan menjadi `stale` saat di-a
 - **backend-exq:** `sqlc.yaml`, `internal/repository/*` (sqlc), `internal/exportjob/{params,report_params,kinds,producers}.go`, `internal/handler/exports_handler.go`, `api/openapi.yaml`, `cmd/api/main.go`, `.env.example`.
 - **frontend CompanyPortal:** `src/lib/api/schema.d.ts`, `src/lib/api/exq-schema.d.ts`, `features/admin-vendors/{types,api,pksApi,hooks,useAdminVendorsUrlState}.ts`, `features/admin-vendors/components/{AdminVendorsPage,VendorFilterBar,VendorsTable,InfoTab,VendorDetailPage,VendorPicFormDialog,PicsPanel,PicRolesDialog,PksPanel,PksFormDialog,PksReasonDialog,PksStatusBadge}.tsx`, `features/admin-vendors/lib/{vendorPicFormSchema,pks}.ts`, `features/approvals/lib/changeDiff.ts`, `features/exports/status.ts`.
 - **Python:** `backend_python/dsr_late_notify/test_job_integration.py` (kasus direktur tidak menerima notifikasi; query tidak berubah).
-- **Docs:** `.claude/CLAUDE.md` Sec 3 (ganti baris "Approved 2026-10-05 ... `vendors.director_*`/`pks_*`" dengan `vendor_pks` + `vendor_pics.is_director`), `.claude/docs/data-map.md`, `.kiro/steering/development-plan.md`, `.claude/development-progress.md`.
+- **Docs:** `.claude/CLAUDE.md` Sec 3 (ganti baris "Approved 2026-10-05 ... `vendors.director_*`/`pks_*`" dengan `vendor_pks` + `vendor_pics.is_director`), `.claude/docs/data-map.md`, `.claude/dev-plan/dev-plan.md`, `.claude/development-progress.md`.
 
 ## Seed dev
 

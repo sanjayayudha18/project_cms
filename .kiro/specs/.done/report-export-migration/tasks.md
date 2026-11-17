@@ -204,8 +204,8 @@ Dependensi lintas grup: Sonnet 3.2 menunggu Opus 3.1. Sonnet 5.4, 5.6, 6.2 menun
   - _Model: Sonnet, Medium — triase kegagalan gate._
 
 - [x] 10. Dokumentasi
-  - _Catatan 2026-10-29: `.claude/CLAUDE.md` Sec 3 (`pkg/reports`, `backend-exq` + ekspor laporan, mig `035` di Core) + Sec 12 (baseline "up to `035_`"); `data-map.md` subbagian "Migration 035"; `rbac-role-feature-matrix.md` (4 route `/api/v1/exports/reports/*`, `/exports`, `format=csv` = 400); `tech.md` (`pkg/reports`); `development-plan.md` X.8 = built + baris 2.3 (CSV pindah ke X.8); `development-progress.md` baris X.8; `docs/deployment.md` "Release checklist: report export (X.8)" (`DSR_LATE_START_DATE` sama di tiga runtime, `035` sebelum rilis, task 7 + 8 satu rilis, rollback image) + CI `-p 1`._
-  - `.claude/CLAUDE.md` Sec 3 + `data-map.md` (`export_jobs.report_params`), `rbac-role-feature-matrix.md` (route `/api/v1/exports/reports/*`, `/exports`, `format=csv` dihapus), `tech.md` (`pkg/reports`), `development-plan.md` X.8, `.claude/development-progress.md`.
+  - _Catatan 2026-10-29: `.claude/CLAUDE.md` Sec 3 (`pkg/reports`, `backend-exq` + ekspor laporan, mig `035` di Core) + Sec 12 (baseline "up to `035_`"); `data-map.md` subbagian "Migration 035"; `rbac-role-feature-matrix.md` (4 route `/api/v1/exports/reports/*`, `/exports`, `format=csv` = 400); `tech.md` (`pkg/reports`); `.claude/dev-plan/dev-plan.md` X.8 = built + baris 2.3 (CSV pindah ke X.8); `development-progress.md` baris X.8; `docs/deployment.md` "Release checklist: report export (X.8)" (`DSR_LATE_START_DATE` sama di tiga runtime, `035` sebelum rilis, task 7 + 8 satu rilis, rollback image) + CI `-p 1`._
+  - `.claude/CLAUDE.md` Sec 3 + `data-map.md` (`export_jobs.report_params`), `rbac-role-feature-matrix.md` (route `/api/v1/exports/reports/*`, `/exports`, `format=csv` dihapus), `tech.md` (`pkg/reports`), `.claude/dev-plan/dev-plan.md` X.8, `.claude/development-progress.md`.
   - Daftar cek deploy: nilai `DSR_LATE_START_DATE` sama di `backend`, `backend-exq`, `backend_python`.
   - _Requirements: 1.6, 6.3_
   - _Model: Haiku, Low — pembaruan dokumen._
@@ -228,7 +228,7 @@ Dependensi lintas grup: Sonnet 3.2 menunggu Opus 3.1. Sonnet 5.4, 5.6, 6.2 menun
 
 - Task 1-10 selesai, gate 9 hijau, task 11 dicentang user.
 - Property 1-12 punya test yang lulus.
-- `development-plan.md` X.8 diperbarui ke "built".
+- `.claude/dev-plan/dev-plan.md` X.8 diperbarui ke "built".
 
 ## Task Dependency Graph
 

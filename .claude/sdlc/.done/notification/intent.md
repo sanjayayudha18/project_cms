@@ -5,7 +5,7 @@ Stage: 1 Plan. Stage berikut: `spec.md` (setelah intent diterima).
 Menyentuh Sec 4 #7: **skema (tabel baru `notifications`, migrasi baru)** → wajib AI-DLC penuh.
 
 ## Problem
-Beberapa fitur sudah atau akan butuh notifikasi, tapi modulnya belum ada (`.kiro/steering/development-plan.md` 0.3):
+Beberapa fitur sudah atau akan butuh notifikasi, tapi modulnya belum ada (`.claude/dev-plan/dev-plan.md` 0.3):
 
 - `dsr-late-report` (intent, keputusan #5): DSR telat/tidak masuk → notifikasi ke PIC vendor + Operator internal, in-app + email, dicek 09:00 WIB.
 - `atm-visit-quota` (intent #12): kelebihan kuota kunjungan → sekarang hanya peringatan di layar + badge; in-app/email "menyusul modul 0.3".

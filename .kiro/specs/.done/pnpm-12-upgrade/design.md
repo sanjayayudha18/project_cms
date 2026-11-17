@@ -12,7 +12,7 @@ Ringkasan keputusan:
 - **D2:** Dockerfile memasang pnpm lewat `npm install -g pnpm@12.16.1`, tanpa corepack.
 - **D3:** Lockfile tidak dibuat ulang. Bila install tanpa frozen menghasilkan diff format, diff di-commit di perubahan yang sama. Bila versi resolved berubah, pekerjaan berhenti.
 - **D4:** job frontend di CI tidak ditambahkan. Temuannya dicatat di X.3.
-- **D5:** dicatat sebagai item cross-cutting X.12 di `development-plan.md`.
+- **D5:** dicatat sebagai item cross-cutting X.12 di `.claude/dev-plan/dev-plan.md`.
 - **D6:** developer lain cukup diberi tahu lewat dokumentasi dan changelog.
 
 Pekerjaan dibagi tiga langkah: ambil baseline gate dengan pnpm 11.20.0, ganti pin dan Dockerfile, lalu jalankan ulang gate dan Docker build dengan pnpm 12.16.1 dan bandingkan hasilnya dengan baseline.
@@ -158,7 +158,7 @@ Req 5.4 diverifikasi dengan `./dev.ps1 company` dan `./dev.ps1 vendor` setelah p
 | --- | --- | --- |
 | `.claude/docs/arsitektur-teknologi.md` baris 74 | `pnpm \| 11.20.0` → `pnpm \| 12.16.1` | 6.1 |
 | `.kiro/steering/lessons-learned.md` dan `.claude/lessons-learned.md` | Entri baru "pnpm 11 → 12 upgrade" (isi di bawah), teks sama di kedua file. Tiga entri pnpm lama diberi catatan status | 5.2, 5.3, 6.2, 6.3 |
-| `.kiro/steering/development-plan.md` | Baris X.12 di tabel cross-cutting. Baris X.3 ditambah temuan "CI tidak punya job frontend" | 6.4, 6.6 |
+| `.claude/dev-plan/dev-plan.md` | Baris X.12 di tabel cross-cutting. Baris X.3 ditambah temuan "CI tidak punya job frontend" | 6.4, 6.6 |
 | `.claude/development-progress.md` | Entri changelog, termasuk satu baris untuk developer lain | 6.5 |
 
 Isi entri lessons-learned baru:
@@ -274,5 +274,5 @@ CI GitHub Actions tidak menguji frontend (D4), jadi gate di atas wajib dijalanka
 | `frontend/*/pnpm-lock.yaml` | Tidak diharapkan berubah. Hanya bila ada diff format sesuai D3 |
 | `.claude/docs/arsitektur-teknologi.md` | 1 baris |
 | `.kiro/steering/lessons-learned.md`, `.claude/lessons-learned.md` | Entri baru + catatan status entri lama |
-| `.kiro/steering/development-plan.md` | Baris X.12 baru + temuan di X.3 |
+| `.claude/dev-plan/dev-plan.md` | Baris X.12 baru + temuan di X.3 |
 | `.claude/development-progress.md` | Entri changelog |

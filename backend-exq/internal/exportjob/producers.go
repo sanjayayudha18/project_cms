@@ -25,6 +25,8 @@ type Querier interface {
 	ExportATMsBatch(ctx context.Context, arg repository.ExportATMsBatchParams) ([]repository.ExportATMsBatchRow, error)
 	ExportATMAssignmentsBatch(ctx context.Context, arg repository.ExportATMAssignmentsBatchParams) ([]repository.ExportATMAssignmentsBatchRow, error)
 	ExportDsrLocationMapsBatch(ctx context.Context, arg repository.ExportDsrLocationMapsBatchParams) ([]repository.ExportDsrLocationMapsBatchRow, error)
+	ExportCashCountPicsBatch(ctx context.Context, arg repository.ExportCashCountPicsBatchParams) ([]repository.ExportCashCountPicsBatchRow, error)
+	CountCashCountPics(ctx context.Context, status string) (int64, error)
 	ExportPackagePricesBatch(ctx context.Context, arg repository.ExportPackagePricesBatchParams) ([]repository.ExportPackagePricesBatchRow, error)
 	CountVendors(ctx context.Context, arg repository.CountVendorsParams) (int64, error)
 	CountVendorBranches(ctx context.Context, arg repository.CountVendorBranchesParams) (int64, error)
@@ -340,6 +342,21 @@ func dsrMapsProducer() Producer {
 	}
 }
 
+func cashCountPicsProducer() Producer {
+	type row = repository.ExportCashCountPicsBatchRow
+	return tableProducer[row]{
+		header: exportHeaderOf(csvexport.CashCountPICs),
+		fetch: func(ctx context.Context, q Querier, p Params, _ time.Time, after int64, limit int32) ([]row, error) {
+			return q.ExportCashCountPicsBatch(ctx, repository.ExportCashCountPicsBatchParams{AfterID: after, Status: p.StatusFilter, BatchSize: limit})
+		},
+		id:    func(r row) int64 { return r.ID },
+		cells: func(r row) []string { return []string{r.PicRole, r.Username, r.RegionCode, r.AreaCode} },
+		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
+			return q.CountCashCountPics(ctx, p.StatusFilter)
+		},
+	}
+}
+
 // priceLevelOf is the price level filter ("all" when unset); vendor_id is mandatory.
 func priceLevelOf(p Params) (string, error) {
 	if p.VendorID == nil {
@@ -405,7 +422,8 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 			"pics":              picsProducer(),
 			"dsr-location-maps": dsrMapsProducer(),
 		},
-		KindHargaPaket: {"package-prices": packagePricesProducer()},
+		KindHargaPaket:    {"package-prices": packagePricesProducer()},
+		KindCashCountPics: {csvexport.CashCountPICs: cashCountPicsProducer()},
 		KindMasterDataGlobal: {
 			csvexport.Vendors:        vendorsProducer(false),
 			csvexport.VendorBranches: branchesProducer(),

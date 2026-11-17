@@ -459,6 +459,269 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/VendorPksReasonRequest' } } }
       responses: *pksWriteResponses
 
+  # -- cash-count parameters (ScDD 5.1) ----------------------------------------
+  # Reads: the listed maker role + ADMIN. Writes are maker-checker: 202 = pending approval; the maker
+  # role (CC-CWM / CC-CCR, never ADMIN) is re-checked in the service, so ADMIN gets 403.
+  /cash-count/category-params:
+    get:
+      operationId: listCashCountCategoryParams
+      tags: [cash-count]
+      description: CC-CWM / ADMIN. The active parameter set (null before any is seeded) and the superseded history.
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountCategoryParamsList' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitCashCountCategoryParams
+      tags: [cash-count]
+      description: >-
+        CC-CWM. Proposes a new parameter set; on approval it supersedes the active one in the same
+        transaction. 409 when another proposal is pending.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountCategoryParamsRequest' } } }
+      responses: &ccWriteResponses
+        '202': { description: 'Accepted, pending approval', content: { application/json: { schema: { $ref: '#/components/schemas/ChangeRequestAccepted' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /cash-count/anomaly-categories:
+    get:
+      operationId: listCashCountAnomalyCategories
+      tags: [cash-count]
+      description: CC-CCR / ADMIN. Kategori ATM Anomaly; `status` defaults to active.
+      parameters: [ { $ref: '#/components/parameters/CashCountStatus' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAnomalyCategoryList' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitCashCountAnomalyCategory
+      tags: [cash-count]
+      description: CC-CCR. Stages a new category through maker-checker.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAnomalyCategoryCreate' } } }
+      responses: *ccWriteResponses
+  /cash-count/anomaly-categories/{id}:
+    put:
+      operationId: updateCashCountAnomalyCategory
+      tags: [cash-count]
+      description: CC-CCR. Stages a name/description change (code is immutable).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAnomalyCategoryUpdate' } } }
+      responses: *ccWriteResponses
+  /cash-count/anomaly-categories/{id}/disable:
+    post:
+      operationId: disableCashCountAnomalyCategory
+      tags: [cash-count]
+      description: CC-CCR. Stages a soft-disable.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+  /cash-count/anomaly-categories/{id}/enable:
+    post:
+      operationId: enableCashCountAnomalyCategory
+      tags: [cash-count]
+      description: CC-CCR. Stages a re-enable.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+
+  /cash-count/checklist-items:
+    get:
+      operationId: listCashCountChecklistItems
+      tags: [cash-count]
+      description: CC-CCR / ADMIN. Berita Acara checklist items; empty until the user fills them (AC-5.1-07).
+      parameters:
+        - $ref: '#/components/parameters/CashCountStatus'
+        - { name: category, in: query, schema: { type: string, enum: [SELECTED_MACHINE, NON_MACHINE] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountChecklistItemList' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitCashCountChecklistItem
+      tags: [cash-count]
+      description: CC-CCR. Stages a new item (SELECTED_MACHINE needs `day`, NON_MACHINE must not have one).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountChecklistItemCreate' } } }
+      responses: *ccWriteResponses
+  /cash-count/checklist-items/{id}:
+    put:
+      operationId: updateCashCountChecklistItem
+      tags: [cash-count]
+      description: CC-CCR. Stages a day / point / text change (category is immutable).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountChecklistItemUpdate' } } }
+      responses: *ccWriteResponses
+  /cash-count/checklist-items/{id}/disable:
+    post:
+      operationId: disableCashCountChecklistItem
+      tags: [cash-count]
+      description: CC-CCR. Stages a soft-disable.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+  /cash-count/checklist-items/{id}/enable:
+    post:
+      operationId: enableCashCountChecklistItem
+      tags: [cash-count]
+      description: CC-CCR. Stages a re-enable.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+
+  /cash-count/areas:
+    get:
+      operationId: listCashCountAreas
+      tags: [cash-count]
+      description: CC-CWM / ADMIN. Areas with their region codes.
+      parameters: [ { $ref: '#/components/parameters/CashCountStatus' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAreaList' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitCashCountArea
+      tags: [cash-count]
+      description: CC-CWM. Stages a new area; one region code belongs to one active area.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAreaCreate' } } }
+      responses: *ccWriteResponses
+  /cash-count/areas/{id}:
+    put:
+      operationId: updateCashCountArea
+      tags: [cash-count]
+      description: CC-CWM. Stages a name + full region set change (code is immutable).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountAreaUpdate' } } }
+      responses: *ccWriteResponses
+  /cash-count/areas/{id}/disable:
+    post:
+      operationId: disableCashCountArea
+      tags: [cash-count]
+      description: CC-CWM. Stages a soft-disable; 409 while an active executor PIC still points at the area.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+  /cash-count/areas/{id}/enable:
+    post:
+      operationId: enableCashCountArea
+      tags: [cash-count]
+      description: CC-CWM. Stages a re-enable (regions are re-attached with an update).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+
+  /cash-count/pics:
+    get:
+      operationId: listCashCountPics
+      tags: [cash-count]
+      description: CC-CWM / ADMIN. Mapping PIC (coordinator per region, executor per area).
+      parameters:
+        - $ref: '#/components/parameters/CashCountStatus'
+        - { name: pic_role, in: query, schema: { type: string, enum: [COORDINATOR, EXECUTOR] } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountPicList' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    post:
+      operationId: submitCashCountPic
+      tags: [cash-count]
+      description: >-
+        CC-CWM. Stages a new mapping. The user must be active, LDAP and hold CC-COORDINATOR (coordinator)
+        or CC-EXECUTOR (executor); re-checked on apply (409 when it changed meanwhile).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountPicCreate' } } }
+      responses: *ccWriteResponses
+  /cash-count/pics/{id}:
+    put:
+      operationId: updateCashCountPic
+      tags: [cash-count]
+      description: CC-CWM. Stages a user / target change (pic_role is immutable).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CashCountPicUpdate' } } }
+      responses: *ccWriteResponses
+  /cash-count/pics/{id}/disable:
+    post:
+      operationId: disableCashCountPic
+      tags: [cash-count]
+      description: CC-CWM. Stages a soft-disable ("hapus" never deletes).
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+  /cash-count/pics/{id}/enable:
+    post:
+      operationId: enableCashCountPic
+      tags: [cash-count]
+      description: CC-CWM. Stages a re-enable.
+      parameters: [ { $ref: '#/components/parameters/CashCountID' } ]
+      responses: *ccWriteResponses
+
+  /cash-count/import/{entity}/dry-run:
+    post:
+      operationId: dryRunCashCountImport
+      tags: [cash-count]
+      description: >-
+        CC-CWM only. Validates a mapping-PIC CSV (`entity` = cash-count-pics, replace-all: active mappings absent
+        from the file are previewed as `disable`). Nothing is written; row problems are part of the 200 answer.
+      parameters: [ { $ref: '#/components/parameters/CashCountImportEntity' } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/CashCountImportUpload' }
+      responses:
+        '200': { description: Preview, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountImportPreview' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ImportUnprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /cash-count/import/{entity}/confirm:
+    post:
+      operationId: confirmCashCountImport
+      tags: [cash-count]
+      description: >-
+        CC-CWM only. Stages the file as ONE batch under one approval (all-or-nothing). 202 = new batch,
+        200 = the same file (SHA-256) was already staged, nothing new is created.
+      parameters: [ { $ref: '#/components/parameters/CashCountImportEntity' } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/CashCountImportUpload' }
+      responses:
+        '200': { description: Already staged, content: { application/json: { schema: { $ref: '#/components/schemas/CashCountImportConfirm' } } } }
+        '202': { description: 'Accepted, pending approval', content: { application/json: { schema: { $ref: '#/components/schemas/CashCountImportConfirm' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ImportUnprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -473,6 +736,9 @@ components:
     DsrLateVendorBranchID: { name: vendor_branch_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
     VendorRequestID: { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
     PartyID: { name: id, in: path, required: true, description: vendor party id (not the request id), schema: { type: integer, format: int64, minimum: 1 } }
+    CashCountID: { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+    CashCountStatus: { name: status, in: query, description: 'default active', schema: { type: string, enum: [active, disabled, all] } }
+    CashCountImportEntity: { name: entity, in: path, required: true, description: 'cash-count-pics is the only entity this route group accepts', schema: { type: string } }
 
   responses:
     BadRequest: { description: 'Malformed id, query or body', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
@@ -481,6 +747,15 @@ components:
     NotFound: { description: Not found or outside the caller's scope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     Conflict: { description: Status does not allow the action, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     Unprocessable: { description: Field validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    PayloadTooLarge: { description: Upload over the size limit, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    ImportUnprocessable:
+      description: 'No file field, nothing to import, or row errors (validation_failed + errors[])'
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - $ref: '#/components/schemas/CashCountImportInvalid'
     InternalError: { description: Unexpected error, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
   schemas:
@@ -1232,3 +1507,236 @@ components:
         realizations: { type: array, nullable: true, items: { $ref: '#/components/schemas/RealizationView' } }
         can_report: { type: boolean }
         completion_rejection_reason: { type: string, nullable: true }
+
+    # -- cash-count parameters (ScDD 5.1) -----------------------------------------
+    CashCountCategoryParamsSet:
+      type: object
+      additionalProperties: false
+      required: [id, medium_min_amount, medium_max_amount, currency_code, onsite_high, onsite_medium, onsite_low,
+        period_months, created_by, effective_from, superseded_at]
+      properties:
+        id: { type: integer, format: int64 }
+        medium_min_amount: { type: string, nullable: true, pattern: '^-?\d+(\.\d+)?$', description: 'exact decimal IDR (never float); LOW below it, MEDIUM from it (inclusive)' }
+        medium_max_amount: { type: string, nullable: true, pattern: '^-?\d+(\.\d+)?$', description: 'exact decimal IDR; MEDIUM up to it (inclusive), HIGH above' }
+        currency_code: { type: string, enum: [IDR] }
+        onsite_high: { type: integer, minimum: 0, maximum: 6 }
+        onsite_medium: { type: integer, minimum: 0, maximum: 6 }
+        onsite_low: { type: integer, minimum: 0, maximum: 6 }
+        period_months: { type: integer, enum: [6] }
+        created_by: { type: integer, format: int64 }
+        effective_from: { type: string, format: date-time, nullable: true }
+        superseded_at: { type: string, format: date-time, nullable: true }
+    CashCountCategoryParamsList:
+      type: object
+      additionalProperties: false
+      required: [active, history]
+      properties:
+        active:
+          nullable: true
+          allOf: [ { $ref: '#/components/schemas/CashCountCategoryParamsSet' } ]
+        history: { type: array, items: { $ref: '#/components/schemas/CashCountCategoryParamsSet' } }
+    CashCountCategoryParamsRequest:
+      type: object
+      required: [medium_min_amount, medium_max_amount, currency_code, onsite_high, onsite_medium, onsite_low]
+      properties:
+        medium_min_amount: { type: string, description: 'decimal text, > 0, at most 2 decimals' }
+        medium_max_amount: { type: string, description: 'decimal text, > medium_min_amount' }
+        currency_code: { type: string, enum: [IDR] }
+        onsite_high: { type: integer, minimum: 0, maximum: 6 }
+        onsite_medium: { type: integer, minimum: 0, maximum: 6 }
+        onsite_low: { type: integer, minimum: 0, maximum: 6 }
+    CashCountAnomalyCategory:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, description, is_active, deleted_at]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        is_active: { type: boolean }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    CashCountAnomalyCategoryList:
+      type: object
+      additionalProperties: false
+      required: [categories]
+      properties:
+        categories: { type: array, items: { $ref: '#/components/schemas/CashCountAnomalyCategory' } }
+    CashCountAnomalyCategoryCreate:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: '^[A-Z0-9_]{2,20}$' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+    CashCountAnomalyCategoryUpdate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+    CashCountChecklistItem:
+      type: object
+      additionalProperties: false
+      required: [id, category, day, point_no, item_text, is_active, deleted_at]
+      properties:
+        id: { type: integer, format: int64 }
+        category: { type: string, enum: [SELECTED_MACHINE, NON_MACHINE] }
+        day: { type: string, nullable: true, enum: [DAY1, DAY2, null], description: 'DAY1 = mesin, DAY2 = vault; only for SELECTED_MACHINE' }
+        point_no: { type: integer, format: int32, minimum: 1 }
+        item_text: { type: string }
+        is_active: { type: boolean }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    CashCountChecklistItemList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CashCountChecklistItem' } }
+    CashCountChecklistItemCreate:
+      type: object
+      required: [category, point_no, item_text]
+      properties:
+        category: { type: string, enum: [SELECTED_MACHINE, NON_MACHINE] }
+        day: { type: string, nullable: true, enum: [DAY1, DAY2, null] }
+        point_no: { type: integer, format: int32, minimum: 1 }
+        item_text: { type: string, minLength: 1, maxLength: 500 }
+    CashCountChecklistItemUpdate:
+      type: object
+      required: [point_no, item_text]
+      properties:
+        day: { type: string, nullable: true, enum: [DAY1, DAY2, null] }
+        point_no: { type: integer, format: int32, minimum: 1 }
+        item_text: { type: string, minLength: 1, maxLength: 500 }
+    CashCountArea:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, region_codes, is_active, deleted_at]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        region_codes: { type: array, items: { type: string } }
+        is_active: { type: boolean }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    CashCountAreaList:
+      type: object
+      additionalProperties: false
+      required: [areas]
+      properties:
+        areas: { type: array, items: { $ref: '#/components/schemas/CashCountArea' } }
+    CashCountAreaCreate:
+      type: object
+      required: [code, name, region_codes]
+      properties:
+        code: { type: string, pattern: '^[A-Z0-9_]{2,20}$' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        region_codes: { type: array, minItems: 1, items: { type: string } }
+    CashCountAreaUpdate:
+      type: object
+      required: [name, region_codes]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        region_codes: { type: array, minItems: 1, items: { type: string } }
+    CashCountPic:
+      type: object
+      additionalProperties: false
+      required: [id, pic_role, user_id, username, full_name, region_code, area_id, area_code, area_name, is_active, deleted_at]
+      properties:
+        id: { type: integer, format: int64 }
+        pic_role: { type: string, enum: [COORDINATOR, EXECUTOR] }
+        user_id: { type: integer, format: int64 }
+        username: { type: string }
+        full_name: { type: string }
+        region_code: { type: string, nullable: true, description: COORDINATOR only }
+        area_id: { type: integer, format: int64, nullable: true, description: EXECUTOR only }
+        area_code: { type: string, nullable: true }
+        area_name: { type: string, nullable: true }
+        is_active: { type: boolean }
+        deleted_at: { type: string, format: date-time, nullable: true }
+    CashCountPicList:
+      type: object
+      additionalProperties: false
+      required: [pics]
+      properties:
+        pics: { type: array, items: { $ref: '#/components/schemas/CashCountPic' } }
+    CashCountPicCreate:
+      type: object
+      required: [pic_role, user_id]
+      properties:
+        pic_role: { type: string, enum: [COORDINATOR, EXECUTOR] }
+        user_id: { type: integer, format: int64 }
+        region_code: { type: string, nullable: true, description: required for COORDINATOR }
+        area_id: { type: integer, format: int64, nullable: true, description: required for EXECUTOR }
+    CashCountPicUpdate:
+      type: object
+      required: [user_id]
+      properties:
+        user_id: { type: integer, format: int64 }
+        region_code: { type: string, nullable: true }
+        area_id: { type: integer, format: int64, nullable: true }
+    CashCountImportUpload:
+      type: object
+      required: [file]
+      properties:
+        file: { type: string, format: binary, description: 'CSV with header pic_role,username,region_code,area_code' }
+    CashCountImportFieldChange:
+      type: object
+      additionalProperties: false
+      required: [field, before, after]
+      properties:
+        field: { type: string }
+        before: { type: string }
+        after: { type: string }
+    CashCountImportChange:
+      type: object
+      additionalProperties: false
+      required: [row, op, key, fields]
+      properties:
+        row: { type: integer, description: 'file line, header = 1; 0 for an implicit disable' }
+        op: { type: string, enum: [create, update, enable, disable] }
+        key: { type: string }
+        fields: { type: array, nullable: true, items: { $ref: '#/components/schemas/CashCountImportFieldChange' } }
+    CashCountImportRowError:
+      type: object
+      additionalProperties: false
+      required: [row, field, message]
+      properties:
+        row: { type: integer }
+        field: { type: string }
+        message: { type: string }
+    CashCountImportPreview:
+      type: object
+      additionalProperties: false
+      required: [entity, total_rows, valid_rows, creates, updates, unchanged, errors, errors_truncated, data_updates, enables, disables, changes]
+      properties:
+        entity: { type: string }
+        total_rows: { type: integer }
+        valid_rows: { type: integer }
+        creates: { type: integer }
+        updates: { type: integer }
+        unchanged: { type: integer }
+        errors: { type: array, nullable: true, items: { $ref: '#/components/schemas/CashCountImportRowError' } }
+        errors_truncated: { type: boolean }
+        data_updates: { type: integer }
+        enables: { type: integer }
+        disables: { type: integer }
+        changes: { type: array, nullable: true, items: { $ref: '#/components/schemas/CashCountImportChange' } }
+    CashCountImportConfirm:
+      type: object
+      additionalProperties: false
+      required: [batch_id, rows, approval_request_id, existing, entity]
+      properties:
+        batch_id: { type: integer, format: int64 }
+        rows: { type: integer }
+        approval_request_id: { type: integer, format: int64, nullable: true }
+        existing: { type: boolean }
+        entity: { type: string }
+    CashCountImportInvalid:
+      type: object
+      additionalProperties: false
+      required: [error, message, errors]
+      properties:
+        error: { type: string }
+        message: { type: string }
+        errors: { type: array, items: { $ref: '#/components/schemas/CashCountImportRowError' } }

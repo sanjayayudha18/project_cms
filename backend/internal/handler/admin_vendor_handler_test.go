@@ -26,6 +26,9 @@ type fakeVendorAdminServicer struct {
 	listErr     error
 	countResult int64
 	countErr    error
+	listCalled  bool
+	lastList    db.ListVendorsAdminParams
+	lastCount   db.CountVendorsAdminParams
 	getResult   *db.GetVendorAdminByIDRow
 	getErr      error
 
@@ -48,11 +51,14 @@ type fakeVendorAdminServicer struct {
 	enableCalled bool
 }
 
-func (f *fakeVendorAdminServicer) List(context.Context, db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+func (f *fakeVendorAdminServicer) List(_ context.Context, p db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+	f.listCalled = true
+	f.lastList = p
 	return f.listResult, f.listErr
 }
 
-func (f *fakeVendorAdminServicer) Count(context.Context, db.CountVendorsAdminParams) (int64, error) {
+func (f *fakeVendorAdminServicer) Count(_ context.Context, p db.CountVendorsAdminParams) (int64, error) {
+	f.lastCount = p
 	return f.countResult, f.countErr
 }
 
@@ -151,6 +157,74 @@ func TestAdminVendorHandler_List_InvalidPksStatus_BadRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name     string
+		query    string
+		wantCode int
+		wantKind *string
+		wantCall bool
+		wantStat *string
+		wantPks  *string
+		wantLim  int64
+		wantOff  int64
+	}{
+		{name: "FLM_VENDOR", query: "kind=FLM_VENDOR", wantCode: 200, wantKind: str("FLM_VENDOR"), wantCall: true, wantLim: 25},
+		{name: "INTERNAL", query: "kind=INTERNAL", wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantLim: 25},
+		{name: "empty kind is nil", query: "kind=", wantCode: 200, wantCall: true, wantLim: 25},
+		{name: "absent kind is nil", query: "", wantCode: 200, wantCall: true, wantLim: 25},
+		{name: "invalid kind", query: "kind=xyz", wantCode: 400},
+		{name: "lowercase kind invalid", query: "kind=internal", wantCode: 400},
+		{
+			name: "combined with status, pks_status, paging", query: "kind=INTERNAL&status=active&pks_status=" + anyPksStatus() + "&page=3&page_size=10",
+			wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantPks: str(anyPksStatus()), wantLim: 10, wantOff: 20,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &fakeVendorAdminServicer{}
+			router, tokenSvc := mountAdminVendorHandler(svc)
+			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+			rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?"+tt.query, token, "")
+
+			if rec.Code != tt.wantCode {
+				t.Fatalf("code = %d, want %d: %s", rec.Code, tt.wantCode, rec.Body.String())
+			}
+			if svc.listCalled != tt.wantCall {
+				t.Fatalf("service called = %v, want %v", svc.listCalled, tt.wantCall)
+			}
+			if !tt.wantCall {
+				return
+			}
+			for name, got := range map[string]*string{"List": svc.lastList.Kind, "Count": svc.lastCount.Kind} {
+				if (got == nil) != (tt.wantKind == nil) || (got != nil && *got != *tt.wantKind) {
+					t.Errorf("%s Kind = %v, want %v", name, got, tt.wantKind)
+				}
+			}
+			if (svc.lastList.PksStatus == nil) != (tt.wantPks == nil) || (tt.wantPks != nil && *svc.lastList.PksStatus != *tt.wantPks) {
+				t.Errorf("List PksStatus = %v, want %v", svc.lastList.PksStatus, tt.wantPks)
+			}
+			if svc.lastList.PageLimit != tt.wantLim || svc.lastList.PageOffset != tt.wantOff {
+				t.Errorf("paging = %d/%d, want %d/%d", svc.lastList.PageLimit, svc.lastList.PageOffset, tt.wantLim, tt.wantOff)
+			}
+			if tt.wantPks != nil && (svc.lastCount.PksStatus == nil || *svc.lastCount.PksStatus != *tt.wantPks) {
+				t.Errorf("Count PksStatus = %v, want %v", svc.lastCount.PksStatus, tt.wantPks)
+			}
+		})
+	}
+}
+
+var pksStatusSample = func() string {
+	for k := range reports.PksStatuses {
+		return k
+	}
+	return ""
+}()
+
+func anyPksStatus() string { return pksStatusSample }
 
 func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
 	str := func(s string) *string { return &s }

@@ -51,12 +51,15 @@ func regionHarness(t *testing.T) (*RegionAdminService, int64, string) {
 
 	repo := repository.NewRegionAdminRepository(tx, tx)
 	svc := NewRegionAdminService(repo, tx)
-	// Region codes are restricted to [A-Za-z0-9], max 20 chars (regionCodeRe)
-	// -- base36 keeps the tag short and alphanumeric, unlike rolemgmt's
-	// hyphenated TROLE- tags. Uppercased because Create normalizes codes to
-	// uppercase (Req 2.7): callers below compare created.Code directly
-	// against "<PREFIX>"+tag, so tag must already be in its normalized form.
-	tag := strings.ToUpper(strconv.FormatInt(time.Now().UnixNano()%1e12, 36))
+	// Region codes are 2-10 upper-case letters/digits (regionCodeRe,
+	// region-standardization Req 1.3): a 3-char base36 tag keeps every
+	// "<PREFIX>"+tag within 10 chars. Everything runs in a rolled-back tx, so
+	// the tag only has to avoid codes already in the DB. Uppercased because
+	// Create normalizes codes to uppercase (Req 2.7).
+	tag := strings.ToUpper(strconv.FormatInt(time.Now().UnixNano()%46656, 36))
+	for len(tag) < 3 {
+		tag = "0" + tag
+	}
 	return svc, adminUserID, tag
 }
 
@@ -233,7 +236,7 @@ func TestCreateRegion_AuthorizationMatrix(t *testing.T) {
 func TestCreateRegion_AuditFailureRollsBack(t *testing.T) {
 	svc, _, tag := regionHarness(t)
 	ctx := context.Background()
-	code := "RGNOAUDIT" + tag
+	code := "RGNA" + tag
 	const nonExistentActorID = int64(999999999)
 
 	_, err := svc.Create(ctx, nonExistentActorID, "ADMIN", CreateRegionRequest{Code: code, Region: "No Audit"}, "")
@@ -309,7 +312,7 @@ func TestUpdateRegionName_NotFound(t *testing.T) {
 func TestDisableRegion_BlockedByActiveLocations(t *testing.T) {
 	svc, adminUserID, tag := regionHarness(t)
 	ctx := context.Background()
-	code := "RGDEPLOC" + tag
+	code := "RGLOC" + tag
 
 	created, err := svc.Create(ctx, adminUserID, "ADMIN", CreateRegionRequest{Code: code, Region: "Has Locations"}, "")
 	if err != nil {
@@ -343,7 +346,7 @@ func TestDisableRegion_BlockedByActiveLocations(t *testing.T) {
 func TestDisableEnableRegion_RoundTrip(t *testing.T) {
 	svc, adminUserID, tag := regionHarness(t)
 	ctx := context.Background()
-	code := "RGTOGGLE" + tag
+	code := "RGTOG" + tag
 
 	created, err := svc.Create(ctx, adminUserID, "ADMIN", CreateRegionRequest{Code: code, Region: "Toggle"}, "")
 	if err != nil {
@@ -416,7 +419,7 @@ func TestDisableEnableRegion_NoOpConflictWritesNoAudit(t *testing.T) {
 func TestDisableRegion_AuditFailureRollsBack(t *testing.T) {
 	svc, adminUserID, tag := regionHarness(t)
 	ctx := context.Background()
-	code := "RGSTATNA" + tag
+	code := "RGSNA" + tag
 	const nonExistentActorID = int64(999999999)
 
 	created, err := svc.Create(ctx, adminUserID, "ADMIN", CreateRegionRequest{Code: code, Region: "Status No Audit"}, "")
@@ -442,7 +445,7 @@ func TestDisableRegion_AuditFailureRollsBack(t *testing.T) {
 func TestListRegionsAdmin_SearchCaseInsensitive(t *testing.T) {
 	svc, adminUserID, tag := regionHarness(t)
 	ctx := context.Background()
-	code := "RGSEARCH" + tag
+	code := "RGSRCH" + tag
 
 	if _, err := svc.Create(ctx, adminUserID, "ADMIN", CreateRegionRequest{Code: code, Region: "Findable " + tag}, ""); err != nil {
 		t.Fatalf("Create: %v", err)

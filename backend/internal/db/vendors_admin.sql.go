@@ -38,6 +38,7 @@ WHERE ($1::text IS NULL
       )
   AND ($3::text IS NULL
         OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $4::date, $5::int) = $3::text)
+  AND ($6::text IS NULL OR v.kind = $6::text)
 `
 
 type CountVendorsAdminParams struct {
@@ -46,6 +47,7 @@ type CountVendorsAdminParams struct {
 	PksStatus     *string     `json:"pks_status"`
 	Today         pgtype.Date `json:"today"`
 	RenewalMonths int32       `json:"renewal_months"`
+	Kind          *string     `json:"kind"`
 }
 
 // Same joins and filters as ListVendorsAdmin, no LIMIT/OFFSET — pagination total (Req 6.6).
@@ -56,6 +58,7 @@ func (q *Queries) CountVendorsAdmin(ctx context.Context, arg CountVendorsAdminPa
 		arg.PksStatus,
 		arg.Today,
 		arg.RenewalMonths,
+		arg.Kind,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -240,8 +243,9 @@ WHERE ($3::text IS NULL
       )
   AND ($5::text IS NULL
         OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $1::date, $2::int) = $5::text)
+  AND ($6::text IS NULL OR v.kind = $6::text)
 ORDER BY v.name ASC, v.id ASC
-LIMIT $7::bigint OFFSET $6::bigint
+LIMIT $8::bigint OFFSET $7::bigint
 `
 
 type ListVendorsAdminParams struct {
@@ -250,6 +254,7 @@ type ListVendorsAdminParams struct {
 	Q             *string     `json:"q"`
 	Status        string      `json:"status"`
 	PksStatus     *string     `json:"pks_status"`
+	Kind          *string     `json:"kind"`
 	PageOffset    int64       `json:"page_offset"`
 	PageLimit     int64       `json:"page_limit"`
 }
@@ -296,6 +301,7 @@ func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminPara
 		arg.Q,
 		arg.Status,
 		arg.PksStatus,
+		arg.Kind,
 		arg.PageOffset,
 		arg.PageLimit,
 	)

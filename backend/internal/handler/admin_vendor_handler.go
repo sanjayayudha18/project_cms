@@ -86,8 +86,17 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		pksStatus = &v
 	}
 
+	var kind *string
+	if v := q.Get("kind"); v != "" {
+		if v != "FLM_VENDOR" && v != "INTERNAL" {
+			writeError(w, http.StatusBadRequest, "bad_request", "kind tidak valid")
+			return
+		}
+		kind = &v
+	}
+
 	listArg := db.ListVendorsAdminParams{
-		Q: qParam, Status: status, PksStatus: pksStatus,
+		Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	}
 	rows, err := h.svc.List(r.Context(), listArg)
@@ -95,7 +104,7 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status, PksStatus: pksStatus})
+	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return

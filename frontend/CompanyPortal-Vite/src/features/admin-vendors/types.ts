@@ -57,6 +57,7 @@ export interface AdminVendorsListParams {
   status?: VendorStatus;
   q?: string;
   pks_status?: PksStatus;
+  kind?: VendorKind;
 }
 
 export interface AdminVendorsListResponse {
@@ -105,6 +106,7 @@ export interface AdminVendorBranch {
   branch_code: string;
   branch_name: string;
   location_id: number | null;
+  /** Name of the branch's standard region (regions.region via region_code, migration 042); read-only. */
   region: string | null;
   /** replenish-ticket: segment of the request number; null = requests for this cabang are rejected. */
   region_code: string | null;
@@ -131,7 +133,6 @@ export interface CreateVendorBranchPayload {
   branch_code: string;
   branch_name: string;
   location_id: number | null;
-  region: string | null;
   region_code: string | null;
   category: VendorVaultCategory;
 }
@@ -139,7 +140,6 @@ export interface CreateVendorBranchPayload {
 export interface UpdateVendorBranchPayload {
   branch_name: string;
   location_id: number | null;
-  region: string | null;
   region_code: string | null;
   category: VendorVaultCategory;
 }

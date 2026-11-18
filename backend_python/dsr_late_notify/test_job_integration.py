@@ -45,6 +45,10 @@ async def seed(c: asyncpg.Connection, tag: str) -> dict[str, dict[str, int]]:
         ids["vendor"][v["key"]] = await c.fetchval(
             "INSERT INTO vendors (code, name, kind) VALUES ($1, $1, $2) RETURNING id", f"DLR_{v['key']}_{tag}", v["kind"])
     for b in CASES["branches"]:
+        if b.get("region_code"):
+            # region_code is an FK to regions.code since migration 042 (rolled back with the test tx).
+            await c.execute("INSERT INTO regions (code, region) VALUES ($1, 'IT dsr late') ON CONFLICT (code) DO NOTHING",
+                            b["region_code"])
         ids["branch"][b["key"]] = await c.fetchval("""
             INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, is_active, deleted_at, created_at, region_code)
             VALUES ($1, $2, $2, $3, $4, $5, $6) RETURNING id""",

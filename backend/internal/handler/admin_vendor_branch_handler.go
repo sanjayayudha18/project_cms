@@ -123,7 +123,7 @@ func (h *AdminVendorBranchHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": branch.ID, "vendor_id": branch.VendorID, "branch_code": branch.BranchCode, "branch_name": branch.BranchName,
-		"location_id": branch.LocationID, "region": branch.Region, "region_code": branch.RegionCode, "category": branch.Category, "is_active": branch.IsActive,
+		"location_id": branch.LocationID, "region_code": branch.RegionCode, "category": branch.Category, "is_active": branch.IsActive,
 		"deleted_at": formatTimestamptz(branch.DeletedAt),
 	})
 }
@@ -132,7 +132,6 @@ type createVendorBranchRequestBody struct {
 	BranchCode string  `json:"branch_code"`
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
 }
@@ -159,7 +158,7 @@ func (h *AdminVendorBranchHandler) Create(w http.ResponseWriter, r *http.Request
 
 	change, err := h.svc.Create(r.Context(), authCtx.UserID, service.VendorBranchPayload{
 		VendorID: vendorID, BranchCode: body.BranchCode, BranchName: body.BranchName,
-		LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
+		LocationID: body.LocationID, RegionCode: body.RegionCode, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)
@@ -172,7 +171,6 @@ func (h *AdminVendorBranchHandler) Create(w http.ResponseWriter, r *http.Request
 type updateVendorBranchRequestBody struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"`
 	Category   string  `json:"category"`
 }
@@ -198,7 +196,7 @@ func (h *AdminVendorBranchHandler) Update(w http.ResponseWriter, r *http.Request
 	}
 
 	change, err := h.svc.Update(r.Context(), authCtx.UserID, id, service.VendorBranchUpdatePayload{
-		BranchName: body.BranchName, LocationID: body.LocationID, Region: body.Region, RegionCode: body.RegionCode, Category: body.Category,
+		BranchName: body.BranchName, LocationID: body.LocationID, RegionCode: body.RegionCode, Category: body.Category,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleVendorBranchAdminError(w, err)

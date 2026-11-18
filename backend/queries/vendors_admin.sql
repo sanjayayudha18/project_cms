@@ -30,6 +30,7 @@ WHERE (sqlc.narg('q')::text IS NULL
       )
   AND (sqlc.narg('pks_status')::text IS NULL
         OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text)
+  AND (sqlc.narg('kind')::text IS NULL OR v.kind = sqlc.narg('kind')::text)
 ORDER BY v.name ASC, v.id ASC
 LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 
@@ -47,7 +48,8 @@ WHERE (sqlc.narg('q')::text IS NULL
         OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
   AND (sqlc.narg('pks_status')::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text);
+        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text)
+  AND (sqlc.narg('kind')::text IS NULL OR v.kind = sqlc.narg('kind')::text);
 
 -- name: GetVendorDirectorPic :one
 -- Active Director_PIC (Direktur Utama) of one vendor, or no row (vendor-pks

@@ -5,6 +5,7 @@
  * as an inline conflict message, icon + text, not a generic error.
  */
 
+import { BackLink } from "@/components/ui/BackLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, Trash2 } from "lucide-react";
@@ -31,6 +32,7 @@ export function RbacDelegationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink to="/settings" label="Kembali ke Pengaturan" />
       <PageHeader
         eyebrow="Pengaturan"
         title="Delegasi Persetujuan"

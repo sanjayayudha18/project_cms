@@ -17,6 +17,13 @@ type fakeVendorBranchAdminRepo struct {
 	countFunc      func(ctx context.Context, arg db.CountVendorBranchesAdminParams) (int64, error)
 	getByIDFunc    func(ctx context.Context, id int64) (*db.GetVendorBranchAdminByIDRow, error)
 	findByCodeFunc func(ctx context.Context, code string) (*int64, error)
+	// inactiveRegions: region codes IsActiveRegion reports as unknown/inactive
+	// (region-standardization Req 3.3); every other code counts as active.
+	inactiveRegions map[string]bool
+}
+
+func (f *fakeVendorBranchAdminRepo) IsActiveRegion(_ context.Context, code string) (bool, error) {
+	return !f.inactiveRegions[code], nil
 }
 
 func (f *fakeVendorBranchAdminRepo) List(ctx context.Context, arg db.ListVendorBranchesAdminParams) ([]db.ListVendorBranchesAdminRow, error) {
@@ -300,5 +307,48 @@ func TestVendorBranchAdminService_Enable_HappyPath(t *testing.T) {
 	}
 	if sub.lastRequest.Op != "enable" {
 		t.Errorf("expected op=enable, got %q", sub.lastRequest.Op)
+	}
+}
+
+// region-standardization Req 3.3 / Property 3: a non-NULL region_code must be
+// an active standard region, else 422 on region_code and nothing is staged.
+func TestVendorBranchAdminService_RegionMustBeActive(t *testing.T) {
+	existing := &db.GetVendorBranchAdminByIDRow{ID: 9, VendorID: 3, BranchCode: "BR1", BranchName: "Branch One", Category: "ATM"}
+	for _, tc := range []struct {
+		name       string
+		code       *string
+		wantReject bool
+	}{
+		{"active region", sp("JKTBAR"), false},
+		{"lower-case active region is normalized", sp(" jktbar "), false},
+		{"unknown or inactive region", sp("OLD1"), true},
+		{"no region", nil, false},
+	} {
+		for _, op := range []string{"create", "update"} {
+			t.Run(tc.name+"/"+op, func(t *testing.T) {
+				repo := &fakeVendorBranchAdminRepo{
+					inactiveRegions: map[string]bool{"OLD1": true},
+					getByIDFunc:     func(context.Context, int64) (*db.GetVendorBranchAdminByIDRow, error) { return existing, nil },
+				}
+				sub := &fakeVendorBranchSubmitter{}
+				svc := NewVendorBranchAdminService(repo, sub, &fakeVendorBranchChildCounter{})
+				var err error
+				if op == "create" {
+					_, err = svc.Create(context.Background(), 7, VendorBranchPayload{VendorID: 3, BranchCode: "BR2", BranchName: "B2", Category: "ATM", RegionCode: tc.code}, "")
+				} else {
+					_, err = svc.Update(context.Background(), 7, 9, VendorBranchUpdatePayload{BranchName: "B1", Category: "ATM", RegionCode: tc.code}, "")
+				}
+				var ve *ValidationError
+				if tc.wantReject {
+					if !errors.As(err, &ve) || ve.Field != "region_code" || sub.submitCalled {
+						t.Fatalf("err = %v, submitCalled = %v; want ValidationError on region_code and no submit", err, sub.submitCalled)
+					}
+					return
+				}
+				if err != nil || !sub.submitCalled {
+					t.Fatalf("err = %v, submitCalled = %v; want staged", err, sub.submitCalled)
+				}
+			})
+		}
 	}
 }

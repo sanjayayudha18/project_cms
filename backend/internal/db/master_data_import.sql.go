@@ -9,6 +9,32 @@ import (
 	"context"
 )
 
+const importActiveRegionCodes = `-- name: ImportActiveRegionCodes :many
+SELECT code FROM regions WHERE is_active = true
+`
+
+// Vendor branch CSV dry-run (region-standardization Req 3.5): a region_code
+// must name an active standard region.
+func (q *Queries) ImportActiveRegionCodes(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, importActiveRegionCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		items = append(items, code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const importLocationIDs = `-- name: ImportLocationIDs :many
 SELECT id FROM locations
 `

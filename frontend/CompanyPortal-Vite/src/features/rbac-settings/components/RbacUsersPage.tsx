@@ -9,6 +9,7 @@
  * roleDomain/roleLevel) -- see backend/migrations/002_cms_tables.sql.
  */
 
+import { BackLink } from "@/components/ui/BackLink";
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +64,7 @@ export function RbacUsersPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink to="/settings" label="Kembali ke Pengaturan" />
       <PageHeader
         eyebrow="Pengaturan"
         title="Hierarki Pengguna"

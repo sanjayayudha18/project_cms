@@ -708,6 +708,13 @@ type MenuFeature struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Temporary: pre-042 values for the documented rollback of 042_region_standardization.sql. Drop in a later migration once the release is confirmed.
+type Migration042Backup struct {
+	Entity    string `json:"entity"`
+	EntityKey string `json:"entity_key"`
+	Payload   []byte `json:"payload"`
+}
+
 // Notifikasi in-app, satu baris per user penerima. Dibaca hanya oleh penerimanya. Dihapus setelah 90 hari (retensi). Migrasi 025.
 type Notification struct {
 	ID              int64              `json:"id"`
@@ -756,6 +763,18 @@ type Region struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	IsActive  bool               `json:"is_active"`
 	// Soft-disable timestamp (set with is_active=false). Never hard-delete: locations.region_id references this table.
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Kota di bawah tepat satu region baku (spec region-standardization Q1). Tabel saja: belum ada layar/API/CSV.
+type RegionCity struct {
+	ID        int64              `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	RegionID  int64              `json:"region_id"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
@@ -916,12 +935,10 @@ type VendorBranch struct {
 	IsActive   bool               `json:"is_active"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	// Vendor regional grouping from MASTER_ATM_ESQ.FLMVendorRegion (e.g. "Jakarta Timur"). Distinct from regions.region (ATM geographic area) and branch_name (vendor sub-region). See migration 030.
-	Region    *string            `json:"region"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 	// Tipe cabang: ATM, CASH, or ATM_CASH -- mirrors vendor_vaults.category. Added per .claude/sdlc/vendor-branch-tipe/plan.md; existing rows default to ATM pending re-seed.
 	Category string `json:"category"`
-	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
+	// Region baku cabang (FK regions.code, migration 042). Nama region dibaca dari regions.region. Segmen nomor request REP-<vendor>-<region_code>-...
 	RegionCode *string `json:"region_code"`
 }
 

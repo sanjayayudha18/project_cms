@@ -15,13 +15,13 @@ import {
 } from "../lib/vendorBranchFormSchema";
 import { VENDOR_VAULT_CATEGORIES } from "../lib/vendorVaultFormSchema";
 import type { AdminVendorBranch, UpdateVendorBranchPayload } from "../types";
+import { RegionCodeSelect } from "./RegionCodeSelect";
 
 function toDefaultValues(branch: AdminVendorBranch): VendorBranchFormValues {
   return {
     branch_code: branch.branch_code,
     branch_name: branch.branch_name,
     location_id: branch.location_id ? String(branch.location_id) : "",
-    region: branch.region ?? "",
     region_code: branch.region_code ?? "",
     category: branch.category,
   };
@@ -50,7 +50,6 @@ export function VendorBranchEditPage({ vendorId, branchId }: VendorBranchEditPag
       branch_code: "",
       branch_name: "",
       location_id: "",
-      region: "",
       region_code: "",
       category: "ATM",
     },
@@ -71,7 +70,6 @@ export function VendorBranchEditPage({ vendorId, branchId }: VendorBranchEditPag
       const payload: UpdateVendorBranchPayload = {
         branch_name: values.branch_name,
         location_id: values.location_id ? Number(values.location_id) : null,
-        region: values.region || null,
         region_code: toRegionCode(values.region_code),
         category: values.category,
       };
@@ -123,15 +121,11 @@ export function VendorBranchEditPage({ vendorId, branchId }: VendorBranchEditPag
             <input {...form.register("branch_name")} className={inputClass} />
           </Field>
 
-          <Field label="Wilayah" error={form.formState.errors.region?.message}>
-            <input {...form.register("region")} className={inputClass} />
-          </Field>
-
           <Field label="Kode Region" error={form.formState.errors.region_code?.message}>
-            <input
-              {...form.register("region_code")}
-              placeholder="mis. JKT"
-              className={`${inputClass} uppercase`}
+            <RegionCodeSelect
+              registration={form.register("region_code")}
+              currentCode={branch.region_code ?? undefined}
+              className={inputClass}
             />
           </Field>
 

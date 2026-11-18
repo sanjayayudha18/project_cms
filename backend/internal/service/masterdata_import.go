@@ -194,6 +194,7 @@ type MasterDataImportRepo interface {
 	PackageKeys(ctx context.Context) ([]db.ImportPackageKeysRow, error)
 	PackageLabels(ctx context.Context) ([]db.ImportVendorPackageLabelsRow, error)
 	LocationIDs(ctx context.Context) ([]int64, error)
+	ActiveRegionCodes(ctx context.Context) ([]string, error)
 }
 
 // MasterDataImporter validates a CSV against the current master data without
@@ -252,6 +253,7 @@ type importEnv struct {
 	packages          map[string]int64            // active "vendor|branch|package" -> id
 	labels            map[string]bool             // vendor-wide package labels with an open tariff, "vendor|label"
 	locations         map[int64]bool
+	regions           map[string]bool         // active region codes (vendor branch import only)
 	spans             map[string][]importSpan // terminal -> active periods (db rows not in the file + accepted file rows)
 	seenKey           map[string]int
 	seenID            map[int64]int
@@ -549,6 +551,16 @@ func (i *MasterDataImporter) buildEnv(ctx context.Context, entity string) (*impo
 		for _, id := range ids {
 			env.locations[id] = true
 		}
+		if entity == ExportVendorBranches {
+			codes, err := i.repo.ActiveRegionCodes(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("loading regions for import: %w", err)
+			}
+			env.regions = make(map[string]bool, len(codes))
+			for _, c := range codes {
+				env.regions[c] = true
+			}
+		}
 	case ExportATMAssignments:
 		if env.atms, err = i.activeSet(ctx, ExportATMs, func(r map[string]string) string { return r["terminal_id"] }); err != nil {
 			return nil, err
@@ -805,6 +817,12 @@ func (e *importEnv) validateRow(header []string, rec importRecord) (ImportRow, [
 				v[col] = cur[col]
 			}
 		}
+	}
+
+	if e.entity == ExportVendorBranches {
+		// `region` is read-only since migration 042: the name follows region_code
+		// (regions.region), so the file's value is ignored (region-standardization Req 4.4).
+		v["region"] = e.cur[id]["region"]
 	}
 
 	if e.entity == ExportVendorPICs {

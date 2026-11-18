@@ -12,6 +12,8 @@ import { z } from "zod";
 import type { PksStatus, VendorStatus } from "./types";
 
 const PKS_STATUSES = ["aktif", "need_renewal", "expired", "terminated", "belum_diisi"] as const;
+const VENDOR_KINDS = ["FLM_VENDOR", "INTERNAL"] as const;
+export type VendorKind = (typeof VENDOR_KINDS)[number];
 
 export const ADMIN_VENDORS_SEARCH_SCHEMA = z.object({
   page: z.number().int().min(1).optional(),
@@ -19,6 +21,7 @@ export const ADMIN_VENDORS_SEARCH_SCHEMA = z.object({
   status: z.enum(["active", "disabled", "all"]).optional(),
   q: z.string().max(100).optional(),
   pks_status: z.enum(PKS_STATUSES).optional(),
+  kind: z.enum(VENDOR_KINDS).optional(),
 });
 
 export type AdminVendorsSearchParams = z.infer<typeof ADMIN_VENDORS_SEARCH_SCHEMA>;
@@ -29,6 +32,7 @@ export interface AdminVendorsUrlParams {
   status: VendorStatus;
   q: string;
   pks_status?: PksStatus;
+  kind?: VendorKind;
 }
 
 const DEFAULTS: AdminVendorsUrlParams = {
@@ -47,6 +51,7 @@ export function parseParams(raw: Record<string, unknown>): AdminVendorsUrlParams
     status: typeof raw.status === "string" ? (raw.status as VendorStatus) : DEFAULTS.status,
     q: typeof raw.q === "string" ? raw.q : DEFAULTS.q,
     pks_status: PKS_STATUSES.find((v) => v === raw.pks_status),
+    kind: VENDOR_KINDS.find((v) => v === raw.kind),
   };
 }
 
@@ -57,6 +62,7 @@ export function omitDefaults(params: AdminVendorsUrlParams): AdminVendorsSearchP
   if (params.status !== DEFAULTS.status) out.status = params.status;
   if (params.q !== DEFAULTS.q) out.q = params.q;
   if (params.pks_status) out.pks_status = params.pks_status;
+  if (params.kind) out.kind = params.kind;
   return out;
 }
 
@@ -89,7 +95,7 @@ export function useAdminVendorsUrlState() {
   }, [debouncedSearch]);
 
   function setParams(partial: Partial<AdminVendorsUrlParams>): void {
-    const resetPage = "pks_status" in partial && partial.page === undefined;
+    const resetPage = ("pks_status" in partial || "kind" in partial) && partial.page === undefined;
     const next = omitDefaults({ ...params, ...partial, ...(resetPage ? { page: 1 } : {}) });
     navigate({ to: ".", search: next });
   }

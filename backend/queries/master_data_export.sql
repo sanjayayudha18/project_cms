@@ -40,13 +40,14 @@ SELECT b.id,
        v.code                                  AS vendor_code,
        b.branch_code,
        b.branch_name,
-       COALESCE(b.region, '')::text            AS region,
+       COALESCE(rg.region, '')::text            AS region,
        COALESCE(b.region_code, '')::text       AS region_code,
        b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
        b.is_active
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE b.id > sqlc.arg('after_id')::bigint
   AND (sqlc.narg('vendor_id')::bigint IS NULL OR b.vendor_id = sqlc.narg('vendor_id')::bigint)
   AND (sqlc.arg('status')::text = 'all'
@@ -68,7 +69,7 @@ SELECT vl.id,
        COALESCE(vl.category, '')::text                  AS category,
        COALESCE(vl.operating_hours, '')::text           AS operating_hours,
        COALESCE(vl.currency_code, '')::text             AS currency_code,
-       COALESCE(b.region, '')::text                     AS region,
+       COALESCE(rg.region, '')::text                     AS region,
        COALESCE(vl.alamat, '')::text                    AS alamat,
        COALESCE(vl.min_balance::text, '')::text         AS min_balance,
        COALESCE(vl.max_balance::text, '')::text         AS max_balance,
@@ -82,6 +83,7 @@ SELECT vl.id,
 FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE vl.id > sqlc.arg('after_id')::bigint
   AND (sqlc.narg('vendor_id')::bigint IS NULL OR v.id = sqlc.narg('vendor_id')::bigint)
   AND (sqlc.narg('branch_id')::bigint IS NULL OR b.id = sqlc.narg('branch_id')::bigint)

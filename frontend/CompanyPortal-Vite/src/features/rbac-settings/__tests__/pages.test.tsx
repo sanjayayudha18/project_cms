@@ -253,3 +253,10 @@ describe("RbacPoliciesPage", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 });
+
+// BackLink memakai <Link>; test ini tidak butuh RouterProvider.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { to: string; children: import("react").ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));

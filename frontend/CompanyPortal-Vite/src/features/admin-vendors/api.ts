@@ -48,6 +48,7 @@ function toQueryString(params: AdminVendorsListParams): string {
   if (params.status) q.set("status", params.status);
   if (params.q) q.set("q", params.q);
   if (params.pks_status) q.set("pks_status", params.pks_status);
+  if (params.kind) q.set("kind", params.kind);
   return q.toString();
 }
 

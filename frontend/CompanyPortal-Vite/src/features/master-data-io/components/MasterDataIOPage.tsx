@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { type KeyboardEvent, useRef } from "react";
 import { type MasterDataIoTab, useMasterDataIoTab } from "../useMasterDataIoTab";
@@ -41,6 +42,9 @@ export function MasterDataIOPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <div className="self-start">
+        <BackLink to="/settings" label="Kembali ke Pengaturan" />
+      </div>
       <PageHeader
         eyebrow="Data master"
         title="Impor CSV Data Master"

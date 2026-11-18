@@ -69,3 +69,8 @@ func (r *MasterDataExportRepository) PackageKeys(ctx context.Context) ([]db.Impo
 func (r *MasterDataExportRepository) LocationIDs(ctx context.Context) ([]int64, error) {
 	return r.queries.ImportLocationIDs(ctx)
 }
+
+// ActiveRegionCodes lists active standard region codes (vendor branch CSV dry-run, region-standardization Req 3.5).
+func (r *MasterDataExportRepository) ActiveRegionCodes(ctx context.Context) ([]string, error) {
+	return r.queries.ImportActiveRegionCodes(ctx)
+}

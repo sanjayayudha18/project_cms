@@ -18,7 +18,10 @@ export interface AdminRegion {
   code: string;
   region: string | null;
   is_active: boolean;
-  location_count: number;
+  /** Active ATMs whose location is in this region (region-standardization Req 6.1). */
+  atm_count: number;
+  /** Active vendor branches whose region_code is this region's code (Req 6.1). */
+  vendor_branch_count: number;
   created_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
@@ -48,15 +51,17 @@ export interface UpdateRegionPayload {
   region: string;
 }
 
-// code: 1-20 chars after trim, alphanumeric only (mirrors regionCodeRe in
-// backend/internal/service/region_admin.go). region (display name): 1-100
-// chars after trim.
+// code: 2-10 chars after trim, letters/digits only (mirrors regionCodeRe in
+// backend/internal/service/region_admin.go, same rule as vendor branch
+// region_code -- region-standardization Req 1.3; the backend upper-cases).
+// region (display name): 1-100 chars after trim.
 export const createRegionSchema = z.object({
   code: z
     .string()
     .trim()
     .min(1, "Kode wajib diisi")
-    .max(20, "Maksimal 20 karakter")
+    .min(2, "Minimal 2 karakter")
+    .max(10, "Maksimal 10 karakter")
     .regex(/^[A-Za-z0-9]+$/, "Hanya huruf dan angka"),
   region: z.string().trim().min(1, "Nama wajib diisi").max(100, "Maksimal 100 karakter"),
 });

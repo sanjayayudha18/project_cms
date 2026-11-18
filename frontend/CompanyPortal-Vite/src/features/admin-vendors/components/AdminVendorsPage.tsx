@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -97,6 +98,9 @@ export function AdminVendorsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <div className="self-start">
+        <BackLink to="/settings" label="Kembali ke Pengaturan" />
+      </div>
       <PageHeader
         eyebrow="Pengaturan"
         title="Manajemen Vendor"
@@ -114,7 +118,7 @@ export function AdminVendorsPage() {
           </>
         }
       />
-      <ReportExportNotice error={exportFlow.requestError} />
+      <ReportExportNotice error={exportFlow.requestError} showMyExportsLink={false} />
       <ExportProgressDialog {...exportFlow.dialogProps} />
 
       <VendorFilterBar

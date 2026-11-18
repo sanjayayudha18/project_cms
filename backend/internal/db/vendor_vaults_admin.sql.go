@@ -252,13 +252,14 @@ func (q *Queries) GetVendorBranchVendorID(ctx context.Context, id int64) (int64,
 }
 
 const getVendorVaultAdminByID = `-- name: GetVendorVaultAdminByID :one
-SELECT v.id, v.vendor_branch_id, b.branch_name, b.region,
+SELECT v.id, v.vendor_branch_id, b.branch_name, rg.region,
        v.vault_code, v.vault_name, v.category, v.currency_code, v.alamat,
        v.min_balance, v.max_balance, v.cis_limit_amount, v.cis_limit_currency,
        v.latitude, v.longitude, v.operating_hours, v.location_id,
        v.escrow_cash, v.escrow_atm, v.is_active, v.deleted_at
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE v.id = $1
 `
 
@@ -318,13 +319,14 @@ func (q *Queries) GetVendorVaultAdminByID(ctx context.Context, id int64) (GetVen
 
 const listVendorVaultsAdmin = `-- name: ListVendorVaultsAdmin :many
 
-SELECT v.id, v.vendor_branch_id, b.branch_name, b.region,
+SELECT v.id, v.vendor_branch_id, b.branch_name, rg.region,
        v.vault_code, v.vault_name, v.category, v.currency_code, v.alamat,
        v.min_balance, v.max_balance, v.cis_limit_amount, v.cis_limit_currency,
        v.latitude, v.longitude, v.operating_hours, v.location_id,
        v.escrow_cash, v.escrow_atm, v.is_active, v.deleted_at
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE b.vendor_id = $1
   AND ($2::bigint IS NULL OR v.vendor_branch_id = $2::bigint)
   AND ($3::text IS NULL

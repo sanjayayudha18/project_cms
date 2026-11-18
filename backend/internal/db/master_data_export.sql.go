@@ -175,13 +175,14 @@ SELECT b.id,
        v.code                                  AS vendor_code,
        b.branch_code,
        b.branch_name,
-       COALESCE(b.region, '')::text            AS region,
+       COALESCE(rg.region, '')::text            AS region,
        COALESCE(b.region_code, '')::text       AS region_code,
        b.category,
        COALESCE(b.location_id::text, '')::text AS location_id,
        b.is_active
 FROM vendor_branches b
 JOIN vendors v ON v.id = b.vendor_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE b.id > $1::bigint
   AND ($2::bigint IS NULL OR b.vendor_id = $2::bigint)
   AND ($3::text = 'all'
@@ -343,7 +344,7 @@ SELECT vl.id,
        COALESCE(vl.category, '')::text                  AS category,
        COALESCE(vl.operating_hours, '')::text           AS operating_hours,
        COALESCE(vl.currency_code, '')::text             AS currency_code,
-       COALESCE(b.region, '')::text                     AS region,
+       COALESCE(rg.region, '')::text                     AS region,
        COALESCE(vl.alamat, '')::text                    AS alamat,
        COALESCE(vl.min_balance::text, '')::text         AS min_balance,
        COALESCE(vl.max_balance::text, '')::text         AS max_balance,
@@ -357,6 +358,7 @@ SELECT vl.id,
 FROM vendor_vaults vl
 JOIN vendor_branches b ON b.id = vl.vendor_branch_id
 JOIN vendors v ON v.id = b.vendor_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE vl.id > $1::bigint
   AND ($2::bigint IS NULL OR v.id = $2::bigint)
   AND ($3::bigint IS NULL OR b.id = $3::bigint)

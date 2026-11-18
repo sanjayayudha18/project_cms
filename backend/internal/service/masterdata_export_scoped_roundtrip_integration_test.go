@@ -43,8 +43,11 @@ func seedScopedFixture(t *testing.T, h *testHelpers, tag string) scopedFixture {
 	h.trackVendor(f.vendorID)
 
 	branch := func(code, name, region string, regionCode *string, category string) int64 {
-		id := scan(`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region, region_code, category)
-			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, f.vendorID, code, name, region, regionCode, category)
+		if regionCode != nil {
+			seedTestRegion(t, h.pool, *regionCode, region)
+		}
+		id := scan(`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code, category)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id`, f.vendorID, code, name, regionCode, category)
 		h.trackVendorBranch(id)
 		return id
 	}

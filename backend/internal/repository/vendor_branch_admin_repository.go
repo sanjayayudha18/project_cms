@@ -61,3 +61,15 @@ func (r *VendorBranchAdminRepository) FindByCode(ctx context.Context, code strin
 	}
 	return &id, nil
 }
+
+// IsActiveRegion reports whether code is an active standard region
+// (region-standardization Req 3.3, 3.5). Primary pool, like FindByCode.
+func (r *VendorBranchAdminRepository) IsActiveRegion(ctx context.Context, code string) (bool, error) {
+	if _, err := r.queries.FindActiveRegionByCode(ctx, code); err != nil {
+		if err == pgx.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}

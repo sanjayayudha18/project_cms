@@ -58,6 +58,7 @@ func newPicImportFixture(t *testing.T) *picImportFixture {
 
 	vendorID := h.seedVendor("ITP-"+f.tag, "Vendor PIC "+tail)
 	branchID := h.seedVendorBranch(vendorID, "IT"+tail, "Cabang PIC "+tail)
+	seedTestRegion(t, h.pool, f.region, "IT cash count "+f.region)
 	if _, err := h.pool.Exec(f.ctx, `UPDATE vendor_branches SET region_code = $2 WHERE id = $1`, branchID, f.region); err != nil {
 		t.Fatalf("seed region: %v", err)
 	}

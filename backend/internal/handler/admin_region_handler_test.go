@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -99,7 +100,7 @@ func regionName(s string) *string { return &s }
 
 func TestAdminRegionHandler_List_HappyPath(t *testing.T) {
 	svc := &fakeRegionAdminServicer{
-		listResult:  []db.ListRegionsAdminRow{{ID: 1, Code: "JKT_CENTRAL", Region: regionName("JKT-Central"), IsActive: true, LocationCount: 12}},
+		listResult:  []db.ListRegionsAdminRow{{ID: 1, Code: "JKT_CENTRAL", Region: regionName("JKT-Central"), IsActive: true, AtmCount: 12, VendorBranchCount: 4}},
 		countResult: 1,
 	}
 	router, tokenSvc := mountAdminRegionHandler(svc)
@@ -111,7 +112,7 @@ func TestAdminRegionHandler_List_HappyPath(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`"total":1`, `"page_size":10`, `"code":"JKT_CENTRAL"`, `"is_active":true`, `"location_count":12`} {
+	for _, want := range []string{`"total":1`, `"page_size":10`, `"code":"JKT_CENTRAL"`, `"is_active":true`, `"atm_count":12`, `"vendor_branch_count":4`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected %s in body, got: %s", want, body)
 		}
@@ -178,7 +179,7 @@ func TestAdminRegionHandler_List_RepoError_500(t *testing.T) {
 }
 
 func TestAdminRegionHandler_Get_HappyPath(t *testing.T) {
-	svc := &fakeRegionAdminServicer{getResult: &db.GetRegionAdminByIDRow{ID: 1, Code: "JKT_CENTRAL", Region: regionName("JKT-Central"), IsActive: true, LocationCount: 3}}
+	svc := &fakeRegionAdminServicer{getResult: &db.GetRegionAdminByIDRow{ID: 1, Code: "JKT_CENTRAL", Region: regionName("JKT-Central"), IsActive: true, AtmCount: 3, VendorBranchCount: 1}}
 	router, tokenSvc := mountAdminRegionHandler(svc)
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
@@ -187,8 +188,8 @@ func TestAdminRegionHandler_Get_HappyPath(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"location_count":3`) {
-		t.Errorf("expected location_count in body, got: %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `"atm_count":3`) || !strings.Contains(rec.Body.String(), `"vendor_branch_count":1`) {
+		t.Errorf("expected atm_count + vendor_branch_count in body, got: %s", rec.Body.String())
 	}
 }
 
@@ -439,5 +440,18 @@ func TestAdminRegionHandler_Enable_InvalidID_BadRequest(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// region-standardization Req 7.2: an active vendor branch blocks disable (409).
+func TestAdminRegionHandler_Disable_HasActiveVendorBranches_409(t *testing.T) {
+	svc := &fakeRegionAdminServicer{disableErr: fmt.Errorf("%w: %d", service.ErrRegionHasActiveVendorBranches, 3)}
+	router, tokenSvc := mountAdminRegionHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/regions/1/disable", token, "")
+
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "active vendor branches") {
+		t.Fatalf("expected 409 naming active vendor branches, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

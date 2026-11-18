@@ -76,6 +76,25 @@ type VendorBranchAdminRepo interface {
 	Count(ctx context.Context, arg db.CountVendorBranchesAdminParams) (int64, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorBranchAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
+	// IsActiveRegion reports whether code names an active standard region
+	// (region-standardization Req 3.3). Primary pool.
+	IsActiveRegion(ctx context.Context, code string) (bool, error)
+}
+
+// ensureActiveRegion rejects a non-NULL region_code that is not an active
+// standard region (Req 3.3) before anything is staged. NULL stays allowed.
+func (s *VendorBranchAdminService) ensureActiveRegion(ctx context.Context, code *string) error {
+	if code == nil {
+		return nil
+	}
+	ok, err := s.repo.IsActiveRegion(ctx, *code)
+	if err != nil {
+		return fmt.Errorf("checking region %s: %w", *code, err)
+	}
+	if !ok {
+		return &ValidationError{Field: "region_code", Message: "region tidak dikenal atau nonaktif"}
+	}
+	return nil
 }
 
 // VendorBranchChildCounter checks whether a branch still has active
@@ -114,8 +133,7 @@ type VendorBranchPayload struct {
 	BranchCode string  `json:"branch_code"`
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
-	RegionCode *string `json:"region_code"`
+	RegionCode *string `json:"region_code"` // FK regions.code; the free-text region was dropped in migration 042
 	Category   string  `json:"category"`
 }
 
@@ -125,7 +143,6 @@ type VendorBranchPayload struct {
 type VendorBranchUpdatePayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"` // nil = cleared (form always sends the current value)
 	Category   string  `json:"category"`
 }
@@ -169,6 +186,9 @@ func (s *VendorBranchAdminService) Create(ctx context.Context, makerID int64, re
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
+	if err := s.ensureActiveRegion(ctx, req.RegionCode); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
 
 	existing, err := s.repo.FindByCode(ctx, req.BranchCode)
 	if err != nil {
@@ -208,6 +228,9 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
+	if err := s.ensureActiveRegion(ctx, req.RegionCode); err != nil {
+		return db.MasterDataChangeRequest{}, err
+	}
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{
 		EntityType: "vendor_branch",

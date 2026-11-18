@@ -28,7 +28,9 @@ func seedVendorWide(t *testing.T, tx pgx.Tx, marker string) (atmID, vendorID, br
 	if err := tx.QueryRow(ctx, `INSERT INTO vendors (code, name) VALUES ($1, $2) RETURNING id`, "ITEST-"+marker, "Vendor "+marker).Scan(&vendorID); err != nil {
 		t.Fatalf("insert vendor: %v", err)
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region) VALUES ($1, $2, 'Cabang', 'Region '||$2) RETURNING id`, vendorID, "ITEST-"+marker).Scan(&branchID); err != nil {
+	regionCode := itRegionCode("ITEST-" + marker)
+	seedTestRegion(t, tx, regionCode, "Region ITEST-"+marker)
+	if err := tx.QueryRow(ctx, `INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code) VALUES ($1, $2, 'Cabang', $3) RETURNING id`, vendorID, "ITEST-"+marker, regionCode).Scan(&branchID); err != nil {
 		t.Fatalf("insert branch: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `

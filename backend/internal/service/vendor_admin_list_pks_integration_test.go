@@ -240,6 +240,38 @@ func TestVendorAdminListPks_Property_Integration(t *testing.T) {
 			rt.Fatalf("filters matched %d vendors, want %d (INTERNAL must match none)", matched, n-internal)
 		}
 
+		// kind filter (spec settings-menu-review Property 1/2): equals the
+		// unfiltered list narrowed to that kind; the two kinds partition it.
+		kindTotal := 0
+		for _, k := range []string{"FLM_VENDOR", "INTERNAL"} {
+			k := k
+			var want []int64
+			for i, s := range specs {
+				if s.internal == (k == "INTERNAL") {
+					want = append(want, ids[i])
+				}
+			}
+			rows, err := svc.List(ctx, db.ListVendorsAdminParams{Q: &q, Status: "all", Kind: &k, PageLimit: 50})
+			if err != nil {
+				rt.Fatalf("list kind %s: %v", k, err)
+			}
+			got := make([]int64, len(rows))
+			for i, r := range rows {
+				got[i] = r.ID
+			}
+			if fmt.Sprint(got) != fmt.Sprint(want) {
+				rt.Fatalf("kind %s: ids %v, want %v", k, got, want)
+			}
+			total, err := svc.Count(ctx, db.CountVendorsAdminParams{Q: &q, Status: "all", Kind: &k})
+			if err != nil || int(total) != len(want) {
+				rt.Fatalf("kind %s: total %d err %v, want %d", k, total, err, len(want))
+			}
+			kindTotal += len(want)
+		}
+		if kindTotal != n {
+			rt.Fatalf("kinds cover %d vendors, want %d", kindTotal, n)
+		}
+
 		// q by name keeps working.
 		one := fmt.Sprintf("%s-%02d", tag, 0)
 		rows, err := svc.List(ctx, db.ListVendorsAdminParams{Q: &one, Status: "all", PageLimit: 10})

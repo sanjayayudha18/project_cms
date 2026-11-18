@@ -11,7 +11,14 @@ import type { AdminRegion } from "../types";
 const nav = vi.hoisted(() => ({ navigate: vi.fn(), search: {} as Record<string, unknown> }));
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
-  return { ...actual, useNavigate: () => nav.navigate, useSearch: () => nav.search };
+  return {
+    ...actual,
+    useNavigate: () => nav.navigate,
+    useSearch: () => nav.search,
+    Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+      <a href={to}>{children}</a>
+    ),
+  };
 });
 
 const data = vi.hoisted(() => ({
@@ -43,7 +50,8 @@ const region = (over: Partial<AdminRegion>): AdminRegion => ({
   code: "JKT",
   region: "Jakarta",
   is_active: true,
-  location_count: 3,
+  atm_count: 3,
+  vendor_branch_count: 2,
   created_at: null,
   updated_at: null,
   deleted_at: null,

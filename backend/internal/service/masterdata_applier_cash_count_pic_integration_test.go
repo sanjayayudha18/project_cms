@@ -44,6 +44,7 @@ func newCcPicFixture(t *testing.T) *ccPicFixture {
 	f.region = "T83" + short // ^[A-Z0-9]{2,10}$, unique per run
 	vendorID := h.seedVendor("IT83-"+tag, "Vendor PIC "+tag)
 	branchID := h.seedVendorBranch(vendorID, "IT83B-"+tag, "Branch PIC "+tag)
+	seedTestRegion(t, h.pool, f.region, "IT cash count "+f.region)
 	f.exec(`UPDATE vendor_branches SET region_code = $2 WHERE id = $1`, branchID, f.region)
 
 	f.coord1 = f.seedUser("CC-COORDINATOR", "it83c1_"+tag)

@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -67,6 +68,9 @@ export function AdminATMsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <div className="self-start">
+        <BackLink to="/settings" label="Kembali ke Pengaturan" />
+      </div>
       <PageHeader
         eyebrow="Pengaturan"
         title="Manajemen ATM"

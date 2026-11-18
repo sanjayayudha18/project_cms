@@ -68,6 +68,7 @@ func TestCashCountAreaApplier_Lifecycle_Integration(t *testing.T) {
 	// Active vendor branches carrying the region codes (L648).
 	vendorID := h.seedVendor("ITCC-"+tag, "Vendor CC Area "+tag)
 	for i, rc := range []string{regA, regB, regC} {
+		seedTestRegion(t, pool, rc, "IT cash count "+rc)
 		b := h.seedVendorBranch(vendorID, "ITCCB"+strconv.Itoa(i)+"-"+tag, "Branch "+tag)
 		if _, err := pool.Exec(ctx, `UPDATE vendor_branches SET region_code = $1 WHERE id = $2`, rc, b); err != nil {
 			t.Fatalf("set region_code: %v", err)

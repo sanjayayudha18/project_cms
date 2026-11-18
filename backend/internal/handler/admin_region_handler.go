@@ -282,7 +282,8 @@ func (h *AdminRegionHandler) handleRegionAdminError(w http.ResponseWriter, err e
 		writeError(w, http.StatusConflict, "conflict", service.ErrRegionCodeConflict.Error())
 	case errors.Is(err, service.ErrRegionCodeImmutable):
 		writeError(w, http.StatusBadRequest, "bad_request", service.ErrRegionCodeImmutable.Error())
-	case errors.Is(err, service.ErrRegionHasActiveLocations):
+	case errors.Is(err, service.ErrRegionHasActiveLocations),
+		errors.Is(err, service.ErrRegionHasActiveVendorBranches):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, service.ErrRegionStatusUnchanged):
 		writeError(w, http.StatusConflict, "conflict", service.ErrRegionStatusUnchanged.Error())
@@ -304,10 +305,12 @@ func regionToResponse(reg db.Region) map[string]any {
 	}
 }
 
+// atm_count / vendor_branch_count: active ATMs and active vendor branches in
+// the region (region-standardization Req 6.1); they replace location_count.
 func listRegionRowToResponse(r db.ListRegionsAdminRow) map[string]any {
 	return map[string]any{
-		"id": r.ID, "code": r.Code, "region": r.Region,
-		"is_active": r.IsActive, "location_count": r.LocationCount,
+		"id": r.ID, "code": r.Code, "region": r.Region, "is_active": r.IsActive,
+		"atm_count": r.AtmCount, "vendor_branch_count": r.VendorBranchCount,
 		"created_at": formatTimestamptz(r.CreatedAt), "updated_at": formatTimestamptz(r.UpdatedAt),
 		"deleted_at": formatTimestamptz(r.DeletedAt),
 	}
@@ -315,8 +318,8 @@ func listRegionRowToResponse(r db.ListRegionsAdminRow) map[string]any {
 
 func getRegionRowToResponse(r db.GetRegionAdminByIDRow) map[string]any {
 	return map[string]any{
-		"id": r.ID, "code": r.Code, "region": r.Region,
-		"is_active": r.IsActive, "location_count": r.LocationCount,
+		"id": r.ID, "code": r.Code, "region": r.Region, "is_active": r.IsActive,
+		"atm_count": r.AtmCount, "vendor_branch_count": r.VendorBranchCount,
 		"created_at": formatTimestamptz(r.CreatedAt), "updated_at": formatTimestamptz(r.UpdatedAt),
 		"deleted_at": formatTimestamptz(r.DeletedAt),
 	}

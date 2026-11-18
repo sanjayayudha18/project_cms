@@ -70,8 +70,8 @@ func TestRegionAdminRepository(t *testing.T) {
 		if got.Code != code {
 			t.Errorf("GetByID Code = %q, want %q", got.Code, code)
 		}
-		if got.LocationCount != 0 {
-			t.Errorf("LocationCount = %d, want 0 (no locations seeded yet)", got.LocationCount)
+		if got.AtmCount != 0 || got.VendorBranchCount != 0 {
+			t.Errorf("AtmCount, VendorBranchCount = %d, %d, want 0, 0 (nothing seeded yet)", got.AtmCount, got.VendorBranchCount)
 		}
 	})
 
@@ -271,8 +271,9 @@ func TestRegionAdminRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetByID: %v", err)
 		}
-		if gotByID.LocationCount != 2 {
-			t.Errorf("GetByID LocationCount = %d, want 2 (matches CountActiveLocations)", gotByID.LocationCount)
+		// region-standardization Req 6.1: locations alone are not ATMs.
+		if gotByID.AtmCount != 0 {
+			t.Errorf("GetByID AtmCount = %d, want 0 (locations seeded, no ATMs)", gotByID.AtmCount)
 		}
 	})
 

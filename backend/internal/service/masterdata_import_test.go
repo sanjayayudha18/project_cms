@@ -72,6 +72,11 @@ func (fakeImportRepo) PackageLabels(context.Context) ([]db.ImportVendorPackageLa
 
 func (fakeImportRepo) LocationIDs(context.Context) ([]int64, error) { return []int64{5, 6}, nil }
 
+// ActiveRegionCodes: standard regions the fixture branches may use (region-standardization Req 3.5).
+func (fakeImportRepo) ActiveRegionCodes(context.Context) ([]string, error) {
+	return []string{"JKTBAR", "JKTPST", "JABAR", "SUMATERA", "JKT", "JKTUTR", "JKTTIM", "MDN", "BDG"}, nil
+}
+
 func dryRun(t *testing.T, entity, csvText string) *ImportResult {
 	t.Helper()
 	res, err := NewMasterDataImporter(fakeImportRepo{}).DryRun(adminCtx(7), entity, strings.NewReader(csvText))
@@ -529,5 +534,18 @@ func TestImport_VendorBranchStagesCategory(t *testing.T) {
 	}
 	if p, ok := sub.lastRequest.Payload.(VendorBranchUpdatePayload); !ok || p.Category != "ATM" || p.RegionCode == nil || *p.RegionCode != "JKT" {
 		t.Errorf("update payload = %#v, want current category ATM and region code JKT", sub.lastRequest.Payload)
+	}
+}
+
+// region-standardization Req 3.5 / 4.4: the dry-run only accepts an active
+// standard region_code, and the `region` column is ignored (the name comes
+// from regions.region, so a different value there is not a change).
+func TestImport_VendorBranchRegionMustBeActive(t *testing.T) {
+	h := "id,vendor_code,branch_code,branch_name,region,region_code,location_id,is_active\n"
+	if res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Jakarta,ZZZ9,5,true\n"); !hasErr(res, 2, "region_code") {
+		t.Errorf("unknown region_code must be a row error, got %+v", res.Preview.Errors)
+	}
+	if res := dryRun(t, ExportVendorBranches, h+"1,V1,B1,Cabang 1,Nama Lain,JKT,5,true\n"); len(res.Preview.Errors) != 0 || res.Preview.Unchanged != 1 {
+		t.Errorf("a different `region` value alone must not be a change, got %+v", res.Preview)
 	}
 }

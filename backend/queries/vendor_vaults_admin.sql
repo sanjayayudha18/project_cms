@@ -11,13 +11,14 @@
 -- Scoped to one vendor via its branches (dbRead). Filters: q (vault_code / vault_name substring),
 -- status ('active'|'disabled'|'all', caller resolves absent to 'active'),
 -- vendor_branch_id (optional branch drill-down, NULL = all branches).
-SELECT v.id, v.vendor_branch_id, b.branch_name, b.region,
+SELECT v.id, v.vendor_branch_id, b.branch_name, rg.region,
        v.vault_code, v.vault_name, v.category, v.currency_code, v.alamat,
        v.min_balance, v.max_balance, v.cis_limit_amount, v.cis_limit_currency,
        v.latitude, v.longitude, v.operating_hours, v.location_id,
        v.escrow_cash, v.escrow_atm, v.is_active, v.deleted_at
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE b.vendor_id = sqlc.arg('vendor_id')
   AND (sqlc.narg('vendor_branch_id')::bigint IS NULL OR v.vendor_branch_id = sqlc.narg('vendor_branch_id')::bigint)
   AND (sqlc.narg('q')::text IS NULL
@@ -53,13 +54,14 @@ SELECT COUNT(*) FROM vendor_vaults WHERE vendor_branch_id = $1 AND deleted_at IS
 
 -- name: GetVendorVaultAdminByID :one
 -- Routing: db (primary). Includes soft-deleted rows; doubles as the "before" snapshot / CurrentState (T2.5).
-SELECT v.id, v.vendor_branch_id, b.branch_name, b.region,
+SELECT v.id, v.vendor_branch_id, b.branch_name, rg.region,
        v.vault_code, v.vault_name, v.category, v.currency_code, v.alamat,
        v.min_balance, v.max_balance, v.cis_limit_amount, v.cis_limit_currency,
        v.latitude, v.longitude, v.operating_hours, v.location_id,
        v.escrow_cash, v.escrow_atm, v.is_active, v.deleted_at
 FROM vendor_vaults v
 JOIN vendor_branches b ON b.id = v.vendor_branch_id
+LEFT JOIN regions rg ON rg.code = b.region_code
 WHERE v.id = $1;
 
 -- name: FindVendorVaultAdminByCode :one

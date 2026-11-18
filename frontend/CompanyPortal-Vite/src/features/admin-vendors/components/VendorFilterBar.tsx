@@ -1,6 +1,11 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
-import type { PksStatus } from "../types";
+import type { PksStatus, VendorKind } from "../types";
 import type { AdminVendorsUrlParams } from "../useAdminVendorsUrlState";
+
+const KIND_OPTIONS: { value: VendorKind; label: string }[] = [
+  { value: "FLM_VENDOR", label: "Vendor FLM" },
+  { value: "INTERNAL", label: "ROH" },
+];
 
 const PKS_STATUS_OPTIONS: { value: PksStatus; label: string }[] = [
   { value: "aktif", label: "Aktif" },
@@ -70,6 +75,14 @@ export function VendorFilterBar({
         onChange={(value) =>
           onParamsChange({ pks_status: (value as PksStatus | null) ?? undefined })
         }
+        placeholder="Semua"
+      />
+
+      <FilterSelect
+        label="Jenis vendor"
+        options={KIND_OPTIONS}
+        value={params.kind ?? null}
+        onChange={(value) => onParamsChange({ kind: (value as VendorKind | null) ?? undefined })}
         placeholder="Semua"
       />
     </div>

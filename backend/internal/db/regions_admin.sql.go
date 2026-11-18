@@ -25,6 +25,20 @@ func (q *Queries) CountActiveLocationsByRegion(ctx context.Context, regionID int
 	return count, err
 }
 
+const countActiveVendorBranchesByRegionCode = `-- name: CountActiveVendorBranchesByRegionCode :one
+SELECT COUNT(*) FROM vendor_branches WHERE region_code = $1 AND is_active = true
+`
+
+// Second disable guard (region-standardization Req 7.2): active vendor
+// branches still pointing at the region's code. Run inside the disable tx,
+// after LockRegionForUpdate.
+func (q *Queries) CountActiveVendorBranchesByRegionCode(ctx context.Context, regionCode *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveVendorBranchesByRegionCode, regionCode)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countRegionsAdmin = `-- name: CountRegionsAdmin :one
 SELECT COUNT(*)
 FROM regions r
@@ -141,22 +155,24 @@ func (q *Queries) FindRegionByCode(ctx context.Context, code string) (int64, err
 
 const getRegionAdminByID = `-- name: GetRegionAdminByID :one
 SELECT r.id, r.code, r.region, r.created_at, r.updated_at, r.is_active, r.deleted_at,
-       COUNT(l.id) AS location_count
+       (SELECT COUNT(*) FROM atms a JOIN locations l ON l.id = a.location_id
+         WHERE l.region_id = r.id AND a.is_active)::bigint AS atm_count,
+       (SELECT COUNT(*) FROM vendor_branches vb
+         WHERE vb.region_code = r.code AND vb.is_active)::bigint AS vendor_branch_count
 FROM regions r
-LEFT JOIN locations l ON l.region_id = r.id
 WHERE r.id = $1
-GROUP BY r.id
 `
 
 type GetRegionAdminByIDRow struct {
-	ID            int64              `json:"id"`
-	Code          string             `json:"code"`
-	Region        *string            `json:"region"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	LocationCount int64              `json:"location_count"`
+	ID                int64              `json:"id"`
+	Code              string             `json:"code"`
+	Region            *string            `json:"region"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	IsActive          bool               `json:"is_active"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	AtmCount          int64              `json:"atm_count"`
+	VendorBranchCount int64              `json:"vendor_branch_count"`
 }
 
 // Includes soft-deleted rows -- 404 pre-checks on update/disable/enable are
@@ -172,7 +188,8 @@ func (q *Queries) GetRegionAdminByID(ctx context.Context, id int64) (GetRegionAd
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.DeletedAt,
-		&i.LocationCount,
+		&i.AtmCount,
+		&i.VendorBranchCount,
 	)
 	return i, err
 }
@@ -180,9 +197,11 @@ func (q *Queries) GetRegionAdminByID(ctx context.Context, id int64) (GetRegionAd
 const listRegionsAdmin = `-- name: ListRegionsAdmin :many
 
 SELECT r.id, r.code, r.region, r.created_at, r.updated_at, r.is_active, r.deleted_at,
-       COUNT(l.id) AS location_count
+       (SELECT COUNT(*) FROM atms a JOIN locations l ON l.id = a.location_id
+         WHERE l.region_id = r.id AND a.is_active)::bigint AS atm_count,
+       (SELECT COUNT(*) FROM vendor_branches vb
+         WHERE vb.region_code = r.code AND vb.is_active)::bigint AS vendor_branch_count
 FROM regions r
-LEFT JOIN locations l ON l.region_id = r.id
 WHERE ($1::text IS NULL
         OR r.code ILIKE '%' || $1::text || '%'
         OR r.region ILIKE '%' || $1::text || '%')
@@ -191,7 +210,6 @@ WHERE ($1::text IS NULL
         OR ($2::text = 'active' AND r.is_active = true)
         OR ($2::text = 'inactive' AND r.is_active = false)
       )
-GROUP BY r.id
 ORDER BY r.code ASC, r.id ASC
 LIMIT $4::bigint OFFSET $3::bigint
 `
@@ -204,14 +222,15 @@ type ListRegionsAdminParams struct {
 }
 
 type ListRegionsAdminRow struct {
-	ID            int64              `json:"id"`
-	Code          string             `json:"code"`
-	Region        *string            `json:"region"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	IsActive      bool               `json:"is_active"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
-	LocationCount int64              `json:"location_count"`
+	ID                int64              `json:"id"`
+	Code              string             `json:"code"`
+	Region            *string            `json:"region"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	IsActive          bool               `json:"is_active"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+	AtmCount          int64              `json:"atm_count"`
+	VendorBranchCount int64              `json:"vendor_branch_count"`
 }
 
 // Admin Region Management (.kiro/specs/region-management, Task 2): sqlc
@@ -228,8 +247,9 @@ type ListRegionsAdminRow struct {
 // locations row referencing the region", with no is_active filter.
 // Filters: q (ILIKE on code OR region, case-insensitive; region is nullable
 // so a NULL never matches, which is correct) and status (sqlc.arg,
-// all|active|inactive). location_count = dependent locations rows (see NOTE
-// above -- no is_active filter exists on locations). Ordered code ASC, id ASC.
+// all|active|inactive). atm_count = active ATMs whose location is in the
+// region; vendor_branch_count = active vendor branches with that region_code
+// (region-standardization Req 6.1). Ordered code ASC, id ASC.
 func (q *Queries) ListRegionsAdmin(ctx context.Context, arg ListRegionsAdminParams) ([]ListRegionsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listRegionsAdmin,
 		arg.Q,
@@ -252,7 +272,8 @@ func (q *Queries) ListRegionsAdmin(ctx context.Context, arg ListRegionsAdminPara
 			&i.UpdatedAt,
 			&i.IsActive,
 			&i.DeletedAt,
-			&i.LocationCount,
+			&i.AtmCount,
+			&i.VendorBranchCount,
 		); err != nil {
 			return nil, err
 		}
@@ -262,6 +283,26 @@ func (q *Queries) ListRegionsAdmin(ctx context.Context, arg ListRegionsAdminPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockRegionForUpdate = `-- name: LockRegionForUpdate :one
+SELECT id, code, is_active FROM regions WHERE id = $1 FOR UPDATE
+`
+
+type LockRegionForUpdateRow struct {
+	ID       int64  `json:"id"`
+	Code     string `json:"code"`
+	IsActive bool   `json:"is_active"`
+}
+
+// Row lock taken first in the disable tx (Req 7.3) so a concurrent vendor
+// branch apply (FOR SHARE on the same row) cannot slip a branch in between
+// the count and the disable (Property 4).
+func (q *Queries) LockRegionForUpdate(ctx context.Context, id int64) (LockRegionForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, lockRegionForUpdate, id)
+	var i LockRegionForUpdateRow
+	err := row.Scan(&i.ID, &i.Code, &i.IsActive)
+	return i, err
 }
 
 const updateRegionName = `-- name: UpdateRegionName :one

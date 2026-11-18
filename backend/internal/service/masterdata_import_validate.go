@@ -106,6 +106,10 @@ func (e *importEnv) validateVendorBranch(v map[string]string, add func(string, s
 		fromErr(err)
 	} else {
 		v["region_code"] = notesOrEmpty(n)
+		// Req 3.5: only an active standard region; "" (NULL) and <keep> pass.
+		if n != nil && *n != keepCurrentCell && !e.regions[*n] {
+			add("region_code", "region tidak dikenal atau nonaktif")
+		}
 	}
 	v["category"] = strings.ToUpper(v["category"])
 	if !validVendorBranchCategories[v["category"]] {

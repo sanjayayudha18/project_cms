@@ -454,10 +454,6 @@ func (*fakeQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBa
 	return nil, nil
 }
 
-func (*fakeQ) ExportVendorPksMissingBatch(context.Context, repository.ExportVendorPksMissingBatchParams) ([]repository.ExportVendorPksMissingBatchRow, error) {
-	return nil, nil
-}
-
 func (f *fakeQ) ExportCashCountPicsBatch(_ context.Context, a repository.ExportCashCountPicsBatchParams) ([]repository.ExportCashCountPicsBatchRow, error) {
 	f.calls = append(f.calls, a)
 	var out []repository.ExportCashCountPicsBatchRow

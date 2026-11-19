@@ -502,6 +502,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/pks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ADMIN / ADMIN_PARAM / ATM-SPV. Daftar PKS: one row per PKS (history included) plus one `menunggu_persetujuan` row per pending create (replica). Default `status` = `terkini`. 422 = unknown `pks_type` / `vendor` code or invalid filter. */
+        get: operations["listPks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/pks/{pksID}/reminder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description ADMIN / ADMIN_PARAM. Sets the renewal reminder (days) of one PKS. Applies immediately, audit in the same tx (not maker-checker). 422 = `renewal_days` out of range. */
+        put: operations["updatePksReminder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/vendors/{vendorID}/pks": {
         parameters: {
             query?: never;
@@ -509,8 +543,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description ADMIN / ADMIN_PARAM. Per PKS type (ordered by type code): active PKS, history and the pending change of one vendor (primary DB). A vendor may hold only some types. INTERNAL vendor: `groups` is empty. */
-        get: operations["getVendorPks"];
+        get?: never;
         put?: never;
         /** @description ADMIN / ADMIN_PARAM. Stages a new PKS (replaces the active one of the same type on approval) through maker-checker. 202 = pending approval. 409 = a change of this (vendor, type) is pending, or `wod_number` is already used (details field `wod_number`). 422 = unknown / inactive `pks_type` or invalid field. */
         post: operations["submitVendorPks"];
@@ -972,6 +1005,11 @@ export interface components {
             op: string;
         };
         SubmitVendorPksRequest: {
+            /**
+             * Format: int32
+             * @description reminder in days; must be <= PKS validity in days
+             */
+            renewal_days: number;
             /** @description code of an active PKS type (e.g. FLM, CIT) */
             pks_type: string;
             /** @description trimmed; unique case-insensitively across all PKS */
@@ -1008,74 +1046,70 @@ export interface components {
         VendorPksReasonRequest: {
             reason: string;
         };
-        /** @enum {string} */
-        PksStatus: "aktif" | "need_renewal" | "expired" | "terminated" | "belum_diisi";
-        VendorPksRecord: {
+        PksListItem: {
+            /**
+             * Format: int64
+             * @description null for a pending create (no vendor_pks row yet)
+             */
+            id: number | null;
             /** Format: int64 */
-            id: number;
+            vendor_id: number;
+            vendor_code: string;
+            vendor_name: string;
+            pks_type: string;
+            pks_type_name: string;
             wod_number: string;
             pks_name: string;
             /** Format: date */
             effective_date: string;
             /** Format: date */
             expiry_date: string;
-            /** Format: int32 */
-            validity_months: number;
-            /** @description only on the active PKS; negative once expired */
-            remaining_days?: number;
-            /** Format: date-time */
-            created_at: string | null;
-            /**
-             * Format: date-time
-             * @description history rows only
-             */
-            replaced_at?: string;
-            /**
-             * Format: int64
-             * @description history rows only
-             */
-            replaced_by_pks_id?: number;
-            /** Format: date-time */
-            terminated_at: string | null;
-            termination_reason: string | null;
-        };
-        VendorPksPending: {
-            /** Format: int64 */
-            change_request_id: number;
+            renewal_days: number;
+            /** @description negative once expired */
+            remaining_days: number;
             /** @enum {string} */
-            op: "create" | "disable" | "enable";
-            payload: {
-                [key: string]: unknown;
-            };
-            /** Format: int64 */
-            maker_id: number;
-            maker_name: string;
-            /** Format: date-time */
-            created_at: string | null;
+            status: "aktif" | "need_renewal" | "belum_berlaku" | "expired" | "terminated" | "diganti" | "menunggu_persetujuan";
+            pending: {
+                op: string;
+                /** Format: int64 */
+                change_id: number;
+            } | null;
         };
-        VendorPksDetail: {
+        PksListPage: {
+            items: components["schemas"]["PksListItem"][];
             /** Format: int64 */
-            vendor_id: number;
-            /** @enum {string} */
-            kind: "FLM_VENDOR" | "INTERNAL";
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        UpdatePksReminderRequest: {
             /**
-             * Format: date
-             * @description Asia/Jakarta date used for status
+             * Format: int32
+             * @description must be <= PKS validity in days
              */
-            today: string;
-            renewal_months: number;
-            /** @description one entry per type the vendor has a PKS or pending change for, ordered by type code */
-            groups: components["schemas"]["VendorPksGroup"][];
+            renewal_days: number;
         };
-        VendorPksGroup: {
-            pks_type: {
-                code: string;
-                name: string;
+        UpdatePksReminderResponse: {
+            pks: {
+                /** Format: int64 */
+                id: number;
+                /** Format: int64 */
+                vendor_id: number;
+                /** Format: int64 */
+                pks_type_id: number;
+                wod_number: string;
+                pks_name: string;
+                /** Format: date */
+                effective_date: string | null;
+                /** Format: date */
+                expiry_date: string | null;
+                /** Format: int32 */
+                renewal_days: number;
+                /** Format: date-time */
+                replaced_at: string | null;
+                /** Format: date-time */
+                terminated_at: string | null;
             };
-            pks_status: components["schemas"]["PksStatus"] | null;
-            active: components["schemas"]["VendorPksRecord"] | null;
-            history: components["schemas"]["VendorPksRecord"][];
-            pending: components["schemas"]["VendorPksPending"] | null;
         };
         /** @enum {string} */
         DsrLateStatus: "ok" | "late" | "not_sent" | "pending";
@@ -2968,13 +3002,20 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    getVendorPks: {
+    listPks: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                vendorID: components["parameters"]["VendorID"];
+            query?: {
+                status?: "terkini" | "semua" | "aktif" | "need_renewal" | "belum_berlaku" | "expired" | "terminated" | "diganti";
+                /** @description PKS type code */
+                pks_type?: string;
+                /** @description vendor code */
+                vendor?: string;
+                q?: string;
+                page?: number;
+                page_size?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2985,13 +3026,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VendorPksDetail"];
+                    "application/json": components["schemas"]["PksListPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updatePksReminder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pksID: components["parameters"]["PksID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePksReminderRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePksReminderResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -13,7 +13,7 @@ export const adminVendorsRoute = createRoute({
   path: "/settings/admin/vendors",
   getParentRoute: () => protectedRoute,
   validateSearch: ADMIN_VENDORS_SEARCH_SCHEMA,
-  beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
+  beforeLoad: requireRoles(["ATM-SPV"]),
   loader: () => AdminVendorsPage.preload?.(),
   component: AdminVendorsRouteComponent,
 });

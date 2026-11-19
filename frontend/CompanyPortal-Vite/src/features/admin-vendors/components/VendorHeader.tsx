@@ -9,9 +9,12 @@ import { SummaryStrip } from "./SummaryStrip";
 export function VendorHeader({
   vendor,
   vendorId,
+  showSummary = true,
 }: {
   vendor: AdminVendor | undefined;
   vendorId: number;
+  /** false for ATM-SPV: the summary reads branches/PICs/prices it may not access. */
+  showSummary?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -43,7 +46,7 @@ export function VendorHeader({
         )}
       </div>
 
-      <SummaryStrip vendorId={vendorId} />
+      {showSummary && <SummaryStrip vendorId={vendorId} />}
     </div>
   );
 }

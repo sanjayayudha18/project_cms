@@ -53,11 +53,6 @@ func (r *VendorAdminRepository) GetPksTypeByCode(ctx context.Context, code strin
 	return &t, nil
 }
 
-// ListPksSummaries returns the per-(vendor, active type) PKS summary for one page of vendors (replica).
-func (r *VendorAdminRepository) ListPksSummaries(ctx context.Context, arg db.ListVendorPksSummariesParams) ([]db.ListVendorPksSummariesRow, error) {
-	return r.dbRead.ListVendorPksSummaries(ctx, arg)
-}
-
 // GetByID returns a vendor by id, including soft-deleted rows. Returns nil,
 // nil if no matching vendor is found.
 func (r *VendorAdminRepository) GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {

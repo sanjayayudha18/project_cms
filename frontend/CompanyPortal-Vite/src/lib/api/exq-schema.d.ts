@@ -947,8 +947,9 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                status?: "active" | "disabled" | "all";
-                pks_status?: "aktif" | "need_renewal" | "expired" | "terminated" | "belum_diisi";
+                status?: "terkini" | "semua" | "aktif" | "need_renewal" | "belum_berlaku" | "expired" | "terminated" | "diganti";
+                pks_type?: string;
+                vendor?: string;
             };
             header?: never;
             path?: never;

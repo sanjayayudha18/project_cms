@@ -1014,7 +1014,7 @@ type VendorPic struct {
 	Roles []string `json:"roles"`
 }
 
-// PKS (perjanjian kerja sama) per vendor per type dengan riwayat (D1; 043). Satu PKS aktif per (vendor, type) (replaced_at IS NULL, vendor_pks_active_uq); vendor boleh punya subset type. Ditulis hanya lewat maker-checker master data (entity_type vendor_pks). pks_name/effective_date/expiry_date/pks_type_id/wod_number tidak pernah di-UPDATE; tidak pernah di-hard-delete. Riwayat batalkan terminate hanya di audit_logs.
+// PKS (perjanjian kerja sama) per vendor per type dengan riwayat (D1; 043). Satu PKS aktif per (vendor, type) (replaced_at IS NULL, vendor_pks_active_uq); vendor boleh punya subset type. Create/ganti/terminasi hanya lewat maker-checker master data (entity_type vendor_pks). Kolom yang boleh di-UPDATE hanya renewal_days (044, langsung + audit di tx yang sama), replaced_at/replaced_by_pks_id, dan kolom terminate; pks_name/effective_date/expiry_date/pks_type_id/wod_number tidak pernah di-UPDATE; tidak pernah di-hard-delete. Status dihitung oleh vendor_pks_record_status() (044). Riwayat batalkan terminate hanya di audit_logs.
 type VendorPk struct {
 	ID            int64       `json:"id"`
 	VendorID      int64       `json:"vendor_id"`
@@ -1037,6 +1037,8 @@ type VendorPk struct {
 	PksTypeID int64 `json:"pks_type_id"`
 	// No. WOD, teks bebas 1-100 tanpa spasi tepi. Unik global case-insensitive termasuk riwayat (vendor_pks_wod_uq); tidak pernah di-UPDATE (Req 2.9). Migrasi 043.
 	WodNumber string `json:"wod_number"`
+	// Ambang Need Renewal dalam hari: need_renewal bila expiry_date < hari ini + renewal_days. 30-3666 dan <= expiry_date - effective_date. Diisi saat create (maker-checker); diubah langsung oleh ADMIN/ADMIN_PARAM dari Daftar PKS dengan audit vendor_pks_reminder_updated di tx yang sama, juga untuk PKS diganti/terminated. Satu-satunya kolom isi PKS yang boleh di-UPDATE. Default 270 hanya untuk binary lama selama jendela deploy. Migrasi 044.
+	RenewalDays int32 `json:"renewal_days"`
 }
 
 // Master type PKS (FLM, CIT, ...). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks_type, ADMIN/ADMIN_PARAM). Tidak pernah di-hard-delete: disable = is_active false, diblok selama ada vendor_pks aktif (replaced_at IS NULL, termasuk terminated) dengan type ini. Bukan vendors.kind. Migrasi 043.

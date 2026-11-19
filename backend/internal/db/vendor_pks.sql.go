@@ -179,36 +179,6 @@ func (q *Queries) GetVendorPksByID(ctx context.Context, id int64) (GetVendorPksB
 	return i, err
 }
 
-const getVendorPksStatus = `-- name: GetVendorPksStatus :one
-SELECT COALESCE(vendor_pks_status($1::text, $2::date,
-                         $3::timestamptz, $4::date,
-                         $5::int), '')::text AS pks_status
-`
-
-type GetVendorPksStatusParams struct {
-	Kind          string             `json:"kind"`
-	ExpiryDate    pgtype.Date        `json:"expiry_date"`
-	TerminatedAt  pgtype.Timestamptz `json:"terminated_at"`
-	Today         pgtype.Date        `json:"today"`
-	RenewalMonths int32              `json:"renewal_months"`
-}
-
-// Detail screen (task 7.1): the same vendor_pks_status() rule the list, filter
-// and export use (Req 6.8). Arguments come from the already-loaded vendor + active
-// PKS; NULL expiry = no active PKS. ” for an INTERNAL vendor (function NULL).
-func (q *Queries) GetVendorPksStatus(ctx context.Context, arg GetVendorPksStatusParams) (string, error) {
-	row := q.db.QueryRow(ctx, getVendorPksStatus,
-		arg.Kind,
-		arg.ExpiryDate,
-		arg.TerminatedAt,
-		arg.Today,
-		arg.RenewalMonths,
-	)
-	var pks_status string
-	err := row.Scan(&pks_status)
-	return pks_status, err
-}
-
 const getVendorPksVendor = `-- name: GetVendorPksVendor :one
 
 SELECT id, kind, deleted_at FROM vendors WHERE id = $1
@@ -234,10 +204,10 @@ func (q *Queries) GetVendorPksVendor(ctx context.Context, id int64) (GetVendorPk
 }
 
 const insertVendorPks = `-- name: InsertVendorPks :one
-INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, renewal_days, created_by)
 VALUES ($1, $2, $3, $4,
-        $5, $6, $7)
-RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
+        $5, $6, $7, $8)
+RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, renewal_days, created_by,
           replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
           termination_reason, created_at, updated_at
 `
@@ -249,6 +219,7 @@ type InsertVendorPksParams struct {
 	PksName       string      `json:"pks_name"`
 	EffectiveDate pgtype.Date `json:"effective_date"`
 	ExpiryDate    pgtype.Date `json:"expiry_date"`
+	RenewalDays   int32       `json:"renewal_days"`
 	CreatedBy     int64       `json:"created_by"`
 }
 
@@ -260,6 +231,7 @@ type InsertVendorPksRow struct {
 	PksName           string             `json:"pks_name"`
 	EffectiveDate     pgtype.Date        `json:"effective_date"`
 	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	RenewalDays       int32              `json:"renewal_days"`
 	CreatedBy         int64              `json:"created_by"`
 	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
 	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
@@ -278,6 +250,7 @@ func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams
 		arg.PksName,
 		arg.EffectiveDate,
 		arg.ExpiryDate,
+		arg.RenewalDays,
 		arg.CreatedBy,
 	)
 	var i InsertVendorPksRow
@@ -289,6 +262,7 @@ func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
+		&i.RenewalDays,
 		&i.CreatedBy,
 		&i.ReplacedAt,
 		&i.ReplacedByPksID,
@@ -299,79 +273,6 @@ func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const listVendorPksByVendor = `-- name: ListVendorPksByVendor :many
-SELECT p.id, p.vendor_id, p.pks_type_id, t.code AS pks_type_code, t.name AS pks_type_name,
-       p.wod_number, p.pks_name, p.effective_date, p.expiry_date, p.created_by,
-       p.replaced_at, p.replaced_by_pks_id, p.terminated_at, p.terminated_by,
-       p.termination_reason, p.created_at, p.updated_at,
-       vendor_pks_validity_months(p.effective_date, p.expiry_date)::int AS validity_months
-FROM vendor_pks p
-JOIN vendor_pks_types t ON t.id = p.pks_type_id
-WHERE p.vendor_id = $1
-ORDER BY t.code, p.replaced_at DESC NULLS FIRST, p.id DESC
-`
-
-type ListVendorPksByVendorRow struct {
-	ID                int64              `json:"id"`
-	VendorID          int64              `json:"vendor_id"`
-	PksTypeID         int64              `json:"pks_type_id"`
-	PksTypeCode       string             `json:"pks_type_code"`
-	PksTypeName       string             `json:"pks_type_name"`
-	WodNumber         string             `json:"wod_number"`
-	PksName           string             `json:"pks_name"`
-	EffectiveDate     pgtype.Date        `json:"effective_date"`
-	ExpiryDate        pgtype.Date        `json:"expiry_date"`
-	CreatedBy         int64              `json:"created_by"`
-	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
-	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
-	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
-	TerminatedBy      *int64             `json:"terminated_by"`
-	TerminationReason *string            `json:"termination_reason"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	ValidityMonths    int32              `json:"validity_months"`
-}
-
-// Per type (code): active PKS first, then history newest-replaced first.
-func (q *Queries) ListVendorPksByVendor(ctx context.Context, vendorID int64) ([]ListVendorPksByVendorRow, error) {
-	rows, err := q.db.Query(ctx, listVendorPksByVendor, vendorID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVendorPksByVendorRow{}
-	for rows.Next() {
-		var i ListVendorPksByVendorRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.VendorID,
-			&i.PksTypeID,
-			&i.PksTypeCode,
-			&i.PksTypeName,
-			&i.WodNumber,
-			&i.PksName,
-			&i.EffectiveDate,
-			&i.ExpiryDate,
-			&i.CreatedBy,
-			&i.ReplacedAt,
-			&i.ReplacedByPksID,
-			&i.TerminatedAt,
-			&i.TerminatedBy,
-			&i.TerminationReason,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.ValidityMonths,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const lockVendorForPks = `-- name: LockVendorForPks :one

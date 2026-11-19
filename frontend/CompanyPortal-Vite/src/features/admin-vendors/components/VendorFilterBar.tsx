@@ -1,20 +1,10 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
-import { useEffect, useMemo, useState } from "react";
-import type { PksType } from "../pksApi";
-import type { PksStatus, VendorKind } from "../types";
+import type { VendorKind } from "../types";
 import type { AdminVendorsUrlParams } from "../useAdminVendorsUrlState";
 
 const KIND_OPTIONS: { value: VendorKind; label: string }[] = [
   { value: "FLM_VENDOR", label: "Vendor FLM" },
   { value: "INTERNAL", label: "ROH" },
-];
-
-const PKS_STATUS_OPTIONS: { value: PksStatus; label: string }[] = [
-  { value: "aktif", label: "Aktif" },
-  { value: "need_renewal", label: "Need Renewal" },
-  { value: "expired", label: "Expired" },
-  { value: "terminated", label: "Terminated" },
-  { value: "belum_diisi", label: "Tidak ada" },
 ];
 
 const STATUS_OPTIONS = [
@@ -28,62 +18,15 @@ interface VendorFilterBarProps {
   searchInput: string;
   onSearchInputChange: (value: string) => void;
   onParamsChange: (partial: Partial<AdminVendorsUrlParams>) => void;
-  pksTypes?: PksType[];
 }
 
-/**
- * Search + Status + PKS Type & Status filter for the admin Vendors list (Req 5.3, 5.6).
- * pks_type + pks_status are required together; status select is disabled until type is chosen.
- */
+/** Search + Status + Jenis vendor filter for the admin Vendors list (PKS filtering lives in Daftar PKS). */
 export function VendorFilterBar({
   params,
   searchInput,
   onSearchInputChange,
   onParamsChange,
-  pksTypes = [],
 }: VendorFilterBarProps) {
-  const [selectedType, setSelectedType] = useState<string>(params.pks_type ?? "");
-
-  useEffect(() => {
-    setSelectedType(params.pks_type ?? "");
-  }, [params.pks_type]);
-
-  const pksTypeOptions = useMemo(() => {
-    return pksTypes
-      .filter((t) => t.is_active)
-      .sort((a, b) => a.code.localeCompare(b.code))
-      .map((t) => ({
-        value: t.code,
-        label: t.name ? `${t.code} - ${t.name}` : t.code,
-      }));
-  }, [pksTypes]);
-
-  function handleTypeChange(val: string | null) {
-    const nextType = val ?? "";
-    setSelectedType(nextType);
-    if (!nextType) {
-      // Clearing type clears both type and status filter
-      onParamsChange({ pks_type: undefined, pks_status: undefined, page: 1 });
-      return;
-    }
-    // If status was already chosen, update the pair with new type
-    if (params.pks_status) {
-      onParamsChange({ pks_type: nextType, pks_status: params.pks_status, page: 1 });
-    }
-  }
-
-  function handleStatusChange(val: string | null) {
-    if (!val || !selectedType) {
-      onParamsChange({ pks_type: undefined, pks_status: undefined, page: 1 });
-      return;
-    }
-    onParamsChange({
-      pks_type: selectedType,
-      pks_status: val as PksStatus,
-      page: 1,
-    });
-  }
-
   return (
     <div className="flex flex-wrap items-end gap-4">
       <div className="flex flex-col gap-1">
@@ -115,23 +58,6 @@ export function VendorFilterBar({
           })
         }
         placeholder="Aktif"
-      />
-
-      <FilterSelect
-        label="Type PKS"
-        options={pksTypeOptions}
-        value={selectedType || null}
-        onChange={handleTypeChange}
-        placeholder="Semua"
-      />
-
-      <FilterSelect
-        label="Status PKS"
-        options={PKS_STATUS_OPTIONS}
-        value={params.pks_status ?? null}
-        disabled={!selectedType}
-        onChange={handleStatusChange}
-        placeholder="Semua"
       />
 
       <FilterSelect

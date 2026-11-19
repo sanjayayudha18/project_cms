@@ -173,7 +173,7 @@ func TestReportParamsHash(t *testing.T) {
 	}
 }
 
-// vendor-pks task 9.3: the vendor_pks branch of ParseReportParams.
+// vendor-pks-list: the vendor_pks branch of ParseReportParams (Req 10.1, 10.2).
 func TestParseReportParams_VendorPks(t *testing.T) {
 	q100, q101 := strings.Repeat("ü", 100), strings.Repeat("ü", 101) // runes, not bytes
 	tests := []struct {
@@ -181,13 +181,13 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 		query url.Values
 		want  ReportParams
 	}{
-		{"defaults", q(), ReportParams{VendorStatus: sp("active")}},
-		{"all filters", q("q", "  Alfa ", "status", "all", "pks_type", " cit ", "pks_status", "need_renewal"),
-			ReportParams{Q: sp("Alfa"), VendorStatus: sp("all"), PksType: sp("CIT"), PksStatus: sp("need_renewal")}},
-		{"blank q dropped", q("q", "   "), ReportParams{VendorStatus: sp("active")}},
-		{"q 100 runes ok", q("q", q100), ReportParams{Q: sp(q100), VendorStatus: sp("active")}},
-		{"disabled", q("status", "disabled"), ReportParams{VendorStatus: sp("disabled")}},
-		{"foreign params ignored", q("month", "bogus", "vendor_id", "x", "date_from", "x"), ReportParams{VendorStatus: sp("active")}},
+		{"defaults", q(), ReportParams{Status: sp("terkini")}},
+		{"all filters", q("q", "  Alfa ", "status", "need_renewal", "pks_type", " cit ", "vendor", " pt-a "),
+			ReportParams{Q: sp("Alfa"), Status: sp("need_renewal"), PksType: sp("CIT"), Vendor: sp("PT-A")}},
+		{"blank q dropped", q("q", "   "), ReportParams{Status: sp("terkini")}},
+		{"q 100 runes ok", q("q", q100), ReportParams{Q: sp(q100), Status: sp("terkini")}},
+		{"semua status", q("status", "semua"), ReportParams{Status: sp("semua")}},
+		{"foreign params ignored", q("month", "bogus", "vendor_id", "x", "date_from", "x"), ReportParams{Status: sp("terkini")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,9 +204,9 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 		})
 	}
 
-	for _, key := range []string{"aktif", "need_renewal", "expired", "terminated", "belum_diisi"} {
-		if _, err := ParseReportParams(KindVendorPks, q("pks_type", "FLM", "pks_status", key), reportNow); err != nil {
-			t.Errorf("pks_status %q rejected: %v", key, err)
+	for _, key := range []string{"terkini", "semua", "aktif", "need_renewal", "belum_berlaku", "expired", "terminated", "diganti"} {
+		if _, err := ParseReportParams(KindVendorPks, q("status", key), reportNow); err != nil {
+			t.Errorf("status %q rejected: %v", key, err)
 		}
 	}
 
@@ -216,13 +216,14 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 		field string
 		msg   string
 	}{
-		{"q 101 runes", q("q", q101), "q", "maksimal 100 karakter"},
-		{"status unknown", q("status", "bogus"), "status", "tidak dikenal"},
-		{"status wrong case", q("status", "ACTIVE"), "status", "tidak dikenal"},
-		{"pks_status unknown", q("pks_type", "FLM", "pks_status", "bogus"), "pks_status", "invalid pks_status \"bogus\""},
-		{"pks_status label not key", q("pks_type", "FLM", "pks_status", "Aktif"), "pks_status", "invalid pks_status \"Aktif\""},
-		{"pks_status without type", q("pks_status", "aktif"), "pks_type", "pks_type and pks_status must be given together"},
-		{"pks_type without status", q("pks_type", "FLM"), "pks_status", "pks_type and pks_status must be given together"},
+		{"pks_status rejected", q("pks_status", "aktif"), "pks_status", "tidak dikenal"},
+		{"pks_status belum_diisi rejected", q("pks_status", "belum_diisi"), "pks_status", "tidak dikenal"},
+		{"vendor-level status active rejected", q("status", "active"), "status", "invalid status \"active\""},
+		{"vendor-level status disabled rejected", q("status", "disabled"), "status", "invalid status \"disabled\""},
+		{"vendor-level status all rejected", q("status", "all"), "status", "invalid status \"all\""},
+		{"status belum_diisi rejected", q("status", "belum_diisi"), "status", "invalid status \"belum_diisi\""},
+		{"status unknown", q("status", "bogus"), "status", "invalid status \"bogus\""},
+		{"q 101 runes", q("q", q101), "q", "q must be at most 100 characters"},
 	}
 	for _, tt := range rejects {
 		t.Run("reject "+tt.name, func(t *testing.T) {
@@ -247,20 +248,20 @@ func TestVendorPksParamsHashAndAudit(t *testing.T) {
 		}
 		return p
 	}
-	a := parse(q("q", "abc", "status", "all", "pks_type", "FLM", "pks_status", "expired"))
-	b := parse(q("pks_status", "expired", "pks_type", "flm", "status", "all", "q", " abc "))
+	a := parse(q("q", "abc", "status", "semua", "pks_type", "FLM", "vendor", "PTA"))
+	b := parse(q("vendor", "pta", "pks_type", "flm", "status", "semua", "q", " abc "))
 	if ParamsHash(a) != ParamsHash(b) || len(ParamsHash(a)) != 64 {
 		t.Error("hash depends on query order / q whitespace, or is not hex sha256")
 	}
 	// Default status spelled out equals the default.
-	if ParamsHash(parse(q())) != ParamsHash(parse(q("status", "active"))) {
+	if ParamsHash(parse(q())) != ParamsHash(parse(q("status", "terkini"))) {
 		t.Error("explicit default status changed the hash")
 	}
 	for i, d := range []Params{
-		parse(q("q", "abd", "status", "all", "pks_type", "FLM", "pks_status", "expired")),
-		parse(q("q", "abc", "status", "active", "pks_type", "FLM", "pks_status", "expired")),
-		parse(q("q", "abc", "status", "all", "pks_type", "FLM", "pks_status", "aktif")),
-		parse(q("q", "abc", "status", "all")),
+		parse(q("q", "abd", "status", "semua", "pks_type", "FLM", "vendor", "PTA")),
+		parse(q("q", "abc", "status", "aktif", "pks_type", "FLM", "vendor", "PTA")),
+		parse(q("q", "abc", "status", "semua", "pks_type", "CIT", "vendor", "PTA")),
+		parse(q("q", "abc", "status", "semua")),
 	} {
 		if ParamsHash(d) == ParamsHash(a) {
 			t.Errorf("diff[%d] collides with a", i)
@@ -275,13 +276,13 @@ func TestVendorPksParamsHashAndAudit(t *testing.T) {
 		t.Error("vendor_pks hash equals a replenishment hash")
 	}
 
-	// Audit filter keeps the four keys (q, status, pks_type, pks_status), absent = nil; file name is vendor-pks-<WIB day>.csv.
+	// Audit filter keeps the four keys (q, status, pks_type, vendor), absent = nil; file name is vendor-pks-<WIB day>.csv.
 	f := a.Report.legacyFilter(KindVendorPks)
-	if len(f) != 4 || *f["pks_type"].(*string) != "FLM" || *f["q"].(*string) != "abc" || *f["status"].(*string) != "all" || *f["pks_status"].(*string) != "expired" {
+	if len(f) != 4 || *f["pks_type"].(*string) != "FLM" || *f["q"].(*string) != "abc" || *f["status"].(*string) != "semua" || *f["vendor"].(*string) != "PTA" {
 		t.Errorf("legacyFilter = %v", f)
 	}
-	if f := parse(q()).Report.legacyFilter(KindVendorPks); f["q"].(*string) != nil || f["pks_type"].(*string) != nil || f["pks_status"].(*string) != nil {
-		t.Errorf("absent filters must be nil, got %v", f)
+	if f := parse(q()).Report.legacyFilter(KindVendorPks); f["q"].(*string) != nil || f["pks_type"].(*string) != nil || f["vendor"].(*string) != nil || *f["status"].(*string) != "terkini" {
+		t.Errorf("absent filters must be nil except status=terkini, got %v", f)
 	}
 	late := time.Date(2026, 10, 29, 20, 0, 0, 0, time.UTC) // 03:00 WIB next day
 	if got := reports.VendorPksFileName(late); got != "vendor-pks-20261030.csv" {
@@ -293,7 +294,7 @@ func TestReportKindVendorPks(t *testing.T) {
 	if string(KindVendorPks) != reports.VendorPks || !IsReportKind(KindVendorPks) {
 		t.Error("KindVendorPks must alias reports.VendorPks and be a report kind")
 	}
-	for role, want := range map[string]bool{"ADMIN": true, "ADMIN_PARAM": true, "ATM-SPV": false, "VENDOR-USER": false, "": false} {
+	for role, want := range map[string]bool{"ADMIN": true, "ADMIN_PARAM": true, "ATM-SPV": true, "VENDOR-USER": false, "": false} {
 		if allowed(KindVendorPks, role) != want {
 			t.Errorf("allowed(vendor_pks, %q) = %v, want %v", role, !want, want)
 		}

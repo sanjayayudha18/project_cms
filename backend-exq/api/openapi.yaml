@@ -288,8 +288,9 @@ paths:
       tags: [exports]
       parameters:
         - { name: q, in: query, schema: { type: string, maxLength: 100 } }
-        - { name: status, in: query, schema: { type: string, enum: [active, disabled, all], default: active } }
-        - { name: pks_status, in: query, schema: { type: string, enum: [aktif, need_renewal, expired, terminated, belum_diisi] } }
+        - { name: status, in: query, schema: { type: string, enum: [terkini, semua, aktif, need_renewal, belum_berlaku, expired, terminated, diganti], default: terkini } }
+        - { name: pks_type, in: query, schema: { type: string } }
+        - { name: vendor, in: query, schema: { type: string } }
       responses:
         '200': { $ref: '#/components/responses/JobExisting' }
         '202': { $ref: '#/components/responses/JobCreated' }

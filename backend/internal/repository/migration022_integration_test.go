@@ -78,10 +78,11 @@ func TestMigration022Schema(t *testing.T) {
 			t.Errorf("index %s missing", name)
 		}
 	}
+	// 022's functions were dropped by 045 (vendor-pks-list Req 3.6); vendor_pks_record_status (044) replaces them.
 	for _, fn := range []string{"vendor_pks_status", "vendor_pks_validity_months"} {
 		if pksCount(t, tx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-			WHERE n.nspname='public' AND p.proname=$1`, fn) != 1 {
-			t.Errorf("function %s missing", fn)
+			WHERE n.nspname='public' AND p.proname=$1`, fn) != 0 {
+			t.Errorf("function %s must be dropped by 045", fn)
 		}
 	}
 

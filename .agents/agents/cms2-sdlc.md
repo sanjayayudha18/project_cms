@@ -36,7 +36,7 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
 - **Gate 2 (Wajib Berhenti)**: Jangan membuat `tasks.md` sebelum user selesai me-review dan menyetujui `design.md` (`accepted`).
 
 ### Tahap 3 — Build Plan (`tasks.md`)
-- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `claude-cms-orchestrator`.
+- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
 - Setiap task wajib mencantumkan:
   ```markdown
   - [ ] 1.1 <Judul Task yang Spesifik>

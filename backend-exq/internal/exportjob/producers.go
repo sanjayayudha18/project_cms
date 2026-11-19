@@ -11,7 +11,6 @@ import (
 
 	"github.com/cimb-niaga/cms/backend-exq/internal/repository"
 	"github.com/cimb-niaga/cms/pkg/csvexport"
-	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Querier is the subset of *repository.Queries the producers call.
@@ -399,13 +398,12 @@ func packagePricesProducer() Producer {
 
 // DefaultProducers is NewProducers without a DSR start date (DSR report files are header only).
 func DefaultProducers() map[Kind]map[string]Producer {
-	return NewProducers(nil, reports.VendorPksRenewalMonthsDefault)
+	return NewProducers(nil)
 }
 
 // NewProducers maps kind -> entity -> producer (design "entity table per Kind"), master data and
 // reports. dsrStart is DSR_LATE_START_DATE; nil = DSR report files are header only.
-// pksRenewalMonths is VENDOR_PKS_RENEWAL_MONTHS (the vendor_pks export).
-func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string]Producer {
+func NewProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
 	m := map[Kind]map[string]Producer{
 		KindVendor: {
 			"vendor":            vendorsProducer(true),
@@ -433,7 +431,7 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 			csvexport.VendorPks:      vendorPksMasterProducer(),
 		},
 	}
-	for k, byEntity := range reportProducers(dsrStart, pksRenewalMonths) {
+	for k, byEntity := range reportProducers(dsrStart) {
 		m[k] = byEntity
 	}
 	return m

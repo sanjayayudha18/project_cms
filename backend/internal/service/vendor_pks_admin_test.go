@@ -39,9 +39,6 @@ func (f *fakePksRepo) Active(_ context.Context, _, typeID int64) (*db.GetActiveV
 func (f *fakePksRepo) GetByID(context.Context, int64) (*db.GetVendorPksByIDRow, error) {
 	return f.byID, nil
 }
-func (f *fakePksRepo) ListByVendor(context.Context, int64) ([]db.ListVendorPksByVendorRow, error) {
-	return nil, nil
-}
 func (f *fakePksRepo) Pending(context.Context, int64) ([]db.GetPendingVendorPksChangesRow, error) {
 	return f.pending, f.pendingEr
 }
@@ -57,9 +54,6 @@ func (f *fakePksRepo) PksTypeByCode(_ context.Context, code string) (*db.VendorP
 	return f.types[code], nil
 }
 func (f *fakePksRepo) WodTaken(context.Context, string) (bool, error) { return f.wodTaken, nil }
-func (f *fakePksRepo) Status(context.Context, db.GetVendorPksStatusParams) (string, error) {
-	return "", nil
-}
 
 type fakePksSubmitter struct {
 	calls []SubmitRequest
@@ -89,7 +83,7 @@ func newPksRepo() *fakePksRepo {
 
 func newPksSvc(repo *fakePksRepo) (*VendorPksAdminService, *fakePksSubmitter) {
 	sub := &fakePksSubmitter{}
-	return NewVendorPksAdminService(repo, sub, 9), sub
+	return NewVendorPksAdminService(repo, sub, nil), sub
 }
 
 func pendingFor(id, vendorID, typeID int64) db.GetPendingVendorPksChangesRow {
@@ -98,7 +92,7 @@ func pendingFor(id, vendorID, typeID int64) db.GetPendingVendorPksChangesRow {
 }
 
 func validPksReq() SubmitVendorPksRequest {
-	return SubmitVendorPksRequest{PksType: "FLM", WodNumber: "WOD-001", PksName: "PKS 2026", EffectiveDate: "2026-01-01", ExpiryDate: "2027-01-01"}
+	return SubmitVendorPksRequest{PksType: "FLM", WodNumber: "WOD-001", PksName: "PKS 2026", EffectiveDate: "2026-01-01", ExpiryDate: "2027-01-01", RenewalDays: 270}
 }
 
 func TestVendorPksSubmitNew_Validation(t *testing.T) {
@@ -127,7 +121,15 @@ func TestVendorPksSubmitNew_Validation(t *testing.T) {
 		{"expiry bad format", with(func(r *SubmitVendorPksRequest) { r.ExpiryDate = "2027/01/01" }), "expiry_date"},
 		{"expiry impossible date", with(func(r *SubmitVendorPksRequest) { r.ExpiryDate = "2027-02-30" }), "expiry_date"},
 		{"expiry before effective", with(func(r *SubmitVendorPksRequest) { r.ExpiryDate = "2025-12-31" }), "expiry_date"},
-		{"expiry equals effective", with(func(r *SubmitVendorPksRequest) { r.ExpiryDate = "2026-01-01" }), ""},
+		{"expiry equals effective (term 0 < reminder)", with(func(r *SubmitVendorPksRequest) { r.ExpiryDate = "2026-01-01" }), "renewal_days"},
+		{"renewal 0", with(func(r *SubmitVendorPksRequest) { r.RenewalDays = 0 }), "renewal_days"},
+		{"renewal 29", with(func(r *SubmitVendorPksRequest) { r.RenewalDays = 29 }), "renewal_days"},
+		{"renewal 30 ok", with(func(r *SubmitVendorPksRequest) { r.RenewalDays = 30 }), ""},
+		{"renewal 3667", with(func(r *SubmitVendorPksRequest) {
+			r.EffectiveDate, r.ExpiryDate, r.RenewalDays = "2000-01-01", "2030-01-01", 3667
+		}), "renewal_days"},
+		{"renewal longer than term", with(func(r *SubmitVendorPksRequest) { r.RenewalDays = 366 }), "renewal_days"},
+		{"renewal equals term ok", with(func(r *SubmitVendorPksRequest) { r.RenewalDays = 365 }), ""},
 		{"past dates accepted", with(func(r *SubmitVendorPksRequest) { r.EffectiveDate, r.ExpiryDate = "2000-01-01", "2001-01-01" }), ""},
 		{"future dates accepted", with(func(r *SubmitVendorPksRequest) { r.EffectiveDate, r.ExpiryDate = "2090-01-01", "2095-01-01" }), ""},
 	}

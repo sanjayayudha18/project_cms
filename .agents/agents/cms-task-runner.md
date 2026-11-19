@@ -9,7 +9,7 @@ Jika salah satu tidak tersedia, tanyakan terlebih dahulu dan jangan mengubah kod
 
 ## Langkah Eksekusi
 1. **Baca Konteks**: Patuhi seluruh aturan di `.agents/rules/GEMINI.md`. Baca `tasks.md` pada folder spec (Overview, Model Split, blok task terkait, Notes, Task Dependency Graph), lalu baca bagian `requirements.md` dan `design.md` yang dirujuk oleh `_Requirements:_` pada task tersebut.
-2. **Aktifkan Skills**: Jika prompt mencantumkan daftar skill yang disetujui user melalui `claude-cms-orchestrator`, baca dan ikuti `SKILL.md` dari masing-masing skill di `.agents/skills/<nama-skill>/SKILL.md` sebelum menulis kode.
+2. **Aktifkan Skills**: Jika prompt mencantumkan daftar skill yang disetujui user melalui `gemini-cms-orchestrator`, baca dan ikuti `SKILL.md` dari masing-masing skill di `.agents/skills/<nama-skill>/SKILL.md` sebelum menulis kode.
 3. **Cek Dependensi**: Dari `## Task Dependency Graph`, pastikan seluruh task prasyarat sudah berstatus `[x]` di `tasks.md`. Jika belum selesai, **BERHENTI** dan laporkan dependensi yang masih belum selesai.
 4. **Kerjakan Task**: Hanya ubah file dan perilaku yang dijelaskan pada blok task tersebut. Jangan melakukan refactor di luar cakupan atau menambah tabel/kolom/endpoint/env baru yang tidak ada di desain.
    - Area kritis (autentikasi, uang, rekonsiliasi, eksekusi migrasi `migrate up`, penghapusan): menulis file migrasi diperbolehkan, tetapi menjalankan `go run ./cmd/migrate up` memerlukan izin eksplisit user. Jangan pernah menjalankan `psql -f` secara manual.
@@ -30,7 +30,7 @@ Jika task menyentuh domain spesifik di bawah ini, baca dan patuhi juga panduan s
 | Sinkronisasi Kontrak OpenAPI Go -> React | `go-backend-specialist.md` / `react-portal-specialist.md` | `openapi-frontend-sync` |
 | Frontend React & UI/UX (`CompanyPortal-Vite`, `VendorPortal-Vite`) | `react-portal-specialist.md` | `react-ui-ux-craft`, `openapi-frontend-sync`, `cms2-master-data` |
 | Audit Keamanan, Finansial & Code Review | `security-fin-reviewer.md` | `cms2-sdlc` |
-| Orkestrasi Multi-Session per Task & Model | `cms-orchestrator.md` | `claude-cms-orchestrator` |
+| Orkestrasi Multi-Session per Task & Model | `cms-orchestrator.md` | `gemini-cms-orchestrator` |
 
 ## Larangan
 - Jangan melakukan `git commit`, `push`, `stash`, pindah branch, atau `reset`.

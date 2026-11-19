@@ -402,21 +402,50 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '500': { $ref: '#/components/responses/InternalError' }
 
-  /admin/vendors/{vendorID}/pks:
+  /admin/pks:
     get:
-      operationId: getVendorPks
+      operationId: listPks
       tags: [vendor-pks]
       description: >-
-        ADMIN / ADMIN_PARAM. Per PKS type (ordered by type code): active PKS, history and the pending
-        change of one vendor (primary DB). A vendor may hold only some types. INTERNAL vendor: `groups` is empty.
-      parameters: [ { $ref: '#/components/parameters/VendorID' } ]
+        ADMIN / ADMIN_PARAM / ATM-SPV. Daftar PKS: one row per PKS (history included) plus one
+        `menunggu_persetujuan` row per pending create (replica). Default `status` = `terkini`.
+        422 = unknown `pks_type` / `vendor` code or invalid filter.
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [terkini, semua, aktif, need_renewal, belum_berlaku, expired, terminated, diganti] } }
+        - { name: pks_type, in: query, required: false, schema: { type: string }, description: 'PKS type code' }
+        - { name: vendor, in: query, required: false, schema: { type: string }, description: 'vendor code' }
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: page, in: query, required: false, schema: { type: integer, minimum: 1 } }
+        - { name: page_size, in: query, required: false, schema: { type: integer, minimum: 1 } }
       responses:
-        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/VendorPksDetail' } } } }
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/PksListPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /admin/pks/{pksID}/reminder:
+    put:
+      operationId: updatePksReminder
+      tags: [vendor-pks]
+      description: >-
+        ADMIN / ADMIN_PARAM. Sets the renewal reminder (days) of one PKS. Applies immediately, audit in the
+        same tx (not maker-checker). 422 = `renewal_days` out of range.
+      parameters: [ { $ref: '#/components/parameters/PksID' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/UpdatePksReminderRequest' } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/UpdatePksReminderResponse' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '500': { $ref: '#/components/responses/InternalError' }
+
+  /admin/vendors/{vendorID}/pks:
     post:
       operationId: submitVendorPks
       tags: [vendor-pks]
@@ -845,8 +874,9 @@ components:
     SubmitVendorPksRequest:
       type: object
       additionalProperties: false
-      required: [pks_type, wod_number, pks_name, effective_date, expiry_date]
+      required: [pks_type, wod_number, pks_name, effective_date, expiry_date, renewal_days]
       properties:
+        renewal_days: { type: integer, format: int32, minimum: 30, maximum: 3666, description: 'reminder in days; must be <= PKS validity in days' }
         pks_type: { type: string, description: 'code of an active PKS type (e.g. FLM, CIT)' }
         wod_number: { type: string, minLength: 1, maxLength: 100, description: 'trimmed; unique case-insensitively across all PKS' }
         pks_name: { type: string, minLength: 1, maxLength: 500 }
@@ -890,70 +920,67 @@ components:
       required: [reason]
       properties:
         reason: { type: string, minLength: 1, maxLength: 500 }
-    PksStatus: { type: string, enum: [aktif, need_renewal, expired, terminated, belum_diisi] }
-    VendorPksRecord:
+    PksListItem:
       type: object
       additionalProperties: false
-      required: [id, wod_number, pks_name, effective_date, expiry_date, validity_months, created_at, terminated_at, termination_reason]
+      required: [id, vendor_id, vendor_code, vendor_name, pks_type, pks_type_name, wod_number, pks_name, effective_date, expiry_date, renewal_days, remaining_days, status, pending]
       properties:
-        id: { type: integer, format: int64 }
+        id: { type: integer, format: int64, nullable: true, description: 'null for a pending create (no vendor_pks row yet)' }
+        vendor_id: { type: integer, format: int64 }
+        vendor_code: { type: string }
+        vendor_name: { type: string }
+        pks_type: { type: string }
+        pks_type_name: { type: string }
         wod_number: { type: string }
         pks_name: { type: string }
         effective_date: { type: string, format: date }
         expiry_date: { type: string, format: date }
-        validity_months: { type: integer, format: int32 }
-        remaining_days: { type: integer, description: 'only on the active PKS; negative once expired' }
-        created_at: { type: string, format: date-time, nullable: true }
-        replaced_at: { type: string, format: date-time, description: 'history rows only' }
-        replaced_by_pks_id: { type: integer, format: int64, description: 'history rows only' }
-        terminated_at: { type: string, format: date-time, nullable: true }
-        termination_reason: { type: string, nullable: true }
-    VendorPksPending:
+        renewal_days: { type: integer }
+        remaining_days: { type: integer, description: 'negative once expired' }
+        status: { type: string, enum: [aktif, need_renewal, belum_berlaku, expired, terminated, diganti, menunggu_persetujuan] }
+        pending:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [op, change_id]
+          properties:
+            op: { type: string }
+            change_id: { type: integer, format: int64 }
+    PksListPage:
       type: object
       additionalProperties: false
-      required: [change_request_id, op, payload, maker_id, maker_name, created_at]
+      required: [items, total, page, page_size]
       properties:
-        change_request_id: { type: integer, format: int64 }
-        op: { type: string, enum: [create, disable, enable] }
-        payload: { type: object, additionalProperties: true }
-        maker_id: { type: integer, format: int64 }
-        maker_name: { type: string }
-        created_at: { type: string, format: date-time, nullable: true }
-    VendorPksDetail:
+        items: { type: array, items: { $ref: '#/components/schemas/PksListItem' } }
+        total: { type: integer, format: int64 }
+        page: { type: integer }
+        page_size: { type: integer }
+    UpdatePksReminderRequest:
       type: object
       additionalProperties: false
-      required: [vendor_id, kind, today, renewal_months, groups]
+      required: [renewal_days]
       properties:
-        vendor_id: { type: integer, format: int64 }
-        kind: { type: string, enum: [FLM_VENDOR, INTERNAL] }
-        today: { type: string, format: date, description: 'Asia/Jakarta date used for status' }
-        renewal_months: { type: integer }
-        groups:
-          type: array
-          description: 'one entry per type the vendor has a PKS or pending change for, ordered by type code'
-          items: { $ref: '#/components/schemas/VendorPksGroup' }
-    VendorPksGroup:
+        renewal_days: { type: integer, format: int32, minimum: 30, maximum: 3666, description: 'must be <= PKS validity in days' }
+    UpdatePksReminderResponse:
       type: object
       additionalProperties: false
-      required: [pks_type, pks_status, active, history, pending]
+      required: [pks]
       properties:
-        pks_type:
+        pks:
           type: object
           additionalProperties: false
-          required: [code, name]
+          required: [id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, renewal_days, replaced_at, terminated_at]
           properties:
-            code: { type: string }
-            name: { type: string }
-        pks_status:
-          nullable: true
-          allOf: [ { $ref: '#/components/schemas/PksStatus' } ]
-        active:
-          nullable: true
-          allOf: [ { $ref: '#/components/schemas/VendorPksRecord' } ]
-        history: { type: array, items: { $ref: '#/components/schemas/VendorPksRecord' } }
-        pending:
-          nullable: true
-          allOf: [ { $ref: '#/components/schemas/VendorPksPending' } ]
+            id: { type: integer, format: int64 }
+            vendor_id: { type: integer, format: int64 }
+            pks_type_id: { type: integer, format: int64 }
+            wod_number: { type: string }
+            pks_name: { type: string }
+            effective_date: { type: string, format: date, nullable: true }
+            expiry_date: { type: string, format: date, nullable: true }
+            renewal_days: { type: integer, format: int32 }
+            replaced_at: { type: string, format: date-time, nullable: true }
+            terminated_at: { type: string, format: date-time, nullable: true }
     # -- dsr-late-report ------------------------------------------------------
     DsrLateStatus: { type: string, enum: [ok, late, not_sent, pending] }
     DsrLateDailyRow:

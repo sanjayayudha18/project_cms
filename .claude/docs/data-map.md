@@ -120,6 +120,16 @@ Spec: `.kiro/specs/vendor-pks/` (design "Data Models", D1–D32). Migrations `02
 *   **Export**: `export_jobs.kind = 'vendor_pks'` (migration 037), report params `q`, `status`, `pks_status`. Served by `backend-exq` at `POST /exports/reports/vendor-pks`.
 *   **Query note (sqlc v1.31.1)**: `ListVendorsAdmin` and `ExportVendorPksBatch` wrap `validity_months` and `remaining_days` in COALESCE to 0, and `pks_status` to `''`, because sqlc types these function/cast results as NOT NULL. A NULL meaning is "no active PKS" (`pks_id IS NULL`) or an INTERNAL vendor. The status filter uses the raw function, not the COALESCEd column.
 
+## Daftar PKS + reminder (migration 044)
+
+Spec: `.kiro/specs/vendor-pks-list/` (design "Data Models"). Migration `044_vendor_pks_list.sql` applied to dev DB 2026-11-19 via `go run ./cmd/migrate up` (`migrate status`: 43 applied, 0 pending). One tx; guard aborts if any PKS has a masa under 30 days.
+
+*   **`vendor_pks.renewal_days`**: `integer NOT NULL DEFAULT 270`; CHECK 30–3666; CHECK `renewal_days` ≤ masa PKS (`expiry_date - effective_date`). Backfill only updates rows whose value is not 270: `LEAST(270, expiry - effective)`.
+*   **Status function**: new `vendor_pks_record_status(replaced_at, terminated_at, effective, expiry, renewal_days, today)`. `vendor_pks_status` and `vendor_pks_validity_months` are kept until migration `045` (task 10).
+*   **Menu/access**: menu `settings.pks` (`sort_order` 2). `role_permissions`: ADMIN and ADMIN_PARAM → `settings.pks`; ATM-SPV → `settings` + `settings.pks` (read only; write routes stay ADMIN/ADMIN_PARAM).
+*   **Reminder writes**: `PUT /api/v1/admin/pks/{pksID}/reminder` writes directly (GR#3 deviation, CLAUDE.md Sec 12) with audit `vendor_pks_reminder_updated` in the same tx. Only `renewal_days` changes; no other PKS content column is updated.
+*   **Deploy window**: a pre-044 binary that approves a PKS under 270 days after the migration hits CHECK `vendor_pks_renewal_days_le_term_chk`. Deploy `backend` + `backend-exq` + CompanyPortal in one release.
+
 ## Vendor PKS per Type (migration 043)
 
 <a id="vendor-pks-type-migration-043"></a>

@@ -22,6 +22,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/repository"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Spec vendor-pks task 7.5, per type (vendor-pks-type task 4.4): VendorPksApplier +
@@ -168,8 +169,17 @@ func vendorJSON(t testing.TB, pool *pgxpool.Pool, vendorID int64) string {
 
 func approvePksCreate(t *testing.T, svc *MasterDataApprovalService, h *testHelpers, vendorID, typeID int64, wod, name, eff, exp string, replaces *int64) (int64, error) {
 	t.Helper()
+	// renewal_days must be 30..term (vendor_pks_renewal_days_le_term_chk): default 270, capped at the term.
+	days := int32(reports.RenewalDaysDefault)
+	if e, err1 := time.Parse(vendorPksDateLayout, eff); err1 == nil {
+		if x, err2 := time.Parse(vendorPksDateLayout, exp); err2 == nil {
+			if term := int32(x.Sub(e).Hours() / 24); term < days {
+				days = term
+			}
+		}
+	}
 	id := h.insertPending("vendor_pks", "create", nil, VendorPksCreatePayload{
-		VendorID: vendorID, PksTypeID: typeID, WodNumber: wod, PksName: name, EffectiveDate: eff, ExpiryDate: exp, ReplacesPksID: replaces,
+		VendorID: vendorID, PksTypeID: typeID, WodNumber: wod, PksName: name, EffectiveDate: eff, ExpiryDate: exp, RenewalDays: days, ReplacesPksID: replaces,
 	})
 	return id, approveChange(t, svc, id)
 }
@@ -222,7 +232,7 @@ func TestVendorPksApplier_RandomCreates_OneActivePerType_Integration(t *testing.
 			otherBefore := rowsOfType(loadPksRows(t, h.pool, vendorID), typeIDs[1-k])
 
 			eff := base.AddDate(0, 0, rapid.IntRange(-3000, 3000).Draw(rt, "eff_offset"))
-			exp := eff.AddDate(0, 0, rapid.IntRange(0, 1500).Draw(rt, "validity_days"))
+			exp := eff.AddDate(0, 0, rapid.IntRange(30, 1500).Draw(rt, "validity_days"))
 			w := want{
 				name: fmt.Sprintf("PKS %d/%d", i, rapid.IntRange(0, 9999).Draw(rt, "name_no")), wod: nextWod(tag),
 				eff: eff.Format(vendorPksDateLayout), exp: exp.Format(vendorPksDateLayout),
@@ -657,7 +667,7 @@ func newPksApprovalFixture(t *testing.T) *pksApprovalFixture {
 	orchestrator := approval.NewOrchestrator(repo, repo, repo, auditWriter, nil)
 	changeRepo := repository.NewMasterDataChangeRepository(pool)
 	changes := NewMasterDataChangeService(changeRepo, orchestrator, auditWriter)
-	f.pks = NewVendorPksAdminService(repository.NewVendorPksAdminRepository(pool), changes, 9)
+	f.pks = NewVendorPksAdminService(repository.NewVendorPksAdminRepository(pool), changes, pool)
 	f.approvals = NewMasterDataApprovalService(orchestrator, changeRepo, pool, svc.appliers, auditWriter)
 	return f
 }
@@ -682,7 +692,7 @@ func (f *pksApprovalFixture) cleanup() {
 }
 
 func (f *pksApprovalFixture) req(typeCode, wod string) SubmitVendorPksRequest {
-	return SubmitVendorPksRequest{PksType: typeCode, WodNumber: wod, PksName: "PKS fixture", EffectiveDate: "2026-01-01", ExpiryDate: "2027-01-01"}
+	return SubmitVendorPksRequest{PksType: typeCode, WodNumber: wod, PksName: "PKS fixture", EffectiveDate: "2026-01-01", ExpiryDate: "2027-01-01", RenewalDays: 270}
 }
 
 // Maker != checker: the real orchestrator refuses the maker approving their own

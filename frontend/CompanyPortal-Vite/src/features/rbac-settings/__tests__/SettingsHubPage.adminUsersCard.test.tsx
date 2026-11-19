@@ -87,3 +87,25 @@ describe("SettingsHubPage — Manajemen Pengguna card visibility", () => {
     expect(screen.getByRole("link", { name: /Manajemen Vendor/ })).toBeInTheDocument();
   });
 });
+
+describe("SettingsHubPage — Daftar PKS card per role (Req 9.3)", () => {
+  it("ATM-SPV sees only Daftar PKS and Manajemen Vendor", async () => {
+    setUser("ATM-SPV");
+    render(<SettingsHubPage />);
+
+    expect(screen.getByRole("link", { name: /Daftar PKS/ })).toHaveAttribute(
+      "href",
+      "/settings/admin/pks",
+    );
+    expect(screen.getByRole("link", { name: /Manajemen Vendor/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Manajemen Pengguna/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Manajemen ATM/ })).not.toBeInTheDocument();
+  });
+
+  it("ADMIN sees Daftar PKS on the Data master tab", async () => {
+    setUser("ADMIN");
+    render(<SettingsHubPage />);
+    await openMasterTab();
+    expect(screen.getByRole("link", { name: /Daftar PKS/ })).toBeInTheDocument();
+  });
+});

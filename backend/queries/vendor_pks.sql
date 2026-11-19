@@ -34,18 +34,6 @@ FROM vendor_pks p
 JOIN vendor_pks_types t ON t.id = p.pks_type_id
 WHERE p.id = $1;
 
--- name: ListVendorPksByVendor :many
--- Per type (code): active PKS first, then history newest-replaced first.
-SELECT p.id, p.vendor_id, p.pks_type_id, t.code AS pks_type_code, t.name AS pks_type_name,
-       p.wod_number, p.pks_name, p.effective_date, p.expiry_date, p.created_by,
-       p.replaced_at, p.replaced_by_pks_id, p.terminated_at, p.terminated_by,
-       p.termination_reason, p.created_at, p.updated_at,
-       vendor_pks_validity_months(p.effective_date, p.expiry_date)::int AS validity_months
-FROM vendor_pks p
-JOIN vendor_pks_types t ON t.id = p.pks_type_id
-WHERE p.vendor_id = $1
-ORDER BY t.code, p.replaced_at DESC NULLS FIRST, p.id DESC;
-
 -- name: GetPendingVendorPksChanges :many
 -- At most one pending change per (vendor, type) (DB index), so many per vendor.
 SELECT c.id, c.op, c.entity_id, c.payload, c.maker_id,
@@ -66,23 +54,15 @@ SELECT (EXISTS (SELECT 1 FROM vendor_pks
                    WHERE c.entity_type = 'vendor_pks' AND c.op = 'create' AND c.status = 'pending'
                      AND lower(btrim(c.payload->>'wod_number')) = lower(btrim(sqlc.arg('wod_number')::text))))::bool AS taken;
 
--- name: GetVendorPksStatus :one
--- Detail screen (task 7.1): the same vendor_pks_status() rule the list, filter
--- and export use (Req 6.8). Arguments come from the already-loaded vendor + active
--- PKS; NULL expiry = no active PKS. '' for an INTERNAL vendor (function NULL).
-SELECT COALESCE(vendor_pks_status(sqlc.arg('kind')::text, sqlc.narg('expiry_date')::date,
-                         sqlc.narg('terminated_at')::timestamptz, sqlc.arg('today')::date,
-                         sqlc.arg('renewal_months')::int), '')::text AS pks_status;
-
 -- name: MarkVendorPksReplaced :exec
 UPDATE vendor_pks SET replaced_at = sqlc.arg('replaced_at')
 WHERE id = sqlc.arg('id') AND replaced_at IS NULL;
 
 -- name: InsertVendorPks :one
-INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, renewal_days, created_by)
 VALUES (sqlc.arg('vendor_id'), sqlc.arg('pks_type_id'), sqlc.arg('wod_number'), sqlc.arg('pks_name'),
-        sqlc.arg('effective_date'), sqlc.arg('expiry_date'), sqlc.arg('created_by'))
-RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
+        sqlc.arg('effective_date'), sqlc.arg('expiry_date'), sqlc.arg('renewal_days'), sqlc.arg('created_by'))
+RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, renewal_days, created_by,
           replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
           termination_reason, created_at, updated_at;
 

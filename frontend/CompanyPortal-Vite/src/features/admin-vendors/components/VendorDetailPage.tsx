@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useAuthStore } from "@/lib/auth/store";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useVendor } from "../hooks";
 import { BranchesPanel } from "./BranchesPanel";
 import { DsrLocationMapsPanel } from "./DsrLocationMapsPanel";
 import { InfoTab } from "./InfoTab";
 import { PackagePricesPanel } from "./PackagePricesPanel";
 import { PicsPanel } from "./PicsPanel";
-import { PksPanel } from "./PksPanel";
 import { VendorHeader } from "./VendorHeader";
+import { VendorPksTab } from "./VendorPksTab";
 
 const TOP_TABS = [
   { id: "info", label: "Info" },
@@ -59,17 +60,30 @@ function TabBar<T extends string>({
  * PIC Vendor-wide tab for PICs with no branch (vendor_branch_id NULL).
  */
 export function VendorDetailPage({ vendorId }: { vendorId: number }) {
-  const [tab, setTab] = useState<TopTab>("info");
+  const role = useAuthStore((st) => st.user?.role);
+  // ATM-SPV is read-only and sees the PKS tab only (Req 8.4).
+  const pksOnly = role === "ATM-SPV";
+  const rawTab = (useSearch({ strict: false }) as { tab?: unknown }).tab;
+  const navigate = useNavigate();
   const vendorQuery = useVendor(vendorId);
   const vendor = vendorQuery.data;
   // PKS tab is hidden for internal vendors (ROH has no PKS)
-  const tabs = vendor?.kind === "INTERNAL" ? TOP_TABS.filter((t) => t.id !== "pks") : TOP_TABS;
+  const available = TOP_TABS.filter(
+    (t) => (!pksOnly || t.id === "pks") && !(vendor?.kind === "INTERNAL" && t.id === "pks"),
+  );
+  const requested = TOP_TABS.find((t) => t.id === rawTab)?.id;
+  const tab: TopTab = pksOnly ? "pks" : (requested ?? "info");
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <VendorHeader vendor={vendor} vendorId={vendorId} />
+      <VendorHeader vendor={vendor} vendorId={vendorId} showSummary={!pksOnly} />
 
-      <TabBar label="Detail vendor" tabs={tabs} active={tab} onChange={setTab} />
+      <TabBar
+        label="Detail vendor"
+        tabs={available}
+        active={tab}
+        onChange={(id) => navigate({ to: ".", search: { tab: id } as never })}
+      />
 
       {vendorQuery.isError && (
         <p role="alert" className="text-sm text-[var(--danger-fg)]">
@@ -87,9 +101,7 @@ export function VendorDetailPage({ vendorId }: { vendorId: number }) {
 
       {tab === "dsrMaps" && <DsrLocationMapsPanel vendorId={vendorId} />}
 
-      {tab === "pks" && vendor?.kind !== "INTERNAL" && (
-        <PksPanel vendorId={vendorId} vendor={vendor} />
-      )}
+      {tab === "pks" && vendor && vendor.kind !== "INTERNAL" && <VendorPksTab vendor={vendor} />}
     </div>
   );
 }

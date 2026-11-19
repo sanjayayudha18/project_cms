@@ -49,11 +49,6 @@ func (r *VendorPksAdminRepository) GetByID(ctx context.Context, id int64) (*db.G
 	return nilIfNoRows(r.queries.GetVendorPksByID(ctx, id))
 }
 
-// ListByVendor returns, per type code, the active PKS first, then history newest-replaced first.
-func (r *VendorPksAdminRepository) ListByVendor(ctx context.Context, vendorID int64) ([]db.ListVendorPksByVendorRow, error) {
-	return r.queries.ListVendorPksByVendor(ctx, vendorID)
-}
-
 // Pending returns the vendor's pending vendor_pks changes (at most one per type).
 func (r *VendorPksAdminRepository) Pending(ctx context.Context, vendorID int64) ([]db.GetPendingVendorPksChangesRow, error) {
 	return r.queries.GetPendingVendorPksChanges(ctx, vendorID)
@@ -72,9 +67,4 @@ func (r *VendorPksAdminRepository) PksTypeByCode(ctx context.Context, code strin
 // WodTaken reports whether a No. WOD is used by any PKS row or pending create.
 func (r *VendorPksAdminRepository) WodTaken(ctx context.Context, wod string) (bool, error) {
 	return r.queries.WodNumberTaken(ctx, wod)
-}
-
-// Status evaluates vendor_pks_status() for already-loaded inputs; "" = no status (INTERNAL).
-func (r *VendorPksAdminRepository) Status(ctx context.Context, arg db.GetVendorPksStatusParams) (string, error) {
-	return r.queries.GetVendorPksStatus(ctx, arg)
 }

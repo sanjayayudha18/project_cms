@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/audit"
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
@@ -47,28 +47,77 @@ type VendorPksAdminRepo interface {
 	Vendor(ctx context.Context, vendorID int64) (*db.GetVendorPksVendorRow, error)
 	Active(ctx context.Context, vendorID, pksTypeID int64) (*db.GetActiveVendorPksRow, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorPksByIDRow, error)
-	ListByVendor(ctx context.Context, vendorID int64) ([]db.ListVendorPksByVendorRow, error)
 	Pending(ctx context.Context, vendorID int64) ([]db.GetPendingVendorPksChangesRow, error)
-	PksType(ctx context.Context, id int64) (*db.VendorPksType, error)
 	PksTypeByCode(ctx context.Context, code string) (*db.VendorPksType, error)
 	WodTaken(ctx context.Context, wod string) (bool, error)
-	Status(ctx context.Context, arg db.GetVendorPksStatusParams) (string, error)
 }
 
 // VendorPksAdminService validates PKS changes and stages them through
 // MasterDataChangeService.Submit (which re-checks ADMIN/ADMIN_PARAM).
 // VendorPksApplier writes vendor_pks once a checker approves.
 type VendorPksAdminService struct {
-	repo          VendorPksAdminRepo
-	changes       VendorAdminSubmitter
-	renewalMonths int
-	now           func() time.Time
+	repo    VendorPksAdminRepo
+	changes VendorAdminSubmitter
+	pool    VendorPicRolePool // primary; UpdateReminder tx
 }
 
-// NewVendorPksAdminService creates the service; renewalMonths comes from
-// VENDOR_PKS_RENEWAL_MONTHS (reports.ParseVendorPksRenewalMonths).
-func NewVendorPksAdminService(repo VendorPksAdminRepo, changes VendorAdminSubmitter, renewalMonths int) *VendorPksAdminService {
-	return &VendorPksAdminService{repo: repo, changes: changes, renewalMonths: renewalMonths, now: time.Now}
+// NewVendorPksAdminService creates the service. pool is the primary pool.
+func NewVendorPksAdminService(repo VendorPksAdminRepo, changes VendorAdminSubmitter, pool VendorPicRolePool) *VendorPksAdminService {
+	return &VendorPksAdminService{repo: repo, changes: changes, pool: pool}
+}
+
+// UpdateReminder sets renewal_days of any PKS row (replaced and terminated
+// included) immediately — documented GR#3 deviation (spec vendor-pks-list D9,
+// same pattern as VendorPicRoleService.SetRoles): no maker-checker, the
+// update and its audit_logs row share one primary tx, so a failed audit
+// rolls the update back. Role ∉ ADMIN/ADMIN_PARAM → ErrMasterDataForbidden;
+// missing row → ErrVendorPksNotFound; invalid days → 422 on "renewal_days".
+// An unchanged value returns the row without update or audit.
+func (s *VendorPksAdminService) UpdateReminder(ctx context.Context, actorID int64, role string, pksID int64, days int32, ip string) (db.UpdateVendorPksRenewalDaysRow, error) {
+	var zero db.UpdateVendorPksRenewalDaysRow
+	if !masterDataMakerRoles[strings.ToUpper(strings.TrimSpace(role))] {
+		return zero, ErrMasterDataForbidden
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return zero, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	q := db.New(tx)
+	row, err := q.GetVendorPksForUpdate(ctx, pksID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return zero, ErrVendorPksNotFound
+	}
+	if err != nil {
+		return zero, fmt.Errorf("load pks %d for update: %w", pksID, err)
+	}
+	if err := validateRenewalDays(days, row.EffectiveDate.Time, row.ExpiryDate.Time); err != nil {
+		return zero, err
+	}
+	if row.RenewalDays == days {
+		return db.UpdateVendorPksRenewalDaysRow(row), nil
+	}
+
+	updated, err := q.UpdateVendorPksRenewalDays(ctx, db.UpdateVendorPksRenewalDaysParams{RenewalDays: days, ID: pksID})
+	if err != nil {
+		return zero, fmt.Errorf("update pks %d renewal days: %w", pksID, err)
+	}
+	if err := audit.NewWriter(tx).Write(ctx, audit.Entry{
+		ActorID:    actorID,
+		Action:     "vendor_pks_reminder_updated",
+		EntityType: vendorPksEntity,
+		EntityID:   pksID,
+		Before:     map[string]any{"renewal_days": row.RenewalDays},
+		After:      map[string]any{"renewal_days": days},
+		IP:         ip,
+	}); err != nil {
+		return zero, fmt.Errorf("write audit log: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return zero, fmt.Errorf("commit pks %d reminder: %w", pksID, err)
+	}
+	return updated, nil
 }
 
 // SubmitVendorPksRequest is the body of POST /admin/vendors/{vendorID}/pks.
@@ -79,6 +128,7 @@ type SubmitVendorPksRequest struct {
 	PksName       string `json:"pks_name"`
 	EffectiveDate string `json:"effective_date"`
 	ExpiryDate    string `json:"expiry_date"`
+	RenewalDays   int32  `json:"renewal_days"`
 }
 
 // VendorPksCreatePayload is the jsonb payload of op=create (design "Payload
@@ -92,6 +142,7 @@ type VendorPksCreatePayload struct {
 	EffectiveDate string `json:"effective_date"`
 	ExpiryDate    string `json:"expiry_date"`
 	WodNumber     string `json:"wod_number"`
+	RenewalDays   int32  `json:"renewal_days"` // absent in pre-044 payloads → applier uses reports.RenewalDaysDefault
 	ReplacesPksID *int64 `json:"replaced_pks_id"`
 }
 
@@ -104,187 +155,9 @@ type VendorPksReasonPayload struct {
 	Reason    string `json:"reason"`
 }
 
-// VendorPksRecord is one PKS row of the detail. RemainingDays is set only for
-// the active PKS; Replaced* only for history.
-type VendorPksRecord struct {
-	ID                int64      `json:"id"`
-	WodNumber         string     `json:"wod_number"`
-	PksName           string     `json:"pks_name"`
-	EffectiveDate     string     `json:"effective_date"`
-	ExpiryDate        string     `json:"expiry_date"`
-	ValidityMonths    int32      `json:"validity_months"`
-	RemainingDays     *int       `json:"remaining_days,omitempty"`
-	CreatedAt         *time.Time `json:"created_at"`
-	ReplacedAt        *time.Time `json:"replaced_at,omitempty"`
-	ReplacedByPksID   *int64     `json:"replaced_by_pks_id,omitempty"`
-	TerminatedAt      *time.Time `json:"terminated_at"`
-	TerminationReason *string    `json:"termination_reason"`
-}
-
-// VendorPksPending is the pending PKS change of one (vendor, type).
-type VendorPksPending struct {
-	ChangeRequestID int64           `json:"change_request_id"`
-	Op              string          `json:"op"`
-	Payload         json.RawMessage `json:"payload"`
-	MakerID         int64           `json:"maker_id"`
-	MakerName       string          `json:"maker_name"`
-	CreatedAt       *time.Time      `json:"created_at"`
-}
-
-// VendorPksTypeRef names the PKS type of a group.
-type VendorPksTypeRef struct {
-	Code string `json:"code"`
-	Name string `json:"name"`
-}
-
-// VendorPksGroup is the PKS of one type: active (+ status), history, pending.
-type VendorPksGroup struct {
-	PksType   VendorPksTypeRef  `json:"pks_type"`
-	PksStatus *string           `json:"pks_status"`
-	Active    *VendorPksRecord  `json:"active"`
-	History   []VendorPksRecord `json:"history"`
-	Pending   *VendorPksPending `json:"pending"`
-
-	typeID             int64
-	activeExpiry       pgtype.Date
-	activeTerminatedAt pgtype.Timestamptz
-}
-
-// VendorPksDetail is GET /admin/vendors/{vendorID}/pks: one group per type the
-// vendor has a PKS or a pending change for, ordered by type code (Req 3.2).
-// Groups is empty for an INTERNAL vendor.
-type VendorPksDetail struct {
-	VendorID      int64            `json:"vendor_id"`
-	Kind          string           `json:"kind"`
-	Today         string           `json:"today"`
-	RenewalMonths int              `json:"renewal_months"`
-	Groups        []VendorPksGroup `json:"groups"`
-}
-
 // pendingKey is the part of a pending vendor_pks payload the per-type checks need.
 type pendingKey struct {
 	PksTypeID int64 `json:"pks_type_id"`
-}
-
-// Get returns, per type, the active PKS (status + remaining days), history and
-// pending change of a vendor, all from the primary (Req 3.2, 3.3).
-func (s *VendorPksAdminService) Get(ctx context.Context, vendorID int64) (*VendorPksDetail, error) {
-	vendor, err := s.repo.Vendor(ctx, vendorID)
-	if err != nil {
-		return nil, fmt.Errorf("load vendor %d: %w", vendorID, err)
-	}
-	if vendor == nil {
-		return nil, ErrVendorNotFound
-	}
-	today := reports.TodayWIB(s.now())
-	detail := &VendorPksDetail{
-		VendorID: vendorID, Kind: vendor.Kind, Today: today.Format(vendorPksDateLayout),
-		RenewalMonths: s.renewalMonths, Groups: []VendorPksGroup{},
-	}
-	if vendor.Kind == vendorKindInternal {
-		return detail, nil
-	}
-
-	groups, err := s.recordGroups(ctx, vendorID, today)
-	if err != nil {
-		return nil, err
-	}
-	if groups, err = s.withPending(ctx, vendorID, groups); err != nil {
-		return nil, err
-	}
-	slices.SortFunc(groups, func(a, b VendorPksGroup) int { return strings.Compare(a.PksType.Code, b.PksType.Code) })
-
-	for i := range groups {
-		g := &groups[i]
-		status, err := s.repo.Status(ctx, db.GetVendorPksStatusParams{
-			Kind: vendor.Kind, ExpiryDate: g.activeExpiry, TerminatedAt: g.activeTerminatedAt,
-			Today: toPgDate(today), RenewalMonths: int32(s.renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
-		})
-		if err != nil {
-			return nil, fmt.Errorf("vendor %d pks status type %s: %w", vendorID, g.PksType.Code, err)
-		}
-		if status != "" {
-			g.PksStatus = &status
-		}
-	}
-	detail.Groups = groups
-	return detail, nil
-}
-
-// recordGroups builds one group per type from the vendor's PKS rows (already
-// ordered by type code, active first).
-func (s *VendorPksAdminService) recordGroups(ctx context.Context, vendorID int64, today time.Time) ([]VendorPksGroup, error) {
-	rows, err := s.repo.ListByVendor(ctx, vendorID)
-	if err != nil {
-		return nil, fmt.Errorf("list vendor %d pks: %w", vendorID, err)
-	}
-	groups := []VendorPksGroup{}
-	for _, r := range rows {
-		if len(groups) == 0 || groups[len(groups)-1].typeID != r.PksTypeID {
-			groups = append(groups, VendorPksGroup{
-				PksType: VendorPksTypeRef{Code: r.PksTypeCode, Name: r.PksTypeName},
-				History: []VendorPksRecord{}, typeID: r.PksTypeID,
-			})
-		}
-		g := &groups[len(groups)-1]
-		rec := newVendorPksRecord(r)
-		if r.ReplacedAt.Valid {
-			g.History = append(g.History, rec)
-			continue
-		}
-		days := int(r.ExpiryDate.Time.Sub(today) / (24 * time.Hour))
-		rec.RemainingDays = &days
-		g.Active = &rec
-		g.activeExpiry, g.activeTerminatedAt = r.ExpiryDate, r.TerminatedAt
-	}
-	return groups, nil
-}
-
-// withPending attaches each pending change to its type's group, adding a group
-// for a type that has only a pending create.
-func (s *VendorPksAdminService) withPending(ctx context.Context, vendorID int64, groups []VendorPksGroup) ([]VendorPksGroup, error) {
-	pending, err := s.repo.Pending(ctx, vendorID)
-	if err != nil {
-		return nil, fmt.Errorf("vendor %d pending pks changes: %w", vendorID, err)
-	}
-	for _, p := range pending {
-		var key pendingKey
-		if err := json.Unmarshal(p.Payload, &key); err != nil {
-			return nil, fmt.Errorf("decode pending pks change %d: %w", p.ID, err)
-		}
-		idx := slices.IndexFunc(groups, func(g VendorPksGroup) bool { return g.typeID == key.PksTypeID })
-		if idx < 0 {
-			t, err := s.repo.PksType(ctx, key.PksTypeID)
-			if err != nil {
-				return nil, fmt.Errorf("load pks type %d: %w", key.PksTypeID, err)
-			}
-			if t == nil {
-				return nil, fmt.Errorf("pending pks change %d: pks type %d not found", p.ID, key.PksTypeID)
-			}
-			groups = append(groups, VendorPksGroup{
-				PksType: VendorPksTypeRef{Code: t.Code, Name: t.Name}, History: []VendorPksRecord{}, typeID: t.ID,
-			})
-			idx = len(groups) - 1
-		}
-		groups[idx].Pending = &VendorPksPending{
-			ChangeRequestID: p.ID, Op: p.Op, Payload: json.RawMessage(p.Payload),
-			MakerID: p.MakerID, MakerName: p.MakerName, CreatedAt: timestamptzToPtr(p.CreatedAt),
-		}
-	}
-	return groups, nil
-}
-
-func newVendorPksRecord(r db.ListVendorPksByVendorRow) VendorPksRecord {
-	rec := VendorPksRecord{
-		ID: r.ID, WodNumber: r.WodNumber, PksName: r.PksName,
-		EffectiveDate: r.EffectiveDate.Time.Format(vendorPksDateLayout), ExpiryDate: r.ExpiryDate.Time.Format(vendorPksDateLayout),
-		ValidityMonths: r.ValidityMonths, CreatedAt: timestamptzToPtr(r.CreatedAt),
-		TerminatedAt: timestamptzToPtr(r.TerminatedAt), TerminationReason: r.TerminationReason,
-	}
-	if r.ReplacedAt.Valid {
-		rec.ReplacedAt, rec.ReplacedByPksID = timestamptzToPtr(r.ReplacedAt), r.ReplacedByPksID
-	}
-	return rec
 }
 
 // SubmitNew stages a new PKS (op=create) for one type. Order: vendor → fields
@@ -445,7 +318,7 @@ func (s *VendorPksAdminService) checkNoPending(ctx context.Context, vendorID, pk
 func validateVendorPksCreate(vendorID, pksTypeID int64, req SubmitVendorPksRequest) (VendorPksCreatePayload, error) {
 	p := VendorPksCreatePayload{
 		VendorID: vendorID, PksTypeID: pksTypeID, WodNumber: strings.TrimSpace(req.WodNumber),
-		PksName:       strings.TrimSpace(req.PksName),
+		PksName: strings.TrimSpace(req.PksName), RenewalDays: req.RenewalDays,
 		EffectiveDate: strings.TrimSpace(req.EffectiveDate), ExpiryDate: strings.TrimSpace(req.ExpiryDate),
 	}
 	if err := validateVendorPksWod(p.WodNumber); err != nil {
@@ -465,7 +338,26 @@ func validateVendorPksCreate(vendorID, pksTypeID int64, req SubmitVendorPksReque
 	if exp.Before(eff) {
 		return p, &ValidationError{Field: "expiry_date", Message: "Tanggal berakhir tidak boleh sebelum tanggal berlaku"}
 	}
+	if err := validateRenewalDays(p.RenewalDays, eff, exp); err != nil {
+		return p, err
+	}
 	return p, nil
+}
+
+// validateRenewalDays: required, RenewalDaysMin–RenewalDaysMax and not longer
+// than the PKS term (expiry − effective, in days) → 422 on "renewal_days".
+// Shared with UpdateReminder (task 4.2).
+func validateRenewalDays(days int32, eff, exp time.Time) error {
+	if days == 0 {
+		return &ValidationError{Field: "renewal_days", Message: "Hari reminder wajib diisi"}
+	}
+	if days < reports.RenewalDaysMin || days > reports.RenewalDaysMax {
+		return &ValidationError{Field: "renewal_days", Message: fmt.Sprintf("Hari reminder harus antara %d dan %d", reports.RenewalDaysMin, reports.RenewalDaysMax)}
+	}
+	if term := int(exp.Sub(eff).Hours() / 24); int(days) > term {
+		return &ValidationError{Field: "renewal_days", Message: fmt.Sprintf("Hari reminder tidak boleh melebihi masa PKS (%d hari)", term)}
+	}
+	return nil
 }
 
 // validateVendorPksWod: already trimmed, 1–100 characters, no format pattern (Req 2.3).

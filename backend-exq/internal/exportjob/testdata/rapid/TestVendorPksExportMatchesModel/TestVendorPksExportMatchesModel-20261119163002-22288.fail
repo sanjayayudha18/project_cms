@@ -1,0 +1,179 @@
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw day: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw minute_of_day: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw vendors: 4
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw kind: "FLM_VENDOR"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw disabled: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw pks_count: 3
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw typ: "CIT"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw replaced: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw term_days: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw renewal: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw expiry_mode: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw exp_off: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw terminated: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw typ: "CIT"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw replaced: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw term_days: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw renewal: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw expiry_mode: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw exp_off: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw terminated: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw typ: "CIT"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw replaced: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw term_days: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw renewal: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw expiry_mode: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw exp_off: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw terminated: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw has_director: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw kind: "FLM_VENDOR"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw disabled: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw pks_count: 1
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw typ: "CIT"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw replaced: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw term_days: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw renewal: 30
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw expiry_mode: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw exp_off: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw terminated: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw has_director: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw kind: "FLM_VENDOR"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw disabled: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw pks_count: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw has_director: false
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw kind: "FLM_VENDOR"
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw disabled: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw pks_count: 0
+# 2026/11/19 16:30:02.546873 [TestVendorPksExportMatchesModel] [rapid] draw has_director: false
+# 2026/11/19 16:30:02.565473 [TestVendorPksExportMatchesModel] [rapid] draw status: "semua"
+# 2026/11/19 16:30:02.565473 [TestVendorPksExportMatchesModel] [rapid] draw q: "T93"
+# 2026/11/19 16:30:02.565473 [TestVendorPksExportMatchesModel] [rapid] draw filter_type: false
+# 2026/11/19 16:30:02.565473 [TestVendorPksExportMatchesModel] [rapid] draw filter_vendor: false
+# 2026/11/19 16:30:02.595551 [TestVendorPksExportMatchesModel] filter={status:semua pksType: vendor: q:T93} today=2026-01-01 row 0
+# got:  ["T93V01" "T93 Vendor 01 Ü" "" "" "" "CIT" "T93-WOD-01-0" "T93 PKS 1-0 CIT =x" "2025-12-02" "2026-01-01" "30" "30" "Terminated"]
+# want: ["T93V01" "T93 Vendor 01 Ü" "" "" "" "CIT" "T93-WOD-01-2" "T93 PKS 1-2 CIT =x" "2025-12-02" "2026-01-01" "30" "30" "Diganti"]
+# 
+v0.4.8#11371297151894489135
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x38e38e38e38e4
+0x3
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0

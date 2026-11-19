@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -32,11 +31,7 @@ type fakeVendorAdminServicer struct {
 	getResult   *db.GetVendorAdminByIDRow
 	getErr      error
 
-	resolveErr    error
-	resolveCalled bool
-	lastResolve   string
-	pksResult     map[int64][]service.VendorPksSummary
-	pksErr        error
+	lastRole string
 
 	createResult db.MasterDataChangeRequest
 	createErr    error
@@ -57,37 +52,23 @@ type fakeVendorAdminServicer struct {
 	enableCalled bool
 }
 
-func (f *fakeVendorAdminServicer) List(_ context.Context, p db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+func (f *fakeVendorAdminServicer) List(_ context.Context, role string, p db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
 	f.listCalled = true
+	f.lastRole = role
 	f.lastList = p
 	return f.listResult, f.listErr
 }
 
-// pksTypeFixtureID is the id the fake resolves any accepted pks_type code to.
-const pksTypeFixtureID = int64(11)
-
-func (f *fakeVendorAdminServicer) ResolvePksFilterType(_ context.Context, code string) (int64, error) {
-	f.resolveCalled, f.lastResolve = true, code
-	if f.resolveErr != nil {
-		return 0, f.resolveErr
-	}
-	return pksTypeFixtureID, nil
-}
-
-func (f *fakeVendorAdminServicer) PksSummaries(context.Context, []int64) (map[int64][]service.VendorPksSummary, error) {
-	return f.pksResult, f.pksErr
-}
-
-func (f *fakeVendorAdminServicer) Count(_ context.Context, p db.CountVendorsAdminParams) (int64, error) {
+func (f *fakeVendorAdminServicer) Count(_ context.Context, _ string, p db.CountVendorsAdminParams) (int64, error) {
 	f.lastCount = p
 	return f.countResult, f.countErr
 }
 
-func (f *fakeVendorAdminServicer) Get(context.Context, int64) (*db.GetVendorAdminByIDRow, error) {
+func (f *fakeVendorAdminServicer) Get(_ context.Context, role string, _ int64) (*db.GetVendorAdminByIDRow, error) {
 	return f.getResult, f.getErr
 }
 
-func (f *fakeVendorAdminServicer) GetKindAndDirector(context.Context, int64) (string, *db.GetVendorDirectorPicRow, error) {
+func (f *fakeVendorAdminServicer) GetKindAndDirector(context.Context, string, int64) (string, *db.GetVendorDirectorPicRow, error) {
 	return "FLM_VENDOR", nil, nil
 }
 
@@ -114,7 +95,7 @@ func (f *fakeVendorAdminServicer) Enable(context.Context, int64, int64, string) 
 }
 
 // mountAdminVendorHandler mirrors the real mount in cmd/api/main.go:
-// RequireAuth + RequireRoles("ADMIN", "ADMIN_PARAM").
+// RequireAuth + RequireRoles(reports.PksViewerRoles...); Routes() narrows writes.
 func mountAdminVendorHandler(svc VendorAdminServicer) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
@@ -126,7 +107,7 @@ func mountAdminVendorHandler(svc VendorAdminServicer) (http.Handler, *pkgauth.To
 	r := chi.NewRouter()
 	r.With(
 		custommw.RequireAuth(tokenSvc),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+		custommw.RequireRoles(reports.PksViewerRoles...),
 	).Mount("/api/v1/admin/vendors", h.Routes())
 	return r, tokenSvc
 }
@@ -161,24 +142,6 @@ func TestAdminVendorHandler_List_InvalidStatus_BadRequest(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_List_InvalidPksStatus_BadRequest(t *testing.T) {
-	router, tokenSvc := mountAdminVendorHandler(&fakeVendorAdminServicer{})
-	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
-
-	for _, v := range []string{"xyz", "AKTIF", "all"} {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_type=FLM&pks_status="+v, token, "")
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("pks_status=%s: expected 400, got %d: %s", v, rec.Code, rec.Body.String())
-		}
-	}
-	for v := range reports.PksStatuses {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_type=FLM&pks_status="+v, token, "")
-		if rec.Code != http.StatusOK {
-			t.Errorf("pks_status=%s: expected 200, got %d: %s", v, rec.Code, rec.Body.String())
-		}
-	}
-}
-
 func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 	str := func(s string) *string { return &s }
 	tests := []struct {
@@ -187,8 +150,6 @@ func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 		wantCode int
 		wantKind *string
 		wantCall bool
-		wantStat *string
-		wantPks  *string
 		wantLim  int64
 		wantOff  int64
 	}{
@@ -199,8 +160,8 @@ func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 		{name: "invalid kind", query: "kind=xyz", wantCode: 400},
 		{name: "lowercase kind invalid", query: "kind=internal", wantCode: 400},
 		{
-			name: "combined with status, pks pair, paging", query: "kind=INTERNAL&status=active&pks_type=cit&pks_status=" + anyPksStatus() + "&page=3&page_size=10",
-			wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantPks: str(anyPksStatus()), wantLim: 10, wantOff: 20,
+			name: "combined with status, paging", query: "kind=INTERNAL&status=active&page=3&page_size=10",
+			wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantLim: 10, wantOff: 20,
 		},
 	}
 	for _, tt := range tests {
@@ -225,91 +186,23 @@ func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 					t.Errorf("%s Kind = %v, want %v", name, got, tt.wantKind)
 				}
 			}
-			if (svc.lastList.PksStatus == nil) != (tt.wantPks == nil) || (tt.wantPks != nil && *svc.lastList.PksStatus != *tt.wantPks) {
-				t.Errorf("List PksStatus = %v, want %v", svc.lastList.PksStatus, tt.wantPks)
-			}
 			if svc.lastList.PageLimit != tt.wantLim || svc.lastList.PageOffset != tt.wantOff {
 				t.Errorf("paging = %d/%d, want %d/%d", svc.lastList.PageLimit, svc.lastList.PageOffset, tt.wantLim, tt.wantOff)
 			}
-			if tt.wantPks != nil && (svc.lastCount.PksStatus == nil || *svc.lastCount.PksStatus != *tt.wantPks) {
-				t.Errorf("Count PksStatus = %v, want %v", svc.lastCount.PksStatus, tt.wantPks)
-			}
-			// The type id travels with the status to List and Count, and only with it.
-			for name, got := range map[string]*int64{"List": svc.lastList.PksTypeID, "Count": svc.lastCount.PksTypeID} {
-				if (got != nil) != (tt.wantPks != nil) || (got != nil && *got != pksTypeFixtureID) {
-					t.Errorf("%s PksTypeID = %v, want %v when pks filter is %v", name, got, pksTypeFixtureID, tt.wantPks)
-				}
-			}
-			if tt.wantPks != nil && svc.lastResolve != "cit" {
-				t.Errorf("ResolvePksFilterType got %q, want the raw query value", svc.lastResolve)
-			}
 		})
 	}
 }
 
-var pksStatusSample = func() string {
-	for k := range reports.PksStatuses {
-		return k
-	}
-	return ""
-}()
-
-func anyPksStatus() string { return pksStatusSample }
-
-// pks_type and pks_status are a pair (Req 4.4): one alone, an unknown/disabled type -> 400,
-// and the service is never asked to list in those cases; a service failure is a 500.
-func TestAdminVendorHandler_List_PksFilterPair(t *testing.T) {
-	tests := []struct {
-		name       string
-		query      string
-		resolveErr error
-		wantCode   int
-		wantList   bool
-	}{
-		{"type without status", "pks_type=FLM", nil, http.StatusBadRequest, false},
-		{"status without type", "pks_status=" + anyPksStatus(), nil, http.StatusBadRequest, false},
-		{"unknown or disabled type", "pks_type=NOPE&pks_status=" + anyPksStatus(), service.ErrPksFilterType, http.StatusBadRequest, false},
-		{"type lookup fails", "pks_type=FLM&pks_status=" + anyPksStatus(), errors.New("db down"), http.StatusInternalServerError, false},
-		{"valid pair", "pks_type=FLM&pks_status=" + anyPksStatus(), nil, http.StatusOK, true},
-		{"neither", "", nil, http.StatusOK, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc := &fakeVendorAdminServicer{resolveErr: tt.resolveErr}
-			router, tokenSvc := mountAdminVendorHandler(svc)
-			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
-
-			rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?"+tt.query, token, "")
-
-			if rec.Code != tt.wantCode {
-				t.Fatalf("code = %d, want %d: %s", rec.Code, tt.wantCode, rec.Body.String())
-			}
-			if svc.listCalled != tt.wantList {
-				t.Errorf("List called = %v, want %v", svc.listCalled, tt.wantList)
-			}
-		})
-	}
-}
-
-// Each item carries pks: [] (never the old single pks/pks_status fields): entries per type from
-// PksSummaries, belum_diisi has remaining_days null, INTERNAL/unknown vendor gets [] not null.
-func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPksPerType(t *testing.T) {
+// Each item carries pks_count (never the old pks/pks_status fields) and the director.
+func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPksCount(t *testing.T) {
 	str := func(s string) *string { return &s }
 	i64 := func(n int64) *int64 { return &n }
-	days := int32(420)
 	svc := &fakeVendorAdminServicer{
-		countResult: 3,
+		countResult: 2,
 		listResult: []db.ListVendorsAdminRow{
-			{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR",
+			{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR", PksCount: 3,
 				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id")},
-			{ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "FLM_VENDOR"},
-			{ID: 3, Code: "C", Name: "C", IsActive: true, Kind: "INTERNAL"},
-		},
-		pksResult: map[int64][]service.VendorPksSummary{
-			1: {
-				{PksType: "CIT", PksTypeName: "Cash in Transit", PksStatus: "aktif", RemainingDays: &days},
-				{PksType: "FLM", PksTypeName: "FLM", PksStatus: "belum_diisi"},
-			},
+			{ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "INTERNAL"},
 		},
 	}
 	router, tokenSvc := mountAdminVendorHandler(svc)
@@ -322,54 +215,59 @@ func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPksPerType(t *testing
 	var body struct {
 		Vendors []map[string]any `json:"vendors"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Vendors) != 3 {
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Vendors) != 2 {
 		t.Fatalf("decode: %v, vendors=%d, body=%s", err, len(body.Vendors), rec.Body.String())
 	}
-	v0, v1, v2 := body.Vendors[0], body.Vendors[1], body.Vendors[2]
-
 	for i, v := range body.Vendors {
-		if _, ok := v["pks_status"]; ok {
-			t.Errorf("vendor %d still carries the removed pks_status field", i)
-		}
-		if _, ok := v["pks"].([]any); !ok {
-			t.Errorf("vendor %d pks = %#v, want a JSON array (never null)", i, v["pks"])
+		for _, removed := range []string{"pks", "pks_status"} {
+			if _, ok := v[removed]; ok {
+				t.Errorf("vendor %d still carries the removed %q field", i, removed)
+			}
 		}
 	}
+	v0, v1 := body.Vendors[0], body.Vendors[1]
 	dir, _ := v0["director"].(map[string]any)
 	if dir["name"] != "Budi" || dir["phone"] != "0812" || dir["email"] != "b@x.id" {
 		t.Errorf("vendor 0 director = %v", v0["director"])
 	}
-	pks, _ := v0["pks"].([]any)
-	if len(pks) != 2 {
-		t.Fatalf("vendor 0 pks = %v, want 2 entries", v0["pks"])
+	if v0["pks_count"] != float64(3) || v1["pks_count"] != float64(0) {
+		t.Errorf("pks_count = %v/%v, want 3/0", v0["pks_count"], v1["pks_count"])
 	}
-	cit, _ := pks[0].(map[string]any)
-	if cit["pks_type"] != "CIT" || cit["pks_type_name"] != "Cash in Transit" || cit["pks_status"] != "aktif" || cit["remaining_days"] != float64(420) {
-		t.Errorf("vendor 0 CIT entry = %v", cit)
-	}
-	flm, _ := pks[1].(map[string]any)
-	if flm["pks_type"] != "FLM" || flm["pks_status"] != "belum_diisi" || flm["remaining_days"] != nil {
-		t.Errorf("vendor 0 FLM entry = %v, want belum_diisi with remaining_days null", flm)
-	}
-	if a, _ := v1["pks"].([]any); len(a) != 0 || v1["director"] != nil {
-		t.Errorf("vendor 1 pks/director = %v/%v, want []/nil", v1["pks"], v1["director"])
-	}
-	if a, _ := v2["pks"].([]any); v2["kind"] != "INTERNAL" || len(a) != 0 {
-		t.Errorf("vendor 2 kind/pks = %v/%v, want INTERNAL/[]", v2["kind"], v2["pks"])
+	if v1["director"] != nil || v1["kind"] != "INTERNAL" {
+		t.Errorf("vendor 1 director/kind = %v/%v, want nil/INTERNAL", v1["director"], v1["kind"])
 	}
 }
 
-func TestAdminVendorHandler_List_PksSummariesError_Internal(t *testing.T) {
+// ATM-SPV may read vendors (Req 9.2) but every write stays ADMIN/ADMIN_PARAM.
+func TestAdminVendorHandler_ATMSPV_ReadOnly(t *testing.T) {
 	svc := &fakeVendorAdminServicer{
-		listResult: []db.ListVendorsAdminRow{{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR"}},
-		pksErr:     errors.New("db down"),
+		getResult:  &db.GetVendorAdminByIDRow{ID: 1, Code: "ACM", Name: "Acme", IsActive: true},
+		listResult: []db.ListVendorsAdminRow{{ID: 1, Code: "ACM", Name: "Acme", IsActive: true}},
 	}
 	router, tokenSvc := mountAdminVendorHandler(svc)
-	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+	token := tokenForRole(t, tokenSvc, 1, "ATM-SPV")
 
-	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors", token, "")
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", rec.Code, rec.Body.String())
+	for _, path := range []string{"/api/v1/admin/vendors", "/api/v1/admin/vendors/1"} {
+		if rec := doRequest(router, http.MethodGet, path, token, ""); rec.Code != http.StatusOK {
+			t.Errorf("GET %s = %d, want 200: %s", path, rec.Code, rec.Body.String())
+		}
+	}
+	if svc.lastRole != "ATM-SPV" {
+		t.Errorf("service saw role %q, want ATM-SPV", svc.lastRole)
+	}
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/admin/vendors"},
+		{http.MethodPut, "/api/v1/admin/vendors/1"},
+		{http.MethodPost, "/api/v1/admin/vendors/1/disable"},
+		{http.MethodPost, "/api/v1/admin/vendors/1/enable"},
+	}
+	for _, w := range writes {
+		if rec := doRequest(router, w.method, w.path, token, `{}`); rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s = %d, want 403", w.method, w.path, rec.Code)
+		}
+	}
+	if svc.createCalled || svc.updateCalled || svc.disableCalled || svc.enableCalled {
+		t.Error("a write reached the service for ATM-SPV")
 	}
 }
 

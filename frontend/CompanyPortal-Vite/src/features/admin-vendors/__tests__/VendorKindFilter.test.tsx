@@ -11,7 +11,6 @@ import { AdminVendorsPage } from "../components/AdminVendorsPage";
 
 const useVendorsListMock = vi.fn();
 const navigateMock = vi.fn();
-const exportRequestMock = vi.fn();
 let searchState: Record<string, unknown> = {};
 
 vi.mock("../hooks", () => ({
@@ -21,17 +20,6 @@ vi.mock("../hooks", () => ({
   useEnableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
-
-vi.mock("../../exports", () => ({
-  useExportFlow: () => ({
-    request: exportRequestMock,
-    isRequesting: false,
-    requestError: null,
-    dialogProps: {},
-  }),
-  ExportProgressDialog: () => null,
-  ReportExportNotice: () => null,
 }));
 
 vi.mock("../../master-data/pending", () => ({ usePendingEntityIds: () => new Set<number>() }));
@@ -51,7 +39,6 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
 beforeEach(() => {
   useVendorsListMock.mockReset();
   navigateMock.mockReset();
-  exportRequestMock.mockReset();
   searchState = {};
   useVendorsListMock.mockReturnValue({
     data: { vendors: [], page: 1, page_size: 25, total: 0 },
@@ -87,19 +74,6 @@ describe("Jenis vendor filter", () => {
     render(<AdminVendorsPage />);
 
     expect(useVendorsListMock).toHaveBeenCalledWith(expect.objectContaining({ kind: "INTERNAL" }));
-  });
-
-  it("PKS export does not carry kind (Q9)", async () => {
-    searchState = { kind: "INTERNAL", q: "abc" };
-    const user = userEvent.setup();
-    render(<AdminVendorsPage />);
-
-    await user.click(screen.getByRole("button", { name: /Ekspor CSV/ }));
-
-    expect(exportRequestMock).toHaveBeenCalledTimes(1);
-    const arg = exportRequestMock.mock.calls[0][0];
-    expect(arg.report).toBe("vendor-pks");
-    expect(arg.params).not.toHaveProperty("kind");
   });
 });
 

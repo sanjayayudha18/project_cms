@@ -78,10 +78,8 @@ func TestProperty1VendorPksMasterIsCodeNameDirector(t *testing.T) {
 // pksQ captures the report producer's queries and serves canned pages.
 type pksQ struct {
 	*fakeQ
-	batchArgs   []repository.ExportVendorPksBatchParams
-	missingArgs []repository.ExportVendorPksMissingBatchParams
-	batch       []repository.ExportVendorPksBatchRow
-	missing     []repository.ExportVendorPksMissingBatchRow
+	batchArgs []repository.ExportVendorPksBatchParams
+	batch     []repository.ExportVendorPksBatchRow
 }
 
 func (q *pksQ) ExportVendorPksBatch(_ context.Context, a repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
@@ -89,15 +87,10 @@ func (q *pksQ) ExportVendorPksBatch(_ context.Context, a repository.ExportVendor
 	return q.batch, nil
 }
 
-func (q *pksQ) ExportVendorPksMissingBatch(_ context.Context, a repository.ExportVendorPksMissingBatchParams) ([]repository.ExportVendorPksMissingBatchRow, error) {
-	q.missingArgs = append(q.missingArgs, a)
-	return q.missing, nil
-}
-
 func runVendorPks(t *testing.T, q Querier, rp ReportParams, asOf time.Time) [][]string {
 	t.Helper()
 	var out [][]string
-	err := vendorPksProducer(7).Produce(context.Background(), q, Params{Kind: KindVendorPks, Report: &rp}, asOf,
+	err := vendorPksProducer().Produce(context.Background(), q, Params{Kind: KindVendorPks, Report: &rp}, asOf,
 		func(c []string) error { out = append(out, c); return nil })
 	if err != nil {
 		t.Fatal(err)
@@ -119,67 +112,59 @@ func TestVendorPksProducerTodayIsWIBDate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			q := &pksQ{fakeQ: &fakeQ{}}
 			runVendorPks(t, q, ReportParams{}, tt.asOf)
+			if len(q.batchArgs) == 0 {
+				t.Fatal("no batch args recorded")
+			}
 			got := q.batchArgs[0]
 			if !got.Today.Valid || !got.Today.Time.Equal(tt.want) {
 				t.Fatalf("Today = %v, want %v", got.Today, tt.want)
 			}
-			if got.RenewalMonths != 7 {
-				t.Fatalf("RenewalMonths = %d, want 7", got.RenewalMonths)
+			if got.Status != "terkini" {
+				t.Fatalf("default Status = %q, want terkini", got.Status)
 			}
 		})
 	}
 }
 
-// Req 6.2/A3: belum_diisi + type switches to the missing query, one line per vendor with only
-// code/name/director/type/status filled; any other filter stays on the active-PKS query.
-func TestVendorPksProducerBelumDiisiAndFilterRouting(t *testing.T) {
+// Filter routing: {status, pks_type, vendor, q} are passed to ExportVendorPksBatchParams.
+func TestVendorPksProducerFilterRouting(t *testing.T) {
 	asOf := time.Date(2026, 11, 18, 8, 0, 0, 0, wib)
-	cit, bd, aktif := "CIT", "belum_diisi", "aktif"
-	dn := "=Budi"
+	cit, vcode, qstr, st := "CIT", "PTA", "my pks", "need_renewal"
 
-	q := &pksQ{fakeQ: &fakeQ{}, missing: []repository.ExportVendorPksMissingBatchRow{
-		{VendorCode: "NEWV", VendorName: "PT Baru", DirectorName: &dn, PksTypeCode: "CIT"},
-	}}
-	got := runVendorPks(t, q, ReportParams{PksType: &cit, PksStatus: &bd}, asOf)
-	want := reports.VendorPksCells(reports.VendorPksRow{VendorCode: "NEWV", VendorName: "PT Baru", DirectorName: &dn,
-		PksTypeCode: &cit, PksStatus: &bd})
-	if len(got) != 1 || !slices.Equal(got[0], want) || len(got[0]) != len(reports.VendorPksHeader) {
-		t.Fatalf("got %q, want [%q]", got, want)
+	q := &pksQ{fakeQ: &fakeQ{}}
+	runVendorPks(t, q, ReportParams{PksType: &cit, Vendor: &vcode, Q: &qstr, Status: &st}, asOf)
+	if len(q.batchArgs) != 1 {
+		t.Fatalf("batch calls %d, want 1", len(q.batchArgs))
 	}
-	if got[0][2] != "'=Budi" || got[0][5] != "CIT" || got[0][12] != "Belum diisi" || got[0][6] != "" {
-		t.Errorf("cells = %q", got[0])
-	}
-	if len(q.batchArgs) != 0 || q.missingArgs[0].PksType != "CIT" {
-		t.Errorf("batch calls %d, missing args %+v", len(q.batchArgs), q.missingArgs)
-	}
-
-	q = &pksQ{fakeQ: &fakeQ{}}
-	runVendorPks(t, q, ReportParams{PksType: &cit, PksStatus: &aktif}, asOf)
-	if len(q.missingArgs) != 0 || len(q.batchArgs) != 1 || *q.batchArgs[0].PksType != "CIT" || *q.batchArgs[0].PksStatus != "aktif" {
-		t.Errorf("aktif routing: missing %d batch %+v", len(q.missingArgs), q.batchArgs)
+	arg := q.batchArgs[0]
+	if arg.Status != "need_renewal" || *arg.PksType != "CIT" || *arg.Vendor != "PTA" || *arg.Q != "my pks" {
+		t.Errorf("got args %+v", arg)
 	}
 }
 
-// One output line per active PKS, with CSVSafe on type/WOD and the 13-column width.
+// One output line per PKS row, with CSVSafe on string cells and the 13-column width.
 func TestVendorPksProducerRowPerPks(t *testing.T) {
 	eff := pgtype.Date{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
 	exp := pgtype.Date{Time: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
 	q := &pksQ{fakeQ: &fakeQ{}, batch: []repository.ExportVendorPksBatchRow{
 		{VendorCode: "A", VendorName: "PT A", PksTypeCode: "CIT", WodNumber: "=W1", PksName: "P1", EffectiveDate: eff, ExpiryDate: exp,
-			ValidityMonths: 12, RemainingDays: 30, PksStatus: "aktif"},
+			ValidityDays: 365, RenewalDays: 270, PksStatus: "aktif"},
 		{VendorCode: "A", VendorName: "PT A", PksTypeCode: "FLM", WodNumber: "W2", PksName: "P2", EffectiveDate: eff, ExpiryDate: exp,
-			ValidityMonths: 12, RemainingDays: -3, PksStatus: "expired"},
+			ValidityDays: 365, RenewalDays: 90, PksStatus: "expired"},
 	}}
 	got := runVendorPks(t, q, ReportParams{}, time.Date(2026, 11, 18, 8, 0, 0, 0, wib))
 	if len(got) != 2 {
 		t.Fatalf("rows = %d, want 2 (one per PKS)", len(got))
 	}
 	for _, c := range got {
-		if len(c) != len(reports.VendorPksHeader) {
-			t.Fatalf("cells %d != header %d", len(c), len(reports.VendorPksHeader))
+		if len(c) != len(reports.PksExportHeader) {
+			t.Fatalf("cells %d != header %d", len(c), len(reports.PksExportHeader))
 		}
 	}
-	if got[0][5] != "CIT" || got[0][6] != "'=W1" || got[1][5] != "FLM" || got[1][12] != "Expired" || got[1][11] != "-3" {
-		t.Errorf("rows = %q", got)
+	if got[0][5] != "CIT" || got[0][6] != "'=W1" || got[0][10] != "365" || got[0][11] != "270" || got[0][12] != "Aktif" {
+		t.Errorf("row[0] = %q", got[0])
+	}
+	if got[1][5] != "FLM" || got[1][6] != "W2" || got[1][10] != "365" || got[1][11] != "90" || got[1][12] != "Expired" {
+		t.Errorf("row[1] = %q", got[1])
 	}
 }

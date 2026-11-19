@@ -22,7 +22,6 @@ import (
 // t.Cleanup and a last step fails the test on leftovers. Skips when DATABASE_URL is empty (p11Pool).
 
 const (
-	t94Months     = 9
 	t94VendorCols = 7 // 7 vendor profile columns
 	t94PksCols    = 5 // vendor_code, vendor_name + 3 director columns (PKS columns left the vendor files)
 )
@@ -156,9 +155,9 @@ func (f *t94Fix) seed() {
 
 func (f *t94Fix) produce(p Params) [][]string {
 	f.t.Helper()
-	pr := NewProducers(nil, t94Months)[KindMasterDataGlobal][csvexport.Vendors]
+	pr := NewProducers(nil)[KindMasterDataGlobal][csvexport.Vendors]
 	if p.VendorID != nil {
-		pr = NewProducers(nil, t94Months)[KindVendor]["vendor"]
+		pr = NewProducers(nil)[KindVendor]["vendor"]
 	}
 	var rows [][]string
 	err := pr.Produce(context.Background(), f.q, p, t94AsOf, func(c []string) error {
@@ -173,9 +172,9 @@ func (f *t94Fix) produce(p Params) [][]string {
 
 func (f *t94Fix) producePks(p Params) [][]string {
 	f.t.Helper()
-	pr := NewProducers(nil, t94Months)[KindMasterDataGlobal][csvexport.VendorPks]
+	pr := NewProducers(nil)[KindMasterDataGlobal][csvexport.VendorPks]
 	if p.VendorID != nil {
-		pr = NewProducers(nil, t94Months)[KindVendor][csvexport.VendorPks]
+		pr = NewProducers(nil)[KindVendor][csvexport.VendorPks]
 	}
 	var rows [][]string
 	err := pr.Produce(context.Background(), f.q, p, t94AsOf, func(c []string) error {
@@ -246,13 +245,13 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	ctx := context.Background()
 	q := "T94"
 	rep, err := f.q.ExportVendorPksBatch(ctx, repository.ExportVendorPksBatchParams{
-		Today: wibDate(reports.TodayWIB(t94AsOf)), RenewalMonths: t94Months, Q: &q, Status: "all", BatchSize: 1000})
+		Today: wibDate(reports.TodayWIB(t94AsOf)), Q: &q, Status: "semua", BatchSize: 1000})
 	if err != nil {
 		t.Fatalf("ExportVendorPksBatch: %v", err)
 	}
 	want := map[string][]string{} // vendor code -> report director cells 3..5
 	for _, r := range rep {
-		want[r.VendorCode] = reports.VendorPksCells(vendorPksRow(r))[2:5]
+		want[r.VendorCode] = reports.PksExportCells(pksExportRow(r))[2:5]
 	}
 	if len(want) != 3 { // A, D, E have an active PKS
 		t.Fatalf("report rows = %d, want 3 (one active PKS each for A, D, E)", len(want))

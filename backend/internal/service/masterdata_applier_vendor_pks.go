@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // VendorPksApplier is the Applier for entity_type="vendor_pks" (spec
@@ -124,6 +125,10 @@ func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDa
 			return 0, nil, fmt.Errorf("mark vendor pks %d replaced: %w", *activeID, err)
 		}
 	}
+	renewalDays := p.RenewalDays
+	if renewalDays == 0 { // payload staged before migration 044
+		renewalDays = reports.RenewalDaysDefault
+	}
 	row, err := q.InsertVendorPks(ctx, db.InsertVendorPksParams{
 		VendorID:      p.VendorID,
 		PksTypeID:     p.PksTypeID,
@@ -131,6 +136,7 @@ func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDa
 		PksName:       p.PksName,
 		EffectiveDate: pgtype.Date{Time: eff, Valid: true},
 		ExpiryDate:    pgtype.Date{Time: exp, Valid: true},
+		RenewalDays:   renewalDays,
 		CreatedBy:     change.MakerID,
 	})
 	if err != nil {

@@ -27,41 +27,26 @@ func (q *Queries) CountActiveUsersByVendor(ctx context.Context, vendorID *int64)
 const countVendorsAdmin = `-- name: CountVendorsAdmin :one
 SELECT COUNT(*)
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.pks_type_id = $1::bigint AND ap.replaced_at IS NULL
-WHERE ($2::text IS NULL
-        OR v.code ILIKE '%' || $2::text || '%'
-        OR v.name ILIKE '%' || $2::text || '%')
+WHERE ($1::text IS NULL
+        OR v.code ILIKE '%' || $1::text || '%'
+        OR v.name ILIKE '%' || $1::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND v.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL)
+        $2::text = 'all'
+        OR ($2::text = 'active' AND v.deleted_at IS NULL)
+        OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND ($4::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $5::date, $6::int) = $4::text)
-  AND ($7::text IS NULL OR v.kind = $7::text)
+  AND ($3::text IS NULL OR v.kind = $3::text)
 `
 
 type CountVendorsAdminParams struct {
-	PksTypeID     *int64      `json:"pks_type_id"`
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	Kind          *string     `json:"kind"`
+	Q      *string `json:"q"`
+	Status string  `json:"status"`
+	Kind   *string `json:"kind"`
 }
 
 // Same joins and filters as ListVendorsAdmin, no LIMIT/OFFSET — pagination total (Req 6.6).
 func (q *Queries) CountVendorsAdmin(ctx context.Context, arg CountVendorsAdminParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendorsAdmin,
-		arg.PksTypeID,
-		arg.Q,
-		arg.Status,
-		arg.PksStatus,
-		arg.Today,
-		arg.RenewalMonths,
-		arg.Kind,
-	)
+	row := q.db.QueryRow(ctx, countVendorsAdmin, arg.Q, arg.Status, arg.Kind)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -223,96 +208,33 @@ func (q *Queries) GetVendorDirectorPic(ctx context.Context, vendorID int64) (Get
 	return i, err
 }
 
-const listVendorPksSummaries = `-- name: ListVendorPksSummaries :many
-SELECT v.id AS vendor_id, t.code, t.name,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $1::date, $2::int), '')::text AS pks_status,
-       COALESCE(ap.expiry_date - $1::date, 0)::int AS remaining_days
-FROM vendors v
-CROSS JOIN vendor_pks_types t
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.pks_type_id = t.id AND ap.replaced_at IS NULL
-WHERE v.id = ANY($3::bigint[])
-  AND v.kind = 'FLM_VENDOR'
-  AND t.is_active
-ORDER BY v.id ASC, t.code ASC
-`
-
-type ListVendorPksSummariesParams struct {
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	VendorIds     []int64     `json:"vendor_ids"`
-}
-
-type ListVendorPksSummariesRow struct {
-	VendorID      int64  `json:"vendor_id"`
-	Code          string `json:"code"`
-	Name          string `json:"name"`
-	PksStatus     string `json:"pks_status"`
-	RemainingDays int32  `json:"remaining_days"`
-}
-
-// PKS summary per (vendor, active type) for one page of vendors (vendor-pks-type Req 4.1, 4.3, 4.5, 4.6;
-// design DD7). FLM_VENDOR only — INTERNAL vendors yield no rows. CROSS JOIN over active types, LEFT JOIN
-// the active PKS (vendor_pks_active_uq); no PKS -> status 'belum_diisi' from vendor_pks_status() and
-// remaining_days 0 (the handler maps belum_diisi to null). pks_status is COALESCEd to ” only to keep it non-null for sqlc/pgx.
-func (q *Queries) ListVendorPksSummaries(ctx context.Context, arg ListVendorPksSummariesParams) ([]ListVendorPksSummariesRow, error) {
-	rows, err := q.db.Query(ctx, listVendorPksSummaries, arg.Today, arg.RenewalMonths, arg.VendorIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVendorPksSummariesRow{}
-	for rows.Next() {
-		var i ListVendorPksSummariesRow
-		if err := rows.Scan(
-			&i.VendorID,
-			&i.Code,
-			&i.Name,
-			&i.PksStatus,
-			&i.RemainingDays,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listVendorsAdmin = `-- name: ListVendorsAdmin :many
 
 SELECT v.id, v.code, v.name, v.legal_name, v.npwp, v.contact_email, v.contact_phone, v.hq_address, v.is_active, v.deleted_at,
        v.kind,
+       (SELECT count(*) FROM vendor_pks p WHERE p.vendor_id = v.id AND p.replaced_at IS NULL)::int AS pks_count,
        dp.id AS director_id, dp.name AS director_name, dp.phone AS director_phone, dp.email AS director_email
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.pks_type_id = $1::bigint AND ap.replaced_at IS NULL
 LEFT JOIN vendor_pics dp ON dp.vendor_id = v.id AND dp.is_director AND dp.deleted_at IS NULL
-WHERE ($2::text IS NULL
-        OR v.code ILIKE '%' || $2::text || '%'
-        OR v.name ILIKE '%' || $2::text || '%')
+WHERE ($1::text IS NULL
+        OR v.code ILIKE '%' || $1::text || '%'
+        OR v.name ILIKE '%' || $1::text || '%')
   AND (
-        $3::text = 'all'
-        OR ($3::text = 'active' AND v.deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL)
+        $2::text = 'all'
+        OR ($2::text = 'active' AND v.deleted_at IS NULL)
+        OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND ($4::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $5::date, $6::int) = $4::text)
-  AND ($7::text IS NULL OR v.kind = $7::text)
+  AND ($3::text IS NULL OR v.kind = $3::text)
 ORDER BY v.name ASC, v.id ASC
-LIMIT $9::bigint OFFSET $8::bigint
+LIMIT $5::bigint OFFSET $4::bigint
 `
 
 type ListVendorsAdminParams struct {
-	PksTypeID     *int64      `json:"pks_type_id"`
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	Kind          *string     `json:"kind"`
-	PageOffset    int64       `json:"page_offset"`
-	PageLimit     int64       `json:"page_limit"`
+	Q          *string `json:"q"`
+	Status     string  `json:"status"`
+	Kind       *string `json:"kind"`
+	PageOffset int64   `json:"page_offset"`
+	PageLimit  int64   `json:"page_limit"`
 }
 
 type ListVendorsAdminRow struct {
@@ -327,6 +249,7 @@ type ListVendorsAdminRow struct {
 	IsActive      bool               `json:"is_active"`
 	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
 	Kind          string             `json:"kind"`
+	PksCount      int32              `json:"pks_count"`
 	DirectorID    *int64             `json:"director_id"`
 	DirectorName  *string            `json:"director_name"`
 	DirectorPhone *string            `json:"director_phone"`
@@ -337,20 +260,12 @@ type ListVendorsAdminRow struct {
 // CRUD endpoints (Req 6-8). Vendors have no admin queries anywhere yet.
 // Admin vendor list (Req 6) + direktur (vendor-pks 8.x). Filters: q (case-insensitive substring across
 // code/name), status — the caller resolves absent status to 'active' before calling (Resolved Decision 5),
-// so this query only sees 'active' | 'disabled' | 'all' — and the PAIR pks_type_id + pks_status (both NULL =
-// no filter; the service rejects only one of the two, vendor-pks-type Req 4.4). PKS per type is NOT selected
-// here: ListVendorPksSummaries fills it per page. The ap join hits vendor_pks_active_uq
-// (vendor_id, pks_type_id) WHERE replaced_at IS NULL, so it never duplicates rows. PKS status is computed by
-// vendor_pks_status() from today (Asia/Jakarta, from Go) and renewal_months; INTERNAL vendors yield NULL and
-// never match a pks_status filter (Req 4.6). Ordered name ASC, id ASC (Req 6.5).
+// so this query only sees 'active' | 'disabled' | 'all'. No PKS filter/join any more (vendor-pks-list Req 7.1):
+// pks_count = current (not replaced) PKS rows of the vendor, 0 for INTERNAL. Ordered name ASC, id ASC (Req 6.5).
 func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminParams) ([]ListVendorsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorsAdmin,
-		arg.PksTypeID,
 		arg.Q,
 		arg.Status,
-		arg.PksStatus,
-		arg.Today,
-		arg.RenewalMonths,
 		arg.Kind,
 		arg.PageOffset,
 		arg.PageLimit,
@@ -374,6 +289,7 @@ func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminPara
 			&i.IsActive,
 			&i.DeletedAt,
 			&i.Kind,
+			&i.PksCount,
 			&i.DirectorID,
 			&i.DirectorName,
 			&i.DirectorPhone,

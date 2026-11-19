@@ -36,17 +36,17 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
 - **Gate 2 (Wajib Berhenti)**: Jangan membuat `tasks.md` sebelum user selesai me-review dan menyetujui `design.md` (`accepted`).
 
 ### Tahap 3 — Build Plan (`tasks.md`)
-- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `cms-run-wave`.
+- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `claude-cms-orchestrator`.
 - Setiap task wajib mencantumkan:
   ```markdown
   - [ ] 1.1 <Judul Task yang Spesifik>
     - Deskripsi teknis langkah pengerjaan dan file target eksklusif.
     - _Requirements: <ID Requirement dari requirements.md>_
-    - _Model: <Gemini 4 Argon (High) | Gemini 4 Argon | Gemini 3.8 Flash>_
+    - _Model: <Gemini 4 Argon (High) | Gemini 4 Argon | Gemini 4 Hydrogen | Gemini 3.8 Flash>_
     - _Skills: <daftar skill dari .agents/skills/>_
     - _Agent: <spesialis dari .agents/agents/>_
   ```
-  *(Catatan: `Gemini 4 Carbon` hanya akan di-assign secara manual oleh user; untuk task arsitektur/audit berat gunakan `Gemini 4 Argon (High)`).*
+  *(Catatan: `Gemini 4 Neon` dan `Gemini 4 Carbon` hanya akan di-assign secara manual oleh user; untuk task arsitektur/audit berat gunakan `Gemini 4 Argon (High)`).*
 - Susun bagian `## Task Dependency Graph` yang mengelompokkan task ke dalam **Wave 1, Wave 2, dst.** (task di dalam wave yang sama harus menyentuh file yang berbeda agar aman dijalankan paralel).
 - **Gate 3**: Berhenti dan tunggu Engineer / User menyetujui `tasks.md` sebelum mengeksekusi kode atau mendelegasikan wave ke `cms-orchestrator.md`.
 
@@ -67,17 +67,19 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
 
 ## 3. Matriks Penugasan Model, Agent Spesialis, & Skill pada `tasks.md`
 
-Saat menyusun `tasks.md` di Tahap 3, gunakan tabel pemilihan LLM dari [`.agents/specs/gemini-sdlc.md`](../specs/gemini-sdlc.md):
+Saat menyusun `tasks.md` di Tahap 3, gunakan tabel pemilihan LLM terbaru dari [`.agents/specs/gemini-sdlc.md`](../specs/gemini-sdlc.md):
 
-> **Aturan Penting**: **Gemini 4 Carbon hanya akan di-assign secara manual oleh user.** Agen dilarang meng-assign `Gemini 4 Carbon` secara otomatis pada `tasks.md`; gunakan **`Gemini 4 Argon (High)`** untuk semua task yang membutuhkan penalaran tajam/mendalam.
+> **Aturan Penting**: **Gemini 4 Neon dan Gemini 4 Carbon hanya akan di-assign secara manual oleh user.** Agen dilarang meng-assign `Neon` atau `Carbon` secara otomatis pada `tasks.md`; gunakan **`Gemini 4 Argon (High)`** untuk semua task yang membutuhkan penalaran tajam/mendalam.
 
-| Model | Keunggulan Utama | Kapan Harus Dipakai? |
-| :--- | :--- | :--- |
-| **Gemini 4 Carbon (Terkuat — Manual User Only)** | Penalaran paling tajam, minim halusinasi, jago security audit & bug kritis. | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi khusus. |
-| **Gemini 4 Argon (High)** | Penalaran mendalam (High thinking) + kapasitas agentic coding skala besar (1M token). | Cari root-cause bug rumit, security patching, bedah arsitektur skema DB, security/financial audit, & merge conflict Git yang kompleks. |
-| **Gemini 4 Argon (Andalan Utama / Medium)** | Keseimbangan terbaik antara kecerdasan tinggi & agentic coding skala besar (1M token). | Buat fitur baru end-to-end, refactoring lintas banyak file, analisis dokumen/PRD tebal, & PR review. |
-| **Gemini 3.8 Flash (Tercepat)** | Respons instan, ringan, hemat kuota (versi terbaik dibanding 3.7 / 3.6 Flash). | Edit kode ringan, generate commit message Git, buat unit test sederhana, & rangkum dokumen cepat. |
-| **Gemini 3.7 / 3.6 Flash & 3.1 Pro** | Model generasi sebelumnya. | Skip saja — gunakan 3.8 Flash untuk kecepatan atau 4 Argon untuk kualitas. |
+| Model | Level Thinking | Keunggulan Utama | Kapan Harus Dipakai? |
+| :--- | :--- | :--- | :--- |
+| **Gemini 4 Neon (Ultra-Frontier — Manual User Only)** | `Low`, `Medium`, `High`, `XHigh` | Kasta tertinggi keluarga Gemini 4 dengan penalaran hingga `XHigh`. | **Hanya di-assign manual oleh user** untuk eskalasi masalah logika/arsitektur ekstrem. |
+| **Gemini 4 Carbon (Cyber & Deep Reasoning — Manual User Only)** | `Low`, `Medium`, `High` | Penalaran sangat tajam, minim halusinasi, spesialis *security audit* & *bug* kritis. | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi khusus. |
+| **Gemini 4 Argon (High)** | `High` | Penalaran mendalam (*High thinking*) + kapasitas *agentic coding* skala besar (1M token). | Cari *root-cause bug* rumit, *security patching*, bedah arsitektur skema DB, *security/financial audit*, & *merge conflict* Git yang kompleks. |
+| **Gemini 4 Argon (Andalan Utama)** | `Medium`, `Low` | Keseimbangan terbaik antara kecerdasan tinggi & *agentic coding* skala besar (1M token). | Buat fitur baru *end-to-end*, *refactoring* lintas banyak file, analisis dokumen/PRD tebal, & *PR review*. |
+| **Gemini 4 Hydrogen (Tercepat Gen-4)** | `Low`, `Medium`, `High` | Evolusi generasi ke-4 pengganti *Flash*: cepat, ringan, hemat kuota untuk koding harian. | Edit kode/konfigurasi ringan, *generate commit message* Git, buat unit test sederhana, & rangkum dokumen cepat. |
+| **Gemini 3.8 Flash (Cepat Gen-3.8)** | `Low`, `Medium`, `High` | Respons instan, ringan, hemat kuota (kompatibel langsung dengan subagent `Model: "flash"`). | Edit kode ringan, unit test sederhana, & subagent paralel berbiaya rendah. |
+| **Gemini 3.7 / 3.6 Flash & 3.1 Pro** | `Low`, `Medium`, `High` | Model generasi sebelumnya. | *Skip saja* — gunakan **4 Hydrogen / 3.8 Flash** untuk kecepatan atau **4 Argon** untuk kualitas. |
 
 Pemetaan Domain Task ke Agent Spesialis & Skill:
 
@@ -87,7 +89,7 @@ Pemetaan Domain Task ke Agent Spesialis & Skill:
 | Migrasi skema DB, indeks, query `sqlc v1.31.1` | `db-sqlc-architect.md` | `db-migration-sqlc`, `sql-query-tuning` | `Gemini 4 Argon (High)` (untuk bedah arsitektur skema) atau `Gemini 4 Argon` |
 | Endpoint Go Chi v5, Service, Maker-Checker Applier, Importer/Exporter | `go-backend-specialist.md` | `go-chi-endpoint`, `cms2-master-data` | `Gemini 4 Argon` |
 | Komponen React end-to-end, Tabel, Form, Modal, 4 UI States | `react-portal-specialist.md` | `react-ui-ux-craft`, `openapi-frontend-sync` | `Gemini 4 Argon` |
-| Edit konfigurasi/katalog ringan, unit test sederhana, dokumentasi cepat | Sesuai layer | Sesuai layer | `Gemini 3.8 Flash` |
+| Edit konfigurasi/katalog ringan, unit test sederhana, dokumentasi cepat | Sesuai layer | Sesuai layer | `Gemini 4 Hydrogen` / `Gemini 3.8 Flash` |
 
 ---
 

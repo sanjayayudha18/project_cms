@@ -25,7 +25,7 @@ If they disagree, CLAUDE.md wins, then the standard.
 |---|---|---|---|
 | R | `README.md` from template: per-phase checklist (✅/❌ + evidence), phase table, dependencies, cross-phase decisions. Failing points → `<n>.0-keputusan.md` (questions only; **don't answer them**) | Roadmap accepted | `mattpocock-skills:grilling` for unclear splits |
 | 1 | One phase file (only phases whose checklist is ✅): AC with source lines → Design → `## Gerbang Sec 4 #7` → Tasks + `### Task Dependency Graph`. Run standard Sec 7 traceability | Phase plan accepted | `mattpocock-skills:domain-modeling`, `ecc:database-migrations` + `ecc:postgres-patterns` (schema), `ecc:contract-first` (API), `cms2-master-data` (master data) |
-| 2 | Execute tasks: `cms-run-wave` (`<phase file>`, wave N) or `cms-task-runner` per task. Fill `## Test Results` | Build + tests green | `ecc:tdd-workflow`, `ecc:golang-testing`, `ecc:verification-loop` |
+| 2 | Execute tasks: `claude-cms-orchestrator` (`<phase file>`, wave N) or `cms-task-runner` per task. Fill `## Test Results` | Build + tests green | `ecc:tdd-workflow`, `ecc:golang-testing`, `ecc:verification-loop` |
 | 3 | `## Review` (bugs/security/compliance, R1…, DoD §11) | Code owner merges → status `done <date> <sha>` | `/code-review`; `/security-review` mandatory for §4 #7 phases |
 | — | After release: `## Incidents` + regression test | On-call | `mattpocock-skills:diagnosing-bugs` |
 

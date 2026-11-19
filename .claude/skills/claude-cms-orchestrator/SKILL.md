@@ -1,5 +1,5 @@
 ---
-name: cms-run-wave
+name: claude-cms-orchestrator
 description: Dispatch one wave from a CMS2 spec's "## Task Dependency Graph" (or a ScDD phase file's "### Task Dependency Graph") — one new Claude session per task, each on the model + effort its `_Model:` line names, each following the cms-task-runner agent. Use when the user says "jalankan wave N <spec>" / "run wave N".
 ---
 

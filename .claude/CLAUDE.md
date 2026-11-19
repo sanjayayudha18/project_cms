@@ -239,7 +239,7 @@ For scopes whose **requirements are already clear** in an official source (DSR/F
 *   **Where**: `.claude/dev-plan/plan-perscope/dev-phase-perscope/<n>-<scope>/` → `README.md` (roadmap: entry checklist per phase, phase table, dependencies, cross-phase decisions) + `<n>.<m>-<slug>.md` per phase. The area file `plan-perscope/<n>-<scope>.md` stays the summary and the only home of area checklist + PO conflicts.
 *   **Entry checklist, per phase**: official source · every rule points to source lines · PO conflicts decided · new tables approved. A failing point goes to a no-code `<n>.0-keputusan.md` phase; only dependent phases wait.
 *   **Gates** (human only): roadmap README once per scope; per phase (1) plan accepted, (2) build + tests green, (3) review + merge. Mid-build ambiguity → phase `blocked`, new AC, gate 1 again (README too if >1 phase changes).
-*   Execution: `cms-run-wave` / `cms-task-runner` with the phase file path.
+*   Execution: `claude-cms-orchestrator` / `cms-task-runner` with the phase file path.
 
 * * *
 ## 5\. Cross-Cutting Domain Rules (NON-NEGOTIABLE)

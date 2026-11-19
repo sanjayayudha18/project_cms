@@ -10,7 +10,7 @@ description: Standar Scope Driven Development (ScDD) CMS2 — rencana implementa
 
 ScDD adalah metode kedua di samping spec Kiro (`kiro-spec-standard.md`). Dipakai saat **requirement sudah jelas** di dokumen sumber resmi (DSR/FSD/URS). Requirement tidak ditulis ulang dalam format EARS; gantinya tiap fase memuat **acceptance criteria (AC) bernomor** yang menunjuk baris sumber, lalu design + tasks langsung di file yang sama. Singkatan: **ScDD** (bukan "SDD", yang biasa berarti *Spec* Driven Development).
 
-Ditulis dalam Bahasa Indonesia. Heading `##` di template Sec 5–6 dipakai persis (alat `cms-task-runner` / `cms-run-wave` mencarinya secara literal).
+Ditulis dalam Bahasa Indonesia. Heading `##` di template Sec 5–6 dipakai persis (alat `cms-task-runner` / `claude-cms-orchestrator` mencarinya secara literal).
 
 ## 1. Kapan dipakai
 
@@ -165,4 +165,4 @@ Isi bagian setelah build:
 - `.claude/development-progress.md`: **satu baris per scope**, ringkasan status fase + tautan ke README; diperbarui di setiap gerbang.
 - Kode dan file fase tidak cocok → STOP, tanya.
 - Pelajaran dari review/insiden → `.claude/lessons-learned.md`.
-- Alat: skill `cms2-scope` (membuat + memandu gerbang), `cms-run-wave` + agent `cms-task-runner` (eksekusi task; input = path file fase).
+- Alat: skill `cms2-scope` (membuat + memandu gerbang), `claude-cms-orchestrator` + agent `cms-task-runner` (eksekusi task; input = path file fase).

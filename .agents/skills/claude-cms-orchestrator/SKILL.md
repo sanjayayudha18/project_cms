@@ -1,5 +1,5 @@
 ---
-name: cms-run-wave
+name: claude-cms-orchestrator
 description: >-
   Dispatch one wave of tasks from a CMS2 spec's "## Task Dependency Graph"
   (e.g. .agents/specs/<feature>/tasks.md) using Antigravity subagents, each
@@ -22,9 +22,9 @@ Skill ini menjalankan satu *wave* paralel (atau daftar task terpilih) dari bagia
 2. **Cek Gate Wave Sebelumnya**: Pastikan seluruh task pada wave sebelum `N` sudah berstatus `[x]`. Jika masih ada yang `[ ]`, tampilkan daftarnya kepada user dan berhenti (kecuali user menginstruksikan untuk tetap lanjut).
 3. **Petakan Model, Subagent Spesialis & Skill per Task**:
    - Periksa baris `_Model:_` pada task (atau warisi dari parent task-nya) dan petakan ke parameter `Model` pada tool `invoke_subagent` Antigravity:
-     - Model Codename / Deep Reasoning (`Gemini 4 Argon (High)` / `Argon High` / `Gemini 4 Argon` / `Argon`, atau `Carbon` bila di-assign manual oleh user) -> `Model: "inherit"` (mewarisi `Argon (High/Medium)` atau `Carbon` dari session utama; beri catatan pengingat ke user pada langkah konfirmasi jika dropdown model session utama saat ini belum sesuai) atau fallback `"pro"`
+     - Model Codename / Deep Reasoning (`Gemini 4 Argon (High)` / `Argon High` / `Gemini 4 Argon` / `Argon`, atau `Neon` / `Carbon` bila di-assign manual oleh user) -> `Model: "inherit"` (mewarisi `Argon (High/Medium)`, `Neon`, atau `Carbon` dari session utama; beri catatan pengingat ke user pada langkah konfirmasi jika dropdown model session utama saat ini belum sesuai) atau fallback `"pro"`
      - Kompleks / Arsitektur / High effort (`Opus` / `Pro` / `High`) -> `Model: "pro"`
-     - Standar / Implementasi menengah (`Sonnet` / `Flash` / `Medium`) -> `Model: "flash"`
+     - Standar / Cepat (`Gemini 4 Hydrogen` / `Gemini 3.8 Flash` / `Flash` / `Medium`) -> `Model: "flash"` (atau `"inherit"` jika session utama berada di `Gemini 4 Hydrogen`)
      - Ringan / Boilerplate (`Haiku` / `Flash Lite` / `Low`) -> `Model: "flash_lite"`
      - Jika tidak ditentukan -> `Model: "inherit"`
    - Pilih subagent spesialis dari `.agents/agents/` berdasarkan domain file yang disentuh oleh task:

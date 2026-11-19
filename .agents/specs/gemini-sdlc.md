@@ -27,14 +27,16 @@ Setiap fitur baru dibuat di dalam subfolder kebab-case `.agents/specs/<nama-fitu
 
 ## Panduan Pemilihan LLM pada `tasks.md`
 
-Saat menyusun bagian `## Model Split` dan metadata `_Model:_` pada tiap task di `tasks.md`, gunakan acuan pemilihan model berikut:
+Saat menyusun bagian `## Model Split` dan metadata `_Model:_` pada tiap task di `tasks.md`, gunakan acuan pemilihan model Gemini terbaru berikut:
 
-> **Aturan Penting**: **Gemini 4 Carbon hanya akan di-assign secara manual oleh user.** Agen dilarang meng-assign `Gemini 4 Carbon` secara otomatis saat menyusun `tasks.md`; gunakan **`Gemini 4 Argon (High)`** untuk seluruh task berat/kritis yang membutuhkan penalaran tingkat tinggi.
+> **Aturan Penting**: **Gemini 4 Neon dan Gemini 4 Carbon hanya akan di-assign secara manual oleh user.** Agen dilarang meng-assign `Neon` atau `Carbon` secara otomatis saat menyusun `tasks.md`; gunakan **`Gemini 4 Argon (High)`** untuk seluruh task berat/kritis yang membutuhkan penalaran tingkat tinggi.
 
-| Model | Keunggulan Utama | Kapan Harus Dipakai? |
-| :--- | :--- | :--- |
-| **Gemini 4 Carbon (Terkuat — Manual User Only)** | Penalaran paling tajam, minim halusinasi, jago security audit & bug kritis. | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi bug kritis/audit khusus. |
-| **Gemini 4 Argon (High)** | Penalaran mendalam (High thinking) + kapasitas agentic coding skala besar (1M token). | Bedah arsitektur skema DB, cari root-cause bug rumit, security & financial audit, serta merge conflict Git yang kompleks. |
-| **Gemini 4 Argon (Andalan Utama / Medium)** | Keseimbangan terbaik antara kecerdasan tinggi & agentic coding skala besar (1M token). | Buat fitur baru end-to-end, refactoring lintas banyak file, analisis dokumen/PRD tebal, & PR review. |
-| **Gemini 3.8 Flash (Tercepat)** | Respons instan, ringan, hemat kuota (versi terbaik dibanding 3.7 / 3.6 Flash). | Edit kode ringan, generate commit message Git, buat unit test sederhana, & rangkum dokumen cepat. |
-| **Gemini 3.7 / 3.6 Flash & 3.1 Pro** | Model generasi sebelumnya. | Skip saja — gunakan 3.8 Flash untuk kecepatan atau 4 Argon untuk kualitas. |
+| Model | Pilihan Level Thinking | Keunggulan Utama | Kapan Harus Dipakai? |
+| :--- | :--- | :--- | :--- |
+| **Gemini 4 Neon** *(Ultra-Frontier — Manual User Only)* | `Low`, `Medium`, `High`, `XHigh` | Kasta tertinggi keluarga Gemini 4 dengan mode penalaran ekstrem hingga `XHigh` untuk logika multi-tahap & finansial paling rumit. | **Hanya di-assign manual oleh user** untuk eskalasi masalah arsitektur/ekonomi/logika ekstrem. |
+| **Gemini 4 Carbon** *(Cyber & Deep Reasoning — Manual User Only)* | `Low`, `Medium`, `High` | Penalaran sangat tajam, minim halusinasi, spesialis *security audit*, *vulnerability patching*, & *bug* kritis. | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi bug kritis/audit keamanan khusus. |
+| **Gemini 4 Argon (High)** *(Default Deep Reasoning di `tasks.md`)* | `High` | Penalaran mendalam + kapasitas *agentic coding* skala besar (1M token). | **Default task berat**: bedah arsitektur skema DB, cari *root-cause bug* rumit, *security & financial audit*, serta *merge conflict* Git kompleks. |
+| **Gemini 4 Argon** *(Andalan Utama)* | `Medium`, `Low` | Keseimbangan terbaik antara kecerdasan tinggi & *agentic coding* skala besar (1M token). | **Default fitur**: buat fitur baru *end-to-end*, *refactoring* lintas banyak file, analisis dokumen/PRD tebal, & *PR review*. |
+| **Gemini 4 Hydrogen** *(Tercepat Gen-4)* | `Low`, `Medium`, `High` | Evolusi langsung generasi ke-4 pengganti *Flash*: sangat cepat, hemat kuota, dioptimalkan untuk koding harian & *agentic workflow* ringan. | Edit kode/konfigurasi ringan, *generate commit message* Git, buat unit test sederhana, & rangkum dokumen cepat. |
+| **Gemini 3.8 Flash** *(Cepat Gen-3.8)* | `Low`, `Medium`, `High` | Respons instan & hemat kuota (digunakan otomatis oleh subagent `Model: "flash"`). | Task ringan pararel via subagent `flash`, edit katalog/konfigurasi sederhana. |
+| **Gemini 3.7 / 3.6 Flash & 3.1 Pro** | `Low`, `Medium`, `High` | Model generasi sebelumnya. | *Skip saja* — gunakan **4 Hydrogen / 3.8 Flash** untuk kecepatan atau **4 Argon** untuk kualitas. |

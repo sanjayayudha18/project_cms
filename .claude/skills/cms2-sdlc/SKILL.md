@@ -33,7 +33,7 @@ next stage until the user says the current artifact is accepted.
 |---|---|---|---|
 | 1 Plan | `requirements.md` `## Introduction` (+ open questions) | `ecc:intent-driven-development` | `mattpocock-skills:grilling`, `ecc:product-lens` |
 | 2 Design | `requirements.md` (EARS) → `design.md` | `mattpocock-skills:domain-modeling` | `ecc:contract-first`, `ecc:database-migrations` + `ecc:postgres-patterns`, `ecc:architecture-decision-records` (→ `.claude/docs/decisions.md`), `cms2-master-data` |
-| 3 Build | `tasks.md` | `/ecc:plan` (wait for OK) | `ecc:golang-patterns`, `ui-ux-pro-max` (UI), `cms2-master-data`; run per task/wave with `cms-task-runner` / `cms-run-wave` |
+| 3 Build | `tasks.md` | `/ecc:plan` (wait for OK) | `ecc:golang-patterns`, `ui-ux-pro-max` (UI), `cms2-master-data`; run per task/wave with `cms-task-runner` / `claude-cms-orchestrator` |
 | 4 Test | `tasks.md` `## Notes` → `### Test Results` | `ecc:tdd-workflow` | `ecc:golang-testing`, `ecc:verification-loop` |
 | 5 Deploy | `review.md` | `/code-review` | `/security-review` (mandatory for §4 #7 areas) |
 | 6 Maintain | `incidents.md` | `mattpocock-skills:diagnosing-bugs` | `engineering:incident-response`; each incident → regression test; a breach → new spec |

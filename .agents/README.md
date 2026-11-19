@@ -30,7 +30,7 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │   │   └── SKILL.md             # Checklist 9-langkah entitas master-data (maker-checker)
 │   ├── cms2-bugfix/
 │   │   └── SKILL.md             # Workflow end-to-end perbaikan bug
-│   ├── cms-run-wave/
+│   ├── claude-cms-orchestrator/
 │   │   └── SKILL.md             # Dispatcher paralel task per wave menggunakan subagent
 │   ├── db-migration-sqlc/
 │   │   └── SKILL.md             # Workflow migrasi PostgreSQL, soft-delete & sqlc v1.31.1

@@ -19,3 +19,4 @@ vendor-vaults legacy fill: alamat=<keep>,cis_limit_amount=<keep>,escrow_atm=<kee
 vendors header: name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active
 vendors legacy[0]: id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active
 vendors legacy[1]: id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active,director_name,director_phone,director_email,pks_name,pks_effective_date,pks_expiry_date,pks_validity_months,pks_remaining_days,pks_status
+vendors legacy[2]: name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active,director_name,director_phone,director_email,pks_name,pks_effective_date,pks_expiry_date,pks_validity_months,pks_remaining_days,pks_status

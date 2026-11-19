@@ -248,6 +248,7 @@ func main() {
 		"atm_assignment":       service.ATMAssignmentApplier{},
 		"dsr_location_map":     service.DsrLocationMapApplier{},
 		"vendor_pks":           service.VendorPksApplier{},
+		"vendor_pks_type":      service.PksTypeApplier{},
 		// ScDD 5.1 cash count parameters + mapping PIC.
 		"cash_count_category_params":  service.CashCountCategoryParamsApplier{},
 		"cash_count_anomaly_category": service.CashCountAnomalyCategoryApplier{},
@@ -362,6 +363,9 @@ func main() {
 	// ADMIN/ADMIN_PARAM-only: PKS vendor (spec vendor-pks 8.1), maker-checker; reads on primary.
 	vendorPksAdminService := service.NewVendorPksAdminService(repository.NewVendorPksAdminRepository(dbPool), masterDataChangeService, renewalMonths)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pks", handler.NewAdminVendorPksHandler(vendorPksAdminService).Routes())
+
+	pksTypeAdminService := service.NewPksTypeAdminService(repository.NewPksTypeRepository(dbPool, dbReadPool), masterDataChangeService)
+	masterDataAdmin.Mount("/api/v1/admin/pks-types", handler.NewAdminPksTypeHandler(pksTypeAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same
 	// maker-checker-native flow; price is a decimal string (numeric(20,2)).

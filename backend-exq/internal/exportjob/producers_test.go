@@ -201,10 +201,15 @@ func TestHeadersMatchCSVExport(t *testing.T) {
 		if e == csvexport.PackagePrices {
 			kind = KindHargaPaket
 		}
-		if !slices.Equal(m[kind][e].Header(), want.Header) {
+		// vendor-pks: PKS columns left the vendor files (vendor-pks-type Req 7): code, name + 3 director columns.
+		wantHeader := want.Header
+		if e == csvexport.VendorPks {
+			wantHeader = want.Header[:5]
+		}
+		if !slices.Equal(m[kind][e].Header(), wantHeader) {
 			t.Errorf("%s header differs", e)
 		}
-		if e == csvexport.VendorPks && !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.Header) {
+		if e == csvexport.VendorPks && !slices.Equal(m[KindMasterDataGlobal][e].Header(), want.Header[:5]) {
 			t.Errorf("global %s header differs", e)
 		}
 	}
@@ -444,8 +449,12 @@ func TestErrorsPropagate(t *testing.T) {
 	}
 }
 
-// vendor_pks export is covered by task 9.3.
+// vendor_pks export is covered by producers_vendor_pks_test.go (embedding fake) and the integration tests.
 func (*fakeQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
+	return nil, nil
+}
+
+func (*fakeQ) ExportVendorPksMissingBatch(context.Context, repository.ExportVendorPksMissingBatchParams) ([]repository.ExportVendorPksMissingBatchRow, error) {
 	return nil, nil
 }
 

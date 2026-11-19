@@ -30,6 +30,7 @@ import { adminATMsRoute } from "./routes/settings/admin/atms";
 import { adminExportsRoute } from "./routes/settings/admin/exports";
 import { adminHolidaysRoute } from "./routes/settings/admin/holidays";
 import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
+import { adminPksTypesRoute } from "./routes/settings/admin/pks-types";
 import { adminRegionsRoute } from "./routes/settings/admin/regions";
 import { adminUsersRoute } from "./routes/settings/admin/users";
 import { adminVendorBranchDetailRoute } from "./routes/settings/admin/vendor-branch-detail";
@@ -79,6 +80,7 @@ export const routeTree = rootRoute.addChildren([
     exportPreviewRoute,
     adminATMsRoute,
     adminRegionsRoute,
+    adminPksTypesRoute,
     adminHolidaysRoute,
     adminAcmAreasRoute,
     approvalsRoute,

@@ -100,11 +100,11 @@ func TestVendorPksCsvGolden(t *testing.T) {
 	rows := []VendorPksRow{
 		{VendorCode: "ABACUS", VendorName: "PT Abacus Ñandú 雅加达",
 			DirectorName: ptr("Budi Santoso"), DirectorPhone: ptr("0812 3456"), DirectorEmail: ptr("budi@abacus.co.id"),
-			PksName: ptr("PKS Replenish 2026"), EffectiveDate: d(2026, 1, 1), ExpiryDate: d(2027, 6, 30),
+			PksTypeCode: ptr("FLM"), WodNumber: ptr("WOD-001"), PksName: ptr("PKS Replenish 2026"), EffectiveDate: d(2026, 1, 1), ExpiryDate: d(2027, 6, 30),
 			ValidityMonths: ptr(int32(18)), RemainingDays: ptr(int32(237)), PksStatus: ptr("aktif")},
 		{VendorCode: "KEJAR", VendorName: `=HYPERLINK("x")`,
 			DirectorName: ptr("@admin"), DirectorPhone: ptr("+62 811"), DirectorEmail: ptr("-x@y.id"),
-			PksName: ptr("PKS, \"Koma\""), EffectiveDate: d(2026, 2, 3), ExpiryDate: d(2026, 8, 3),
+			PksTypeCode: ptr("CIT"), WodNumber: ptr("=WOD-2"), PksName: ptr("PKS, \"Koma\""), EffectiveDate: d(2026, 2, 3), ExpiryDate: d(2026, 8, 3),
 			ValidityMonths: ptr(int32(6)), RemainingDays: ptr(int32(-4)), PksStatus: ptr("expired")},
 		{VendorCode: "NEWV", VendorName: "PT Baru", PksStatus: ptr("belum_diisi")},
 		{VendorCode: "T", VendorName: "PT T", PksName: ptr("PKS T"),
@@ -130,11 +130,11 @@ func TestVendorPksCsvGolden(t *testing.T) {
 	}
 	want := csvexport.BOM + strings.Join([]string{
 		strings.Join(VendorPksHeader, ","),
-		"ABACUS,PT Abacus Ñandú 雅加达,Budi Santoso,0812 3456,budi@abacus.co.id,PKS Replenish 2026,2026-01-01,2027-06-30,18,237,Aktif",
-		`KEJAR,"'=HYPERLINK(""x"")",'@admin,+62 811,'-x@y.id,"PKS, ""Koma""",2026-02-03,2026-08-03,6,-4,Expired`,
-		"NEWV,PT Baru,,,,,,,,,Belum diisi",
-		"T,PT T,,,,PKS T,2025-01-01,2026-01-01,12,,Terminated",
-		"R,PT R,,,,,,,,,Need Renewal",
+		"ABACUS,PT Abacus Ñandú 雅加达,Budi Santoso,0812 3456,budi@abacus.co.id,FLM,WOD-001,PKS Replenish 2026,2026-01-01,2027-06-30,18,237,Aktif",
+		`KEJAR,"'=HYPERLINK(""x"")",'@admin,+62 811,'-x@y.id,CIT,'=WOD-2,"PKS, ""Koma""",2026-02-03,2026-08-03,6,-4,Expired`,
+		"NEWV,PT Baru,,,,,,,,,,,Belum diisi",
+		"T,PT T,,,,,,PKS T,2025-01-01,2026-01-01,12,,Terminated",
+		"R,PT R,,,,,,,,,,,Need Renewal",
 	}, "\n") + "\n"
 	if got := buf.String(); got != want {
 		t.Errorf("csv differs\n got: %q\nwant: %q", got, want)
@@ -153,21 +153,21 @@ func TestVendorPksCellsGolden(t *testing.T) {
 	}{
 		{"director and pks", VendorPksRow{VendorCode: "ABACUS", VendorName: "PT Abacus",
 			DirectorName: ptr("Budi"), DirectorPhone: ptr("0812"), DirectorEmail: ptr("b@a.id"),
-			PksName: ptr("PKS 2026"), EffectiveDate: d(2026, 1, 1), ExpiryDate: d(2027, 6, 30),
+			PksTypeCode: ptr("FLM"), WodNumber: ptr("W1"), PksName: ptr("PKS 2026"), EffectiveDate: d(2026, 1, 1), ExpiryDate: d(2027, 6, 30),
 			ValidityMonths: ptr(int32(18)), RemainingDays: ptr(int32(237)), PksStatus: ptr("aktif")},
-			[]string{"ABACUS", "PT Abacus", "Budi", "0812", "b@a.id", "PKS 2026", "2026-01-01", "2027-06-30", "18", "237", "Aktif"}},
+			[]string{"ABACUS", "PT Abacus", "Budi", "0812", "b@a.id", "FLM", "W1", "PKS 2026", "2026-01-01", "2027-06-30", "18", "237", "Aktif"}},
 		{"no director no pks", VendorPksRow{VendorCode: "NEWV", VendorName: "PT Baru", PksStatus: ptr("belum_diisi")},
-			[]string{"NEWV", "PT Baru", "", "", "", "", "", "", "", "", "Belum diisi"}},
+			[]string{"NEWV", "PT Baru", "", "", "", "", "", "", "", "", "", "", "Belum diisi"}},
 		{"internal without status", VendorPksRow{VendorCode: "ROH", VendorName: "ROH", DirectorName: ptr("Ani")},
-			[]string{"ROH", "ROH", "Ani", "", "", "", "", "", "", "", ""}},
+			[]string{"ROH", "ROH", "Ani", "", "", "", "", "", "", "", "", "", ""}},
 		{"negative remaining days", VendorPksRow{VendorCode: "K", VendorName: "PT K", PksName: ptr("P"),
 			EffectiveDate: d(2026, 2, 3), ExpiryDate: d(2026, 8, 3), ValidityMonths: ptr(int32(6)),
 			RemainingDays: ptr(int32(-4)), PksStatus: ptr("expired")},
-			[]string{"K", "PT K", "", "", "", "P", "2026-02-03", "2026-08-03", "6", "-4", "Expired"}},
+			[]string{"K", "PT K", "", "", "", "", "", "P", "2026-02-03", "2026-08-03", "6", "-4", "Expired"}},
 		{"formula prefixes", VendorPksRow{VendorCode: "=A", VendorName: "@B",
-			DirectorName: ptr("=X"), DirectorPhone: ptr("+62 811"), DirectorEmail: ptr("-x@y.id"), PksName: ptr("@P"),
+			DirectorName: ptr("=X"), DirectorPhone: ptr("+62 811"), DirectorEmail: ptr("-x@y.id"), PksTypeCode: ptr("=T"), WodNumber: ptr("@W"), PksName: ptr("@P"),
 			PksStatus: ptr("need_renewal")},
-			[]string{"'=A", "'@B", "'=X", "+62 811", "'-x@y.id", "'@P", "", "", "", "", "Need Renewal"}},
+			[]string{"'=A", "'@B", "'=X", "+62 811", "'-x@y.id", "'=T", "'@W", "'@P", "", "", "", "", "Need Renewal"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -178,9 +178,32 @@ func TestVendorPksCellsGolden(t *testing.T) {
 	}
 }
 
+func TestParsePksFilter(t *testing.T) {
+	tests := []struct {
+		name, typ, status, wantType, wantStatus string
+		wantErr                                 bool
+	}{
+		{"both empty = no filter", "", "", "", "", false},
+		{"blank both = no filter", "  ", " ", "", "", false},
+		{"pair, type upper-cased", " cit ", "aktif", "CIT", "aktif", false},
+		{"type only", "FLM", "", "", "", true},
+		{"status only", "", "aktif", "", "", true},
+		{"unknown status", "FLM", "bogus", "", "", true},
+		{"status is case sensitive", "FLM", "Aktif", "", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ty, st, err := ParsePksFilter(tt.typ, tt.status)
+			if (err != nil) != tt.wantErr || ty != tt.wantType || st != tt.wantStatus {
+				t.Errorf("got (%q,%q,%v); want (%q,%q,err=%v)", ty, st, err, tt.wantType, tt.wantStatus, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestVendorPksHeaderStable(t *testing.T) {
 	want := []string{"Kode Vendor", "Nama Perusahaan", "Nama Direktur Utama", "Telepon Direktur Utama",
-		"Email Direktur Utama", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS", "Masa Berlaku (bulan)",
+		"Email Direktur Utama", "Type PKS", "No. WOD", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS", "Masa Berlaku (bulan)",
 		"Monitoring PKS (hari)", "Status PKS"}
 	if !slices.Equal(VendorPksHeader, want) {
 		t.Errorf("header %v", VendorPksHeader)

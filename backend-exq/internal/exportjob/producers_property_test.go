@@ -181,7 +181,7 @@ func propCases() []propCase {
 		{"vendors-forceAll", vendorsProducer(true), func(t *rapid.T, q *propQ, n int) {
 			q.vendors = propTable[repository.ExportVendorsBatchRow](t, n)
 		}},
-		{"vendor-pks", vendorPksMasterProducer(9), func(t *rapid.T, q *propQ, n int) {
+		{"vendor-pks", vendorPksMasterProducer(), func(t *rapid.T, q *propQ, n int) {
 			q.vendorPks = propTable[repository.ExportVendorsWithPksBatchRow](t, n)
 		}},
 		{"branches", branchesProducer(), func(t *rapid.T, q *propQ, n int) {

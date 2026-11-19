@@ -330,7 +330,11 @@ func TestReportProducerStopsOnCancelAndEmitError(t *testing.T) {
 	}
 }
 
-// vendor_pks export is covered by task 9.3.
+// vendor_pks export is covered by producers_vendor_pks_test.go (embedding fake) and the integration tests.
 func (*reportQ) ExportVendorPksBatch(context.Context, repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
+	return nil, nil
+}
+
+func (*reportQ) ExportVendorPksMissingBatch(context.Context, repository.ExportVendorPksMissingBatchParams) ([]repository.ExportVendorPksMissingBatchRow, error) {
 	return nil, nil
 }

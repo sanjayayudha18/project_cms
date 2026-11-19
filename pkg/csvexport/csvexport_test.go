@@ -123,8 +123,10 @@ func TestVendorsContractRevamp(t *testing.T) {
 		t.Errorf("vendors ReadOnlyColumns = %v, want nil", e.ReadOnlyColumns)
 	}
 	wantLegacy0 := []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}
-	wantLegacy1 := slices.Concat(wantLegacy0, VendorReadOnlyColumns())
-	if len(e.LegacyHeaders) != 2 || !slices.Equal(e.LegacyHeaders[0], wantLegacy0) || !slices.Equal(e.LegacyHeaders[1], wantLegacy1) {
+	wantLegacy1 := slices.Concat(wantLegacy0, wantLegacyReadOnly)
+	wantLegacy2 := slices.Concat(wantHeader, wantLegacyReadOnly)
+	if len(e.LegacyHeaders) != 3 || !slices.Equal(e.LegacyHeaders[0], wantLegacy0) || !slices.Equal(e.LegacyHeaders[1], wantLegacy1) ||
+		!slices.Equal(e.LegacyHeaders[2], wantLegacy2) {
 		t.Errorf("vendors legacy headers = %v", e.LegacyHeaders)
 	}
 	cells := VendorCells(VendorRow{

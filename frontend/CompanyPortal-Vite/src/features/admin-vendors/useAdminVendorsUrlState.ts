@@ -15,14 +15,19 @@ const PKS_STATUSES = ["aktif", "need_renewal", "expired", "terminated", "belum_d
 const VENDOR_KINDS = ["FLM_VENDOR", "INTERNAL"] as const;
 export type VendorKind = (typeof VENDOR_KINDS)[number];
 
-export const ADMIN_VENDORS_SEARCH_SCHEMA = z.object({
-  page: z.number().int().min(1).optional(),
-  page_size: z.number().int().min(1).max(100).optional(),
-  status: z.enum(["active", "disabled", "all"]).optional(),
-  q: z.string().max(100).optional(),
-  pks_status: z.enum(PKS_STATUSES).optional(),
-  kind: z.enum(VENDOR_KINDS).optional(),
-});
+export const ADMIN_VENDORS_SEARCH_SCHEMA = z
+  .object({
+    page: z.number().int().min(1).optional(),
+    page_size: z.number().int().min(1).max(100).optional(),
+    status: z.enum(["active", "disabled", "all"]).optional(),
+    q: z.string().max(100).optional(),
+    pks_type: z.string().max(50).optional(),
+    pks_status: z.enum(PKS_STATUSES).optional(),
+    kind: z.enum(VENDOR_KINDS).optional(),
+  })
+  .refine((d) => (d.pks_type === undefined) === (d.pks_status === undefined), {
+    message: "pks_type dan pks_status harus disediakan berpasangan",
+  });
 
 export type AdminVendorsSearchParams = z.infer<typeof ADMIN_VENDORS_SEARCH_SCHEMA>;
 
@@ -31,6 +36,7 @@ export interface AdminVendorsUrlParams {
   page_size: number;
   status: VendorStatus;
   q: string;
+  pks_type?: string;
   pks_status?: PksStatus;
   kind?: VendorKind;
 }
@@ -45,12 +51,20 @@ const DEFAULTS: AdminVendorsUrlParams = {
 const SEARCH_DEBOUNCE_MS = 300;
 
 export function parseParams(raw: Record<string, unknown>): AdminVendorsUrlParams {
+  const rawPksType =
+    typeof raw.pks_type === "string" && raw.pks_type.trim() !== ""
+      ? raw.pks_type.trim()
+      : undefined;
+  const rawPksStatus = PKS_STATUSES.find((v) => v === raw.pks_status);
+  const hasPair = Boolean(rawPksType && rawPksStatus);
+
   return {
     page: typeof raw.page === "number" ? raw.page : DEFAULTS.page,
     page_size: typeof raw.page_size === "number" ? raw.page_size : DEFAULTS.page_size,
     status: typeof raw.status === "string" ? (raw.status as VendorStatus) : DEFAULTS.status,
     q: typeof raw.q === "string" ? raw.q : DEFAULTS.q,
-    pks_status: PKS_STATUSES.find((v) => v === raw.pks_status),
+    pks_type: hasPair ? rawPksType : undefined,
+    pks_status: hasPair ? rawPksStatus : undefined,
     kind: VENDOR_KINDS.find((v) => v === raw.kind),
   };
 }
@@ -61,7 +75,10 @@ export function omitDefaults(params: AdminVendorsUrlParams): AdminVendorsSearchP
   if (params.page_size !== DEFAULTS.page_size) out.page_size = params.page_size;
   if (params.status !== DEFAULTS.status) out.status = params.status;
   if (params.q !== DEFAULTS.q) out.q = params.q;
-  if (params.pks_status) out.pks_status = params.pks_status;
+  if (params.pks_type && params.pks_status) {
+    out.pks_type = params.pks_type;
+    out.pks_status = params.pks_status;
+  }
   if (params.kind) out.kind = params.kind;
   return out;
 }
@@ -95,7 +112,12 @@ export function useAdminVendorsUrlState() {
   }, [debouncedSearch]);
 
   function setParams(partial: Partial<AdminVendorsUrlParams>): void {
-    const resetPage = ("pks_status" in partial || "kind" in partial) && partial.page === undefined;
+    const resetPage =
+      ("pks_type" in partial ||
+        "pks_status" in partial ||
+        "kind" in partial ||
+        "status" in partial) &&
+      partial.page === undefined;
     const next = omitDefaults({ ...params, ...partial, ...(resetPage ? { page: 1 } : {}) });
     navigate({ to: ".", search: next });
   }

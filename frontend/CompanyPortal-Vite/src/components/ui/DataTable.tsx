@@ -68,6 +68,7 @@ export function DataTable<T>({
                   return (
                     <th
                       key={header.id}
+                      colSpan={header.colSpan}
                       className={[
                         "px-4 py-3 text-xs font-medium uppercase tracking-wider",
                         "text-[var(--n-500)] bg-[var(--n-50)]",
@@ -109,7 +110,10 @@ export function DataTable<T>({
           <tbody>
             {table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-[var(--n-500)]">
+                <td
+                  colSpan={table.getVisibleLeafColumns().length}
+                  className="px-4 py-12 text-center text-[var(--n-500)]"
+                >
                   {emptyMessage}
                 </td>
               </tr>

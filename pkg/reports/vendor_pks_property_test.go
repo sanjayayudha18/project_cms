@@ -35,6 +35,8 @@ func vendorPksRowGen() *rapid.Generator[VendorPksRow] {
 			DirectorName:   optGen(textGen()).Draw(t, "dirName"),
 			DirectorPhone:  optGen(textGen()).Draw(t, "dirPhone"),
 			DirectorEmail:  optGen(textGen()).Draw(t, "dirEmail"),
+			PksTypeCode:    optGen(textGen()).Draw(t, "pksType"),
+			WodNumber:      optGen(textGen()).Draw(t, "wod"),
 			PksName:        optGen(textGen()).Draw(t, "pksName"),
 			EffectiveDate:  optGen(date).Draw(t, "eff"),
 			ExpiryDate:     optGen(date).Draw(t, "exp"),
@@ -67,16 +69,16 @@ func TestVendorPksCellsProperty(t *testing.T) {
 
 func TestVendorPksDetailCellsRaw(t *testing.T) {
 	// Raw: no CSVSafe quote prefix.
-	r := VendorPksRow{DirectorName: ptr("=1+1"), DirectorPhone: ptr("+62"), PksName: ptr("@x"),
+	r := VendorPksRow{DirectorName: ptr("=1+1"), DirectorPhone: ptr("+62"), PksTypeCode: ptr("=C"), PksName: ptr("@x"), WodNumber: ptr("+W"),
 		PksStatus: ptr("aktif")}
 	got := VendorPksDetailCells(r)
-	want := []string{"=1+1", "+62", "", "@x", "", "", "", "", "Aktif"}
+	want := []string{"=1+1", "+62", "", "=C", "+W", "@x", "", "", "", "", "Aktif"}
 	if !slices.Equal(got, want) {
 		t.Errorf("raw cells = %q; want %q", got, want)
 	}
-	// All nil: nine empty cells.
-	want = make([]string, 9)
+	// All nil: eleven empty cells.
+	want = make([]string, 11)
 	if got := VendorPksDetailCells(VendorPksRow{}); !slices.Equal(got, want) {
-		t.Errorf("nil row cells = %q; want nine empty", got)
+		t.Errorf("nil row cells = %q; want eleven empty", got)
 	}
 }

@@ -1014,7 +1014,7 @@ type VendorPic struct {
 	Roles []string `json:"roles"`
 }
 
-// PKS (perjanjian kerja sama) per vendor dengan riwayat (D1). Satu PKS aktif per vendor (replaced_at IS NULL, vendor_pks_active_uq). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks). pks_name/effective_date/expiry_date tidak pernah di-UPDATE; tidak pernah di-hard-delete. Riwayat batalkan terminate hanya di audit_logs.
+// PKS (perjanjian kerja sama) per vendor per type dengan riwayat (D1; 043). Satu PKS aktif per (vendor, type) (replaced_at IS NULL, vendor_pks_active_uq); vendor boleh punya subset type. Ditulis hanya lewat maker-checker master data (entity_type vendor_pks). pks_name/effective_date/expiry_date/pks_type_id/wod_number tidak pernah di-UPDATE; tidak pernah di-hard-delete. Riwayat batalkan terminate hanya di audit_logs.
 type VendorPk struct {
 	ID            int64       `json:"id"`
 	VendorID      int64       `json:"vendor_id"`
@@ -1023,7 +1023,7 @@ type VendorPk struct {
 	ExpiryDate    pgtype.Date `json:"expiry_date"`
 	// Maker change create (users.id).
 	CreatedBy int64 `json:"created_by"`
-	// NULL = PKS aktif vendor. Diisi saat PKS baru disetujui dan menggantikannya (D17).
+	// NULL = PKS aktif vendor untuk type ini. Diisi saat PKS baru dengan type sama disetujui dan menggantikannya (D17; 043).
 	ReplacedAt pgtype.Timestamptz `json:"replaced_at"`
 	// PKS yang menggantikan baris ini; hanya terisi bila replaced_at terisi.
 	ReplacedByPksID *int64 `json:"replaced_by_pks_id"`
@@ -1033,6 +1033,23 @@ type VendorPk struct {
 	TerminationReason *string            `json:"termination_reason"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	// Type PKS (vendor_pks_types). Wajib; tidak pernah di-UPDATE (Req 2.9). Migrasi 043.
+	PksTypeID int64 `json:"pks_type_id"`
+	// No. WOD, teks bebas 1-100 tanpa spasi tepi. Unik global case-insensitive termasuk riwayat (vendor_pks_wod_uq); tidak pernah di-UPDATE (Req 2.9). Migrasi 043.
+	WodNumber string `json:"wod_number"`
+}
+
+// Master type PKS (FLM, CIT, ...). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks_type, ADMIN/ADMIN_PARAM). Tidak pernah di-hard-delete: disable = is_active false, diblok selama ada vendor_pks aktif (replaced_at IS NULL, termasuk terminated) dengan type ini. Bukan vendors.kind. Migrasi 043.
+type VendorPksType struct {
+	ID int64 `json:"id"`
+	// Kode type, ^[A-Z0-9]{2,10}$, unik (upper). Tidak berubah setelah dibuat; update hanya name.
+	Code string `json:"code"`
+	// Nama tampilan type, 1-100 karakter setelah trim.
+	Name string `json:"name"`
+	// false = type nonaktif: tidak bisa dipilih untuk PKS baru dan tidak tampil sebagai kolom/filter daftar vendor.
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.

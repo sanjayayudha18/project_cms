@@ -115,9 +115,10 @@ func TestExportRoundTrip_VendorExportHeader_ZeroChanges(t *testing.T) {
 		}
 	}
 
-	// Template stays the 9-column Import_Header (Req 2.6).
-	if e, ok := csvexport.Lookup(csvexport.Vendors); !ok || len(e.Header) != 9 {
-		t.Errorf("vendor template header = %v (ok=%v), want 9 columns", e.Header, ok)
+	// Template stays the Import_Header: the seven profile columns (name first; id/code are legacy since the
+	// master-data import revamp), with no read-only tail (Req 2.6; vendor-pks-type Req 7).
+	if e, ok := csvexport.Lookup(csvexport.Vendors); !ok || len(e.Header) != 7 {
+		t.Errorf("vendor template header = %v (ok=%v), want 7 columns", e.Header, ok)
 	}
 }
 

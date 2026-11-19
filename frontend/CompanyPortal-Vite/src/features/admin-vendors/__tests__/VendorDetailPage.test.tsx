@@ -50,16 +50,16 @@ afterEach(() => {
 
 vi.mock("../hooks", () => ({
   useVendor: (...args: unknown[]) => useVendorMock(...args),
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useVendorPks: () => ({
     isLoading: false,
     isError: false,
     data: {
+      vendor_id: 1,
+      kind: "FLM_VENDOR" as const,
       today: "2026-09-16",
       renewal_months: 6,
-      pks_status: "belum_diisi",
-      active: null,
-      history: [],
-      pending: null,
+      groups: [],
     },
   }),
   useSubmitVendorPks: () => noopMutation,

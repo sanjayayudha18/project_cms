@@ -16,6 +16,7 @@ let searchState: Record<string, unknown> = {};
 
 vi.mock("../hooks", () => ({
   useVendorsList: (...args: unknown[]) => useVendorsListMock(...args),
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useDisableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useEnableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),

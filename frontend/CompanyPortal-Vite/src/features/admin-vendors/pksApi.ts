@@ -12,7 +12,40 @@ export type VendorPksDetail = components["schemas"]["VendorPksDetail"];
 export type SubmitVendorPksPayload = components["schemas"]["SubmitVendorPksRequest"];
 export type VendorPksReasonPayload = components["schemas"]["VendorPksReasonRequest"];
 
+export type PksType = components["schemas"]["PksTypeList"]["types"][number];
+export type CreatePksTypePayload = components["schemas"]["CreatePksTypeRequest"];
+export type UpdatePksTypePayload = components["schemas"]["UpdatePksTypeRequest"];
+
 const base = (vendorId: number) => `/admin/vendors/${vendorId}/pks`;
+
+/** PKS type master (maker-checker; 202 = staged). Mounted at /api/v1/admin/pks-types. */
+export async function listPksTypes(): Promise<PksType[]> {
+  const { data } = await api.get<components["schemas"]["PksTypeList"]>("/admin/pks-types");
+  return data.types;
+}
+
+export async function submitPksType(payload: CreatePksTypePayload): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>("/admin/pks-types", payload);
+  return data;
+}
+
+export async function updatePksType(
+  id: number,
+  payload: UpdatePksTypePayload,
+): Promise<ChangeRequestAccepted> {
+  const { data } = await api.put<ChangeRequestAccepted>(`/admin/pks-types/${id}`, payload);
+  return data;
+}
+
+export async function disablePksType(id: number): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`/admin/pks-types/${id}/disable`);
+  return data;
+}
+
+export async function enablePksType(id: number): Promise<ChangeRequestAccepted> {
+  const { data } = await api.post<ChangeRequestAccepted>(`/admin/pks-types/${id}/enable`);
+  return data;
+}
 
 export async function getVendorPks(vendorId: number): Promise<VendorPksDetail> {
   const { data } = await api.get<VendorPksDetail>(base(vendorId));

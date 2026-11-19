@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
@@ -63,8 +65,9 @@ func (VendorPksApplier) Apply(ctx context.Context, tx pgx.Tx, change db.MasterDa
 }
 
 // applyVendorPksCreate: lock the vendor (serialises every PKS apply of that
-// vendor), re-check it is an active FLM vendor and that the active PKS is still
-// the one the maker saw, then replace it. The old row keeps its terminate data
+// vendor), re-check it is an active FLM vendor, share-lock the PKS type and
+// re-check it is active, and that the active PKS of that (vendor, type) is
+// still the one the maker saw, then replace it. Other types are untouched. The old row keeps its terminate data
 // (Req 3.10).
 func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDataChangeRequest) (int64, any, error) {
 	var p VendorPksCreatePayload
@@ -90,18 +93,27 @@ func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDa
 	if v.Kind == vendorKindInternal || v.DeletedAt.Valid {
 		return 0, nil, fmt.Errorf("vendor %d is no longer an active FLM vendor: %w", p.VendorID, ErrMasterDataChangeStale)
 	}
+	// FOR SHARE: a concurrent type disable (FOR UPDATE + in-use check) waits
+	// for this tx, so no new active PKS lands on a disabled type (DD6).
+	t, err := q.LockPksTypeShare(ctx, p.PksTypeID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !t.IsActive) {
+		return 0, nil, fmt.Errorf("pks type %d is no longer active: %w", p.PksTypeID, ErrMasterDataChangeStale)
+	}
+	if err != nil {
+		return 0, nil, fmt.Errorf("lock pks type %d: %w", p.PksTypeID, err)
+	}
 
 	var activeID *int64
-	active, err := q.GetActiveVendorPks(ctx, p.VendorID)
+	active, err := q.GetActiveVendorPks(ctx, db.GetActiveVendorPksParams{VendorID: p.VendorID, PksTypeID: p.PksTypeID})
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 	case err != nil:
-		return 0, nil, fmt.Errorf("load active pks of vendor %d: %w", p.VendorID, err)
+		return 0, nil, fmt.Errorf("load active pks of vendor %d type %d: %w", p.VendorID, p.PksTypeID, err)
 	default:
 		activeID = &active.ID
 	}
 	if !sameInt64Ptr(activeID, p.ReplacesPksID) {
-		return 0, nil, fmt.Errorf("active pks of vendor %d changed since submit: %w", p.VendorID, ErrMasterDataChangeStale)
+		return 0, nil, fmt.Errorf("active pks of vendor %d type %d changed since submit: %w", p.VendorID, p.PksTypeID, ErrMasterDataChangeStale)
 	}
 
 	if activeID != nil {
@@ -114,13 +126,15 @@ func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDa
 	}
 	row, err := q.InsertVendorPks(ctx, db.InsertVendorPksParams{
 		VendorID:      p.VendorID,
+		PksTypeID:     p.PksTypeID,
+		WodNumber:     strings.TrimSpace(p.WodNumber),
 		PksName:       p.PksName,
 		EffectiveDate: pgtype.Date{Time: eff, Valid: true},
 		ExpiryDate:    pgtype.Date{Time: exp, Valid: true},
 		CreatedBy:     change.MakerID,
 	})
 	if err != nil {
-		return 0, nil, fmt.Errorf("insert vendor pks for vendor %d: %w", p.VendorID, err)
+		return 0, nil, mapVendorPksInsertError(p.VendorID, err)
 	}
 	if activeID != nil {
 		err := q.SetVendorPksReplacedBy(ctx, db.SetVendorPksReplacedByParams{ID: *activeID, ReplacedByPksID: &row.ID})
@@ -129,6 +143,21 @@ func applyVendorPksCreate(ctx context.Context, q *db.Queries, change db.MasterDa
 		}
 	}
 	return row.ID, row, nil
+}
+
+// mapVendorPksInsertError: a WOD taken since submit → ErrVendorPksWodTaken
+// (409); losing the one-active-per-(vendor, type) race → stale.
+func mapVendorPksInsertError(vendorID int64, err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+		switch pgErr.ConstraintName {
+		case "vendor_pks_wod_uq":
+			return fmt.Errorf("insert vendor pks for vendor %d: %w", vendorID, ErrVendorPksWodTaken)
+		case "vendor_pks_active_uq":
+			return fmt.Errorf("insert vendor pks for vendor %d: %w", vendorID, ErrMasterDataChangeStale)
+		}
+	}
+	return fmt.Errorf("insert vendor pks for vendor %d: %w", vendorID, err)
 }
 
 func sameInt64Ptr(a, b *int64) bool {

@@ -357,7 +357,7 @@ func TestPreviewRevampedProducersAndVendorPks(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s/%s preview: %v", p.Kind, p.Entity, err)
 		}
-		if len(got.Columns) != 11 || got.Columns[0] != "vendor_code" || got.Columns[10] != "pks_status" {
+		if len(got.Columns) != 5 || got.Columns[0] != "vendor_code" || got.Columns[4] != "director_email" {
 			t.Fatalf("vendor-pks columns = %v", got.Columns)
 		}
 		if len(got.Rows) != 2 || got.Total != 2 {

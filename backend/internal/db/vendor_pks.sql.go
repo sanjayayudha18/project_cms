@@ -12,19 +12,52 @@ import (
 )
 
 const getActiveVendorPks = `-- name: GetActiveVendorPks :one
-SELECT id, vendor_id, pks_name, effective_date, expiry_date, created_by,
-       replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
-       termination_reason, created_at, updated_at
-FROM vendor_pks
-WHERE vendor_id = $1 AND replaced_at IS NULL
+SELECT p.id, p.vendor_id, p.pks_type_id, t.code AS pks_type_code, t.name AS pks_type_name,
+       p.wod_number, p.pks_name, p.effective_date, p.expiry_date, p.created_by,
+       p.replaced_at, p.replaced_by_pks_id, p.terminated_at, p.terminated_by,
+       p.termination_reason, p.created_at, p.updated_at
+FROM vendor_pks p
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE p.vendor_id = $1 AND p.pks_type_id = $2
+  AND p.replaced_at IS NULL
 `
 
-func (q *Queries) GetActiveVendorPks(ctx context.Context, vendorID int64) (VendorPk, error) {
-	row := q.db.QueryRow(ctx, getActiveVendorPks, vendorID)
-	var i VendorPk
+type GetActiveVendorPksParams struct {
+	VendorID  int64 `json:"vendor_id"`
+	PksTypeID int64 `json:"pks_type_id"`
+}
+
+type GetActiveVendorPksRow struct {
+	ID                int64              `json:"id"`
+	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	PksTypeCode       string             `json:"pks_type_code"`
+	PksTypeName       string             `json:"pks_type_name"`
+	WodNumber         string             `json:"wod_number"`
+	PksName           string             `json:"pks_name"`
+	EffectiveDate     pgtype.Date        `json:"effective_date"`
+	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	CreatedBy         int64              `json:"created_by"`
+	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
+	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+// One active PKS per (vendor, type).
+func (q *Queries) GetActiveVendorPks(ctx context.Context, arg GetActiveVendorPksParams) (GetActiveVendorPksRow, error) {
+	row := q.db.QueryRow(ctx, getActiveVendorPks, arg.VendorID, arg.PksTypeID)
+	var i GetActiveVendorPksRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorID,
+		&i.PksTypeID,
+		&i.PksTypeCode,
+		&i.PksTypeName,
+		&i.WodNumber,
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
@@ -40,7 +73,7 @@ func (q *Queries) GetActiveVendorPks(ctx context.Context, vendorID int64) (Vendo
 	return i, err
 }
 
-const getPendingVendorPksChange = `-- name: GetPendingVendorPksChange :one
+const getPendingVendorPksChanges = `-- name: GetPendingVendorPksChanges :many
 SELECT c.id, c.op, c.entity_id, c.payload, c.maker_id,
        u.full_name AS maker_name, c.created_at
 FROM master_data_change_requests c
@@ -48,9 +81,10 @@ JOIN users u ON u.id = c.maker_id
 WHERE c.entity_type = 'vendor_pks'
   AND c.status = 'pending'
   AND (c.payload->>'vendor_id')::bigint = $1::bigint
+ORDER BY (c.payload->>'pks_type_id')::bigint, c.id
 `
 
-type GetPendingVendorPksChangeRow struct {
+type GetPendingVendorPksChangesRow struct {
 	ID        int64              `json:"id"`
 	Op        string             `json:"op"`
 	EntityID  *int64             `json:"entity_id"`
@@ -60,35 +94,76 @@ type GetPendingVendorPksChangeRow struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-func (q *Queries) GetPendingVendorPksChange(ctx context.Context, vendorID int64) (GetPendingVendorPksChangeRow, error) {
-	row := q.db.QueryRow(ctx, getPendingVendorPksChange, vendorID)
-	var i GetPendingVendorPksChangeRow
-	err := row.Scan(
-		&i.ID,
-		&i.Op,
-		&i.EntityID,
-		&i.Payload,
-		&i.MakerID,
-		&i.MakerName,
-		&i.CreatedAt,
-	)
-	return i, err
+// At most one pending change per (vendor, type) (DB index), so many per vendor.
+func (q *Queries) GetPendingVendorPksChanges(ctx context.Context, vendorID int64) ([]GetPendingVendorPksChangesRow, error) {
+	rows, err := q.db.Query(ctx, getPendingVendorPksChanges, vendorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPendingVendorPksChangesRow{}
+	for rows.Next() {
+		var i GetPendingVendorPksChangesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Op,
+			&i.EntityID,
+			&i.Payload,
+			&i.MakerID,
+			&i.MakerName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getVendorPksByID = `-- name: GetVendorPksByID :one
-SELECT id, vendor_id, pks_name, effective_date, expiry_date, created_by,
-       replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
-       termination_reason, created_at, updated_at
-FROM vendor_pks WHERE id = $1
+SELECT p.id, p.vendor_id, p.pks_type_id, t.code AS pks_type_code, t.name AS pks_type_name,
+       p.wod_number, p.pks_name, p.effective_date, p.expiry_date, p.created_by,
+       p.replaced_at, p.replaced_by_pks_id, p.terminated_at, p.terminated_by,
+       p.termination_reason, p.created_at, p.updated_at
+FROM vendor_pks p
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE p.id = $1
 `
 
+type GetVendorPksByIDRow struct {
+	ID                int64              `json:"id"`
+	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	PksTypeCode       string             `json:"pks_type_code"`
+	PksTypeName       string             `json:"pks_type_name"`
+	WodNumber         string             `json:"wod_number"`
+	PksName           string             `json:"pks_name"`
+	EffectiveDate     pgtype.Date        `json:"effective_date"`
+	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	CreatedBy         int64              `json:"created_by"`
+	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
+	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Doubles as the "before" snapshot and the applier's CurrentState: same shape.
-func (q *Queries) GetVendorPksByID(ctx context.Context, id int64) (VendorPk, error) {
+func (q *Queries) GetVendorPksByID(ctx context.Context, id int64) (GetVendorPksByIDRow, error) {
 	row := q.db.QueryRow(ctx, getVendorPksByID, id)
-	var i VendorPk
+	var i GetVendorPksByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorID,
+		&i.PksTypeID,
+		&i.PksTypeCode,
+		&i.PksTypeName,
+		&i.WodNumber,
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
@@ -145,7 +220,7 @@ type GetVendorPksVendorRow struct {
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
-// PKS vendor (spec .kiro/specs/vendor-pks/, task 4.2). Mutations
+// PKS vendor (spec .kiro/specs/vendor-pks/, task 4.2; per type + No. WOD: vendor-pks-type task 2.2). Mutations
 // (MarkVendorPksReplaced, InsertVendorPks, SetVendorPksReplacedBy,
 // TerminateVendorPks, UnterminateVendorPks) run ONLY from VendorPksApplier inside
 // the apply-on-approve tx. No query updates pks_name / effective_date /
@@ -159,34 +234,58 @@ func (q *Queries) GetVendorPksVendor(ctx context.Context, id int64) (GetVendorPk
 }
 
 const insertVendorPks = `-- name: InsertVendorPks :one
-INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by)
-VALUES ($1, $2, $3,
-        $4, $5)
-RETURNING id, vendor_id, pks_name, effective_date, expiry_date, created_by,
+INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+VALUES ($1, $2, $3, $4,
+        $5, $6, $7)
+RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
           replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
           termination_reason, created_at, updated_at
 `
 
 type InsertVendorPksParams struct {
 	VendorID      int64       `json:"vendor_id"`
+	PksTypeID     int64       `json:"pks_type_id"`
+	WodNumber     string      `json:"wod_number"`
 	PksName       string      `json:"pks_name"`
 	EffectiveDate pgtype.Date `json:"effective_date"`
 	ExpiryDate    pgtype.Date `json:"expiry_date"`
 	CreatedBy     int64       `json:"created_by"`
 }
 
-func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams) (VendorPk, error) {
+type InsertVendorPksRow struct {
+	ID                int64              `json:"id"`
+	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	WodNumber         string             `json:"wod_number"`
+	PksName           string             `json:"pks_name"`
+	EffectiveDate     pgtype.Date        `json:"effective_date"`
+	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	CreatedBy         int64              `json:"created_by"`
+	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
+	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams) (InsertVendorPksRow, error) {
 	row := q.db.QueryRow(ctx, insertVendorPks,
 		arg.VendorID,
+		arg.PksTypeID,
+		arg.WodNumber,
 		arg.PksName,
 		arg.EffectiveDate,
 		arg.ExpiryDate,
 		arg.CreatedBy,
 	)
-	var i VendorPk
+	var i InsertVendorPksRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorID,
+		&i.PksTypeID,
+		&i.WodNumber,
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
@@ -203,18 +302,24 @@ func (q *Queries) InsertVendorPks(ctx context.Context, arg InsertVendorPksParams
 }
 
 const listVendorPksByVendor = `-- name: ListVendorPksByVendor :many
-SELECT id, vendor_id, pks_name, effective_date, expiry_date, created_by,
-       replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
-       termination_reason, created_at, updated_at,
-       vendor_pks_validity_months(effective_date, expiry_date)::int AS validity_months
-FROM vendor_pks
-WHERE vendor_id = $1
-ORDER BY replaced_at DESC NULLS FIRST, id DESC
+SELECT p.id, p.vendor_id, p.pks_type_id, t.code AS pks_type_code, t.name AS pks_type_name,
+       p.wod_number, p.pks_name, p.effective_date, p.expiry_date, p.created_by,
+       p.replaced_at, p.replaced_by_pks_id, p.terminated_at, p.terminated_by,
+       p.termination_reason, p.created_at, p.updated_at,
+       vendor_pks_validity_months(p.effective_date, p.expiry_date)::int AS validity_months
+FROM vendor_pks p
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE p.vendor_id = $1
+ORDER BY t.code, p.replaced_at DESC NULLS FIRST, p.id DESC
 `
 
 type ListVendorPksByVendorRow struct {
 	ID                int64              `json:"id"`
 	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	PksTypeCode       string             `json:"pks_type_code"`
+	PksTypeName       string             `json:"pks_type_name"`
+	WodNumber         string             `json:"wod_number"`
 	PksName           string             `json:"pks_name"`
 	EffectiveDate     pgtype.Date        `json:"effective_date"`
 	ExpiryDate        pgtype.Date        `json:"expiry_date"`
@@ -229,7 +334,7 @@ type ListVendorPksByVendorRow struct {
 	ValidityMonths    int32              `json:"validity_months"`
 }
 
-// Active PKS first, then history newest-replaced first.
+// Per type (code): active PKS first, then history newest-replaced first.
 func (q *Queries) ListVendorPksByVendor(ctx context.Context, vendorID int64) ([]ListVendorPksByVendorRow, error) {
 	rows, err := q.db.Query(ctx, listVendorPksByVendor, vendorID)
 	if err != nil {
@@ -242,6 +347,10 @@ func (q *Queries) ListVendorPksByVendor(ctx context.Context, vendorID int64) ([]
 		if err := rows.Scan(
 			&i.ID,
 			&i.VendorID,
+			&i.PksTypeID,
+			&i.PksTypeCode,
+			&i.PksTypeName,
+			&i.WodNumber,
 			&i.PksName,
 			&i.EffectiveDate,
 			&i.ExpiryDate,
@@ -320,7 +429,7 @@ SET terminated_at = now(),
     terminated_by = $1,
     termination_reason = $2
 WHERE id = $3 AND replaced_at IS NULL AND terminated_at IS NULL
-RETURNING id, vendor_id, pks_name, effective_date, expiry_date, created_by,
+RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
           replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
           termination_reason, created_at, updated_at
 `
@@ -331,13 +440,33 @@ type TerminateVendorPksParams struct {
 	ID                int64   `json:"id"`
 }
 
+type TerminateVendorPksRow struct {
+	ID                int64              `json:"id"`
+	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	WodNumber         string             `json:"wod_number"`
+	PksName           string             `json:"pks_name"`
+	EffectiveDate     pgtype.Date        `json:"effective_date"`
+	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	CreatedBy         int64              `json:"created_by"`
+	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
+	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Zero rows (pgx.ErrNoRows) = stale: replaced or already terminated.
-func (q *Queries) TerminateVendorPks(ctx context.Context, arg TerminateVendorPksParams) (VendorPk, error) {
+func (q *Queries) TerminateVendorPks(ctx context.Context, arg TerminateVendorPksParams) (TerminateVendorPksRow, error) {
 	row := q.db.QueryRow(ctx, terminateVendorPks, arg.TerminatedBy, arg.TerminationReason, arg.ID)
-	var i VendorPk
+	var i TerminateVendorPksRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorID,
+		&i.PksTypeID,
+		&i.WodNumber,
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
@@ -357,18 +486,38 @@ const unterminateVendorPks = `-- name: UnterminateVendorPks :one
 UPDATE vendor_pks
 SET terminated_at = NULL, terminated_by = NULL, termination_reason = NULL
 WHERE id = $1 AND replaced_at IS NULL AND terminated_at IS NOT NULL
-RETURNING id, vendor_id, pks_name, effective_date, expiry_date, created_by,
+RETURNING id, vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
           replaced_at, replaced_by_pks_id, terminated_at, terminated_by,
           termination_reason, created_at, updated_at
 `
 
+type UnterminateVendorPksRow struct {
+	ID                int64              `json:"id"`
+	VendorID          int64              `json:"vendor_id"`
+	PksTypeID         int64              `json:"pks_type_id"`
+	WodNumber         string             `json:"wod_number"`
+	PksName           string             `json:"pks_name"`
+	EffectiveDate     pgtype.Date        `json:"effective_date"`
+	ExpiryDate        pgtype.Date        `json:"expiry_date"`
+	CreatedBy         int64              `json:"created_by"`
+	ReplacedAt        pgtype.Timestamptz `json:"replaced_at"`
+	ReplacedByPksID   *int64             `json:"replaced_by_pks_id"`
+	TerminatedAt      pgtype.Timestamptz `json:"terminated_at"`
+	TerminatedBy      *int64             `json:"terminated_by"`
+	TerminationReason *string            `json:"termination_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Zero rows (pgx.ErrNoRows) = stale: replaced or not terminated.
-func (q *Queries) UnterminateVendorPks(ctx context.Context, id int64) (VendorPk, error) {
+func (q *Queries) UnterminateVendorPks(ctx context.Context, id int64) (UnterminateVendorPksRow, error) {
 	row := q.db.QueryRow(ctx, unterminateVendorPks, id)
-	var i VendorPk
+	var i UnterminateVendorPksRow
 	err := row.Scan(
 		&i.ID,
 		&i.VendorID,
+		&i.PksTypeID,
+		&i.WodNumber,
 		&i.PksName,
 		&i.EffectiveDate,
 		&i.ExpiryDate,
@@ -382,4 +531,21 @@ func (q *Queries) UnterminateVendorPks(ctx context.Context, id int64) (VendorPk,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const wodNumberTaken = `-- name: WodNumberTaken :one
+SELECT (EXISTS (SELECT 1 FROM vendor_pks
+                WHERE lower(wod_number) = lower(btrim($1::text)))
+        OR EXISTS (SELECT 1 FROM master_data_change_requests c
+                   WHERE c.entity_type = 'vendor_pks' AND c.op = 'create' AND c.status = 'pending'
+                     AND lower(btrim(c.payload->>'wod_number')) = lower(btrim($1::text))))::bool AS taken
+`
+
+// True when any vendor_pks row (history included) or a pending create change holds
+// this No. WOD; case-insensitive, trimmed. The unique indexes stay the last net.
+func (q *Queries) WodNumberTaken(ctx context.Context, wodNumber string) (bool, error) {
+	row := q.db.QueryRow(ctx, wodNumberTaken, wodNumber)
+	var taken bool
+	err := row.Scan(&taken)
+	return taken, err
 }

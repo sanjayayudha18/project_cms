@@ -16,6 +16,10 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("../hooks", () => ({
   useVendorPks: () => m.query,
+  usePksTypesList: () => ({
+    data: [{ id: 1, code: "FLM", name: "First Line Maintenance", is_active: true, in_use: true }],
+    isLoading: false,
+  }),
   useSubmitVendorPks: () => ({ mutateAsync: m.submit, isPending: false }),
   useTerminateVendorPks: () => ({ mutateAsync: m.terminate, isPending: false }),
   useUnterminateVendorPks: () => ({ mutateAsync: m.unterminate, isPending: false }),
@@ -26,6 +30,7 @@ import { PksPanel } from "../components/PksPanel";
 const ACTIVE = {
   id: 7,
   vendor_id: 42,
+  wod_number: "WOD/2026/001",
   pks_name: "PKS Cash Logistik 2026",
   effective_date: "2026-01-15",
   expiry_date: "2027-01-14",
@@ -38,6 +43,7 @@ const ACTIVE = {
 const OLD = {
   id: 3,
   vendor_id: 42,
+  wod_number: "WOD/2024/099",
   pks_name: "PKS Lama",
   effective_date: "2024-01-01",
   expiry_date: "2024-12-31",
@@ -49,16 +55,39 @@ const OLD = {
 };
 
 function detail(over: Record<string, unknown> = {}) {
+  const pks_status = (over.pks_status as string) ?? "aktif";
+  const active = over.active !== undefined ? over.active : ACTIVE;
+  const history = over.history !== undefined ? over.history : [OLD];
+  const pending = over.pending !== undefined ? over.pending : null;
+
+  const isCompletelyEmpty =
+    pks_status === "belum_diisi" &&
+    !active &&
+    Array.isArray(history) &&
+    history.length === 0 &&
+    !pending;
+
+  const defaultGroups = isCompletelyEmpty
+    ? []
+    : [
+        {
+          pks_type: { code: "FLM", name: "First Line Maintenance" },
+          pks_status,
+          active,
+          history,
+          pending,
+        },
+      ];
+
   return {
     isLoading: false,
     isError: false,
     data: {
+      vendor_id: 42,
+      kind: "FLM_VENDOR" as const,
       today: "2026-09-16",
       renewal_months: 6,
-      pks_status: "aktif",
-      active: ACTIVE,
-      history: [OLD],
-      pending: null,
+      groups: over.groups !== undefined ? over.groups : defaultGroups,
       ...over,
     },
   };
@@ -123,7 +152,7 @@ describe("PksPanel states", () => {
     expect(btn("Terminate PKS")).toBeNull();
   });
 
-  it("pending change: shows the pending block and disables every action with a reason", () => {
+  it("pending change: shows the pending block and disables terminate action for that type", () => {
     m.query = detail({
       pending: { op: "disable", maker_name: "Budi", payload: { reason: "Kontrak diputus" } },
     });
@@ -134,8 +163,50 @@ describe("PksPanel states", () => {
     expect(block).toHaveTextContent("Budi");
     expect(block).toHaveTextContent("Kontrak diputus");
     expect(screen.getByText("Masih ada perubahan PKS yang menunggu persetujuan.")).toBeVisible();
-    expect(btn("Catat PKS baru")).toBeDisabled();
     expect(btn("Terminate PKS")).toBeDisabled();
+  });
+
+  it("multi-type: terminate is disabled only for the type that has a pending change", () => {
+    m.query = {
+      isLoading: false,
+      isError: false,
+      data: {
+        vendor_id: 42,
+        kind: "FLM_VENDOR",
+        today: "2026-09-16",
+        renewal_months: 6,
+        groups: [
+          {
+            pks_type: { code: "FLM", name: "First Line Maintenance" },
+            pks_status: "aktif",
+            active: { ...ACTIVE, id: 10, pks_name: "PKS FLM" },
+            history: [],
+            pending: { op: "disable", maker_name: "Budi", payload: { reason: "Putus kontrak" } },
+          },
+          {
+            pks_type: { code: "SLM", name: "Second Line Maintenance" },
+            pks_status: "aktif",
+            active: { ...ACTIVE, id: 20, pks_name: "PKS SLM" },
+            history: [],
+            pending: null,
+          },
+        ],
+      },
+    };
+    render(<PksPanel vendorId={42} vendor={{ is_active: true }} />);
+
+    const flmCard = screen.getByRole("article", { name: "PKS FLM" });
+    const slmCard = screen.getByRole("article", { name: "PKS SLM" });
+
+    expect(within(flmCard).getByRole("button", { name: "Terminate PKS" })).toBeDisabled();
+    expect(
+      within(flmCard).getByText("Masih ada perubahan PKS yang menunggu persetujuan."),
+    ).toBeInTheDocument();
+
+    expect(within(slmCard).getByRole("button", { name: "Terminate PKS" })).toBeEnabled();
+    expect(
+      within(slmCard).queryByText("Masih ada perubahan PKS yang menunggu persetujuan."),
+    ).toBeNull();
   });
 
   it("pending create shows the proposed PKS name", () => {

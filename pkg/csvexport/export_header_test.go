@@ -9,7 +9,10 @@ import (
 
 var wantVendorHeader = []string{"name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}
 
-var wantVendorReadOnly = []string{
+var wantVendorReadOnly = []string{"director_name", "director_phone", "director_email"}
+
+// The nine read-only columns of the previous Export_Header (director + active PKS).
+var wantLegacyReadOnly = []string{
 	"director_name", "director_phone", "director_email",
 	"pks_name", "pks_effective_date", "pks_expiry_date",
 	"pks_validity_months", "pks_remaining_days", "pks_status",
@@ -90,5 +93,33 @@ func TestVendorImportTemplateHasSevenColumns(t *testing.T) {
 	first, _, _ := strings.Cut(strings.TrimPrefix(buf.String(), "\xef\xbb\xbf"), "\n")
 	if got := strings.Split(strings.TrimSpace(first), ","); !slices.Equal(got, wantVendorHeader) {
 		t.Errorf("template header %v, want %v", got, wantVendorHeader)
+	}
+}
+
+func TestVendorLegacyHeadersKeepNineColumnExport(t *testing.T) {
+	e, _ := Lookup(Vendors)
+	prefix0 := []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}
+	want := [][]string{
+		prefix0,
+		slices.Concat(prefix0, wantLegacyReadOnly),
+		slices.Concat(wantVendorHeader, wantLegacyReadOnly), // previous Export_Header
+	}
+	if len(e.LegacyHeaders) != len(want) {
+		t.Fatalf("legacy headers = %d, want %d", len(e.LegacyHeaders), len(want))
+	}
+	for i := range want {
+		if !slices.Equal(e.LegacyHeaders[i], want[i]) {
+			t.Errorf("LegacyHeaders[%d] = %v, want %v", i, e.LegacyHeaders[i], want[i])
+		}
+	}
+	// No PKS column may remain in the current contract: Header, Import_Header (Header) and the 3 read-only columns.
+	for _, c := range slices.Concat(e.Header, VendorReadOnlyColumns()) {
+		if strings.HasPrefix(c, "pks_") {
+			t.Errorf("current vendor contract carries PKS column %q", c)
+		}
+	}
+	// A vendor import must still not exist for PKS: vendor-pks stays export-only.
+	if _, ok := Lookup(VendorPks); ok {
+		t.Error("vendor-pks must stay export-only")
 	}
 }

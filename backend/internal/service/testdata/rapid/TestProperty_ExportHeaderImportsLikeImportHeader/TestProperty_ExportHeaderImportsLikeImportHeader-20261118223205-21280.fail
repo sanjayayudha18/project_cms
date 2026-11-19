@@ -1,0 +1,10 @@
+# 2026/11/18 22:32:05.690980 [TestProperty_ExportHeaderImportsLikeImportHeader] [rapid] draw rows: 0
+# 2026/11/18 22:32:05.690980 [TestProperty_ExportHeaderImportsLikeImportHeader] [rapid] draw withV1: false
+# 2026/11/18 22:32:05.690980 [TestProperty_ExportHeaderImportsLikeImportHeader] import-header preview {Entity:vendors TotalRows:0 ValidRows:0 Creates:0 Updates:0 Unchanged:0 Errors:[] ErrorsTruncated:false DataUpdates:0 Enables:0 Disables:0 Changes:[]}
+# export-header preview {Entity:vendors TotalRows:0 ValidRows:0 Creates:0 Updates:0 Unchanged:0 Errors:[{Row:1 Field:header Message:kolom header tidak sesuai; diharapkan persis: name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active (atau legacy: id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active)}] ErrorsTruncated:false DataUpdates:0 Enables:0 Disables:0 Changes:[]}
+# 
+v0.4.8#7085428813464342420
+0x0
+0x0
+0x0
+0x0

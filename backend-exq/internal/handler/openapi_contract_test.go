@@ -218,7 +218,7 @@ func TestOpenAPIContract_Responses(t *testing.T) {
 		{"report mismatch 400 range", "POST", "/reports/replenishment-amount-mismatch?date_from=2026-09-01&date_to=2026-10-07", "ADMIN", ok, 400},
 		{"report trips 202", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ATM-USER", ok, 202},
 		{"report trips 403", "POST", "/reports/replenishment-trips?date_from=2026-10-01&date_to=2026-10-07", "ADMIN_PARAM", ok, 403},
-		{"report vendor-pks 202", "POST", "/reports/vendor-pks?q=abc&status=all&pks_status=aktif", "ADMIN_PARAM", ok, 202},
+		{"report vendor-pks 202", "POST", "/reports/vendor-pks?q=abc&status=all&pks_type=FLM&pks_status=aktif", "ADMIN_PARAM", ok, 202},
 		{"report vendor-pks 400", "POST", "/reports/vendor-pks?pks_status=nope", "ADMIN", ok, 400},
 		{"report vendor-pks 401", "POST", "/reports/vendor-pks", "", ok, 401},
 		{"report vendor-pks 403", "POST", "/reports/vendor-pks", "ATM-USER", ok, 403},

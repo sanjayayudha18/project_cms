@@ -21,6 +21,7 @@ import {
   CalendarOff,
   Download,
   FileSpreadsheet,
+  FileText,
   GitBranch,
   HelpCircle,
   KeyRound,
@@ -125,6 +126,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Kelola region dan status aktifnya.",
     href: "/settings/admin/regions",
     icon: MapIcon,
+    category: "master",
+  },
+  {
+    id: "admin-pks-types",
+    title: "Type PKS",
+    description: "Kelola master type perjanjian kerja sama vendor.",
+    href: "/settings/admin/pks-types",
+    icon: FileText,
     category: "master",
   },
   {

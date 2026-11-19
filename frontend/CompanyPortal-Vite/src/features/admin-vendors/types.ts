@@ -14,6 +14,8 @@ export type VendorStatus = "active" | "disabled" | "all";
 export type VendorKind = "FLM_VENDOR" | "INTERNAL";
 export type PksStatus = components["schemas"]["PksStatus"];
 export type VendorPksRecord = components["schemas"]["VendorPksRecord"];
+export type VendorPksGroup = components["schemas"]["VendorPksGroup"];
+export type VendorPksPending = components["schemas"]["VendorPksPending"];
 
 /** Direktur Utama = the vendor-wide PIC flagged is_director; null when none recorded. */
 export interface VendorDirector {
@@ -22,14 +24,12 @@ export interface VendorDirector {
   email: string | null;
 }
 
-/** Active PKS summary on the list; null when the vendor has no active PKS. */
+/** One entry per active PKS type on a list row (vendor-pks-type, Req 4.2); remaining_days null = belum_diisi. */
 export interface VendorPksSummary {
-  id: number;
-  pks_name: string;
-  effective_date: string;
-  expiry_date: string;
-  validity_months: number;
-  remaining_days: number;
+  pks_type: string;
+  pks_type_name: string;
+  pks_status: PksStatus;
+  remaining_days: number | null;
 }
 
 export interface AdminVendor {
@@ -45,10 +45,8 @@ export interface AdminVendor {
   deleted_at: string | null;
   kind: VendorKind;
   director: VendorDirector | null;
-  /** List only (absent on detail). null = no active PKS. */
-  pks?: VendorPksSummary | null;
-  /** List only (absent on detail). null = INTERNAL vendor. */
-  pks_status?: PksStatus | null;
+  /** List only (absent on detail). One entry per active type, ordered by code; [] for INTERNAL vendors. */
+  pks?: VendorPksSummary[];
 }
 
 export interface AdminVendorsListParams {
@@ -56,6 +54,8 @@ export interface AdminVendorsListParams {
   page_size: number;
   status?: VendorStatus;
   q?: string;
+  /** pks_type + pks_status are a pair: send both or neither (else 400). */
+  pks_type?: string;
   pks_status?: PksStatus;
   kind?: VendorKind;
 }

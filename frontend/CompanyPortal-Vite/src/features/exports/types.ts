@@ -7,9 +7,10 @@ export type StatusFilter = components["schemas"]["StatusFilter"];
 export type ExportPreview = components["schemas"]["ExportPreview"];
 export type PriceLevel = components["schemas"]["PriceLevel"];
 
-// vendor-pks adds q + pks_status, which the generated ReportParams does not list yet.
+// vendor-pks adds q + pks_status, vendor-pks-type adds pks_type, which the generated ReportParams does not list yet.
 export type ReportParams = components["schemas"]["ReportParams"] & {
   q?: string;
+  pks_type?: string;
   pks_status?: string;
 };
 /** URL segment of `POST /exports/reports/{report}`. */

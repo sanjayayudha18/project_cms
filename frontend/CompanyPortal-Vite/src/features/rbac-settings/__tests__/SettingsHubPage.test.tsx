@@ -45,6 +45,7 @@ describe("SettingsHubPage — admin cards (Task 10)", () => {
     ["Manajemen Vendor", "/settings/admin/vendors"],
     ["Manajemen ATM", "/settings/admin/atms"],
     ["Manajemen Region", "/settings/admin/regions"],
+    ["Type PKS", "/settings/admin/pks-types"],
   ])("links %s to %s on the Data master tab", (name, href) => {
     renderMasterTab();
     expect(screen.getByRole("link", { name: new RegExp(name) })).toHaveAttribute("href", href);

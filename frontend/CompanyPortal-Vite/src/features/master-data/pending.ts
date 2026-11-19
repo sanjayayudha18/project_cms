@@ -22,7 +22,8 @@ type PendingEntityType =
   | "cash_count_anomaly_category"
   | "cash_count_checklist_item"
   | "cash_count_area"
-  | "cash_count_pic";
+  | "cash_count_pic"
+  | "vendor_pks_type";
 
 interface PendingChange {
   id: number;

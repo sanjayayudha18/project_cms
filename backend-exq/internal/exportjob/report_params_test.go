@@ -182,8 +182,8 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 		want  ReportParams
 	}{
 		{"defaults", q(), ReportParams{VendorStatus: sp("active")}},
-		{"all filters", q("q", "  Alfa ", "status", "all", "pks_status", "need_renewal"),
-			ReportParams{Q: sp("Alfa"), VendorStatus: sp("all"), PksStatus: sp("need_renewal")}},
+		{"all filters", q("q", "  Alfa ", "status", "all", "pks_type", " cit ", "pks_status", "need_renewal"),
+			ReportParams{Q: sp("Alfa"), VendorStatus: sp("all"), PksType: sp("CIT"), PksStatus: sp("need_renewal")}},
 		{"blank q dropped", q("q", "   "), ReportParams{VendorStatus: sp("active")}},
 		{"q 100 runes ok", q("q", q100), ReportParams{Q: sp(q100), VendorStatus: sp("active")}},
 		{"disabled", q("status", "disabled"), ReportParams{VendorStatus: sp("disabled")}},
@@ -205,7 +205,7 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 	}
 
 	for _, key := range []string{"aktif", "need_renewal", "expired", "terminated", "belum_diisi"} {
-		if _, err := ParseReportParams(KindVendorPks, q("pks_status", key), reportNow); err != nil {
+		if _, err := ParseReportParams(KindVendorPks, q("pks_type", "FLM", "pks_status", key), reportNow); err != nil {
 			t.Errorf("pks_status %q rejected: %v", key, err)
 		}
 	}
@@ -219,8 +219,10 @@ func TestParseReportParams_VendorPks(t *testing.T) {
 		{"q 101 runes", q("q", q101), "q", "maksimal 100 karakter"},
 		{"status unknown", q("status", "bogus"), "status", "tidak dikenal"},
 		{"status wrong case", q("status", "ACTIVE"), "status", "tidak dikenal"},
-		{"pks_status unknown", q("pks_status", "bogus"), "pks_status", "tidak dikenal"},
-		{"pks_status label not key", q("pks_status", "Aktif"), "pks_status", "tidak dikenal"},
+		{"pks_status unknown", q("pks_type", "FLM", "pks_status", "bogus"), "pks_status", "invalid pks_status \"bogus\""},
+		{"pks_status label not key", q("pks_type", "FLM", "pks_status", "Aktif"), "pks_status", "invalid pks_status \"Aktif\""},
+		{"pks_status without type", q("pks_status", "aktif"), "pks_type", "pks_type and pks_status must be given together"},
+		{"pks_type without status", q("pks_type", "FLM"), "pks_status", "pks_type and pks_status must be given together"},
 	}
 	for _, tt := range rejects {
 		t.Run("reject "+tt.name, func(t *testing.T) {
@@ -245,8 +247,8 @@ func TestVendorPksParamsHashAndAudit(t *testing.T) {
 		}
 		return p
 	}
-	a := parse(q("q", "abc", "status", "all", "pks_status", "expired"))
-	b := parse(q("pks_status", "expired", "status", "all", "q", " abc "))
+	a := parse(q("q", "abc", "status", "all", "pks_type", "FLM", "pks_status", "expired"))
+	b := parse(q("pks_status", "expired", "pks_type", "flm", "status", "all", "q", " abc "))
 	if ParamsHash(a) != ParamsHash(b) || len(ParamsHash(a)) != 64 {
 		t.Error("hash depends on query order / q whitespace, or is not hex sha256")
 	}
@@ -255,9 +257,9 @@ func TestVendorPksParamsHashAndAudit(t *testing.T) {
 		t.Error("explicit default status changed the hash")
 	}
 	for i, d := range []Params{
-		parse(q("q", "abd", "status", "all", "pks_status", "expired")),
-		parse(q("q", "abc", "status", "active", "pks_status", "expired")),
-		parse(q("q", "abc", "status", "all", "pks_status", "aktif")),
+		parse(q("q", "abd", "status", "all", "pks_type", "FLM", "pks_status", "expired")),
+		parse(q("q", "abc", "status", "active", "pks_type", "FLM", "pks_status", "expired")),
+		parse(q("q", "abc", "status", "all", "pks_type", "FLM", "pks_status", "aktif")),
 		parse(q("q", "abc", "status", "all")),
 	} {
 		if ParamsHash(d) == ParamsHash(a) {
@@ -273,12 +275,12 @@ func TestVendorPksParamsHashAndAudit(t *testing.T) {
 		t.Error("vendor_pks hash equals a replenishment hash")
 	}
 
-	// Audit filter keeps the three keys, absent = nil; file name is vendor-pks-<WIB day>.csv.
+	// Audit filter keeps the four keys (q, status, pks_type, pks_status), absent = nil; file name is vendor-pks-<WIB day>.csv.
 	f := a.Report.legacyFilter(KindVendorPks)
-	if len(f) != 3 || *f["q"].(*string) != "abc" || *f["status"].(*string) != "all" || *f["pks_status"].(*string) != "expired" {
+	if len(f) != 4 || *f["pks_type"].(*string) != "FLM" || *f["q"].(*string) != "abc" || *f["status"].(*string) != "all" || *f["pks_status"].(*string) != "expired" {
 		t.Errorf("legacyFilter = %v", f)
 	}
-	if f := parse(q()).Report.legacyFilter(KindVendorPks); f["q"].(*string) != nil || f["pks_status"].(*string) != nil {
+	if f := parse(q()).Report.legacyFilter(KindVendorPks); f["q"].(*string) != nil || f["pks_type"].(*string) != nil || f["pks_status"].(*string) != nil {
 		t.Errorf("absent filters must be nil, got %v", f)
 	}
 	late := time.Date(2026, 10, 29, 20, 0, 0, 0, time.UTC) // 03:00 WIB next day

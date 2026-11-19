@@ -20,6 +20,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   cash_count_checklist_item: "Item checklist cash count",
   cash_count_area: "Area cash count",
   cash_count_pic: "PIC cash count",
+  vendor_pks_type: "Type PKS",
 };
 
 export const OP_LABELS: Record<MasterDataOp, string> = {

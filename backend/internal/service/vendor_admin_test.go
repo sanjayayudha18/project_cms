@@ -22,6 +22,8 @@ type fakeVendorAdminRepo struct {
 	getByIDFunc          func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	findByCodeFunc       func(ctx context.Context, code string) (*int64, error)
 	countActiveUsersFunc func(ctx context.Context, vendorID int64) (int64, error)
+	pksTypeByCodeFunc    func(ctx context.Context, code string) (*db.VendorPksType, error)
+	pksSummariesFunc     func(ctx context.Context, arg db.ListVendorPksSummariesParams) ([]db.ListVendorPksSummariesRow, error)
 }
 
 func (f *fakeVendorAdminRepo) List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
@@ -41,6 +43,20 @@ func (f *fakeVendorAdminRepo) Count(ctx context.Context, arg db.CountVendorsAdmi
 func (f *fakeVendorAdminRepo) GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
 	if f.getByIDFunc != nil {
 		return f.getByIDFunc(ctx, id)
+	}
+	return nil, nil
+}
+
+func (f *fakeVendorAdminRepo) GetPksTypeByCode(ctx context.Context, code string) (*db.VendorPksType, error) {
+	if f.pksTypeByCodeFunc != nil {
+		return f.pksTypeByCodeFunc(ctx, code)
+	}
+	return nil, nil
+}
+
+func (f *fakeVendorAdminRepo) ListPksSummaries(ctx context.Context, arg db.ListVendorPksSummariesParams) ([]db.ListVendorPksSummariesRow, error) {
+	if f.pksSummariesFunc != nil {
+		return f.pksSummariesFunc(ctx, arg)
 	}
 	return nil, nil
 }

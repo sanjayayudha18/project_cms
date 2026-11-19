@@ -40,7 +40,8 @@ type ReportParams struct {
 	Classification *string `json:"classification,omitempty"`   // amount mismatch
 	Q              *string `json:"q,omitempty"`                // vendor_pks: code/name search
 	VendorStatus   *string `json:"vendor_status,omitempty"`    // vendor_pks: active|disabled|all
-	PksStatus      *string `json:"pks_status,omitempty"`       // vendor_pks: key of reports.PksStatuses
+	PksStatus      *string `json:"pks_status,omitempty"`       // vendor_pks: key of reports.PksStatuses (with PksType)
+	PksType        *string `json:"pks_type,omitempty"`         // vendor_pks: PKS type code (with PksStatus)
 }
 
 // reportEntities maps each report kind to the legacy `report` value stored as export_jobs.entity.
@@ -119,11 +120,16 @@ func (r *ReportParams) parseVendorPks(q url.Values) error {
 		return &reports.ValidationError{Field: "status", Message: "tidak dikenal"}
 	}
 	r.VendorStatus = &st
-	if ps := q.Get("pks_status"); ps != "" {
-		if _, ok := reports.PksStatuses[ps]; !ok {
-			return &reports.ValidationError{Field: "pks_status", Message: "tidak dikenal"}
+	typeCode, ps, err := reports.ParsePksFilter(q.Get("pks_type"), q.Get("pks_status"))
+	if err != nil {
+		field := "pks_status"
+		if q.Get("pks_type") == "" {
+			field = "pks_type"
 		}
-		r.PksStatus = &ps
+		return &reports.ValidationError{Field: field, Message: err.Error()}
+	}
+	if ps != "" {
+		r.PksType, r.PksStatus = &typeCode, &ps
 	}
 	return nil
 }
@@ -196,7 +202,7 @@ func reportHashBytes(p Params) []byte {
 func (r ReportParams) legacyFilter(kind Kind) map[string]any {
 	switch kind {
 	case KindVendorPks:
-		return map[string]any{"q": r.Q, "status": r.VendorStatus, "pks_status": r.PksStatus}
+		return map[string]any{"q": r.Q, "status": r.VendorStatus, "pks_type": r.PksType, "pks_status": r.PksStatus}
 	case KindDsrLateDaily, KindDsrLateSummary:
 		m := map[string]any{"month": r.Month, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID}
 		if kind == KindDsrLateDaily {

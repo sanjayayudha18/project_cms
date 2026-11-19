@@ -509,10 +509,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description ADMIN / ADMIN_PARAM. Active PKS, history and the pending change of one vendor (primary DB). INTERNAL vendor: `pks_status` and `active` are null, `history` is empty. */
+        /** @description ADMIN / ADMIN_PARAM. Per PKS type (ordered by type code): active PKS, history and the pending change of one vendor (primary DB). A vendor may hold only some types. INTERNAL vendor: `groups` is empty. */
         get: operations["getVendorPks"];
         put?: never;
-        /** @description ADMIN / ADMIN_PARAM. Stages a new PKS (replaces the active one on approval) through maker-checker. 202 = pending approval. */
+        /** @description ADMIN / ADMIN_PARAM. Stages a new PKS (replaces the active one of the same type on approval) through maker-checker. 202 = pending approval. 409 = a change of this (vendor, type) is pending, or `wod_number` is already used (details field `wod_number`). 422 = unknown / inactive `pks_type` or invalid field. */
         post: operations["submitVendorPks"];
         delete?: never;
         options?: never;
@@ -548,6 +548,75 @@ export interface paths {
         put?: never;
         /** @description ADMIN / ADMIN_PARAM. Stages the undo of a terminate through maker-checker. */
         post: operations["unterminateVendorPks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/pks-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ADMIN / ADMIN_PARAM. All PKS types incl. disabled, with `in_use` (replica). */
+        get: operations["listPksTypes"];
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a new PKS type through maker-checker. 202 = pending approval; duplicate code (table or pending) = 409. */
+        post: operations["submitPksType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/pks-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a name change (code is immutable) through maker-checker. */
+        put: operations["updatePksType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/pks-types/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a disable through maker-checker; 409 while any PKS (terminated included) uses the type. */
+        post: operations["disablePksType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/pks-types/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ADMIN / ADMIN_PARAM. Stages a re-enable through maker-checker. */
+        post: operations["enablePksType"];
         delete?: never;
         options?: never;
         head?: never;
@@ -903,6 +972,10 @@ export interface components {
             op: string;
         };
         SubmitVendorPksRequest: {
+            /** @description code of an active PKS type (e.g. FLM, CIT) */
+            pks_type: string;
+            /** @description trimmed; unique case-insensitively across all PKS */
+            wod_number: string;
             pks_name: string;
             /** Format: date */
             effective_date: string;
@@ -912,6 +985,26 @@ export interface components {
              */
             expiry_date: string;
         };
+        CreatePksTypeRequest: {
+            /** @description upper-cased server-side */
+            code: string;
+            name: string;
+        };
+        UpdatePksTypeRequest: {
+            name: string;
+        };
+        PksTypeList: {
+            types: {
+                /** Format: int64 */
+                id: number;
+                code: string;
+                name: string;
+                is_active: boolean;
+                in_use: boolean;
+                created_at: string | null;
+                updated_at: string | null;
+            }[];
+        };
         VendorPksReasonRequest: {
             reason: string;
         };
@@ -920,6 +1013,7 @@ export interface components {
         VendorPksRecord: {
             /** Format: int64 */
             id: number;
+            wod_number: string;
             pks_name: string;
             /** Format: date */
             effective_date: string;
@@ -970,6 +1064,14 @@ export interface components {
              */
             today: string;
             renewal_months: number;
+            /** @description one entry per type the vendor has a PKS or pending change for, ordered by type code */
+            groups: components["schemas"]["VendorPksGroup"][];
+        };
+        VendorPksGroup: {
+            pks_type: {
+                code: string;
+                name: string;
+            };
             pks_status: components["schemas"]["PksStatus"] | null;
             active: components["schemas"]["VendorPksRecord"] | null;
             history: components["schemas"]["VendorPksRecord"][];
@@ -1941,6 +2043,7 @@ export interface components {
     parameters: {
         VendorID: number;
         PksID: number;
+        PksTypeID: number;
         Page: number;
         PageSize: number;
         /** @description YYYY-MM, not after the current month (WIB) */
@@ -2974,6 +3077,151 @@ export interface operations {
                 "application/json": components["schemas"]["VendorPksReasonRequest"];
             };
         };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPksTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PksTypeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    submitPksType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePksTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updatePksType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PksTypeID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePksTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    disablePksType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PksTypeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted, pending approval */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    enablePksType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PksTypeID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Accepted, pending approval */
             202: {

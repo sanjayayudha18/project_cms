@@ -3,13 +3,13 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
@@ -31,6 +31,12 @@ type fakeVendorAdminServicer struct {
 	lastCount   db.CountVendorsAdminParams
 	getResult   *db.GetVendorAdminByIDRow
 	getErr      error
+
+	resolveErr    error
+	resolveCalled bool
+	lastResolve   string
+	pksResult     map[int64][]service.VendorPksSummary
+	pksErr        error
 
 	createResult db.MasterDataChangeRequest
 	createErr    error
@@ -55,6 +61,21 @@ func (f *fakeVendorAdminServicer) List(_ context.Context, p db.ListVendorsAdminP
 	f.listCalled = true
 	f.lastList = p
 	return f.listResult, f.listErr
+}
+
+// pksTypeFixtureID is the id the fake resolves any accepted pks_type code to.
+const pksTypeFixtureID = int64(11)
+
+func (f *fakeVendorAdminServicer) ResolvePksFilterType(_ context.Context, code string) (int64, error) {
+	f.resolveCalled, f.lastResolve = true, code
+	if f.resolveErr != nil {
+		return 0, f.resolveErr
+	}
+	return pksTypeFixtureID, nil
+}
+
+func (f *fakeVendorAdminServicer) PksSummaries(context.Context, []int64) (map[int64][]service.VendorPksSummary, error) {
+	return f.pksResult, f.pksErr
 }
 
 func (f *fakeVendorAdminServicer) Count(_ context.Context, p db.CountVendorsAdminParams) (int64, error) {
@@ -145,13 +166,13 @@ func TestAdminVendorHandler_List_InvalidPksStatus_BadRequest(t *testing.T) {
 	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
 
 	for _, v := range []string{"xyz", "AKTIF", "all"} {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_type=FLM&pks_status="+v, token, "")
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("pks_status=%s: expected 400, got %d: %s", v, rec.Code, rec.Body.String())
 		}
 	}
 	for v := range reports.PksStatuses {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
+		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_type=FLM&pks_status="+v, token, "")
 		if rec.Code != http.StatusOK {
 			t.Errorf("pks_status=%s: expected 200, got %d: %s", v, rec.Code, rec.Body.String())
 		}
@@ -178,7 +199,7 @@ func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 		{name: "invalid kind", query: "kind=xyz", wantCode: 400},
 		{name: "lowercase kind invalid", query: "kind=internal", wantCode: 400},
 		{
-			name: "combined with status, pks_status, paging", query: "kind=INTERNAL&status=active&pks_status=" + anyPksStatus() + "&page=3&page_size=10",
+			name: "combined with status, pks pair, paging", query: "kind=INTERNAL&status=active&pks_type=cit&pks_status=" + anyPksStatus() + "&page=3&page_size=10",
 			wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantPks: str(anyPksStatus()), wantLim: 10, wantOff: 20,
 		},
 	}
@@ -213,6 +234,15 @@ func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
 			if tt.wantPks != nil && (svc.lastCount.PksStatus == nil || *svc.lastCount.PksStatus != *tt.wantPks) {
 				t.Errorf("Count PksStatus = %v, want %v", svc.lastCount.PksStatus, tt.wantPks)
 			}
+			// The type id travels with the status to List and Count, and only with it.
+			for name, got := range map[string]*int64{"List": svc.lastList.PksTypeID, "Count": svc.lastCount.PksTypeID} {
+				if (got != nil) != (tt.wantPks != nil) || (got != nil && *got != pksTypeFixtureID) {
+					t.Errorf("%s PksTypeID = %v, want %v when pks filter is %v", name, got, pksTypeFixtureID, tt.wantPks)
+				}
+			}
+			if tt.wantPks != nil && svc.lastResolve != "cit" {
+				t.Errorf("ResolvePksFilterType got %q, want the raw query value", svc.lastResolve)
+			}
 		})
 	}
 }
@@ -226,26 +256,59 @@ var pksStatusSample = func() string {
 
 func anyPksStatus() string { return pksStatusSample }
 
-func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
+// pks_type and pks_status are a pair (Req 4.4): one alone, an unknown/disabled type -> 400,
+// and the service is never asked to list in those cases; a service failure is a 500.
+func TestAdminVendorHandler_List_PksFilterPair(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		resolveErr error
+		wantCode   int
+		wantList   bool
+	}{
+		{"type without status", "pks_type=FLM", nil, http.StatusBadRequest, false},
+		{"status without type", "pks_status=" + anyPksStatus(), nil, http.StatusBadRequest, false},
+		{"unknown or disabled type", "pks_type=NOPE&pks_status=" + anyPksStatus(), service.ErrPksFilterType, http.StatusBadRequest, false},
+		{"type lookup fails", "pks_type=FLM&pks_status=" + anyPksStatus(), errors.New("db down"), http.StatusInternalServerError, false},
+		{"valid pair", "pks_type=FLM&pks_status=" + anyPksStatus(), nil, http.StatusOK, true},
+		{"neither", "", nil, http.StatusOK, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &fakeVendorAdminServicer{resolveErr: tt.resolveErr}
+			router, tokenSvc := mountAdminVendorHandler(svc)
+			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+			rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?"+tt.query, token, "")
+
+			if rec.Code != tt.wantCode {
+				t.Fatalf("code = %d, want %d: %s", rec.Code, tt.wantCode, rec.Body.String())
+			}
+			if svc.listCalled != tt.wantList {
+				t.Errorf("List called = %v, want %v", svc.listCalled, tt.wantList)
+			}
+		})
+	}
+}
+
+// Each item carries pks: [] (never the old single pks/pks_status fields): entries per type from
+// PksSummaries, belum_diisi has remaining_days null, INTERNAL/unknown vendor gets [] not null.
+func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPksPerType(t *testing.T) {
 	str := func(s string) *string { return &s }
 	i64 := func(n int64) *int64 { return &n }
-	date := func(y int, m time.Month, d int) pgtype.Date {
-		return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
-	}
+	days := int32(420)
 	svc := &fakeVendorAdminServicer{
 		countResult: 3,
 		listResult: []db.ListVendorsAdminRow{
-			{ // FLM vendor with active PKS + director
-				ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR",
-				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id"),
-				PksID: i64(9), PksName: str("PKS 2026"), PksEffectiveDate: date(2026, 1, 1), PksExpiryDate: date(2027, 12, 31),
-				PksValidityMonths: 24, PksRemainingDays: 420, PksStatus: "aktif",
-			},
-			{ // FLM vendor without PKS: COALESCEd to 0 / '' + 'belum_diisi'
-				ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "FLM_VENDOR", PksStatus: "belum_diisi",
-			},
-			{ // INTERNAL: no PKS, empty status -> pks_status null
-				ID: 3, Code: "C", Name: "C", IsActive: true, Kind: "INTERNAL",
+			{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR",
+				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id")},
+			{ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "FLM_VENDOR"},
+			{ID: 3, Code: "C", Name: "C", IsActive: true, Kind: "INTERNAL"},
+		},
+		pksResult: map[int64][]service.VendorPksSummary{
+			1: {
+				{PksType: "CIT", PksTypeName: "Cash in Transit", PksStatus: "aktif", RemainingDays: &days},
+				{PksType: "FLM", PksTypeName: "FLM", PksStatus: "belum_diisi"},
 			},
 		},
 	}
@@ -264,24 +327,49 @@ func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
 	}
 	v0, v1, v2 := body.Vendors[0], body.Vendors[1], body.Vendors[2]
 
-	if v0["kind"] != "FLM_VENDOR" || v0["pks_status"] != "aktif" {
-		t.Errorf("vendor 0 kind/pks_status = %v/%v", v0["kind"], v0["pks_status"])
+	for i, v := range body.Vendors {
+		if _, ok := v["pks_status"]; ok {
+			t.Errorf("vendor %d still carries the removed pks_status field", i)
+		}
+		if _, ok := v["pks"].([]any); !ok {
+			t.Errorf("vendor %d pks = %#v, want a JSON array (never null)", i, v["pks"])
+		}
 	}
 	dir, _ := v0["director"].(map[string]any)
 	if dir["name"] != "Budi" || dir["phone"] != "0812" || dir["email"] != "b@x.id" {
 		t.Errorf("vendor 0 director = %v", v0["director"])
 	}
-	pks, _ := v0["pks"].(map[string]any)
-	if pks["id"] != float64(9) || pks["pks_name"] != "PKS 2026" || pks["effective_date"] != "2026-01-01" ||
-		pks["expiry_date"] != "2027-12-31" || pks["validity_months"] != float64(24) || pks["remaining_days"] != float64(420) {
-		t.Errorf("vendor 0 pks = %v", v0["pks"])
+	pks, _ := v0["pks"].([]any)
+	if len(pks) != 2 {
+		t.Fatalf("vendor 0 pks = %v, want 2 entries", v0["pks"])
 	}
+	cit, _ := pks[0].(map[string]any)
+	if cit["pks_type"] != "CIT" || cit["pks_type_name"] != "Cash in Transit" || cit["pks_status"] != "aktif" || cit["remaining_days"] != float64(420) {
+		t.Errorf("vendor 0 CIT entry = %v", cit)
+	}
+	flm, _ := pks[1].(map[string]any)
+	if flm["pks_type"] != "FLM" || flm["pks_status"] != "belum_diisi" || flm["remaining_days"] != nil {
+		t.Errorf("vendor 0 FLM entry = %v, want belum_diisi with remaining_days null", flm)
+	}
+	if a, _ := v1["pks"].([]any); len(a) != 0 || v1["director"] != nil {
+		t.Errorf("vendor 1 pks/director = %v/%v, want []/nil", v1["pks"], v1["director"])
+	}
+	if a, _ := v2["pks"].([]any); v2["kind"] != "INTERNAL" || len(a) != 0 {
+		t.Errorf("vendor 2 kind/pks = %v/%v, want INTERNAL/[]", v2["kind"], v2["pks"])
+	}
+}
 
-	if v1["pks"] != nil || v1["director"] != nil || v1["pks_status"] != "belum_diisi" {
-		t.Errorf("vendor 1 pks/director/pks_status = %v/%v/%v, want nil/nil/belum_diisi", v1["pks"], v1["director"], v1["pks_status"])
+func TestAdminVendorHandler_List_PksSummariesError_Internal(t *testing.T) {
+	svc := &fakeVendorAdminServicer{
+		listResult: []db.ListVendorsAdminRow{{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR"}},
+		pksErr:     errors.New("db down"),
 	}
-	if v2["kind"] != "INTERNAL" || v2["pks"] != nil || v2["pks_status"] != nil {
-		t.Errorf("vendor 2 kind/pks/pks_status = %v/%v/%v, want INTERNAL/nil/nil", v2["kind"], v2["pks"], v2["pks_status"])
+	router, tokenSvc := mountAdminVendorHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors", token, "")
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

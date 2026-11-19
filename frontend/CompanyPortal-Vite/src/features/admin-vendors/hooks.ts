@@ -44,10 +44,12 @@ import {
   updateVendorVault,
 } from "./api";
 import {
+  type PksType,
   type SubmitVendorPksPayload,
   type VendorPksDetail,
   type VendorPksReasonPayload,
   getVendorPks,
+  listPksTypes,
   submitVendorPks,
   terminateVendorPks,
   unterminateVendorPks,
@@ -89,6 +91,18 @@ export const adminVendorKeys = {
   list: (params: AdminVendorsListParams) => [...adminVendorKeys.all, "list", params] as const,
   detail: (id: number) => [...adminVendorKeys.all, "detail", id] as const,
 };
+
+export const pksTypeKeys = {
+  all: ["pks-types"] as const,
+  list: () => [...pksTypeKeys.all, "list"] as const,
+};
+
+export function usePksTypesList() {
+  return useQuery<PksType[], ApiError>({
+    queryKey: pksTypeKeys.list(),
+    queryFn: listPksTypes,
+  });
+}
 
 export function useVendorsList(params: AdminVendorsListParams) {
   return useQuery<AdminVendorsListResponse, ApiError>({

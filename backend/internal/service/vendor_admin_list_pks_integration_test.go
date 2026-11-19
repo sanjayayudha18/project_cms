@@ -4,8 +4,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -16,25 +18,30 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/repository"
 )
 
-// Property 4, list part (spec vendor-pks task 6.3): for random vendors with
-// PKS + director, the vendors list with a pks_status filter equals the
-// unfiltered list narrowed to that status; total = rows across all pages;
-// INTERNAL vendors match no filter; q by name still works; a disabled
-// director is not shown. "today" is fixed through VendorAdminService.now.
-// Everything runs in one rolled-back tx. Skips when DATABASE_URL is empty.
+// Properties 6 and 7 (spec vendor-pks-type task 5.2). For random vendors with a PKS per active type:
+//   - P6: the list filtered by (pks_type, pks_status) equals the unfiltered list narrowed to the status
+//     shown for that type, and Count = rows across all pages.
+//   - P7: PksSummaries gives one entry per active type ordered by code (belum_diisi + nil days when empty),
+//     INTERNAL vendors get none and match no filter, an inactive type never becomes an entry.
+//
+// "today" is fixed through VendorAdminService.now. Runs in one rolled-back tx; skips without DATABASE_URL.
 
 const vlpRenewalMonths = 9
 
 var vlpAllStatuses = []string{"aktif", "need_renewal", "expired", "terminated", "belum_diisi"}
 
+// vlpPks is one drawn PKS of a vendor for one type.
+type vlpPks struct {
+	has        bool
+	eff, exp   time.Time
+	terminated bool
+	hasOld     bool // a replaced (history) PKS of the same type must be ignored
+}
+
 type vlpSpec struct {
 	internal    bool
-	hasPks      bool
-	eff, exp    time.Time
-	terminated  bool
-	hasOldPks   bool
-	dirMode     int // 0 none, 1 active, 2 disabled
 	disabledVnd bool
+	pks         []vlpPks // index = position in the active types ordered by code
 }
 
 func vlpAddMonths(d time.Time, n int) time.Time {
@@ -48,53 +55,45 @@ func vlpAddMonths(d time.Time, n int) time.Time {
 	return time.Date(y, m, day, 0, 0, 0, 0, time.UTC)
 }
 
-// vlpStatus is the Req 6.2-6.6 reference model; "" = no status (INTERNAL).
-func vlpStatus(s vlpSpec, today time.Time) string {
+// vlpStatus is the reference model of vendor_pks_status() for one type; "" = INTERNAL (no status).
+func vlpStatus(internal bool, p vlpPks, today time.Time) string {
 	switch {
-	case s.internal:
+	case internal:
 		return ""
-	case !s.hasPks:
+	case !p.has:
 		return "belum_diisi"
-	case s.terminated:
+	case p.terminated:
 		return "terminated"
-	case s.exp.Before(today):
+	case p.exp.Before(today):
 		return "expired"
-	case s.exp.Before(vlpAddMonths(today, vlpRenewalMonths)):
+	case p.exp.Before(vlpAddMonths(today, vlpRenewalMonths)):
 		return "need_renewal"
 	}
 	return "aktif"
 }
 
-func vlpValidityMonths(eff, exp time.Time) int {
-	end := exp.AddDate(0, 0, 1)
-	n := 0
-	for !vlpAddMonths(eff, n+1).After(end) {
-		n++
-	}
-	return n
-}
-
-func vlpDrawSpec(rt *rapid.T, today time.Time, i int) vlpSpec {
-	l := func(s string) string { return fmt.Sprintf("%s%d", s, i) }
-	s := vlpSpec{
-		internal:    rapid.IntRange(0, 5).Draw(rt, l("internal")) == 0,
-		hasPks:      rapid.IntRange(0, 5).Draw(rt, l("haspks")) != 0,
-		terminated:  rapid.IntRange(0, 4).Draw(rt, l("term")) == 0,
-		hasOldPks:   rapid.Bool().Draw(rt, l("old")),
-		dirMode:     rapid.IntRange(0, 2).Draw(rt, l("dir")),
-		disabledVnd: rapid.IntRange(0, 5).Draw(rt, l("dis")) == 0,
+func vlpDrawPks(rt *rapid.T, today time.Time, label string) vlpPks {
+	p := vlpPks{
+		has:        rapid.IntRange(0, 5).Draw(rt, label+"has") != 0,
+		terminated: rapid.IntRange(0, 4).Draw(rt, label+"term") == 0,
+		hasOld:     rapid.Bool().Draw(rt, label+"old"),
 	}
 	// Expiry biased around today and today+N months so every status shows up.
-	switch rapid.IntRange(0, 2).Draw(rt, l("mode")) {
+	switch rapid.IntRange(0, 2).Draw(rt, label+"mode") {
 	case 0:
-		s.exp = today.AddDate(0, 0, rapid.IntRange(-730, 1095).Draw(rt, l("exp")))
+		p.exp = today.AddDate(0, 0, rapid.IntRange(-730, 1095).Draw(rt, label+"exp"))
 	case 1:
-		s.exp = today.AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, l("dt")))
+		p.exp = today.AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, label+"dt"))
 	default:
-		s.exp = vlpAddMonths(today, vlpRenewalMonths).AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, l("dr")))
+		p.exp = vlpAddMonths(today, vlpRenewalMonths).AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, label+"dr"))
 	}
-	s.eff = s.exp.AddDate(0, 0, -rapid.IntRange(0, 900).Draw(rt, l("len")))
-	return s
+	p.eff = p.exp.AddDate(0, 0, -rapid.IntRange(0, 900).Draw(rt, label+"len"))
+	return p
+}
+
+type vlpType struct {
+	id   int64
+	code string
 }
 
 func TestVendorAdminListPks_Property_Integration(t *testing.T) {
@@ -119,10 +118,45 @@ func TestVendorAdminListPks_Property_Integration(t *testing.T) {
 		t.Fatalf("load a user: %v", err)
 	}
 
+	// Active types (ordered by code) are what the list may show; an inactive one must never appear.
+	var inactiveID int64
+	inactiveCode := fmt.Sprintf("ZI%d", time.Now().UnixNano()%10_000_000)
+	if err := tx.QueryRow(ctx, `INSERT INTO vendor_pks_types (code, name, is_active) VALUES ($1, $1, false) RETURNING id`,
+		inactiveCode).Scan(&inactiveID); err != nil {
+		t.Fatalf("insert inactive type: %v", err)
+	}
+	var types []vlpType
+	trows, err := tx.Query(ctx, `SELECT id, code FROM vendor_pks_types WHERE is_active ORDER BY code`)
+	if err != nil {
+		t.Fatalf("load types: %v", err)
+	}
+	for trows.Next() {
+		var ty vlpType
+		if err := trows.Scan(&ty.id, &ty.code); err != nil {
+			t.Fatalf("scan type: %v", err)
+		}
+		types = append(types, ty)
+	}
+	trows.Close()
+	if len(types) < 2 {
+		t.Fatalf("need >= 2 active pks types (FLM, CIT seeded by 043), got %d", len(types))
+	}
+
 	wib := time.FixedZone("WIB", 7*3600)
 	today := time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)
 	svc := NewVendorAdminService(repository.NewVendorAdminRepository(tx, tx), nil, WithPksRenewalMonths(vlpRenewalMonths))
 	svc.now = func() time.Time { return time.Date(2026, 11, 6, 12, 0, 0, 0, wib) }
+
+	// Type filter validation: unknown and inactive type are rejected, active resolves (case-insensitive).
+	if _, err := svc.ResolvePksFilterType(ctx, "NOPE"); !errors.Is(err, ErrPksFilterType) {
+		t.Fatalf("unknown type: err = %v, want ErrPksFilterType", err)
+	}
+	if _, err := svc.ResolvePksFilterType(ctx, inactiveCode); !errors.Is(err, ErrPksFilterType) {
+		t.Fatalf("inactive type: err = %v, want ErrPksFilterType", err)
+	}
+	if id, err := svc.ResolvePksFilterType(ctx, " "+types[0].code+" "); err != nil || id != types[0].id {
+		t.Fatalf("active type: id %d err %v, want %d", id, err, types[0].id)
+	}
 
 	runTag := time.Now().UnixNano()
 	iter := 0
@@ -134,8 +168,14 @@ func TestVendorAdminListPks_Property_Integration(t *testing.T) {
 		specs := make([]vlpSpec, n)
 		ids := make([]int64, n)
 		for i := range specs {
-			specs[i] = vlpDrawSpec(rt, today, i)
-			s := specs[i]
+			s := vlpSpec{
+				internal:    rapid.IntRange(0, 5).Draw(rt, fmt.Sprintf("internal%d", i)) == 0,
+				disabledVnd: rapid.IntRange(0, 5).Draw(rt, fmt.Sprintf("dis%d", i)) == 0,
+			}
+			for k := range types {
+				s.pks = append(s.pks, vlpDrawPks(rt, today, fmt.Sprintf("v%dt%d", i, k)))
+			}
+			specs[i] = s
 			kind := "FLM_VENDOR"
 			if s.internal {
 				kind = "INTERNAL"
@@ -146,146 +186,166 @@ func TestVendorAdminListPks_Property_Integration(t *testing.T) {
 				code, kind, !s.disabledVnd).Scan(&ids[i]); err != nil {
 				rt.Fatalf("insert vendor: %v", err)
 			}
-			if s.hasOldPks {
-				if _, err := tx.Exec(ctx, `INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by, replaced_at)
-					VALUES ($1, 'PKS lama', '2000-01-01', '2000-12-31', $2, now())`, ids[i], userID); err != nil {
-					rt.Fatalf("insert old pks: %v", err)
+			for k, p := range s.pks {
+				wod := fmt.Sprintf("WOD-%s-%d-%d", tag, i, k)
+				if p.hasOld {
+					if _, err := tx.Exec(ctx, `INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by, replaced_at)
+						VALUES ($1, $2, $3, 'PKS lama', '2000-01-01', '2000-12-31', $4, now())`,
+						ids[i], types[k].id, wod+"-old", userID); err != nil {
+						rt.Fatalf("insert old pks: %v", err)
+					}
+				}
+				if p.has {
+					if _, err := tx.Exec(ctx, `INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
+						terminated_at, terminated_by, termination_reason)
+						VALUES ($1, $2, $3, 'PKS aktif', $4, $5, $6,
+						        CASE WHEN $7 THEN now() END, CASE WHEN $7 THEN $6::bigint END, CASE WHEN $7 THEN 'putus' END)`,
+						ids[i], types[k].id, wod, p.eff, p.exp, userID, p.terminated); err != nil {
+						rt.Fatalf("insert pks: %v", err)
+					}
 				}
 			}
-			if s.hasPks {
-				if _, err := tx.Exec(ctx, `INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by,
-					terminated_at, terminated_by, termination_reason)
-					VALUES ($1, 'PKS aktif', $2, $3, $4,
-					        CASE WHEN $5 THEN now() END, CASE WHEN $5 THEN $4::bigint END, CASE WHEN $5 THEN 'putus' END)`,
-					ids[i], s.eff, s.exp, userID, s.terminated); err != nil {
-					rt.Fatalf("insert pks: %v", err)
-				}
-			}
-			if s.dirMode != 0 {
-				if _, err := tx.Exec(ctx, `INSERT INTO vendor_pics (vendor_id, name, is_director, roles, is_notification_recipient, is_active, deleted_at)
-					VALUES ($1, $2, true, '{}', false, $3, CASE WHEN $3 THEN NULL ELSE now() END)`,
-					ids[i], fmt.Sprintf("Direktur %d", i), s.dirMode == 1); err != nil {
-					rt.Fatalf("insert director: %v", err)
-				}
+			// A PKS on the inactive type must never surface as an entry or a column.
+			if _, err := tx.Exec(ctx, `INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+				VALUES ($1, $2, $3, 'PKS type nonaktif', '2026-01-01', '2027-12-31', $4)`,
+				ids[i], inactiveID, fmt.Sprintf("WOD-%s-%d-inactive", tag, i), userID); err != nil {
+				rt.Fatalf("insert pks on inactive type: %v", err)
 			}
 		}
 
 		q := tag
-		all := vlpPages(rt, ctx, svc, &q, nil, 3)
-
-		// Unfiltered rows match the reference model (status, months, days, director).
+		all := vlpPages(rt, ctx, svc, db.ListVendorsAdminParams{Q: &q, Status: "all"}, 3)
 		if len(all) != n {
 			rt.Fatalf("unfiltered rows = %d, want %d", len(all), n)
 		}
+		allIDs := make([]int64, n)
 		for i, row := range all {
-			s := specs[i]
 			if row.ID != ids[i] {
 				rt.Fatalf("order: row %d id %d, want %d", i, row.ID, ids[i])
 			}
-			if want := vlpStatus(s, today); row.PksStatus != want {
-				rt.Fatalf("vendor %d (%+v): pks_status %q, want %q", i, s, row.PksStatus, want)
-			}
-			wantDays := int(s.exp.Sub(today).Hours() / 24)
-			if s.hasPks {
-				if row.PksID == nil || int(row.PksValidityMonths) != vlpValidityMonths(s.eff, s.exp) || int(row.PksRemainingDays) != wantDays {
-					rt.Fatalf("vendor %d: pks %v months %d days %d, want months %d days %d", i, row.PksID,
-						row.PksValidityMonths, row.PksRemainingDays, vlpValidityMonths(s.eff, s.exp), wantDays)
+			allIDs[i] = row.ID
+		}
+
+		// P7: summaries — one entry per active type ordered by code; INTERNAL none.
+		sums, err := svc.PksSummaries(ctx, allIDs)
+		if err != nil {
+			rt.Fatalf("PksSummaries: %v", err)
+		}
+		for i, s := range specs {
+			got := sums[ids[i]]
+			if s.internal {
+				if len(got) != 0 {
+					rt.Fatalf("vendor %d INTERNAL: %d entries, want 0", i, len(got))
 				}
-			} else if row.PksID != nil || row.PksValidityMonths != 0 || row.PksRemainingDays != 0 {
-				rt.Fatalf("vendor %d: no active pks but pks_id=%v months=%d days=%d", i, row.PksID, row.PksValidityMonths, row.PksRemainingDays)
+				continue
 			}
-			if s.dirMode == 1 {
-				if row.DirectorName == nil || *row.DirectorName != fmt.Sprintf("Direktur %d", i) {
-					rt.Fatalf("vendor %d: director %v, want active director", i, row.DirectorName)
+			if len(got) != len(types) {
+				rt.Fatalf("vendor %d: %d entries, want %d (one per active type): %+v", i, len(got), len(types), got)
+			}
+			if !sort.SliceIsSorted(got, func(a, b int) bool { return got[a].PksType < got[b].PksType }) {
+				rt.Fatalf("vendor %d: entries not ordered by type code: %+v", i, got)
+			}
+			for k, e := range got {
+				p := s.pks[k]
+				if e.PksType != types[k].code {
+					rt.Fatalf("vendor %d entry %d: type %q, want %q (inactive type %q must not appear)", i, k, e.PksType, types[k].code, inactiveCode)
 				}
-			} else if row.DirectorID != nil || row.DirectorName != nil {
-				rt.Fatalf("vendor %d: director shown for dirMode %d", i, s.dirMode)
+				want := vlpStatus(false, p, today)
+				if e.PksStatus != want {
+					rt.Fatalf("vendor %d type %s (%+v): status %q, want %q", i, e.PksType, p, e.PksStatus, want)
+				}
+				if !p.has {
+					if e.RemainingDays != nil {
+						rt.Fatalf("vendor %d type %s: belum_diisi must have nil remaining_days, got %d", i, e.PksType, *e.RemainingDays)
+					}
+				} else if wantDays := int32(p.exp.Sub(today).Hours() / 24); e.RemainingDays == nil || *e.RemainingDays != wantDays {
+					rt.Fatalf("vendor %d type %s: remaining_days %v, want %d", i, e.PksType, e.RemainingDays, wantDays)
+				}
 			}
 		}
 
-		// Each filter = unfiltered narrowed to that status; total = all pages.
-		matched := 0
-		for _, st := range vlpAllStatuses {
-			st := st
-			var want []int64
-			for _, row := range all {
-				if row.PksStatus == st {
-					want = append(want, row.ID)
+		// P6: for each (type, status), filter = unfiltered narrowed to the status shown for that type.
+		for k, ty := range types {
+			tid := ty.id
+			matched := 0
+			for _, st := range vlpAllStatuses {
+				st := st
+				var want []int64
+				for i := range specs {
+					if len(sums[ids[i]]) > 0 && sums[ids[i]][k].PksStatus == st {
+						want = append(want, ids[i])
+					}
+				}
+				got := vlpPages(rt, ctx, svc, db.ListVendorsAdminParams{Q: &q, Status: "all", PksTypeID: &tid, PksStatus: &st}, 2)
+				gotIDs := make([]int64, len(got))
+				for i, r := range got {
+					gotIDs[i] = r.ID
+				}
+				if fmt.Sprint(gotIDs) != fmt.Sprint(want) {
+					rt.Fatalf("filter %s/%s: ids %v, want %v", ty.code, st, gotIDs, want)
+				}
+				total, err := svc.Count(ctx, db.CountVendorsAdminParams{Q: &q, Status: "all", PksTypeID: &tid, PksStatus: &st})
+				if err != nil {
+					rt.Fatalf("count: %v", err)
+				}
+				if int(total) != len(want) {
+					rt.Fatalf("filter %s/%s: total %d, want %d", ty.code, st, total, len(want))
+				}
+				matched += len(want)
+			}
+			internal := 0
+			for _, s := range specs {
+				if s.internal {
+					internal++
 				}
 			}
-			got := vlpPages(rt, ctx, svc, &q, &st, 2)
+			if matched != n-internal {
+				rt.Fatalf("type %s: filters matched %d vendors, want %d (INTERNAL must match none)", ty.code, matched, n-internal)
+			}
+		}
+
+		// kind filter, q-by-name and disabled-vendor visibility keep working with the type join in place.
+		kindTotal := 0
+		for _, kd := range []string{"FLM_VENDOR", "INTERNAL"} {
+			kd := kd
+			var want []int64
+			for i, s := range specs {
+				if s.internal == (kd == "INTERNAL") {
+					want = append(want, ids[i])
+				}
+			}
+			got := vlpPages(rt, ctx, svc, db.ListVendorsAdminParams{Q: &q, Status: "all", Kind: &kd}, 50)
 			gotIDs := make([]int64, len(got))
 			for i, r := range got {
 				gotIDs[i] = r.ID
 			}
 			if fmt.Sprint(gotIDs) != fmt.Sprint(want) {
-				rt.Fatalf("filter %s: ids %v, want %v", st, gotIDs, want)
+				rt.Fatalf("kind %s: ids %v, want %v", kd, gotIDs, want)
 			}
-			total, err := svc.Count(ctx, db.CountVendorsAdminParams{Q: &q, Status: "all", PksStatus: &st})
-			if err != nil {
-				rt.Fatalf("count: %v", err)
-			}
-			if int(total) != len(want) {
-				rt.Fatalf("filter %s: total %d, want %d", st, total, len(want))
-			}
-			matched += len(want)
-		}
-		internal := 0
-		for _, s := range specs {
-			if s.internal {
-				internal++
-			}
-		}
-		if matched != n-internal {
-			rt.Fatalf("filters matched %d vendors, want %d (INTERNAL must match none)", matched, n-internal)
-		}
-
-		// kind filter (spec settings-menu-review Property 1/2): equals the
-		// unfiltered list narrowed to that kind; the two kinds partition it.
-		kindTotal := 0
-		for _, k := range []string{"FLM_VENDOR", "INTERNAL"} {
-			k := k
-			var want []int64
-			for i, s := range specs {
-				if s.internal == (k == "INTERNAL") {
-					want = append(want, ids[i])
-				}
-			}
-			rows, err := svc.List(ctx, db.ListVendorsAdminParams{Q: &q, Status: "all", Kind: &k, PageLimit: 50})
-			if err != nil {
-				rt.Fatalf("list kind %s: %v", k, err)
-			}
-			got := make([]int64, len(rows))
-			for i, r := range rows {
-				got[i] = r.ID
-			}
-			if fmt.Sprint(got) != fmt.Sprint(want) {
-				rt.Fatalf("kind %s: ids %v, want %v", k, got, want)
-			}
-			total, err := svc.Count(ctx, db.CountVendorsAdminParams{Q: &q, Status: "all", Kind: &k})
+			total, err := svc.Count(ctx, db.CountVendorsAdminParams{Q: &q, Status: "all", Kind: &kd})
 			if err != nil || int(total) != len(want) {
-				rt.Fatalf("kind %s: total %d err %v, want %d", k, total, err, len(want))
+				rt.Fatalf("kind %s: total %d err %v, want %d", kd, total, err, len(want))
 			}
 			kindTotal += len(want)
 		}
 		if kindTotal != n {
 			rt.Fatalf("kinds cover %d vendors, want %d", kindTotal, n)
 		}
-
-		// q by name keeps working.
 		one := fmt.Sprintf("%s-%02d", tag, 0)
-		rows, err := svc.List(ctx, db.ListVendorsAdminParams{Q: &one, Status: "all", PageLimit: 10})
-		if err != nil || len(rows) != 1 || rows[0].ID != ids[0] {
-			rt.Fatalf("q=%s: rows %d err %v, want vendor %d only", one, len(rows), err, ids[0])
+		byName, err := svc.List(ctx, db.ListVendorsAdminParams{Q: &one, Status: "all", PageLimit: 10})
+		if err != nil || len(byName) != 1 || byName[0].ID != ids[0] {
+			rt.Fatalf("q=%s: rows %d err %v, want vendor %d only", one, len(byName), err, ids[0])
 		}
 	})
 }
 
-// vlpPages walks every page (size ps) of the list for q and the optional status.
-func vlpPages(rt *rapid.T, ctx context.Context, svc *VendorAdminService, q, st *string, ps int64) []db.ListVendorsAdminRow {
+// vlpPages walks every page (size ps) of the list for the given filters.
+func vlpPages(rt *rapid.T, ctx context.Context, svc *VendorAdminService, base db.ListVendorsAdminParams, ps int64) []db.ListVendorsAdminRow {
 	var out []db.ListVendorsAdminRow
 	for off := int64(0); ; off += ps {
-		rows, err := svc.List(ctx, db.ListVendorsAdminParams{Q: q, Status: "all", PksStatus: st, PageLimit: ps, PageOffset: off})
+		arg := base
+		arg.PageLimit, arg.PageOffset = ps, off
+		rows, err := svc.List(ctx, arg)
 		if err != nil {
 			rt.Fatalf("list: %v", err)
 		}

@@ -22,6 +22,8 @@ var (
 	ErrVendorNotFound      = errors.New("vendor not found")
 	ErrVendorCodeConflict  = errors.New("vendor code already exists")
 	ErrVendorCodeImmutable = errors.New("vendor code cannot be changed")
+	// ErrPksFilterType: the pks_type list filter names an unknown or disabled type (handler -> 400).
+	ErrPksFilterType = errors.New("pks_type tidak dikenal atau nonaktif")
 )
 
 // VendorAdminSubmitter is the narrow MasterDataChangeService surface
@@ -37,6 +39,8 @@ type VendorAdminSubmitter interface {
 type VendorAdminRepo interface {
 	List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
 	Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
+	GetPksTypeByCode(ctx context.Context, code string) (*db.VendorPksType, error)
+	ListPksSummaries(ctx context.Context, arg db.ListVendorPksSummariesParams) ([]db.ListVendorPksSummariesRow, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
 	CountActiveUsers(ctx context.Context, vendorID int64) (int64, error)
@@ -159,6 +163,52 @@ func (s *VendorAdminService) List(ctx context.Context, arg db.ListVendorsAdminPa
 func (s *VendorAdminService) Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) {
 	arg.Today, arg.RenewalMonths = s.pksToday(), int32(s.renewalMonths) //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
 	return s.repo.Count(ctx, arg)
+}
+
+// VendorPksSummary is one entry of a list item's pks array (vendor-pks-type Req 4.1, 4.3).
+// RemainingDays is nil when the vendor has no active PKS of that type (belum_diisi).
+type VendorPksSummary struct {
+	PksType       string `json:"pks_type"`
+	PksTypeName   string `json:"pks_type_name"`
+	PksStatus     string `json:"pks_status"`
+	RemainingDays *int32 `json:"remaining_days"`
+}
+
+// ResolvePksFilterType maps a pks_type code to its id for the list filter. Unknown or disabled
+// type -> ErrPksFilterType (Req 4.4). Reads the replica like the list itself.
+func (s *VendorAdminService) ResolvePksFilterType(ctx context.Context, code string) (int64, error) {
+	t, err := s.repo.GetPksTypeByCode(ctx, strings.ToUpper(strings.TrimSpace(code)))
+	if err != nil {
+		return 0, fmt.Errorf("resolving pks type: %w", err)
+	}
+	if t == nil || !t.IsActive {
+		return 0, ErrPksFilterType
+	}
+	return t.ID, nil
+}
+
+// PksSummaries returns the PKS entries per vendor id for one page, ordered by type code, in a
+// single query (Req 4.1). INTERNAL vendors and vendors absent from the map have no entries.
+func (s *VendorAdminService) PksSummaries(ctx context.Context, vendorIDs []int64) (map[int64][]VendorPksSummary, error) {
+	out := make(map[int64][]VendorPksSummary, len(vendorIDs))
+	if len(vendorIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.repo.ListPksSummaries(ctx, db.ListVendorPksSummariesParams{
+		Today: s.pksToday(), RenewalMonths: int32(s.renewalMonths), VendorIds: vendorIDs, //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing pks summaries: %w", err)
+	}
+	for _, r := range rows {
+		e := VendorPksSummary{PksType: r.Code, PksTypeName: r.Name, PksStatus: r.PksStatus}
+		if r.PksStatus != "belum_diisi" {
+			d := r.RemainingDays
+			e.RemainingDays = &d
+		}
+		out[r.VendorID] = append(out[r.VendorID], e)
+	}
+	return out, nil
 }
 
 // Get returns a vendor by id, including soft-deleted rows. Returns nil, nil

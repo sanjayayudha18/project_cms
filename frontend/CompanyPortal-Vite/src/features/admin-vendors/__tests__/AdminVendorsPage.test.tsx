@@ -23,6 +23,7 @@ const disableMutate = vi.fn();
 
 vi.mock("../hooks", () => ({
   useVendorsList: (...args: unknown[]) => useVendorsListMock(...args),
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useDisableVendor: () => ({ mutate: disableMutate, isPending: false }),
   useEnableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
 import { AlertCircle, Download } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ExportProgressDialog,
   ReportExportNotice,
@@ -14,7 +14,7 @@ import {
 } from "../../exports";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
-import { useDisableVendor, useEnableVendor, useVendorsList } from "../hooks";
+import { useDisableVendor, useEnableVendor, usePksTypesList, useVendorsList } from "../hooks";
 import type { AdminVendor } from "../types";
 import { useAdminVendorsUrlState } from "../useAdminVendorsUrlState";
 import { VendorFilterBar } from "./VendorFilterBar";
@@ -30,9 +30,18 @@ export function AdminVendorsPage() {
   const exportFlow = useExportFlow();
 
   const vendorsQuery = useVendorsList(params);
+  const pksTypesQuery = usePksTypesList();
   const pendingIds = usePendingEntityIds("vendor");
   const disableMutation = useDisableVendor();
   const enableMutation = useEnableVendor();
+
+  const activePksTypes = useMemo(
+    () =>
+      (pksTypesQuery.data ?? [])
+        .filter((t) => t.is_active)
+        .sort((a, b) => a.code.localeCompare(b.code)),
+    [pksTypesQuery.data],
+  );
 
   const [formVendor, setFormVendor] = useState<AdminVendor | null>(null);
   const [isFormOpen, setFormOpen] = useState(false);
@@ -48,7 +57,10 @@ export function AdminVendorsPage() {
   function requestPksExport(): void {
     const reportParams: ReportParams = { status: params.status };
     if (params.q) reportParams.q = params.q;
-    if (params.pks_status) reportParams.pks_status = params.pks_status;
+    if (params.pks_type && params.pks_status) {
+      reportParams.pks_type = params.pks_type;
+      reportParams.pks_status = params.pks_status;
+    }
     void exportFlow.request({ kind: "report", report: "vendor-pks", params: reportParams });
   }
 
@@ -123,6 +135,7 @@ export function AdminVendorsPage() {
 
       <VendorFilterBar
         params={params}
+        pksTypes={activePksTypes}
         searchInput={searchInput}
         onSearchInputChange={setSearchInput}
         onParamsChange={setParams}
@@ -153,6 +166,7 @@ export function AdminVendorsPage() {
       {!vendorsQuery.isLoading && !vendorsQuery.isError && vendors.length > 0 && (
         <VendorsTable
           vendors={vendors}
+          pksTypes={activePksTypes}
           pendingIds={pendingIds}
           onEdit={openEdit}
           onDisable={(vendor) => setPendingAction({ type: "disable", vendor })}

@@ -23,8 +23,8 @@ import (
 
 const (
 	t94Months     = 9
-	t94VendorCols = 7  // 7 vendor profile columns
-	t94PksCols    = 11 // vendor_code, vendor_name + 9 director/PKS columns
+	t94VendorCols = 7 // 7 vendor profile columns
+	t94PksCols    = 5 // vendor_code, vendor_name + 3 director columns (PKS columns left the vendor files)
 )
 
 // 2026-07-01 08:00 WIB.
@@ -70,7 +70,7 @@ func (f *t94Fix) cleanup() {
 func (f *t94Fix) assertNoLeftovers() {
 	for _, q := range []string{
 		`SELECT count(*) FROM vendors WHERE code LIKE 'T94%'`,
-		`SELECT count(*) FROM vendor_pks WHERE pks_name LIKE 'T94%'`,
+		`SELECT count(*) FROM vendor_pks WHERE wod_number LIKE 'T94%'`,
 		`SELECT count(*) FROM vendor_pics WHERE name LIKE 'T94%'`,
 		`SELECT count(*) FROM users WHERE username LIKE 'T94%'`,
 	} {
@@ -111,7 +111,7 @@ func (f *t94Fix) seed() {
 		f.ids[code] = id
 		return id
 	}
-	pks := func(vid int64, name, eff, exp string, replaced, terminated bool) {
+	pks := func(vid int64, name, wod, eff, exp string, replaced, terminated bool) {
 		var repl, term, by, reason any
 		if replaced {
 			repl = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -119,9 +119,11 @@ func (f *t94Fix) seed() {
 		if terminated {
 			term, by, reason = time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), f.userID, "T94 reason"
 		}
-		f.exec(`INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by, replaced_at, terminated_at, terminated_by, termination_reason)
-			VALUES ($1, $2, $3::date, $4::date, $5, $6::timestamptz, $7::timestamptz, $8, $9)`,
-			vid, name, eff, exp, f.userID, repl, term, by, reason)
+		f.exec(`INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
+				replaced_at, terminated_at, terminated_by, termination_reason)
+			VALUES ($1, (SELECT id FROM vendor_pks_types WHERE code = 'FLM'), $2, $3, $4::date, $5::date, $6,
+				$7::timestamptz, $8::timestamptz, $9, $10)`,
+			vid, wod, name, eff, exp, f.userID, repl, term, by, reason)
 	}
 	pic := func(vid int64, name string, director, deleted bool) {
 		var del any
@@ -133,8 +135,8 @@ func (f *t94Fix) seed() {
 	}
 
 	a := vendor("T94A", "FLM_VENDOR", false)
-	pks(a, "T94 PKS lama", "2022-01-01", "2023-12-31", true, false)
-	pks(a, "T94 PKS =aktif", "2025-01-01", "2027-12-31", false, false)
+	pks(a, "T94 PKS lama", "T94-WOD-A0", "2022-01-01", "2023-12-31", true, false)
+	pks(a, "T94 PKS =aktif", "T94-WOD-A1", "2025-01-01", "2027-12-31", false, false)
 	pic(a, "T94 Direktur A", true, false)
 
 	vendor("T94B", "FLM_VENDOR", false)
@@ -143,10 +145,10 @@ func (f *t94Fix) seed() {
 	pic(c, "T94 Direktur C", true, false)
 
 	d := vendor("T94D", "FLM_VENDOR", true)
-	pks(d, "T94 PKS D", "2025-07-01", "2026-09-30", false, false) // need renewal
+	pks(d, "T94 PKS D", "T94-WOD-D", "2025-07-01", "2026-09-30", false, false) // need renewal
 
 	e := vendor("T94E", "FLM_VENDOR", false)
-	pks(e, "T94 PKS E", "2025-01-01", "2028-12-31", false, true)
+	pks(e, "T94 PKS E", "T94-WOD-E", "2025-01-01", "2028-12-31", false, true)
 	pic(e, "T94 deleted director", true, true)
 	pic(e, "T94 Direktur E", true, false)
 	pic(e, "T94 contact E", false, false)
@@ -236,8 +238,9 @@ func TestVendorExportPks_ImportColumnsMatchOldQuery(t *testing.T) {
 	}
 }
 
-// Property 1 (DB part) + the fixture rules: vendor-pks cells (after CSVSafe) equal cells 3-11 of the
-// vendor_pks report for the same vendor, As_Of_Date and renewal months.
+// Property 1 (DB part) + the fixture rules: the three director cells of the vendor-pks master export
+// (after CSVSafe) equal cells 3-5 of the vendor_pks report for the same vendor, As_Of_Date and renewal
+// months; the report has one line per active PKS, so vendors without PKS (B, C) are absent from it.
 func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	f := newT94Fix(t)
 	ctx := context.Background()
@@ -247,12 +250,12 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExportVendorPksBatch: %v", err)
 	}
-	want := map[string][]string{} // vendor code -> report cells 3..11
+	want := map[string][]string{} // vendor code -> report director cells 3..5
 	for _, r := range rep {
-		want[r.VendorCode] = reports.VendorPksCells(vendorPksRow(r))[2:]
+		want[r.VendorCode] = reports.VendorPksCells(vendorPksRow(r))[2:5]
 	}
-	if len(want) != len(f.ids) {
-		t.Fatalf("report rows = %d, want %d", len(want), len(f.ids))
+	if len(want) != 3 { // A, D, E have an active PKS
+		t.Fatalf("report rows = %d, want 3 (one active PKS each for A, D, E)", len(want))
 	}
 
 	byCode := map[string][]string{}
@@ -265,9 +268,9 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 			continue // real dev vendor
 		}
 		if _, dup := byCode[code]; dup {
-			t.Fatalf("vendor %s exported more than once (replaced PKS must not show)", code)
+			t.Fatalf("vendor %s exported more than once", code)
 		}
-		ro := make([]string, 0, 9)
+		ro := make([]string, 0, 3)
 		for _, c := range row[2:] {
 			ro = append(ro, csvexport.CSVSafe(c))
 		}
@@ -276,27 +279,24 @@ func TestVendorExportPks_ReadOnlyColumnsMatchPksReport(t *testing.T) {
 	for code := range f.ids {
 		got, ok := byCode[code]
 		if !ok {
-			t.Fatalf("vendor %s missing from export", code)
+			t.Fatalf("vendor %s missing from export (the master list has every vendor)", code)
 		}
-		if !slices.Equal(got, want[code]) {
-			t.Errorf("%s read-only cells\ngot:  %q\nwant: %q", code, got, want[code])
+		if w, inReport := want[code]; inReport && !slices.Equal(got, w) {
+			t.Errorf("%s director cells\ngot:  %q\nwant: %q", code, got, w)
 		}
 	}
 
 	// Literal checks, independent of the report query.
-	if r := byCode["T94A"]; r[0] != "T94 Direktur A" || r[3] != "T94 PKS =aktif" || r[5] != "2027-12-31" || r[8] != "Aktif" {
-		t.Errorf("T94A (old replaced PKS leaked?): %q", r)
+	if r := byCode["T94A"]; r[0] != "T94 Direktur A" {
+		t.Errorf("T94A: %q", r)
 	}
-	if r := byCode["T94B"]; r[8] != "Belum diisi" || r[0] != "" || r[3] != "" {
+	if r := byCode["T94B"]; r[0] != "" || r[1] != "" || r[2] != "" {
 		t.Errorf("FLM without PKS/director: %q", r)
 	}
-	if r := byCode["T94C"]; r[8] != "" || r[3] != "" || r[0] != "T94 Direktur C" {
+	if r := byCode["T94C"]; r[0] != "T94 Direktur C" {
 		t.Errorf("INTERNAL with director: %q", r)
 	}
-	if r := byCode["T94D"]; r[8] != "Need Renewal" {
-		t.Errorf("disabled vendor with PKS: status %q", r[8])
-	}
-	if r := byCode["T94E"]; r[8] != "Terminated" || r[0] != "T94 Direktur E" {
+	if r := byCode["T94E"]; r[0] != "T94 Direktur E" { // soft-deleted twin and regular PIC never leak
 		t.Errorf("T94E: %q", r)
 	}
 }

@@ -9,6 +9,7 @@ vi.mock("../hooks", () => ({
     isError: false,
     refetch: vi.fn(),
   }),
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useDisableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useEnableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),

@@ -10,6 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const m = vi.hoisted(() => ({ submit: vi.fn(), terminate: vi.fn(), unterminate: vi.fn() }));
 vi.mock("../hooks", () => ({
+  usePksTypesList: () => ({
+    data: [
+      { id: 1, code: "FLM", name: "First Line Maintenance", is_active: true, in_use: true },
+      { id: 2, code: "SLM", name: "Second Line Maintenance", is_active: true, in_use: true },
+    ],
+    isLoading: false,
+  }),
   useSubmitVendorPks: () => ({ mutateAsync: m.submit, isPending: false }),
   useTerminateVendorPks: () => ({ mutateAsync: m.terminate, isPending: false }),
   useUnterminateVendorPks: () => ({ mutateAsync: m.unterminate, isPending: false }),
@@ -27,8 +34,12 @@ beforeEach(() => {
 
 async function fillForm(
   user: ReturnType<typeof userEvent.setup>,
-  v: { name?: string; eff?: string; exp?: string },
+  v: { type?: string; wod?: string; name?: string; eff?: string; exp?: string },
 ) {
+  const typeVal = v.type ?? "FLM";
+  if (typeVal) await user.selectOptions(screen.getByLabelText("Type PKS"), typeVal);
+  const wodVal = v.wod ?? "WOD-001";
+  if (wodVal) await user.type(screen.getByLabelText("No. WOD"), wodVal);
   if (v.name !== undefined) await user.type(screen.getByLabelText("Nama PKS"), v.name);
   if (v.eff) await user.type(screen.getByLabelText("Tanggal efektif"), v.eff);
   if (v.exp) await user.type(screen.getByLabelText("Tanggal expired"), v.exp);
@@ -49,6 +60,8 @@ describe("PksFormDialog", () => {
 
     await waitFor(() =>
       expect(m.submit).toHaveBeenCalledWith({
+        pks_type: "FLM",
+        wod_number: "WOD-001",
         pks_name: "PKS Baru",
         effective_date: "2026-01-01",
         expiry_date: "2027-01-01",
@@ -67,6 +80,8 @@ describe("PksFormDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Ajukan" }));
 
+    expect(await screen.findByText("Type PKS wajib dipilih")).toBeInTheDocument();
+    expect(await screen.findByText("No. WOD wajib diisi")).toBeInTheDocument();
     expect(await screen.findByText("Wajib diisi")).toBeInTheDocument();
     expect(screen.getAllByText("Tanggal wajib diisi")).toHaveLength(2);
     expect(m.submit).not.toHaveBeenCalled();
@@ -132,6 +147,24 @@ describe("PksFormDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("409 duplicate WOD puts the error on No. WOD field and keeps dialog open", async () => {
+    m.submit.mockRejectedValue({
+      status: 409,
+      message: "No. WOD sudah dipakai",
+      details: [{ field: "wod_number", message: "No. WOD sudah dipakai" }],
+    });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderForm(onClose);
+
+    await fillForm(user, { name: "PKS", eff: "2026-01-01", exp: "2027-01-01" });
+    await user.click(screen.getByRole("button", { name: "Ajukan" }));
+
+    expect(await screen.findByText("No. WOD sudah dipakai")).toBeInTheDocument();
+    expect(screen.getByLabelText("No. WOD")).toHaveAttribute("aria-invalid", "true");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it.each([
     [404, "Vendor tidak ditemukan"],
     [409, "Masih ada perubahan PKS yang menunggu persetujuan"],
@@ -153,7 +186,11 @@ describe("PksFormDialog", () => {
     const user = userEvent.setup();
     renderForm();
 
-    await user.click(screen.getByLabelText("Nama PKS"));
+    await user.selectOptions(screen.getByLabelText("Type PKS"), "FLM");
+    await user.click(screen.getByLabelText("No. WOD"));
+    await user.keyboard("WOD-001");
+    await user.tab();
+    expect(screen.getByLabelText("Nama PKS")).toHaveFocus();
     await user.keyboard("PKS Kbd");
     await user.tab();
     expect(screen.getByLabelText("Tanggal efektif")).toHaveFocus();
@@ -180,6 +217,8 @@ describe("PksFormDialog", () => {
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Nama PKS")).toHaveValue("");
+    expect(screen.getByLabelText("No. WOD")).toHaveValue("");
+    expect(screen.getByLabelText("Type PKS")).toHaveValue("");
   });
 });
 

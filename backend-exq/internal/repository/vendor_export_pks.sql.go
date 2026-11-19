@@ -7,8 +7,6 @@ package repository
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const exportVendorsWithPksBatch = `-- name: ExportVendorsWithPksBatch :many
@@ -24,68 +22,49 @@ SELECT v.id,
        v.is_active,
        d.name                               AS director_name,
        d.phone                              AS director_phone,
-       d.email                              AS director_email,
-       ap.pks_name                          AS pks_name,
-       ap.effective_date                    AS effective_date,
-       ap.expiry_date                       AS expiry_date,
-       COALESCE(vendor_pks_validity_months(ap.effective_date, ap.expiry_date), 0)::int AS validity_months,
-       COALESCE(ap.expiry_date - $1::date, 0)::int                      AS remaining_days,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                $1::date, $2::int), '')::text   AS pks_status
+       d.email                              AS director_email
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
 LEFT JOIN vendor_pics d ON d.vendor_id = v.id AND d.is_director AND d.deleted_at IS NULL
-WHERE v.id > $3::bigint
-  AND ($4::bigint IS NULL OR v.id = $4::bigint)
-  AND ($5::text = 'all'
-       OR ($5::text = 'active' AND v.deleted_at IS NULL)
-       OR ($5::text = 'disabled' AND v.deleted_at IS NOT NULL))
+WHERE v.id > $1::bigint
+  AND ($2::bigint IS NULL OR v.id = $2::bigint)
+  AND ($3::text = 'all'
+       OR ($3::text = 'active' AND v.deleted_at IS NULL)
+       OR ($3::text = 'disabled' AND v.deleted_at IS NOT NULL))
 ORDER BY v.id
-LIMIT $6::int
+LIMIT $4::int
 `
 
 type ExportVendorsWithPksBatchParams struct {
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	AfterID       int64       `json:"after_id"`
-	VendorID      *int64      `json:"vendor_id"`
-	Status        string      `json:"status"`
-	BatchSize     int32       `json:"batch_size"`
+	AfterID   int64  `json:"after_id"`
+	VendorID  *int64 `json:"vendor_id"`
+	Status    string `json:"status"`
+	BatchSize int32  `json:"batch_size"`
 }
 
 type ExportVendorsWithPksBatchRow struct {
-	ID             int64       `json:"id"`
-	Code           string      `json:"code"`
-	Name           string      `json:"name"`
-	LegalName      string      `json:"legal_name"`
-	Npwp           string      `json:"npwp"`
-	ContactEmail   string      `json:"contact_email"`
-	ContactPhone   string      `json:"contact_phone"`
-	HqAddress      string      `json:"hq_address"`
-	IsActive       bool        `json:"is_active"`
-	DirectorName   *string     `json:"director_name"`
-	DirectorPhone  *string     `json:"director_phone"`
-	DirectorEmail  *string     `json:"director_email"`
-	PksName        *string     `json:"pks_name"`
-	EffectiveDate  pgtype.Date `json:"effective_date"`
-	ExpiryDate     pgtype.Date `json:"expiry_date"`
-	ValidityMonths int32       `json:"validity_months"`
-	RemainingDays  int32       `json:"remaining_days"`
-	PksStatus      string      `json:"pks_status"`
+	ID            int64   `json:"id"`
+	Code          string  `json:"code"`
+	Name          string  `json:"name"`
+	LegalName     string  `json:"legal_name"`
+	Npwp          string  `json:"npwp"`
+	ContactEmail  string  `json:"contact_email"`
+	ContactPhone  string  `json:"contact_phone"`
+	HqAddress     string  `json:"hq_address"`
+	IsActive      bool    `json:"is_active"`
+	DirectorName  *string `json:"director_name"`
+	DirectorPhone *string `json:"director_phone"`
+	DirectorEmail *string `json:"director_email"`
 }
 
-// Vendor export with Direktur Utama + active PKS (spec vendor-export-pks, task 3.1). Read-only.
+// Vendor export with Direktur Utama (spec vendor-export-pks, task 3.1; PKS join dropped by vendor-pks-type task 2.4,
+// PKS is exported by the vendor_pks report instead). Read-only.
 // backend-exq only (NOT shared): ExportVendorsBatch stays untouched because the
 // importer in backend/ reads it for the current-state comparison.
 // Vendor columns + predicates: COPY of ExportVendorsBatch (backend/queries/master_data_export.sql);
-// keep in sync, Property 2 checks it on a real DB. Director/PKS joins: COPY of ExportVendorPksBatch
-// (backend/queries/vendor_pks_report.sql). Both joins hit partial unique indexes (vendor_pics_director_uq,
-// vendor_pks_active_uq), so they never add rows and CountVendors stays the row count.
-// COALESCE on function results keeps them non-null for sqlc/pgx: 0/” = no active PKS or INTERNAL vendor.
+// keep in sync, Property 2 checks it on a real DB. Director join hits partial unique index
+// vendor_pics_director_uq, so it never adds rows and CountVendors stays the row count.
 func (q *Queries) ExportVendorsWithPksBatch(ctx context.Context, arg ExportVendorsWithPksBatchParams) ([]ExportVendorsWithPksBatchRow, error) {
 	rows, err := q.db.Query(ctx, exportVendorsWithPksBatch,
-		arg.Today,
-		arg.RenewalMonths,
 		arg.AfterID,
 		arg.VendorID,
 		arg.Status,
@@ -111,12 +90,6 @@ func (q *Queries) ExportVendorsWithPksBatch(ctx context.Context, arg ExportVendo
 			&i.DirectorName,
 			&i.DirectorPhone,
 			&i.DirectorEmail,
-			&i.PksName,
-			&i.EffectiveDate,
-			&i.ExpiryDate,
-			&i.ValidityMonths,
-			&i.RemainingDays,
-			&i.PksStatus,
 		); err != nil {
 			return nil, err
 		}

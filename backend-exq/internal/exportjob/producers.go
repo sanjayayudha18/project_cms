@@ -201,14 +201,13 @@ func vendorsProducer(forceAll bool) Producer {
 	}
 }
 
-func vendorPksMasterProducer(renewalMonths int) Producer {
+func vendorPksMasterProducer() Producer {
 	type row = repository.ExportVendorsWithPksBatchRow
 	return tableProducer[row]{
-		header: headerOf(csvexport.VendorPks, true),
+		header: headerOf(csvexport.VendorPks, true)[:5], // code, name + 3 director columns; PKS columns left the vendor files (Req 7)
 		fetch: func(ctx context.Context, q Querier, p Params, asOf time.Time, after int64, limit int32) ([]row, error) {
 			v, _ := scope(p)
 			return q.ExportVendorsWithPksBatch(ctx, repository.ExportVendorsWithPksBatchParams{
-				Today: wibDate(reports.TodayWIB(asOf)), RenewalMonths: int32(renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
 				AfterID: after, VendorID: v, Status: p.StatusFilter, BatchSize: limit,
 			})
 		},
@@ -414,7 +413,7 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 			"vaults":            vaultsProducer(),
 			"pics":              picsProducer(),
 			"dsr-location-maps": dsrMapsProducer(),
-			csvexport.VendorPks: vendorPksMasterProducer(pksRenewalMonths),
+			csvexport.VendorPks: vendorPksMasterProducer(),
 		},
 		// Cabang scope: PIC branch only, never vendor-wide PICs (D3, enforced in SQL).
 		KindCabang: {
@@ -431,7 +430,7 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 			csvexport.VendorPICs:     picsProducer(),
 			csvexport.ATMs:           atmsProducer(),
 			csvexport.ATMAssignments: atmAssignmentsProducer(),
-			csvexport.VendorPks:      vendorPksMasterProducer(pksRenewalMonths),
+			csvexport.VendorPks:      vendorPksMasterProducer(),
 		},
 	}
 	for k, byEntity := range reportProducers(dsrStart, pksRenewalMonths) {

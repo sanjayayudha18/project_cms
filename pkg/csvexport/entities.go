@@ -22,16 +22,18 @@ func (e Entity) ExportHeader() []string {
 	return slices.Concat(e.Header, e.ReadOnlyColumns)
 }
 
-// VendorReadOnlyColumns are the nine director + active-PKS columns (used by
-// vendor-pks export and legacy vendor export headers). Returns a fresh slice
-// so callers cannot mutate the contract.
+// VendorReadOnlyColumns are the three director columns that follow the profile
+// columns in a vendor export (PKS columns left the vendor CSV, vendor-pks-type
+// Req 7). Returns a fresh slice so callers cannot mutate the contract.
 func VendorReadOnlyColumns() []string { return slices.Clone(vendorReadOnlyColumns) }
 
-var vendorReadOnlyColumns = []string{
-	"director_name", "director_phone", "director_email",
-	"pks_name", "pks_effective_date", "pks_expiry_date",
-	"pks_validity_months", "pks_remaining_days", "pks_status",
-}
+var vendorReadOnlyColumns = []string{"director_name", "director_phone", "director_email"}
+
+// legacyVendorReadOnlyColumns is the pre-vendor-pks-type nine-column tail
+// (director + active PKS). Still accepted on import; the vendor-pks export entity
+// keeps it until its own header moves to pkg/reports (task 6.3).
+var legacyVendorReadOnlyColumns = slices.Concat(vendorReadOnlyColumns,
+	[]string{"pks_name", "pks_effective_date", "pks_expiry_date", "pks_validity_months", "pks_remaining_days", "pks_status"})
 
 func (e Entity) clone() Entity {
 	e.Header = slices.Clone(e.Header)
@@ -54,7 +56,9 @@ var importable = map[string]Entity{
 		// Older files still carry id and code (and, from vendor-export-pks, the nine read-only PKS columns).
 		LegacyHeaders: [][]string{
 			{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-			slices.Concat([]string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}, vendorReadOnlyColumns),
+			slices.Concat([]string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}, legacyVendorReadOnlyColumns),
+			// Previous Export_Header: seven profile columns + nine read-only columns.
+			slices.Concat([]string{"name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}, legacyVendorReadOnlyColumns),
 		},
 	},
 	VendorBranches: {
@@ -128,7 +132,7 @@ var exportOnly = map[string]Entity{
 	},
 	VendorPks: {
 		Name:   VendorPks,
-		Header: slices.Concat([]string{"vendor_code", "vendor_name"}, vendorReadOnlyColumns),
+		Header: slices.Concat([]string{"vendor_code", "vendor_name"}, legacyVendorReadOnlyColumns),
 	},
 }
 

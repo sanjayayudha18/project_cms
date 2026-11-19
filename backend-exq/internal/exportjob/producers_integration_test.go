@@ -68,6 +68,9 @@ type p11Fix struct {
 	atmID   int64
 	rows    map[string][]p11Row
 	seq     int
+	// vaultIDs maps a fixture vault's tagged vault_name to its id: since migration 040 the
+	// vault CSV starts with a row number, not the id (see cellIDs).
+	vaultIDs map[string]int64
 }
 
 func p11Seed(t *testing.T) *rand.Rand {
@@ -159,7 +162,7 @@ func p11Want(s string) string {
 
 func newP11Fix(t *testing.T) *p11Fix {
 	t.Helper()
-	f := &p11Fix{t: t, rng: p11Seed(t), rows: map[string][]p11Row{}}
+	f := &p11Fix{t: t, rng: p11Seed(t), rows: map[string][]p11Row{}, vaultIDs: map[string]int64{}}
 	f.pool = p11Pool(t)
 	f.q = repository.New(f.pool)
 	f.tag = fmt.Sprintf("P11X%X", time.Now().UnixNano()%0xffffffffff)
@@ -236,14 +239,15 @@ func (f *p11Fix) seed() {
 			maxA, maxW := p11Num(f.rng, n+f.rng.IntN(5))
 			n++
 			code := fmt.Sprintf("%sVL%d", f.tag, f.next())
-			id := f.id(`INSERT INTO vendor_vaults (vendor_branch_id, vault_code, type, category, currency_code, is_active,
-				min_capacity_amount, max_capacity_amount, deleted_at)
-				VALUES ($1, $2, $3, $3, 'IDR', $4, $5::text::numeric, $6::text::numeric, CASE WHEN $7::bool THEN now() END) RETURNING id`,
+			// vault_name = the tagged code, so cellIDs can map a CSV row back to its id.
+			id := f.id(`INSERT INTO vendor_vaults (vendor_branch_id, vault_code, vault_name, type, category, currency_code, is_active,
+				min_balance, max_balance, deleted_at)
+				VALUES ($1, $2, $2, $3, $3, 'IDR', $4, $5::text::numeric, $6::text::numeric, CASE WHEN $7::bool THEN now() END) RETURNING id`,
 				f.bIDs[b], code, cat, !dis, minA, maxA, dis)
 			r := p11Row{id: id, vendor: f.bvendor[b], branch: b, vcode: f.vcodes[f.bvendor[b]], bcode: f.bcodes[b], disabled: dis, minCap: minW, maxCap: maxW}
 			f.rows["vaults"] = append(f.rows["vaults"], r)
+			f.vaultIDs[code] = id
 			vaultOf = append(vaultOf, r)
-			_ = code
 		}
 	}
 	for _, v := range vaultOf {
@@ -377,7 +381,11 @@ func (r p11Row) matches(status string, asOfD time.Time) bool {
 
 func (f *p11Fix) expect(q p11Q, forceAll bool) []p11Row {
 	var out []p11Row
-	for _, r := range f.rows[q.entity] {
+	entity := q.entity
+	if entity == "vendor-pks" { // vendor-pks-type Req 7.1: one line per vendor (code, name + director columns)
+		entity = "vendor"
+	}
+	for _, r := range f.rows[entity] {
 		if q.vendor != nil && r.vendor != *q.vendor {
 			continue
 		}
@@ -432,6 +440,39 @@ func p11CellIDs(t *testing.T, rows [][]string) []int64 {
 	return out
 }
 
+// cellIDs is p11CellIDs for any entity. Since the vendor-vaults-export-revamp layout
+// (dde5cfc) vendor rows (name, legal_name, ...) and vault rows (no, branch_name,
+// vault_name, ...) carry no id: they are mapped back through the fixture's tagged vendor
+// name / vault_name, and rows that are not fixture rows (global export over dev data)
+// are left out.
+func (f *p11Fix) cellIDs(t *testing.T, entity string, rows [][]string) []int64 {
+	t.Helper()
+	var out []int64
+	switch entity {
+	case "vendor", csvexport.Vendors:
+		for _, r := range rows {
+			for i, code := range f.vcodes { // fixture vendors are named by their code
+				if r[0] == code {
+					out = append(out, f.vIDs[i])
+				}
+			}
+		}
+		return out
+	case "vaults", csvexport.VendorVaults:
+	default:
+		return p11CellIDs(t, rows)
+	}
+	for i, r := range rows {
+		if r[0] != strconv.Itoa(i+1) {
+			t.Fatalf("vault row %d: no cell %q, want %d", i, r[0], i+1)
+		}
+		if id, ok := f.vaultIDs[r[2]]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 func p11Params(t *testing.T, kind Kind, q p11Q, f *p11Fix) Params {
 	t.Helper()
 	var v, b *int64
@@ -457,6 +498,18 @@ func (f *p11Fix) checkCells(t *testing.T, q p11Q, rows [][]string, want []p11Row
 	t.Helper()
 	for i, w := range want {
 		c := rows[i]
+		if q.entity == "vendor" { // profile layout: name (= fixture code), legal_name, ...
+			if c[0] != w.vcode {
+				t.Errorf("vendor id %d: name cell %q, want %q", w.id, c[0], w.vcode)
+			}
+			continue
+		}
+		if q.entity == "vaults" { // 040 layout: branch_name, vault_name, ..., min_balance, max_balance
+			if c[1] != w.bcode || c[8] != w.minCap || c[9] != w.maxCap {
+				t.Errorf("vault id %d: branch/min/max %q/%q/%q, want %q/%q/%q", w.id, c[1], c[8], c[9], w.bcode, w.minCap, w.maxCap)
+			}
+			continue
+		}
 		if c[1] != w.vcode {
 			t.Errorf("%s id %d: vendor cell %q, want %q", q.entity, w.id, c[1], w.vcode)
 		}
@@ -470,9 +523,6 @@ func (f *p11Fix) checkCells(t *testing.T, q p11Q, rows [][]string, want []p11Row
 			if c[2] != w.bcode {
 				t.Errorf("%s id %d: branch cell %q, want %q", q.entity, w.id, c[2], w.bcode)
 			}
-		}
-		if q.entity == "vaults" && (c[6] != w.minCap || c[7] != w.maxCap) {
-			t.Errorf("vault id %d: capacity %q/%q, want %q/%q", w.id, c[6], c[7], w.minCap, w.maxCap)
 		}
 		if q.entity == "pics" {
 			if got := csvexport.UnCSVSafe(c[3]); got != w.name {
@@ -543,7 +593,7 @@ func TestP11ProducersProperties(t *testing.T) {
 			if err != nil {
 				t.Fatalf("it %d %s/%s %+v: %v", it, kind, q.entity, qq, err)
 			}
-			got := p11CellIDs(t, rows)
+			got := f.cellIDs(t, q.entity, rows)
 			// Property 1 + 6: exactly the in-scope rows, once each, ascending ids.
 			if !slices.Equal(got, f.ids(want)) {
 				t.Fatalf("it %d %s/%s status=%s level=%s v=%v b=%v asOf=%s:\n got %v\nwant %v",
@@ -598,8 +648,8 @@ func TestP11ProducersProperties(t *testing.T) {
 				}
 			}
 		}
-		check("vendor_vaults", "min_capacity_amount", f.rows["vaults"], func(r p11Row) string { return r.minCap })
-		check("vendor_vaults", "max_capacity_amount", f.rows["vaults"], func(r p11Row) string { return r.maxCap })
+		check("vendor_vaults", "min_balance", f.rows["vaults"], func(r p11Row) string { return r.minCap })
+		check("vendor_vaults", "max_balance", f.rows["vaults"], func(r p11Row) string { return r.maxCap })
 		check("vendor_package_prices", "base_price", f.rows["package-prices"], func(r p11Row) string { return r.base })
 		// producers print exactly that text, for every status
 		for _, ent := range []string{"vaults", "package-prices"} {
@@ -638,7 +688,7 @@ func TestP11GlobalProducersFixtureOnce(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s/%s: %v", ent, st, err)
 			}
-			ids := p11CellIDs(t, rows)
+			ids := f.cellIDs(t, ent, rows)
 			if !slices.IsSorted(ids) {
 				t.Fatalf("%s/%s: ids not ascending", ent, st)
 			}

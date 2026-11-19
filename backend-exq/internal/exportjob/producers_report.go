@@ -24,6 +24,7 @@ type ReportQuerier interface {
 	ListReplenishClassificationAmounts(ctx context.Context, ids []int64) ([]repository.ReplenishClassificationAmount, error)
 	ReportReplenishTrips(ctx context.Context, arg repository.ReportReplenishTripsParams) ([]repository.ReportReplenishTripsRow, error)
 	ExportVendorPksBatch(ctx context.Context, arg repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error)
+	ExportVendorPksMissingBatch(ctx context.Context, arg repository.ExportVendorPksMissingBatchParams) ([]repository.ExportVendorPksMissingBatchRow, error)
 }
 
 var _ ReportQuerier = (*repository.Queries)(nil)
@@ -253,18 +254,23 @@ func tripsFn(ctx context.Context, q Querier, r ReportParams, _ time.Time, emit f
 	return nil
 }
 
-// vendorPksProducer: one line per vendor (name, id keyset) with its active PKS and director, as of
+// vendorPksProducer: one line per ACTIVE PKS (vendor code, type code keyset) with its director, as of
 // the WIB day of the job. renewalMonths = VENDOR_PKS_RENEWAL_MONTHS. Status/remaining days are
 // computed in SQL (vendor_pks_status), so the file equals the vendor list screen.
+// pks_status = belum_diisi (with pks_type) switches to one line per FLM vendor without an active
+// PKS of that type, PKS cells empty (Req 6.2, A3).
 func vendorPksProducer(renewalMonths int) Producer {
 	return reportProducer(KindVendorPks, func(ctx context.Context, q Querier, r ReportParams, asOf time.Time, emit func([]string) error) error {
 		status := "active"
 		if r.VendorStatus != nil {
 			status = *r.VendorStatus
 		}
+		if r.PksStatus != nil && *r.PksStatus == "belum_diisi" && r.PksType != nil {
+			return vendorPksMissing(ctx, q, r, status, emit)
+		}
 		arg := repository.ExportVendorPksBatchParams{
 			Today: wibDate(reports.TodayWIB(asOf)), RenewalMonths: int32(renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
-			Q: r.Q, Status: status, PksStatus: r.PksStatus, BatchSize: PageSize,
+			Q: r.Q, Status: status, PksType: r.PksType, PksStatus: r.PksStatus, BatchSize: PageSize,
 		}
 		for {
 			if err := ctx.Err(); err != nil {
@@ -272,7 +278,7 @@ func vendorPksProducer(renewalMonths int) Producer {
 			}
 			rows, err := q.ExportVendorPksBatch(ctx, arg)
 			if err != nil {
-				return fmt.Errorf("export vendor pks after id %d: %w", arg.AfterID, err)
+				return fmt.Errorf("export vendor pks after %q/%q: %w", arg.AfterVendorCode, arg.AfterTypeCode, err)
 			}
 			for _, x := range rows {
 				if err := emit(reports.VendorPksCells(vendorPksRow(x))); err != nil {
@@ -283,39 +289,60 @@ func vendorPksProducer(renewalMonths int) Producer {
 				return nil
 			}
 			last := rows[len(rows)-1]
-			arg.AfterName, arg.AfterID = last.VendorName, last.ID
+			arg.AfterVendorCode, arg.AfterTypeCode = last.VendorCode, last.PksTypeCode
 		}
 	})
 }
 
+func vendorPksMissing(ctx context.Context, q Querier, r ReportParams, status string, emit func([]string) error) error {
+	arg := repository.ExportVendorPksMissingBatchParams{PksType: *r.PksType, Q: r.Q, Status: status, BatchSize: PageSize}
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		rows, err := q.ExportVendorPksMissingBatch(ctx, arg)
+		if err != nil {
+			return fmt.Errorf("export vendor pks missing after %q: %w", arg.AfterVendorCode, err)
+		}
+		for _, x := range rows {
+			missing := "belum_diisi"
+			row := reports.VendorPksRow{
+				VendorCode: x.VendorCode, VendorName: x.VendorName,
+				DirectorName: x.DirectorName, DirectorPhone: x.DirectorPhone, DirectorEmail: x.DirectorEmail,
+				PksTypeCode: &x.PksTypeCode, PksStatus: &missing,
+			}
+			if err := emit(reports.VendorPksCells(row)); err != nil {
+				return err
+			}
+		}
+		if len(rows) < PageSize {
+			return nil
+		}
+		arg.AfterVendorCode = rows[len(rows)-1].VendorCode
+	}
+}
+
 func vendorPksRow(x repository.ExportVendorPksBatchRow) reports.VendorPksRow {
-	row := pksDetailRow(x.DirectorName, x.DirectorPhone, x.DirectorEmail, x.PksName,
-		x.EffectiveDate, x.ExpiryDate, x.ValidityMonths, x.RemainingDays, x.PksStatus)
-	row.VendorCode, row.VendorName = x.VendorCode, x.VendorName
-	return row
+	// An active PKS row always has dates, validity, remaining days and status (COALESCEd in SQL).
+	status := x.PksStatus
+	return reports.VendorPksRow{
+		VendorCode: x.VendorCode, VendorName: x.VendorName,
+		DirectorName: x.DirectorName, DirectorPhone: x.DirectorPhone, DirectorEmail: x.DirectorEmail,
+		PksTypeCode: &x.PksTypeCode, WodNumber: &x.WodNumber, PksName: &x.PksName,
+		EffectiveDate: datePtr(x.EffectiveDate), ExpiryDate: datePtr(x.ExpiryDate),
+		ValidityMonths: &x.ValidityMonths, RemainingDays: &x.RemainingDays, PksStatus: &status,
+	}
 }
 
-// vendorPksMasterCells builds the 11 raw cells for the master-data vendor-pks preview/export
-// (vendor_code, vendor_name + the 9 director/PKS columns).
+// vendorPksMasterCells builds the raw cells of the vendor-pks master-data preview/export:
+// vendor_code, vendor_name + the three director columns (PKS columns left the vendor files, Req 7).
 func vendorPksMasterCells(x repository.ExportVendorsWithPksBatchRow) []string {
-	d := pksDetailRow(x.DirectorName, x.DirectorPhone, x.DirectorEmail, x.PksName,
-		x.EffectiveDate, x.ExpiryDate, x.ValidityMonths, x.RemainingDays, x.PksStatus)
-	return append([]string{x.Code, x.Name}, reports.VendorPksDetailCells(d)...)
+	return []string{x.Code, x.Name, derefStr(x.DirectorName), derefStr(x.DirectorPhone), derefStr(x.DirectorEmail)}
 }
 
-// pksDetailRow is the director + active-PKS part of a vendor row; shared by the
-// vendor_pks report and the vendor-pks master-data export so the empty-cell rule lives here.
-func pksDetailRow(dirName, dirPhone, dirEmail, pksName *string, effective, expiry pgtype.Date,
-	validityMonths, remainingDays int32, pksStatus string) reports.VendorPksRow {
-	row := reports.VendorPksRow{
-		DirectorName: dirName, DirectorPhone: dirPhone, DirectorEmail: dirEmail,
-		PksName: pksName, EffectiveDate: datePtr(effective), ExpiryDate: datePtr(expiry),
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
 	}
-	if expiry.Valid { // no active PKS: validity, remaining days and status stay empty
-		row.ValidityMonths, row.RemainingDays = &validityMonths, &remainingDays
-	}
-	if pksStatus != "" {
-		row.PksStatus = &pksStatus
-	}
-	return row
+	return *p
 }

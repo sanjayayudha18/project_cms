@@ -52,32 +52,51 @@ describe("admin-vendors URL state: kind (settings-menu-review Req 2.6/2.7)", () 
   });
 });
 
-describe("admin-vendors URL state: pks_status (vendor-pks Req 1.10)", () => {
+describe("admin-vendors URL state: pks_type + pks_status pair (vendor-pks-type Req 5.3)", () => {
   const base = { page: 1, page_size: 25, status: "active" as const, q: "" };
 
-  it("round-trips a valid pks_status", () => {
-    const params = { ...base, pks_status: "need_renewal" as const };
+  it("round-trips a valid pks_type + pks_status pair", () => {
+    const params = { ...base, pks_type: "FLM", pks_status: "need_renewal" as const };
     const url = omitDefaults(params);
 
-    expect(url).toEqual({ pks_status: "need_renewal" });
+    expect(url).toEqual({ pks_type: "FLM", pks_status: "need_renewal" });
     expect(parseParams(url)).toEqual(params);
   });
 
+  it("drops orphaned pks_type when pks_status is missing", () => {
+    const parsed = parseParams({ pks_type: "FLM" });
+    expect(parsed.pks_type).toBeUndefined();
+    expect(parsed.pks_status).toBeUndefined();
+  });
+
+  it("drops orphaned pks_status when pks_type is missing", () => {
+    const parsed = parseParams({ pks_status: "aktif" });
+    expect(parsed.pks_type).toBeUndefined();
+    expect(parsed.pks_status).toBeUndefined();
+  });
+
   it("drops an unknown pks_status instead of passing it to the API", () => {
-    expect(parseParams({ pks_status: "bogus" }).pks_status).toBeUndefined();
-    expect(parseParams({ pks_status: 3 }).pks_status).toBeUndefined();
+    expect(parseParams({ pks_type: "FLM", pks_status: "bogus" }).pks_status).toBeUndefined();
+    expect(parseParams({ pks_type: "FLM", pks_status: 3 }).pks_status).toBeUndefined();
   });
 
-  it("omits pks_status when unset", () => {
+  it("omits pks_type and pks_status when unset or partial", () => {
     expect(omitDefaults(base)).toEqual({});
+    expect(omitDefaults({ ...base, pks_type: "FLM" })).toEqual({});
+    expect(omitDefaults({ ...base, pks_status: "aktif" })).toEqual({});
   });
 
-  it("the search schema accepts only the five statuses", async () => {
+  it("the search schema requires both or neither", async () => {
     const { ADMIN_VENDORS_SEARCH_SCHEMA } = await import("./useAdminVendorsUrlState");
 
-    for (const v of ["aktif", "need_renewal", "expired", "terminated", "belum_diisi"]) {
-      expect(ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_status: v }).success).toBe(true);
-    }
-    expect(ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_status: "x" }).success).toBe(false);
+    expect(
+      ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_type: "FLM", pks_status: "aktif" }).success,
+    ).toBe(true);
+    expect(ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({}).success).toBe(true);
+    expect(ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_type: "FLM" }).success).toBe(false);
+    expect(ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_status: "aktif" }).success).toBe(false);
+    expect(
+      ADMIN_VENDORS_SEARCH_SCHEMA.safeParse({ pks_type: "FLM", pks_status: "invalid" }).success,
+    ).toBe(false);
   });
 });

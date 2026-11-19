@@ -48,7 +48,7 @@ func (h *AdminVendorPksHandler) Routes() chi.Router {
 	return r
 }
 
-// Get handles GET / -- active PKS, history and pending change.
+// Get handles GET / -- per PKS type: active PKS, history and pending change.
 func (h *AdminVendorPksHandler) Get(w http.ResponseWriter, r *http.Request) {
 	vendorID, err := parsePathID(r, "vendorID")
 	if err != nil {
@@ -63,7 +63,7 @@ func (h *AdminVendorPksHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, detail)
 }
 
-// Create handles POST / {pks_name, effective_date, expiry_date} -- 202 pending approval.
+// Create handles POST / {pks_type, wod_number, pks_name, effective_date, expiry_date} -- 202 pending approval.
 func (h *AdminVendorPksHandler) Create(w http.ResponseWriter, r *http.Request) {
 	authCtx, vendorID, ok := h.authAndVendor(w, r)
 	if !ok {
@@ -141,8 +141,14 @@ func handleVendorPksError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", "Vendor tidak ditemukan")
 	case errors.Is(err, service.ErrVendorPksNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "PKS tidak ditemukan")
+	case errors.Is(err, service.ErrVendorPksWodTaken):
+		writeJSON(w, http.StatusConflict, ErrorResponse{
+			Error:   "conflict",
+			Message: service.ErrVendorPksWodTaken.Error(),
+			Details: []FieldError{{Field: "wod_number", Message: service.ErrVendorPksWodTaken.Error()}},
+		})
 	case errors.Is(err, service.ErrMasterDataChangePending):
-		writeError(w, http.StatusConflict, "conflict", "Masih ada perubahan PKS yang menunggu persetujuan")
+		writeError(w, http.StatusConflict, "conflict", "Masih ada perubahan PKS (type ini) yang menunggu persetujuan")
 	case errors.Is(err, service.ErrVendorPksVendorInactive):
 		writeError(w, http.StatusConflict, "conflict", "Vendor nonaktif. Aktifkan vendor dulu")
 	case errors.Is(err, service.ErrVendorPksNotActive):

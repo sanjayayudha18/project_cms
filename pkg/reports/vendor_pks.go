@@ -47,13 +47,32 @@ func TodayWIB(now time.Time) time.Time { return civilDate(now.In(WIB)) }
 
 // VendorPksHeader is the column header of the export (Req 10.3).
 var VendorPksHeader = []string{"Kode Vendor", "Nama Perusahaan", "Nama Direktur Utama", "Telepon Direktur Utama",
-	"Email Direktur Utama", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS", "Masa Berlaku (bulan)",
-	"Monitoring PKS (hari)", "Status PKS"}
+	"Email Direktur Utama", "Type PKS", "No. WOD", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS",
+	"Masa Berlaku (bulan)", "Monitoring PKS (hari)", "Status PKS"}
 
-// VendorPksRow is one vendor of the export. Nil pointers = empty cell (no PKS / no director).
+// ParsePksFilter validates the pks_type + pks_status filter pair (Req 4.4/6.2): both empty = no filter,
+// both set = filter, only one = error. pks_type is trimmed and upper-cased; pks_status must be a PksStatuses key.
+// Whether the type code exists and is active is checked by the caller against the DB.
+func ParsePksFilter(pksType, pksStatus string) (typeCode, status string, err error) {
+	typeCode, status = strings.ToUpper(strings.TrimSpace(pksType)), strings.TrimSpace(pksStatus)
+	if typeCode == "" && status == "" {
+		return "", "", nil
+	}
+	if typeCode == "" || status == "" {
+		return "", "", fmt.Errorf("pks_type and pks_status must be given together")
+	}
+	if _, ok := PksStatuses[status]; !ok {
+		return "", "", fmt.Errorf("invalid pks_status %q", status)
+	}
+	return typeCode, status, nil
+}
+
+// VendorPksRow is one PKS (or one "belum diisi" vendor) of the export. Nil pointers = empty cell
+// (no PKS / no director).
 type VendorPksRow struct {
 	VendorCode, VendorName                     string
 	DirectorName, DirectorPhone, DirectorEmail *string
+	PksTypeCode, WodNumber                     *string
 	PksName                                    *string
 	EffectiveDate, ExpiryDate                  *time.Time
 	ValidityMonths, RemainingDays              *int32
@@ -69,8 +88,9 @@ func VendorPksCells(r VendorPksRow) []string {
 	return cells
 }
 
-// VendorPksDetailCells are the nine raw (NOT CSVSafe'd) cells after code+name: director name/phone/email,
-// PKS name, effective date, expiry date, validity months, remaining days, status label. Nil = empty cell.
+// VendorPksDetailCells are the eleven raw (NOT CSVSafe'd) cells after code+name: director name/phone/email,
+// PKS type code, WOD number, PKS name, effective date, expiry date, validity months, remaining days,
+// status label. Nil = empty cell.
 // The caller applies CSVSafe.
 func VendorPksDetailCells(r VendorPksRow) []string {
 	label := ""
@@ -79,7 +99,7 @@ func VendorPksDetailCells(r VendorPksRow) []string {
 	}
 	return []string{
 		str(r.DirectorName), str(r.DirectorPhone), str(r.DirectorEmail),
-		str(r.PksName), dateCell(r.EffectiveDate, nil), dateCell(r.ExpiryDate, nil),
+		str(r.PksTypeCode), str(r.WodNumber), str(r.PksName), dateCell(r.EffectiveDate, nil), dateCell(r.ExpiryDate, nil),
 		int32Cell(r.ValidityMonths), int32Cell(r.RemainingDays), label,
 	}
 }

@@ -87,6 +87,7 @@ func TestOpenAPIContract_RouteCoverage(t *testing.T) {
 		"/vendor/replenish-orders":      NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
 		"/dsr-late-reports":             NewDsrLateHandler(&contractDsrLate{}).Routes(),
 		"/admin/vendors/{vendorID}/pks": NewAdminVendorPksHandler(&contractPksSvc{}).Routes(),
+		"/admin/pks-types":              NewAdminPksTypeHandler(&contractPksTypeSvc{}).Routes(),
 		// cash-count (ScDD 5.1): the import mount only documents dry-run/confirm, not the batch history
 		"/cash-count/category-params":    NewCashCountCategoryParamsHandler(ccParamsSvc{}).Routes(),
 		"/cash-count/anomaly-categories": NewCashCountAnomalyCategoryHandler(ccAnomalySvc{}).Routes(),
@@ -140,6 +141,7 @@ type contractCase struct {
 	orders     *contractOrderSvc
 	dsrLate    *contractDsrLate
 	pks        *contractPksSvc
+	pksTypes   *contractPksTypeSvc
 	cc         *contractCC // cash-count fakes (cash_count_contract_test.go)
 	ctype      string      // Content-Type override (multipart uploads); "" = JSON
 	wantStatus int
@@ -238,6 +240,12 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 	}
 	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/admin/vendors/{vendorID}/pks", NewAdminVendorPksHandler(pks).Routes())
 
+	pksTypes := tc.pksTypes
+	if pksTypes == nil {
+		pksTypes = &contractPksTypeSvc{}
+	}
+	r.With(custommw.RequireAuth(ts)).Mount("/api/v1/admin/pks-types", NewAdminPksTypeHandler(pksTypes).Routes())
+
 	mountCashCount(r, ts, tc.cc, false)
 
 	req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
@@ -333,20 +341,30 @@ func (s *contractPksSvc) SubmitUnterminate(context.Context, int64, int64, int64,
 func contractPksFull() *service.VendorPksDetail {
 	t, status, days, reason := contractTime(), "need_renewal", 511, "kinerja buruk"
 	replacedBy := int64(31)
-	return &service.VendorPksDetail{
-		VendorID: 12, Kind: "FLM_VENDOR", Today: "2026-11-05", RenewalMonths: 9, PksStatus: &status,
-		Active: &service.VendorPksRecord{ID: 31, PksName: "PKS 2026", EffectiveDate: "2026-01-01", ExpiryDate: "2027-03-31",
+	flm := service.VendorPksGroup{
+		PksType: service.VendorPksTypeRef{Code: "FLM", Name: "FLM"}, PksStatus: &status,
+		Active: &service.VendorPksRecord{ID: 31, WodNumber: "WOD-031", PksName: "PKS 2026", EffectiveDate: "2026-01-01", ExpiryDate: "2027-03-31",
 			ValidityMonths: 15, RemainingDays: &days, CreatedAt: &t},
-		History: []service.VendorPksRecord{{ID: 30, PksName: "PKS 2024", EffectiveDate: "2024-01-01", ExpiryDate: "2025-12-31",
+		History: []service.VendorPksRecord{{ID: 30, WodNumber: "WOD-030", PksName: "PKS 2024", EffectiveDate: "2024-01-01", ExpiryDate: "2025-12-31",
 			ValidityMonths: 24, CreatedAt: &t, ReplacedAt: &t, ReplacedByPksID: &replacedBy, TerminatedAt: &t, TerminationReason: &reason}},
-		Pending: &service.VendorPksPending{ChangeRequestID: 88, Op: "create", Payload: json.RawMessage(`{"vendor_id":12,"pks_name":"PKS 2027"}`),
+		Pending: &service.VendorPksPending{ChangeRequestID: 88, Op: "create", Payload: json.RawMessage(`{"vendor_id":12,"pks_type_id":1,"pks_name":"PKS 2027"}`),
 			MakerID: 5, MakerName: "Budi", CreatedAt: &t},
+	}
+	// CIT: only a pending create — no active PKS, no status, empty history.
+	cit := service.VendorPksGroup{
+		PksType: service.VendorPksTypeRef{Code: "CIT", Name: "Cash in Transit"}, History: []service.VendorPksRecord{},
+		Pending: &service.VendorPksPending{ChangeRequestID: 89, Op: "create", Payload: json.RawMessage(`{"vendor_id":12,"pks_type_id":2}`),
+			MakerID: 5, MakerName: "Budi", CreatedAt: &t},
+	}
+	return &service.VendorPksDetail{
+		VendorID: 12, Kind: "FLM_VENDOR", Today: "2026-11-05", RenewalMonths: 9,
+		Groups: []service.VendorPksGroup{cit, flm},
 	}
 }
 
 // contractPksInternal is an INTERNAL vendor: no status, no active PKS, empty (non-nil) history.
 func contractPksInternal() *service.VendorPksDetail {
-	return &service.VendorPksDetail{VendorID: 12, Kind: "INTERNAL", Today: "2026-11-05", RenewalMonths: 9, History: []service.VendorPksRecord{}}
+	return &service.VendorPksDetail{VendorID: 12, Kind: "INTERNAL", Today: "2026-11-05", RenewalMonths: 9, Groups: []service.VendorPksGroup{}}
 }
 
 // contractPartyReader returns parties as the real service builds them (non-nil slices).
@@ -702,6 +720,7 @@ func contractCases(t *testing.T) []contractCase {
 		{name: "dsr late vendor role denied", method: http.MethodGet, path: dl + "/daily?month=2026-10", role: "VENDOR", wantStatus: 403},
 	}
 	cases = append(cases, contractPksCases()...)
+	cases = append(cases, contractPksTypeCases()...)
 	cases = append(cases, contractCashCountCases(t)...)
 	// every handleError class once, on a route that reaches it
 	for _, e := range []struct {

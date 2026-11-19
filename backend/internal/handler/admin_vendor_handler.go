@@ -21,6 +21,8 @@ import (
 type VendorAdminServicer interface {
 	List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
 	Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
+	ResolvePksFilterType(ctx context.Context, code string) (int64, error)
+	PksSummaries(ctx context.Context, vendorIDs []int64) (map[int64][]service.VendorPksSummary, error)
 	Get(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
 	GetKindAndDirector(ctx context.Context, id int64) (string, *db.GetVendorDirectorPicRow, error)
 	// Mutations stage a maker-checker change request (T4.1) and return it
@@ -77,13 +79,30 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		qParam = &v
 	}
 
+	// pks_type + pks_status are a pair: both or neither (Req 4.4).
+	typeCode, statusVal := q.Get("pks_type"), q.Get("pks_status")
+	if (typeCode == "") != (statusVal == "") {
+		writeError(w, http.StatusBadRequest, "bad_request", "pks_type dan pks_status harus diisi berdua")
+		return
+	}
 	var pksStatus *string
-	if v := q.Get("pks_status"); v != "" {
-		if _, ok := reports.PksStatuses[v]; !ok {
+	var pksTypeID *int64
+	if statusVal != "" {
+		if _, ok := reports.PksStatuses[statusVal]; !ok {
 			writeError(w, http.StatusBadRequest, "bad_request", "pks_status tidak valid")
 			return
 		}
-		pksStatus = &v
+		pksStatus = &statusVal
+		id, err := h.svc.ResolvePksFilterType(r.Context(), typeCode)
+		if errors.Is(err, service.ErrPksFilterType) {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+			return
+		}
+		if err != nil {
+			writeUnexpectedError(w, err)
+			return
+		}
+		pksTypeID = &id
 	}
 
 	var kind *string
@@ -96,7 +115,7 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	listArg := db.ListVendorsAdminParams{
-		Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind,
+		PksTypeID: pksTypeID, Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	}
 	rows, err := h.svc.List(r.Context(), listArg)
@@ -104,15 +123,24 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind})
+	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{PksTypeID: pksTypeID, Q: qParam, Status: status, PksStatus: pksStatus, Kind: kind})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
 		return
 	}
 
+	ids := make([]int64, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	pks, err := h.svc.PksSummaries(r.Context(), ids)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		return
+	}
 	items := make([]map[string]any, len(rows))
 	for i, row := range rows {
-		items[i] = listVendorRowToResponse(row)
+		items[i] = listVendorRowToResponse(row, pks[row.ID])
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"vendors": items, "page": page, "page_size": pageSize, "total": total,
@@ -314,28 +342,19 @@ func directorResponse(name string, phone, email *string) map[string]any {
 	return map[string]any{"name": name, "phone": phone, "email": email}
 }
 
-func listVendorRowToResponse(r db.ListVendorsAdminRow) map[string]any {
-	// ListVendorsAdmin COALESCEs the PKS columns (0 / ''); restore NULLs here:
-	// pks = null without an active PKS, pks_status = null for INTERNAL vendors.
-	var director, pks, pksStatus any
+func listVendorRowToResponse(r db.ListVendorsAdminRow, pks []service.VendorPksSummary) map[string]any {
+	var director any
 	if r.DirectorName != nil {
 		director = directorResponse(*r.DirectorName, r.DirectorPhone, r.DirectorEmail)
 	}
-	if r.PksID != nil {
-		pks = map[string]any{
-			"id": *r.PksID, "pks_name": r.PksName,
-			"effective_date": formatPgDate(r.PksEffectiveDate), "expiry_date": formatPgDate(r.PksExpiryDate),
-			"validity_months": r.PksValidityMonths, "remaining_days": r.PksRemainingDays,
-		}
-	}
-	if r.PksStatus != "" {
-		pksStatus = r.PksStatus
+	if pks == nil { // INTERNAL vendor or no active type: [] not null (Req 4.6)
+		pks = []service.VendorPksSummary{}
 	}
 	return map[string]any{
 		"id": r.ID, "code": r.Code, "name": r.Name, "legal_name": r.LegalName, "npwp": r.Npwp, "contact_email": r.ContactEmail,
 		"contact_phone": r.ContactPhone, "hq_address": r.HqAddress, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt),
-		"kind":       r.Kind, "director": director, "pks": pks, "pks_status": pksStatus,
+		"kind":       r.Kind, "director": director, "pks": pks,
 	}
 }
 

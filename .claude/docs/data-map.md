@@ -120,6 +120,34 @@ Spec: `.kiro/specs/vendor-pks/` (design "Data Models", D1–D32). Migrations `02
 *   **Export**: `export_jobs.kind = 'vendor_pks'` (migration 037), report params `q`, `status`, `pks_status`. Served by `backend-exq` at `POST /exports/reports/vendor-pks`.
 *   **Query note (sqlc v1.31.1)**: `ListVendorsAdmin` and `ExportVendorPksBatch` wrap `validity_months` and `remaining_days` in COALESCE to 0, and `pks_status` to `''`, because sqlc types these function/cast results as NOT NULL. A NULL meaning is "no active PKS" (`pks_id IS NULL`) or an INTERNAL vendor. The status filter uses the raw function, not the COALESCEd column.
 
+## Vendor PKS per Type (migration 043)
+
+<a id="vendor-pks-type-migration-043"></a>
+
+Spec: `.kiro/specs/vendor-pks-type/` (design "Data Models", Q1–Q9, DD1–DD10). Migration `043_vendor_pks_type.sql` applied to dev DB 2026-11-18 via `go run ./cmd/migrate up` (`migrate status`: 42 applied, 0 pending, no MISMATCH). Guard: migrasi 043 menolak dijalankan jika terdapat data `vendor_pks` atau change request `vendor_pks` berstatus `pending` (pada dev DB diverifikasi 0 baris).
+
+*   **`vendor_pks_types`**: identity PK. Master-data maker-checker entity `vendor_pks_type`.
+    *   `code` text UNIQUE NOT NULL, CHECK `code ~ '^[A-Z0-9_]{2,20}$'`.
+    *   `name` text NOT NULL, CHECK `length(btrim(name)) BETWEEN 1 AND 100`.
+    *   `is_active` boolean NOT NULL DEFAULT true.
+    *   `created_by` FK → `users(id)`, `created_at`, `updated_at` (trigger), `deleted_at`.
+    *   Seeded with `CIT` ("Cash in Transit") dan `FLM` ("First Line Maintenance") aktif.
+    *   Aturan disable: penonaktifan type diblokir jika type tersebut sedang dipakai oleh PKS aktif atau PKS terminated (`LockPksType` + cek penggunaan; melempar `ErrPksTypeInUse` yang menghasilkan HTTP 409 `pks_type_in_use`).
+*   **Perubahan pada `vendor_pks`**:
+    *   `pks_type_id` bigint NOT NULL FK → `vendor_pks_types(id)` ON DELETE RESTRICT.
+    *   `wod_number` text NOT NULL, CHECK `length(btrim(wod_number)) BETWEEN 1 AND 100`.
+    *   Index `vendor_pks_active_uq` diubah menjadi UNIQUE `(vendor_id, pks_type_id) WHERE replaced_at IS NULL` (satu PKS aktif per vendor per type).
+    *   Index `vendor_pks_wod_uq` baru: UNIQUE `(lower(btrim(wod_number))) WHERE replaced_at IS NULL` (No. WOD unik global di antara seluruh PKS aktif lintas vendor dan lintas type).
+    *   Index `vendor_pks_type_active_idx`: `(pks_type_id) WHERE replaced_at IS NULL`.
+*   **Maker-checker & Change Requests**:
+    *   Index `master_data_change_requests_vendor_pks_pending_uq` diubah menjadi UNIQUE `(cast(payload->>'vendor_id' as bigint), cast(payload->>'pks_type_id' as bigint)) WHERE entity_type = 'vendor_pks' AND status = 'pending'`.
+    *   Payload change request `vendor_pks` kini menyertakan `pks_type_id` dan `wod_number`. Terminate/unterminate change request menyertakan `pks_type_id`.
+    *   Index baru `master_data_change_requests_vendor_pks_wod_pending_uq`: partial unique pada `lower(btrim(payload->>'wod_number')) WHERE entity_type = 'vendor_pks' AND op = 'create' AND status = 'pending'` untuk mencegah race condition pengajuan No. WOD duplikat.
+    *   Index baru `master_data_change_requests_pks_type_code_pending_uq`: partial unique pada `upper(payload->>'code') WHERE entity_type = 'vendor_pks_type' AND op = 'create' AND status = 'pending'`.
+*   **Ekspor**:
+    *   CSV vendor master data: 6 kolom PKS (`pks_status`, `pks_name`, `effective_date`, `expiry_date`, `validity_months`, `remaining_days`) dihapus (header kini 7 kolom).
+    *   Ekspor `vendor_pks` (`backend-exq`): setiap baris mewakili satu PKS per type aktif. Menambahkan kolom `pks_type`, `pks_type_name`, dan `wod_number`. Filter kini mendukung pasangan `pks_type` dan `pks_status` (termasuk status netral `belum_diisi`).
+
 ## Cash count parameters (migration 041)
 
 Source: ScDD phase 5.1 `.claude/dev-plan/plan-perscope/dev-phase-perscope/5-cash-count/5.1-parameter.md` (gate 1 accepted 2026-11-12). File: `backend/migrations/041_cash_count_parameters.sql` (one tx, forward-only). Applied to dev 2026-11-13 via `go run ./cmd/migrate up` (40 applied, 0 pending). Next free number: `042`. The shapes below replace the draft in section B (items 2–3) of the FSD proposal.

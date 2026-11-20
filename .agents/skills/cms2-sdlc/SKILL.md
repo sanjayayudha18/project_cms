@@ -8,18 +8,18 @@ description: >-
   or says "fitur baru" / "spec baru" / "AI-DLC baru" / "lanjut tahap".
 ---
 
-# CMS2 SDLC Driver (Khusus Gemini / `.agents/`)
+# CMS2 SDLC & DevPlanner Driver (Khusus Gemini / `.agents/`)
 
-Sumber kebenaran: `.agents/rules/GEMINI.md`. Seluruh artefak fitur baru yang dikerjakan oleh Gemini disimpan di `.agents/specs/<feature>/` agar terpisah dari `.claude/` dan `.kiro/`.
+Sumber kebenaran: `.agents/rules/GEMINI.md` dan `.agents/agents/gemini-cms-devplanner.md`.
 
 ## Langkah 0 — Selalu Jalankan Sebelum Menulis Kode
 
-1. Tanyakan kepada user:
-   *"Perlu dibuat spec baru (`.agents/specs/<feature>/`) atau cukup dokumentasi bug fix (`.agents/bugfixes.md`)?"*
-   Tunggu jawaban user.
-   - Jika bug fix -> gunakan skill `cms2-bugfix` dan catat di `.agents/bugfixes.md`.
-   - Perubahan yang menyentuh autentikasi, uang/jurnal, rekonsiliasi, migrasi/skema database, atau penghapusan data -> **wajib** melalui alur spec penuh.
-2. Periksa `.agents/specs/<feature>/` (dan `.agents/specs/done/`). Jika sudah ada, cari **file terakhir dengan `> Status: accepted`** lalu lanjutkan dari tahap berikutnya.
+1. Sajikan 4 metode pengembangan kepada user dengan analisis & rekomendasi (Opsi B):
+   - **1. Spec-Driven Dev** (`.agents/specs/<feature>/`): 6-Tahap formal untuk fitur kritis (skema DB, finansial, auth, maker-checker).
+   - **2. Scope-Driven Dev** (`.agents/scopes/<feature>/`): Batasan MVP & MoSCoW (`scope.md` -> `tasks.md`) untuk rilis cepat/timebox.
+   - **3. Bug Fix** (`.agents/bugfixes.md`): Perbaikan error/kegagalan sistem menggunakan failing test terlebih dahulu.
+   - **4. Small Change Dev** (`.agents/changes.md`): Perubahan minor <2 file (tweak UI, ubah text, tanpa migrasi DB).
+2. Periksa folder terkait (`.agents/specs/`, `.agents/scopes/`, atau file log). Jika sudah ada, cari **file terakhir dengan `> Status: accepted`** lalu lanjutkan dari tahap berikutnya.
    Jika kode dan artefak tidak sinkron -> **BERHENTI** dan tanyakan ke user.
 3. Nama folder menggunakan format `kebab-case` (misalnya `vendor-pks`, `vendor-export-pks`).
 
@@ -32,7 +32,7 @@ Setiap file diawali dengan `# <Judul>` lalu baris `> Status: draft`. Hanya user 
 | :--- | :--- | :--- | :--- |
 | **1 Plan & Requirements** | `requirements.md` (`## Introduction`, `## Open Questions`, & EARS Requirements) | PO/User menjawab open questions & menyetujui `requirements.md` (`accepted`) | Tangkap masalah, hasil yang diharapkan, batasan, open questions, dan tulis EARS requirements setelah open questions terjawab. **Berhenti dan tunggu review user sebelum membuat `design.md`.** |
 | **2 Design** | `design.md` | Engineer/User menyetujui `design.md` (`accepted`) | Tulis kontrak API, model data, Correctness Properties, out-of-scope; tandai area kritis (auth/uang/recon/migrasi/delete). **Berhenti dan tunggu review user sebelum membuat `tasks.md`.** |
-| **3 Build** | `tasks.md` | Engineer menyetujui tasks | Susun daftar task dengan `_Requirements:_`, `_Model:_`, `_Skills:_` (sesuai matriks di `cms-orchestrator.md`), dan `## Task Dependency Graph`. Eksekusi per task/wave dengan diff kecil. |
+| **3 Build** | `tasks.md` | Engineer menyetujui tasks | Susun daftar task dengan `_Requirements:_`, `_Model:_`, `_Skills:_` (sesuai matriks di `gemini-cms-orchestrator.md`), dan `## Task Dependency Graph`. Eksekusi per task/wave dengan diff kecil. |
 | **4 Test** | `tasks.md` -> `## Notes` -> `### Test Results` | Build + automated tests hijau | Jalankan perintah verifikasi dari `.agents/rules/GEMINI.md` (`go test ./...`, `golangci-lint`, `pnpm ... test/build/lint`). Catat verifikasi browser manual sebagai `outstanding (user)`. |
 | **5 Deploy** | `review.md` | Code owner melakukan merge | Dokumentasikan `## Review Passes`, `## Findings` (Important vs nit), dan checklist `## Definition of Done`. |
 | **6 Maintain** | `incidents.md` | On-call | Catat `## Signals` dan `## Incident Log` beserta regression test yang ditambahkan. |

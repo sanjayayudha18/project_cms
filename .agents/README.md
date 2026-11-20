@@ -14,15 +14,22 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 ├── development-progress.md      # Tracking status fitur yang dikerjakan oleh Gemini
 ├── lessons-learned.md           # Catatan pembelajaran dari review/insiden
 ├── agents/
-│   ├── cms2-sdlc.md             # Agent perancang & pengawal 6-tahap AI-Native SDLC
-│   ├── cms-orchestrator.md      # Orchestrator pembuka session baru sesuai task & model di dokumen
+│   ├── gemini-cms-devplanner.md # Agent perancang & pengawal AI-Native SDLC (Spec, Scope, Bugfix, Small Change)
+│   ├── gemini-cms-orchestrator.md # Orchestrator pembuka session baru sesuai task & model di dokumen
 │   ├── cms-task-runner.md       # Instruksi dasar eksekutor task per wave
 │   ├── db-sqlc-architect.md     # Subagent spesialis PostgreSQL, migrasi & sqlc v1.31.1
 │   ├── go-backend-specialist.md # Subagent spesialis Go + Chi v5 (backend/, backend-exq/, pkg/)
 │   ├── react-portal-specialist.md # Subagent spesialis React + Vite & UI/UX kedua portal
 │   └── security-fin-reviewer.md # Subagent auditor keamanan & aturan finansial (read-only)
 ├── rules/
-│   └── GEMINI.md                # Aturan proyek (auto-loaded oleh Antigravity, batas ≤ 24 KB/file)
+│   ├── GEMINI.md                # Aturan utama & single source of truth (auto-loaded oleh Antigravity, batas ≤ 24 KB/file)
+│   ├── graphify.md              # Aturan navigasi knowledge graph AST lokal
+│   └── steering/                # Panduan teknis domain mendalam:
+│       ├── database.md          # Skema DB, SQLC, topologi db/dbRead, migrasi 001-045
+│       ├── backend.md           # Go workspace (go.work), Flat vs Envelope JSON, Python EOD, deploy GCP
+│       ├── security-compliance.md # Maker-checker, audit logs atomik, deviasi GR#3, RBAC, LDAP vs lokal
+│       ├── frontend.md          # Dual portal CompanyPortal vs VendorPortal, brand, OpenAPI sync, 4 UI state
+│       └── sdlc-protocols.md    # 4 Metode SDLC, sequential human gate, the leash Sec 4, tech-debt
 ├── skills/
 │   ├── cms2-sdlc/
 │   │   └── SKILL.md             # Driver 6-tahap AI-Native SDLC

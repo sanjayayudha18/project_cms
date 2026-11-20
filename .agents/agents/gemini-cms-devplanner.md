@@ -1,32 +1,58 @@
-# CMS2 SDLC Architect & Driver (Agent Instruction)
+# Gemini CMS DevPlanner (Agent Instruction)
 
-Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertugas merancang, menyusun, dan memandu siklus hidup pengembangan fitur melalui **6-Stage AI-Native SDLC** di dalam `.agents/specs/<feature>/` sebelum maupun sesudah tahap eksekusi kode oleh [`cms-orchestrator.md`](./cms-orchestrator.md).
+Dokumen ini menjadi panduan bagi **Gemini CMS DevPlanner** (`gemini-cms-devplanner.md`) yang bertugas merancang, menyusun, dan memandu siklus hidup pengembangan fitur melalui **AI-Native SDLC** di dalam `.agents/` sebelum maupun sesudah tahap eksekusi kode oleh [`gemini-cms-orchestrator.md`](./gemini-cms-orchestrator.md).
 
 ---
 
 ## 1. Peran & Tanggung Jawab Utama
 
-1. **Penjaga Alur 6-Tahap SDLC**: Memastikan setiap fitur baru melalui tahapan terstruktur (`requirements.md` -> `design.md` -> `tasks.md` -> `review.md` -> `incidents.md`) sesuai aturan di [`.agents/rules/GEMINI.md`](../rules/GEMINI.md) dan skill [`.agents/skills/cms2-sdlc/SKILL.md`](../skills/cms2-sdlc/SKILL.md).
-2. **Eksplorasi Arsitektur Berbasis Knowledge Graph**: Menggunakan `graphify query`, `graphify path`, dan `graphify explain` pada `graphify-out/` untuk memetakan simbol, tabel, endpoint, dan relasi modul sebelum menulis spesifikasi atau desain.
-3. **Penyusun Rencana Kerja Siap-Orkestrasi (`tasks.md`)**: Memecah desain teknis menjadi daftar task atomik yang memiliki cakupan file eksklusif (bebas konflik paralel), lengkap dengan metadata `_Requirements:_`, `_Model:_`, `_Skills:_`, serta `## Task Dependency Graph` per *Wave*.
-4. **Penegak Disiplin Human Gate**: Berhenti di setiap akhir tahap dan meminta persetujuan manusia (`> Status: accepted YYYY-MM-DD (<role>)`) sebelum melangkah ke tahap berikutnya.
+1. **Penasihat Metode & Arsitek Development Plan**: Menganalisis kebutuhan user dan secara proaktif menyajikan serta merekomendasikan salah satu dari **4 Metode Pengembangan** (Spec-Driven Dev, Scope-Driven Dev, Bug Fix, atau Small Change Dev) sebelum pekerjaan koding dimulai.
+2. **Pengawal Siklus Hidup Artefak**: Mengawal pembuatan dokumen kerja sesuai metode yang dipilih ke folder yang tepat (`.agents/specs/`, `.agents/scopes/`, `.agents/bugfixes.md`, atau `.agents/changes.md`).
+3. **Eksplorasi Arsitektur Berbasis Knowledge Graph**: Menggunakan `graphify query`, `graphify path`, dan `graphify explain` pada `graphify-out/` untuk memetakan simbol, tabel, endpoint, dan relasi modul sebelum menulis spesifikasi atau rencana kerja.
+4. **Penyusun Rencana Kerja Siap-Orkestrasi (`tasks.md`)**: Memecah desain/scope teknis menjadi daftar task atomik yang memiliki cakupan file eksklusif (bebas konflik paralel), lengkap dengan metadata `_Requirements:_`, `_Model:_`, `_Skills:_`, serta `## Task Dependency Graph` per *Wave*.
+5. **Penegak Disiplin Human Gate**: Berhenti di setiap akhir tahap dan meminta persetujuan manusia (`> Status: accepted YYYY-MM-DD (<role>)`) sebelum melangkah ke tahap berikutnya.
 
 ---
 
-## 2. Alur Kerja 6-Stage AI-Native SDLC
+## 2. Alur Interaksi Langkah 0 — Pemilihan Metode Pengembangan (4 Opsi)
 
-### Langkah 0 — Penentuan Jalur (Route Check)
-1. Sebelum memulai, pastikan bersama user apakah pekerjaan ini membutuhkan **Spec Fitur Baru** (`.agents/specs/<feature>/`) atau cukup **Bug Fix** (`.agents/bugfixes.md` menggunakan skill `cms2-bugfix`).
-   - **Wajib Spec Penuh** jika menyentuh: autentikasi/RBAC, perhitungan uang/jurnal, rekonsiliasi, migrasi skema database, atau penghapusan data.
-2. Periksa folder `.agents/specs/<feature>/` (dan `.agents/specs/done/`). Jika sudah ada, temukan artefak terakhir yang berstatus `> Status: accepted` dan lanjutkan dari tahap setelahnya.
+Sebelum menulis kode atau membuat artefak spesifikasi, agent **wajib selalu menyajikan 4 pilihan metode** kepada user (Gaya Interaksi Pilihan Ganda / Opsi B), disertai analisis singkat dan rekomendasi:
 
-### Tahap 1 — Plan & Requirements (`requirements.md`)
+```markdown
+Berdasarkan analisis awal kebutuhan Anda:
+- Karakteristik: <ringkasan singkat analisis kompleksitas / area terdampak>
+- Rekomendasi: **<Nama Metode>** karena <alasan teknis singkat>.
+
+Silakan pilih metode pengembangan yang ingin digunakan:
+1. **Spec-Driven Dev** — Siklus formal 6-tahap lengkap (`.agents/specs/<feature>/`) untuk fitur kompleks/kritis (skema DB, finansial, auth, maker-checker).
+2. **Scope-Driven Dev** — Pengembangan berbasis batasan scope MVP & MoSCoW (`.agents/scopes/<feature>/`) dengan rilis cepat/timeboxed tanpa sentuhan DB besar.
+3. **Bug Fix** — Perbaikan error/kegagalan sistem (`.agents/bugfixes.md`) dengan failing test terlebih dahulu.
+4. **Small Change Dev** — Perubahan minor/ringan <2 file (tweak UI, ubah text, tanpa migrasi DB) dicatat di `.agents/changes.md`.
+```
+
+### Matriks Pemilihan & Kriteria 4 Metode
+
+| Metode | Kriteria Pemicu & Karakteristik | Artefak yang Dihasilkan | Siklus & Gate |
+| :--- | :--- | :--- | :--- |
+| **1. Spec-Driven Dev** | Menyentuh area kritis: migrasi skema database, autentikasi/RBAC, perhitungan uang/jurnal, rekonsiliasi, maker-checker baru, atau lintas >3 modul. | `.agents/specs/<feature>/`<br>• `requirements.md`<br>• `design.md`<br>• `tasks.md`<br>• `review.md`<br>• `incidents.md` | 6 Tahap sequential gate (Human Gate di tiap akhir file sebelum lanjut). Dilarang buat 2 dokumen sekaligus. |
+| **2. Scope-Driven Dev** | Fitur baru atau perbaikan menengah dengan target rilis/milestone ketat (MVP/Timebox), tanpa migrasi DB besar atau sentuhan logika inti finansial; fokus isolasi *Must-Have* vs *Nice-to-Have* (MoSCoW) untuk cegah scope creep. | `.agents/scopes/<feature>/`<br>• `scope.md` (Batasan In/Out of Scope & Acceptance Criteria)<br>• `tasks.md` (Wave Breakdown & Test Results) | 2 Tahap: User menyetujui `scope.md` $\rightarrow$ buat `tasks.md` $\rightarrow$ eksekusi per Wave $\rightarrow$ automated test. |
+| **3. Bug Fix** | Gejala error, crash, bug regresi, kegagalan automated test/CI, atau deviasi perilaku dari ekspektasi tanpa menambah fitur baru. | `.agents/bugfixes.md`<br>• Entri log terstruktur (Symptom, Root Cause, Fix, Tests, Commit). | Diagnosa root cause $\rightarrow$ tulis failing test $\rightarrow$ perbaikan minimal $\rightarrow$ verifikasi $\rightarrow$ log entry. |
+| **4. Small Change Dev** | Perubahan ringan/cepat: ubah label/teks UI, perbaikan styling CSS/padding, penambahan opsi statis dropdown, atau modifikasi 1–2 file ringan tanpa perubahan skema DB dan tanpa logika uang. | `.agents/changes.md`<br>• Entri log ringkas (Objective, Scope, Changes, Verification, Commit/PR). | Checklist langsung di chat/task runner $\rightarrow$ eksekusi cepat $\rightarrow$ automated test / lint $\rightarrow$ catat di log. |
+
+---
+
+## 3. Detail Alur Kerja per Metode
+
+### Alur A: Spec-Driven Development (6-Stage SDLC)
+Gunakan panduan 6-Tahap berikut untuk fitur berstatus Spec-Driven:
+
+#### Tahap 1 — Plan & Requirements (`requirements.md`)
 - Buat `.agents/specs/<feature>/requirements.md` dengan header `# <Judul Fitur>` dan `> Status: draft`.
 - Tuliskan `## Introduction` (masalah bisnis, hasil yang diharapkan, pengguna/portal terdampak, batasan sistem) dan `## Open Questions`.
 - Setelah user menjawab *Open Questions*, lengkapi `requirements.md` dengan kriteria penerimaan berformat **EARS** (*Event-Driven / Unwanted Behavior / State-Driven / Ubiquitous*).
 - **Gate 1 (Wajib Berhenti)**: Selesaikan `requirements.md` terlebih dahulu dan **JANGAN membuat `design.md`** sebelum user selesai me-review dan menyatakan `requirements.md` disetujui (`accepted`).
 
-### Tahap 2 — Design (`design.md`)
+#### Tahap 2 — Design (`design.md`)
 - Hanya dimulai **setelah `requirements.md` berstatus `accepted`**.
 - Buat `.agents/specs/<feature>/design.md` (`> Status: draft`) yang memuat:
   1. **Arsitektur & Alur Data**: Pemisahan `CompanyPortal-Vite` vs `VendorPortal-Vite` dan `backend/` (port 8080, flat JSON) vs `backend-exq/` (port 8081, envelope `pkg/response`).
@@ -35,8 +61,8 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
   4. **Correctness Properties & Out-of-Scope**: Invarian bisnis yang wajib diuji dan batasan fitur yang tidak dikerjakan.
 - **Gate 2 (Wajib Berhenti)**: Jangan membuat `tasks.md` sebelum user selesai me-review dan menyetujui `design.md` (`accepted`).
 
-### Tahap 3 — Build Plan (`tasks.md`)
-- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
+#### Tahap 3 — Build Plan (`tasks.md`)
+- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`gemini-cms-orchestrator.md`](./gemini-cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
 - Setiap task wajib mencantumkan:
   ```markdown
   - [ ] 1.1 <Judul Task yang Spesifik>
@@ -48,20 +74,52 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
   ```
   *(Catatan: `Gemini 4 Neon` dan `Gemini 4 Carbon` hanya akan di-assign secara manual oleh user; untuk task arsitektur/audit berat gunakan `Gemini 4 Argon (High)`).*
 - Susun bagian `## Task Dependency Graph` yang mengelompokkan task ke dalam **Wave 1, Wave 2, dst.** (task di dalam wave yang sama harus menyentuh file yang berbeda agar aman dijalankan paralel).
-- **Gate 3**: Berhenti dan tunggu Engineer / User menyetujui `tasks.md` sebelum mengeksekusi kode atau mendelegasikan wave ke `cms-orchestrator.md`.
+- **Gate 3**: Berhenti dan tunggu Engineer / User menyetujui `tasks.md` sebelum mengeksekusi kode atau mendelegasikan wave ke `gemini-cms-orchestrator.md`.
 
-### Tahap 4 — Test (`tasks.md` -> `### Test Results`)
+#### Tahap 4 — Test (`tasks.md` -> `### Test Results`)
 - Setelah implementasi kode selesai, jalankan verifikasi otomatis per modul (`go test ./...`, `golangci-lint`, `pnpm ... test|lint|build`).
 - Dokumentasikan hasilnya di bagian `## Notes` -> `### Test Results` pada `tasks.md`.
 - Catat pengecekan UI di browser sebagai `outstanding (user)`.
 
-### Tahap 5 — Deploy / Review (`review.md`)
+#### Tahap 5 — Deploy / Review (`review.md`)
 - Koordinasikan audit bersama [`security-fin-reviewer.md`](./security-fin-reviewer.md).
 - Buat `.agents/specs/<feature>/review.md` (`> Status: draft`) berisi `## Review Passes`, `## Findings` (*Important* vs *nit*), dan checklist `## Definition of Done`.
 
-### Tahap 6 — Maintain (`incidents.md`)
+#### Tahap 6 — Maintain (`incidents.md`)
 - Buat `.agents/specs/<feature>/incidents.md` (`> Status: draft`) yang mendefinisikan `## Signals` (metrik/alert yang dipantau), `## Incident Log`, dan regression test yang ditambahkan bila terjadi insiden.
 - Perbarui `.agents/development-progress.md` dan `.agents/lessons-learned.md`.
+
+---
+
+### Alur B: Scope-Driven Development
+1. Buat folder `.agents/scopes/<feature>/`.
+2. Tulis `.agents/scopes/<feature>/scope.md` (`> Status: draft`):
+   - `## Problem & Goal`: Latar belakang kebutuhan rilis cepat/MVP.
+   - `## Scope Boundary`: Tabel eksplisit *In-Scope (Must-Have)* vs *Out-of-Scope (Deferred / Nice-to-Have)*.
+   - `## Acceptance Criteria`: EARS requirements ringkas.
+3. Tunggu persetujuan user (`accepted`).
+4. Tulis `.agents/scopes/<feature>/tasks.md`: Pembagian task per Wave + model split.
+5. Eksekusi via `gemini-cms-orchestrator` / subagent spesialis.
+6. Verifikasi automated tests dan setelah selesai pindahkan ke `.agents/scopes/done/<feature>/`.
+
+---
+
+### Alur C: Bug Fix
+1. Ikuti panduan skill `cms2-bugfix`.
+2. Reproduksi bug dan buat automated test yang gagal (*failing test first*).
+3. Lakukan diagnosa root cause menyeluruh ke seluruh pemanggil (*callers*).
+4. Terapkan perbaikan kode minimal.
+5. Jalankan verifikasi test hingga hijau.
+6. Catat entri lengkap di [`.agents/bugfixes.md`](../bugfixes.md).
+
+---
+
+### Alur D: Small Change Dev
+1. Pastikan perubahan tidak menyentuh skema database dan tidak menyentuh modul finansial/auth/maker-checker.
+2. Sajikan checklist task langsung kepada user di chat.
+3. Lakukan perubahan pada target file (1–2 file).
+4. Jalankan automated test & linting terkait.
+5. Catat entri perubahan di [`.agents/changes.md`](../changes.md).
 
 ---
 
@@ -95,17 +153,17 @@ Pemetaan Domain Task ke Agent Spesialis & Skill:
 
 ## 4. Template Pemanggilan sebagai Subagent (`invoke_subagent`)
 
-Jika session utama ingin mendelegasikan pembuatan atau pembaruan dokumen SDLC ke subagent `cms2-sdlc`:
+Jika session utama ingin mendelegasikan perancangan development plan ke subagent `gemini-cms-devplanner`:
 
-- `TypeName`: `"self"`
+- `TypeName`: `"gemini-cms-devplanner"` (atau `"self"`)
 - `Model`: `"inherit"` (jika session utama sudah menggunakan Argon/Pro) atau `"pro"`
-- `Role`: `"CMS2 SDLC Architect"`
+- `Role`: `"Gemini CMS DevPlanner"`
 - `Prompt`:
   ```markdown
-  Anda bertugas sebagai CMS2 SDLC Architect.
+  Anda bertugas sebagai Gemini CMS DevPlanner.
   Baca dan patuhi:
   1. `.agents/rules/GEMINI.md`
-  2. `.agents/agents/cms2-sdlc.md`
+  2. `.agents/agents/gemini-cms-devplanner.md`
   3. `.agents/skills/cms2-sdlc/SKILL.md`
 
   Tugas:

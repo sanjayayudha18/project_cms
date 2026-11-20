@@ -34,6 +34,7 @@ import {
   Shield,
   ShieldCheck,
   UserCog,
+  UserPlus,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -435,15 +436,29 @@ export function SettingsHubPage() {
         title="Pengaturan"
         description="Kelola akses, alur persetujuan, dan data master CMS."
         actions={
-          <button
-            type="button"
-            title="Bantuan"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 hover:bg-[var(--n-50)]"
-            style={{ borderColor: "var(--n-200)", color: "var(--n-600)" }}
-          >
-            <HelpCircle size={20} aria-hidden="true" />
-            <span className="sr-only">Bantuan</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {canSeeRoleManagementCard(userRole) && (
+              // Same roles as backend /api/v1/admin/users (APPACCESS + ADMIN).
+              <Link
+                to="/settings/admin/users"
+                search={{ create: true }}
+                className="flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] px-[var(--space-5)] text-sm font-semibold text-white transition-colors duration-200 hover:brightness-95"
+                style={{ backgroundColor: "var(--red-600)" }}
+              >
+                <UserPlus size={16} aria-hidden="true" />
+                Tambah Pengguna
+              </Link>
+            )}
+            <button
+              type="button"
+              title="Bantuan"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 hover:bg-[var(--n-50)]"
+              style={{ borderColor: "var(--n-200)", color: "var(--n-600)" }}
+            >
+              <HelpCircle size={20} aria-hidden="true" />
+              <span className="sr-only">Bantuan</span>
+            </button>
+          </div>
         }
       />
 

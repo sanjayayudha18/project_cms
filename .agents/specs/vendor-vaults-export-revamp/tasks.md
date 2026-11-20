@@ -4,7 +4,7 @@
 
 ## Overview
 
-Rencana implementasi terstruktur untuk merestrukturisasi skema dan kolom ekspor/impor **Vendor Vaults** (`/exports/vendor-vaults`), **Vendor Branches** (`/exports/vendor-branches`), **Vendors** (`/exports/vendors`), serta menambahkan menu dataset baru **PKS Vendor** (`/exports/vendor-pks`). Setiap task dirancang dengan cakupan file eksklusif per *Wave* sehingga siap dieksekusi oleh [`cms-orchestrator.md`](../../agents/cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
+Rencana implementasi terstruktur untuk merestrukturisasi skema dan kolom ekspor/impor **Vendor Vaults** (`/exports/vendor-vaults`), **Vendor Branches** (`/exports/vendor-branches`), **Vendors** (`/exports/vendors`), serta menambahkan menu dataset baru **PKS Vendor** (`/exports/vendor-pks`). Setiap task dirancang dengan cakupan file eksklusif per *Wave* sehingga siap dieksekusi oleh [`gemini-cms-orchestrator.md`](../../agents/gemini-cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
 
 ## Model Split
 

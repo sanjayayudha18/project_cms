@@ -1,6 +1,6 @@
-# CMS Orchestrator (Session & Subagent Dispatcher)
+# Gemini CMS Orchestrator (Session & Subagent Dispatcher)
 
-Dokumen ini menjadi panduan bagi **Orchestrator Agent** yang bertugas membaca dokumen rencana kerja (seperti `.agents/specs/<feature>/tasks.md` atau dokumen spesifikasi task lainnya) dan **menjalankan session subagent baru** (`invoke_subagent`) sesuai dengan **cakupan task**, **peran spesialis**, dan **model** yang diminta di dalam dokumen.
+Dokumen ini menjadi panduan bagi **Gemini CMS Orchestrator** yang bertugas membaca dokumen rencana kerja (seperti `.agents/specs/<feature>/tasks.md` atau dokumen spesifikasi task lainnya) dan **menjalankan session subagent baru** (`invoke_subagent`) sesuai dengan **cakupan task**, **peran spesialis**, dan **model** yang diminta di dalam dokumen.
 
 ---
 
@@ -27,7 +27,7 @@ Dokumen ini menjadi panduan bagi **Orchestrator Agent** yang bertugas membaca do
 
    | Indikator File / Kata Kunci pada Task | Subagent Spesialis (`.agents/agents/`) | Skills yang Di-assign Otomatis (`.agents/skills/`) | `Role` pada `invoke_subagent` | `TypeName` |
    | :--- | :--- | :--- | :--- | :--- |
-   | `.agents/specs/<feature>/` (`requirements.md`, `design.md`, `tasks.md`, `review.md`, `incidents.md`) | `cms2-sdlc.md` | `cms2-sdlc`, `graphify` | `"CMS2 SDLC Architect"` | `"self"` |
+   | `.agents/specs/<feature>/` (`requirements.md`, `design.md`, `tasks.md`, `review.md`, `incidents.md`) | `gemini-cms-devplanner.md` | `cms2-sdlc`, `graphify` | `"Gemini CMS DevPlanner"` | `"gemini-cms-devplanner"` (atau `"self"`) |
    | `migrations/`, `queries/*.sql`, `sqlc.yaml`, `internal/db/`, index, tabel baru | `db-sqlc-architect.md` | `db-migration-sqlc` (+ `sql-query-tuning` jika menyentuh reporting/index/export) | `"DB & sqlc Architect"` | `"self"` |
    | `internal/handler/`, `internal/service/`, `internal/repository/`, `cmd/api/main.go` | `go-backend-specialist.md` | `go-chi-endpoint` (+ `cms2-master-data` jika menyentuh `applier` / `Submit` / `approval_requests`) | `"Go Backend Specialist"` | `"self"` |
    | Entitas master data (`vendors`, `vendor_branches`, `vendor_vaults`, `vendor_pics`, `atms`, `dsr_location_vault_maps`, dll.) | `go-backend-specialist.md` / `react-portal-specialist.md` | `cms2-master-data` (+ `go-chi-endpoint` di BE / `react-ui-ux-craft` di FE) | `"Master Data Specialist"` | `"self"` |
@@ -76,7 +76,7 @@ Untuk setiap task yang siap dijalankan:
    - `Workspace`: `"inherit"` (default, dengan batasan file ketat per task agar aman berjalan paralel).
 2. Gunakan template `Prompt` berikut saat memanggil `invoke_subagent`:
    ```markdown
-   Anda dijalankan pada session baru oleh CMS Orchestrator.
+   Anda dijalankan pada session baru oleh Gemini CMS Orchestrator.
    Baca dan patuhi aturan di:
    1. `.agents/rules/GEMINI.md`
    2. `.agents/agents/cms-task-runner.md`

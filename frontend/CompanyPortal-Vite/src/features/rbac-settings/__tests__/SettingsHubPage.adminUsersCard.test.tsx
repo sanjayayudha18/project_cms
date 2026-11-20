@@ -109,3 +109,20 @@ describe("SettingsHubPage — Daftar PKS card per role (Req 9.3)", () => {
     expect(screen.getByRole("link", { name: /Daftar PKS/ })).toBeInTheDocument();
   });
 });
+
+describe("SettingsHubPage — Tambah Pengguna button", () => {
+  it.each(["APPACCESS", "ADMIN"] as const)("links to the users page for %s", (role) => {
+    setUser(role);
+    render(<SettingsHubPage />);
+    expect(screen.getByRole("link", { name: /Tambah Pengguna/ })).toHaveAttribute(
+      "href",
+      "/settings/admin/users",
+    );
+  });
+
+  it.each(["ADMIN_PARAM", "ATM-SPV"] as const)("is hidden for %s", (role) => {
+    setUser(role);
+    render(<SettingsHubPage />);
+    expect(screen.queryByRole("link", { name: /Tambah Pengguna/ })).not.toBeInTheDocument();
+  });
+});

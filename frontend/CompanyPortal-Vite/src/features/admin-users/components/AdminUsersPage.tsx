@@ -15,7 +15,8 @@ import { UsersTable } from "./UsersTable";
 
 /** Admin Users screen (Req 2-5): filterable/paginated table + create/edit/disable/enable. */
 export function AdminUsersPage() {
-  const { params, searchInput, setSearchInput, setParams } = useAdminUsersUrlState();
+  const { params, searchInput, setSearchInput, setParams, shouldOpenCreate } =
+    useAdminUsersUrlState();
   const { toast } = useToast();
 
   const usersQuery = useUsersList(params);
@@ -26,7 +27,7 @@ export function AdminUsersPage() {
   const enableMutation = useEnableUser();
 
   const [formUser, setFormUser] = useState<AdminUser | null>(null);
-  const [isFormOpen, setFormOpen] = useState(false);
+  const [isFormOpen, setFormOpen] = useState(shouldOpenCreate);
   const [pendingAction, setPendingAction] = useState<{
     type: "disable" | "enable";
     user: AdminUser;
@@ -39,6 +40,11 @@ export function AdminUsersPage() {
   function openCreate(): void {
     setFormUser(null);
     setFormOpen(true);
+  }
+
+  function closeForm(): void {
+    setFormOpen(false);
+    if (shouldOpenCreate) setParams({}); // drop ?create so refresh/back doesn't reopen it
   }
 
   function openEdit(user: AdminUser): void {
@@ -127,7 +133,7 @@ export function AdminUsersPage() {
         </div>
       </div>
 
-      <UserFormDialog open={isFormOpen} onClose={() => setFormOpen(false)} user={formUser} />
+      <UserFormDialog open={isFormOpen} onClose={closeForm} user={formUser} />
 
       <ConfirmActionDialog
         open={pendingAction !== null}

@@ -215,3 +215,23 @@ describe("AdminUsersPage — states and navigation (fe-coverage C2)", () => {
     expect(nav.navigate).toHaveBeenLastCalledWith({ to: ".", search: { status: "all" } });
   });
 });
+
+describe("AdminUsersPage — ?create=true from the Settings hub", () => {
+  it("opens the Tambah Pengguna dialog on arrival and drops ?create on close", async () => {
+    nav.search = { create: true };
+    render(<AdminUsersPage />);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Tambah Pengguna")).toBeInTheDocument();
+
+    await userEvent.setup().click(within(dialog).getByRole("button", { name: "Batal" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(nav.navigate).toHaveBeenCalledWith({ to: ".", search: {} });
+  });
+
+  it("keeps the dialog closed without ?create", () => {
+    render(<AdminUsersPage />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});

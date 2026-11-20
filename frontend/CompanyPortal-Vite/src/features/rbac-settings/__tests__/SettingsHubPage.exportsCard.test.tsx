@@ -54,7 +54,7 @@ it("shows only the import and export cards on the Export & Import tab", async ()
   for (const name of [/Impor CSV Data Master/, /Export Data/]) {
     expect(within(io).getByRole("link", { name })).toBeInTheDocument();
   }
-  expect(screen.getAllByRole("link")).toHaveLength(2);
+  expect(within(io).getAllByRole("link")).toHaveLength(2);
   expect(screen.queryByRole("region", { name: "Data master & admin" })).toBeNull();
 });
 

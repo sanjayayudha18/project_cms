@@ -13,7 +13,7 @@ description: >-
 
 Skill ini adalah versi **Google Gemini / Antigravity** dari task orchestrator CMS2. Bertugas membaca dokumen rencana kerja (`.agents/specs/<feature>/tasks.md`), melakukan gate-check prasyarat, memetakan model Claude/Gemini ke parameter `invoke_subagent`, menentukan subagent spesialis & skills, lalu meluncurkan subagent terisolasi per task dalam satu *wave* paralel secara reaktif tanpa polling.
 
-Dokumen panduan arsitektur lengkap: **`.agents/agents/cms-orchestrator.md`**.
+Dokumen panduan arsitektur lengkap: **`.agents/agents/gemini-cms-orchestrator.md`**.
 
 ---
 

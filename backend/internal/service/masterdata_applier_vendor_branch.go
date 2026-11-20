@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,28 @@ func ensureBranchHasNoActiveChildren(ctx context.Context, q *db.Queries, branchI
 	return nil
 }
 
+// ErrVendorBranchRegionInactive: at apply time the branch's region_code is
+// no longer an active standard region (region-standardization Req 3.4). The
+// change is not applied; the approval path records it as an apply failure.
+var ErrVendorBranchRegionInactive = errors.New("vendor branch region is not an active region")
+
+// lockActiveRegion takes FOR SHARE on the region row inside the approve tx,
+// so a concurrent region disable (FOR UPDATE + active-branch count) either
+// waits and then sees this branch, or wins first and this apply fails
+// (Property 4). NULL region_code needs no lock.
+func lockActiveRegion(ctx context.Context, q *db.Queries, code *string) error {
+	if code == nil {
+		return nil
+	}
+	if _, err := q.LockActiveRegionByCodeForShare(ctx, *code); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("%w: %s", ErrVendorBranchRegionInactive, *code)
+		}
+		return fmt.Errorf("locking region %s: %w", *code, err)
+	}
+	return nil
+}
+
 // VendorBranchApplier is the Applier for entity_type="vendor_branch" (T3.1).
 type VendorBranchApplier struct{}
 
@@ -42,16 +65,16 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor branch create payload: %w", err)
 		}
+		if err := lockActiveRegion(ctx, q, p.RegionCode); err != nil {
+			return 0, nil, err
+		}
 		created, err := q.CreateVendorBranchAdmin(ctx, db.CreateVendorBranchAdminParams{
 			VendorID:   p.VendorID,
 			BranchCode: p.BranchCode,
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
-			Region:     p.Region,
 			RegionCode: p.RegionCode,
 			Category:   p.Category,
-			// nil = NULL; validated at submit, DB CHECK guards the rest (vendor-cis-limit FR1).
-			CisLimitAmount: p.CisLimitAmount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor branch: %w", err)
@@ -66,15 +89,15 @@ func (VendorBranchApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Maste
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor branch update payload: %w", err)
 		}
+		if err := lockActiveRegion(ctx, q, p.RegionCode); err != nil {
+			return 0, nil, err
+		}
 		updated, err := q.UpdateVendorBranchAdmin(ctx, db.UpdateVendorBranchAdminParams{
 			ID:         *change.EntityID,
 			BranchName: p.BranchName,
 			LocationID: p.LocationID,
-			Region:     p.Region,
 			RegionCode: p.RegionCode,
 			Category:   p.Category,
-			// nil = NULL; validated at submit, DB CHECK guards the rest (vendor-cis-limit FR1).
-			CisLimitAmount: p.CisLimitAmount,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor branch: %w", err)

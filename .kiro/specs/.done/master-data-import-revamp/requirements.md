@@ -54,7 +54,7 @@ PO meminta revamp menu impor CSV di `/settings/admin/master-data-io` ("Ekspor & 
 
 ### Dependency & Scope Note
 
-- `development-plan.md` scope guard rule 2 melarang fitur master data baru (hanya bugfix). Spec ini butuh persetujuan PO dan dicatat sebagai item baru **X.10** (D11) sebelum implementasi.
+- `.claude/dev-plan/dev-plan.md` scope guard rule 2 melarang fitur master data baru (hanya bugfix). Spec ini butuh persetujuan PO dan dicatat sebagai item baru **X.10** (D11) sebelum implementasi.
 - Mengikuti pola yang ada: `MasterDataImporter`, `MasterDataImportBatchRepository`, `MasterDataApprovalService`, `internal/notification` (`notification.Service.Send`), `approval_steps.assigned_approver_id` untuk penerima notifikasi.
 - Nomor migrasi berikut yang bebas: `036` (file terakhir `035_export_jobs_reports.sql`).
 
@@ -215,5 +215,5 @@ PO meminta revamp menu impor CSV di `/settings/admin/master-data-io` ("Ekspor & 
 | D8 | Tombol "Coba terapkan lagi" | **Ya**, di detail batch, memakai endpoint retry-apply yang ada (otorisasi ADMIN/ADMIN_PARAM tetap). | ✅ mengikuti saran (PO 2026-11-02) |
 | D9 | Penarikan pengajuan oleh Maker | **Tidak termasuk.** Orchestrator belum punya status batal; Checker bisa menolak. | ✅ mengikuti saran (PO 2026-11-02) |
 | D10 | Judul halaman | **"Impor CSV Data Master"**, rute tetap `/settings/admin/master-data-io` supaya tautan lama tidak putus. | ✅ mengikuti saran (PO 2026-11-02) |
-| D11 | Scope guard `development-plan.md` (rule 2: tidak ada fitur master data baru) | **PO menyetujui pengecualian** dan item dicatat sebagai **X.10** di cross-cutting. | ✅ mengikuti saran (PO 2026-11-02) |
+| D11 | Scope guard `.claude/dev-plan/dev-plan.md` (rule 2: tidak ada fitur master data baru) | **PO menyetujui pengecualian** dan item dicatat sebagai **X.10** di cross-cutting. | ✅ mengikuti saran (PO 2026-11-02) |
 | D12 | Kegagalan notifikasi | **Best-effort**: pengajuan/keputusan tetap tersimpan, kegagalan dicatat di log. Inbox `/approvals` tetap sumber utama, jadi checker tetap bisa menemukan batch. | ✅ mengikuti saran (PO 2026-11-02) |

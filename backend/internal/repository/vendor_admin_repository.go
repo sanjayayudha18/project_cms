@@ -41,6 +41,18 @@ func (r *VendorAdminRepository) Count(ctx context.Context, arg db.CountVendorsAd
 	return r.dbRead.CountVendorsAdmin(ctx, arg)
 }
 
+// GetPksTypeByCode resolves a PKS type code (case-insensitive) from the replica; nil, nil when unknown.
+func (r *VendorAdminRepository) GetPksTypeByCode(ctx context.Context, code string) (*db.VendorPksType, error) {
+	t, err := r.dbRead.GetPksTypeByCode(ctx, code)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
+}
+
 // GetByID returns a vendor by id, including soft-deleted rows. Returns nil,
 // nil if no matching vendor is found.
 func (r *VendorAdminRepository) GetByID(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {

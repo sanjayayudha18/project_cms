@@ -17,10 +17,12 @@ import (
 // must therefore be decided before the service touches storage. The
 // DB-dependent properties (3-6, 9) are covered by region_admin_integration_test.go.
 
-var alnumRe = regexp.MustCompile(`^[A-Z0-9]{1,20}$`)
+// region-standardization Req 1.3 narrowed the rule from 1-20 to 2-10
+// alphanumerics (the vendor branch region_code format).
+var alnumRe = regexp.MustCompile(`^[A-Z0-9]{2,10}$`)
 
 // Property 1: the stored code is the trimmed+uppercased input, normalization is
-// idempotent, and a code is accepted iff that normalized form is 1-20 alphanumerics.
+// idempotent, and a code is accepted iff that normalized form is 2-10 alphanumerics.
 func TestRegionCode_NormalizedAndAcceptedIffAlnum(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		raw := rapid.OneOf(
@@ -54,7 +56,8 @@ func TestCreateRegion_InvalidInputRejectedWithoutMutation(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		code := rapid.OneOf(
 			rapid.Just(""), rapid.Just("   "),
-			rapid.StringMatching(`[A-Z0-9]{21,30}`),
+			rapid.StringMatching(`[A-Z0-9]{11,30}`),
+			rapid.StringMatching(`[A-Z0-9]`),
 			rapid.StringMatching(`[A-Z0-9]{0,5}[-_.!@][A-Z0-9]{0,5}`),
 		).Draw(t, "badCode")
 		name := rapid.OneOf(

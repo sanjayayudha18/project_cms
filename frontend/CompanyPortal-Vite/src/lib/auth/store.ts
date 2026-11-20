@@ -18,7 +18,15 @@ export type DbRole =
   | "VENDOR-VAULT-USER"
   /** cit-acm-plan: tim ACM (penetapan vault). */
   | "ACM-USER"
-  | "ACM-SPV";
+  | "ACM-SPV"
+  /** cash-count 5.1: peran Cash Count (CWM/CCR = maker parameter; sisanya fase berikut). */
+  | "CC-CWM"
+  | "CC-COORDINATOR"
+  | "CC-EXECUTOR"
+  | "CC-CCR"
+  | "CC-RECON"
+  | "CC-D3"
+  | "CC-D2";
 
 export interface AuthUser {
   id: number;

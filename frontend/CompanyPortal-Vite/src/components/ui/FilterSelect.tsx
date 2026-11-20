@@ -6,6 +6,7 @@ interface FilterSelectProps {
   value: string | null;
   onChange: (value: string | null) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ export function FilterSelect({
   value,
   onChange,
   placeholder = "Semua",
+  disabled = false,
 }: FilterSelectProps) {
   const selectId = useId();
 
@@ -32,11 +34,12 @@ export function FilterSelect({
       <select
         id={selectId}
         value={value ?? ""}
+        disabled={disabled}
         onChange={(e) => {
           const val = e.target.value;
           onChange(val === "" ? null : val);
         }}
-        className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] font-sans focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)] outline-none"
+        className="min-h-[44px] min-w-[44px] rounded-[var(--radius-md)] border border-[var(--n-300)] bg-[var(--n-0)] px-3 text-sm text-[var(--n-800)] font-sans focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)] outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-[var(--n-100)]"
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (

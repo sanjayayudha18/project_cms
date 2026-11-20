@@ -7,6 +7,8 @@ import { atmPortalRoute } from "./routes/atm-portal";
 import { atmProfileRoute } from "./routes/atm-portal.$terminalId";
 import { auditLogsRoute } from "./routes/audit-logs";
 import { cashCountRoute } from "./routes/cash-count/index";
+import { cashCountParametersRoute } from "./routes/cash-count/parameters";
+import { cashCountPicsRoute } from "./routes/cash-count/pics";
 import { cashFlowRoute } from "./routes/cash-flow";
 import { vaultPlanDetailRoute, vaultPlanListRoute } from "./routes/cit/vault-plans";
 import { dsrLateReportRoute } from "./routes/dsr-late-report";
@@ -28,6 +30,8 @@ import { adminATMsRoute } from "./routes/settings/admin/atms";
 import { adminExportsRoute } from "./routes/settings/admin/exports";
 import { adminHolidaysRoute } from "./routes/settings/admin/holidays";
 import { adminMasterDataIORoute } from "./routes/settings/admin/master-data-io";
+import { adminPksRoute } from "./routes/settings/admin/pks";
+import { adminPksTypesRoute } from "./routes/settings/admin/pks-types";
 import { adminRegionsRoute } from "./routes/settings/admin/regions";
 import { adminUsersRoute } from "./routes/settings/admin/users";
 import { adminVendorBranchDetailRoute } from "./routes/settings/admin/vendor-branch-detail";
@@ -61,6 +65,8 @@ export const routeTree = rootRoute.addChildren([
     dmaaForecastRoute,
     invoiceRoute,
     cashCountRoute,
+    cashCountParametersRoute,
+    cashCountPicsRoute,
     eodMonitoringRoute,
     auditLogsRoute,
     settingsRoute,
@@ -75,6 +81,8 @@ export const routeTree = rootRoute.addChildren([
     exportPreviewRoute,
     adminATMsRoute,
     adminRegionsRoute,
+    adminPksRoute,
+    adminPksTypesRoute,
     adminHolidaysRoute,
     adminAcmAreasRoute,
     approvalsRoute,

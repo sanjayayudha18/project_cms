@@ -76,7 +76,7 @@ Spec ini memindahkan keempat CSV tersebut ke `backend-exq` dan memprosesnya lewa
 
 ### Dependency & Scope Note
 
-Item X.8 di `development-plan.md`. Bergantung penuh pada `vendor-data-export` (X.7): `export_jobs`, worker, janitor, `pkg/csvexport`, `ExportProgressDialog`, routing `/api/v1/exports/` ke `:8081`, dan deployment pertama `backend-exq`. Implementasi dimulai setelah X.7 di-deploy. Penyesuaian D9 sebaiknya dimasukkan ke `vendor-data-export` sebelum spec itu diimplementasikan, supaya tidak ada pekerjaan ulang.
+Item X.8 di `.claude/dev-plan/dev-plan.md`. Bergantung penuh pada `vendor-data-export` (X.7): `export_jobs`, worker, janitor, `pkg/csvexport`, `ExportProgressDialog`, routing `/api/v1/exports/` ke `:8081`, dan deployment pertama `backend-exq`. Implementasi dimulai setelah X.7 di-deploy. Penyesuaian D9 sebaiknya dimasukkan ke `vendor-data-export` sebelum spec itu diimplementasikan, supaya tidak ada pekerjaan ulang.
 
 ## Glossary
 

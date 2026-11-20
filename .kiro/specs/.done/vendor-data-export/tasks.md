@@ -304,8 +304,8 @@ Dependensi lintas grup: Sonnet 3.3 dan 6.1 menunggu Opus 3.1 (dan 3.2 untuk 3.3)
   - _Model: Sonnet, Medium — triase kegagalan gate._
 
 - [x] 17. Dokumentasi
-  - _Catatan 2026-10-29: CLAUDE.md Sec 3/10/12, data-map (`#export-jobs-migration-034`), tech.md, structure.md (`backend-cit` -> `backend-exq`), rbac-role-feature-matrix.md, development-plan.md X.7, development-progress.md. Sisa usang yang tidak diubah: tech.md "Two Go modules", structure.md `pkg/database/`, development-plan.md catatan skeleton exq (~baris 64) — di luar scope task ini._
-  - `.claude/CLAUDE.md` Sec 3 + `.claude/docs/data-map.md` (`export_jobs`, `export_job_chunks`), `tech.md` / `structure.md` (`pkg/csvexport`, `backend-exq` kini punya konten), `rbac-role-feature-matrix.md` (route `backend-exq` ber-guard, route `/settings/admin/exports`), `development-plan.md` (X.7), `.claude/development-progress.md`.
+  - _Catatan 2026-10-29: CLAUDE.md Sec 3/10/12, data-map (`#export-jobs-migration-034`), tech.md, structure.md (`backend-cit` -> `backend-exq`), rbac-role-feature-matrix.md, .claude/dev-plan/dev-plan.md X.7, development-progress.md. Sisa usang yang tidak diubah: tech.md "Two Go modules", structure.md `pkg/database/`, .claude/dev-plan/dev-plan.md catatan skeleton exq (~baris 64) — di luar scope task ini._
+  - `.claude/CLAUDE.md` Sec 3 + `.claude/docs/data-map.md` (`export_jobs`, `export_job_chunks`), `tech.md` / `structure.md` (`pkg/csvexport`, `backend-exq` kini punya konten), `rbac-role-feature-matrix.md` (route `backend-exq` ber-guard, route `/settings/admin/exports`), `.claude/dev-plan/dev-plan.md` (X.7), `.claude/development-progress.md`.
   - _Requirements: 11.8_
   - _Model: Haiku, Low — pembaruan dokumen berdasarkan hasil yang sudah ada._
 
@@ -329,7 +329,7 @@ Dependensi lintas grup: Sonnet 3.3 dan 6.1 menunggu Opus 3.1 (dan 3.2 untuk 3.3)
 
 - Semua task 1-17 selesai, gate 16 hijau, task 18 dicentang user.
 - Semua Correctness Property 1-18 punya test yang lulus.
-- `development-plan.md` X.7 diperbarui ke "built", X.8 tetap planned.
+- `.claude/dev-plan/dev-plan.md` X.7 diperbarui ke "built", X.8 tetap planned.
 
 ## Task Dependency Graph
 

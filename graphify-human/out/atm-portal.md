@@ -126,7 +126,7 @@ _Baca/tulis dideteksi dari kata kunci SQL (FROM/JOIN vs INSERT/UPDATE/DELETE), t
 | [`backend/internal/handler/replenishment_handler.go`](../../backend/internal/handler/replenishment_handler.go) | - | 1 | `replenishment-realisasi` |
 | [`backend/internal/service/atm_admin.go`](../../backend/internal/service/atm_admin.go) | - | 1 | `master-data-atm` |
 | [`backend/internal/service/dmaa_forecast.go`](../../backend/internal/service/dmaa_forecast.go) | - | 1 | `dmaa-forecast` |
-| [`backend/internal/service/vendor_package_admin.go`](../../backend/internal/service/vendor_package_admin.go) | - | 1 | `master-data-vendor` |
+| [`backend/internal/service/vendor_branch_admin.go`](../../backend/internal/service/vendor_branch_admin.go) | - | 1 | `master-data-vendor` |
 
 _Angka = jumlah relasi di graph (impor, panggilan, referensi). Maksimal 20 baris._
 

@@ -13,6 +13,7 @@ const m = vi.hoisted(() => ({
   navigate: vi.fn(),
   branch: {} as Record<string, unknown>,
   update: vi.fn(),
+  regions: {} as Record<string, unknown>,
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children: ReactNode }) => (
@@ -24,6 +25,20 @@ vi.mock("../hooks", () => ({
   useVendorBranch: () => m.branch,
   useUpdateVendorBranch: () => ({ mutateAsync: m.update, isPending: false }),
 }));
+vi.mock("../../admin-regions/hooks", () => ({
+  useRegionsList: () => m.regions,
+}));
+
+const ACTIVE_REGIONS = {
+  isLoading: false,
+  isError: false,
+  data: {
+    regions: [
+      { id: 7, code: "JKTBAR", region: "Jakarta Barat", is_active: true },
+      { id: 3, code: "JKTPST", region: "Jakarta Pusat", is_active: true },
+    ],
+  },
+};
 
 import { VendorBranchEditPage } from "../components/VendorBranchEditPage";
 
@@ -33,8 +48,8 @@ const BRANCH = {
   branch_code: "JKT01",
   branch_name: "Cabang Jakarta",
   location_id: 15,
-  region: "Jabodetabek",
-  region_code: "JKT",
+  region: "Jakarta Pusat",
+  region_code: "JKTPST",
   category: "CASH",
 };
 
@@ -52,6 +67,7 @@ beforeEach(() => {
   m.navigate.mockReset();
   m.update.mockReset();
   m.branch = { isLoading: false, isError: false, data: BRANCH };
+  m.regions = ACTIVE_REGIONS;
   useToastStore.setState({ toasts: [] });
 });
 
@@ -76,16 +92,38 @@ describe("VendorBranchEditPage", () => {
     expect(control("Kode Cabang")).toBeDisabled();
     expect(control("Tipe")).toHaveValue("CASH");
     expect(control("ID Lokasi (opsional)")).toHaveValue("15");
+    // region-standardization Req 3.3 / Q5b: region is a select of active regions, no free-text Wilayah.
+    expect(control("Kode Region").tagName).toBe("SELECT");
+    expect(control("Kode Region")).toHaveValue("JKTPST");
+    expect(screen.getByRole("option", { name: "JKTBAR — Jakarta Barat" })).toBeInTheDocument();
+    expect(screen.queryByText("Wilayah", { selector: "span" })).not.toBeInTheDocument();
   });
 
-  it("submits the change for approval, upper-cases the region code, then goes back", async () => {
+  it("keeps a stored region that is no longer active as a labelled option", async () => {
+    m.branch = { isLoading: false, isError: false, data: { ...BRANCH, region_code: "OLD1" } };
+    render(<VendorBranchEditPage vendorId={42} branchId={3} />);
+
+    await waitFor(() => expect(control("Kode Region")).toHaveValue("OLD1"));
+    expect(screen.getByRole("option", { name: "OLD1 (nonaktif)" })).toBeInTheDocument();
+  });
+
+  it("shows a disabled placeholder while regions load and an alert when they fail", () => {
+    m.regions = { isLoading: true, isError: false, data: undefined };
+    const { rerender } = render(<VendorBranchEditPage vendorId={42} branchId={3} />);
+    expect(screen.getByRole("combobox", { name: "Kode Region" })).toBeDisabled();
+
+    m.regions = { isLoading: false, isError: true, data: undefined };
+    rerender(<VendorBranchEditPage vendorId={42} branchId={3} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Daftar region gagal dimuat");
+  });
+
+  it("submits the change for approval with the picked region, then goes back", async () => {
     m.update.mockResolvedValue({ change_request_id: 601, status: "pending" });
     render(<VendorBranchEditPage vendorId={42} branchId={3} />);
     await waitFor(() => expect(control("Nama Cabang")).toHaveValue("Cabang Jakarta"));
 
     fireEvent.change(control("Nama Cabang"), { target: { value: "Cabang Jakarta Pusat" } });
-    fireEvent.change(control("Kode Region"), { target: { value: " jkp " } });
-    fireEvent.change(control("Wilayah"), { target: { value: "" } });
+    fireEvent.change(control("Kode Region"), { target: { value: "JKTBAR" } });
     fireEvent.change(control("ID Lokasi (opsional)"), { target: { value: "" } });
     await userEvent.setup().click(screen.getByRole("button", { name: "Simpan" }));
 
@@ -95,8 +133,7 @@ describe("VendorBranchEditPage", () => {
       payload: {
         branch_name: "Cabang Jakarta Pusat",
         location_id: null,
-        region: null,
-        region_code: "JKP",
+        region_code: "JKTBAR",
         category: "CASH",
       },
     });

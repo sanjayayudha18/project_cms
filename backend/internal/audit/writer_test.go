@@ -149,3 +149,56 @@ func TestWriter_Write_NilBeforeAfter(t *testing.T) {
 		t.Errorf("after = %s, want NULL", after)
 	}
 }
+
+// TestWriter_WriteTx verifies WriteTx executes audit log writes on the provided tx.
+func TestWriter_WriteTx(t *testing.T) {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("DATABASE_URL not set — skipping integration test")
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		t.Fatalf("connecting to database: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	t.Cleanup(func() { tx.Rollback(ctx) })
+
+	var actorID int64
+	if err := tx.QueryRow(ctx, "SELECT id FROM users LIMIT 1").Scan(&actorID); err != nil {
+		t.Fatalf("fetch a seed user id: %v", err)
+	}
+
+	w := NewWriter(pool)
+	err = w.WriteTx(ctx, tx, Entry{
+		ActorID:    actorID,
+		Action:     "create_tx",
+		EntityType: "test_entity",
+		EntityID:   99,
+		Before:     map[string]string{"foo": "bar"},
+		After:      map[string]string{"foo": "baz"},
+		IP:         "10.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("WriteTx: %v", err)
+	}
+
+	var row db.AuditLog
+	err = tx.QueryRow(ctx,
+		"SELECT id, actor_id, action, entity_type, entity_id FROM audit_logs WHERE entity_type=$1 AND entity_id=$2",
+		"test_entity", int64(99),
+	).Scan(&row.ID, &row.ActorID, &row.Action, &row.EntityType, &row.EntityID)
+	if err != nil {
+		t.Fatalf("read back row: %v", err)
+	}
+	if row.Action != "create_tx" {
+		t.Errorf("Action = %q, want create_tx", row.Action)
+	}
+}
+

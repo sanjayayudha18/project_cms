@@ -40,38 +40,31 @@ func (q *Queries) CountVendorBranchesAdmin(ctx context.Context, arg CountVendorB
 }
 
 const createVendorBranchAdmin = `-- name: CreateVendorBranchAdmin :one
-INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region, region_code, category, cis_limit_amount)
+INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, location_id, region_code, category)
 VALUES ($1, $2, $3,
-        $4, $5, $6, $7,
-        CAST($8::text AS numeric))
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-          cis_limit_amount, cis_limit_currency
+        $4, $5, $6)
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region_code, category, is_active, deleted_at
 `
 
 type CreateVendorBranchAdminParams struct {
-	VendorID       int64   `json:"vendor_id"`
-	BranchCode     string  `json:"branch_code"`
-	BranchName     string  `json:"branch_name"`
-	LocationID     *int64  `json:"location_id"`
-	Region         *string `json:"region"`
-	RegionCode     *string `json:"region_code"`
-	Category       string  `json:"category"`
-	CisLimitAmount *string `json:"cis_limit_amount"`
+	VendorID   int64   `json:"vendor_id"`
+	BranchCode string  `json:"branch_code"`
+	BranchName string  `json:"branch_name"`
+	LocationID *int64  `json:"location_id"`
+	RegionCode *string `json:"region_code"`
+	Category   string  `json:"category"`
 }
 
 type CreateVendorBranchAdminRow struct {
-	ID               int64              `json:"id"`
-	VendorID         int64              `json:"vendor_id"`
-	BranchCode       string             `json:"branch_code"`
-	BranchName       string             `json:"branch_name"`
-	LocationID       *int64             `json:"location_id"`
-	Region           *string            `json:"region"`
-	RegionCode       *string            `json:"region_code"`
-	Category         string             `json:"category"`
-	IsActive         bool               `json:"is_active"`
-	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CisLimitAmount   pgtype.Numeric     `json:"cis_limit_amount"`
-	CisLimitCurrency string             `json:"cis_limit_currency"`
+	ID         int64              `json:"id"`
+	VendorID   int64              `json:"vendor_id"`
+	BranchCode string             `json:"branch_code"`
+	BranchName string             `json:"branch_name"`
+	LocationID *int64             `json:"location_id"`
+	RegionCode *string            `json:"region_code"`
+	Category   string             `json:"category"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
 func (q *Queries) CreateVendorBranchAdmin(ctx context.Context, arg CreateVendorBranchAdminParams) (CreateVendorBranchAdminRow, error) {
@@ -80,10 +73,8 @@ func (q *Queries) CreateVendorBranchAdmin(ctx context.Context, arg CreateVendorB
 		arg.BranchCode,
 		arg.BranchName,
 		arg.LocationID,
-		arg.Region,
 		arg.RegionCode,
 		arg.Category,
-		arg.CisLimitAmount,
 	)
 	var i CreateVendorBranchAdminRow
 	err := row.Scan(
@@ -92,13 +83,10 @@ func (q *Queries) CreateVendorBranchAdmin(ctx context.Context, arg CreateVendorB
 		&i.BranchCode,
 		&i.BranchName,
 		&i.LocationID,
-		&i.Region,
 		&i.RegionCode,
 		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
-		&i.CisLimitAmount,
-		&i.CisLimitCurrency,
 	)
 	return i, err
 }
@@ -125,6 +113,19 @@ func (q *Queries) EnableVendorBranch(ctx context.Context, id int64) error {
 	return err
 }
 
+const findActiveRegionByCode = `-- name: FindActiveRegionByCode :one
+SELECT code FROM regions WHERE code = $1 AND is_active = true
+`
+
+// Submit/CSV dry-run check (region-standardization Req 3.3, 3.5): region_code
+// must name an active standard region. Primary pool (read-after-write safe).
+func (q *Queries) FindActiveRegionByCode(ctx context.Context, code string) (string, error) {
+	row := q.db.QueryRow(ctx, findActiveRegionByCode, code)
+	var code_2 string
+	err := row.Scan(&code_2)
+	return code_2, err
+}
+
 const findVendorBranchAdminByCode = `-- name: FindVendorBranchAdminByCode :one
 SELECT id FROM vendor_branches WHERE branch_code = $1
 `
@@ -139,28 +140,25 @@ func (q *Queries) FindVendorBranchAdminByCode(ctx context.Context, branchCode st
 }
 
 const getVendorBranchAdminByID = `-- name: GetVendorBranchAdminByID :one
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-       cis_limit_amount, cis_limit_currency
+SELECT id, vendor_id, branch_code, branch_name, location_id, region_code, category, is_active, deleted_at
 FROM vendor_branches WHERE id = $1
 `
 
 type GetVendorBranchAdminByIDRow struct {
-	ID               int64              `json:"id"`
-	VendorID         int64              `json:"vendor_id"`
-	BranchCode       string             `json:"branch_code"`
-	BranchName       string             `json:"branch_name"`
-	LocationID       *int64             `json:"location_id"`
-	Region           *string            `json:"region"`
-	RegionCode       *string            `json:"region_code"`
-	Category         string             `json:"category"`
-	IsActive         bool               `json:"is_active"`
-	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CisLimitAmount   pgtype.Numeric     `json:"cis_limit_amount"`
-	CisLimitCurrency string             `json:"cis_limit_currency"`
+	ID         int64              `json:"id"`
+	VendorID   int64              `json:"vendor_id"`
+	BranchCode string             `json:"branch_code"`
+	BranchName string             `json:"branch_name"`
+	LocationID *int64             `json:"location_id"`
+	RegionCode *string            `json:"region_code"`
+	Category   string             `json:"category"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
 // Includes soft-deleted rows -- used both for the read endpoint and as the
-// "before" snapshot / CurrentState staleness check (T2.5).
+// "before" snapshot / CurrentState staleness check (T2.5). No region name
+// here on purpose: renaming a region must not make pending branch changes stale.
 func (q *Queries) GetVendorBranchAdminByID(ctx context.Context, id int64) (GetVendorBranchAdminByIDRow, error) {
 	row := q.db.QueryRow(ctx, getVendorBranchAdminByID, id)
 	var i GetVendorBranchAdminByIDRow
@@ -170,32 +168,30 @@ func (q *Queries) GetVendorBranchAdminByID(ctx context.Context, id int64) (GetVe
 		&i.BranchCode,
 		&i.BranchName,
 		&i.LocationID,
-		&i.Region,
 		&i.RegionCode,
 		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
-		&i.CisLimitAmount,
-		&i.CisLimitCurrency,
 	)
 	return i, err
 }
 
 const listVendorBranchesAdmin = `-- name: ListVendorBranchesAdmin :many
 
-SELECT id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-       cis_limit_amount, cis_limit_currency
-FROM vendor_branches
-WHERE vendor_id = $1
+SELECT vb.id, vb.vendor_id, vb.branch_code, vb.branch_name, vb.location_id, r.region, vb.region_code,
+       vb.category, vb.is_active, vb.deleted_at
+FROM vendor_branches vb
+LEFT JOIN regions r ON r.code = vb.region_code
+WHERE vb.vendor_id = $1
   AND ($2::text IS NULL
-        OR branch_code ILIKE '%' || $2::text || '%'
-        OR branch_name ILIKE '%' || $2::text || '%')
+        OR vb.branch_code ILIKE '%' || $2::text || '%'
+        OR vb.branch_name ILIKE '%' || $2::text || '%')
   AND (
         $3::text = 'all'
-        OR ($3::text = 'active' AND deleted_at IS NULL)
-        OR ($3::text = 'disabled' AND deleted_at IS NOT NULL)
+        OR ($3::text = 'active' AND vb.deleted_at IS NULL)
+        OR ($3::text = 'disabled' AND vb.deleted_at IS NOT NULL)
       )
-ORDER BY branch_name ASC, id ASC
+ORDER BY vb.branch_name ASC, vb.id ASC
 LIMIT $5::bigint OFFSET $4::bigint
 `
 
@@ -208,29 +204,33 @@ type ListVendorBranchesAdminParams struct {
 }
 
 type ListVendorBranchesAdminRow struct {
-	ID               int64              `json:"id"`
-	VendorID         int64              `json:"vendor_id"`
-	BranchCode       string             `json:"branch_code"`
-	BranchName       string             `json:"branch_name"`
-	LocationID       *int64             `json:"location_id"`
-	Region           *string            `json:"region"`
-	RegionCode       *string            `json:"region_code"`
-	Category         string             `json:"category"`
-	IsActive         bool               `json:"is_active"`
-	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CisLimitAmount   pgtype.Numeric     `json:"cis_limit_amount"`
-	CisLimitCurrency string             `json:"cis_limit_currency"`
+	ID         int64              `json:"id"`
+	VendorID   int64              `json:"vendor_id"`
+	BranchCode string             `json:"branch_code"`
+	BranchName string             `json:"branch_name"`
+	LocationID *int64             `json:"location_id"`
+	Region     *string            `json:"region"`
+	RegionCode *string            `json:"region_code"`
+	Category   string             `json:"category"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
-// Admin vendor branch management (plan.md Fase 3, T3.1). Mutations route
-// through the master-data maker-checker engine (Fase 2, D1) -- these
-// create/update/disable/enable queries are only ever run by
-// VendorBranchApplier inside the apply-on-approve transaction, never
-// directly by VendorBranchAdminService.
+// Admin vendor branch management (plan.md Fase 3, T3.1; cis_limit moved to vendor_vaults in migration 040).
+// Mutations route through the master-data maker-checker engine (Fase 2, D1) -- these
+// create/update/disable/enable queries are only ever run by VendorBranchApplier
+// inside the apply-on-approve transaction on primary pool (`db`), never directly by VendorBranchAdminService.
+// Topology:
+//   - ListVendorBranchesAdmin / CountVendorBranchesAdmin -> `dbRead` (replica).
+//   - GetVendorBranchAdminByID / FindVendorBranchAdminByCode -> `db` (primary).
+//
 // Scoped to one vendor (Req: /api/v1/admin/vendors/{id}/branches). Filters:
 // q (case-insensitive substring across branch_code/branch_name) and status
 // ('active' | 'disabled' | 'all') -- caller resolves absent status to
 // 'active' (mirrors ListVendorsAdmin's convention).
+// region = name of the branch's standard region (regions.region via
+// region_code, region-standardization Req 4.2); vendor_branches.region was
+// dropped in migration 042.
 func (q *Queries) ListVendorBranchesAdmin(ctx context.Context, arg ListVendorBranchesAdminParams) ([]ListVendorBranchesAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorBranchesAdmin,
 		arg.VendorID,
@@ -257,8 +257,6 @@ func (q *Queries) ListVendorBranchesAdmin(ctx context.Context, arg ListVendorBra
 			&i.Category,
 			&i.IsActive,
 			&i.DeletedAt,
-			&i.CisLimitAmount,
-			&i.CisLimitCurrency,
 		); err != nil {
 			return nil, err
 		}
@@ -270,43 +268,49 @@ func (q *Queries) ListVendorBranchesAdmin(ctx context.Context, arg ListVendorBra
 	return items, nil
 }
 
+const lockActiveRegionByCodeForShare = `-- name: LockActiveRegionByCodeForShare :one
+SELECT code FROM regions WHERE code = $1 AND is_active = true FOR SHARE
+`
+
+// Apply-time check inside the approve tx (Req 3.4): FOR SHARE blocks a
+// concurrent region disable (FOR UPDATE) until the branch apply commits, so
+// the disable then sees the branch and is rejected (Property 4).
+func (q *Queries) LockActiveRegionByCodeForShare(ctx context.Context, code string) (string, error) {
+	row := q.db.QueryRow(ctx, lockActiveRegionByCodeForShare, code)
+	var code_2 string
+	err := row.Scan(&code_2)
+	return code_2, err
+}
+
 const updateVendorBranchAdmin = `-- name: UpdateVendorBranchAdmin :one
 UPDATE vendor_branches
 SET branch_name = $1,
     location_id = $2,
-    region = $3,
-    region_code = $4,
-    category = $5,
-    cis_limit_amount = CAST($6::text AS numeric),
+    region_code = $3,
+    category = $4,
     updated_at = now()
-WHERE id = $7 AND deleted_at IS NULL
-RETURNING id, vendor_id, branch_code, branch_name, location_id, region, region_code, category, is_active, deleted_at,
-          cis_limit_amount, cis_limit_currency
+WHERE id = $5 AND deleted_at IS NULL
+RETURNING id, vendor_id, branch_code, branch_name, location_id, region_code, category, is_active, deleted_at
 `
 
 type UpdateVendorBranchAdminParams struct {
-	BranchName     string  `json:"branch_name"`
-	LocationID     *int64  `json:"location_id"`
-	Region         *string `json:"region"`
-	RegionCode     *string `json:"region_code"`
-	Category       string  `json:"category"`
-	CisLimitAmount *string `json:"cis_limit_amount"`
-	ID             int64   `json:"id"`
+	BranchName string  `json:"branch_name"`
+	LocationID *int64  `json:"location_id"`
+	RegionCode *string `json:"region_code"`
+	Category   string  `json:"category"`
+	ID         int64   `json:"id"`
 }
 
 type UpdateVendorBranchAdminRow struct {
-	ID               int64              `json:"id"`
-	VendorID         int64              `json:"vendor_id"`
-	BranchCode       string             `json:"branch_code"`
-	BranchName       string             `json:"branch_name"`
-	LocationID       *int64             `json:"location_id"`
-	Region           *string            `json:"region"`
-	RegionCode       *string            `json:"region_code"`
-	Category         string             `json:"category"`
-	IsActive         bool               `json:"is_active"`
-	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
-	CisLimitAmount   pgtype.Numeric     `json:"cis_limit_amount"`
-	CisLimitCurrency string             `json:"cis_limit_currency"`
+	ID         int64              `json:"id"`
+	VendorID   int64              `json:"vendor_id"`
+	BranchCode string             `json:"branch_code"`
+	BranchName string             `json:"branch_name"`
+	LocationID *int64             `json:"location_id"`
+	RegionCode *string            `json:"region_code"`
+	Category   string             `json:"category"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
 // branch_code is immutable (not editable here, mirrors vendors.code /
@@ -317,10 +321,8 @@ func (q *Queries) UpdateVendorBranchAdmin(ctx context.Context, arg UpdateVendorB
 	row := q.db.QueryRow(ctx, updateVendorBranchAdmin,
 		arg.BranchName,
 		arg.LocationID,
-		arg.Region,
 		arg.RegionCode,
 		arg.Category,
-		arg.CisLimitAmount,
 		arg.ID,
 	)
 	var i UpdateVendorBranchAdminRow
@@ -330,13 +332,10 @@ func (q *Queries) UpdateVendorBranchAdmin(ctx context.Context, arg UpdateVendorB
 		&i.BranchCode,
 		&i.BranchName,
 		&i.LocationID,
-		&i.Region,
 		&i.RegionCode,
 		&i.Category,
 		&i.IsActive,
 		&i.DeletedAt,
-		&i.CisLimitAmount,
-		&i.CisLimitCurrency,
 	)
 	return i, err
 }

@@ -1,6 +1,15 @@
 import { ModuleCard, type ModuleCardProps } from "@/components/ui/ModuleCard";
 import { createRoute } from "@tanstack/react-router";
-import { BarChart3, CalendarDays, ClipboardCheck, ListChecks, Scale, Table } from "lucide-react";
+import {
+  BarChart3,
+  CalendarDays,
+  ClipboardCheck,
+  ListChecks,
+  Scale,
+  SlidersHorizontal,
+  Table,
+  Users,
+} from "lucide-react";
 import { protectedRoute } from "../_protected";
 
 export const cashCountRoute = createRoute({
@@ -10,6 +19,24 @@ export const cashCountRoute = createRoute({
 });
 
 const CASH_COUNT_CARDS: ModuleCardProps[] = [
+  {
+    id: "parameters",
+    title: "Parameter",
+    description:
+      "Kategori vault High/Medium/Low, kategori ATM Anomaly, checklist BA, dan area cash count.",
+    href: "/cash-count/parameters",
+    icon: SlidersHorizontal,
+    disabled: false,
+  },
+  {
+    id: "pics",
+    title: "Mapping PIC",
+    description:
+      "PIC Coordinator per region dan PIC Executor per area, termasuk unggah dan unduh CSV.",
+    href: "/cash-count/pics",
+    icon: Users,
+    disabled: false,
+  },
   {
     id: "scheduling",
     title: "Penjadwalan",

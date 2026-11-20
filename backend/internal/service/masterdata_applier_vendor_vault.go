@@ -12,7 +12,7 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 )
 
-// VendorVaultApplier is the Applier for entity_type="vendor_vault" (T3.2).
+// VendorVaultApplier is the Applier for entity_type="vendor_vault" (T3.2, revamped in migration 040).
 type VendorVaultApplier struct{}
 
 // numericFromDecimalPtr parses an optional decimal string into pgtype.Numeric
@@ -28,12 +28,18 @@ func numericFromDecimalPtr(s *string) (pgtype.Numeric, error) {
 	return n, nil
 }
 
-// vaultNumerics converts the four numeric fields of an update payload.
-func vaultNumerics(p VendorVaultUpdatePayload) (minC, maxC, lat, lon pgtype.Numeric, err error) {
+// vaultNumerics converts the five numeric fields of an update payload.
+func vaultNumerics(p VendorVaultUpdatePayload) (minB, maxB, cisLimit, lat, lon pgtype.Numeric, err error) {
 	for _, f := range []struct {
 		dst *pgtype.Numeric
 		src *string
-	}{{&minC, p.MinCapacityAmount}, {&maxC, p.MaxCapacityAmount}, {&lat, p.Latitude}, {&lon, p.Longitude}} {
+	}{
+		{&minB, p.MinBalance},
+		{&maxB, p.MaxBalance},
+		{&cisLimit, p.CisLimitAmount},
+		{&lat, p.Latitude},
+		{&lon, p.Longitude},
+	} {
 		if *f.dst, err = numericFromDecimalPtr(f.src); err != nil {
 			return
 		}
@@ -51,14 +57,42 @@ func (VendorVaultApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Master
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor vault create payload: %w", err)
 		}
-		minC, maxC, lat, lon, err := vaultNumerics(p.VendorVaultUpdatePayload)
+		if err := validateVaultFields(&p.VendorVaultUpdatePayload); err != nil {
+			return 0, nil, err
+		}
+		p.VaultCode = strings.TrimSpace(p.VaultCode)
+		if p.VaultName == nil || *p.VaultName == "" {
+			genName, err := q.GenerateNextVendorVaultName(ctx, p.VendorBranchID)
+			if err != nil {
+				return 0, nil, fmt.Errorf("generate vault name: %w", err)
+			}
+			if trimmed := strings.TrimSpace(genName); trimmed != "" {
+				p.VaultName = &trimmed
+			}
+		}
+		if p.VaultCode == "" && p.VaultName != nil {
+			p.VaultCode = *p.VaultName
+		}
+		minB, maxB, cisLimit, lat, lon, err := vaultNumerics(p.VendorVaultUpdatePayload)
 		if err != nil {
 			return 0, nil, err
 		}
 		created, err := q.CreateVendorVaultAdmin(ctx, db.CreateVendorVaultAdminParams{
-			VendorBranchID: p.VendorBranchID, VaultCode: p.VaultCode, Category: p.Category, CurrencyCode: p.CurrencyCode,
-			MinCapacityAmount: minC, MaxCapacityAmount: maxC, Latitude: lat, Longitude: lon,
-			OperatingHours: p.OperatingHours, LocationID: p.LocationID, EscrowAccount: p.EscrowAccount,
+			VendorBranchID: p.VendorBranchID,
+			VaultCode:      p.VaultCode,
+			VaultName:      p.VaultName,
+			Category:       p.Category,
+			CurrencyCode:   p.CurrencyCode,
+			Alamat:         p.Alamat,
+			MinBalance:     minB,
+			MaxBalance:     maxB,
+			CisLimitAmount: cisLimit,
+			Latitude:       lat,
+			Longitude:      lon,
+			OperatingHours: p.OperatingHours,
+			LocationID:     p.LocationID,
+			EscrowCash:     p.EscrowCash,
+			EscrowAtm:      p.EscrowAtm,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("create vendor vault: %w", err)
@@ -73,14 +107,28 @@ func (VendorVaultApplier) Apply(ctx context.Context, tx pgx.Tx, change db.Master
 		if err := json.Unmarshal(change.Payload, &p); err != nil {
 			return 0, nil, fmt.Errorf("unmarshal vendor vault update payload: %w", err)
 		}
-		minC, maxC, lat, lon, err := vaultNumerics(p)
+		if err := validateVaultFields(&p); err != nil {
+			return 0, nil, err
+		}
+		minB, maxB, cisLimit, lat, lon, err := vaultNumerics(p)
 		if err != nil {
 			return 0, nil, err
 		}
 		updated, err := q.UpdateVendorVaultAdmin(ctx, db.UpdateVendorVaultAdminParams{
-			ID: *change.EntityID, Category: p.Category, CurrencyCode: p.CurrencyCode,
-			MinCapacityAmount: minC, MaxCapacityAmount: maxC, Latitude: lat, Longitude: lon,
-			OperatingHours: p.OperatingHours, LocationID: p.LocationID, EscrowAccount: p.EscrowAccount,
+			ID:             *change.EntityID,
+			VaultName:      p.VaultName,
+			Category:       p.Category,
+			CurrencyCode:   p.CurrencyCode,
+			Alamat:         p.Alamat,
+			MinBalance:     minB,
+			MaxBalance:     maxB,
+			CisLimitAmount: cisLimit,
+			Latitude:       lat,
+			Longitude:      lon,
+			OperatingHours: p.OperatingHours,
+			LocationID:     p.LocationID,
+			EscrowCash:     p.EscrowCash,
+			EscrowAtm:      p.EscrowAtm,
 		})
 		if err != nil {
 			return 0, nil, fmt.Errorf("update vendor vault: %w", err)

@@ -101,11 +101,13 @@ func seedForecastVendorPackage(t *testing.T, tx pgx.Tx, marker, vendorName strin
 	}
 
 	var branchID int64
+	regionCode := itRegionCode("ITEST-" + marker)
+	seedTestRegion(t, tx, regionCode, "Integration Test Region")
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region)
-		VALUES ($1, $2, $3, 'Integration Test Region')
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, vendorID, "ITEST-"+marker, vendorName+" Branch").Scan(&branchID); err != nil {
+	`, vendorID, "ITEST-"+marker, vendorName+" Branch", regionCode).Scan(&branchID); err != nil {
 		t.Fatalf("insert vendor branch: %v", err)
 	}
 

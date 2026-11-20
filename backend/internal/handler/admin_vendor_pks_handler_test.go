@@ -30,15 +30,6 @@ type fakeVendorPksServicer struct {
 	gotNew                      *service.SubmitVendorPksRequest
 }
 
-func (f *fakeVendorPksServicer) Get(_ context.Context, vendorID int64) (*service.VendorPksDetail, error) {
-	f.calls++
-	f.gotVendor = vendorID
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &service.VendorPksDetail{VendorID: vendorID}, nil
-}
-
 func (f *fakeVendorPksServicer) SubmitNew(_ context.Context, makerID, vendorID int64, req service.SubmitVendorPksRequest, _ string) (db.MasterDataChangeRequest, error) {
 	f.calls++
 	f.gotMaker, f.gotVendor, f.gotNew = makerID, vendorID, &req
@@ -77,11 +68,10 @@ const (
 	pksReasonReq = `{"reason":"alasan yang cukup panjang"}`
 )
 
-// pksEndpoints are the four operations of the PKS tab.
+// pksEndpoints are the write operations of the PKS tab (the per-vendor GET moved to /admin/pks).
 var pksEndpoints = []struct {
 	name, method, path, body string
 }{
-	{"get", http.MethodGet, pksBase, ""},
 	{"create", http.MethodPost, pksBase, pksCreateReq},
 	{"terminate", http.MethodPost, pksBase + "/5/terminate", pksReasonReq},
 	{"unterminate", http.MethodPost, pksBase + "/5/unterminate", pksReasonReq},
@@ -100,12 +90,7 @@ func TestAdminVendorPksHandler_Success(t *testing.T) {
 	router, ts := mountAdminVendorPksHandler(svc)
 	tok := tokenForRole(t, ts, 9, "ADMIN")
 
-	rec := doRequest(router, http.MethodGet, pksBase, tok, "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"vendor_id":3`) {
-		t.Fatalf("get: want 200 with detail, got %d: %s", rec.Code, rec.Body.String())
-	}
-
-	for _, tc := range pksEndpoints[1:] {
+	for _, tc := range pksEndpoints {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := doRequest(router, tc.method, tc.path, tok, tc.body)
 			if rec.Code != http.StatusAccepted || !strings.Contains(rec.Body.String(), `"change_request_id"`) {

@@ -738,7 +738,7 @@ func TestVendorVaultApplier_Approve_CreateUpdateDisable_Integration(t *testing.T
 		VendorBranchID: branchID, VaultCode: "ITVV-V-" + tag,
 		VendorVaultUpdatePayload: VendorVaultUpdatePayload{
 			Category: "CASH", CurrencyCode: "IDR",
-			MinCapacityAmount: sp("1000000.50"), MaxCapacityAmount: sp("9000000000.00"),
+			MinBalance: sp("1000000.50"), MaxBalance: sp("9000000000.00"),
 			Latitude: sp("-6.200000"), Longitude: sp("106.816666"),
 		},
 	})
@@ -750,7 +750,7 @@ func TestVendorVaultApplier_Approve_CreateUpdateDisable_Integration(t *testing.T
 	var vaultID int64
 	var typ, category, minC, maxC, lat string
 	if err := dbtx(svc).QueryRow(ctx,
-		`SELECT id, type, category, min_capacity_amount::text, max_capacity_amount::text, latitude::text FROM vendor_vaults WHERE vault_code = $1`,
+		`SELECT id, type, category, min_balance::text, max_balance::text, latitude::text FROM vendor_vaults WHERE vault_code = $1`,
 		"ITVV-V-"+tag).Scan(&vaultID, &typ, &category, &minC, &maxC, &lat); err != nil {
 		t.Fatalf("querying created vault: %v", err)
 	}
@@ -759,14 +759,14 @@ func TestVendorVaultApplier_Approve_CreateUpdateDisable_Integration(t *testing.T
 		t.Errorf("unexpected vault row: type=%s category=%s min=%s max=%s lat=%s", typ, category, minC, maxC, lat)
 	}
 
-	// Update: change category, drop capacities (NULL).
+	// Update: change category, drop balances (NULL).
 	updateID := h.insertPending("vendor_vault", "update", &vaultID, VendorVaultUpdatePayload{Category: "ATM", CurrencyCode: "IDR"})
 	svc.orchestrator = &canApproveOnce{result: db.ApprovalRequest{DocumentType: masterDataDocumentType, DocumentID: updateID, Status: "approved"}}
 	if _, err := svc.Approve(ctx, 999, 1, "127.0.0.1"); err != nil {
 		t.Fatalf("Approve(update) error = %v", err)
 	}
 	var minIsNull bool
-	if err := dbtx(svc).QueryRow(ctx, `SELECT category, min_capacity_amount IS NULL FROM vendor_vaults WHERE id = $1`, vaultID).Scan(&category, &minIsNull); err != nil {
+	if err := dbtx(svc).QueryRow(ctx, `SELECT category, min_balance IS NULL FROM vendor_vaults WHERE id = $1`, vaultID).Scan(&category, &minIsNull); err != nil {
 		t.Fatalf("querying updated vault: %v", err)
 	}
 	if category != "ATM" || !minIsNull {

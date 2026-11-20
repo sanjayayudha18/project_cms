@@ -114,7 +114,7 @@ export function RegionFormDialog({ open, onClose, region }: RegionFormDialogProp
             id="code"
             {...form.register("code")}
             disabled={mode === "edit"}
-            maxLength={20}
+            maxLength={10}
             className={inputClass}
           />
         </Field>

@@ -59,6 +59,8 @@ func newVaultPlanFixture(t *testing.T) *vaultPlanFixture {
 		t.Fatal(err)
 	}
 
+	seedTestRegion(t, pool, "ITEST", "Integration Test Region")
+	seedTestRegion(t, pool, "ITOTHER", "Integration Test Other")
 	// Second replenish branch + ATM (same vendor + region, so one request).
 	branch2 := row(`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code) VALUES ($1, $2, 'B2', 'ITEST') RETURNING id`, f.vendorID, "ITB2-"+tag)
 	pkg2 := row(`INSERT INTO vendor_packages_branch (vendor_branch_id, package_code, machine_group, price_class, tier_min, base_price, currency, effective_start_date)

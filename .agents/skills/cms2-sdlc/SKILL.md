@@ -25,12 +25,13 @@ Sumber kebenaran: `.agents/rules/GEMINI.md`. Seluruh artefak fitur baru yang dik
 
 ## 6 Tahap SDLC
 
-Setiap file diawali dengan `# <Judul>` lalu baris `> Status: draft`. Hanya user yang mengubahnya menjadi `> Status: accepted YYYY-MM-DD (<role>)`. Kerjakan satu tahap dalam satu waktu; jangan pernah memulai tahap berikutnya sebelum user menyatakan artefak saat ini `accepted`.
+Setiap file diawali dengan `# <Judul>` lalu baris `> Status: draft`. Hanya user yang mengubahnya menjadi `> Status: accepted YYYY-MM-DD (<role>)`.
+**Aturan Satu Dokumen per Giliran**: Tulis satu dokumen artefak dalam satu waktu; selesaikan dan tunggu user me-review serta menyatakan `accepted` pada `requirements.md` sebelum mulai menulis `design.md`, lalu tunggu `design.md` disetujui sebelum menulis `tasks.md`. Dilarang membuat dua file artefak berbeda sekaligus dalam satu giliran.
 
 | # | Artefak (`.agents/specs/<feature>/`) | Gate Manusia (Agen Tidak Pernah Self-Approve) | Tugas Agen |
 | :--- | :--- | :--- | :--- |
-| **1 Plan** | `requirements.md` -> `## Introduction` (+ open questions) | PO menyetujui Introduction & menjawab open questions | Tangkap masalah, hasil yang diharapkan, batasan, dan cakupan. Daftarkan open questions tanpa menjawabnya sendiri. |
-| **2 Design** | `requirements.md` (EARS) + `design.md` | PO menyetujui requirements; Engineer menyetujui design | Tulis EARS requirements, kontrak API, model data, Correctness Properties, out-of-scope; tandai area kritis (auth/uang/recon/migrasi/delete). |
+| **1 Plan & Requirements** | `requirements.md` (`## Introduction`, `## Open Questions`, & EARS Requirements) | PO/User menjawab open questions & menyetujui `requirements.md` (`accepted`) | Tangkap masalah, hasil yang diharapkan, batasan, open questions, dan tulis EARS requirements setelah open questions terjawab. **Berhenti dan tunggu review user sebelum membuat `design.md`.** |
+| **2 Design** | `design.md` | Engineer/User menyetujui `design.md` (`accepted`) | Tulis kontrak API, model data, Correctness Properties, out-of-scope; tandai area kritis (auth/uang/recon/migrasi/delete). **Berhenti dan tunggu review user sebelum membuat `tasks.md`.** |
 | **3 Build** | `tasks.md` | Engineer menyetujui tasks | Susun daftar task dengan `_Requirements:_`, `_Model:_`, `_Skills:_` (sesuai matriks di `cms-orchestrator.md`), dan `## Task Dependency Graph`. Eksekusi per task/wave dengan diff kecil. |
 | **4 Test** | `tasks.md` -> `## Notes` -> `### Test Results` | Build + automated tests hijau | Jalankan perintah verifikasi dari `.agents/rules/GEMINI.md` (`go test ./...`, `golangci-lint`, `pnpm ... test/build/lint`). Catat verifikasi browser manual sebagai `outstanding (user)`. |
 | **5 Deploy** | `review.md` | Code owner melakukan merge | Dokumentasikan `## Review Passes`, `## Findings` (Important vs nit), dan checklist `## Definition of Done`. |

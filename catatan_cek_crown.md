@@ -215,6 +215,6 @@ Lakukan setelah bagian 0–6 selesai dan temuan yang menghalangi sudah diperbaik
 - [ ] `git fetch` lalu pastikan `dev1` tidak tertinggal dari `origin/main`.
 - [ ] Buka Pull Request `dev1` → `main` di GitHub. GitHub Actions (`.github/workflows/ci.yml`) harus hijau. Catatan: CI belum punya job frontend, jadi jalankan `pnpm run lint`, `test:coverage`, dan `build` di kedua portal secara lokal sebelum merge.
 - [ ] Review oleh code owner, lalu merge. Jangan force push.
-- [ ] Perbarui `development-plan.md` (X.6 dan status snapshot) setelah merge.
+- [ ] Perbarui `.claude/dev-plan/dev-plan.md` (X.6 dan status snapshot) setelah merge.
 
 **Hasil akhir:** _(diisi)_ lulus / ada temuan: …

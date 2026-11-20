@@ -118,7 +118,7 @@ A. Human workflow panjang
 
 Contoh:
 
-vendor upload invoice → validasi → maker submit → checker approve → hasil approved
+CROWN hitung tagihan trip → vendor review/banding → maker submit → checker approve → hasil final (FSD §6, 2026-11-12)
 
 
 Pola:

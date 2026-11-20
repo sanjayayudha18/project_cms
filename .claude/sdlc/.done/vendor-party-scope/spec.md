@@ -52,7 +52,7 @@ Sumber: `intent.md` (draft 2026-10-20). Q1–Q8 intent belum dijawab PO; spec in
   `vendor.ssi` dan `vendor.bijak` (baseline) diberi peran `replenish` oleh seed. Seed tetap idempoten, tanpa audit (data dev).
 - **S6 (Q6): notifikasi pihak hanya ke akun dengan peran = peran pihak** dan cabang = cabang pihak atau vendor-wide.
   **PIC vendor (`vendor_pics`) tidak dipisah per peran.** `vendor_pics` tidak punya kolom peran, dan menambahnya =
-  fitur master data baru (dilarang scope guard development-plan rule 2). PIC tetap menerima email per cabang seperti
+  fitur master data baru (dilarang scope guard dev-plan rule 2). PIC tetap menerima email per cabang seperti
   sekarang → known gap, dicatat.
 - **S7 (Q7): laporan dan daftar realisasi hanya untuk akun `replenish`.** Akun vault: menu Realisasi disembunyikan,
   `GET /vendor/replenish-realizations` → `403` `vendor_scope_role`. Pihak replenish sudah di luar cakupan akun vault,

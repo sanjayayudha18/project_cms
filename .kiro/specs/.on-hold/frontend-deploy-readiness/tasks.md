@@ -34,7 +34,7 @@ Pola rujukan: job `go-image` dan `scripts/ci/check-image.sh` (spec `backend-exq-
 - 6.4 Permukaan tidak berubah (Property 9) — Sonnet, High
 - 6.5 Bersihkan harness — Sonnet, High
 - 7.1 `deployment.md` deploy frontend, TLS/LB, Pipeline, EOD routing — Sonnet, Medium
-- 7.3 `development-plan.md` + `development-progress.md` — Sonnet, Medium
+- 7.3 `.claude/dev-plan/dev-plan.md` + `development-progress.md` — Sonnet, Medium
 - 8. Checkpoint — Sonnet, Medium
 - 9. Daftar outstanding user — Haiku, Low (Haiku)
 - 10. Commit setelah user menulis "commit" — Haiku, Low (Haiku)
@@ -157,7 +157,7 @@ Dependensi lintas grup: Opus 7.2 butuh hasil terukur Sonnet 6.1 dan 6.2 (`remote
     - Release checklist `backend-exq`, baris `TRUSTED_PROXIES`: sesuaikan ("tidak lagi berbeda dari `backend`").
     - Nilai harus cocok dengan bukti 6.1/6.2; yang belum bisa diukur (alamat GFE, `<lb-ip>`) ditandai "verifikasi saat deploy pertama".
     - _Requirements: 9.2, 9.3_
-  - [ ] 7.3 `.kiro/steering/development-plan.md` dan `.claude/development-progress.md`
+  - [ ] 7.3 `.claude/dev-plan/dev-plan.md` dan `.claude/development-progress.md`
     - X.15: status built, ringkasan, langkah berikutnya (cek browser, run CI pertama, deploy pertama). Satu entri di `development-progress.md`.
     - _Requirements: 9.5_
   - _Model: Opus, High — 7.2 menentukan nilai `TRUSTED_PROXIES` produksi (zona auth: batas login per IP dan IP audit). 7.1 dan 7.3 Sonnet, Medium._
@@ -218,7 +218,7 @@ Ditentukan di task 1.4 dari hasil 1.2(c) dan 1.3: varian R hanya bila resolver n
 - **Wave 13:** 6.5 bersihkan harness (butuh 6.2, 6.3).
 - **Wave 14:** 7.1 dokumen deploy (butuh 6.1, 6.2).
 - **Wave 15:** 7.2 `TRUSTED_PROXIES` (butuh 6.1, 6.2; file sama dengan 7.1).
-- **Wave 16:** 7.3 development-plan + progress.
+- **Wave 16:** 7.3 dev-plan + progress.
 - **Wave 17:** 8 checkpoint (butuh semua di atas).
 - **Wave 18:** 9 outstanding, 10 commit (10 menunggu user menulis "commit").
 

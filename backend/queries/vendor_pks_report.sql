@@ -1,67 +1,68 @@
--- Vendor + PKS report export (vendor-pks task 4.3, Req 10). Read-only.
--- SHARED FILE: backend-exq generates these queries too (its sqlc.yaml lists
--- this path). Regenerate in BOTH modules.
+-- Daftar PKS export (spec .kiro/specs/vendor-pks-list/, task 6.1, Req 3.4/10.1/10.3). Read-only.
+-- SHARED FILE: backend-exq generates these queries (its sqlc.yaml lists this path); backend does not.
 --
--- Predicates q / status are copied verbatim from ListVendorsAdmin
--- (vendors_admin.sql); keep the two in sync. `status` is 'active' | 'disabled'
--- | 'all' (caller resolves absent to 'active'). `pks_status` NULL = no filter;
--- otherwise one key of reports.PksStatuses. Vendor INTERNAL has status NULL, so
--- it never matches a pks_status filter. `today` = Asia/Jakarta date from Go
--- (D30), `renewal_months` = VENDOR_PKS_RENEWAL_MONTHS.
+-- One row per vendor_pks row (history included), FLM_VENDOR only, no pending rows (A2). Filters are the same
+-- as ListPksAdmin (vendor_pks_list.sql) — keep in sync (Property 6: screen and export agree):
+--   status   : 'terkini' = replaced_at IS NULL, 'semua' = every row, else a vendor_pks_record_status() label
+--   pks_type : NULL or vendor_pks_types.code;  vendor : NULL or vendors.code;  q : NULL or ILIKE on name / WOD
+--   today    : Asia/Jakarta date from Go.
+-- Masa Berlaku (hari) = expiry_date - effective_date; remaining days are not exported.
 --
--- Keyset page on (name, id): first page after_name = '' and after_id = 0.
--- Director = the vendor's single active vendor_pics.is_director row (partial
--- unique index vendor_pics_director_uq), so the LEFT JOIN never multiplies rows.
--- Active PKS = vendor_pks.replaced_at IS NULL (vendor_pks_active_uq).
--- Function results are cast explicitly so sqlc does not infer their types.
+-- Keyset on (vendor code, type code, 9999-12-31 - effective_date, id) = newest effective first without a mixed
+-- sort direction. First page: after_vendor_code = '', after_type_code = '', after_rev_effective = 0, after_id = 0.
+-- Director = the vendor's single active vendor_pics.is_director row (partial unique index), so the LEFT JOIN
+-- never multiplies rows. Function results are cast explicitly so sqlc does not infer their types.
 
 -- name: ExportVendorPksBatch :many
--- COALESCE keeps these non-null for sqlc/pgx (a NULL scan into int32 fails): 0/'' means
--- "no active PKS" (pks_id IS NULL) or, for pks_status, an INTERNAL vendor. Filter below uses the raw function.
-SELECT v.id,
+SELECT p.id,
        v.code                                                        AS vendor_code,
        v.name                                                        AS vendor_name,
        d.name                                                        AS director_name,
        d.phone                                                       AS director_phone,
        d.email                                                       AS director_email,
-       ap.pks_name                                                   AS pks_name,
-       ap.effective_date                                             AS effective_date,
-       ap.expiry_date                                                AS expiry_date,
-       COALESCE(vendor_pks_validity_months(ap.effective_date, ap.expiry_date), 0)::int AS validity_months,
-       COALESCE(ap.expiry_date - sqlc.arg('today')::date, 0)::int               AS remaining_days,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                         sqlc.arg('today')::date, sqlc.arg('renewal_months')::int), '')::text AS pks_status
-FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
+       t.code                                                        AS pks_type_code,
+       p.wod_number                                                  AS wod_number,
+       p.pks_name                                                    AS pks_name,
+       p.effective_date                                              AS effective_date,
+       p.expiry_date                                                 AS expiry_date,
+       (p.expiry_date - p.effective_date)::int                       AS validity_days,
+       p.renewal_days                                                AS renewal_days,
+       vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                p.renewal_days, sqlc.arg('today')::date)::text AS pks_status,
+       (DATE '9999-12-31' - p.effective_date)::int                   AS rev_effective
+FROM vendor_pks p
+JOIN vendors v ON v.id = p.vendor_id
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
 LEFT JOIN vendor_pics d ON d.vendor_id = v.id AND d.is_director AND d.deleted_at IS NULL
-WHERE (v.name, v.id) > (sqlc.arg('after_name')::text, sqlc.arg('after_id')::bigint)
+WHERE v.kind = 'FLM_VENDOR'
+  AND (v.code, t.code, (DATE '9999-12-31' - p.effective_date)::int, p.id)
+        > (sqlc.arg('after_vendor_code')::text, sqlc.arg('after_type_code')::text,
+           sqlc.arg('after_rev_effective')::int, sqlc.arg('after_id')::bigint)
+  AND (sqlc.arg('status')::text = 'semua'
+        OR (sqlc.arg('status')::text = 'terkini' AND p.replaced_at IS NULL)
+        OR vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                    p.renewal_days, sqlc.arg('today')::date) = sqlc.arg('status')::text)
+  AND (sqlc.narg('pks_type')::text IS NULL OR t.code = sqlc.narg('pks_type')::text)
+  AND (sqlc.narg('vendor')::text IS NULL OR v.code = sqlc.narg('vendor')::text)
   AND (sqlc.narg('q')::text IS NULL
-        OR v.code ILIKE '%' || sqlc.narg('q')::text || '%'
-        OR v.name ILIKE '%' || sqlc.narg('q')::text || '%')
-  AND (
-        sqlc.arg('status')::text = 'all'
-        OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
-        OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
-      )
-  AND (sqlc.narg('pks_status')::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                             sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text)
-ORDER BY v.name, v.id
+        OR p.pks_name ILIKE '%' || sqlc.narg('q')::text || '%'
+        OR p.wod_number ILIKE '%' || sqlc.narg('q')::text || '%')
+ORDER BY v.code, t.code, (DATE '9999-12-31' - p.effective_date)::int, p.id
 LIMIT sqlc.arg('batch_size')::int;
 
 -- name: CountVendorPksReport :one
 -- Same joins and filters as ExportVendorPksBatch, without keyset/LIMIT.
 SELECT COUNT(*)
-FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
-WHERE (sqlc.narg('q')::text IS NULL
-        OR v.code ILIKE '%' || sqlc.narg('q')::text || '%'
-        OR v.name ILIKE '%' || sqlc.narg('q')::text || '%')
-  AND (
-        sqlc.arg('status')::text = 'all'
-        OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
-        OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
-      )
-  AND (sqlc.narg('pks_status')::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                             sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text);
+FROM vendor_pks p
+JOIN vendors v ON v.id = p.vendor_id
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE v.kind = 'FLM_VENDOR'
+  AND (sqlc.arg('status')::text = 'semua'
+        OR (sqlc.arg('status')::text = 'terkini' AND p.replaced_at IS NULL)
+        OR vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                    p.renewal_days, sqlc.arg('today')::date) = sqlc.arg('status')::text)
+  AND (sqlc.narg('pks_type')::text IS NULL OR t.code = sqlc.narg('pks_type')::text)
+  AND (sqlc.narg('vendor')::text IS NULL OR v.code = sqlc.narg('vendor')::text)
+  AND (sqlc.narg('q')::text IS NULL
+        OR p.pks_name ILIKE '%' || sqlc.narg('q')::text || '%'
+        OR p.wod_number ILIKE '%' || sqlc.narg('q')::text || '%');

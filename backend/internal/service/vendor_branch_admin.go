@@ -53,28 +53,6 @@ func normalizeBranchRegionCode(in *string) (*string, error) {
 	return &code, nil
 }
 
-// cisLimitRe: positive-looking decimal, at most 18 integer digits and 2 decimals = numeric(20,2).
-var cisLimitRe = regexp.MustCompile(`^[0-9]{1,18}(\.[0-9]{1,2})?$`)
-
-// normalizeCisLimit trims a Limit CIS amount (vendor-cis-limit FR1.2); blank = NULL. Must be > 0,
-// checked as text (never float); the DB CHECK vendor_branches_cis_limit_amount_chk is the last net.
-func normalizeCisLimit(in *string) (*string, error) {
-	if in == nil {
-		return nil, nil
-	}
-	s := strings.TrimSpace(*in)
-	if s == "" {
-		return nil, nil
-	}
-	if !cisLimitRe.MatchString(s) {
-		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus angka desimal, maksimal 18 digit dan 2 angka di belakang titik"}
-	}
-	if strings.Trim(s, "0.") == "" {
-		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus lebih besar dari 0"}
-	}
-	return &s, nil
-}
-
 // DecimalStringPtr renders a nullable numeric as an exact decimal string (nil for NULL) for handlers
 // that map db rows straight to JSON (money as string, QC F7).
 func DecimalStringPtr(n pgtype.Numeric) (*string, error) {
@@ -98,6 +76,25 @@ type VendorBranchAdminRepo interface {
 	Count(ctx context.Context, arg db.CountVendorBranchesAdminParams) (int64, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorBranchAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
+	// IsActiveRegion reports whether code names an active standard region
+	// (region-standardization Req 3.3). Primary pool.
+	IsActiveRegion(ctx context.Context, code string) (bool, error)
+}
+
+// ensureActiveRegion rejects a non-NULL region_code that is not an active
+// standard region (Req 3.3) before anything is staged. NULL stays allowed.
+func (s *VendorBranchAdminService) ensureActiveRegion(ctx context.Context, code *string) error {
+	if code == nil {
+		return nil
+	}
+	ok, err := s.repo.IsActiveRegion(ctx, *code)
+	if err != nil {
+		return fmt.Errorf("checking region %s: %w", *code, err)
+	}
+	if !ok {
+		return &ValidationError{Field: "region_code", Message: "region tidak dikenal atau nonaktif"}
+	}
+	return nil
 }
 
 // VendorBranchChildCounter checks whether a branch still has active
@@ -136,11 +133,8 @@ type VendorBranchPayload struct {
 	BranchCode string  `json:"branch_code"`
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
-	RegionCode *string `json:"region_code"`
+	RegionCode *string `json:"region_code"` // FK regions.code; the free-text region was dropped in migration 042
 	Category   string  `json:"category"`
-	// CisLimitAmount: Limit CIS decimal string, nil = NULL (vendor-cis-limit FR1). Currency stays IDR (S4).
-	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // VendorBranchUpdatePayload is update's payload shape. branch_code and
@@ -149,11 +143,8 @@ type VendorBranchPayload struct {
 type VendorBranchUpdatePayload struct {
 	BranchName string  `json:"branch_name"`
 	LocationID *int64  `json:"location_id"`
-	Region     *string `json:"region"`
 	RegionCode *string `json:"region_code"` // nil = cleared (form always sends the current value)
 	Category   string  `json:"category"`
-	// CisLimitAmount: nil = cleared (form always sends the current value, like region_code).
-	CisLimitAmount *string `json:"cis_limit_amount"`
 }
 
 // List returns a page of a vendor's branches matching the given filters.
@@ -195,7 +186,7 @@ func (s *VendorBranchAdminService) Create(ctx context.Context, makerID int64, re
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
-	if req.CisLimitAmount, err = normalizeCisLimit(req.CisLimitAmount); err != nil {
+	if err := s.ensureActiveRegion(ctx, req.RegionCode); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 
@@ -237,7 +228,7 @@ func (s *VendorBranchAdminService) Update(ctx context.Context, makerID, id int64
 		return db.MasterDataChangeRequest{}, err
 	}
 	req.RegionCode = regionCode
-	if req.CisLimitAmount, err = normalizeCisLimit(req.CisLimitAmount); err != nil {
+	if err := s.ensureActiveRegion(ctx, req.RegionCode); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 

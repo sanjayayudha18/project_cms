@@ -26,10 +26,16 @@ export function RegionsTable({ regions, onEdit, onDisable, onEnable }: RegionsTa
       cell: ({ row }) => row.original.region ?? "-",
     },
     {
-      id: "location_count",
-      header: "Jumlah Lokasi",
+      id: "atm_count",
+      header: "Jumlah ATM",
       meta: { align: "right" },
-      cell: ({ row }) => row.original.location_count,
+      cell: ({ row }) => row.original.atm_count,
+    },
+    {
+      id: "vendor_branch_count",
+      header: "Jumlah Cabang Vendor",
+      meta: { align: "right" },
+      cell: ({ row }) => row.original.vendor_branch_count,
     },
     {
       id: "status",

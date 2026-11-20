@@ -19,7 +19,7 @@ pnpm 12 adalah major release: inti pnpm ditulis ulang dalam Rust dan dikirim seb
 
 Isi sumber di atas sudah diparafrasekan.
 
-### Kondisi kode saat ini (dicek 2026-11-03, branch `main` @ `56b9969`, working tree punya perubahan yang belum di-commit di `navigation.ts`, `exports.preview.test.tsx`, `development-plan.md`)
+### Kondisi kode saat ini (dicek 2026-11-03, branch `main` @ `56b9969`, working tree punya perubahan yang belum di-commit di `navigation.ts`, `exports.preview.test.tsx`, `.claude/dev-plan/dev-plan.md`)
 
 - `frontend/CompanyPortal-Vite/package.json` dan `frontend/VendorPortal-Vite/package.json`: `"packageManager": "pnpm@11.20.0+sha512.9a6f…bfee"`. Tidak ada field `engines` atau `pnpm`.
 - `frontend/CompanyPortal-Vite/Dockerfile` dan `frontend/VendorPortal-Vite/Dockerfile` baris 3: `RUN corepack enable && corepack install --global pnpm@11.20.0` di atas `node:22-alpine`, lalu `COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./` dan `RUN pnpm install --frozen-lockfile`.
@@ -38,7 +38,7 @@ Isi sumber di atas sudah diparafrasekan.
 - Cara install pnpm di kedua Dockerfile.
 - Verifikasi lockfile dan `pnpm-workspace.yaml` dengan pnpm 12.
 - Gate kualitas kedua portal dijalankan ulang dengan pnpm 12.
-- Pesan petunjuk di `frontend/dev.ps1` dan dokumentasi (lessons-learned, arsitektur-teknologi, development-plan, development-progress).
+- Pesan petunjuk di `frontend/dev.ps1` dan dokumentasi (lessons-learned, arsitektur-teknologi, dev-plan, development-progress).
 
 ### Tidak termasuk
 
@@ -54,7 +54,7 @@ Tidak menyentuh auth, uang, rekonsiliasi, migrasi data, atau delete. Risikonya a
 
 ### Dependency & Scope Note
 
-Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 mewajibkan item dicatat dulu dengan OK user (D5). Pekerjaan ini tidak bergantung pada fase mana pun dan tidak mengubah perilaku aplikasi.
+Belum ada item untuk pekerjaan ini di `.claude/dev-plan/dev-plan.md`. Scope guard rule 1 mewajibkan item dicatat dulu dengan OK user (D5). Pekerjaan ini tidak bergantung pada fase mana pun dan tidak mengubah perilaku aplikasi.
 
 ## Glossary
 
@@ -139,9 +139,9 @@ Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 
 1. THE `.claude/docs/arsitektur-teknologi.md` SHALL mencatat pnpm 12.16.1 untuk CP dan VP.
 2. THE `.kiro/steering/lessons-learned.md` dan `.claude/lessons-learned.md` SHALL memuat entri upgrade pnpm 11 → 12 (setting workspace tak dikenal, lockfile siklik, flag yang ditolak, `ENOEXEC`, metode install Docker), dan kedua file SHALL berisi teks entri yang sama.
 3. WHERE entri lessons-learned lama menyebut perilaku khusus pnpm 11, THE entri tersebut SHALL tetap ada dan diberi catatan apakah masih berlaku di pnpm 12.
-4. THE `.kiro/steering/development-plan.md` SHALL memuat item cross-cutting X.12 "pnpm 12 upgrade" dengan status dan langkah berikutnya (D5).
+4. THE `.claude/dev-plan/dev-plan.md` SHALL memuat item cross-cutting X.12 "pnpm 12 upgrade" dengan status dan langkah berikutnya (D5).
 5. WHEN pekerjaan selesai, THE `.claude/development-progress.md` SHALL memuat entri changelog upgrade pnpm 12.16.1, termasuk satu baris untuk developer lain: pasang ulang pnpm global dengan `npm install -g pnpm@12.16.1` (D6).
-6. THE baris X.3 di `.kiro/steering/development-plan.md` SHALL mencatat temuan bahwa `.github/workflows/ci.yml` tidak punya job frontend, sebagai item terbuka di luar spec ini (D4).
+6. THE baris X.3 di `.claude/dev-plan/dev-plan.md` SHALL mencatat temuan bahwa `.github/workflows/ci.yml` tidak punya job frontend, sebagai item terbuka di luar spec ini (D4).
 
 ## Open Questions
 
@@ -150,8 +150,8 @@ Belum ada item untuk pekerjaan ini di `development-plan.md`. Scope guard rule 1 
 | D1 | Target versi: pnpm 12.16.1 (major, rewrite Rust) atau tetap di line 11 dengan naik ke 11.28.9 (`latest-11`, berisi fix keamanan 11.28.5)? | 12.16.1 sesuai permintaan. `latest` di npm sudah menunjuk ke line 12, repo tidak punya dependency git, `.npmrc`, atau flag yang ditolak, dan `pnpm-workspace.yaml` hanya berisi `allowBuilds`. Risiko utamanya hanya Docker build dan mesin developer, dan keduanya diverifikasi di spec ini. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
 | D2 | Cara memasang pnpm di Dockerfile: tetap `corepack install --global pnpm@12.16.1` atau ganti ke `npm install -g pnpm@12.16.1`? | `npm install -g pnpm@12.16.1`. lessons-learned sudah mencatat corepack bisa gagal di `node:22-alpine` untuk pnpm 11, shim pnpm 12 punya isu `ENOEXEC` saat dijalankan oleh launcher lain, dan Node 25+ tidak lagi membawa corepack. Integritas tetap terjaga oleh hash di PackageManagerPin. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
 | D3 | Lockfile: biarkan apa adanya (cukup `--frozen-lockfile` lolos) atau paksa regenerate sekali dengan pnpm 12? | Biarkan apa adanya. Jalankan satu `pnpm install` tanpa frozen untuk cek diff. Bila ada diff format/peer variant, commit di perubahan yang sama supaya churn tidak muncul diam-diam di PR lain. Bila versi resolved berubah, berhenti dan lapor (Req 3.4). | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
-| D4 | `ci.yml` tidak punya job frontend. Tambahkan job frontend (pnpm 12.16.1, lint, test, build) di spec ini? | Tidak di spec ini (YAGNI, satu concern per perubahan). Catat sebagai temuan di `development-plan.md` X.3 dan putuskan terpisah. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
-| D5 | Catat pekerjaan ini sebagai item cross-cutting baru di `development-plan.md` (X.12)? | Ya, X.12 "pnpm 12 upgrade", sesuai scope guard rule 1. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
+| D4 | `ci.yml` tidak punya job frontend. Tambahkan job frontend (pnpm 12.16.1, lint, test, build) di spec ini? | Tidak di spec ini (YAGNI, satu concern per perubahan). Catat sebagai temuan di `.claude/dev-plan/dev-plan.md` X.3 dan putuskan terpisah. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
+| D5 | Catat pekerjaan ini sebagai item cross-cutting baru di `.claude/dev-plan/dev-plan.md` (X.12)? | Ya, X.12 "pnpm 12 upgrade", sesuai scope guard rule 1. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |
 | D8 | Task 5.1 (2026-11-03): dengan pin 12.16.1, `pnpm install --frozen-lockfile` exit 0 tapi menambah boot document (+158 baris, 0 dihapus) di awal `pnpm-lock.yaml`: `packageManagerDependencies: pnpm 12.16.1` + 14 `@pnpm/exe.*@12.16.1` dengan hash. Fitur resmi pnpm (https://pnpm.io/lockfile), dokumen proyek tidak berubah. Terima atau matikan (`pmOnFail: ignore`)? | Terima dan commit bersama upgrade: mengunci binary pnpm dengan hash, frozen install gagal bila pin dan Lockfile tidak cocok, dan tanpa commit setiap install mengotori Lockfile. Perbandingan snapshot memakai dokumen terakhir saja. | ✅ DIPUTUSKAN user 2026-11-03 |
 | D7 | Baseline pnpm 11.20.0 (task 2.2/2.3, 2026-11-03): `pnpm audit --prod` sudah merah (CP 3, VP 6 vuln dari dependency aplikasi `zod`, `seroval` via `@tanstack/react-router`). Req 4.5 "0 vulnerability" tidak bisa dipenuhi tanpa upgrade dependency (di luar scope). | Ganti Req 4.5 jadi paritas: himpunan advisory pnpm 12 = baseline. Perbaikan vuln dikerjakan terpisah. | ✅ DIPUTUSKAN user 2026-11-03 |
 | D6 | Developer lain yang memakai pnpm global 10.x atau 11.x di bawah 11.10.0: cukup didokumentasikan, atau perlu pengumuman/checklist khusus? | Cukup dokumentasi (Req 5) plus satu baris di ringkasan commit. Tim kecil dan pin `packageManager` memunculkan error yang jelas. | ✅ DIPUTUSKAN PO 2026-11-03 (ikut saran) |

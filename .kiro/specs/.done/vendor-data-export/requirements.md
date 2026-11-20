@@ -50,7 +50,7 @@ Sekaligus, semua kegiatan export data dipindahkan ke `backend-exq` (D13) dan dij
 
 ### Dependency & Scope Note
 
-User menyetujui (2026-10-28) scope baru **Export Data** di luar Phase 2, dicatat di `development-plan.md` sebagai item cross-cutting X.7. Export bersifat read-only terhadap data master, jadi tidak melanggar scope guard rule 2. Spec lanjutan `report-export-migration` (X.8) bergantung pada spec ini dan memakai mekanisme `export_jobs` yang sama.
+User menyetujui (2026-10-28) scope baru **Export Data** di luar Phase 2, dicatat di `.claude/dev-plan/dev-plan.md` sebagai item cross-cutting X.7. Export bersifat read-only terhadap data master, jadi tidak melanggar scope guard rule 2. Spec lanjutan `report-export-migration` (X.8) bergantung pada spec ini dan memakai mekanisme `export_jobs` yang sama.
 
 ## Glossary
 
@@ -314,7 +314,7 @@ User menyetujui (2026-10-28) scope baru **Export Data** di luar Phase 2, dicatat
 | D6 | Peran yang boleh ekspor | `ADMIN`, `ADMIN_PARAM`. | ✅ DIPUTUSKAN PO 2026-10-28 |
 | D7 | Sinkron atau asinkron? | Asinkron (`export_jobs`), supaya ekspor data besar tidak perlu diubah lagi nanti. Template kosong tetap sinkron. | ✅ DIPUTUSKAN PO 2026-10-28 |
 | D8 | Endpoint masuk kontrak OpenAPI? | Ya, `backend-exq/api/openapi.yaml` + test kontrak + tipe TS terpisah (Requirement 15). | ✅ DIPUTUSKAN PO 2026-10-28 |
-| D9 | Masuk `development-plan.md` sebagai apa? | Scope baru Export Data (item X.7). | ✅ DIPUTUSKAN PO 2026-10-28 |
+| D9 | Masuk `.claude/dev-plan/dev-plan.md` sebagai apa? | Scope baru Export Data (item X.7). | ✅ DIPUTUSKAN PO 2026-10-28 |
 | D10 | Backend tujuan | `backend-exq`. | ✅ DIPUTUSKAN PO 2026-10-28 |
 | D11 | `CSVSafe` + header CSV master data | Pindah ke `pkg/` (CSV_Contract) karena export di `backend-exq` dan import di `backend/` harus memakai satu kontrak. | ✅ mengikuti D13 (2026-10-28) |
 | D12 | Lokasi menu di CompanyPortal | Kartu "Export Data" di hub Pengaturan (`/settings/admin/exports`). | ✅ DIPUTUSKAN PO 2026-10-28 |

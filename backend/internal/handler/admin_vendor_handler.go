@@ -12,17 +12,16 @@ import (
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/middleware"
-	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // VendorAdminServicer is the subset of service.VendorAdminService the
-// handler needs: List/Get (read-only, Req 6/9.5) plus
-// Create/Update/Disable/Enable (Req 7/8).
+// handler needs: List/Get (read-only, Req 6/9.5; role re-checked in the
+// service, vendor-pks-list Req 9.2) plus Create/Update/Disable/Enable (Req 7/8).
 type VendorAdminServicer interface {
-	List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
-	Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error)
-	Get(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error)
-	GetKindAndDirector(ctx context.Context, id int64) (string, *db.GetVendorDirectorPicRow, error)
+	List(ctx context.Context, role string, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error)
+	Count(ctx context.Context, role string, arg db.CountVendorsAdminParams) (int64, error)
+	Get(ctx context.Context, role string, id int64) (*db.GetVendorAdminByIDRow, error)
+	GetKindAndDirector(ctx context.Context, role string, id int64) (string, *db.GetVendorDirectorPicRow, error)
 	// Mutations stage a maker-checker change request (T4.1) and return it
 	// pending; the vendor row itself changes only after approval.
 	Create(ctx context.Context, actorID int64, req service.CreateVendorRequest, actorIP string) (db.MasterDataChangeRequest, error)
@@ -31,12 +30,14 @@ type VendorAdminServicer interface {
 	Enable(ctx context.Context, actorID, id int64, actorIP string) (db.MasterDataChangeRequest, error)
 }
 
-// AdminVendorHandler handles ADMIN/ADMIN_PARAM-only vendor management
-// endpoints: list/get/create/update/disable/enable. Mirrors AdminUserHandler
+// AdminVendorHandler handles vendor management endpoints:
+// list/get/create/update/disable/enable. Mirrors AdminUserHandler
 // structurally, but disable/enable go straight through VendorAdminService
 // (which already owns the existence pre-check + audit) rather than a
 // separate deactivate service. Mount behind RequireAuth +
-// RequireRoles("ADMIN", "ADMIN_PARAM") — see cmd/api/main.go.
+// RequireRoles(reports.PksViewerRoles...) (ADMIN, ADMIN_PARAM, ATM-SPV);
+// Routes() narrows every write to ADMIN/ADMIN_PARAM (vendor-pks-list Req 9.2)
+// — see cmd/api/main.go.
 type AdminVendorHandler struct {
 	svc VendorAdminServicer
 }
@@ -50,16 +51,22 @@ func NewAdminVendorHandler(svc VendorAdminServicer) *AdminVendorHandler {
 func (h *AdminVendorHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.List)
-	r.Post("/", h.Create)
 	r.Get("/{id}", h.Get)
-	r.Put("/{id}", h.Update)
-	r.Post("/{id}/disable", h.Disable)
-	r.Post("/{id}/enable", h.Enable)
+	w := r.With(middleware.RequireRoles("ADMIN", "ADMIN_PARAM"))
+	w.Post("/", h.Create)
+	w.Put("/{id}", h.Update)
+	w.Post("/{id}/disable", h.Disable)
+	w.Post("/{id}/enable", h.Enable)
 	return r
 }
 
-// List handles GET / — filterable, paginated vendor list (Req 6).
+// List handles GET / — filterable, paginated vendor list (Req 6), each with pks_count.
 func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
 	q := r.URL.Query()
 
 	page, pageSize, err := parsePageParams(q)
@@ -77,27 +84,27 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 		qParam = &v
 	}
 
-	var pksStatus *string
-	if v := q.Get("pks_status"); v != "" {
-		if _, ok := reports.PksStatuses[v]; !ok {
-			writeError(w, http.StatusBadRequest, "bad_request", "pks_status tidak valid")
+	var kind *string
+	if v := q.Get("kind"); v != "" {
+		if v != "FLM_VENDOR" && v != "INTERNAL" {
+			writeError(w, http.StatusBadRequest, "bad_request", "kind tidak valid")
 			return
 		}
-		pksStatus = &v
+		kind = &v
 	}
 
 	listArg := db.ListVendorsAdminParams{
-		Q: qParam, Status: status, PksStatus: pksStatus,
+		Q: qParam, Status: status, Kind: kind,
 		PageLimit: int64(pageSize), PageOffset: int64((page - 1) * pageSize),
 	}
-	rows, err := h.svc.List(r.Context(), listArg)
+	rows, err := h.svc.List(r.Context(), authCtx.Role, listArg)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		h.handleVendorAdminError(w, err)
 		return
 	}
-	total, err := h.svc.Count(r.Context(), db.CountVendorsAdminParams{Q: qParam, Status: status, PksStatus: pksStatus})
+	total, err := h.svc.Count(r.Context(), authCtx.Role, db.CountVendorsAdminParams{Q: qParam, Status: status, Kind: kind})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		h.handleVendorAdminError(w, err)
 		return
 	}
 
@@ -112,24 +119,29 @@ func (h *AdminVendorHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /{id}.
 func (h *AdminVendorHandler) Get(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
 	id, err := parsePathID(r, "id")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
 
-	row, err := h.svc.Get(r.Context(), id)
+	row, err := h.svc.Get(r.Context(), authCtx.Role, id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		h.handleVendorAdminError(w, err)
 		return
 	}
 	if row == nil {
 		writeError(w, http.StatusNotFound, "not_found", "Vendor tidak ditemukan")
 		return
 	}
-	kind, dir, err := h.svc.GetKindAndDirector(r.Context(), id)
+	kind, dir, err := h.svc.GetKindAndDirector(r.Context(), authCtx.Role, id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+		h.handleVendorAdminError(w, err)
 		return
 	}
 	resp := getVendorRowToResponse(*row)
@@ -292,6 +304,8 @@ func (h *AdminVendorHandler) handleVendorAdminError(w http.ResponseWriter, err e
 		writeError(w, http.StatusBadRequest, "bad_request", service.ErrVendorCodeImmutable.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):
 		writeForbidden(w, "Anda tidak berhak mengubah master data")
+	case errors.Is(err, service.ErrVendorReadForbidden):
+		writeForbidden(w, "Anda tidak berhak melihat vendor")
 	case errors.Is(err, service.ErrMasterDataChangePending):
 		writeError(w, http.StatusConflict, "conflict", service.ErrMasterDataChangePending.Error())
 	default:
@@ -306,27 +320,15 @@ func directorResponse(name string, phone, email *string) map[string]any {
 }
 
 func listVendorRowToResponse(r db.ListVendorsAdminRow) map[string]any {
-	// ListVendorsAdmin COALESCEs the PKS columns (0 / ''); restore NULLs here:
-	// pks = null without an active PKS, pks_status = null for INTERNAL vendors.
-	var director, pks, pksStatus any
+	var director any
 	if r.DirectorName != nil {
 		director = directorResponse(*r.DirectorName, r.DirectorPhone, r.DirectorEmail)
-	}
-	if r.PksID != nil {
-		pks = map[string]any{
-			"id": *r.PksID, "pks_name": r.PksName,
-			"effective_date": formatPgDate(r.PksEffectiveDate), "expiry_date": formatPgDate(r.PksExpiryDate),
-			"validity_months": r.PksValidityMonths, "remaining_days": r.PksRemainingDays,
-		}
-	}
-	if r.PksStatus != "" {
-		pksStatus = r.PksStatus
 	}
 	return map[string]any{
 		"id": r.ID, "code": r.Code, "name": r.Name, "legal_name": r.LegalName, "npwp": r.Npwp, "contact_email": r.ContactEmail,
 		"contact_phone": r.ContactPhone, "hq_address": r.HqAddress, "is_active": r.IsActive,
 		"deleted_at": formatTimestamptz(r.DeletedAt),
-		"kind":       r.Kind, "director": director, "pks": pks, "pks_status": pksStatus,
+		"kind":       r.Kind, "director": director, "pks_count": r.PksCount,
 	}
 }
 

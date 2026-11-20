@@ -20,31 +20,33 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
    - **Wajib Spec Penuh** jika menyentuh: autentikasi/RBAC, perhitungan uang/jurnal, rekonsiliasi, migrasi skema database, atau penghapusan data.
 2. Periksa folder `.agents/specs/<feature>/` (dan `.agents/specs/done/`). Jika sudah ada, temukan artefak terakhir yang berstatus `> Status: accepted` dan lanjutkan dari tahap setelahnya.
 
-### Tahap 1 — Plan (`requirements.md` Bagian Introduction)
+### Tahap 1 — Plan & Requirements (`requirements.md`)
 - Buat `.agents/specs/<feature>/requirements.md` dengan header `# <Judul Fitur>` dan `> Status: draft`.
 - Tuliskan `## Introduction` (masalah bisnis, hasil yang diharapkan, pengguna/portal terdampak, batasan sistem) dan `## Open Questions`.
-- **Gate 1**: Jangan menjawab pertanyaan kebijakan bisnis sendiri. Tunggu Product Owner / User menjawab *Open Questions* dan menyetujui tahap ini.
+- Setelah user menjawab *Open Questions*, lengkapi `requirements.md` dengan kriteria penerimaan berformat **EARS** (*Event-Driven / Unwanted Behavior / State-Driven / Ubiquitous*).
+- **Gate 1 (Wajib Berhenti)**: Selesaikan `requirements.md` terlebih dahulu dan **JANGAN membuat `design.md`** sebelum user selesai me-review dan menyatakan `requirements.md` disetujui (`accepted`).
 
-### Tahap 2 — Design (`requirements.md` EARS + `design.md`)
-- Lengkapi `requirements.md` dengan kriteria penerimaan berformat **EARS** (*Event-Driven / Unwanted Behavior / State-Driven / Ubiquitous*).
+### Tahap 2 — Design (`design.md`)
+- Hanya dimulai **setelah `requirements.md` berstatus `accepted`**.
 - Buat `.agents/specs/<feature>/design.md` (`> Status: draft`) yang memuat:
   1. **Arsitektur & Alur Data**: Pemisahan `CompanyPortal-Vite` vs `VendorPortal-Vite` dan `backend/` (port 8080, flat JSON) vs `backend-exq/` (port 8081, envelope `pkg/response`).
   2. **Model Data & Topologi DB**: Skema tabel, indeks, aturan tipe uang (`numeric` / `bigint` IDR, **tanpa float**), dan pemisahan query Primary (`db`) vs Read Replica (`dbRead`).
   3. **Maker-Checker & Audit**: Mekanisme `Submit` -> `approval_requests` (HTTP `202 Accepted`) -> `Applier` + pencatatan `audit_logs` dalam transaksi database yang sama.
   4. **Correctness Properties & Out-of-Scope**: Invarian bisnis yang wajib diuji dan batasan fitur yang tidak dikerjakan.
-- **Gate 2**: Berhenti dan tunggu persetujuan (`accepted`) atas `requirements.md` dan `design.md`.
+- **Gate 2 (Wajib Berhenti)**: Jangan membuat `tasks.md` sebelum user selesai me-review dan menyetujui `design.md` (`accepted`).
 
 ### Tahap 3 — Build Plan (`tasks.md`)
-- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `cms-run-wave`.
+- Buat `.agents/specs/<feature>/tasks.md` (`> Status: draft`) yang siap dieksekusi oleh [`cms-orchestrator.md`](./cms-orchestrator.md) / skill `gemini-cms-orchestrator`.
 - Setiap task wajib mencantumkan:
   ```markdown
   - [ ] 1.1 <Judul Task yang Spesifik>
     - Deskripsi teknis langkah pengerjaan dan file target eksklusif.
     - _Requirements: <ID Requirement dari requirements.md>_
-    - _Model: <Argon | Pro | Flash | Flash Lite>_
+    - _Model: <Gemini 4 Argon (High) | Gemini 4 Argon | Gemini 4 Hydrogen | Gemini 3.8 Flash>_
     - _Skills: <daftar skill dari .agents/skills/>_
     - _Agent: <spesialis dari .agents/agents/>_
   ```
+  *(Catatan: `Gemini 4 Neon` dan `Gemini 4 Carbon` hanya akan di-assign secara manual oleh user; untuk task arsitektur/audit berat gunakan `Gemini 4 Argon (High)`).*
 - Susun bagian `## Task Dependency Graph` yang mengelompokkan task ke dalam **Wave 1, Wave 2, dst.** (task di dalam wave yang sama harus menyentuh file yang berbeda agar aman dijalankan paralel).
 - **Gate 3**: Berhenti dan tunggu Engineer / User menyetujui `tasks.md` sebelum mengeksekusi kode atau mendelegasikan wave ke `cms-orchestrator.md`.
 
@@ -65,17 +67,29 @@ Dokumen ini menjadi panduan bagi **CMS2 SDLC Agent** (`cms2-sdlc.md`) yang bertu
 
 ## 3. Matriks Penugasan Model, Agent Spesialis, & Skill pada `tasks.md`
 
-Saat menyusun `tasks.md` di Tahap 3, gunakan pemetaan standar berikut:
+Saat menyusun `tasks.md` di Tahap 3, gunakan tabel pemilihan LLM terbaru dari [`.agents/specs/gemini-sdlc.md`](../specs/gemini-sdlc.md):
+
+> **Aturan Penting**: **Gemini 4 Neon dan Gemini 4 Carbon hanya akan di-assign secara manual oleh user.** Agen dilarang meng-assign `Neon` atau `Carbon` secara otomatis pada `tasks.md`; gunakan **`Gemini 4 Argon (High)`** untuk semua task yang membutuhkan penalaran tajam/mendalam.
+
+| Model | Level Thinking | Keunggulan Utama | Kapan Harus Dipakai? |
+| :--- | :--- | :--- | :--- |
+| **Gemini 4 Neon (Ultra-Frontier — Manual User Only)** | `Low`, `Medium`, `High`, `XHigh` | Kasta tertinggi keluarga Gemini 4 dengan penalaran hingga `XHigh`. | **Hanya di-assign manual oleh user** untuk eskalasi masalah logika/arsitektur ekstrem. |
+| **Gemini 4 Carbon (Cyber & Deep Reasoning — Manual User Only)** | `Low`, `Medium`, `High` | Penalaran sangat tajam, minim halusinasi, spesialis *security audit* & *bug* kritis. | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi khusus. |
+| **Gemini 4 Argon (High)** | `High` | Penalaran mendalam (*High thinking*) + kapasitas *agentic coding* skala besar (1M token). | Cari *root-cause bug* rumit, *security patching*, bedah arsitektur skema DB, *security/financial audit*, & *merge conflict* Git yang kompleks. |
+| **Gemini 4 Argon (Andalan Utama)** | `Medium`, `Low` | Keseimbangan terbaik antara kecerdasan tinggi & *agentic coding* skala besar (1M token). | Buat fitur baru *end-to-end*, *refactoring* lintas banyak file, analisis dokumen/PRD tebal, & *PR review*. |
+| **Gemini 4 Hydrogen (Tercepat Gen-4)** | `Low`, `Medium`, `High` | Evolusi generasi ke-4 pengganti *Flash*: cepat, ringan, hemat kuota untuk koding harian. | Edit kode/konfigurasi ringan, *generate commit message* Git, buat unit test sederhana, & rangkum dokumen cepat. |
+| **Gemini 3.8 Flash (Cepat Gen-3.8)** | `Low`, `Medium`, `High` | Respons instan, ringan, hemat kuota (kompatibel langsung dengan subagent `Model: "flash"`). | Edit kode ringan, unit test sederhana, & subagent paralel berbiaya rendah. |
+| **Gemini 3.7 / 3.6 Flash & 3.1 Pro** | `Low`, `Medium`, `High` | Model generasi sebelumnya. | *Skip saja* — gunakan **4 Hydrogen / 3.8 Flash** untuk kecepatan atau **4 Argon** untuk kualitas. |
+
+Pemetaan Domain Task ke Agent Spesialis & Skill:
 
 | Domain Task | `_Agent:_` (`.agents/agents/`) | `_Skills:_` (`.agents/skills/`) | Rekomendasi `_Model:_` |
 | :--- | :--- | :--- | :--- |
-| Perancangan arsitektur lintas modul / rekonsiliasi kompleks | `cms2-sdlc.md` / `go-backend-specialist.md` | `cms2-sdlc` | `Argon` / `Pro` |
-| Migrasi skema DB, indeks, query `sqlc v1.31.1` | `db-sqlc-architect.md` | `db-migration-sqlc`, `sql-query-tuning` | `Pro` (skema/tuning) / `Flash` (CRUD) |
-| Endpoint Go Chi v5, Service, Maker-Checker Applier | `go-backend-specialist.md` | `go-chi-endpoint`, `cms2-master-data` | `Pro` (finansial/auth) / `Flash` (standar) |
-| Sinkronisasi OpenAPI Go ke TypeScript (`gen:api`) | `react-portal-specialist.md` | `openapi-frontend-sync` | `Flash` |
-| Komponen React, Tabel, Form, Modal, 4 UI States | `react-portal-specialist.md` | `react-ui-ux-craft` | `Flash` |
-| Boilerplate, konfigurasi ringan, dokumentasi | Sesuai layer | Sesuai layer | `Flash Lite` |
-| Audit keamanan & kepatuhan finansial (Tahap 5) | `security-fin-reviewer.md` | `cms2-sdlc` | `Pro` / `Argon` |
+| Bedah arsitektur kritis, root-cause bug rumit, security & financial audit (Tahap 5) | `security-fin-reviewer.md` / `cms2-sdlc.md` | `cms2-sdlc`, `cms2-bugfix` | `Gemini 4 Argon (High)` |
+| Migrasi skema DB, indeks, query `sqlc v1.31.1` | `db-sqlc-architect.md` | `db-migration-sqlc`, `sql-query-tuning` | `Gemini 4 Argon (High)` (untuk bedah arsitektur skema) atau `Gemini 4 Argon` |
+| Endpoint Go Chi v5, Service, Maker-Checker Applier, Importer/Exporter | `go-backend-specialist.md` | `go-chi-endpoint`, `cms2-master-data` | `Gemini 4 Argon` |
+| Komponen React end-to-end, Tabel, Form, Modal, 4 UI States | `react-portal-specialist.md` | `react-ui-ux-craft`, `openapi-frontend-sync` | `Gemini 4 Argon` |
+| Edit konfigurasi/katalog ringan, unit test sederhana, dokumentasi cepat | Sesuai layer | Sesuai layer | `Gemini 4 Hydrogen` / `Gemini 3.8 Flash` |
 
 ---
 
@@ -105,6 +119,7 @@ Jika session utama ingin mendelegasikan pembuatan atau pembaruan dokumen SDLC ke
 
 ## 5. Larangan Keras (Guardrails)
 
+- **Dilarang Menulis Lebih dari Satu Dokumen Tahap Sekaligus**: Tulis artefak satu per satu (`requirements.md` selesai & di-review dulu -> baru `design.md` -> baru `tasks.md`). Jangan pernah membuat `design.md` saat `requirements.md` belum di-review/disetujui user.
 - **Dilarang Self-Approve**: Jangan pernah menulis `> Status: accepted` tanpa instruksi eksplisit dari user.
 - **Dilarang Lompat Tahap**: Jangan membuat kode aplikasi sebelum `requirements.md`, `design.md`, dan `tasks.md` disetujui oleh user.
 - **Dilarang Mengabaikan Golden Rules**: Pastikan larangan `float` untuk uang, kewajiban `approval_requests` + `audit_logs` atomik, dan pemisahan `db` vs `dbRead` selalu tertulis eksplisit di `design.md` dan `tasks.md`.

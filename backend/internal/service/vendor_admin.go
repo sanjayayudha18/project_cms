@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"net/mail"
 	"regexp"
+	"slices"
 	"strings"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/pkg/reports"
@@ -22,6 +20,8 @@ var (
 	ErrVendorNotFound      = errors.New("vendor not found")
 	ErrVendorCodeConflict  = errors.New("vendor code already exists")
 	ErrVendorCodeImmutable = errors.New("vendor code cannot be changed")
+	// ErrVendorReadForbidden: role may not read vendors (vendor-pks-list Req 9.2; handler -> 403).
+	ErrVendorReadForbidden = errors.New("role tidak boleh membaca vendor")
 )
 
 // VendorAdminSubmitter is the narrow MasterDataChangeService surface
@@ -51,25 +51,15 @@ type VendorAdminRepo interface {
 type VendorAdminService struct {
 	repo    VendorAdminRepo
 	changes VendorAdminSubmitter
-	// renewalMonths = VENDOR_PKS_RENEWAL_MONTHS (vendor-pks 6.1); now feeds
-	// "today" (WIB) into the PKS status filter/list (6.2).
-	renewalMonths int
-	now           func() time.Time
 }
 
 // VendorAdminOption tunes optional VendorAdminService settings, so existing
 // two-argument callers (tests, import wiring) stay valid.
 type VendorAdminOption func(*VendorAdminService)
 
-// WithPksRenewalMonths sets the "Need Renewal" threshold in months.
-func WithPksRenewalMonths(months int) VendorAdminOption {
-	return func(s *VendorAdminService) { s.renewalMonths = months }
-}
-
 // NewVendorAdminService creates a VendorAdminService with the given dependencies.
-// Without WithPksRenewalMonths the threshold is reports.VendorPksRenewalMonthsDefault.
 func NewVendorAdminService(repo VendorAdminRepo, changes VendorAdminSubmitter, opts ...VendorAdminOption) *VendorAdminService {
-	s := &VendorAdminService{repo: repo, changes: changes, renewalMonths: reports.VendorPksRenewalMonthsDefault, now: time.Now}
+	s := &VendorAdminService{repo: repo, changes: changes}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -141,35 +131,48 @@ type DisableVendorResult struct {
 	LinkedUsersWarning int64
 }
 
-// pksToday is "today" in Asia/Jakarta as a pg date, for vendor_pks_status().
-func (s *VendorAdminService) pksToday() pgtype.Date {
-	return pgtype.Date{Time: reports.TodayWIB(s.now()), Valid: true}
+// canRead gates the read methods: ADMIN, ADMIN_PARAM and ATM-SPV (vendor-pks-list Req 9.2, 9.4).
+// Write methods stay ADMIN/ADMIN_PARAM via the route group + Submit.
+func canRead(role string) error {
+	if !slices.Contains(reports.PksViewerRoles, role) {
+		return ErrVendorReadForbidden
+	}
+	return nil
 }
 
-// List returns a page of vendors matching the given filters (Req 6).
-// Today/RenewalMonths are filled here (vendor-pks 6.2), overriding the caller.
+// List returns a page of vendors matching the given filters (Req 6), each with pks_count.
 // Read-only, never writes an audit entry (Req 9.5).
-func (s *VendorAdminService) List(ctx context.Context, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
-	arg.Today, arg.RenewalMonths = s.pksToday(), int32(s.renewalMonths) //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
+func (s *VendorAdminService) List(ctx context.Context, role string, arg db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+	if err := canRead(role); err != nil {
+		return nil, err
+	}
 	return s.repo.List(ctx, arg)
 }
 
 // Count returns the total number of vendors matching the given filters,
 // without pagination (Req 6.6). Read-only, never writes an audit entry.
-func (s *VendorAdminService) Count(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) {
-	arg.Today, arg.RenewalMonths = s.pksToday(), int32(s.renewalMonths) //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
+func (s *VendorAdminService) Count(ctx context.Context, role string, arg db.CountVendorsAdminParams) (int64, error) {
+	if err := canRead(role); err != nil {
+		return 0, err
+	}
 	return s.repo.Count(ctx, arg)
 }
 
 // Get returns a vendor by id, including soft-deleted rows. Returns nil, nil
 // if no matching vendor is found. Read-only, never writes an audit entry.
-func (s *VendorAdminService) Get(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) {
+func (s *VendorAdminService) Get(ctx context.Context, role string, id int64) (*db.GetVendorAdminByIDRow, error) {
+	if err := canRead(role); err != nil {
+		return nil, err
+	}
 	return s.repo.GetByID(ctx, id)
 }
 
 // GetKindAndDirector returns the extra detail fields (kind + active
 // Director_PIC, nil when none) read from the primary (vendor-pks 6.2).
-func (s *VendorAdminService) GetKindAndDirector(ctx context.Context, id int64) (string, *db.GetVendorDirectorPicRow, error) {
+func (s *VendorAdminService) GetKindAndDirector(ctx context.Context, role string, id int64) (string, *db.GetVendorDirectorPicRow, error) {
+	if err := canRead(role); err != nil {
+		return "", nil, err
+	}
 	return s.repo.GetKindAndDirector(ctx, id)
 }
 

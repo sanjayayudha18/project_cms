@@ -33,7 +33,10 @@ export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
   const pendingIds = usePendingEntityIds("vendor_vault");
   const pendingCreates = usePendingCreates("vendor_vault")
     .filter((c) => c.payload.vendor_branch_id === branchId)
-    .map((c) => ({ id: c.id, label: String(c.payload.vault_code) }));
+    .map((c) => ({
+      id: c.id,
+      label: String(c.payload.vault_name || c.payload.vault_code || `#${c.id}`),
+    }));
   const disableMutation = useDisableVendorVault(vendorId);
   const enableMutation = useEnableVendorVault(vendorId);
 
@@ -62,13 +65,42 @@ export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
   }
 
   const columns: ColumnDef<AdminVendorVault, unknown>[] = [
-    { accessorKey: "vault_code", header: "Kode" },
+    {
+      accessorKey: "vault_name",
+      header: "Nama Vault",
+      cell: ({ row }) => row.original.vault_name || row.original.vault_code || "—",
+    },
     { accessorKey: "category", header: "Kategori" },
     {
-      accessorKey: "max_capacity_amount",
-      header: "Kapasitas Maks",
+      accessorKey: "region",
+      header: "Wilayah",
+      cell: ({ getValue }) => String(getValue() ?? "—"),
+    },
+    {
+      accessorKey: "max_balance",
+      header: "Max Balance",
       meta: { align: "right" },
       cell: ({ getValue }) => <span className="tabular-nums">{String(getValue() ?? "—")}</span>,
+    },
+    {
+      accessorKey: "cis_limit_amount",
+      header: "Limit CIS",
+      meta: { align: "right" },
+      cell: ({ getValue }) => <span className="tabular-nums">{String(getValue() ?? "—")}</span>,
+    },
+    {
+      accessorKey: "escrow_cash",
+      header: "Escrow Cash",
+      cell: ({ getValue }) => (
+        <span className="font-mono tabular-nums">{String(getValue() ?? "—")}</span>
+      ),
+    },
+    {
+      accessorKey: "escrow_atm",
+      header: "Escrow ATM",
+      cell: ({ getValue }) => (
+        <span className="font-mono tabular-nums">{String(getValue() ?? "—")}</span>
+      ),
     },
     {
       accessorKey: "operating_hours",
@@ -131,6 +163,10 @@ export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
     },
   ];
 
+  const pendingVaultLabel = pendingAction
+    ? pendingAction.vault.vault_name || pendingAction.vault.vault_code
+    : "";
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
@@ -177,8 +213,8 @@ export function VaultsPanel({ vendorId, branchId }: VaultsPanelProps) {
         title={pendingAction?.type === "disable" ? "Nonaktifkan Vault" : "Aktifkan Vault"}
         message={
           pendingAction?.type === "disable"
-            ? `Nonaktifkan vault "${pendingAction.vault.vault_code}"?`
-            : `Aktifkan kembali vault "${pendingAction?.vault.vault_code}"?`
+            ? `Nonaktifkan vault "${pendingVaultLabel}"?`
+            : `Aktifkan kembali vault "${pendingVaultLabel}"?`
         }
         confirmLabel={pendingAction?.type === "disable" ? "Nonaktifkan" : "Aktifkan"}
         isPending={disableMutation.isPending || enableMutation.isPending}

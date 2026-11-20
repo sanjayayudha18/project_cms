@@ -198,12 +198,13 @@ RETURNING *;
 -- vendor package as of the forecast date (Req 3.2 — the LATERAL picks at most
 -- one row so it cannot multiply forecast rows). All master-data joins are
 -- LEFT JOIN so a missing atms/locations/vendor match never drops a
--- recommendation row (Req 3.3, 3.4). flm_vendor_region is vendor_branches.region
--- (migration 030), NOT regions.region (that is the ATM's geographic area) —
--- see .kiro/specs/update-cit-forecast-browser/design.md "Data model" note.
+-- recommendation row (Req 3.3, 3.4). flm_vendor_region is the name of the
+-- vendor branch's standard region (regions.region via vb.region_code; the
+-- free-text vendor_branches.region was dropped in migration 042,
+-- region-standardization Req 4.2). no_region = branch without region_code.
 -- CIT-2 (Req 1): adds brand/flm_vendor/flm_vendor_region filters, exact
 -- case-insensitive match via LOWER(...) = LOWER(...) (not ILIKE substring,
--- unlike terminal_id) against the already-joined a.brand/v.name/vb.region.
+-- unlike terminal_id) against the already-joined a.brand/v.name/vbr.region.
 -- Empty-string sentinel = "no filter" for all three, matching the existing
 -- terminal_id convention; the service requires a concrete flm_vendor/
 -- flm_vendor_region before calling this (Req 1.4), so the SQL layer never
@@ -227,7 +228,7 @@ SELECT f.terminal_id, f.periode_pred, f.denom, f.amount_replenish, f.amount_refu
        l.name    AS lokasi_atm,
        a.brand   AS brand,
        v.name    AS flm_vendor,
-       vb.region AS flm_vendor_region,
+       vbr.region AS flm_vendor_region,
        a.priority_class AS priority_class,
        pkg.package_code         AS paket,
        active_pkg.package       AS paket_vendor, -- vendor-wide label (migration 023); NULL for a branch package
@@ -264,6 +265,7 @@ LEFT JOIN LATERAL (
 ) active_pkg ON true
 LEFT JOIN vendor_packages_branch pkg ON pkg.id = active_pkg.vendor_package_id
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+LEFT JOIN regions vbr ON vbr.code = vb.region_code
 LEFT JOIN vendors v ON v.id = vb.vendor_id
 LEFT JOIN LATERAL (
     SELECT cp.escrow
@@ -276,9 +278,9 @@ WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('terminal_id')::text = '' OR f.terminal_id ILIKE '%' || sqlc.arg('terminal_id')::text || '%')
   AND (sqlc.arg('brand')::text = '' OR LOWER(a.brand) = LOWER(sqlc.arg('brand')::text))
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
-  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
+  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vbr.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
   AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL)
-  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region IS NULL))
+  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region_code IS NULL))
 ORDER BY f.terminal_id ASC
 LIMIT sqlc.arg('page_size')::int OFFSET (sqlc.arg('page')::int - 1) * sqlc.arg('page_size')::int;
 
@@ -308,14 +310,15 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) active_pkg ON true
 LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+LEFT JOIN regions vbr ON vbr.code = vb.region_code
 LEFT JOIN vendors v ON v.id = vb.vendor_id
 WHERE f.periode_pred = sqlc.arg('forecast_date')::date
   AND (sqlc.arg('terminal_id')::text = '' OR f.terminal_id ILIKE '%' || sqlc.arg('terminal_id')::text || '%')
   AND (sqlc.arg('brand')::text = '' OR LOWER(a.brand) = LOWER(sqlc.arg('brand')::text))
   AND (sqlc.arg('flm_vendor')::text = '' OR LOWER(v.name) = LOWER(sqlc.arg('flm_vendor')::text))
-  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vb.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
+  AND (sqlc.arg('flm_vendor_region')::text = '' OR LOWER(vbr.region) = LOWER(sqlc.arg('flm_vendor_region')::text))
   AND (NOT sqlc.arg('unassigned')::bool OR v.id IS NULL)
-  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region IS NULL));
+  AND (NOT sqlc.arg('no_region')::bool OR (v.id IS NOT NULL AND vb.region_code IS NULL));
 
 -- name: SummarizeForecastForDate :many
 -- forecast-browser-summary (FR1): per (FLM vendor, region) recap for one
@@ -334,7 +337,7 @@ WITH r AS (
            f.amount_replenish,
            v.id      AS vendor_id,
            v.name    AS flm_vendor,
-           vb.region AS flm_vendor_region,
+           vbr.region AS flm_vendor_region,
            EXISTS (
                SELECT 1
                FROM vendor_request_items vri
@@ -359,6 +362,7 @@ WITH r AS (
         LIMIT 1
     ) active_pkg ON true
     LEFT JOIN vendor_branches vb ON vb.id = active_pkg.vendor_branch_id
+    LEFT JOIN regions vbr ON vbr.code = vb.region_code
     LEFT JOIN vendors v ON v.id = vb.vendor_id
     WHERE f.periode_pred = sqlc.arg('forecast_date')::date
 ), atm AS (
@@ -419,10 +423,11 @@ ORDER BY name ASC;
 -- FLM Vendor Region select. Distinct across all active vendor branches,
 -- independent of which vendor is chosen (Req 1 does not cascade Brand/FLM
 -- Vendor/FLM Vendor Region -- each is filtered independently).
-SELECT DISTINCT region
-FROM vendor_branches
-WHERE region IS NOT NULL AND is_active = true
-ORDER BY region ASC;
+SELECT DISTINCT r.region
+FROM vendor_branches vb
+JOIN regions r ON r.code = vb.region_code
+WHERE r.region IS NOT NULL AND vb.is_active = true
+ORDER BY r.region ASC;
 
 -- name: GetVendorForRequestNumber :one
 -- Resolves vendors.code + request_prefix for the request-number generator

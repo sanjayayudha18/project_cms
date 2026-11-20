@@ -29,7 +29,7 @@ Shell aplikasi internal (`frontend/CompanyPortal-Vite`) masih versi awal: brand 
 Tidak menyentuh money, journal, reconciliation, migrasi, atau delete. Menyentuh tampilan menu per role: visibilitas menu **tidak boleh** melebar dari `filterNavByRoles` saat ini (keamanan tetap di route guard + backend).
 
 ### Dependency & scope
-Item tercatat di `development-plan.md` sebagai cross-cutting **X.1 CompanyPortal app-shell revamp** (Q1 ✅). Frontend only, tidak menunggu Phase 2.
+Item tercatat di `.claude/dev-plan/dev-plan.md` sebagai cross-cutting **X.1 CompanyPortal app-shell revamp** (Q1 ✅). Frontend only, tidak menunggu Phase 2.
 
 ## Glossary
 
@@ -262,7 +262,7 @@ Status: Q1 ✅ DIPUTUSKAN PO 2026-10-23 (masuk plan sebagai X.1). Q2–Q13 ✅ m
 
 | # | Pertanyaan | Saran (= keputusan) |
 | --- | --- | --- |
-| Q1 | Item ini di luar Phase 2 (`development-plan.md` scope guard). Boleh ditambahkan ke plan sebagai item UI terpisah? | ✅ Masuk plan sebagai X.1, jalan paralel Phase 2. |
+| Q1 | Item ini di luar Phase 2 (`.claude/dev-plan/dev-plan.md` scope guard). Boleh ditambahkan ke plan sebagai item UI terpisah? | ✅ Masuk plan sebagai X.1, jalan paralel Phase 2. |
 | Q2 | Brief meminta Plus Jakarta Sans + JetBrains Mono via Google Fonts. CSP memblokir Google Fonts, dan `design.md` menetapkan system stack. Pilih: (a) self-host via `@fontsource-variable/plus-jakarta-sans` + `@fontsource-variable/jetbrains-mono` (dependency baru, Golden Rule #1, + update `design.md`), atau (b) tetap system stack + `ui-monospace`. | (a) self-host, versi dipin exact, subset latin saja agar bundle budget aman. |
 | Q3 | Brief memakai hex/rgba. Design system mewajibkan OKLCH. | Konversi semua ke token OKLCH baru (`--shell-*`) di `tokens.css`; visual setara. |
 | Q4 | Indikator aktif "garis vertikal 3px di tepi kiri" melanggar ban side-stripe (`design.md` Sec 10). | Ganti dengan gradient + ikon merah + dot 6px sebelum label. Alternatif: izinkan sebagai deviasi terdokumentasi. |

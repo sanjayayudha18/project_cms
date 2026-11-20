@@ -10,12 +10,18 @@ Dokumen ini menjadi panduan bagi **Orchestrator Agent** yang bertugas membaca do
 2. **Pemetaan Model (`Model` Parameter)**: Memastikan setiap session baru dijalankan menggunakan model yang sesuai dengan yang tertulis di dokumen:
    | Label Model di Dokumen (`_Model:_`) | Nilai Parameter `Model` pada `invoke_subagent` | Peruntukan |
    | :--- | :--- | :--- |
-   | `Argon`, `Gemini 4 Argon`, `Argon (High/Medium)` | `"inherit"` *(jika session utama sudah Argon)* atau `"pro"` | Penalaran mendalam, orkestrasi lintas modul, arsitektur kritis, & problem solving kompleks |
-   | `Pro`, `Opus`, `Gemini Pro`, `High`, `Complex` | `"pro"` | Arsitektur kompleks, rekonsiliasi, kalkulasi finansial, desain skema & security review |
-   | `Flash`, `Sonnet`, `Gemini Flash`, `Medium`, `Standard` | `"flash"` | Implementasi fitur standar (handler, service, komponen React, unit test) |
-   | `Flash Lite`, `Haiku`, `Lite`, `Low`, `Boilerplate` | `"flash_lite"` | Tugas ringan, perubahan teks/konfigurasi sederhana, pembaruan dokumentasi |
+   | `Gemini 4 Carbon`, `Carbon` *(Manual User Assign Only)* | `"inherit"` *(jika session utama sudah Carbon)* atau `"pro"` | **Hanya di-assign manual oleh user** bila diperlukan untuk eskalasi bug kritis / security audit khusus |
+   | `Gemini 4 Argon (High)`, `Argon High` | `"inherit"` *(jika session utama sudah Argon High)* atau `"pro"` | Penalaran mendalam (High thinking): bedah arsitektur skema DB, cari root-cause bug rumit, security patching, security/financial audit, & merge conflict Git kompleks |
+   | `Gemini 4 Argon`, `Argon`, `Argon (Medium)` | `"inherit"` *(jika session utama sudah Argon)* atau `"pro"` | Andalan utama agentic coding (1M token): buat fitur baru end-to-end, refactoring lintas banyak file, analisis dokumen/PRD tebal, & PR review |
+   | `Gemini 4 Neon`, `Neon`, `Neon (XHigh/High/Medium)` | `"inherit"` *(jika session utama sudah Neon)* atau `"pro"` | Generasi Gemini 4 dengan penalaran adaptif berkecepatan tinggi + opsi *eXtreme High thinking* (`XHigh`): ideal untuk problem solving intensif, debugging algoritma/query rumit, refactoring presisi, dan implementasi yang membutuhkan logika tajam dengan respons gesit |
+   | `Gemini 4 Hydrogen`, `Hydrogen`, `Hydrogen (Medium/High)` | `"inherit"` *(jika session utama sudah Hydrogen)* atau `"pro"` | Generasi Gemini 4 yang lincah & efisien: implementasi fitur standar/CRUD, wiring handler-service-repo, komponen React, & bugfix terisolasi dengan latensi cepat dan kuota hemat |
+   | `Gemini 3.8 Flash`, `Flash`, `Flash (Medium)` | `"flash"` | Tercepat & hemat kuota maksimal: edit kode ringan/boilerplate, generate commit message Git, buat unit test sederhana, & rangkum dokumen cepat |
+   | `Gemini 3.7 / 3.6 Flash`, `3.1 Pro` | *(Skip — petakan ke `"flash"` atau `"inherit"`/`"pro"`)* | Model generasi sebelumnya (tidak direkomendasikan di dokumen baru) |
    | Tidak disebutkan / `Inherit` | `"inherit"` | Menggunakan model dari session utama saat ini |
-   > **Catatan Model `Argon`**: Karena schema tool `invoke_subagent` menerima enum `["inherit", "pro", "flash", "flash_lite"]`, saat dokumen meminta **`Argon`** dan session utama berjalan di atas **Gemini 4 Argon**, gunakan `Model: "inherit"` agar session subagent baru otomatis mewarisi model **Argon** penuh dari parent session (atau gunakan `"pro"` jika session utama sedang menggunakan model selain Argon).
+   > **Catatan Model Generasi Gemini 4 (`Carbon`, `Argon`, `Neon`, `Hydrogen`)**:
+   > Karena schema tool `invoke_subagent` hanya menerima enum `["inherit", "pro", "flash", "flash_lite"]` (belum ada string langsung untuk tiap codename), cara terbaik agar subagent mendapatkan model spesifik generasi Gemini 4 (**Gemini 4 Carbon**, **Gemini 4 Argon**, **Gemini 4 Neon**, atau **Gemini 4 Hydrogen**) adalah melalui `Model: "inherit"` (mewarisi model yang aktif di dropdown session utama).
+   > - Jika wave hanya berisi task `Flash`, Anda dapat menjalankan Orchestrator di **Gemini 3.8 Flash**.
+   > - Jika di dalam wave terdapat task yang meminta model Gemini 4 (**`Carbon`**, **`Argon`**, **`Neon`**, atau **`Hydrogen`**), saat Orchestrator menampilkan **Tabel Konfirmasi (Langkah 2)**, Orchestrator wajib memberi pengingat kepada user: *"Wave ini memiliki task yang meminta model `<Carbon/Argon/Neon/Hydrogen>` (via `inherit`). Pastikan dropdown Model Selection Anda sudah disetel ke `<model-target>` sebelum membalas 'Lanjut'."* (Sementara task lain yang bertuliskan `Flash` pada wave yang sama tetap akan di-dispatch dengan `Model: "flash"` sehingga tidak memboroskan kuota model utama).
 3. **Auto-Assignment Subagent Spesialis & Skills ke Tiap Task**:
    Orchestrator dapat membaca baris `_Skills:_` pada `tasks.md` (jika sudah ditulis) **ATAU meng-assign skill secara otomatis** ke masing-masing task berdasarkan **target file / kata kunci** pada deskripsi task. Jika user meminta Orchestrator menyiapkan/melengkapi `tasks.md`, Orchestrator juga dapat menuliskan baris `_Skills: <skill-1>, <skill-2>_` langsung ke setiap blok task di `tasks.md`.
 
@@ -43,12 +49,23 @@ Dokumen ini menjadi panduan bagi **Orchestrator Agent** yang bertugas membaca do
    - Jika ada prasyarat yang belum `[x]`, **BERHENTI** dan laporkan daftarnya kepada user.
 3. Lewati task yang sudah `[x]` atau task yang ditandai sebagai **verifikasi browser manual oleh user**.
 
-### Langkah 2 — Rencana Dispatch (Tabel Konfirmasi)
+### Langkah 2 — Rencana Dispatch (Tabel Konfirmasi & Gate Model Dropdown)
 Sebelum meluncurkan session subagent baru, tampilkan tabel rencana orkestrasi kepada user (kecuali user sudah memberi instruksi langsung untuk mengeksekusi):
 
-| Task ID | Deskripsi Singkat | Spesialis (`.agents/agents/`) | Model (`invoke_subagent`) | Skills Terkait | File Target |
+| Task ID | Deskripsi Singkat | Spesialis (`.agents/agents/`) | Model Dokumen -> `invoke_subagent` | Skills Terkait | File Target |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `<id>` | `<judul task>` | `<nama-agent>` | `"pro"` / `"flash"` / `"flash_lite"` / `"inherit"` | `<nama-skill>` | `<path file>` |
+| `<id>` | `<judul task>` | `<nama-agent>` | `Carbon`/`Argon`/`Neon`/`Hydrogen` -> `"inherit"`, `Flash` -> `"flash"` | `<nama-skill>` | `<path file>` |
+
+**Aturan Gate Dropdown Model (`Flash` / `Hydrogen` / `Neon` / `Argon` / `Carbon`) pada Langkah 2**:
+1. **Wave Murni `Flash`**: User dapat tetap berada di **Gemini 3.8 Flash** dan langsung membalas *"Lanjut"*.
+2. **Wave Berisi Model Gemini 4 (`Carbon`, `Argon`, `Neon`, atau `Hydrogen`) + `Flash`**:
+   - Tampilkan catatan pengingat di bawah tabel:
+     > *"Wave ini memiliki task yang meminta model **`<Carbon / Argon / Neon / Hydrogen>`** (via `Model: "inherit"`). Silakan pastikan dropdown **Model Selection** Anda berada di **`<Gemini 4 Carbon / Gemini 4 Argon / Gemini 4 Neon / Gemini 4 Hydrogen>`** terlebih dahulu sebelum membalas 'Lanjut'. (Task lain yang bertuliskan `Flash` tetap akan dipanggil dengan `Model: "flash"` sehingga tidak memboroskan kuota model utama)."*
+3. **Wave Campuran Multi-Model Gemini 4 (misal `Hydrogen` + `Neon`, `Neon` + `Argon`, atau `Argon` + `Carbon`) di Wave yang Sama**:
+   - Karena `Model: "inherit"` hanya bisa mewarisi satu model session utama pada satu waktu, pecah eksekusi wave tersebut menjadi **kloter (Sub-Wave)**:
+     - **Kloter A (Model Pertama + `Flash`)**: Minta user menyetel dropdown ke model target pertama (misal **Gemini 4 Neon** atau **Gemini 4 Argon**), lalu jalankan task kloter tersebut via `Model: "inherit"` beserta task `Flash` (`Model: "flash"`).
+     - **Kloter B (Model Kedua)**: Setelah Kloter A selesai atau ter-dispatch, minta user mengubah dropdown ke model berikutnya (misal **Gemini 4 Argon** atau **Gemini 4 Carbon**), lalu jalankan task kloter kedua via `Model: "inherit"`.
+4. **Setelah Semua Subagent Diluncurkan**: User bebas mengembalikan dropdown ke **Gemini 3.8 Flash** untuk menghemat kuota selama menunggu laporan atau saat berkonsolidasi.
 
 ### Langkah 3 — Peluncuran Session Subagent Baru (`invoke_subagent`)
 Untuk setiap task yang siap dijalankan:

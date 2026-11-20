@@ -16,7 +16,8 @@ export type DatasetId =
   | "dsr-location-maps"
   | "package-prices"
   | "atms"
-  | "atm-assignments";
+  | "atm-assignments"
+  | "vendor-pks";
 
 export interface PreviewFilter {
   vendorId?: number;
@@ -71,10 +72,9 @@ export const EXPORT_DATASETS: ExportDataset[] = [
   master({
     id: "vendors",
     label: "Vendor",
-    description:
-      "Daftar vendor beserta kontak, alamat kantor pusat, Direktur Utama, dan PKS aktif.",
+    description: "Daftar vendor beserta kontak dan alamat kantor pusat.",
     filters: { vendor: "none", branch: false, priceLevel: false },
-    numericColumns: ["id", "pks_validity_months", "pks_remaining_days"],
+    numericColumns: [],
   }),
   master({
     id: "vendor-branches",
@@ -88,15 +88,8 @@ export const EXPORT_DATASETS: ExportDataset[] = [
     label: "Vault",
     description: "Vault vendor beserta kapasitas minimum dan maksimum.",
     filters: { vendor: "optional", branch: true, priceLevel: false },
-    numericColumns: [
-      "id",
-      "min_capacity_amount",
-      "max_capacity_amount",
-      "latitude",
-      "longitude",
-      "location_id",
-    ],
-    moneyColumns: ["min_capacity_amount", "max_capacity_amount"],
+    numericColumns: ["no", "min_balance", "max_balance", "cis_limit_amount"],
+    moneyColumns: ["min_balance", "max_balance", "cis_limit_amount"],
   }),
   master({
     id: "vendor-pics",
@@ -104,6 +97,13 @@ export const EXPORT_DATASETS: ExportDataset[] = [
     description: "PIC vendor beserta kontak dan peran notifikasi.",
     filters: { vendor: "optional", branch: true, priceLevel: false },
     numericColumns: ["id"],
+  }),
+  master({
+    id: "vendor-pks",
+    label: "PKS vendor",
+    description: "Daftar vendor beserta Direktur Utama dan PKS aktif.",
+    filters: { vendor: "optional", branch: false, priceLevel: false },
+    numericColumns: ["pks_validity_months", "pks_remaining_days"],
   }),
   master({
     id: "dsr-location-maps",
@@ -179,6 +179,10 @@ export function toParams(id: DatasetId, f: PreviewFilter): MasterExportParams | 
       return vendorId === undefined
         ? { kind: "master_data_global", entity: "vendor-branches", status }
         : { kind: "vendor", vendorId, entity: "branches", status };
+    case "vendor-pks":
+      return vendorId === undefined
+        ? { kind: "master_data_global", entity: "vendor-pks", status }
+        : { kind: "vendor", vendorId, entity: "vendor-pks", status };
     case "vendor-vaults":
     case "vendor-pics": {
       const entity = id === "vendor-vaults" ? "vaults" : "pics";

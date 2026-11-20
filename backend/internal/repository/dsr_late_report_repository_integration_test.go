@@ -156,6 +156,12 @@ func seedDsrLateCases(t *testing.T, ctx context.Context, tx pgx.Tx, c dsrLateCas
 			d := mustTime(t, *b.DeletedAt)
 			deletedAt = &d
 		}
+		if b.RegionCode != nil {
+			// region_code is an FK to regions.code since migration 042; the shared
+			// cases use plain codes (e.g. JKT), so make sure the row exists in this tx.
+			_, err := tx.Exec(ctx, `INSERT INTO regions (code, region) VALUES ($1, 'IT dsr late') ON CONFLICT (code) DO NOTHING`, *b.RegionCode)
+			must("region "+*b.RegionCode, err)
+		}
 		var id int64
 		must("branch "+b.Key, tx.QueryRow(ctx,
 			`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, is_active, deleted_at, created_at, region_code)

@@ -1,16 +1,12 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { Button } from "@/components/ui/Button";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useAuthStore } from "@/lib/auth/store";
 import { useToast } from "@/lib/hooks/useToast";
-import { AlertCircle, Download } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useState } from "react";
-import {
-  ExportProgressDialog,
-  ReportExportNotice,
-  type ReportParams,
-  useExportFlow,
-} from "../../exports";
 import { pendingApprovalMessage } from "../../master-data/changeRequest";
 import { usePendingEntityIds } from "../../master-data/pending";
 import { useDisableVendor, useEnableVendor, useVendorsList } from "../hooks";
@@ -26,7 +22,9 @@ const SKELETON_ROW_KEYS = ["row-1", "row-2", "row-3", "row-4", "row-5"];
 export function AdminVendorsPage() {
   const { params, searchInput, setSearchInput, setParams } = useAdminVendorsUrlState();
   const { toast } = useToast();
-  const exportFlow = useExportFlow();
+  const role = useAuthStore((st) => st.user?.role);
+  // ATM-SPV reads the list only (Req 8.1); writes stay ADMIN/ADMIN_PARAM.
+  const canWrite = role === "ADMIN" || role === "ADMIN_PARAM";
 
   const vendorsQuery = useVendorsList(params);
   const pendingIds = usePendingEntityIds("vendor");
@@ -43,13 +41,6 @@ export function AdminVendorsPage() {
   const vendors = vendorsQuery.data?.vendors ?? [];
   const total = vendorsQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / params.page_size));
-
-  function requestPksExport(): void {
-    const reportParams: ReportParams = { status: params.status };
-    if (params.q) reportParams.q = params.q;
-    if (params.pks_status) reportParams.pks_status = params.pks_status;
-    void exportFlow.request({ kind: "report", report: "vendor-pks", params: reportParams });
-  }
 
   function openCreate(): void {
     setFormVendor(null);
@@ -97,26 +88,14 @@ export function AdminVendorsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <div className="self-start">
+        <BackLink to="/settings" label="Kembali ke Pengaturan" />
+      </div>
       <PageHeader
         eyebrow="Pengaturan"
         title="Manajemen Vendor"
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              disabled={exportFlow.isRequesting}
-              onClick={requestPksExport}
-            >
-              <Download className="h-4 w-4" aria-hidden="true" />
-              Ekspor CSV
-            </Button>
-            <Button onClick={openCreate}>Tambah Vendor</Button>
-          </>
-        }
+        actions={canWrite ? <Button onClick={openCreate}>Tambah Vendor</Button> : undefined}
       />
-      <ReportExportNotice error={exportFlow.requestError} />
-      <ExportProgressDialog {...exportFlow.dialogProps} />
-
       <VendorFilterBar
         params={params}
         searchInput={searchInput}
@@ -149,6 +128,7 @@ export function AdminVendorsPage() {
       {!vendorsQuery.isLoading && !vendorsQuery.isError && vendors.length > 0 && (
         <VendorsTable
           vendors={vendors}
+          canWrite={canWrite}
           pendingIds={pendingIds}
           onEdit={openEdit}
           onDisable={(vendor) => setPendingAction({ type: "disable", vendor })}

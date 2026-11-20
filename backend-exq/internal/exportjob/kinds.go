@@ -23,6 +23,9 @@ type KindSpec struct {
 
 var masterDataAdmin = []string{"ADMIN", "ADMIN_PARAM"}
 
+// cashCountPicRoles: the maker of cash_count_pic (CC-CWM, see entityMakerRoles); ADMIN is not one (AC-5.1-14).
+var cashCountPicRoles = []string{"CC-CWM"}
+
 func idOrZero(p *int64) int64 {
 	if p == nil {
 		return 0
@@ -55,13 +58,15 @@ var KindSpecs = map[Kind]KindSpec{
 	KindHargaPaket:       {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: priceRef},
 	KindMasterDataGlobal: {Roles: masterDataAdmin, DownloadAction: ActionMasterDataExported, EntityRef: globalRef},
 
+	KindCashCountPics: {Roles: cashCountPicRoles, DownloadAction: ActionMasterDataExported, EntityRef: globalRef},
+
 	KindDsrLateDaily:   {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},
 	KindDsrLateSummary: {Roles: reports.DsrLateViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("dsr_late_report")},
 	KindReplenishmentAmountMismatch: {Roles: reports.ReplenishmentViewerRoles, DownloadAction: ActionReportExported,
 		EntityRef: fixed("replenishment_report")},
 	KindReplenishmentTrips: {Roles: reports.ReplenishmentViewerRoles, DownloadAction: ActionReportExported,
 		EntityRef: fixed("replenishment_report")},
-	KindVendorPks: {Roles: reports.VendorPksViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("vendor_pks_report")},
+	KindVendorPks: {Roles: reports.PksViewerRoles, DownloadAction: ActionReportExported, EntityRef: fixed("vendor_pks_report")},
 }
 
 // KindRoles maps each kind to its allowed roles; used by the route guard and the service.

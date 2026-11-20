@@ -1,13 +1,10 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
-import type { PksStatus } from "../types";
+import type { VendorKind } from "../types";
 import type { AdminVendorsUrlParams } from "../useAdminVendorsUrlState";
 
-const PKS_STATUS_OPTIONS: { value: PksStatus; label: string }[] = [
-  { value: "aktif", label: "Aktif" },
-  { value: "need_renewal", label: "Need Renewal" },
-  { value: "expired", label: "Expired" },
-  { value: "terminated", label: "Terminated" },
-  { value: "belum_diisi", label: "Belum diisi" },
+const KIND_OPTIONS: { value: VendorKind; label: string }[] = [
+  { value: "FLM_VENDOR", label: "Vendor FLM" },
+  { value: "INTERNAL", label: "ROH" },
 ];
 
 const STATUS_OPTIONS = [
@@ -23,7 +20,7 @@ interface VendorFilterBarProps {
   onParamsChange: (partial: Partial<AdminVendorsUrlParams>) => void;
 }
 
-/** Search + Status filter for the admin Vendors list (Req 6, 13.3-13.4). */
+/** Search + Status + Jenis vendor filter for the admin Vendors list (PKS filtering lives in Daftar PKS). */
 export function VendorFilterBar({
   params,
   searchInput,
@@ -64,11 +61,11 @@ export function VendorFilterBar({
       />
 
       <FilterSelect
-        label="Status PKS"
-        options={PKS_STATUS_OPTIONS}
-        value={params.pks_status ?? null}
+        label="Jenis vendor"
+        options={KIND_OPTIONS}
+        value={params.kind ?? null}
         onChange={(value) =>
-          onParamsChange({ pks_status: (value as PksStatus | null) ?? undefined })
+          onParamsChange({ kind: (value as VendorKind | null) ?? undefined, page: 1 })
         }
         placeholder="Semua"
       />

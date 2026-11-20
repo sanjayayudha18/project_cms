@@ -4,23 +4,25 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 )
 
-// Property 6 (spec vendor-pks task 7.5): parallel submits of mixed create and
-// terminate for one vendor leave exactly one pending vendor_pks change; every
-// other submit gets ErrMasterDataChangePending (handler → 409). The partial
-// unique index on payload->>'vendor_id' decides the race when the service
-// pre-check passes in several goroutines at once.
-func TestVendorPks_ParallelSubmit_OnePending_Integration(t *testing.T) {
+// Property 8, race side (spec vendor-pks task 7.5, per type: vendor-pks-type task 4.4):
+// parallel submits of mixed create and terminate for one (vendor, type) leave exactly
+// one pending vendor_pks change; every other submit of that type gets
+// ErrMasterDataChangePending (handler → 409). The partial unique index on
+// (payload vendor_id, pks_type_id) decides the race when the service pre-check
+// passes in several goroutines at once. The other type stays free: its own submit
+// still succeeds afterwards.
+func TestVendorPks_ParallelSubmit_OnePendingPerType_Integration(t *testing.T) {
 	f := newPksApprovalFixture(t)
 	ctx := adminCtx(f.maker)
 
 	var pksID int64
-	if err := f.pool.QueryRow(f.ctx, `INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by)
-		VALUES ($1, 'PKS aktif', '2026-01-01', '2027-01-01', $2) RETURNING id`, f.vendorID, f.maker).Scan(&pksID); err != nil {
+	if err := f.pool.QueryRow(f.ctx, `INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+		VALUES ($1, $2, $3, 'PKS aktif', '2026-01-01', '2027-01-01', $4) RETURNING id`,
+		f.vendorID, f.typeAID, nextWod(f.tag), f.maker).Scan(&pksID); err != nil {
 		t.Fatalf("seed active pks: %v", err)
 	}
 
@@ -34,9 +36,7 @@ func TestVendorPks_ParallelSubmit_OnePending_Integration(t *testing.T) {
 			defer wg.Done()
 			<-start
 			if i%2 == 0 {
-				_, errs[i] = f.pks.SubmitNew(ctx, f.maker, f.vendorID, SubmitVendorPksRequest{
-					PksName: fmt.Sprintf("PKS %d", i), EffectiveDate: "2027-01-02", ExpiryDate: "2028-01-01",
-				}, "127.0.0.1")
+				_, errs[i] = f.pks.SubmitNew(ctx, f.maker, f.vendorID, f.req(f.typeA, nextWod(f.tag)), "127.0.0.1")
 				return
 			}
 			_, errs[i] = f.pks.SubmitTerminate(ctx, f.maker, f.vendorID, pksID, "Putus kontrak", "127.0.0.1")
@@ -58,8 +58,19 @@ func TestVendorPks_ParallelSubmit_OnePending_Integration(t *testing.T) {
 	if ok != 1 {
 		t.Errorf("successful submits = %d, want 1 (errs %v)", ok, errs)
 	}
-	if got := countInt(t, f.pool, `SELECT count(*) FROM master_data_change_requests WHERE entity_type = 'vendor_pks'
-		AND status = 'pending' AND (payload->>'vendor_id')::bigint = $1`, f.vendorID); got != 1 {
-		t.Errorf("pending vendor_pks changes = %d, want 1", got)
+	pendingOf := func(typeID int64) int {
+		return countInt(t, f.pool, `SELECT count(*) FROM master_data_change_requests WHERE entity_type = 'vendor_pks'
+			AND status = 'pending' AND (payload->>'vendor_id')::bigint = $1 AND (payload->>'pks_type_id')::bigint = $2`, f.vendorID, typeID)
+	}
+	if got := pendingOf(f.typeAID); got != 1 {
+		t.Errorf("pending vendor_pks changes of type A = %d, want 1", got)
+	}
+
+	// Property 8: a pending change of type A does not block type B.
+	if _, err := f.pks.SubmitNew(ctx, f.maker, f.vendorID, f.req(f.typeB, nextWod(f.tag)), "127.0.0.1"); err != nil {
+		t.Fatalf("SubmitNew type B: %v", err)
+	}
+	if got := pendingOf(f.typeBID); got != 1 {
+		t.Errorf("pending vendor_pks changes of type B = %d, want 1", got)
 	}
 }

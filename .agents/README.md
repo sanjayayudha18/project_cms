@@ -30,8 +30,8 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │   │   └── SKILL.md             # Checklist 9-langkah entitas master-data (maker-checker)
 │   ├── cms2-bugfix/
 │   │   └── SKILL.md             # Workflow end-to-end perbaikan bug
-│   ├── cms-run-wave/
-│   │   └── SKILL.md             # Dispatcher paralel task per wave menggunakan subagent
+│   ├── gemini-cms-orchestrator/
+│   │   └── SKILL.md             # Dispatcher paralel task per wave menggunakan subagent Gemini (Antigravity)
 │   ├── db-migration-sqlc/
 │   │   └── SKILL.md             # Workflow migrasi PostgreSQL, soft-delete & sqlc v1.31.1
 │   ├── go-chi-endpoint/
@@ -44,10 +44,8 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │       └── SKILL.md             # Panduan optimasi query SQL, indexing & routing dbRead
 ├── plugins/
 │   └── .gitkeep                 # Tempat menyimpan bundle plugin lokal
-├── SDLC/
-│   └── gemini-sdlc.md           # Panduan 6-stage AI-Native SDLC (intent -> spec -> plan -> tests -> review -> incidents)
 └── specs/
-    ├── README.md                # Panduan siklus hidup spec fitur di .agents/specs/
+    ├── gemini-sdlc.md           # Panduan siklus hidup spec fitur & 6-stage AI-Native SDLC di .agents/specs/
     └── done/
         └── .gitkeep             # Arsip spec fitur yang sudah selesai
 ```

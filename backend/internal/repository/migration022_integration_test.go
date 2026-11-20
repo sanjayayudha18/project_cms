@@ -78,10 +78,11 @@ func TestMigration022Schema(t *testing.T) {
 			t.Errorf("index %s missing", name)
 		}
 	}
+	// 022's functions were dropped by 045 (vendor-pks-list Req 3.6); vendor_pks_record_status (044) replaces them.
 	for _, fn := range []string{"vendor_pks_status", "vendor_pks_validity_months"} {
 		if pksCount(t, tx, `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-			WHERE n.nspname='public' AND p.proname=$1`, fn) != 1 {
-			t.Errorf("function %s missing", fn)
+			WHERE n.nspname='public' AND p.proname=$1`, fn) != 0 {
+			t.Errorf("function %s must be dropped by 045", fn)
 		}
 	}
 
@@ -93,9 +94,11 @@ func TestMigration022Schema(t *testing.T) {
 		}
 	}
 
-	// Rows that predate the migration default to is_director = false.
-	if n := pksCount(t, tx, `SELECT count(*) FROM vendor_pics WHERE is_director`); n != 0 {
-		t.Errorf("existing vendor_pics with is_director=true: %d, want 0", n)
+	// Rows that predate the migration default to is_director = false (the column default;
+	// existing rows can't be counted any more: directors are entered through the screen).
+	if pksCount(t, tx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public'
+		AND table_name='vendor_pics' AND column_name='is_director' AND column_default = 'false' AND is_nullable = 'NO'`) != 1 {
+		t.Error("vendor_pics.is_director must be NOT NULL DEFAULT false")
 	}
 }
 
@@ -131,21 +134,25 @@ func TestMigration022Constraints(t *testing.T) {
 		pksExec(t, tx, insPIC, vendorID, nil, false, none, time.Now())
 	})
 
-	const insPKS = `INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by, replaced_at)
-		VALUES ($1, 'PKS', $2::date, $3::date, $4, $5)`
+	// Since migration 043 a PKS has a type and a globally unique WOD number; the
+	// per-type rules live in migration043_integration_test.go. Here everything is type FLM
+	// and each row gets its own WOD, so only the rule under test can reject it.
+	const insPKS = `INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by, replaced_at)
+		VALUES ($1, (SELECT id FROM vendor_pks_types WHERE code = 'FLM'), $6, 'PKS', $2::date, $3::date, $4, $5)`
 
 	t.Run("pks rules", func(t *testing.T) {
-		pksRejected(t, tx, "expiry before effective", insPKS, vendorID, "2026-02-01", "2026-01-31", userID, nil)
+		pksRejected(t, tx, "expiry before effective", insPKS, vendorID, "2026-02-01", "2026-01-31", userID, nil, code+"-W1")
 
-		pksExec(t, tx, insPKS, vendorID, "2026-01-01", "2027-12-31", userID, nil)
-		pksRejected(t, tx, "second active PKS", insPKS, vendorID, "2026-01-01", "2027-12-31", userID, nil)
+		pksExec(t, tx, insPKS, vendorID, "2026-01-01", "2027-12-31", userID, nil, code+"-W2")
+		pksRejected(t, tx, "second active PKS of the same type", insPKS, vendorID, "2026-01-01", "2027-12-31", userID, nil, code+"-W3")
 		// A replaced (history) row next to the active one is allowed.
-		pksExec(t, tx, insPKS, vendorID, "2024-01-01", "2025-12-31", userID, time.Now())
+		pksExec(t, tx, insPKS, vendorID, "2024-01-01", "2025-12-31", userID, time.Now(), code+"-W4")
 	})
 
 	t.Run("pending change uniqueness", func(t *testing.T) {
 		const insChange = `INSERT INTO master_data_change_requests (entity_type, entity_id, op, payload, maker_id, status)
-			VALUES ('vendor_pks', NULL, 'create', jsonb_build_object('vendor_id', $1::bigint), $2, $3)`
+			VALUES ('vendor_pks', NULL, 'create', jsonb_build_object('vendor_id', $1::bigint,
+				'pks_type_id', (SELECT id FROM vendor_pks_types WHERE code = 'FLM')), $2, $3)`
 		pksExec(t, tx, insChange, vendorID, userID, "pending")
 		pksRejected(t, tx, "second pending vendor_pks change", insChange, vendorID, userID, "pending")
 		// Once the first is no longer pending, a new pending one is fine.

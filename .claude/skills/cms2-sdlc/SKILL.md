@@ -11,11 +11,11 @@ to use per stage** and the gate discipline. If they disagree, CLAUDE.md wins.
 
 ## Step 0 — every time, before anything
 
-1. Ask (CLAUDE.md §4a rule 0): *"Perlu dibuat spec Kiro baru (`.kiro/specs/<feature>/`)
-   atau cukup dokumentasi bug fix?"* Wait. Bug fix → `.claude/bugfixes.md`
-   (newest first, its template), not this skill.
+1. Ask (CLAUDE.md §4a rule 0): Kiro spec / ScDD / bug-fix documentation, with your
+   suggestion from the ScDD entry checklist. Wait. Bug fix → `.claude/bugfixes.md`
+   (newest first, its template); ScDD → skill `cms2-scope`; neither uses this skill.
    Anything touching auth, money/journal, reconciliation, migration/schema, or
-   deletes → always the full chain.
+   deletes → always a full gated chain (Kiro, or ScDD with its §4 #7 gate).
 2. Check `.kiro/specs/<feature>/` (and `.kiro/specs/done/`). If yes, find the
    **latest file with `> Status: accepted`** and continue from the next stage.
    A feature still in `.claude/sdlc/<feature>/` → legacy chain (`.claude/sdlc/README.md`), finish it there.
@@ -33,7 +33,7 @@ next stage until the user says the current artifact is accepted.
 |---|---|---|---|
 | 1 Plan | `requirements.md` `## Introduction` (+ open questions) | `ecc:intent-driven-development` | `mattpocock-skills:grilling`, `ecc:product-lens` |
 | 2 Design | `requirements.md` (EARS) → `design.md` | `mattpocock-skills:domain-modeling` | `ecc:contract-first`, `ecc:database-migrations` + `ecc:postgres-patterns`, `ecc:architecture-decision-records` (→ `.claude/docs/decisions.md`), `cms2-master-data` |
-| 3 Build | `tasks.md` | `/ecc:plan` (wait for OK) | `ecc:golang-patterns`, `ui-ux-pro-max` (UI), `cms2-master-data`; run per task/wave with `cms-task-runner` / `cms-run-wave` |
+| 3 Build | `tasks.md` | `/ecc:plan` (wait for OK) | `ecc:golang-patterns`, `ui-ux-pro-max` (UI), `cms2-master-data`; run per task/wave with `cms-task-runner` / `claude-cms-orchestrator` |
 | 4 Test | `tasks.md` `## Notes` → `### Test Results` | `ecc:tdd-workflow` | `ecc:golang-testing`, `ecc:verification-loop` |
 | 5 Deploy | `review.md` | `/code-review` | `/security-review` (mandatory for §4 #7 areas) |
 | 6 Maintain | `incidents.md` | `mattpocock-skills:diagnosing-bugs` | `engineering:incident-response`; each incident → regression test; a breach → new spec |

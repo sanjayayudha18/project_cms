@@ -27,3 +27,8 @@ WHERE v.is_active AND v.deleted_at IS NULL AND v.kind = 'FLM_VENDOR'
 
 -- name: ImportLocationIDs :many
 SELECT id FROM locations;
+
+-- name: ImportActiveRegionCodes :many
+-- Vendor branch CSV dry-run (region-standardization Req 3.5): a region_code
+-- must name an active standard region.
+SELECT code FROM regions WHERE is_active = true;

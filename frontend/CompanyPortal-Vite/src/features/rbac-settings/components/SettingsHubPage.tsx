@@ -21,6 +21,7 @@ import {
   CalendarOff,
   Download,
   FileSpreadsheet,
+  FileText,
   GitBranch,
   HelpCircle,
   KeyRound,
@@ -112,6 +113,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     category: "master",
   },
   {
+    id: "admin-pks",
+    title: "Daftar PKS",
+    description: "Pantau masa berlaku PKS semua vendor dan atur reminder perpanjangan.",
+    href: "/settings/admin/pks",
+    icon: FileText,
+    category: "master",
+  },
+  {
     id: "admin-atms",
     title: "Manajemen ATM",
     description: "Pelihara data master dan status aktif ATM.",
@@ -125,6 +134,14 @@ const MASTER_DATA_CARDS: HubCard[] = [
     description: "Kelola region dan status aktifnya.",
     href: "/settings/admin/regions",
     icon: MapIcon,
+    category: "master",
+  },
+  {
+    id: "admin-pks-types",
+    title: "Type PKS",
+    description: "Kelola master type perjanjian kerja sama vendor.",
+    href: "/settings/admin/pks-types",
+    icon: FileText,
     category: "master",
   },
   {
@@ -372,10 +389,15 @@ function canSeeAdminUsersCard(role: string | undefined): boolean {
   return role !== "ADMIN_PARAM";
 }
 
+/** ATM-SPV is read-only on PKS: only Daftar PKS and Manajemen Vendor (Req 9.3). */
+const ATM_SPV_CARD_IDS = ["admin-pks", "admin-vendors"];
+
 export function SettingsHubPage() {
-  const [activeTab, setActiveTab] = useState<SettingsCategory>("access");
-  const [query, setQuery] = useState("");
   const userRole = useAuthStore((s) => s.user?.role);
+  const isAtmSpv = userRole === "ATM-SPV";
+  const [activeTab, setActiveTab] = useState<SettingsCategory>(isAtmSpv ? "master" : "access");
+  const [query, setQuery] = useState("");
+  const tabs = isAtmSpv ? TABS.filter((t) => t.id === "master") : TABS;
 
   const normalizedQuery = query.trim().toLowerCase();
   const showAccess = activeTab === "access";
@@ -395,7 +417,8 @@ export function SettingsHubPage() {
         (c) =>
           matchesQuery(c, normalizedQuery) &&
           (c.id !== "admin-acm-areas" || userRole === "ADMIN") &&
-          (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)),
+          (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)) &&
+          (!isAtmSpv || ATM_SPV_CARD_IDS.includes(c.id)),
       )
     : [];
   const importExportCards = showIO
@@ -429,7 +452,7 @@ export function SettingsHubPage() {
         style={{ backgroundColor: "var(--n-100)" }}
         role="tablist"
       >
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"

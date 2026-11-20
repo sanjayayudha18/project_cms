@@ -248,6 +248,13 @@ func main() {
 		"atm_assignment":       service.ATMAssignmentApplier{},
 		"dsr_location_map":     service.DsrLocationMapApplier{},
 		"vendor_pks":           service.VendorPksApplier{},
+		"vendor_pks_type":      service.PksTypeApplier{},
+		// ScDD 5.1 cash count parameters + mapping PIC.
+		"cash_count_category_params":  service.CashCountCategoryParamsApplier{},
+		"cash_count_anomaly_category": service.CashCountAnomalyCategoryApplier{},
+		"cash_count_checklist_item":   service.CashCountChecklistItemApplier{},
+		"cash_count_area":             service.CashCountAreaApplier{},
+		"cash_count_pic":              service.CashCountPicApplier{},
 	}
 	masterDataChangeRepo := repository.NewMasterDataChangeRepository(dbPool)
 
@@ -292,21 +299,26 @@ func main() {
 		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
 	)
 
-	// ADMIN/ADMIN_PARAM-only: vendor CRUD (Admin User & Vendor Management spec,
-	// retrofitted onto maker-checker by plan.md T4.1): reads are direct, but
+	// vendorRead (vendor-pks-list Req 9.2): ADMIN, ADMIN_PARAM, ATM-SPV. Only the
+	// vendor list/detail and Daftar PKS are mounted here; their handlers narrow
+	// every write (vendor create/update/disable/enable, PKS reminder) to
+	// ADMIN/ADMIN_PARAM, and the services re-check the role. Every vendor
+	// sub-resource (branches, PICs, prices, vaults, DSR mapping, PKS writes)
+	// stays in masterDataAdmin below.
+	vendorRead := r.With(
+		custommw.RequireAuth(tokenService),
+		custommw.RequireRoles(reports.PksViewerRoles...),
+	)
+
+	// Vendor CRUD (Admin User & Vendor Management spec, retrofitted onto
+	// maker-checker by plan.md T4.1): reads are direct, but
 	// create/update/disable/enable stage a change via masterDataChangeService and
 	// return 202; VendorApplier applies it once approved. Mounted before the
 	// /vendors/{vendorID}/... sub-resources below, as before.
 	vendorAdminRepo := repository.NewVendorAdminRepository(dbPool, dbReadPool)
-	// vendor-pks 6.1: "Need Renewal" threshold; must equal backend-exq's value. renewalMonths is also used by 8.1.
-	renewalMonths, err := reports.ParseVendorPksRenewalMonths(getenvDefault("VENDOR_PKS_RENEWAL_MONTHS", ""))
-	if err != nil {
-		slog.Error("invalid VENDOR_PKS_RENEWAL_MONTHS", "error", err)
-		os.Exit(1)
-	}
-	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, masterDataChangeService, service.WithPksRenewalMonths(renewalMonths))
+	vendorAdminService := service.NewVendorAdminService(vendorAdminRepo, masterDataChangeService)
 	adminVendorHandler := handler.NewAdminVendorHandler(vendorAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
+	vendorRead.Mount("/api/v1/admin/vendors", adminVendorHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: ATM master-data CRUD (Admin ATM Management spec,
 	// retrofitted onto maker-checker by plan.md T4.2): reads are direct, but
@@ -353,9 +365,19 @@ func main() {
 	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService, service.NewVendorPicRoleService(dbPool))
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
 
-	// ADMIN/ADMIN_PARAM-only: PKS vendor (spec vendor-pks 8.1), maker-checker; reads on primary.
-	vendorPksAdminService := service.NewVendorPksAdminService(repository.NewVendorPksAdminRepository(dbPool), masterDataChangeService, renewalMonths)
+	// ADMIN/ADMIN_PARAM-only: PKS vendor writes (spec vendor-pks 8.1), maker-checker.
+	// pool = primary for the reminder tx (vendor-pks-list 4.2).
+	vendorPksAdminService := service.NewVendorPksAdminService(repository.NewVendorPksAdminRepository(dbPool), masterDataChangeService, dbPool)
 	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pks", handler.NewAdminVendorPksHandler(vendorPksAdminService).Routes())
+
+	pksTypeRepo := repository.NewPksTypeRepository(dbPool, dbReadPool)
+	// Daftar PKS (vendor-pks-list): list on the replica for PksViewerRoles; reminder PUT
+	// ADMIN/ADMIN_PARAM only (route + service), immediate + audit in tx (GR#3 deviation D9).
+	pksListService := service.NewPksListService(repository.NewPksListRepository(dbReadPool), pksTypeRepo, vendorAdminRepo)
+	vendorRead.Mount("/api/v1/admin/pks", handler.NewAdminPksHandler(pksListService, vendorPksAdminService).Routes())
+
+	pksTypeAdminService := service.NewPksTypeAdminService(pksTypeRepo, masterDataChangeService)
+	masterDataAdmin.Mount("/api/v1/admin/pks-types", handler.NewAdminPksTypeHandler(pksTypeAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same
 	// maker-checker-native flow; price is a decimal string (numeric(20,2)).
@@ -409,23 +431,45 @@ func main() {
 	// replica. Confirm builds the per-entity admin services over a collector
 	// (the same validation/payload/"before" code as the single-record
 	// endpoints) and stages the result as ONE batch under one approval.
-	masterDataImporter := service.NewMasterDataImporter(repository.NewMasterDataExportRepository(dbPool)).WithConfirm(service.ImportConfirmDeps{
+	cashCountPicImportRepo := repository.NewCashCountPicAdminRepository(dbPool, dbPool) // primary: import validates a write flow
+	masterDataImporter := service.NewMasterDataImporter(repository.NewMasterDataExportRepository(dbPool)).WithCashCountPics(cashCountPicImportRepo).WithConfirm(service.ImportConfirmDeps{
 		Batches:      importBatchRepo,
 		Orchestrator: approvalOrchestrator,
 		Audit:        auditWriter,
 		Notifier:     importNotifier,
 		Services: func(sub service.ImportSubmitter) service.ImportServices {
 			return service.ImportServices{
-				Vendors:     service.NewVendorAdminService(vendorAdminRepo, sub),
-				Branches:    service.NewVendorBranchAdminService(vendorBranchAdminRepo, sub, branchChildCounter),
-				Vaults:      service.NewVendorVaultAdminService(vendorVaultAdminRepo, sub),
-				PICs:        service.NewVendorPicAdminService(vendorPicAdminRepo, sub),
-				ATMs:        service.NewATMAdminService(atmAdminRepo, sub),
-				Assignments: service.NewATMAssignmentAdminService(atmAssignmentAdminRepo, sub),
+				Vendors:       service.NewVendorAdminService(vendorAdminRepo, sub),
+				Branches:      service.NewVendorBranchAdminService(vendorBranchAdminRepo, sub, branchChildCounter),
+				Vaults:        service.NewVendorVaultAdminService(vendorVaultAdminRepo, sub),
+				PICs:          service.NewVendorPicAdminService(vendorPicAdminRepo, sub),
+				ATMs:          service.NewATMAdminService(atmAdminRepo, sub),
+				Assignments:   service.NewATMAssignmentAdminService(atmAssignmentAdminRepo, sub),
+				CashCountPICs: service.NewCashCountPicAdminService(cashCountPicImportRepo, sub),
 			}
 		},
 	})
 	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).WithHistory(service.NewMasterDataImportHistoryService(importBatchRepo)).Routes())
+
+	// ScDD 5.1 cash count parameters + mapping PIC. Read: maker role + ADMIN;
+	// change: the service re-checks the maker role per entity type (CC-CWM /
+	// CC-CCR only — ADMIN is rejected as maker, AC-5.1-14).
+	cashCountCWM := r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CWM", "ADMIN"))
+	cashCountCCR := r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CCR", "ADMIN"))
+	cashCountCWM.Mount("/api/v1/cash-count/category-params", handler.NewCashCountCategoryParamsHandler(
+		service.NewCashCountCategoryParamsAdminService(repository.NewCashCountCategoryParamsAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
+	cashCountCCR.Mount("/api/v1/cash-count/anomaly-categories", handler.NewCashCountAnomalyCategoryHandler(
+		service.NewCashCountAnomalyCategoryAdminService(repository.NewCashCountAnomalyCategoryAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
+	cashCountCCR.Mount("/api/v1/cash-count/checklist-items", handler.NewCashCountChecklistItemHandler(
+		service.NewCashCountChecklistItemAdminService(repository.NewCashCountChecklistItemAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
+	cashCountCWM.Mount("/api/v1/cash-count/areas", handler.NewCashCountAreaHandler(
+		service.NewCashCountAreaAdminService(repository.NewCashCountAreaAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
+	cashCountCWM.Mount("/api/v1/cash-count/pics", handler.NewCashCountPicHandler(
+		service.NewCashCountPicAdminService(repository.NewCashCountPicAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
+	// CSV import of mapping PIC (AC-5.1-11): same importer, reachable by CC-CWM;
+	// the service accepts only cash-count-pics from CC-CWM. No history here.
+	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CWM")).Mount("/api/v1/cash-count/import",
+		handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).Routes())
 
 	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8),
 	// plus the RBAC settings menu's read-only list views + policy create/edit

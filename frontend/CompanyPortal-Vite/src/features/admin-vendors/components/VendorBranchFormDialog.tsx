@@ -14,6 +14,7 @@ import {
 } from "../lib/vendorBranchFormSchema";
 import { VENDOR_VAULT_CATEGORIES } from "../lib/vendorVaultFormSchema";
 import type { CreateVendorBranchPayload } from "../types";
+import { RegionCodeSelect } from "./RegionCodeSelect";
 
 interface VendorBranchFormDialogProps {
   open: boolean;
@@ -25,7 +26,6 @@ const EMPTY_VALUES: VendorBranchFormValues = {
   branch_code: "",
   branch_name: "",
   location_id: "",
-  region: "",
   region_code: "",
   category: "ATM",
 };
@@ -57,7 +57,6 @@ export function VendorBranchFormDialog({ open, onClose, vendorId }: VendorBranch
         branch_code: values.branch_code,
         branch_name: values.branch_name,
         location_id: values.location_id ? Number(values.location_id) : null,
-        region: values.region || null,
         region_code: toRegionCode(values.region_code),
         category: values.category,
       };
@@ -89,16 +88,8 @@ export function VendorBranchFormDialog({ open, onClose, vendorId }: VendorBranch
           <input {...form.register("branch_name")} className={inputClass} />
         </Field>
 
-        <Field label="Wilayah" error={form.formState.errors.region?.message}>
-          <input {...form.register("region")} className={inputClass} />
-        </Field>
-
         <Field label="Kode Region" error={form.formState.errors.region_code?.message}>
-          <input
-            {...form.register("region_code")}
-            placeholder="mis. JKT"
-            className={`${inputClass} uppercase`}
-          />
+          <RegionCodeSelect registration={form.register("region_code")} className={inputClass} />
         </Field>
 
         <Field label="Tipe" error={form.formState.errors.category?.message}>

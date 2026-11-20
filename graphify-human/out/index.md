@@ -4,21 +4,22 @@
 > Dibuat otomatis dari `graphify-human/features.toml`. Jangan edit file ini:
 > ubah `features.toml`, lalu jalankan `py graphify-human/generate.py`.
 
-- Commit kode: `357fd65792`
-- Graph dibangun di commit: `357fd65792`
+- Commit kode: `dde5cfcbb3`
+- Graph dibangun di commit: `a9f031b4d6`
+- 29 file kode berubah sejak graph dibangun. Jalankan `graphify update .` dari root repo supaya 'File terkait' akurat.
 
 | Fitur | Status | Portal | Dev plan | File inti | Endpoint | Tabel |
 | --- | --- | --- | --- | --- | --- | --- |
 | [Request CIT (Vendor Request)](vendor-request.md) | Built | CompanyPortal | 2.1, 2.2 | 39 | 25 | 19 |
 | [Upload DSR Vendor](dsr-upload.md) | Partial | VendorPortal, CompanyPortal | 1.3 | 27 | 5 + 10 Python | 10 |
-| [Master Data Vendor](master-data-vendor.md) | Built | CompanyPortal | Master data (feature-complete MVP) | 135 | 54 | 16 |
+| [Master Data Vendor](master-data-vendor.md) | Built | CompanyPortal | Master data (feature-complete for current scope) | 135 | 54 | 16 |
 | [Login dan Sesi](auth.md) | Built | CompanyPortal, VendorPortal | Platform: Auth | 30 | 5 | 4 |
 | [Manajemen User](admin-users.md) | Built | CompanyPortal | Platform: Admin users | 17 | 8 | 4 |
 | [Manajemen Peran](role-management.md) | Built | CompanyPortal | Platform: Role management | 13 | 4 | 1 |
 | [Approval (maker-checker) dan Pengaturan RBAC](approval.md) | Built | CompanyPortal | Platform: Approval | 40 | 17 | 8 |
 | [Log Audit](audit-log.md) | Built | CompanyPortal | Platform: Audit | 17 | 2 | 1 |
 | [Notifikasi (in-app dan email)](notification.md) | Built | CompanyPortal, VendorPortal | 0.3 | 14 | 4 | 6 |
-| [Master Data ATM](master-data-atm.md) | Built | CompanyPortal | Master data (feature-complete MVP) | 24 | 14 | 7 |
+| [Master Data ATM](master-data-atm.md) | Built | CompanyPortal | Master data (feature-complete for current scope) | 24 | 14 | 7 |
 | [Master Data Region](master-data-region.md) | Built | CompanyPortal | 1.1 | 14 | 6 | 2 |
 | [Area ACM](acm-area.md) | Built | CompanyPortal | 2.2a | 7 | 14 | 10 |
 | [Hari Libur](holiday.md) | Built | CompanyPortal | 2.2c | 6 | 6 | 1 |

@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/lib/auth/store";
 import { useToastStore } from "@/lib/hooks/useToast";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -23,21 +24,11 @@ const disableMutate = vi.fn();
 
 vi.mock("../hooks", () => ({
   useVendorsList: (...args: unknown[]) => useVendorsListMock(...args),
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useDisableVendor: () => ({ mutate: disableMutate, isPending: false }),
   useEnableVendor: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateVendor: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
-
-vi.mock("../../exports", () => ({
-  useExportFlow: () => ({
-    request: vi.fn(),
-    isRequesting: false,
-    requestError: null,
-    dialogProps: {},
-  }),
-  ExportProgressDialog: () => null,
-  ReportExportNotice: () => null,
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -54,6 +45,17 @@ beforeEach(() => {
   useVendorsListMock.mockReset();
   disableMutate.mockReset();
   useToastStore.setState({ toasts: [] });
+  useAuthStore.setState({
+    user: {
+      id: 1,
+      username: "a",
+      fullName: "A",
+      email: "a@x",
+      role: "ADMIN",
+      isKaryawan: true,
+      vendorId: null,
+    },
+  });
   useVendorsListMock.mockReturnValue({
     data: { vendors: [ACTIVE_VENDOR], page: 1, page_size: 25, total: 1 },
     isLoading: false,

@@ -6,6 +6,7 @@
  * min_amount < max_amount strict-inequality guard as the backend).
  */
 
+import { BackLink } from "@/components/ui/BackLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, Pencil, X } from "lucide-react";
@@ -29,6 +30,7 @@ export function RbacPoliciesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackLink to="/settings" label="Kembali ke Pengaturan" />
       <PageHeader
         eyebrow="Pengaturan"
         title="Kebijakan Persetujuan"

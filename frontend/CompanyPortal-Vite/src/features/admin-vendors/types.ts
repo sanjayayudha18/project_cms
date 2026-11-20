@@ -6,30 +6,18 @@
  * ADMIN/ADMIN_PARAM-only.
  */
 
-import type { components } from "@/lib/api/schema";
 import type { ChangeRequestAccepted } from "../master-data/changeRequest";
 
 export type VendorStatus = "active" | "disabled" | "all";
 
 export type VendorKind = "FLM_VENDOR" | "INTERNAL";
-export type PksStatus = components["schemas"]["PksStatus"];
-export type VendorPksRecord = components["schemas"]["VendorPksRecord"];
+export type PksStatus = "aktif" | "need_renewal" | "expired" | "terminated" | "belum_diisi";
 
 /** Direktur Utama = the vendor-wide PIC flagged is_director; null when none recorded. */
 export interface VendorDirector {
   name: string;
   phone: string | null;
   email: string | null;
-}
-
-/** Active PKS summary on the list; null when the vendor has no active PKS. */
-export interface VendorPksSummary {
-  id: number;
-  pks_name: string;
-  effective_date: string;
-  expiry_date: string;
-  validity_months: number;
-  remaining_days: number;
 }
 
 export interface AdminVendor {
@@ -45,10 +33,8 @@ export interface AdminVendor {
   deleted_at: string | null;
   kind: VendorKind;
   director: VendorDirector | null;
-  /** List only (absent on detail). null = no active PKS. */
-  pks?: VendorPksSummary | null;
-  /** List only (absent on detail). null = INTERNAL vendor. */
-  pks_status?: PksStatus | null;
+  /** List only (absent on detail): number of PKS records of the vendor (PKS column). */
+  pks_count?: number;
 }
 
 export interface AdminVendorsListParams {
@@ -56,7 +42,7 @@ export interface AdminVendorsListParams {
   page_size: number;
   status?: VendorStatus;
   q?: string;
-  pks_status?: PksStatus;
+  kind?: VendorKind;
 }
 
 export interface AdminVendorsListResponse {
@@ -105,6 +91,7 @@ export interface AdminVendorBranch {
   branch_code: string;
   branch_name: string;
   location_id: number | null;
+  /** Name of the branch's standard region (regions.region via region_code, migration 042); read-only. */
   region: string | null;
   /** replenish-ticket: segment of the request number; null = requests for this cabang are rejected. */
   region_code: string | null;
@@ -131,7 +118,6 @@ export interface CreateVendorBranchPayload {
   branch_code: string;
   branch_name: string;
   location_id: number | null;
-  region: string | null;
   region_code: string | null;
   category: VendorVaultCategory;
 }
@@ -139,7 +125,6 @@ export interface CreateVendorBranchPayload {
 export interface UpdateVendorBranchPayload {
   branch_name: string;
   location_id: number | null;
-  region: string | null;
   region_code: string | null;
   category: VendorVaultCategory;
 }
@@ -149,15 +134,23 @@ export type VendorVaultCategory = "ATM" | "CASH" | "ATM_CASH";
 export interface AdminVendorVault {
   id: number;
   vendor_branch_id: number;
+  branch_name?: string;
+  region: string | null;
   vault_code: string;
+  vault_name: string;
   category: VendorVaultCategory;
   currency_code: string;
-  min_capacity_amount: string | null;
-  max_capacity_amount: string | null;
-  latitude: string | null;
-  longitude: string | null;
+  alamat: string | null;
+  min_balance: string | null;
+  max_balance: string | null;
+  cis_limit_amount: string | null;
+  cis_limit_currency?: string;
+  latitude?: string | null;
+  longitude?: string | null;
   operating_hours: string | null;
-  location_id: number | null;
+  location_id?: number | null;
+  escrow_cash: string | null;
+  escrow_atm: string | null;
   is_active: boolean;
   deleted_at: string | null;
 }
@@ -179,19 +172,21 @@ export interface AdminVendorVaultsListResponse {
 }
 
 export interface VendorVaultFormPayload {
+  vault_name: string | null;
   category: VendorVaultCategory;
   currency_code: string;
-  min_capacity_amount: string | null;
-  max_capacity_amount: string | null;
-  latitude: string | null;
-  longitude: string | null;
+  alamat: string | null;
+  min_balance: string | null;
+  max_balance: string | null;
+  cis_limit_amount: string | null;
   operating_hours: string | null;
-  location_id: number | null;
+  escrow_cash: string | null;
+  escrow_atm: string | null;
 }
 
 export interface CreateVendorVaultPayload extends VendorVaultFormPayload {
   vendor_branch_id: number;
-  vault_code: string;
+  vault_code?: string;
 }
 
 export type UpdateVendorVaultPayload = VendorVaultFormPayload;

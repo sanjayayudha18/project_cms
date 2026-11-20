@@ -14,9 +14,9 @@ import (
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
-// Feature: vendor-export-pks, Property 1 (unit part): the nine read-only cells at the end of a
-// vendor export row equal reports.VendorPksDetailCells of the same data; the first nine are the
-// importable vendor cells.
+// Feature: vendor-vaults-export-revamp, Property 1 (unit part):
+// - vendorPksMasterProducer (entity vendor-pks) emits 5 columns: vendor_code, vendor_name + 3 director cells.
+// - vendorsProducer (entity vendors) emits 7 vendor profile columns without id, code, director, or PKS.
 
 func optText(label string) *rapid.Generator[*string] {
 	return rapid.Custom(func(t *rapid.T) *string {
@@ -28,20 +28,8 @@ func optText(label string) *rapid.Generator[*string] {
 	})
 }
 
-func pgDate(t *rapid.T, label string) pgtype.Date {
-	d := time.Date(rapid.IntRange(2020, 2035).Draw(t, label+"Y"), time.Month(rapid.IntRange(1, 12).Draw(t, label+"M")),
-		rapid.IntRange(1, 28).Draw(t, label+"D"), 0, 0, 0, 0, time.UTC)
-	return pgtype.Date{Time: d, Valid: true}
-}
-
-func TestProperty1VendorTailEqualsPksDetailCells(t *testing.T) {
-	statuses := []string{""} // "" = no active PKS (INTERNAL or FLM without PKS)
-	for k := range reports.PksStatuses {
-		statuses = append(statuses, k)
-	}
-	slices.Sort(statuses)
+func TestProperty1VendorPksMasterIsCodeNameDirector(t *testing.T) {
 	asOf := time.Date(2026, 10, 30, 8, 0, 0, 0, wib)
-
 	rapid.Check(t, func(t *rapid.T) {
 		r := repository.ExportVendorsWithPksBatchRow{
 			ID: 1, Code: propText.Draw(t, "code"), Name: propText.Draw(t, "name"), LegalName: propText.Draw(t, "legal"),
@@ -51,49 +39,67 @@ func TestProperty1VendorTailEqualsPksDetailCells(t *testing.T) {
 		if rapid.Bool().Draw(t, "hasDirector") {
 			r.DirectorName, r.DirectorPhone, r.DirectorEmail = optText("dn").Draw(t, "dn"), optText("dp").Draw(t, "dp"), optText("de").Draw(t, "de")
 		}
-		if rapid.Bool().Draw(t, "hasPks") {
-			r.PksName = optText("pn").Draw(t, "pn")
-			r.EffectiveDate, r.ExpiryDate = pgDate(t, "eff"), pgDate(t, "exp")
-			r.ValidityMonths = rapid.Int32Range(1, 120).Draw(t, "vm")
-			r.RemainingDays = rapid.Int32Range(-400, 4000).Draw(t, "rd")
-			r.PksStatus = rapid.SampledFrom(statuses).Draw(t, "status")
-		}
+		// Expected: code, name + the three director cells, built independently of vendorPksMasterCells.
+		want := []string{r.Code, r.Name, derefStr(r.DirectorName), derefStr(r.DirectorPhone), derefStr(r.DirectorEmail)}
 
-		// Expected tail built from the row independently of pksDetailRow.
-		want := reports.VendorPksRow{DirectorName: r.DirectorName, DirectorPhone: r.DirectorPhone, DirectorEmail: r.DirectorEmail, PksName: r.PksName}
-		if r.ExpiryDate.Valid {
-			eff, exp, vm, rd := r.EffectiveDate.Time, r.ExpiryDate.Time, r.ValidityMonths, r.RemainingDays
-			want.EffectiveDate, want.ExpiryDate, want.ValidityMonths, want.RemainingDays = &eff, &exp, &vm, &rd
+		q := &propQ{
+			vendorPks: []propEntry[repository.ExportVendorsWithPksBatchRow]{{id: 1, row: r, active: r.IsActive}},
+			vendors: []propEntry[repository.ExportVendorsBatchRow]{{id: 1, row: repository.ExportVendorsBatchRow{
+				ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
+				Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone,
+				HqAddress: r.HqAddress, IsActive: r.IsActive,
+			}, active: r.IsActive}},
 		}
-		if r.PksStatus != "" {
-			s := r.PksStatus
-			want.PksStatus = &s
-		}
-		wantTail := reports.VendorPksDetailCells(want)
-		wantHead := csvexport.VendorCells(csvexport.VendorRow{ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
-			Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive})
-
-		q := &propQ{vendors: []propEntry[repository.ExportVendorsWithPksBatchRow]{{id: 1, row: r, active: r.IsActive}}}
-		prod := vendorsProducer(false, 9)
+		prod := vendorPksMasterProducer()
 		rows, _, err := prod.(PreviewProducer).Page(context.Background(), q, Params{StatusFilter: "all"}, asOf, 0, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 1 || len(rows[0]) != len(prod.Header()) {
-			t.Fatalf("got %d rows, want 1 row of %d cells", len(rows), len(prod.Header()))
+		if len(prod.Header()) != 5 || len(rows) != 1 || !slices.Equal(rows[0], want) {
+			t.Fatalf("rows = %q (header %d), want [%q]", rows, len(prod.Header()), want)
 		}
-		n := len(wantHead)
-		if !slices.Equal(rows[0][:n], wantHead) {
-			t.Fatalf("head = %q, want %q", rows[0][:n], wantHead)
+
+		// Vendors producer emits 7 profile columns without id, code, director, or PKS.
+		vProd := vendorsProducer(false)
+		vRows, _, err := vProd.(PreviewProducer).Page(context.Background(), q, Params{StatusFilter: "all"}, asOf, 0, 10)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if !slices.Equal(rows[0][n:], wantTail) || len(wantTail) != 9 {
-			t.Fatalf("tail = %q, want %q", rows[0][n:], wantTail)
+		wantProfile := csvexport.VendorCells(csvexport.VendorRow{
+			Name: r.Name, LegalName: r.LegalName, Npwp: r.Npwp,
+			ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive,
+		})
+		if len(vRows) != 1 || len(vProd.Header()) != 7 || !slices.Equal(vRows[0], wantProfile) {
+			t.Fatalf("vendor profile row = %q, want %q", vRows, wantProfile)
 		}
 	})
 }
 
+// pksQ captures the report producer's queries and serves canned pages.
+type pksQ struct {
+	*fakeQ
+	batchArgs []repository.ExportVendorPksBatchParams
+	batch     []repository.ExportVendorPksBatchRow
+}
+
+func (q *pksQ) ExportVendorPksBatch(_ context.Context, a repository.ExportVendorPksBatchParams) ([]repository.ExportVendorPksBatchRow, error) {
+	q.batchArgs = append(q.batchArgs, a)
+	return q.batch, nil
+}
+
+func runVendorPks(t *testing.T, q Querier, rp ReportParams, asOf time.Time) [][]string {
+	t.Helper()
+	var out [][]string
+	err := vendorPksProducer().Produce(context.Background(), q, Params{Kind: KindVendorPks, Report: &rp}, asOf,
+		func(c []string) error { out = append(out, c); return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
 // "Today" for the PKS status is the WIB calendar day of asOf, not the UTC day.
-func TestVendorsProducerTodayIsWIBDate(t *testing.T) {
+func TestVendorPksProducerTodayIsWIBDate(t *testing.T) {
 	tests := []struct {
 		name string
 		asOf time.Time
@@ -104,18 +110,61 @@ func TestVendorsProducerTodayIsWIBDate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := &fakeQ{n: 1}
-			rows, _, err := vendorsProducer(false, 7).(PreviewProducer).Page(context.Background(), f, Params{StatusFilter: "active"}, tt.asOf, 0, 10)
-			if err != nil || len(rows) != 1 {
-				t.Fatalf("rows=%d err=%v", len(rows), err)
+			q := &pksQ{fakeQ: &fakeQ{}}
+			runVendorPks(t, q, ReportParams{}, tt.asOf)
+			if len(q.batchArgs) == 0 {
+				t.Fatal("no batch args recorded")
 			}
-			got := f.calls[0].(repository.ExportVendorsWithPksBatchParams)
+			got := q.batchArgs[0]
 			if !got.Today.Valid || !got.Today.Time.Equal(tt.want) {
 				t.Fatalf("Today = %v, want %v", got.Today, tt.want)
 			}
-			if got.RenewalMonths != 7 {
-				t.Fatalf("RenewalMonths = %d, want 7", got.RenewalMonths)
+			if got.Status != "terkini" {
+				t.Fatalf("default Status = %q, want terkini", got.Status)
 			}
 		})
+	}
+}
+
+// Filter routing: {status, pks_type, vendor, q} are passed to ExportVendorPksBatchParams.
+func TestVendorPksProducerFilterRouting(t *testing.T) {
+	asOf := time.Date(2026, 11, 18, 8, 0, 0, 0, wib)
+	cit, vcode, qstr, st := "CIT", "PTA", "my pks", "need_renewal"
+
+	q := &pksQ{fakeQ: &fakeQ{}}
+	runVendorPks(t, q, ReportParams{PksType: &cit, Vendor: &vcode, Q: &qstr, Status: &st}, asOf)
+	if len(q.batchArgs) != 1 {
+		t.Fatalf("batch calls %d, want 1", len(q.batchArgs))
+	}
+	arg := q.batchArgs[0]
+	if arg.Status != "need_renewal" || *arg.PksType != "CIT" || *arg.Vendor != "PTA" || *arg.Q != "my pks" {
+		t.Errorf("got args %+v", arg)
+	}
+}
+
+// One output line per PKS row, with CSVSafe on string cells and the 13-column width.
+func TestVendorPksProducerRowPerPks(t *testing.T) {
+	eff := pgtype.Date{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
+	exp := pgtype.Date{Time: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
+	q := &pksQ{fakeQ: &fakeQ{}, batch: []repository.ExportVendorPksBatchRow{
+		{VendorCode: "A", VendorName: "PT A", PksTypeCode: "CIT", WodNumber: "=W1", PksName: "P1", EffectiveDate: eff, ExpiryDate: exp,
+			ValidityDays: 365, RenewalDays: 270, PksStatus: "aktif"},
+		{VendorCode: "A", VendorName: "PT A", PksTypeCode: "FLM", WodNumber: "W2", PksName: "P2", EffectiveDate: eff, ExpiryDate: exp,
+			ValidityDays: 365, RenewalDays: 90, PksStatus: "expired"},
+	}}
+	got := runVendorPks(t, q, ReportParams{}, time.Date(2026, 11, 18, 8, 0, 0, 0, wib))
+	if len(got) != 2 {
+		t.Fatalf("rows = %d, want 2 (one per PKS)", len(got))
+	}
+	for _, c := range got {
+		if len(c) != len(reports.PksExportHeader) {
+			t.Fatalf("cells %d != header %d", len(c), len(reports.PksExportHeader))
+		}
+	}
+	if got[0][5] != "CIT" || got[0][6] != "'=W1" || got[0][10] != "365" || got[0][11] != "270" || got[0][12] != "Aktif" {
+		t.Errorf("row[0] = %q", got[0])
+	}
+	if got[1][5] != "FLM" || got[1][6] != "W2" || got[1][10] != "365" || got[1][11] != "90" || got[1][12] != "Expired" {
+		t.Errorf("row[1] = %q", got[1])
 	}
 }

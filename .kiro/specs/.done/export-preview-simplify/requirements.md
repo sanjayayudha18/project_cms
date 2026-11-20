@@ -44,7 +44,7 @@ Tidak ada. RBAC, isi file, dan audit tidak berubah. Pengaman batas 1.000.000 bar
 
 ### Dependency & Scope Note
 
-Lanjutan `export-menu-revamp` (X.9). Requirement di bawah menggantikan `export-menu-revamp` Req 5.1 (label tombol dengan jumlah baris) dan Req 5.9 (catatan pengambilan file). Pencatatan di `development-plan.md` mengikuti D5.
+Lanjutan `export-menu-revamp` (X.9). Requirement di bawah menggantikan `export-menu-revamp` Req 5.1 (label tombol dengan jumlah baris) dan Req 5.9 (catatan pengambilan file). Pencatatan di `.claude/dev-plan/dev-plan.md` mengikuti D5.
 
 ## Glossary
 
@@ -114,4 +114,4 @@ Lanjutan `export-menu-revamp` (X.9). Requirement di bawah menggantikan `export-m
 | D2 | "Button export tidak perlu menghitung jumlah row" mencakup apa? | **A. Hanya label tombol** jadi "Ekspor". "Total N baris" di kepala halaman dan pengaman > 1.000.000 baris tetap. **B.** Hapus juga total di kepala halaman dan query hitung di `backend-exq`: pengguna tidak tahu ukuran data, dan ekspor > 1.000.000 baris baru gagal di worker. | ✅ mengikuti saran A (PO 2026-10-30) |
 | D3 | Label "Search" berbahasa Inggris, teks UI lain berbahasa Indonesia | Mengikuti permintaan PO: "Search". | ✅ DIPUTUSKAN PO 2026-10-30 |
 | D4 | Tanpa kotak pencarian, dropdown hanya memuat 100 vendor aktif pertama (batas endpoint) | **Terima batas ini.** Seed dev 6 vendor; jumlah vendor CIT jauh di bawah 100. Bila suatu hari > 100, ganti ke endpoint lookup vendor tanpa paging di spec terpisah. | ✅ mengikuti saran (PO 2026-10-30) |
-| D5 | Pencatatan di `development-plan.md` | **Follow-up di bawah X.9** (seperti `sidebar-settings-footer` di bawah X.1), bukan item baru. | ✅ mengikuti saran (PO 2026-10-30) |
+| D5 | Pencatatan di `.claude/dev-plan/dev-plan.md` | **Follow-up di bawah X.9** (seperti `sidebar-settings-footer` di bawah X.1), bukan item baru. | ✅ mengikuti saran (PO 2026-10-30) |

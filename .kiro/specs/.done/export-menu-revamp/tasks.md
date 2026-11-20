@@ -224,7 +224,7 @@ Dependensi lintas grup:
   - _Model: Sonnet, Medium — triase galat lint/test/build._
 
 - [x] 13. Dokumentasi
-  - `development-plan.md` X.9: status built + catatan cek manual. `.claude/development-progress.md`: entri fitur. `CLAUDE.md` Sec 3 tidak berubah (tidak ada tabel baru).
+  - `.claude/dev-plan/dev-plan.md` X.9: status built + catatan cek manual. `.claude/development-progress.md`: entri fitur. `CLAUDE.md` Sec 3 tidak berubah (tidak ada tabel baru).
   - _Requirements: 9.2_
   - _Model: Haiku, Low — pembaruan dokumen._
 

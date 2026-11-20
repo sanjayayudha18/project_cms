@@ -148,4 +148,4 @@ Tidak berubah. "Total N baris" di kepala halaman tetap.
 - Test diubah: `exportButtonState.test.ts`, `exportButtonState.property.test.ts`, `components/ExportPreviewPage.test.tsx`
 - Test baru: `components/exportFormParts.test.tsx`
 
-**Dokumen**: `.kiro/steering/development-plan.md` (follow-up di bawah X.9, D5), `.claude/development-progress.md`, catatan "digantikan oleh `export-preview-simplify`" di kepala `.kiro/specs/export-menu-revamp/requirements.md` untuk Req 5.1 dan 5.9. `ui_design.md` tidak berubah.
+**Dokumen**: `.claude/dev-plan/dev-plan.md` (follow-up di bawah X.9, D5), `.claude/development-progress.md`, catatan "digantikan oleh `export-preview-simplify`" di kepala `.kiro/specs/export-menu-revamp/requirements.md` untuk Req 5.1 dan 5.9. `ui_design.md` tidak berubah.

@@ -2,6 +2,7 @@ package exportjob
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ func TestParseParams(t *testing.T) {
 		{"vendor disabled", KindVendor, "pics", id(1), nil, "disabled", "", nil, "disabled", ""},
 		{"vendor all", KindVendor, "branches", id(1), nil, "all", "", nil, "all", ""},
 		{"vendor dsr maps", KindVendor, "dsr-location-maps", id(1), nil, "", "", nil, "active", ""},
+		{"vendor pks", KindVendor, "vendor-pks", id(1), nil, "all", "", nil, "all", ""},
 		{"vendor bad status", KindVendor, "vendor", id(1), nil, "ACTIVE", "", ErrValidation, "", ""},
 		{"vendor missing id", KindVendor, "vendor", nil, nil, "", "", ErrValidation, "", ""},
 		{"vendor with branch", KindVendor, "vendor", id(1), id(2), "", "", ErrValidation, "", ""},
@@ -48,6 +50,7 @@ func TestParseParams(t *testing.T) {
 		{"harga no vendor", KindHargaPaket, "package-prices", nil, nil, "", "", ErrValidation, "", ""},
 		{"harga bad entity", KindHargaPaket, "vaults", id(1), nil, "", "", ErrUnknownEntity, "", ""},
 		{"global ok", KindMasterDataGlobal, "atms", nil, nil, "", "", nil, "active", ""},
+		{"global vendor-pks", KindMasterDataGlobal, "vendor-pks", nil, nil, "disabled", "", nil, "disabled", ""},
 		{"global with vendor", KindMasterDataGlobal, "atms", id(1), nil, "", "", ErrValidation, "", ""},
 		{"global with branch", KindMasterDataGlobal, "atms", nil, id(1), "", "", ErrValidation, "", ""},
 		{"global price_level", KindMasterDataGlobal, "atms", nil, nil, "", "all", ErrValidation, "", ""},
@@ -82,10 +85,15 @@ func TestParseParams(t *testing.T) {
 
 func TestParseParams_AllGlobalEntitiesAndNoAliasing(t *testing.T) {
 	names := csvexport.ImportableNames()
-	if len(names) != 6 {
-		t.Fatalf("want 6 importable entities, got %d", len(names))
+	if len(names) != 7 {
+		t.Fatalf("want 7 importable entities, got %d", len(names))
 	}
-	for _, n := range names {
+	// Mapping PIC cash count is importable but never part of the global (ADMIN) kind (AC-5.1-14).
+	if _, err := ParseParams(KindMasterDataGlobal, csvexport.CashCountPICs, nil, nil, "", ""); !errors.Is(err, ErrUnknownEntity) {
+		t.Errorf("global %s: want ErrUnknownEntity, got %v", csvexport.CashCountPICs, err)
+	}
+	names = slices.DeleteFunc(names, func(n string) bool { return n == csvexport.CashCountPICs })
+	for _, n := range append(names, csvexport.VendorPks) {
 		if _, err := ParseParams(KindMasterDataGlobal, n, nil, nil, "", ""); err != nil {
 			t.Errorf("%s: %v", n, err)
 		}
@@ -129,10 +137,12 @@ func TestParamsHash(t *testing.T) {
 func TestFileName(t *testing.T) {
 	now := time.Date(2026, 10, 28, 10, 0, 0, 0, time.UTC)
 	vp, _ := ParseParams(KindVendor, "branches", id(1), nil, "", "")
+	vpPks, _ := ParseParams(KindVendor, csvexport.VendorPks, id(1), nil, "", "")
 	cp, _ := ParseParams(KindCabang, "pics", id(1), id(2), "", "")
 	hp, _ := ParseParams(KindHargaPaket, "package-prices", id(1), nil, "", "")
 	hb, _ := ParseParams(KindHargaPaket, "package-prices", id(1), id(2), "", "")
 	gp, _ := ParseParams(KindMasterDataGlobal, "atms", nil, nil, "", "")
+	gpPks, _ := ParseParams(KindMasterDataGlobal, csvexport.VendorPks, nil, nil, "", "")
 
 	tests := []struct {
 		name string
@@ -142,10 +152,12 @@ func TestFileName(t *testing.T) {
 		want string
 	}{
 		{"vendor", vp, "ABC-1", "", now, "vendor-ABC-1-branches-20261028.csv"},
+		{"vendor pks", vpPks, "ABC", "", now, "vendor-ABC-vendor-pks-20261028.csv"},
 		{"cabang", cp, "ABC", "JKT_01", now, "vendor-ABC-cabang-JKT_01-pics-20261028.csv"},
 		{"harga vendor", hp, "ABC", "", now, "harga-paket-ABC-20261028.csv"},
 		{"harga cabang", hb, "ABC", "B1", now, "harga-paket-ABC-cabang-B1-20261028.csv"},
 		{"global", gp, "", "", now, "master-data-atms-20261028.csv"},
+		{"global vendor-pks", gpPks, "", "", now, "master-data-vendor-pks-20261028.csv"},
 		{"sanitize space slash quote", vp, "A B/C\"D;E", "", now, "vendor-A_B_C_D_E-branches-20261028.csv"},
 		{"sanitize unicode per rune", vp, "Ünï世", "", now, "vendor-_n__-branches-20261028.csv"},
 		{"sanitize path traversal", vp, "../x", "", now, "vendor-___x-branches-20261028.csv"},

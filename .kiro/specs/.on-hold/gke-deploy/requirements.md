@@ -5,7 +5,7 @@
 > Status: **requirements disetujui PO 2026-11-04** (D1–D31 mengikuti saran Kiro; detail yang butuh tim infra dikonfirmasi tim infra). Design: `design.md`. Dipindahkan dari `.claude/sdlc/gke-deploy/intent.md` (draft 2026-11-04).
 > Disesuaikan saat menulis design (2026-11-04): Req 7.4 dan D14 memakai uid/gid numerik yang sama (10001:10001) untuk pod Go `backend` dan Python, bukan `fsGroup`, karena `fsGroup` tidak mengubah kepemilikan file di volume NFS (Filestore). Req 9.8 memakai nilai `TRUSTED_PROXIES` Go untuk `RETRY_TRUSTED_PROXIES`, sesuai `.env.example` scheduler, karena request ke scheduler melewati load balancer dan Nginx yang sama.
 > Ditambahkan 2026-11-04 saat menyusun tasks: Req 5.8 (penyebaran pod per node/zona) dan Req 5.9 (perkiraan kebutuhan node). Tanpa 5.8, dua pod satu komponen bisa ditaruh di node yang sama, sehingga pod backup ikut mati bersama node itu.
-> Item rencana: X.14 di `.kiro/steering/development-plan.md`.
+> Item rencana: X.14 di `.claude/dev-plan/dev-plan.md`.
 
 ## Introduction
 
@@ -283,7 +283,7 @@ Sebagian besar image sudah siap untuk K8s. Yang belum siap adalah konfigurasi ya
 1. THE `.claude/docs/deployment.md` SHALL memuat Deploy_Runbook dan mengganti bagian yang menyebut Compute Engine VM, docker compose di VM, `cms-net`, `host.docker.internal`, Cloud Build, dan rencana split VM 2028 untuk produksi.
 2. THE `.claude/CLAUDE.md` Sec 9, 10, 12 ("Backend topology"), dan 14 SHALL menyatakan bahwa produksi berjalan di GKE, compose hanya untuk dev lokal, dan CI/CD adalah Jenkins.
 3. THE `.claude/docs/decisions.md` SHALL mencatat keputusan pindah ke GKE (tanggal, alasan, keputusan D1–D31 yang disetujui).
-4. THE steering `tech.md`, `structure.md`, `project-context.md`, dan `development-plan.md` SHALL diperbarui sesuai Req 14.2.
+4. THE steering `tech.md`, `structure.md`, `project-context.md`, dan `.claude/dev-plan/dev-plan.md` SHALL diperbarui sesuai Req 14.2.
 5. THE spec `.claude/sdlc/.done/ci-jenkins/spec.md` dan `.kiro/specs/backend-exq-deploy-readiness/` SHALL mendapat catatan di kepala dokumen tentang bagian yang digantikan spec ini, tanpa menulis ulang isinya.
 6. THE `backend_python/Dockerfile` SHALL memperbaiki komentar path mount `FTP_DATA` sesuai Req 7.2.
 
@@ -341,7 +341,7 @@ Saran Kiro untuk ke-31 open question di intent. Semua disetujui PO 2026-11-04 ("
 ## Dependency & Scope Note
 
 - **Butuh dari tim infra sebelum design selesai:** D1, D3, D5, D9, D11, D16, D19 (dan bagian infra dari D2, D4, D12, D13, D17, D18, D23, D24, D28, D31).
-- **`.kiro/specs/backend-exq-deploy-readiness/`** (committed `cf53038`, baris X.13 di development-plan masih menulis "belum di-commit"):
+- **`.kiro/specs/backend-exq-deploy-readiness/`** (committed `cf53038`, baris X.13 di dev-plan masih menulis "belum di-commit"):
   - Req 1–2 (`go-image`, `check-image.sh`): tetap berlaku. Non-root tetap penting di K8s; HEALTHCHECK hanya dipakai compose lokal karena K8s memakai probe (Req 5).
   - Req 3 dan 4 (`deployment.md` versi VM, checklist rilis `backend-exq` dengan `cms-net`, `docker network inspect`, port `8081:8081`, `docker ps`): berlaku sampai cutover (D28), lalu digantikan Deploy_Runbook (Req 14.1). Aturan yang tetap: migrasi `034`/`035` sebelum image baru, rilis bersama D15, rollback per image, `JWT_SECRET` dan `DSR_LATE_START_DATE` sama.
   - Req 5–6: tidak terdampak.

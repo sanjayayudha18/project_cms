@@ -6,7 +6,7 @@ Dokumentasi requirement, arsitektur, dan rencana pengembangan
 |---|---|
 | Sistem | CROWN, End-to-End Cash Management System ATM & CIT, CIMB Niaga |
 | Kondisi per | 23 Oktober 2026 (branch `dev1`) |
-| Sumber | URS v0.3 Phase 1, FSD v1.0, `.claude/docs/requirements.md`, `.claude/docs/arsitektur-teknologi.md`, `.kiro/steering/development-plan.md`, kode di repo |
+| Sumber | URS v0.3 Phase 1, FSD v1.0, `.claude/docs/requirements.md`, `.claude/docs/arsitektur-teknologi.md`, `.claude/dev-plan/dev-plan.md`, kode di repo |
 | Audiens | Manajemen, bisnis, dan tim teknis. Bagian 1 sampai 5 untuk semua audiens, bagian 6 sampai 7 untuk tim teknis, bagian 8 sampai 10 untuk semua audiens |
 
 ## Daftar isi
@@ -32,7 +32,7 @@ CROWN adalah sistem internal CIMB Niaga untuk mengelola uang tunai ATM dari ujun
 Pokok-pokok kondisi saat ini:
 
 - **Fondasi platform selesai.** Login dan sesi, maker-checker berjenjang, audit trail, notifikasi in-app dan email, read replica untuk laporan, serta ingest file yang idempoten.
-- **Master data selesai untuk MVP.** Data vendor, cabang vendor, vault, PIC, paket dan harga, ATM, kelolaan ATM, dan region. Setiap perubahan lewat approval.
+- **Master data selesai untuk scope saat ini** (CROWN bukan lagi MVP sejak 12 November 2026). Data vendor, cabang vendor, vault, PIC, paket dan harga, ATM, kelolaan ATM, dan region. Setiap perubahan lewat approval.
 - **Operasional ATM (Phase 2) sebagian besar sudah dibangun.** Order dari DMAA, penetapan vault oleh ACM, kirim order ke vendor, terima atau tolak oleh vendor, dan klasifikasi realisasi pengisian. Yang tersisa adalah laporan DSR telat dan pengecualian ATM bermasalah.
 - **Belum dimulai:** tagihan vendor, rekonsiliasi, integrasi escrow Corebanking, cash count, dan perhitungan EOD Final Realisasi.
 - **Langkah dekat:** verifikasi manual fitur Phase 2 di browser, merge `dev1` ke `main`, dan persetujuan PO untuk laporan DSR telat.
@@ -54,8 +54,8 @@ Pengelolaan uang tunai ATM melibatkan banyak pihak: tim forecasting, tim monitor
 
 ### Batasan yang sudah diputuskan
 
-- **CROWN tidak menghitung forecast.** Nominal order berasal dari file DMAA (`amount_replenish`) dan dianggap final (keputusan 8 Oktober 2026).
-- **CROWN tidak mengeksekusi pembayaran.** Tagihan vendor hanya divalidasi dan di-approve, lalu diserahkan ke proses berikutnya.
+- **CROWN menyesuaikan nominal DMAA dengan DSR** (keputusan 12 November 2026, menggantikan keputusan 8 Oktober). Forecast tetap dari file DMAA, lalu CROWN menghitung `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)`, memproses data complain/project dan penyesuaian manual, dan membentuk order replenish final. Belum dibangun.
+- **CROWN menghitung tagihan trip vendor, tapi tidak mengeksekusi pembayaran** (keputusan 12 November 2026, FSD §6). Vendor memeriksa dan bisa mengajukan banding, lalu tagihan di-approve dan diunduh VOC. Pembayaran lewat SMART di luar CROWN.
 - **Rekonsiliasi cash count dilakukan di Rec 7.** CROWN hanya menyiapkan rekap dan memantau task-nya.
 - **Pindah buku dilakukan manual di BDS.** CROWN hanya mencatat referensinya.
 
@@ -83,7 +83,7 @@ Pengelolaan uang tunai ATM melibatkan banyak pihak: tim forecasting, tim monitor
 | Klasifikasi realisasi | Dihitung dalam hari kerja (memperhitungkan hari libur): sesuai jadwal, maju 1-2 hari, mundur 1-2 hari, tidak dilakukan (lebih dari 2 hari atau tidak diisi), dan pengisian tanpa order. |
 | Master data | Perubahan lewat maker-checker dan audit trail. Import/export massal dengan validasi struktur dan isi. |
 | Cash count vault | Kategori vault High/Medium/Low dari rata-rata saldo escrow 6 bulan. Kunjungan onsite per 6 bulan: High 3 kali, Medium 2 kali, Low 1 kali. Kategori hanya boleh naik. |
-| Tagihan vendor | Vendor upload invoice dan dokumen pendukung. Sistem melakukan rekonsiliasi otomatis, tim internal bisa menyesuaikan saat ada sanggahan. Tanpa eksekusi pembayaran. |
+| Tagihan vendor (invoicing trip) | CROWN menghitung tagihan trip per vendor per bulan: skema harga, jumlah trip per ATM vs minimum paket, prorata, penalti. Vendor memeriksa dan bisa banding, lalu approval. Tanpa eksekusi pembayaran. |
 
 ### 3.3 Laporan yang dibutuhkan
 
@@ -350,7 +350,7 @@ Nomor fase tidak sama dengan urutan pengerjaan. Phase 1 dan Phase 0 dikerjakan s
 | 0 Fondasi | Read replica, `import_jobs` + idempotensi, notifikasi. Penyimpanan dokumen dan export XLSX/PDF ditunda | – | ✅ (0.4, 0.5 ⏸) |
 | 1 Tuntaskan | Region, drill-down cabang vendor, verifikasi ulang DSR, seed data dev | – | ✅ |
 | 2 Operasional ATM | Order DMAA, penetapan vault, kirim ke vendor, realisasi, akun vendor per peran, laporan DSR telat, ATM bermasalah | 0, 1 | 🟡 |
-| 3 Finance | Validasi dan approval tagihan vendor (tanpa pembayaran), rekonsiliasi tagihan | 2, penyimpanan dokumen | ⏳ |
+| 3 Finance | Perhitungan tagihan trip vendor + banding + approval (tanpa pembayaran), rekonsiliasi tagihan | 2, penyimpanan dokumen | ⏳ |
 | 4 Integrasi | Ingest batch escrow dari Corebanking | 0.2, 3 | ⏳ |
 | 5 Cash count | Penjadwalan, berita acara digital, rekap untuk Rec 7 | 0.3, 0.4, 4 | ⏳ |
 | 6 CIT lanjutan | Jurnal, DSR CIT, rekonsiliasi CIT | 2 stabil | ⏳ |
@@ -425,7 +425,7 @@ flowchart TD
 | `dev1` jauh di depan `main` | Risiko konflik dan review besar | Merge setelah verifikasi manual Phase 2 |
 | Frontend belum masuk CI | Lint, test, dan build frontend hanya dijalankan lokal | Ditambahkan bersama perpindahan CI |
 | Beberapa layar masih data contoh | Belum bisa dipakai operasional | Disambungkan oleh fase pemiliknya |
-| Seed harga paket vendor belum lengkap | Sebagian harga khusus belum ada | Gap yang diterima untuk MVP |
+| Seed harga paket vendor belum lengkap | Sebagian harga khusus belum ada | Gap yang diterima |
 | Image `backend-exq` belum di-hardening | Belum relevan karena belum di-deploy | Diperbaiki sebelum deploy |
 
 ### 10.2 Keputusan yang menunggu bisnis atau PO

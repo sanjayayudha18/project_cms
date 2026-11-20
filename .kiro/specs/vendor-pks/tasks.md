@@ -266,7 +266,7 @@ Pola yang dirujuk:
 
 - [x] 13. Dokumentasi
   - `.claude/CLAUDE.md` Sec 3: ganti baris "Approved 2026-10-05 ... `vendors.director_*`/`pks_*`" dengan `vendor_pks` + `vendor_pics.is_director` (mig `022`, constraint roles di `037`) dan kind `vendor_pks` (mig `037`); env `VENDOR_PKS_RENEWAL_MONTHS`.
-  - `.claude/docs/data-map.md`, `.kiro/steering/development-plan.md` (status, migrasi terpakai, next free `038`), `.claude/development-progress.md`, `.claude/sdlc/README.md`, `.claude/docs/deployment.md` (env baru di kedua backend + cek change `vendor_pic` pending sebelum migrasi).
+  - `.claude/docs/data-map.md`, `.claude/dev-plan/dev-plan.md` (status, migrasi terpakai, next free `038`), `.claude/development-progress.md`, `.claude/sdlc/README.md`, `.claude/docs/deployment.md` (env baru di kedua backend + cek change `vendor_pic` pending sebelum migrasi).
   - _Requirements: 12.5_
   - _Model: Haiku, Low — edit dokumen sesuai hasil yang sudah ada._
 

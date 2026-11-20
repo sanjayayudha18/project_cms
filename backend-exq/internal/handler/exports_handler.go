@@ -69,6 +69,7 @@ var masterRoutes = []struct {
 	{"/vendors/{vendorID}/branches/{branchID}/{entity}", exportjob.KindCabang, parseBranch},
 	{"/vendors/{vendorID}/package-prices", exportjob.KindHargaPaket, parsePrices},
 	{"/master-data/{entity}", exportjob.KindMasterDataGlobal, parseGlobal},
+	{"/cash-count-pics", exportjob.KindCashCountPics, parseCashCountPics},
 }
 
 // Routes returns every route except the file download (main mounts Download
@@ -185,6 +186,10 @@ func parsePrices(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool
 
 func parseGlobal(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
 	return parseMaster(w, r, exportjob.KindMasterDataGlobal, chi.URLParam(r, "entity"), nil, nil, "")
+}
+
+func parseCashCountPics(w http.ResponseWriter, r *http.Request) (exportjob.Params, bool) {
+	return parseMaster(w, r, exportjob.KindCashCountPics, csvexport.CashCountPICs, nil, nil, "")
 }
 
 // parseMaster validates kind/entity/ids/status/price level; on error it writes the response.

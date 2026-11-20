@@ -456,7 +456,7 @@ func TestVendorAdminService_List_PassesThroughToRepo(t *testing.T) {
 		return want, nil
 	}}
 
-	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).List(context.Background(), db.ListVendorsAdminParams{Status: "active"})
+	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).List(context.Background(), "ADMIN", db.ListVendorsAdminParams{Status: "active"})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestVendorAdminService_List_PassesThroughToRepo(t *testing.T) {
 func TestVendorAdminService_Count_PassesThroughToRepo(t *testing.T) {
 	repo := &fakeVendorAdminRepo{countFunc: func(ctx context.Context, arg db.CountVendorsAdminParams) (int64, error) { return 42, nil }}
 
-	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).Count(context.Background(), db.CountVendorsAdminParams{Status: "all"})
+	got, err := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{}).Count(context.Background(), "ATM-SPV", db.CountVendorsAdminParams{Status: "all"})
 	if err != nil {
 		t.Fatalf("Count: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestVendorAdminService_Get_PassesThroughToRepo(t *testing.T) {
 	repo := vendorRepoWith(func(id int64) *db.GetVendorAdminByIDRow { return activeVendor(id, "ACM") })
 	svc := NewVendorAdminService(repo, &fakeVendorBranchSubmitter{})
 
-	got, err := svc.Get(context.Background(), 1)
+	got, err := svc.Get(context.Background(), "ADMIN_PARAM", 1)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -490,11 +490,33 @@ func TestVendorAdminService_Get_PassesThroughToRepo(t *testing.T) {
 	}
 
 	repo.getByIDFunc = func(ctx context.Context, id int64) (*db.GetVendorAdminByIDRow, error) { return nil, nil }
-	got, err = svc.Get(context.Background(), 999)
+	got, err = svc.Get(context.Background(), "ADMIN", 999)
 	if err != nil {
 		t.Fatalf("Get(missing): %v", err)
 	}
 	if got != nil {
 		t.Errorf("Get(missing) = %+v, want nil", got)
+	}
+}
+
+// Read methods accept ADMIN/ADMIN_PARAM/ATM-SPV only (vendor-pks-list Req 9.2).
+func TestVendorAdminService_Read_RBAC(t *testing.T) {
+	svc := NewVendorAdminService(&fakeVendorAdminRepo{}, &fakeVendorBranchSubmitter{})
+	for _, role := range []string{"VENDOR-USER", "ATM-USER", "BRANCH-ATM-SPV", ""} {
+		t.Run(role, func(t *testing.T) {
+			ctx := context.Background()
+			if _, err := svc.List(ctx, role, db.ListVendorsAdminParams{}); !errors.Is(err, ErrVendorReadForbidden) {
+				t.Errorf("List err = %v, want ErrVendorReadForbidden", err)
+			}
+			if _, err := svc.Count(ctx, role, db.CountVendorsAdminParams{}); !errors.Is(err, ErrVendorReadForbidden) {
+				t.Errorf("Count err = %v, want ErrVendorReadForbidden", err)
+			}
+			if _, err := svc.Get(ctx, role, 1); !errors.Is(err, ErrVendorReadForbidden) {
+				t.Errorf("Get err = %v, want ErrVendorReadForbidden", err)
+			}
+			if _, _, err := svc.GetKindAndDirector(ctx, role, 1); !errors.Is(err, ErrVendorReadForbidden) {
+				t.Errorf("GetKindAndDirector err = %v, want ErrVendorReadForbidden", err)
+			}
+		})
 	}
 }

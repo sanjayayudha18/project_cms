@@ -4,7 +4,7 @@ Sumber: URS v0.3 Phase 1 · To-be "ATM Cash Forecasting Harian" · FNC 001
 Modul: `backend_python/dmaa/dmaa_etl.py` (ingest DMAA), vendor request / `internal/replenishment`, `internal/dsr`, `internal/approval`, `internal/notification`
 
 ## Order amount (diputuskan 2026-10-08)
-- **CROWN tidak menghitung forecast.** Angka order = `amount_replenish` dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), **sudah final**.
+- **Diubah 2026-11-12 (user):** forecast tetap dari file DMAA (`Order_All_*.xlsx` → `dmaa_etl.py` → `dmaa_atm_forecast`), tapi angkanya **tidak lagi final**. CROWN menyesuaikan dengan DSR vendor per FSD §3 langkah 8 lalu membentuk order replenish final. Diagram di bawah masih menggambarkan alur lama (belum dibangun ulang).
 - Rumus FSD `Forecast Amount − Saldo DSR + Forecast Refund` (2026-10-01) **tidak dipakai** di CROWN.
 - Refund: dikirim DMAA nanti; sampai itu `amount_refund = 0`.
 - Exclude ATM bermasalah + list input FSD (complaint/project/problem/adjustment) tetap tugas CROWN (Phase 2.4, belum dibangun).

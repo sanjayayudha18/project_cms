@@ -31,7 +31,8 @@ func TestIntegration_VendorWideAssignment(t *testing.T) {
 	if err := tx.QueryRow(ctx, `INSERT INTO vendors (code, name) VALUES ('ITEST-VW1', 'Vendor Wide Test') RETURNING id`).Scan(&vendorID); err != nil {
 		t.Fatalf("insert vendor: %v", err)
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region) VALUES ($1, 'ITEST-VW1', 'Cabang VW', 'Region VW') RETURNING id`, vendorID).Scan(&branchID); err != nil {
+	seedTestRegion(t, tx, "ITVW1", "Region VW")
+	if err := tx.QueryRow(ctx, `INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code) VALUES ($1, 'ITEST-VW1', 'Cabang VW', 'ITVW1') RETURNING id`, vendorID).Scan(&branchID); err != nil {
 		t.Fatalf("insert branch: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `

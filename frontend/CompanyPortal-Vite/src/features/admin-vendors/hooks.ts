@@ -43,15 +43,7 @@ import {
   updateVendorPic,
   updateVendorVault,
 } from "./api";
-import {
-  type SubmitVendorPksPayload,
-  type VendorPksDetail,
-  type VendorPksReasonPayload,
-  getVendorPks,
-  submitVendorPks,
-  terminateVendorPks,
-  unterminateVendorPks,
-} from "./pksApi";
+import { type PksType, listPksTypes } from "./pksApi";
 import type {
   AdminVendor,
   AdminVendorBranch,
@@ -89,6 +81,18 @@ export const adminVendorKeys = {
   list: (params: AdminVendorsListParams) => [...adminVendorKeys.all, "list", params] as const,
   detail: (id: number) => [...adminVendorKeys.all, "detail", id] as const,
 };
+
+export const pksTypeKeys = {
+  all: ["pks-types"] as const,
+  list: () => [...pksTypeKeys.all, "list"] as const,
+};
+
+export function usePksTypesList() {
+  return useQuery<PksType[], ApiError>({
+    queryKey: pksTypeKeys.list(),
+    queryFn: listPksTypes,
+  });
+}
 
 export function useVendorsList(params: AdminVendorsListParams) {
   return useQuery<AdminVendorsListResponse, ApiError>({
@@ -145,51 +149,6 @@ export function useEnableVendor() {
   const invalidate = useInvalidateList();
   return useMutation<ChangeRequestAccepted, ApiError, number>({
     mutationFn: enableVendor,
-    onSuccess: invalidate,
-  });
-}
-
-// ─── PKS: key sits under adminVendorKeys.all, so useInvalidateList also refreshes it ─
-
-export const vendorPksKey = (vendorId: number) =>
-  [...adminVendorKeys.all, "pks", vendorId] as const;
-
-export function useVendorPks(vendorId: number | null) {
-  return useQuery<VendorPksDetail, ApiError>({
-    queryKey: vendorPksKey(vendorId ?? 0),
-    queryFn: () => getVendorPks(vendorId as number),
-    enabled: vendorId !== null,
-  });
-}
-
-export function useSubmitVendorPks(vendorId: number) {
-  const invalidate = useInvalidateList();
-  return useMutation<ChangeRequestAccepted, ApiError, SubmitVendorPksPayload>({
-    mutationFn: (payload) => submitVendorPks(vendorId, payload),
-    onSuccess: invalidate,
-  });
-}
-
-export function useTerminateVendorPks(vendorId: number) {
-  const invalidate = useInvalidateList();
-  return useMutation<
-    ChangeRequestAccepted,
-    ApiError,
-    { pksId: number; payload: VendorPksReasonPayload }
-  >({
-    mutationFn: ({ pksId, payload }) => terminateVendorPks(vendorId, pksId, payload),
-    onSuccess: invalidate,
-  });
-}
-
-export function useUnterminateVendorPks(vendorId: number) {
-  const invalidate = useInvalidateList();
-  return useMutation<
-    ChangeRequestAccepted,
-    ApiError,
-    { pksId: number; payload: VendorPksReasonPayload }
-  >({
-    mutationFn: ({ pksId, payload }) => unterminateVendorPks(vendorId, pksId, payload),
     onSuccess: invalidate,
   });
 }

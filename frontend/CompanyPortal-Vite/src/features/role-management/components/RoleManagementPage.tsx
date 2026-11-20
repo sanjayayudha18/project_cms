@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -60,6 +61,7 @@ export function RoleManagementPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <BackLink to="/settings" label="Kembali ke Pengaturan" />
       <PageHeader
         eyebrow="Pengaturan"
         title="Manajemen Peran"

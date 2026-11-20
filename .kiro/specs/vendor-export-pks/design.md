@@ -318,7 +318,7 @@ Kolom CSV baru (urutan tetap, setelah `is_active`):
 | `frontend/CompanyPortal-Vite/src/features/exports/datasets.ts`, `components/PreviewTable.tsx` (+ test) | kolom angka, deskripsi, badge status |
 | `frontend/CompanyPortal-Vite/src/features/admin-vendors/index.ts`, `components/PksStatusBadge.tsx` (+ test) | ekspor badge, `pksStatusFromLabel` |
 | `frontend/CompanyPortal-Vite/src/features/master-data-io/components/ImportWizard.tsx` (+ test) | catatan vendor |
-| `.claude/docs/` / `development-plan.md` / `.claude/development-progress.md` | entri X.16 dan status saat selesai |
+| `.claude/docs/` / `.claude/dev-plan/dev-plan.md` / `.claude/development-progress.md` | entri X.16 dan status saat selesai |
 
 ## Deploy
 

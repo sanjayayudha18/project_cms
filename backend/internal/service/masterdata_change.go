@@ -30,11 +30,46 @@ var masterDataMakerRoles = map[string]bool{
 	"ADMIN_PARAM": true,
 }
 
+// entityMakerRoles overrides masterDataMakerRoles per entity type (ScDD 5.1
+// AC-5.1-14): cash count parameters are staged by the cash count roles only,
+// not by ADMIN/ADMIN_PARAM. Checker stays the existing approval chain.
+var entityMakerRoles = map[string]map[string]bool{
+	"cash_count_category_params":  {"CC-CWM": true},
+	"cash_count_area":             {"CC-CWM": true},
+	"cash_count_pic":              {"CC-CWM": true},
+	"cash_count_anomaly_category": {"CC-CCR": true},
+	"cash_count_checklist_item":   {"CC-CCR": true},
+}
+
+// cashCountEntityPrefix marks entity types that must be listed in
+// entityMakerRoles: an unlisted cash_count_* type is denied, never silently
+// given the ADMIN/ADMIN_PARAM default.
+const cashCountEntityPrefix = "cash_count_"
+
+// makerRolesFor returns the roles allowed to stage a change of entityType;
+// nil means nobody may.
+func makerRolesFor(entityType string) map[string]bool {
+	if roles, ok := entityMakerRoles[entityType]; ok {
+		return roles
+	}
+	if strings.HasPrefix(entityType, cashCountEntityPrefix) {
+		return nil
+	}
+	return masterDataMakerRoles
+}
+
 // authorizeMasterDataMaker reports whether ctx carries an authenticated
-// caller who is makerID and holds a master-data maker role.
+// caller who is makerID and holds a master-data maker role (ADMIN/ADMIN_PARAM).
+// Use authorizeMasterDataMakerFor when the entity type is known.
 func authorizeMasterDataMaker(ctx context.Context, makerID int64) error {
+	return authorizeMasterDataMakerFor(ctx, makerID, "")
+}
+
+// authorizeMasterDataMakerFor reports whether ctx carries an authenticated
+// caller who is makerID and holds a maker role for entityType.
+func authorizeMasterDataMakerFor(ctx context.Context, makerID int64, entityType string) error {
 	authCtx, ok := middleware.GetAuthContext(ctx)
-	if !ok || authCtx == nil || authCtx.UserID != makerID || !masterDataMakerRoles[strings.ToUpper(strings.TrimSpace(authCtx.Role))] {
+	if !ok || authCtx == nil || authCtx.UserID != makerID || !makerRolesFor(entityType)[strings.ToUpper(strings.TrimSpace(authCtx.Role))] {
 		return ErrMasterDataForbidden
 	}
 	return nil
@@ -116,7 +151,7 @@ type SubmitRequest struct {
 // actual entity mutation happens only after approval (T2.4). Amount is
 // always zero -- master-data changes carry no monetary value, see T1.7.
 func (s *MasterDataChangeService) Submit(ctx context.Context, makerID int64, req SubmitRequest, actorIP string) (db.MasterDataChangeRequest, error) {
-	if err := authorizeMasterDataMaker(ctx, makerID); err != nil {
+	if err := authorizeMasterDataMakerFor(ctx, makerID, req.EntityType); err != nil {
 		return db.MasterDataChangeRequest{}, err
 	}
 	if err := validateMasterDataOp(req.Op, req.EntityID); err != nil {

@@ -143,7 +143,7 @@ Dependensi lintas grup: Sonnet 2.2, 2.3, dan 4 butuh Opus 2.1 selesai. Opus 2.1 
   - _Model: Sonnet, Medium — gate; butuh penilaian untuk triase kegagalan._
 
 - [x] 7. Dokumentasi
-  - `development-plan.md` X.16: status built + commit; `.claude/development-progress.md`: entri fitur.
+  - `.claude/dev-plan/dev-plan.md` X.16: status built + commit; `.claude/development-progress.md`: entri fitur.
   - `.claude/docs/deployment.md`: urutan deploy `backend` sebelum/bersamaan `backend-exq` untuk rilis ini.
   - Tidak ada perubahan schema, jadi CLAUDE.md Sec 3 tidak berubah.
   - `graphify update .`; bila `graphify-human/features.toml` memetakan ekspor/impor master data, tambahkan file baru `vendor_export_pks.sql` lalu jalankan `py graphify-human/generate.py`.

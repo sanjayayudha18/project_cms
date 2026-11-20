@@ -56,7 +56,7 @@ CROWN mengelola uang tunai ATM dari order pengisian sampai pengecekan realisasi:
 Batasan yang sudah diputuskan:
 
 - **Tidak ada forecast di CROWN.** Nominal order adalah `amount_replenish` dari file DMAA dan tidak dihitung ulang.
-- **Tidak ada eksekusi pembayaran.** Tagihan vendor hanya divalidasi dan di-approve.
+- **Tidak ada eksekusi pembayaran.** CROWN menghitung tagihan trip vendor (FSD §6, keputusan 12 November 2026), vendor bisa banding, lalu di-approve. Pembayaran lewat SMART di luar CROWN.
 - **Pindah buku dilakukan manual di BDS.**
 - **Rekonsiliasi cash count dijalankan di Rec 7.** CROWN hanya menyiapkan rekapnya.
 

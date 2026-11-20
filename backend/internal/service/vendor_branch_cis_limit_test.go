@@ -15,7 +15,8 @@ func showStr(s *string) string {
 	return *s
 }
 
-// vendor-cis-limit FR1.2: Limit CIS optional, > 0, at most 2 decimals, fits numeric(20,2).
+// R1.5 (moved from vendor_branches to vendor_vaults in migration 040):
+// Limit CIS optional, > 0, at most 2 decimals, fits numeric(20,2).
 func TestNormalizeCisLimit(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -60,34 +61,51 @@ func TestNormalizeCisLimit(t *testing.T) {
 	}
 }
 
-func TestVendorBranchAdminService_Create_CisLimitNormalized(t *testing.T) {
+func TestVendorVaultAdminService_Create_CisLimitNormalized(t *testing.T) {
+	owner := int64(3)
 	sub := &fakeVendorBranchSubmitter{}
-	svc := NewVendorBranchAdminService(&fakeVendorBranchAdminRepo{}, sub, &fakeVendorBranchChildCounter{})
+	svc := NewVendorVaultAdminService(&fakeVendorVaultAdminRepo{branchVendorID: &owner}, sub)
 
-	if _, err := svc.Create(context.Background(), 7, VendorBranchPayload{
-		VendorID: 3, BranchCode: "BR1", BranchName: "Branch One", Category: "ATM", CisLimitAmount: sp(" 2500000000 "),
+	if _, err := svc.Create(context.Background(), 7, 3, VendorVaultPayload{
+		VendorBranchID: 9,
+		VaultCode:      "V1",
+		VendorVaultUpdatePayload: VendorVaultUpdatePayload{
+			Category:       "ATM",
+			CurrencyCode:   "IDR",
+			CisLimitAmount: sp(" 2500000000 "),
+		},
 	}, "127.0.0.1"); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	p := sub.lastRequest.Payload.(VendorBranchPayload)
+	p := sub.lastRequest.Payload.(VendorVaultPayload)
 	if p.CisLimitAmount == nil || *p.CisLimitAmount != "2500000000" {
 		t.Errorf("payload limit = %v, want 2500000000", showStr(p.CisLimitAmount))
 	}
 }
 
-func TestVendorBranchAdminService_CisLimitInvalid_Rejected(t *testing.T) {
-	repo := &fakeVendorBranchAdminRepo{getByIDFunc: func(context.Context, int64) (*db.GetVendorBranchAdminByIDRow, error) {
-		return &db.GetVendorBranchAdminByIDRow{ID: 1}, nil
-	}}
+func TestVendorVaultAdminService_CisLimitInvalid_Rejected(t *testing.T) {
+	owner := int64(3)
+	repo := &fakeVendorVaultAdminRepo{
+		branchVendorID: &owner,
+		getByID:        &db.GetVendorVaultAdminByIDRow{ID: 1, VendorBranchID: 9},
+	}
 	sub := &fakeVendorBranchSubmitter{}
-	svc := NewVendorBranchAdminService(repo, sub, &fakeVendorBranchChildCounter{})
+	svc := NewVendorVaultAdminService(repo, sub)
 	ctx := context.Background()
 
-	_, createErr := svc.Create(ctx, 7, VendorBranchPayload{
-		VendorID: 3, BranchCode: "BR1", BranchName: "B", Category: "ATM", CisLimitAmount: sp("0"),
+	_, createErr := svc.Create(ctx, 7, 3, VendorVaultPayload{
+		VendorBranchID: 9,
+		VaultCode:      "V1",
+		VendorVaultUpdatePayload: VendorVaultUpdatePayload{
+			Category:       "ATM",
+			CurrencyCode:   "IDR",
+			CisLimitAmount: sp("0"),
+		},
 	}, "127.0.0.1")
-	_, updateErr := svc.Update(ctx, 7, 1, VendorBranchUpdatePayload{
-		BranchName: "B", Category: "ATM", CisLimitAmount: sp("12.345"),
+	_, updateErr := svc.Update(ctx, 7, 1, VendorVaultUpdatePayload{
+		Category:       "ATM",
+		CurrencyCode:   "IDR",
+		CisLimitAmount: sp("12.345"),
 	}, "127.0.0.1")
 	for name, err := range map[string]error{"create": createErr, "update": updateErr} {
 		var ve *ValidationError

@@ -83,7 +83,7 @@ Tidak dikerjakan di fitur ini. Di 2.1: `backend/internal/importjob` (Register/St
 ### Fase 7 — Dokumentasi
 - [x] **T7.1** CLAUDE.md Sec 3: Core tables: `import_jobs` (kolom ringkas) + `late_detections`/`scan_runs`/`retry_audit_logs`; catat `retry_file_tracking` digantikan; helper saat ini hanya Python (`lib/import_jobs.py`), `internal/importjob` menyusul di 2.1.
 - [x] **T7.2** CLAUDE.md Sec 12: keputusan S7 (satukan), S4 (deviasi audit sistem), C3 (cek SLA baca tabel lama), R4 (helper Go ditunda).
-- [x] **T7.3** `.claude/development-progress.md`, `.claude/sdlc/README.md`, `.kiro/steering/development-plan.md` (0.2 → done); `graphify update .`.
+- [x] **T7.3** `.claude/development-progress.md`, `.claude/sdlc/README.md`, `.claude/dev-plan/dev-plan.md` (0.2 → done); `graphify update .`.
 - [x] **T7.4** Syarat deploy R2: VM/container yang menjalankan ETL Python + retry scheduler memakai TZ `Asia/Jakarta` — catat di `.claude/docs/deployment.md` dan `backend_python/*/.env.example` (komentar `TZ=Asia/Jakarta`).
 
 ### Fase 8 — Verifikasi (→ `tests.md`)

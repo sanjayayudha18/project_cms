@@ -8,7 +8,7 @@ const LABELS: Array<[PksStatus, string]> = [
   ["need_renewal", "Need Renewal"],
   ["expired", "Expired"],
   ["terminated", "Terminated"],
-  ["belum_diisi", "Belum diisi"],
+  ["belum_diisi", "Tidak ada"],
 ];
 
 describe("PksStatusBadge", () => {

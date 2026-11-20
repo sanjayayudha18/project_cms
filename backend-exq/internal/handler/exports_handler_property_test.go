@@ -40,7 +40,7 @@ var propRoutes = []propRoute{
 		func(v, b, e string) string { return "/vendors/" + v + "/branches/" + b + "/" + e }},
 	{"prices", exportjob.KindHargaPaket, []string{"package-prices"}, true, false,
 		func(v, _, _ string) string { return "/vendors/" + v + "/package-prices" }},
-	{"global", exportjob.KindMasterDataGlobal, csvexport.ImportableNames(), false, false,
+	{"global", exportjob.KindMasterDataGlobal, slices.DeleteFunc(csvexport.ImportableNames(), func(n string) bool { return n == csvexport.CashCountPICs }), false, false,
 		func(_, _, e string) string { return "/master-data/" + e }},
 }
 

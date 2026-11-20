@@ -403,4 +403,4 @@ Mengikuti strategi X.7: fuzz stdlib untuk fungsi murni, generator ber-seed untuk
 | backend-exq | `sqlc.yaml`, `internal/repository/*` (generate), `internal/exportjob/{kinds,report_params,report_producer}.go`, `internal/handler/exports_handler.go` (route laporan), `api/openapi.yaml`, `cmd/api/main.go`, `.env.example` |
 | backend_python | `.env.example` (komentar `RETRY_DSR_LATE_START_DATE`) |
 | Frontend | `src/features/exports/{api,hooks,status}.ts`, `components/{ExportProgressDialog,MyExportsPage}.tsx`, `src/routes/exports.tsx`, `src/features/dsr-late-report/**`, `src/features/replenishment/**`, `src/lib/api/{schema,exq-schema}.d.ts` |
-| Dokumen | `.claude/CLAUDE.md` Sec 3, `data-map.md`, `rbac-role-feature-matrix.md` (route `/api/v1/exports/reports/*`, `/exports`), `development-plan.md` X.8, `development-progress.md` |
+| Dokumen | `.claude/CLAUDE.md` Sec 3, `data-map.md`, `rbac-role-feature-matrix.md` (route `/api/v1/exports/reports/*`, `/exports`), `.claude/dev-plan/dev-plan.md` X.8, `development-progress.md` |

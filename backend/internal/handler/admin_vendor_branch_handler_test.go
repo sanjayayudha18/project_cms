@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
@@ -148,15 +147,12 @@ func TestAdminVendorBranchHandler_Get_NotFound(t *testing.T) {
 	}
 }
 
-// vendor-cis-limit FR1: limit is read as a decimal string + currency, and passed through on create/update.
-func TestAdminVendorBranchHandler_CisLimit_GetAndSubmit(t *testing.T) {
-	var limit pgtype.Numeric
-	if err := limit.Scan("2500000000.00"); err != nil {
-		t.Fatal(err)
-	}
+// R2.1 & R2.2 (migration 040): cis_limit_amount moved from vendor_branches to vendor_vaults,
+// so branch GET/List responses omit cis_limit_amount and cis_limit_currency.
+func TestAdminVendorBranchHandler_OmitsCisLimit(t *testing.T) {
 	svc := &fakeVendorBranchAdminServicer{
-		getResult:    &db.GetVendorBranchAdminByIDRow{ID: 9, VendorID: 3, CisLimitAmount: limit, CisLimitCurrency: "IDR"},
-		listResult:   []db.ListVendorBranchesAdminRow{{ID: 9, VendorID: 3, CisLimitAmount: limit, CisLimitCurrency: "IDR"}},
+		getResult:    &db.GetVendorBranchAdminByIDRow{ID: 9, VendorID: 3, BranchCode: "BR9", BranchName: "Branch Nine", Category: "ATM", IsActive: true},
+		listResult:   []db.ListVendorBranchesAdminRow{{ID: 9, VendorID: 3, BranchCode: "BR9", BranchName: "Branch Nine", Category: "ATM", IsActive: true}},
 		createResult: db.MasterDataChangeRequest{ID: 1, Status: "pending"},
 		updateResult: db.MasterDataChangeRequest{ID: 2, Status: "pending"},
 	}
@@ -165,21 +161,21 @@ func TestAdminVendorBranchHandler_CisLimit_GetAndSubmit(t *testing.T) {
 
 	for _, path := range []string{"/api/v1/admin/vendors/3/branches/9", "/api/v1/admin/vendors/3/branches"} {
 		rec := doRequest(router, http.MethodGet, path, token, "")
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cis_limit_amount":"2500000000.00"`) ||
-			!strings.Contains(rec.Body.String(), `"cis_limit_currency":"IDR"`) {
-			t.Errorf("GET %s: %d %s", path, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"cis_limit_amount"`) ||
+			strings.Contains(rec.Body.String(), `"cis_limit_currency"`) {
+			t.Errorf("GET %s should not contain cis_limit_*: %d %s", path, rec.Code, rec.Body.String())
 		}
 	}
 
 	rec := doRequest(router, http.MethodPost, "/api/v1/admin/vendors/3/branches", token,
-		`{"branch_code":"BR1","branch_name":"B","category":"ATM","cis_limit_amount":"1000"}`)
-	if rec.Code != http.StatusAccepted || svc.lastCreate.CisLimitAmount == nil || *svc.lastCreate.CisLimitAmount != "1000" {
-		t.Errorf("create: %d, limit %v", rec.Code, svc.lastCreate.CisLimitAmount)
+		`{"branch_code":"BR1","branch_name":"B","category":"ATM"}`)
+	if rec.Code != http.StatusAccepted || svc.lastCreate.BranchCode != "BR1" {
+		t.Errorf("create: %d, branch_code %q", rec.Code, svc.lastCreate.BranchCode)
 	}
 	rec = doRequest(router, http.MethodPut, "/api/v1/admin/vendors/3/branches/9", token,
-		`{"branch_name":"B","category":"ATM","cis_limit_amount":"750.50"}`)
-	if rec.Code != http.StatusAccepted || svc.lastUpdate.CisLimitAmount == nil || *svc.lastUpdate.CisLimitAmount != "750.50" {
-		t.Errorf("update: %d, limit %v", rec.Code, svc.lastUpdate.CisLimitAmount)
+		`{"branch_name":"B","category":"ATM"}`)
+	if rec.Code != http.StatusAccepted || svc.lastUpdate.BranchName != "B" {
+		t.Errorf("update: %d, branch_name %q", rec.Code, svc.lastUpdate.BranchName)
 	}
 }
 

@@ -96,6 +96,12 @@ describe("Property 6: one filter mapping for preview and export", () => {
                 ? { kind: "master_data_global", entity: "vendor-branches" }
                 : { kind: "vendor", vendorId, entity: "branches" };
             break;
+          case "vendor-pks":
+            want =
+              vendorId === undefined
+                ? { kind: "master_data_global", entity: "vendor-pks" }
+                : { kind: "vendor", vendorId, entity: "vendor-pks" };
+            break;
           case "vendor-vaults":
           case "vendor-pics": {
             const entity = id === "vendor-vaults" ? "vaults" : "pics";
@@ -230,6 +236,7 @@ describe("Property 8: catalog follows export roles", () => {
     "package-prices": ["ADMIN", "ADMIN_PARAM"],
     atms: ["ADMIN", "ADMIN_PARAM"],
     "atm-assignments": ["ADMIN", "ADMIN_PARAM"],
+    "vendor-pks": ["ADMIN", "ADMIN_PARAM"],
     "dsr-late-report": ["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"],
     replenishment: ["ADMIN", "ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
   };

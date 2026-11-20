@@ -48,7 +48,7 @@ Desain layar dari user (2026-11-05): `.document/master_data/desain-dari-user_ven
 - Tabel `documents` ada di peta tabel, tapi modul dokumen (Phase 0.4) ditunda ke Phase 3/5.
 - `backend/api/openapi.yaml` belum memuat `/admin/vendors`.
 - Layar: `frontend/CompanyPortal-Vite/src/features/admin-vendors/`.
-- Migrasi terakhir `036_master_data_import_batches_file_name.sql`. Nomor **`022`** belum terpakai dan dicadangkan untuk fitur ini (`development-plan.md`).
+- Migrasi terakhir `036_master_data_import_batches_file_name.sql`. Nomor **`022`** belum terpakai dan dicadangkan untuk fitur ini (`.claude/dev-plan/dev-plan.md`).
 
 ### Ruang lingkup
 
@@ -275,7 +275,7 @@ Desain layar dari user (2026-11-05): `.document/master_data/desain-dari-user_ven
 2. THE existing vendor and PIC endpoints, the vendor and PIC CSV round-trip, the notification recipient queries, and the vendor export kinds SHALL keep their current behavior apart from the added fields; existing tests SHALL stay green.
 3. THE new VendorPksAPI endpoints SHALL be described in `backend/api/openapi.yaml`, and CompanyPortal SHALL use the generated types for them; the existing `/admin/vendors` endpoints stay hand-typed (D31).
 4. THE test suite SHALL cover the PksStatusRule boundaries (expiry day, threshold day, month-end clamp, leap year), maker-checker gates (pending 409, stale, maker ≠ checker), RBAC denials, the one-Active_PKS guarantee under concurrent approvals, and filter = displayed status, and the existing coverage gates SHALL still pass.
-5. THE migration and the new PKS entity SHALL be recorded in `.claude/CLAUDE.md` Sec 3 and `development-plan.md` when applied.
+5. THE migration and the new PKS entity SHALL be recorded in `.claude/CLAUDE.md` Sec 3 and `.claude/dev-plan/dev-plan.md` when applied.
 
 ## Open Questions
 
@@ -347,5 +347,5 @@ Semua saran D20–D31 disetujui PO 2026-11-05. D25 (koreksi = catat PKS baru, ta
 ## Dependency & Scope Note
 
 - Bergantung pada maker-checker master data, `backend-exq` export, dan `pkg/csvexport` yang sudah ada. Tidak bergantung pada modul dokumen (D4).
-- Fitur ini dikecualikan dari scope guard rule 2 (no new master-data features) hanya bila user menyetujui mulai build; `development-plan.md` mencatatnya di "Not built" sampai itu.
+- Fitur ini dikecualikan dari scope guard rule 2 (no new master-data features) hanya bila user menyetujui mulai build; `.claude/dev-plan/dev-plan.md` mencatatnya di "Not built" sampai itu.
 - `vendor-cis-limit` (D19) bisa memakai kolom direktur dari fitur ini, tapi tidak sebaliknya.

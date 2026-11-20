@@ -76,8 +76,8 @@ func (f *quotaFixture) seedPackageATM(t *testing.T, suffix, packageLabel string)
 	ctx := context.Background()
 	var branchID, pkgID int64
 	if err := f.tx.QueryRow(ctx, `
-		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region)
-		VALUES ($1, $2, $2, 'Integration Test Region') RETURNING id`,
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name)
+		VALUES ($1, $2, $2) RETURNING id`,
 		f.vendorID, "IVQ-"+suffix+"-"+f.marker).Scan(&branchID); err != nil {
 		t.Fatalf("insert branch: %v", err)
 	}

@@ -320,3 +320,10 @@ describe("RbacPoliciesPage — create form", () => {
     expect(values.required_level).toBe(2);
   });
 });
+
+// BackLink memakai <Link>; test ini tidak butuh RouterProvider.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { to: string; children: import("react").ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));

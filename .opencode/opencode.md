@@ -22,7 +22,7 @@
 
 ## 1\. Overview
 *   **Name**: CROWN THE Cash Management System
-*   **Goal**: E2E ATM cash management: vendor replenishment, daily DSR reporting, forecasting & scheduling, cash count (vault + selective machine), reconciliation vs Corebanking escrow, vendor invoice validation & approval.
+*   **Goal**: E2E ATM cash management, scope = FSD v1.0 §A (user 2026-11-12, **no longer an MVP**): (1) vendor & master data management, (2) DMAA forecast intake, (3) daily ATM cash forecasting — DMAA + vendor DSR → nominal adjustment → final replenishment order, (4) ATM replenish order fulfilment, (5) cash count schedule & execution (vault + selective machine), (6) invoicing trip ATM replenish. Payment in SMART is out of scope. Also parked in the plan: escrow reconciliation vs Corebanking, CIT journal/reconciliation, EOD Final Realisasi.
 *   **Stage**: Greenfield, vibe-coded with AI.
 *   **Roles**: Admin, Operator, Manager (approver), Vendor, Branch/Internal User.
 
@@ -175,7 +175,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 **Platform Core**: `internal/auth` (LDAP + local, JWT, /me) · `internal/user` · `internal/audit` · `internal/approval` (maker-checker) · `internal/document` · `internal/notification` (in-app + SMTP) · `internal/export` (CSV/XLSX/PDF)
 **Master Data**: `internal/vendor` · `internal/vendorpic` · `internal/vault` · `internal/location` · `internal/atm` · `internal/assignment`
 **ATM Operations**: `internal/dsr` · `internal/replenishment` · `internal/cashcount` (vault + selective machine cash count — BA/checklist/photo/e-sign/3-way reconciliation; tables not yet approved, see Sec 3 DB map note)
-**Finance**: `internal/invoice` (upload + validate + approve — NO payment execution) · `internal/reconciliation`
+**Finance**: `internal/invoice` (invoicing trip, FSD v1.0 §6: CROWN computes the vendor trip billing + vendor review/appeal + approval — NO payment execution) · `internal/reconciliation`
 **CIT**: `internal/cit` · `internal/journal` · CIT reconciliation (order vs DSR vs journal)
 **Integration**: `internal/corebanking` (escrow batch file ingest + parse -> feeds reconciliation)
 
@@ -194,7 +194,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 ## 3a. Business Rules & Requirements (from URS v0.3 Rev1, `archives/UR New Template v0.3...docx`)
 > Source-of-truth requirements doc. Anything below not yet reflected in code/schema is a **spec**, not an implemented behavior — check code before assuming it's live.
 
-*   **Forecast / Order ATM (decided 2026-10-08)**: CROWN has no forecast engine. DMAA sends `Order_All_*.xlsx`, `backend_python/dmaa/dmaa_etl.py` loads `dmaa_atm_forecast`; DMAA `amount_replenish` is the final order amount (no in-CROWN formula). Refund comes from DMAA later (`amount_refund = 0` today). Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
+*   **Forecast / Order ATM (decided 2026-11-12, user; supersedes 2026-10-08)**: CROWN runs no forecasting model of its own — the DMAA team sends `Order_All_*.xlsx` (ready 06:00), `backend_python/dmaa/dmaa_etl.py` loads `dmaa_files` + `dmaa_atm_forecast`. DMAA `amount_replenish` is **no longer the final order amount**: CROWN adjusts it with the vendor DSR and forms the final replenishment order per FSD v1.0 §3 (`.document/DSR End To End Cash Management V01.md`): step 8 `(Forecast Replenish + Plan Replenish) − (Saldo DSR + Forecast Refund)` at 09:30–10:00 (Plan Replenish = the H-1 forecast file), complaint/project upload with duplicate-ATM-ID drop + info email, blank-amount orders filled by ATM Monitoring, manual adjust 11:45–12:00, final order shown 12:30. **Not built** — today's Vendor Request still takes the DMAA amount as is; needs a full Kiro spec (money, Sec 4 #7), dev-plan 2.4a. Refund: `amount_refund = 0` until DMAA sends it. Problem-ATM exclusion + FSD input lists are CROWN's job (Phase 2.4). See `.claude/CLAUDE.md` Sec 3a. *Superseded history:* **Order ATM formula** (daily forecasting/replenishment, `cmd/api` — distinct from the EOD `Final Realisasi` formula in Sec 14, which is a different calc for a different job):
     `Order ATM = (Saldo DSR + Proyeksi Refund) − (Rekomendasi DMAA + Rencana Isi Hari-H)`
 *   DSR daily upload deadline: **09:00**. Monthly report of late/missing DSR per vendor feeds FLM penalty basis.
 *   Duplicate-order prevention: an ATM with an active order is not reissued a new one for the same period.
@@ -224,7 +224,7 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 ## 5\. Cross-Cutting Domain Rules (NON-NEGOTIABLE)
 *   **Auth split**: Internal -> LDAP bind (no local password). Vendor -> local creds (bcrypt/argon2), separate frontend + login route. Both issue same JWT; role + auth\_source in claims. Vendors scoped to own assignments only.
 *   **Maker-checker**: any create/update/delete on financial or master data -> `approval_requests` (pending -> approved/rejected). Effect applies only after approval. Maker != checker.
-*   **Invoice**: CMS validates & approves only. Does NOT trigger/execute payment. Terminal = approved (handed off downstream).
+*   **Invoice (decided 2026-11-12, user)**: CROWN **computes** the monthly trip invoice per vendor per FSD v1.0 §6 (`.document/DSR End To End Cash Management V01.md`): price scheme upload (replaces the previous one, upload date = effective date), ATM master from ESQ, trips per ATM vs package minimum, prorata for mid-month activate/deactivate, penalties; vendor reviews and may appeal, then approval. Does NOT trigger/execute payment (SMART, outside CROWN). Terminal = finalised invoice, downloaded by VOC.
 *   **Escrow reconciliation**: source = batch file from Corebanking. Ingest -> parse into `escrow_batch_rows` -> reconcile vs CMS cash position -> store deltas. Idempotent per file hash.
 *   **Audit**: every state change writes `audit_logs` (who, what, before/after, when, ip).
 *   **RBAC**: enforce at middleware AND service layer.
@@ -251,10 +251,10 @@ frontend/VendorPortal-Vite/  # vendor portal, local login
 | Replenishment | Instruction + execution to refill ATM cash. |
 | Vault | Vendor cash vault holding bank cash. |
 | Escrow reconciliation | Match CMS cash position vs Corebanking escrow batch file. |
-| Forecast (DMAA) | Order amount per ATM/denom/date received from DMAA; final, not recomputed by CROWN. |
+| Forecast (DMAA) | Forecast per ATM/denom/date received from DMAA; CROWN adjusts it with the DSR into the final replenishment order (2026-11-12). |
 | Cash count | Physical count: vault (vendor) + selective machine. |
 | Maker-checker | Two-person approval control. |
-| Invoice reconciliation | Validate invoice vs executed CIT/replenishment; approve only, no payment. |
+| Invoicing trip | CROWN computes the vendor trip invoice from executed replenishment (FSD §6); appeal + approve, no payment. |
 
 * * *
 
@@ -342,7 +342,7 @@ LOG_LEVEL=info
 
 ## 12\. Resolved Decisions
 *   Escrow integration: batch file -> `internal/corebanking` ingest -> reconciliation.
-*   Invoice payment: validate & approve only. No payment execution.
+*   Invoice (2026-11-12, user): CROWN computes trip billing + appeal loop (FSD v1.0 §6). No payment execution.
 *   Frontends: two separate SPAs. Internal = LDAP; Vendor = local creds in CMS.
 *   Email: company SMTP relay.
 *   DB topology: primary for write/update, read replica for reporting/dashboard/cash monitoring.

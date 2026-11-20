@@ -9,7 +9,13 @@ function requestErrorText(e: unknown): string {
 }
 
 /** Inline request error (429 etc., icon + text, no dialog) and the "Ekspor Saya" link for report screens. */
-export function ReportExportNotice({ error }: { error: unknown }) {
+export function ReportExportNotice({
+  error,
+  showMyExportsLink = true,
+}: {
+  error: unknown;
+  showMyExportsLink?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
       {error != null && (
@@ -18,9 +24,11 @@ export function ReportExportNotice({ error }: { error: unknown }) {
           {requestErrorText(error)}
         </p>
       )}
-      <Link to="/exports" className="w-fit font-medium text-[var(--red-600)] underline">
-        Lihat Ekspor Saya
-      </Link>
+      {showMyExportsLink && (
+        <Link to="/exports" className="w-fit font-medium text-[var(--red-600)] underline">
+          Lihat Ekspor Saya
+        </Link>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 Author: user (product owner), ditulis bersama Claude. Status: **accepted 2026-10-27** (product owner).
 Stage: 1 Plan selesai → stage berikut `spec.md`.
-Roadmap: Phase 2.3 (`.kiro/steering/development-plan.md`). Sumber: URS v0.3 Phase 1 (FNC 003 Dashboard, aturan DSR 09:00), CLAUDE.md Sec 3a.
+Roadmap: Phase 2.3 (`.claude/dev-plan/dev-plan.md`). Sumber: URS v0.3 Phase 1 (FNC 003 Dashboard, aturan DSR 09:00), CLAUDE.md Sec 3a.
 
 ## Problem
 Vendor FLM wajib mengirim DSR harian paling lambat **09:00**. Upload DSR sudah

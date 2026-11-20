@@ -13,37 +13,37 @@ import (
 
 const countVendorPksReport = `-- name: CountVendorPksReport :one
 SELECT COUNT(*)
-FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
-WHERE ($1::text IS NULL
-        OR v.code ILIKE '%' || $1::text || '%'
-        OR v.name ILIKE '%' || $1::text || '%')
-  AND (
-        $2::text = 'all'
-        OR ($2::text = 'active' AND v.deleted_at IS NULL)
-        OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL)
-      )
-  AND ($3::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                             $4::date, $5::int) = $3::text)
+FROM vendor_pks p
+JOIN vendors v ON v.id = p.vendor_id
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE v.kind = 'FLM_VENDOR'
+  AND ($1::text = 'semua'
+        OR ($1::text = 'terkini' AND p.replaced_at IS NULL)
+        OR vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                    p.renewal_days, $2::date) = $1::text)
+  AND ($3::text IS NULL OR t.code = $3::text)
+  AND ($4::text IS NULL OR v.code = $4::text)
+  AND ($5::text IS NULL
+        OR p.pks_name ILIKE '%' || $5::text || '%'
+        OR p.wod_number ILIKE '%' || $5::text || '%')
 `
 
 type CountVendorPksReportParams struct {
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
+	Status  string      `json:"status"`
+	Today   pgtype.Date `json:"today"`
+	PksType *string     `json:"pks_type"`
+	Vendor  *string     `json:"vendor"`
+	Q       *string     `json:"q"`
 }
 
 // Same joins and filters as ExportVendorPksBatch, without keyset/LIMIT.
 func (q *Queries) CountVendorPksReport(ctx context.Context, arg CountVendorPksReportParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countVendorPksReport,
-		arg.Q,
 		arg.Status,
-		arg.PksStatus,
 		arg.Today,
-		arg.RenewalMonths,
+		arg.PksType,
+		arg.Vendor,
+		arg.Q,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -52,91 +52,101 @@ func (q *Queries) CountVendorPksReport(ctx context.Context, arg CountVendorPksRe
 
 const exportVendorPksBatch = `-- name: ExportVendorPksBatch :many
 
-SELECT v.id,
+SELECT p.id,
        v.code                                                        AS vendor_code,
        v.name                                                        AS vendor_name,
        d.name                                                        AS director_name,
        d.phone                                                       AS director_phone,
        d.email                                                       AS director_email,
-       ap.pks_name                                                   AS pks_name,
-       ap.effective_date                                             AS effective_date,
-       ap.expiry_date                                                AS expiry_date,
-       COALESCE(vendor_pks_validity_months(ap.effective_date, ap.expiry_date), 0)::int AS validity_months,
-       COALESCE(ap.expiry_date - $1::date, 0)::int               AS remaining_days,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                         $1::date, $2::int), '')::text AS pks_status
-FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
+       t.code                                                        AS pks_type_code,
+       p.wod_number                                                  AS wod_number,
+       p.pks_name                                                    AS pks_name,
+       p.effective_date                                              AS effective_date,
+       p.expiry_date                                                 AS expiry_date,
+       (p.expiry_date - p.effective_date)::int                       AS validity_days,
+       p.renewal_days                                                AS renewal_days,
+       vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                p.renewal_days, $1::date)::text AS pks_status,
+       (DATE '9999-12-31' - p.effective_date)::int                   AS rev_effective
+FROM vendor_pks p
+JOIN vendors v ON v.id = p.vendor_id
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
 LEFT JOIN vendor_pics d ON d.vendor_id = v.id AND d.is_director AND d.deleted_at IS NULL
-WHERE (v.name, v.id) > ($3::text, $4::bigint)
-  AND ($5::text IS NULL
-        OR v.code ILIKE '%' || $5::text || '%'
-        OR v.name ILIKE '%' || $5::text || '%')
-  AND (
-        $6::text = 'all'
-        OR ($6::text = 'active' AND v.deleted_at IS NULL)
-        OR ($6::text = 'disabled' AND v.deleted_at IS NOT NULL)
-      )
-  AND ($7::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at,
-                             $1::date, $2::int) = $7::text)
-ORDER BY v.name, v.id
-LIMIT $8::int
+WHERE v.kind = 'FLM_VENDOR'
+  AND (v.code, t.code, (DATE '9999-12-31' - p.effective_date)::int, p.id)
+        > ($2::text, $3::text,
+           $4::int, $5::bigint)
+  AND ($6::text = 'semua'
+        OR ($6::text = 'terkini' AND p.replaced_at IS NULL)
+        OR vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                    p.renewal_days, $1::date) = $6::text)
+  AND ($7::text IS NULL OR t.code = $7::text)
+  AND ($8::text IS NULL OR v.code = $8::text)
+  AND ($9::text IS NULL
+        OR p.pks_name ILIKE '%' || $9::text || '%'
+        OR p.wod_number ILIKE '%' || $9::text || '%')
+ORDER BY v.code, t.code, (DATE '9999-12-31' - p.effective_date)::int, p.id
+LIMIT $10::int
 `
 
 type ExportVendorPksBatchParams struct {
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	AfterName     string      `json:"after_name"`
-	AfterID       int64       `json:"after_id"`
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	BatchSize     int32       `json:"batch_size"`
+	Today             pgtype.Date `json:"today"`
+	AfterVendorCode   string      `json:"after_vendor_code"`
+	AfterTypeCode     string      `json:"after_type_code"`
+	AfterRevEffective int32       `json:"after_rev_effective"`
+	AfterID           int64       `json:"after_id"`
+	Status            string      `json:"status"`
+	PksType           *string     `json:"pks_type"`
+	Vendor            *string     `json:"vendor"`
+	Q                 *string     `json:"q"`
+	BatchSize         int32       `json:"batch_size"`
 }
 
 type ExportVendorPksBatchRow struct {
-	ID             int64       `json:"id"`
-	VendorCode     string      `json:"vendor_code"`
-	VendorName     string      `json:"vendor_name"`
-	DirectorName   *string     `json:"director_name"`
-	DirectorPhone  *string     `json:"director_phone"`
-	DirectorEmail  *string     `json:"director_email"`
-	PksName        *string     `json:"pks_name"`
-	EffectiveDate  pgtype.Date `json:"effective_date"`
-	ExpiryDate     pgtype.Date `json:"expiry_date"`
-	ValidityMonths int32       `json:"validity_months"`
-	RemainingDays  int32       `json:"remaining_days"`
-	PksStatus      string      `json:"pks_status"`
+	ID            int64       `json:"id"`
+	VendorCode    string      `json:"vendor_code"`
+	VendorName    string      `json:"vendor_name"`
+	DirectorName  *string     `json:"director_name"`
+	DirectorPhone *string     `json:"director_phone"`
+	DirectorEmail *string     `json:"director_email"`
+	PksTypeCode   string      `json:"pks_type_code"`
+	WodNumber     string      `json:"wod_number"`
+	PksName       string      `json:"pks_name"`
+	EffectiveDate pgtype.Date `json:"effective_date"`
+	ExpiryDate    pgtype.Date `json:"expiry_date"`
+	ValidityDays  int32       `json:"validity_days"`
+	RenewalDays   int32       `json:"renewal_days"`
+	PksStatus     string      `json:"pks_status"`
+	RevEffective  int32       `json:"rev_effective"`
 }
 
-// Vendor + PKS report export (vendor-pks task 4.3, Req 10). Read-only.
-// SHARED FILE: backend-exq generates these queries too (its sqlc.yaml lists
-// this path). Regenerate in BOTH modules.
+// Daftar PKS export (spec .kiro/specs/vendor-pks-list/, task 6.1, Req 3.4/10.1/10.3). Read-only.
+// SHARED FILE: backend-exq generates these queries (its sqlc.yaml lists this path); backend does not.
 //
-// Predicates q / status are copied verbatim from ListVendorsAdmin
-// (vendors_admin.sql); keep the two in sync. `status` is 'active' | 'disabled'
-// | 'all' (caller resolves absent to 'active'). `pks_status` NULL = no filter;
-// otherwise one key of reports.PksStatuses. Vendor INTERNAL has status NULL, so
-// it never matches a pks_status filter. `today` = Asia/Jakarta date from Go
-// (D30), `renewal_months` = VENDOR_PKS_RENEWAL_MONTHS.
+// One row per vendor_pks row (history included), FLM_VENDOR only, no pending rows (A2). Filters are the same
+// as ListPksAdmin (vendor_pks_list.sql) — keep in sync (Property 6: screen and export agree):
 //
-// Keyset page on (name, id): first page after_name = ” and after_id = 0.
-// Director = the vendor's single active vendor_pics.is_director row (partial
-// unique index vendor_pics_director_uq), so the LEFT JOIN never multiplies rows.
-// Active PKS = vendor_pks.replaced_at IS NULL (vendor_pks_active_uq).
-// Function results are cast explicitly so sqlc does not infer their types.
-// COALESCE keeps these non-null for sqlc/pgx (a NULL scan into int32 fails): 0/” means
-// "no active PKS" (pks_id IS NULL) or, for pks_status, an INTERNAL vendor. Filter below uses the raw function.
+//	status   : 'terkini' = replaced_at IS NULL, 'semua' = every row, else a vendor_pks_record_status() label
+//	pks_type : NULL or vendor_pks_types.code;  vendor : NULL or vendors.code;  q : NULL or ILIKE on name / WOD
+//	today    : Asia/Jakarta date from Go.
+//
+// Masa Berlaku (hari) = expiry_date - effective_date; remaining days are not exported.
+//
+// Keyset on (vendor code, type code, 9999-12-31 - effective_date, id) = newest effective first without a mixed
+// sort direction. First page: after_vendor_code = ”, after_type_code = ”, after_rev_effective = 0, after_id = 0.
+// Director = the vendor's single active vendor_pics.is_director row (partial unique index), so the LEFT JOIN
+// never multiplies rows. Function results are cast explicitly so sqlc does not infer their types.
 func (q *Queries) ExportVendorPksBatch(ctx context.Context, arg ExportVendorPksBatchParams) ([]ExportVendorPksBatchRow, error) {
 	rows, err := q.db.Query(ctx, exportVendorPksBatch,
 		arg.Today,
-		arg.RenewalMonths,
-		arg.AfterName,
+		arg.AfterVendorCode,
+		arg.AfterTypeCode,
+		arg.AfterRevEffective,
 		arg.AfterID,
-		arg.Q,
 		arg.Status,
-		arg.PksStatus,
+		arg.PksType,
+		arg.Vendor,
+		arg.Q,
 		arg.BatchSize,
 	)
 	if err != nil {
@@ -153,12 +163,15 @@ func (q *Queries) ExportVendorPksBatch(ctx context.Context, arg ExportVendorPksB
 			&i.DirectorName,
 			&i.DirectorPhone,
 			&i.DirectorEmail,
+			&i.PksTypeCode,
+			&i.WodNumber,
 			&i.PksName,
 			&i.EffectiveDate,
 			&i.ExpiryDate,
-			&i.ValidityMonths,
-			&i.RemainingDays,
+			&i.ValidityDays,
+			&i.RenewalDays,
 			&i.PksStatus,
+			&i.RevEffective,
 		); err != nil {
 			return nil, err
 		}

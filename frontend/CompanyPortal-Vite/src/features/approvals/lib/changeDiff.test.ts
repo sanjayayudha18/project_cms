@@ -73,6 +73,21 @@ describe("formatValue / humanizeField / changeSubject", () => {
   });
 });
 
+describe("cash count entity labels (AC-5.1-15)", () => {
+  it("labels every cash count entity type instead of the raw key", async () => {
+    const { entityLabel } = await import("./changeDiff");
+    for (const t of [
+      "cash_count_category_params",
+      "cash_count_anomaly_category",
+      "cash_count_checklist_item",
+      "cash_count_area",
+      "cash_count_pic",
+    ]) {
+      expect(entityLabel(t)).not.toBe(t);
+    }
+  });
+});
+
 describe("vendor_pks labels and diff (vendor-pks Req 10.1, 11.4)", () => {
   it("labels the entity and the per-entity op wording", async () => {
     const { ENTITY_LABELS, OP_LABELS, opLabel } = await import("./changeDiff");

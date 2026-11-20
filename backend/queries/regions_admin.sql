@@ -14,12 +14,15 @@
 -- name: ListRegionsAdmin :many
 -- Filters: q (ILIKE on code OR region, case-insensitive; region is nullable
 -- so a NULL never matches, which is correct) and status (sqlc.arg,
--- all|active|inactive). location_count = dependent locations rows (see NOTE
--- above -- no is_active filter exists on locations). Ordered code ASC, id ASC.
+-- all|active|inactive). atm_count = active ATMs whose location is in the
+-- region; vendor_branch_count = active vendor branches with that region_code
+-- (region-standardization Req 6.1). Ordered code ASC, id ASC.
 SELECT r.id, r.code, r.region, r.created_at, r.updated_at, r.is_active, r.deleted_at,
-       COUNT(l.id) AS location_count
+       (SELECT COUNT(*) FROM atms a JOIN locations l ON l.id = a.location_id
+         WHERE l.region_id = r.id AND a.is_active)::bigint AS atm_count,
+       (SELECT COUNT(*) FROM vendor_branches vb
+         WHERE vb.region_code = r.code AND vb.is_active)::bigint AS vendor_branch_count
 FROM regions r
-LEFT JOIN locations l ON l.region_id = r.id
 WHERE (sqlc.narg('q')::text IS NULL
         OR r.code ILIKE '%' || sqlc.narg('q')::text || '%'
         OR r.region ILIKE '%' || sqlc.narg('q')::text || '%')
@@ -28,7 +31,6 @@ WHERE (sqlc.narg('q')::text IS NULL
         OR (sqlc.arg('status')::text = 'active' AND r.is_active = true)
         OR (sqlc.arg('status')::text = 'inactive' AND r.is_active = false)
       )
-GROUP BY r.id
 ORDER BY r.code ASC, r.id ASC
 LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 
@@ -49,11 +51,12 @@ WHERE (sqlc.narg('q')::text IS NULL
 -- Includes soft-deleted rows -- 404 pre-checks on update/disable/enable are
 -- decided by the service, same convention as GetATMAdminByID.
 SELECT r.id, r.code, r.region, r.created_at, r.updated_at, r.is_active, r.deleted_at,
-       COUNT(l.id) AS location_count
+       (SELECT COUNT(*) FROM atms a JOIN locations l ON l.id = a.location_id
+         WHERE l.region_id = r.id AND a.is_active)::bigint AS atm_count,
+       (SELECT COUNT(*) FROM vendor_branches vb
+         WHERE vb.region_code = r.code AND vb.is_active)::bigint AS vendor_branch_count
 FROM regions r
-LEFT JOIN locations l ON l.region_id = r.id
-WHERE r.id = $1
-GROUP BY r.id;
+WHERE r.id = $1;
 
 -- name: FindRegionByCode :one
 -- Uniqueness pre-check (incl. soft-deleted) for create (Req 2.2, 2.7).
@@ -96,3 +99,15 @@ RETURNING id, code, region, created_at, updated_at, is_active, deleted_at;
 -- locations has no is_active column, so this counts every locations row
 -- referencing the region (all are implicitly active).
 SELECT COUNT(*) FROM locations WHERE region_id = $1;
+
+-- name: CountActiveVendorBranchesByRegionCode :one
+-- Second disable guard (region-standardization Req 7.2): active vendor
+-- branches still pointing at the region's code. Run inside the disable tx,
+-- after LockRegionForUpdate.
+SELECT COUNT(*) FROM vendor_branches WHERE region_code = $1 AND is_active = true;
+
+-- name: LockRegionForUpdate :one
+-- Row lock taken first in the disable tx (Req 7.3) so a concurrent vendor
+-- branch apply (FOR SHARE on the same row) cannot slip a branch in between
+-- the count and the disable (Property 4).
+SELECT id, code, is_active FROM regions WHERE id = $1 FOR UPDATE;

@@ -13,17 +13,20 @@ import (
 	"github.com/cimb-niaga/cms/pkg/csvexport"
 )
 
-// Spec vendor-export-pks, task 2.2: the vendor importer accepts the 18-column
-// Export_Header file and drops the nine read-only cells (Properties 4, 5).
+// Spec vendor-export-pks task 2.2, updated for vendor-pks-type (task 4.4): the vendor Export_Header is now the
+// seven profile columns; the previous export header (7 + nine read-only cells, director + active PKS) is a legacy
+// header the importer still accepts and whose read-only cells it drops (Properties 4, 5).
 
 var (
-	vendorImportCols = strings.Split(strings.TrimSpace(vendorHeader), ",")
-	vendorExportCols = slices.Concat(vendorImportCols, csvexport.VendorReadOnlyColumns())
+	vendorImportCols = slices.Clone(exportSpecs[ExportVendors].header) // name,legal_name,...,is_active
+	// vendorExportCols is the previous (16-column) export header.
+	vendorExportCols = slices.Concat(vendorImportCols, csvexport.VendorReadOnlyColumns(),
+		[]string{"pks_name", "pks_effective_date", "pks_expiry_date", "pks_validity_months", "pks_remaining_days", "pks_status"})
 )
 
 // v1Row is vendor V1 exactly as fakeImportRepo exports it (hq_address carries
 // the CSVSafe apostrophe), so it imports as "no change".
-const v1Row = "1,V1,Vendor Satu,PT Satu,012345678901234,a@v1.id,+62 812-345,'= Jl. Mawar,true"
+const v1Row = "Vendor Satu,PT Satu,012345678901234,a@v1.id,+62 812-345,'= Jl. Mawar,true"
 
 func roCells(v string) string { return strings.TrimSuffix(strings.Repeat(v+",", 9), ",") }
 
@@ -52,11 +55,11 @@ func TestProperty_ExportHeaderImportsLikeImportHeader(t *testing.T) {
 		if rapid.Bool().Draw(t, "withV1") {
 			name := rapid.SampledFrom([]string{"Vendor Satu", "Renamed", ""}).Draw(t, "v1name")
 			row := strings.Split(v1Row, ",")
-			row[2] = name
+			row[0] = name
 			body = append(body, row)
 		}
 		for i := 0; i < n; i++ {
-			body = append(body, []string{"", "N" + string(rune('A'+i)), cell.Draw(t, "name"), "", "", "", "", "", "true"})
+			body = append(body, []string{"N" + string(rune('A'+i)), cell.Draw(t, "legal_name"), "", "", "", "", "true"})
 		}
 		withRO := make([][]string, len(body))
 		for i, r := range body {
@@ -139,15 +142,15 @@ func TestImport_VendorExportHeaderExamples(t *testing.T) {
 
 	t.Run("jumlah sel salah", func(t *testing.T) {
 		cells := func(n int) string { return strings.TrimSuffix(strings.Repeat("a,", n), ",") }
-		res := dryRun(t, ExportVendors, exportHdr+cells(9)+"\n"+cells(17)+"\n"+cells(19)+"\n")
+		res := dryRun(t, ExportVendors, exportHdr+cells(9)+"\n"+cells(11)+"\n"+cells(17)+"\n")
 		for line := 2; line <= 4; line++ {
 			if !hasErr(res, line, "row") {
 				t.Errorf("line %d: want a row error, got %+v", line, res.Preview.Errors)
 			}
 		}
 		for _, e := range res.Preview.Errors {
-			if !strings.Contains(e.Message, "jumlah kolom") || !strings.Contains(e.Message, "seharusnya 18") {
-				t.Errorf("message %q must say 'jumlah kolom N, seharusnya 18'", e.Message)
+			if !strings.Contains(e.Message, "jumlah kolom") || !strings.Contains(e.Message, "seharusnya 7") {
+				t.Errorf("message %q must say 'jumlah kolom N, seharusnya 7'", e.Message)
 			}
 		}
 		if res.Preview.ValidRows != 0 {
@@ -156,7 +159,7 @@ func TestImport_VendorExportHeaderExamples(t *testing.T) {
 	})
 
 	t.Run("import header file still accepted", func(t *testing.T) {
-		p := dryRun(t, ExportVendors, vendorHeader+v1Row+"\n").Preview
+		p := dryRun(t, ExportVendors, strings.Join(vendorImportCols, ",")+"\n"+v1Row+"\n").Preview
 		if len(p.Errors) != 0 || p.Unchanged != 1 {
 			t.Fatalf("want 1 unchanged, got %+v", p)
 		}

@@ -16,7 +16,8 @@ const REGION: AdminRegion = {
   code: "JKT",
   region: "Jakarta",
   is_active: true,
-  location_count: 12,
+  atm_count: 12,
+  vendor_branch_count: 4,
   created_at: null,
   updated_at: null,
   deleted_at: null,
@@ -41,7 +42,10 @@ describe("region schemas", () => {
     [{ code: "  jkt  ", region: " Jakarta " }, true],
     [{ code: "", region: "Jakarta" }, false],
     [{ code: "JK-T", region: "Jakarta" }, false],
-    [{ code: "A".repeat(21), region: "Jakarta" }, false],
+    [{ code: "A".repeat(11), region: "Jakarta" }, false],
+    [{ code: "A".repeat(10), region: "Jakarta" }, true],
+    [{ code: "J", region: "Jakarta" }, false],
+    [{ code: "JKT_WEST", region: "Jakarta" }, false],
     [{ code: "JKT", region: "   " }, false],
     [{ code: "JKT", region: "x".repeat(101) }, false],
   ])("createRegionSchema(%j) valid=%s", (input, valid) => {
@@ -119,6 +123,14 @@ describe("RegionsTable", () => {
     expect(screen.getByText("Aktif")).toBeInTheDocument();
     expect(screen.getByText("Nonaktif")).toBeInTheDocument();
     expect(screen.getByText("JKT")).toHaveClass("tabular-nums");
+
+    // Req 6.2/6.3: ATM + vendor branch counts replace "Jumlah Lokasi", right-aligned tabular-nums.
+    expect(screen.getByRole("columnheader", { name: "Jumlah ATM" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Jumlah Cabang Vendor" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Jumlah Lokasi" })).not.toBeInTheDocument();
+    const jktRow = screen.getByText("JKT").closest("tr") as HTMLElement;
+    expect(within(jktRow).getByText("12")).toHaveClass("text-right", "tabular-nums");
+    expect(within(jktRow).getByText("4")).toHaveClass("text-right", "tabular-nums");
 
     const bdgRow = screen.getByText("BDG").closest("tr") as HTMLElement;
     expect(within(bdgRow).getByRole("button", { name: "Aktifkan" })).toBeInTheDocument();

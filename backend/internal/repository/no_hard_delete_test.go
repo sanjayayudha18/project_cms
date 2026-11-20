@@ -60,6 +60,9 @@ func TestQueries_NoHardDelete(t *testing.T) {
 	// nonaktif -> void. Baris anak *_amounts boleh replace-all (bukan bukti sendiri).
 	// dsr_receipts (dsr-late-report, migration 033): append-only, bukti waktu terima DSR pertama.
 	// vendor_pks (vendor-pks, migration 022): riwayat PKS; diganti = replaced_at, terminate = terminated_*.
+	// cash_count_* (5.1 parameter, migration 041): soft-disable via is_active/deleted_at. Not guarded:
+	// cash_count_area_regions (pure link table, rewritten by the area applier) and
+	// cash_count_category_params (versioned sets, superseded_at).
 	tables := []string{
 		"users", "vendors", "atms",
 		"vendor_branches", "vendor_vaults", "vendor_pics", "vendor_packages_branch", "atm_vendor_packages",
@@ -69,6 +72,7 @@ func TestQueries_NoHardDelete(t *testing.T) {
 		"holidays", "vendor_request_realizations", "replenish_classifications",
 		"dsr_receipts",
 		"vendor_pks",
+		"cash_count_anomaly_categories", "cash_count_checklist_items", "cash_count_areas", "cash_count_pics",
 	}
 
 	for _, f := range files {
@@ -102,6 +106,7 @@ func TestNoHardDeletePattern_ActuallyFires(t *testing.T) {
 		"holidays", "vendor_request_realizations", "replenish_classifications",
 		"dsr_receipts",
 		"vendor_pks",
+		"cash_count_anomaly_categories", "cash_count_checklist_items", "cash_count_areas", "cash_count_pics",
 	}
 	for _, table := range guarded {
 		re := regexp.MustCompile(`(?is)DELETE\s+FROM\s+(public\.)?\b` + table + `\b`)

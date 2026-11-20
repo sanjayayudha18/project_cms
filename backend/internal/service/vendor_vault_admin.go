@@ -18,9 +18,61 @@ import (
 var (
 	ErrVendorVaultNotFound     = errors.New("vendor vault not found")
 	ErrVendorVaultCodeConflict = errors.New("vault code already exists")
+	ErrVendorVaultNameConflict = fmt.Errorf("%w: vault name already exists in this branch", ErrVendorVaultCodeConflict)
 )
 
 var currencyCodeRe = regexp.MustCompile(`^[A-Z]{3}$`)
+
+// escrowAccountRe mirrors vendor_vaults_escrow_cash_chk / vendor_vaults_escrow_atm_chk (migration 040).
+var escrowAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
+
+// cisLimitRe: positive-looking decimal, at most 18 integer digits and 2 decimals = numeric(20,2).
+var cisLimitRe = regexp.MustCompile(`^[0-9]{1,18}(\.[0-9]{1,2})?$`)
+
+// normalizeCisLimit trims a Limit CIS amount (migration 040: stored on vendor_vaults); blank = NULL.
+// Must be > 0, checked as text (never float); the DB CHECK vendor_vaults_cis_limit_amount_chk is the last net.
+func normalizeCisLimit(in *string) (*string, error) {
+	if in == nil {
+		return nil, nil
+	}
+	s := strings.TrimSpace(*in)
+	if s == "" {
+		return nil, nil
+	}
+	if !cisLimitRe.MatchString(s) {
+		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus angka desimal, maksimal 18 digit dan 2 angka di belakang titik"}
+	}
+	if strings.Trim(s, "0.") == "" {
+		return nil, &ValidationError{Field: "cis_limit_amount", Message: "harus lebih besar dari 0"}
+	}
+	return &s, nil
+}
+
+// normalizeEscrowField trims and validates an optional 12-digit escrow account string (escrow_cash / escrow_atm).
+func normalizeEscrowField(field string, in *string) (*string, error) {
+	if in == nil {
+		return nil, nil
+	}
+	e := strings.TrimSpace(*in)
+	if e == "" {
+		return nil, nil
+	}
+	if !escrowAccountRe.MatchString(e) {
+		return nil, &ValidationError{Field: field, Message: "harus tepat 12 digit angka"}
+	}
+	return &e, nil
+}
+
+func trimOptionalString(in *string) *string {
+	if in == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*in)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
 
 // VendorVaultSubmitter is the narrow MasterDataChangeService surface
 // VendorVaultAdminService needs (maker-checker-native, D1).
@@ -35,6 +87,8 @@ type VendorVaultAdminRepo interface {
 	Count(ctx context.Context, arg db.CountVendorVaultsAdminParams) (int64, error)
 	GetByID(ctx context.Context, id int64) (*db.GetVendorVaultAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
+	FindByBranchAndName(ctx context.Context, branchID int64, vaultName string) (*int64, error)
+	GenerateNextVaultName(ctx context.Context, branchID int64) (string, error)
 	BranchVendorID(ctx context.Context, branchID int64) (*int64, error)
 }
 
@@ -55,16 +109,19 @@ func NewVendorVaultAdminService(repo VendorVaultAdminRepo, changes VendorVaultSu
 // VendorVaultUpdatePayload is the editable field set; also the embedded
 // tail of VendorVaultPayload. vault_code and vendor_branch_id are immutable.
 type VendorVaultUpdatePayload struct {
-	Category          string  `json:"category"`
-	CurrencyCode      string  `json:"currency_code"`
-	MinCapacityAmount *string `json:"min_capacity_amount"`
-	MaxCapacityAmount *string `json:"max_capacity_amount"`
-	Latitude          *string `json:"latitude"`
-	Longitude         *string `json:"longitude"`
-	OperatingHours    *string `json:"operating_hours"`
-	LocationID        *int64  `json:"location_id"`
-	// EscrowAccount: nomor escrow 12 digit, nil = NULL, tidak unik (vendor-cis-limit FR2).
-	EscrowAccount *string `json:"escrow_account"`
+	VaultName      *string `json:"vault_name"`
+	Category       string  `json:"category"`
+	CurrencyCode   string  `json:"currency_code"`
+	Alamat         *string `json:"alamat"`
+	MinBalance     *string `json:"min_balance"`
+	MaxBalance     *string `json:"max_balance"`
+	CisLimitAmount *string `json:"cis_limit_amount"`
+	Latitude       *string `json:"latitude"`
+	Longitude      *string `json:"longitude"`
+	OperatingHours *string `json:"operating_hours"`
+	LocationID     *int64  `json:"location_id"`
+	EscrowCash     *string `json:"escrow_cash"`
+	EscrowAtm      *string `json:"escrow_atm"`
 }
 
 // VendorVaultPayload is the create request shape and the jsonb payload
@@ -77,30 +134,76 @@ type VendorVaultPayload struct {
 
 // VendorVault is the read DTO: amounts/coordinates as exact decimal strings.
 type VendorVault struct {
-	ID                int64
-	VendorBranchID    int64
-	VaultCode         string
-	Category          string
-	CurrencyCode      string
-	MinCapacityAmount *string
-	MaxCapacityAmount *string
-	Latitude          *string
-	Longitude         *string
-	OperatingHours    *string
-	LocationID        *int64
-	EscrowAccount     *string
-	IsActive          bool
-	DeletedAt         *time.Time
+	ID               int64
+	VendorBranchID   int64
+	BranchName       string
+	Region           *string
+	VaultCode        string
+	VaultName        string
+	Category         string
+	CurrencyCode     string
+	Alamat           *string
+	MinBalance       *string
+	MaxBalance       *string
+	CisLimitAmount   *string
+	CisLimitCurrency string
+	Latitude         *string
+	Longitude        *string
+	OperatingHours   *string
+	LocationID       *int64
+	EscrowCash       *string
+	EscrowAtm        *string
+	IsActive         bool
+	DeletedAt        *time.Time
 }
 
-func newVendorVault(id, branchID int64, code, category, currency string, minC, maxC, lat, lon pgtype.Numeric, hours *string, locID *int64, escrow *string, active bool, deleted pgtype.Timestamptz) (VendorVault, error) {
-	v := VendorVault{ID: id, VendorBranchID: branchID, VaultCode: code, Category: category, CurrencyCode: currency,
-		OperatingHours: hours, LocationID: locID, EscrowAccount: escrow, IsActive: active, DeletedAt: timestamptzToPtr(deleted)}
+func newVendorVault(
+	id, branchID int64,
+	branchName string,
+	region *string,
+	code, vaultName, category, currency string,
+	alamat *string,
+	minB, maxB, cisLimit pgtype.Numeric,
+	cisCurrency string,
+	lat, lon pgtype.Numeric,
+	hours *string,
+	locID *int64,
+	escrowCash, escrowAtm *string,
+	active bool,
+	deleted pgtype.Timestamptz,
+) (VendorVault, error) {
+	if cisCurrency == "" {
+		cisCurrency = "IDR"
+	}
+	v := VendorVault{
+		ID:               id,
+		VendorBranchID:   branchID,
+		BranchName:       branchName,
+		Region:           region,
+		VaultCode:        code,
+		VaultName:        vaultName,
+		Category:         category,
+		CurrencyCode:     currency,
+		Alamat:           alamat,
+		CisLimitCurrency: cisCurrency,
+		OperatingHours:   hours,
+		LocationID:       locID,
+		EscrowCash:       escrowCash,
+		EscrowAtm:        escrowAtm,
+		IsActive:         active,
+		DeletedAt:        timestamptzToPtr(deleted),
+	}
 	var err error
 	for _, f := range []struct {
 		dst **string
 		src pgtype.Numeric
-	}{{&v.MinCapacityAmount, minC}, {&v.MaxCapacityAmount, maxC}, {&v.Latitude, lat}, {&v.Longitude, lon}} {
+	}{
+		{&v.MinBalance, minB},
+		{&v.MaxBalance, maxB},
+		{&v.CisLimitAmount, cisLimit},
+		{&v.Latitude, lat},
+		{&v.Longitude, lon},
+	} {
 		if *f.dst, err = numericToDecimalStringPtr(f.src); err != nil {
 			return VendorVault{}, err
 		}
@@ -116,7 +219,13 @@ func (s *VendorVaultAdminService) List(ctx context.Context, arg db.ListVendorVau
 	}
 	out := make([]VendorVault, len(rows))
 	for i, r := range rows {
-		if out[i], err = newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.EscrowAccount, r.IsActive, r.DeletedAt); err != nil {
+		if out[i], err = newVendorVault(
+			r.ID, r.VendorBranchID, r.BranchName, r.Region,
+			r.VaultCode, r.VaultName, r.Category, r.CurrencyCode, r.Alamat,
+			r.MinBalance, r.MaxBalance, r.CisLimitAmount, r.CisLimitCurrency,
+			r.Latitude, r.Longitude, r.OperatingHours, r.LocationID,
+			r.EscrowCash, r.EscrowAtm, r.IsActive, r.DeletedAt,
+		); err != nil {
 			return nil, fmt.Errorf("vault %d: %w", r.ID, err)
 		}
 	}
@@ -134,7 +243,13 @@ func (s *VendorVaultAdminService) Get(ctx context.Context, id int64) (*VendorVau
 	if err != nil || r == nil {
 		return nil, err
 	}
-	v, err := newVendorVault(r.ID, r.VendorBranchID, r.VaultCode, r.Category, r.CurrencyCode, r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.EscrowAccount, r.IsActive, r.DeletedAt)
+	v, err := newVendorVault(
+		r.ID, r.VendorBranchID, r.BranchName, r.Region,
+		r.VaultCode, r.VaultName, r.Category, r.CurrencyCode, r.Alamat,
+		r.MinBalance, r.MaxBalance, r.CisLimitAmount, r.CisLimitCurrency,
+		r.Latitude, r.Longitude, r.OperatingHours, r.LocationID,
+		r.EscrowCash, r.EscrowAtm, r.IsActive, r.DeletedAt,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +257,12 @@ func (s *VendorVaultAdminService) Get(ctx context.Context, id int64) (*VendorVau
 }
 
 // Create validates and stages a new vault under vendorID's branch.
+// When vault_name is omitted/blank, it is auto-generated as <vendorPrefix>_<area>_V<3-digit>.
+// When vault_code is omitted/blank, it defaults to vault_name.
 func (s *VendorVaultAdminService) Create(ctx context.Context, makerID, vendorID int64, req VendorVaultPayload, actorIP string) (db.MasterDataChangeRequest, error) {
 	req.VaultCode = strings.TrimSpace(req.VaultCode)
 	if req.VendorBranchID == 0 {
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "vendor_branch_id", Message: "wajib diisi"}
-	}
-	if req.VaultCode == "" {
-		return db.MasterDataChangeRequest{}, &ValidationError{Field: "vault_code", Message: "wajib diisi"}
 	}
 	if err := validateVaultFields(&req.VendorVaultUpdatePayload); err != nil {
 		return db.MasterDataChangeRequest{}, err
@@ -165,12 +279,38 @@ func (s *VendorVaultAdminService) Create(ctx context.Context, makerID, vendorID 
 		return db.MasterDataChangeRequest{}, &ValidationError{Field: "vendor_branch_id", Message: "cabang bukan milik vendor ini"}
 	}
 
+	if req.VaultName == nil || *req.VaultName == "" {
+		generated, err := s.repo.GenerateNextVaultName(ctx, req.VendorBranchID)
+		if err != nil {
+			return db.MasterDataChangeRequest{}, fmt.Errorf("generating vault name: %w", err)
+		}
+		if g := strings.TrimSpace(generated); g != "" {
+			req.VaultName = &g
+		}
+	}
+	if req.VaultCode == "" && req.VaultName != nil && *req.VaultName != "" {
+		req.VaultCode = *req.VaultName
+	}
+	if req.VaultCode == "" {
+		return db.MasterDataChangeRequest{}, &ValidationError{Field: "vault_code", Message: "wajib diisi"}
+	}
+
 	existing, err := s.repo.FindByCode(ctx, req.VaultCode)
 	if err != nil {
 		return db.MasterDataChangeRequest{}, fmt.Errorf("checking vault code uniqueness: %w", err)
 	}
 	if existing != nil {
 		return db.MasterDataChangeRequest{}, ErrVendorVaultCodeConflict
+	}
+
+	if req.VaultName != nil && *req.VaultName != "" {
+		existingByName, err := s.repo.FindByBranchAndName(ctx, req.VendorBranchID, *req.VaultName)
+		if err != nil {
+			return db.MasterDataChangeRequest{}, fmt.Errorf("checking vault name uniqueness: %w", err)
+		}
+		if existingByName != nil {
+			return db.MasterDataChangeRequest{}, ErrVendorVaultNameConflict
+		}
 	}
 
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_vault", Op: "create", Payload: req}, actorIP)
@@ -187,6 +327,15 @@ func (s *VendorVaultAdminService) Update(ctx context.Context, makerID, id int64,
 	}
 	if err := validateVaultFields(&req); err != nil {
 		return db.MasterDataChangeRequest{}, err
+	}
+	if req.VaultName != nil && *req.VaultName != "" && *req.VaultName != before.VaultName {
+		existingByName, err := s.repo.FindByBranchAndName(ctx, before.VendorBranchID, *req.VaultName)
+		if err != nil {
+			return db.MasterDataChangeRequest{}, fmt.Errorf("checking vault name uniqueness: %w", err)
+		}
+		if existingByName != nil && *existingByName != id {
+			return db.MasterDataChangeRequest{}, ErrVendorVaultNameConflict
+		}
 	}
 	return s.changes.Submit(ctx, makerID, SubmitRequest{EntityType: "vendor_vault", Op: "update", EntityID: &id, Payload: req, Before: before}, actorIP)
 }
@@ -213,13 +362,13 @@ func (s *VendorVaultAdminService) toggle(ctx context.Context, makerID, id int64,
 }
 
 // validateVaultFields normalizes (trims) and validates the editable fields:
-// category ATM|CASH|ATM_CASH, currency = 3 uppercase letters, capacities >= 0 with
-// min <= max, coordinates within range. Decimals are checked via big.Rat --
-// never float.
-// escrowAccountRe mirrors vendor_vaults_escrow_account_chk (migration 038).
-var escrowAccountRe = regexp.MustCompile(`^[0-9]{12}$`)
-
+// category ATM|CASH|ATM_CASH, currency = 3 uppercase letters, balances >= 0 with
+// min <= max, cis_limit_amount > 0 (numeric(20,2)), escrow_cash/escrow_atm = 12 digits,
+// coordinates within range. Decimals are checked via big.Rat -- never float.
 func validateVaultFields(p *VendorVaultUpdatePayload) error {
+	p.VaultName = trimOptionalString(p.VaultName)
+	p.Alamat = trimOptionalString(p.Alamat)
+	p.OperatingHours = trimOptionalString(p.OperatingHours)
 	p.Category = strings.TrimSpace(p.Category)
 	p.CurrencyCode = strings.ToUpper(strings.TrimSpace(p.CurrencyCode))
 	if p.Category != "ATM" && p.Category != "CASH" && p.Category != "ATM_CASH" {
@@ -228,34 +377,35 @@ func validateVaultFields(p *VendorVaultUpdatePayload) error {
 	if !currencyCodeRe.MatchString(p.CurrencyCode) {
 		return &ValidationError{Field: "currency_code", Message: "wajib 3 huruf (mis. IDR)"}
 	}
-	if p.EscrowAccount != nil {
-		e := strings.TrimSpace(*p.EscrowAccount)
-		switch {
-		case e == "":
-			p.EscrowAccount = nil
-		case !escrowAccountRe.MatchString(e):
-			return &ValidationError{Field: "escrow_account", Message: "harus tepat 12 digit angka"}
-		default:
-			p.EscrowAccount = &e
-		}
+	var err error
+	if p.EscrowCash, err = normalizeEscrowField("escrow_cash", p.EscrowCash); err != nil {
+		return err
+	}
+	if p.EscrowAtm, err = normalizeEscrowField("escrow_atm", p.EscrowAtm); err != nil {
+		return err
+	}
+	if p.CisLimitAmount, err = normalizeCisLimit(p.CisLimitAmount); err != nil {
+		return err
 	}
 
-	minC, err := parseDecimalField("min_capacity_amount", p.MinCapacityAmount)
+	p.MinBalance = trimOptionalString(p.MinBalance)
+	p.MaxBalance = trimOptionalString(p.MaxBalance)
+	minB, err := parseDecimalField("min_balance", p.MinBalance)
 	if err != nil {
 		return err
 	}
-	maxC, err := parseDecimalField("max_capacity_amount", p.MaxCapacityAmount)
+	maxB, err := parseDecimalField("max_balance", p.MaxBalance)
 	if err != nil {
 		return err
 	}
-	if minC != nil && minC.Sign() < 0 {
-		return &ValidationError{Field: "min_capacity_amount", Message: "tidak boleh negatif"}
+	if minB != nil && minB.Sign() < 0 {
+		return &ValidationError{Field: "min_balance", Message: "tidak boleh negatif"}
 	}
-	if maxC != nil && maxC.Sign() < 0 {
-		return &ValidationError{Field: "max_capacity_amount", Message: "tidak boleh negatif"}
+	if maxB != nil && maxB.Sign() < 0 {
+		return &ValidationError{Field: "max_balance", Message: "tidak boleh negatif"}
 	}
-	if minC != nil && maxC != nil && minC.Cmp(maxC) > 0 {
-		return &ValidationError{Field: "min_capacity_amount", Message: "tidak boleh lebih besar dari kapasitas maksimum"}
+	if minB != nil && maxB != nil && minB.Cmp(maxB) > 0 {
+		return &ValidationError{Field: "min_balance", Message: "tidak boleh lebih besar dari saldo maksimum"}
 	}
 
 	if err := validateCoordinate("latitude", p.Latitude, 90); err != nil {

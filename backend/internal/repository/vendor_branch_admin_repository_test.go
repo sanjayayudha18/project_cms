@@ -138,4 +138,26 @@ func TestVendorBranchAdminRepository(t *testing.T) {
 			t.Errorf("FindByCode(unknown) = %v, want nil", foundID)
 		}
 	})
+
+	t.Run("IsActiveRegion checks if region exists and is active", func(t *testing.T) {
+		var rCode string
+		_ = tx.QueryRow(ctx, "SELECT code FROM regions WHERE is_active = true AND deleted_at IS NULL LIMIT 1").Scan(&rCode)
+		if rCode != "" {
+			active, err := repo.IsActiveRegion(ctx, rCode)
+			if err != nil {
+				t.Fatalf("IsActiveRegion(%s): %v", rCode, err)
+			}
+			if !active {
+				t.Errorf("IsActiveRegion(%s) = false, want true", rCode)
+			}
+		}
+		active, err := repo.IsActiveRegion(ctx, "NON_EXISTENT_REGION")
+		if err != nil {
+			t.Fatalf("IsActiveRegion(NON_EXISTENT_REGION): %v", err)
+		}
+		if active {
+			t.Errorf("IsActiveRegion(NON_EXISTENT_REGION) = true, want false")
+		}
+	})
 }
+

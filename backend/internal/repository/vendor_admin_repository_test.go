@@ -194,4 +194,33 @@ func TestVendorAdminRepository(t *testing.T) {
 			t.Errorf("CountActiveUsers = %d, want 2", count)
 		}
 	})
+
+	t.Run("GetPksTypeByCode resolves type code or nil", func(t *testing.T) {
+		got, err := repo.GetPksTypeByCode(ctx, "NON_EXISTENT_CODE")
+		if err != nil {
+			t.Fatalf("GetPksTypeByCode: %v", err)
+		}
+		if got != nil {
+			t.Errorf("GetPksTypeByCode = %+v, want nil", got)
+		}
+	})
+
+	t.Run("GetKindAndDirector returns kind and director", func(t *testing.T) {
+		kind, dir, err := repo.GetKindAndDirector(ctx, activeID)
+		if err != nil {
+			t.Fatalf("GetKindAndDirector: %v", err)
+		}
+		if kind == "" {
+			t.Errorf("expected non-empty kind")
+		}
+		if dir != nil {
+			t.Logf("found director: %+v", dir)
+		}
+
+		_, _, err = repo.GetKindAndDirector(ctx, -999)
+		if err == nil {
+			t.Errorf("GetKindAndDirector(-999) expected error, got nil")
+		}
+	})
 }
+

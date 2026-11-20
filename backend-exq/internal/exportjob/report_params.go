@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
@@ -21,12 +20,6 @@ const (
 	KindVendorPks                   Kind = reports.VendorPks
 )
 
-// vendorPksQMax is the longest accepted free-text search (same bound as the vendor list screen).
-const vendorPksQMax = 100
-
-// vendorStatuses are the accepted vendor_pks `status` values (vendor list filter).
-var vendorStatuses = map[string]bool{"active": true, "disabled": true, "all": true}
-
 // ReportParams is the validated filter of one report export (stored in export_jobs.report_params).
 // Fields that do not apply to the kind stay nil.
 type ReportParams struct {
@@ -36,11 +29,11 @@ type ReportParams struct {
 	VendorID       *int64  `json:"vendor_id,omitempty"`        // all report kinds
 	VendorBranchID *int64  `json:"vendor_branch_id,omitempty"` // DSR
 	RegionCode     *string `json:"region_code,omitempty"`      // replenishment
-	Status         *string `json:"status,omitempty"`           // dsr_late_daily
+	Status         *string `json:"status,omitempty"`           // dsr_late_daily; vendor_pks: terkini|semua|status key
 	Classification *string `json:"classification,omitempty"`   // amount mismatch
-	Q              *string `json:"q,omitempty"`                // vendor_pks: code/name search
-	VendorStatus   *string `json:"vendor_status,omitempty"`    // vendor_pks: active|disabled|all
-	PksStatus      *string `json:"pks_status,omitempty"`       // vendor_pks: key of reports.PksStatuses
+	Q              *string `json:"q,omitempty"`                // vendor_pks: PKS name / WOD search
+	PksType        *string `json:"pks_type,omitempty"`         // vendor_pks: PKS type code
+	Vendor         *string `json:"vendor,omitempty"`           // vendor_pks: vendor code
 }
 
 // reportEntities maps each report kind to the legacy `report` value stored as export_jobs.entity.
@@ -104,26 +97,29 @@ func (r *ReportParams) parseDsr(kind Kind, q url.Values, now time.Time) error {
 	return nil
 }
 
+// parseVendorPks: the Daftar PKS filter {status, pks_type, vendor, q} (pkg/reports.ParsePksListFilter).
+// The pre-Daftar-PKS pks_status parameter is refused (Req 10.1).
 func (r *ReportParams) parseVendorPks(q url.Values) error {
-	if s := strings.TrimSpace(q.Get("q")); s != "" {
-		if utf8.RuneCountInString(s) > vendorPksQMax {
-			return &reports.ValidationError{Field: "q", Message: "maksimal 100 karakter"}
+	if q.Has("pks_status") {
+		return &reports.ValidationError{Field: "pks_status", Message: "tidak dikenal"}
+	}
+	f, err := reports.ParsePksListFilter(q.Get("status"), q.Get("pks_type"), q.Get("vendor"), q.Get("q"))
+	if err != nil {
+		field := "status"
+		if _, ok := reports.PksListStatusFilters[strings.TrimSpace(q.Get("status"))]; ok || q.Get("status") == "" {
+			field = "q" // status is fine, so the only other failure is the q length
 		}
-		r.Q = &s
+		return &reports.ValidationError{Field: field, Message: err.Error()}
 	}
-	st := q.Get("status")
-	if st == "" {
-		st = "active"
-	}
-	if !vendorStatuses[st] {
-		return &reports.ValidationError{Field: "status", Message: "tidak dikenal"}
-	}
-	r.VendorStatus = &st
-	if ps := q.Get("pks_status"); ps != "" {
-		if _, ok := reports.PksStatuses[ps]; !ok {
-			return &reports.ValidationError{Field: "pks_status", Message: "tidak dikenal"}
+	r.Status = &f.Status
+	for _, o := range []struct {
+		v string
+		p **string
+	}{{f.PksType, &r.PksType}, {f.Vendor, &r.Vendor}, {f.Q, &r.Q}} {
+		if o.v != "" {
+			v := o.v
+			*o.p = &v
 		}
-		r.PksStatus = &ps
 	}
 	return nil
 }
@@ -196,7 +192,7 @@ func reportHashBytes(p Params) []byte {
 func (r ReportParams) legacyFilter(kind Kind) map[string]any {
 	switch kind {
 	case KindVendorPks:
-		return map[string]any{"q": r.Q, "status": r.VendorStatus, "pks_status": r.PksStatus}
+		return map[string]any{"status": r.Status, "pks_type": r.PksType, "vendor": r.Vendor, "q": r.Q}
 	case KindDsrLateDaily, KindDsrLateSummary:
 		m := map[string]any{"month": r.Month, "vendor_id": r.VendorID, "vendor_branch_id": r.VendorBranchID}
 		if kind == KindDsrLateDaily {

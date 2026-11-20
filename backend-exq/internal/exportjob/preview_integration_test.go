@@ -194,7 +194,7 @@ func TestP33PagingWalkMatchesProduce(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := p11CellIDs(t, rows)
+		want := f.cellIDs(t, ent, rows)
 		for limit := 1; limit <= 4; limit++ {
 			var got []int64
 			after, pages := int64(0), 0
@@ -206,7 +206,7 @@ func TestP33PagingWalkMatchesProduce(t *testing.T) {
 				if pg.Total != int64(len(want)) {
 					t.Fatalf("%s limit %d: total %d, want %d", ent, limit, pg.Total, len(want))
 				}
-				got = append(got, p11CellIDs(t, pg.Rows)...)
+				got = append(got, f.cellIDs(t, ent, pg.Rows)...)
 				if pg.NextAfter == nil {
 					break
 				}

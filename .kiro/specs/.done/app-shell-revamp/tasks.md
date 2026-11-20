@@ -141,7 +141,7 @@ Keputusan PO D1–D14 ada di `design.md` (`## Overview`). D2 menyetujui dua depe
 
 - [x] 10. Dokumentasi
   - `.kiro/steering/design.md`: deviasi dari design `## Documented deviation` (Sec 1/11 sidebar gelap + toggle, Sec 6 font, Sec 10 blur overlay + transisi width, Sec 2 `--shell-accent` D14)
-  - `.kiro/steering/development-plan.md` X.1 status, `.claude/development-progress.md` entri baru
+  - `.claude/dev-plan/dev-plan.md` X.1 status, `.claude/development-progress.md` entri baru
   - _Requirements: 14.5_
   - _Model: Haiku, Effort: Low — edit dokumen sesuai daftar yang sudah ditentukan._
 

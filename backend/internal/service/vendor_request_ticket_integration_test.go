@@ -123,6 +123,9 @@ func TestIntegration_Ticket_RegionRules(t *testing.T) {
 	ctx := context.Background()
 	actor := Actor{UserID: createdBy, Role: "ADMIN"}
 	setCode := func(code any) {
+		if c, ok := code.(string); ok {
+			seedTestRegion(t, pool, c, "Integration Test Region") // FK since migration 042
+		}
 		if _, err := pool.Exec(ctx, `UPDATE vendor_branches SET region_code = $2 WHERE vendor_id = $1`, vendorID, code); err != nil {
 			t.Fatalf("set region_code: %v", err)
 		}

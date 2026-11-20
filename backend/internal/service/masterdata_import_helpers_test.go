@@ -13,8 +13,8 @@ import (
 // optional cells become nil (not ""), and a PIC without branch_code is vendor-wide.
 func TestImportFieldMappers(t *testing.T) {
 	vault := vaultFields(map[string]string{"category": "CASH", "currency_code": "IDR", "min_capacity_amount": "1000000.50", "location_id": "12"})
-	if vault.Category != "CASH" || vault.MinCapacityAmount == nil || *vault.MinCapacityAmount != "1000000.50" ||
-		vault.MaxCapacityAmount != nil || vault.LocationID == nil || *vault.LocationID != 12 {
+	if vault.Category != "CASH" || vault.MinBalance == nil || *vault.MinBalance != "1000000.50" ||
+		vault.MaxBalance != nil || vault.LocationID == nil || *vault.LocationID != 12 {
 		t.Errorf("vaultFields = %+v", vault)
 	}
 

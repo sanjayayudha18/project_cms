@@ -2,7 +2,7 @@
 
 Author: TODO (product owner / tech lead). Status: draft — menunggu penerimaan.
 Stage: 1 Plan. Trigger ke stage berikut: product owner menerima file ini.
-Roadmap: Phase 0.2 (`.kiro/steering/development-plan.md`). Aturan: CLAUDE.md Sec 5 (Idempotency).
+Roadmap: Phase 0.2 (`.claude/dev-plan/dev-plan.md`). Aturan: CLAUDE.md Sec 5 (Idempotency).
 
 ## Problem
 CLAUDE.md Sec 5 mewajibkan semua ingest file (DSR/invoice/escrow) idempotent per

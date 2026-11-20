@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/service"
@@ -26,8 +25,13 @@ type fakeVendorAdminServicer struct {
 	listErr     error
 	countResult int64
 	countErr    error
+	listCalled  bool
+	lastList    db.ListVendorsAdminParams
+	lastCount   db.CountVendorsAdminParams
 	getResult   *db.GetVendorAdminByIDRow
 	getErr      error
+
+	lastRole string
 
 	createResult db.MasterDataChangeRequest
 	createErr    error
@@ -48,19 +52,23 @@ type fakeVendorAdminServicer struct {
 	enableCalled bool
 }
 
-func (f *fakeVendorAdminServicer) List(context.Context, db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+func (f *fakeVendorAdminServicer) List(_ context.Context, role string, p db.ListVendorsAdminParams) ([]db.ListVendorsAdminRow, error) {
+	f.listCalled = true
+	f.lastRole = role
+	f.lastList = p
 	return f.listResult, f.listErr
 }
 
-func (f *fakeVendorAdminServicer) Count(context.Context, db.CountVendorsAdminParams) (int64, error) {
+func (f *fakeVendorAdminServicer) Count(_ context.Context, _ string, p db.CountVendorsAdminParams) (int64, error) {
+	f.lastCount = p
 	return f.countResult, f.countErr
 }
 
-func (f *fakeVendorAdminServicer) Get(context.Context, int64) (*db.GetVendorAdminByIDRow, error) {
+func (f *fakeVendorAdminServicer) Get(_ context.Context, role string, _ int64) (*db.GetVendorAdminByIDRow, error) {
 	return f.getResult, f.getErr
 }
 
-func (f *fakeVendorAdminServicer) GetKindAndDirector(context.Context, int64) (string, *db.GetVendorDirectorPicRow, error) {
+func (f *fakeVendorAdminServicer) GetKindAndDirector(context.Context, string, int64) (string, *db.GetVendorDirectorPicRow, error) {
 	return "FLM_VENDOR", nil, nil
 }
 
@@ -87,7 +95,7 @@ func (f *fakeVendorAdminServicer) Enable(context.Context, int64, int64, string) 
 }
 
 // mountAdminVendorHandler mirrors the real mount in cmd/api/main.go:
-// RequireAuth + RequireRoles("ADMIN", "ADMIN_PARAM").
+// RequireAuth + RequireRoles(reports.PksViewerRoles...); Routes() narrows writes.
 func mountAdminVendorHandler(svc VendorAdminServicer) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
@@ -99,7 +107,7 @@ func mountAdminVendorHandler(svc VendorAdminServicer) (http.Handler, *pkgauth.To
 	r := chi.NewRouter()
 	r.With(
 		custommw.RequireAuth(tokenSvc),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
+		custommw.RequireRoles(reports.PksViewerRoles...),
 	).Mount("/api/v1/admin/vendors", h.Routes())
 	return r, tokenSvc
 }
@@ -134,45 +142,67 @@ func TestAdminVendorHandler_List_InvalidStatus_BadRequest(t *testing.T) {
 	}
 }
 
-func TestAdminVendorHandler_List_InvalidPksStatus_BadRequest(t *testing.T) {
-	router, tokenSvc := mountAdminVendorHandler(&fakeVendorAdminServicer{})
-	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
-
-	for _, v := range []string{"xyz", "AKTIF", "all"} {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("pks_status=%s: expected 400, got %d: %s", v, rec.Code, rec.Body.String())
-		}
+func TestAdminVendorHandler_List_KindFilter(t *testing.T) {
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name     string
+		query    string
+		wantCode int
+		wantKind *string
+		wantCall bool
+		wantLim  int64
+		wantOff  int64
+	}{
+		{name: "FLM_VENDOR", query: "kind=FLM_VENDOR", wantCode: 200, wantKind: str("FLM_VENDOR"), wantCall: true, wantLim: 25},
+		{name: "INTERNAL", query: "kind=INTERNAL", wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantLim: 25},
+		{name: "empty kind is nil", query: "kind=", wantCode: 200, wantCall: true, wantLim: 25},
+		{name: "absent kind is nil", query: "", wantCode: 200, wantCall: true, wantLim: 25},
+		{name: "invalid kind", query: "kind=xyz", wantCode: 400},
+		{name: "lowercase kind invalid", query: "kind=internal", wantCode: 400},
+		{
+			name: "combined with status, paging", query: "kind=INTERNAL&status=active&page=3&page_size=10",
+			wantCode: 200, wantKind: str("INTERNAL"), wantCall: true, wantLim: 10, wantOff: 20,
+		},
 	}
-	for v := range reports.PksStatuses {
-		rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?pks_status="+v, token, "")
-		if rec.Code != http.StatusOK {
-			t.Errorf("pks_status=%s: expected 200, got %d: %s", v, rec.Code, rec.Body.String())
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &fakeVendorAdminServicer{}
+			router, tokenSvc := mountAdminVendorHandler(svc)
+			token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+			rec := doRequest(router, http.MethodGet, "/api/v1/admin/vendors?"+tt.query, token, "")
+
+			if rec.Code != tt.wantCode {
+				t.Fatalf("code = %d, want %d: %s", rec.Code, tt.wantCode, rec.Body.String())
+			}
+			if svc.listCalled != tt.wantCall {
+				t.Fatalf("service called = %v, want %v", svc.listCalled, tt.wantCall)
+			}
+			if !tt.wantCall {
+				return
+			}
+			for name, got := range map[string]*string{"List": svc.lastList.Kind, "Count": svc.lastCount.Kind} {
+				if (got == nil) != (tt.wantKind == nil) || (got != nil && *got != *tt.wantKind) {
+					t.Errorf("%s Kind = %v, want %v", name, got, tt.wantKind)
+				}
+			}
+			if svc.lastList.PageLimit != tt.wantLim || svc.lastList.PageOffset != tt.wantOff {
+				t.Errorf("paging = %d/%d, want %d/%d", svc.lastList.PageLimit, svc.lastList.PageOffset, tt.wantLim, tt.wantOff)
+			}
+		})
 	}
 }
 
-func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
+// Each item carries pks_count (never the old pks/pks_status fields) and the director.
+func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPksCount(t *testing.T) {
 	str := func(s string) *string { return &s }
 	i64 := func(n int64) *int64 { return &n }
-	date := func(y int, m time.Month, d int) pgtype.Date {
-		return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
-	}
 	svc := &fakeVendorAdminServicer{
-		countResult: 3,
+		countResult: 2,
 		listResult: []db.ListVendorsAdminRow{
-			{ // FLM vendor with active PKS + director
-				ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR",
-				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id"),
-				PksID: i64(9), PksName: str("PKS 2026"), PksEffectiveDate: date(2026, 1, 1), PksExpiryDate: date(2027, 12, 31),
-				PksValidityMonths: 24, PksRemainingDays: 420, PksStatus: "aktif",
-			},
-			{ // FLM vendor without PKS: COALESCEd to 0 / '' + 'belum_diisi'
-				ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "FLM_VENDOR", PksStatus: "belum_diisi",
-			},
-			{ // INTERNAL: no PKS, empty status -> pks_status null
-				ID: 3, Code: "C", Name: "C", IsActive: true, Kind: "INTERNAL",
-			},
+			{ID: 1, Code: "A", Name: "A", IsActive: true, Kind: "FLM_VENDOR", PksCount: 3,
+				DirectorID: i64(7), DirectorName: str("Budi"), DirectorPhone: str("0812"), DirectorEmail: str("b@x.id")},
+			{ID: 2, Code: "B", Name: "B", IsActive: true, Kind: "INTERNAL"},
 		},
 	}
 	router, tokenSvc := mountAdminVendorHandler(svc)
@@ -185,29 +215,59 @@ func TestAdminVendorHandler_List_ResponseCarriesDirectorAndPks(t *testing.T) {
 	var body struct {
 		Vendors []map[string]any `json:"vendors"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Vendors) != 3 {
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Vendors) != 2 {
 		t.Fatalf("decode: %v, vendors=%d, body=%s", err, len(body.Vendors), rec.Body.String())
 	}
-	v0, v1, v2 := body.Vendors[0], body.Vendors[1], body.Vendors[2]
-
-	if v0["kind"] != "FLM_VENDOR" || v0["pks_status"] != "aktif" {
-		t.Errorf("vendor 0 kind/pks_status = %v/%v", v0["kind"], v0["pks_status"])
+	for i, v := range body.Vendors {
+		for _, removed := range []string{"pks", "pks_status"} {
+			if _, ok := v[removed]; ok {
+				t.Errorf("vendor %d still carries the removed %q field", i, removed)
+			}
+		}
 	}
+	v0, v1 := body.Vendors[0], body.Vendors[1]
 	dir, _ := v0["director"].(map[string]any)
 	if dir["name"] != "Budi" || dir["phone"] != "0812" || dir["email"] != "b@x.id" {
 		t.Errorf("vendor 0 director = %v", v0["director"])
 	}
-	pks, _ := v0["pks"].(map[string]any)
-	if pks["id"] != float64(9) || pks["pks_name"] != "PKS 2026" || pks["effective_date"] != "2026-01-01" ||
-		pks["expiry_date"] != "2027-12-31" || pks["validity_months"] != float64(24) || pks["remaining_days"] != float64(420) {
-		t.Errorf("vendor 0 pks = %v", v0["pks"])
+	if v0["pks_count"] != float64(3) || v1["pks_count"] != float64(0) {
+		t.Errorf("pks_count = %v/%v, want 3/0", v0["pks_count"], v1["pks_count"])
 	}
+	if v1["director"] != nil || v1["kind"] != "INTERNAL" {
+		t.Errorf("vendor 1 director/kind = %v/%v, want nil/INTERNAL", v1["director"], v1["kind"])
+	}
+}
 
-	if v1["pks"] != nil || v1["director"] != nil || v1["pks_status"] != "belum_diisi" {
-		t.Errorf("vendor 1 pks/director/pks_status = %v/%v/%v, want nil/nil/belum_diisi", v1["pks"], v1["director"], v1["pks_status"])
+// ATM-SPV may read vendors (Req 9.2) but every write stays ADMIN/ADMIN_PARAM.
+func TestAdminVendorHandler_ATMSPV_ReadOnly(t *testing.T) {
+	svc := &fakeVendorAdminServicer{
+		getResult:  &db.GetVendorAdminByIDRow{ID: 1, Code: "ACM", Name: "Acme", IsActive: true},
+		listResult: []db.ListVendorsAdminRow{{ID: 1, Code: "ACM", Name: "Acme", IsActive: true}},
 	}
-	if v2["kind"] != "INTERNAL" || v2["pks"] != nil || v2["pks_status"] != nil {
-		t.Errorf("vendor 2 kind/pks/pks_status = %v/%v/%v, want INTERNAL/nil/nil", v2["kind"], v2["pks"], v2["pks_status"])
+	router, tokenSvc := mountAdminVendorHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ATM-SPV")
+
+	for _, path := range []string{"/api/v1/admin/vendors", "/api/v1/admin/vendors/1"} {
+		if rec := doRequest(router, http.MethodGet, path, token, ""); rec.Code != http.StatusOK {
+			t.Errorf("GET %s = %d, want 200: %s", path, rec.Code, rec.Body.String())
+		}
+	}
+	if svc.lastRole != "ATM-SPV" {
+		t.Errorf("service saw role %q, want ATM-SPV", svc.lastRole)
+	}
+	writes := []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/admin/vendors"},
+		{http.MethodPut, "/api/v1/admin/vendors/1"},
+		{http.MethodPost, "/api/v1/admin/vendors/1/disable"},
+		{http.MethodPost, "/api/v1/admin/vendors/1/enable"},
+	}
+	for _, w := range writes {
+		if rec := doRequest(router, w.method, w.path, token, `{}`); rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s = %d, want 403", w.method, w.path, rec.Code)
+		}
+	}
+	if svc.createCalled || svc.updateCalled || svc.disableCalled || svc.enableCalled {
+		t.Error("a write reached the service for ATM-SPV")
 	}
 }
 

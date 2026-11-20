@@ -11,12 +11,12 @@ import (
 
 	"github.com/cimb-niaga/cms/backend-exq/internal/repository"
 	"github.com/cimb-niaga/cms/pkg/csvexport"
-	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
 // Querier is the subset of *repository.Queries the producers call.
 type Querier interface {
 	ReportQuerier
+	ExportVendorsBatch(ctx context.Context, arg repository.ExportVendorsBatchParams) ([]repository.ExportVendorsBatchRow, error)
 	ExportVendorsWithPksBatch(ctx context.Context, arg repository.ExportVendorsWithPksBatchParams) ([]repository.ExportVendorsWithPksBatchRow, error)
 	ExportVendorBranchesBatch(ctx context.Context, arg repository.ExportVendorBranchesBatchParams) ([]repository.ExportVendorBranchesBatchRow, error)
 	ExportVendorVaultsBatch(ctx context.Context, arg repository.ExportVendorVaultsBatchParams) ([]repository.ExportVendorVaultsBatchRow, error)
@@ -24,6 +24,8 @@ type Querier interface {
 	ExportATMsBatch(ctx context.Context, arg repository.ExportATMsBatchParams) ([]repository.ExportATMsBatchRow, error)
 	ExportATMAssignmentsBatch(ctx context.Context, arg repository.ExportATMAssignmentsBatchParams) ([]repository.ExportATMAssignmentsBatchRow, error)
 	ExportDsrLocationMapsBatch(ctx context.Context, arg repository.ExportDsrLocationMapsBatchParams) ([]repository.ExportDsrLocationMapsBatchRow, error)
+	ExportCashCountPicsBatch(ctx context.Context, arg repository.ExportCashCountPicsBatchParams) ([]repository.ExportCashCountPicsBatchRow, error)
+	CountCashCountPics(ctx context.Context, status string) (int64, error)
 	ExportPackagePricesBatch(ctx context.Context, arg repository.ExportPackagePricesBatchParams) ([]repository.ExportPackagePricesBatchRow, error)
 	CountVendors(ctx context.Context, arg repository.CountVendorsParams) (int64, error)
 	CountVendorBranches(ctx context.Context, arg repository.CountVendorBranchesParams) (int64, error)
@@ -58,11 +60,12 @@ type PreviewProducer interface {
 // tableProducer is one keyset-paged master-data table. Produce (file) and Page
 // (preview) share fetch and cells, so a preview cannot differ from the file.
 type tableProducer[R any] struct {
-	header []string
-	fetch  func(ctx context.Context, q Querier, p Params, asOf time.Time, afterID int64, limit int32) ([]R, error)
-	id     func(R) int64
-	cells  func(R) []string
-	count  func(ctx context.Context, q Querier, p Params, asOf time.Time) (int64, error)
+	header  []string
+	fetch   func(ctx context.Context, q Querier, p Params, asOf time.Time, afterID int64, limit int32) ([]R, error)
+	id      func(R) int64
+	cells   func(R) []string
+	cellsAt func(no int64, r R) []string
+	count   func(ctx context.Context, q Querier, p Params, asOf time.Time) (int64, error)
 }
 
 func (t tableProducer[R]) Header() []string { return t.header }
@@ -71,7 +74,14 @@ func (t tableProducer[R]) Count(ctx context.Context, q Querier, p Params, asOf t
 	return t.count(ctx, q, p, asOf)
 }
 
-func (t tableProducer[R]) Page(ctx context.Context, q Querier, p Params, asOf time.Time, afterID int64, limit int) ([][]string, int64, error) {
+func (t tableProducer[R]) rowCells(no int64, r R) []string {
+	if t.cellsAt != nil {
+		return t.cellsAt(no, r)
+	}
+	return t.cells(r)
+}
+
+func (t tableProducer[R]) pageFrom(ctx context.Context, q Querier, p Params, asOf time.Time, afterID int64, limit int, startNo int64) ([][]string, int64, error) {
 	// The batch queries take an int32 LIMIT; clamp once here so no producer converts.
 	lim := int32(max(0, min(limit, math.MaxInt32)))
 	rows, err := t.fetch(ctx, q, p, asOf, afterID, lim)
@@ -80,21 +90,26 @@ func (t tableProducer[R]) Page(ctx context.Context, q Querier, p Params, asOf ti
 	}
 	out := make([][]string, 0, len(rows))
 	last := afterID
-	for _, r := range rows {
-		out = append(out, t.cells(r))
+	for i, r := range rows {
+		out = append(out, t.rowCells(startNo+int64(i), r))
 		last = t.id(r)
 	}
 	return out, last, nil
 }
 
-// Produce loops Page until a page is shorter than PageSize.
+func (t tableProducer[R]) Page(ctx context.Context, q Querier, p Params, asOf time.Time, afterID int64, limit int) ([][]string, int64, error) {
+	return t.pageFrom(ctx, q, p, asOf, afterID, limit, 1)
+}
+
+// Produce loops pageFrom until a page is shorter than PageSize.
 func (t tableProducer[R]) Produce(ctx context.Context, q Querier, p Params, asOf time.Time, emit func([]string) error) error {
 	var after int64
+	var startNo int64 = 1
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		rows, last, err := t.Page(ctx, q, p, asOf, after, PageSize)
+		rows, last, err := t.pageFrom(ctx, q, p, asOf, after, PageSize, startNo)
 		if err != nil {
 			return err
 		}
@@ -104,6 +119,7 @@ func (t tableProducer[R]) Produce(ctx context.Context, q Querier, p Params, asOf
 			}
 		}
 		after = last
+		startNo += int64(len(rows))
 		if len(rows) < PageSize {
 			return nil
 		}
@@ -153,33 +169,52 @@ func boolStr(b bool) string { return strconv.FormatBool(b) }
 // scope picks the vendor/branch ids a producer passes on; global kinds pass nil.
 func scope(p Params) (vendorID, branchID *int64) { return p.VendorID, p.BranchID }
 
-func vendorsProducer(forceAll bool, renewalMonths int) Producer {
+func vendorsProducer(forceAll bool) Producer {
 	status := func(p Params) string {
 		if forceAll { // Req 4.6: the vendor profile row is always exported
 			return "all"
 		}
 		return p.StatusFilter
 	}
-	type row = repository.ExportVendorsWithPksBatchRow
+	type row = repository.ExportVendorsBatchRow
 	return tableProducer[row]{
 		header: exportHeaderOf(csvexport.Vendors),
-		fetch: func(ctx context.Context, q Querier, p Params, asOf time.Time, after int64, limit int32) ([]row, error) {
+		fetch: func(ctx context.Context, q Querier, p Params, _ time.Time, after int64, limit int32) ([]row, error) {
 			v, _ := scope(p)
-			return q.ExportVendorsWithPksBatch(ctx, repository.ExportVendorsWithPksBatchParams{
-				Today: wibDate(reports.TodayWIB(asOf)), RenewalMonths: int32(renewalMonths), //nolint:gosec // G115: bounded by reports.ParseVendorPksRenewalMonths
-				AfterID: after, VendorID: v, Status: status(p), BatchSize: limit})
+			return q.ExportVendorsBatch(ctx, repository.ExportVendorsBatchParams{
+				AfterID: after, VendorID: v, Status: status(p), BatchSize: limit,
+			})
 		},
 		id: func(r row) int64 { return r.ID },
 		cells: func(r row) []string {
-			base := csvexport.VendorCells(csvexport.VendorRow{ID: r.ID, Code: r.Code, Name: r.Name, LegalName: r.LegalName,
-				Npwp: r.Npwp, ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone, HqAddress: r.HqAddress, IsActive: r.IsActive})
-			d := pksDetailRow(r.DirectorName, r.DirectorPhone, r.DirectorEmail, r.PksName,
-				r.EffectiveDate, r.ExpiryDate, r.ValidityMonths, r.RemainingDays, r.PksStatus)
-			return append(base, reports.VendorPksDetailCells(d)...)
+			return csvexport.VendorCells(csvexport.VendorRow{
+				Name: r.Name, LegalName: r.LegalName, Npwp: r.Npwp,
+				ContactEmail: r.ContactEmail, ContactPhone: r.ContactPhone,
+				HqAddress: r.HqAddress, IsActive: r.IsActive,
+			})
 		},
 		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
 			v, _ := scope(p)
 			return q.CountVendors(ctx, repository.CountVendorsParams{VendorID: v, Status: status(p)})
+		},
+	}
+}
+
+func vendorPksMasterProducer() Producer {
+	type row = repository.ExportVendorsWithPksBatchRow
+	return tableProducer[row]{
+		header: headerOf(csvexport.VendorPks, true)[:5], // code, name + 3 director columns; PKS columns left the vendor files (Req 7)
+		fetch: func(ctx context.Context, q Querier, p Params, asOf time.Time, after int64, limit int32) ([]row, error) {
+			v, _ := scope(p)
+			return q.ExportVendorsWithPksBatch(ctx, repository.ExportVendorsWithPksBatchParams{
+				AfterID: after, VendorID: v, Status: p.StatusFilter, BatchSize: limit,
+			})
+		},
+		id:    func(r row) int64 { return r.ID },
+		cells: vendorPksMasterCells,
+		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
+			v, _ := scope(p)
+			return q.CountVendors(ctx, repository.CountVendorsParams{VendorID: v, Status: p.StatusFilter})
 		},
 	}
 }
@@ -210,8 +245,23 @@ func vaultsProducer() Producer {
 			return q.ExportVendorVaultsBatch(ctx, repository.ExportVendorVaultsBatchParams{AfterID: after, VendorID: v, BranchID: b, Status: p.StatusFilter, BatchSize: limit})
 		},
 		id: func(r repository.ExportVendorVaultsBatchRow) int64 { return r.ID },
-		cells: func(r repository.ExportVendorVaultsBatchRow) []string {
-			return csvexport.VendorVaultCells(csvexport.VendorVaultRow(r))
+		cellsAt: func(no int64, r repository.ExportVendorVaultsBatchRow) []string {
+			return csvexport.VendorVaultCells(csvexport.VendorVaultRow{
+				No:             no,
+				BranchName:     r.BranchName,
+				VaultName:      r.VaultName,
+				Category:       r.Category,
+				OperatingHours: r.OperatingHours,
+				CurrencyCode:   r.CurrencyCode,
+				Region:         r.Region,
+				Alamat:         r.Alamat,
+				MinBalance:     r.MinBalance,
+				MaxBalance:     r.MaxBalance,
+				CisLimitAmount: r.CisLimitAmount,
+				EscrowCash:     r.EscrowCash,
+				EscrowAtm:      r.EscrowAtm,
+				IsActive:       r.IsActive,
+			})
 		},
 		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
 			v, b := scope(p)
@@ -290,6 +340,21 @@ func dsrMapsProducer() Producer {
 	}
 }
 
+func cashCountPicsProducer() Producer {
+	type row = repository.ExportCashCountPicsBatchRow
+	return tableProducer[row]{
+		header: exportHeaderOf(csvexport.CashCountPICs),
+		fetch: func(ctx context.Context, q Querier, p Params, _ time.Time, after int64, limit int32) ([]row, error) {
+			return q.ExportCashCountPicsBatch(ctx, repository.ExportCashCountPicsBatchParams{AfterID: after, Status: p.StatusFilter, BatchSize: limit})
+		},
+		id:    func(r row) int64 { return r.ID },
+		cells: func(r row) []string { return []string{r.PicRole, r.Username, r.RegionCode, r.AreaCode} },
+		count: func(ctx context.Context, q Querier, p Params, _ time.Time) (int64, error) {
+			return q.CountCashCountPics(ctx, p.StatusFilter)
+		},
+	}
+}
+
 // priceLevelOf is the price level filter ("all" when unset); vendor_id is mandatory.
 func priceLevelOf(p Params) (string, error) {
 	if p.VendorID == nil {
@@ -333,20 +398,20 @@ func packagePricesProducer() Producer {
 
 // DefaultProducers is NewProducers without a DSR start date (DSR report files are header only).
 func DefaultProducers() map[Kind]map[string]Producer {
-	return NewProducers(nil, reports.VendorPksRenewalMonthsDefault)
+	return NewProducers(nil)
 }
 
 // NewProducers maps kind -> entity -> producer (design "entity table per Kind"), master data and
 // reports. dsrStart is DSR_LATE_START_DATE; nil = DSR report files are header only.
-// pksRenewalMonths is VENDOR_PKS_RENEWAL_MONTHS (the vendor_pks export).
-func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string]Producer {
+func NewProducers(dsrStart *time.Time) map[Kind]map[string]Producer {
 	m := map[Kind]map[string]Producer{
 		KindVendor: {
-			"vendor":            vendorsProducer(true, pksRenewalMonths),
+			"vendor":            vendorsProducer(true),
 			"branches":          branchesProducer(),
 			"vaults":            vaultsProducer(),
 			"pics":              picsProducer(),
 			"dsr-location-maps": dsrMapsProducer(),
+			csvexport.VendorPks: vendorPksMasterProducer(),
 		},
 		// Cabang scope: PIC branch only, never vendor-wide PICs (D3, enforced in SQL).
 		KindCabang: {
@@ -354,17 +419,19 @@ func NewProducers(dsrStart *time.Time, pksRenewalMonths int) map[Kind]map[string
 			"pics":              picsProducer(),
 			"dsr-location-maps": dsrMapsProducer(),
 		},
-		KindHargaPaket: {"package-prices": packagePricesProducer()},
+		KindHargaPaket:    {"package-prices": packagePricesProducer()},
+		KindCashCountPics: {csvexport.CashCountPICs: cashCountPicsProducer()},
 		KindMasterDataGlobal: {
-			csvexport.Vendors:        vendorsProducer(false, pksRenewalMonths),
+			csvexport.Vendors:        vendorsProducer(false),
 			csvexport.VendorBranches: branchesProducer(),
 			csvexport.VendorVaults:   vaultsProducer(),
 			csvexport.VendorPICs:     picsProducer(),
 			csvexport.ATMs:           atmsProducer(),
 			csvexport.ATMAssignments: atmAssignmentsProducer(),
+			csvexport.VendorPks:      vendorPksMasterProducer(),
 		},
 	}
-	for k, byEntity := range reportProducers(dsrStart, pksRenewalMonths) {
+	for k, byEntity := range reportProducers(dsrStart) {
 		m[k] = byEntity
 	}
 	return m

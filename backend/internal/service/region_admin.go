@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -30,12 +29,18 @@ var (
 	ErrRegionCodeConflict       = errors.New("region code already exists")
 	ErrRegionCodeImmutable      = errors.New("region code cannot be changed")
 	ErrRegionHasActiveLocations = errors.New("region still has active locations")
-	ErrRegionStatusUnchanged    = errors.New("region status unchanged")
+	// ErrRegionHasActiveVendorBranches: disable refused while an active vendor
+	// branch still uses the region's code (region-standardization Req 7.2).
+	ErrRegionHasActiveVendorBranches = errors.New("region still has active vendor branches")
+	ErrRegionStatusUnchanged         = errors.New("region status unchanged")
 )
 
-// regionCodeRe restricts a region code to letters and digits only (Req
-// 2.4/2.7, A2/A3), 1-20 characters after trimming (checked separately).
-var regionCodeRe = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+// regionCodeRe restricts a region code (Req 2.4/2.7). region-standardization
+// Req 1.3: same rule as a vendor branch region_code
+// (branchRegionCodeRe / vendor_branches_region_code_chk, 2-10 upper-case
+// letters/digits after normalizeRegionCode), so every new region can be used
+// by a cabang through the FK vendor_branches.region_code -> regions.code.
+var regionCodeRe = branchRegionCodeRe
 
 // regionAdminRoles are re-checked at the service layer independent of the
 // route guard (Req 5.2) -- "enforce at middleware AND service", same
@@ -64,6 +69,12 @@ type RegionAdminRepo interface {
 	GetByID(ctx context.Context, id int64) (*db.GetRegionAdminByIDRow, error)
 	FindByCode(ctx context.Context, code string) (*int64, error)
 	CountActiveLocations(ctx context.Context, regionID int64) (int64, error)
+	// Disable-guard reads inside the disable tx (Req 7.3): row lock first,
+	// then both reference counts, so a concurrent vendor branch apply (FOR
+	// SHARE on the region row) is serialized against the disable.
+	LockForUpdateTx(ctx context.Context, tx pgx.Tx, id int64) error
+	CountActiveLocationsTx(ctx context.Context, tx pgx.Tx, regionID int64) (int64, error)
+	CountActiveVendorBranchesTx(ctx context.Context, tx pgx.Tx, regionCode string) (int64, error)
 	CreateTx(ctx context.Context, tx pgx.Tx, arg db.CreateRegionAdminParams) (db.Region, error)
 	UpdateNameTx(ctx context.Context, tx pgx.Tx, id int64, region string) (db.Region, error)
 	SetActiveTx(ctx context.Context, tx pgx.Tx, id int64, active bool) (db.Region, error)
@@ -143,18 +154,16 @@ func validateRegionName(name string) (string, error) {
 	return trimmed, nil
 }
 
-// validateRegionCode enforces Req 2.4/2.7: 1-20 characters after trimming,
-// alphanumeric only. Returns the normalized (trimmed+uppercased) form.
+// validateRegionCode enforces Req 2.4/2.7 with the region-standardization
+// format (Req 1.3): 2-10 letters/digits after trimming + upper-casing.
+// Returns the normalized form.
 func validateRegionCode(code string) (string, error) {
 	normalized := normalizeRegionCode(code)
 	if normalized == "" {
 		return "", &ValidationError{Field: "code", Message: "kode wajib diisi"}
 	}
-	if len(normalized) > 20 {
-		return "", &ValidationError{Field: "code", Message: "kode maksimal 20 karakter"}
-	}
 	if !regionCodeRe.MatchString(normalized) {
-		return "", &ValidationError{Field: "code", Message: "kode hanya boleh berisi huruf dan angka"}
+		return "", &ValidationError{Field: "code", Message: "kode harus 2-10 huruf/angka tanpa spasi atau tanda baca"}
 	}
 	return normalized, nil
 }
@@ -288,6 +297,30 @@ func (s *RegionAdminService) Enable(ctx context.Context, actorID int64, actorRol
 	return s.setActive(ctx, actorID, actorRole, id, true, actorIP)
 }
 
+// ensureRegionUnused is the disable guard (Req 7.1-7.3), run inside the
+// disable tx after locking the region row: refuse while any locations row or
+// any active vendor branch still references the region.
+func (s *RegionAdminService) ensureRegionUnused(ctx context.Context, tx pgx.Tx, id int64, code string) error {
+	if err := s.repo.LockForUpdateTx(ctx, tx, id); err != nil {
+		return fmt.Errorf("locking region: %w", err)
+	}
+	locations, err := s.repo.CountActiveLocationsTx(ctx, tx, id)
+	if err != nil {
+		return fmt.Errorf("counting dependent locations: %w", err)
+	}
+	if locations > 0 {
+		return fmt.Errorf("%w: %d", ErrRegionHasActiveLocations, locations)
+	}
+	branches, err := s.repo.CountActiveVendorBranchesTx(ctx, tx, code)
+	if err != nil {
+		return fmt.Errorf("counting dependent vendor branches: %w", err)
+	}
+	if branches > 0 {
+		return fmt.Errorf("%w: %d", ErrRegionHasActiveVendorBranches, branches)
+	}
+	return nil
+}
+
 func (s *RegionAdminService) setActive(ctx context.Context, actorID int64, actorRole string, id int64, active bool, actorIP string) (db.Region, error) {
 	if !isRegionAdminActor(actorRole) {
 		return db.Region{}, ErrNotAuthorized
@@ -305,21 +338,17 @@ func (s *RegionAdminService) setActive(ctx context.Context, actorID int64, actor
 		return db.Region{}, ErrRegionStatusUnchanged
 	}
 
-	if !active {
-		count, err := s.repo.CountActiveLocations(ctx, id)
-		if err != nil {
-			return db.Region{}, fmt.Errorf("counting dependent locations: %w", err)
-		}
-		if count > 0 {
-			return db.Region{}, fmt.Errorf("%w: %d", ErrRegionHasActiveLocations, count)
-		}
-	}
-
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return db.Region{}, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if !active {
+		if err := s.ensureRegionUnused(ctx, tx, id, before.Code); err != nil {
+			return db.Region{}, err
+		}
+	}
 
 	updated, err := s.repo.SetActiveTx(ctx, tx, id, active)
 	if err != nil {

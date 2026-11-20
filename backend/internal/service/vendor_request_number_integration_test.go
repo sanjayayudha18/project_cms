@@ -61,9 +61,10 @@ func setupNumberGeneratorHarness(t *testing.T) (pool *pgxpool.Pool, vendorID, cr
 		marker, "Number Test Vendor "+marker).Scan(&vendorID); err != nil {
 		t.Fatalf("insert vendor: %v", err)
 	}
+	seedTestRegion(t, pool, "ITEST", "Integration Test Region")
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region, region_code)
-		VALUES ($1, $2, 'Number Test Branch', 'Integration Test Region', 'ITEST') RETURNING id`,
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code)
+		VALUES ($1, $2, 'Number Test Branch', 'ITEST') RETURNING id`,
 		vendorID, marker).Scan(&branchID); err != nil {
 		t.Fatalf("insert vendor branch: %v", err)
 	}

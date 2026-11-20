@@ -208,9 +208,15 @@ func seedBranchPackage(t *testing.T, tx pgx.Tx, vendorID int64, marker string, r
 	t.Helper()
 	ctx := context.Background()
 	var branchID, packageID int64
+	var regionCode *string
+	if region != nil {
+		c := itRegionCode("ITEST-" + marker)
+		seedTestRegion(t, tx, c, *region)
+		regionCode = &c
+	}
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region)
-		VALUES ($1, $2, $2, $3) RETURNING id`, vendorID, "ITEST-"+marker, region).Scan(&branchID); err != nil {
+		INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, region_code)
+		VALUES ($1, $2, $2, $3) RETURNING id`, vendorID, "ITEST-"+marker, regionCode).Scan(&branchID); err != nil {
 		t.Fatalf("insert vendor branch: %v", err)
 	}
 	if err := tx.QueryRow(ctx, `

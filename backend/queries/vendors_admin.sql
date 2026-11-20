@@ -2,23 +2,15 @@
 -- CRUD endpoints (Req 6-8). Vendors have no admin queries anywhere yet.
 
 -- name: ListVendorsAdmin :many
--- COALESCE keeps these non-null for sqlc/pgx (a NULL scan into int32 fails): 0/'' means
--- "no active PKS" (pks_id IS NULL) or, for pks_status, an INTERNAL vendor. Filter below uses the raw function.
--- Admin vendor list (Req 6) + PKS/direktur (vendor-pks 8.1-8.5). Filters: q
--- (case-insensitive substring across code/name), status — the caller resolves
--- absent status to 'active' before calling (Resolved Decision 5), so this
--- query only ever sees 'active' | 'disabled' | 'all' — and pks_status (NULL =
--- no filter). PKS status is computed by vendor_pks_status() from today
--- (Asia/Jakarta, from Go) and renewal_months. Ordered name ASC, id ASC (Req 6.5).
+-- Admin vendor list (Req 6) + direktur (vendor-pks 8.x). Filters: q (case-insensitive substring across
+-- code/name), status — the caller resolves absent status to 'active' before calling (Resolved Decision 5),
+-- so this query only sees 'active' | 'disabled' | 'all'. No PKS filter/join any more (vendor-pks-list Req 7.1):
+-- pks_count = current (not replaced) PKS rows of the vendor, 0 for INTERNAL. Ordered name ASC, id ASC (Req 6.5).
 SELECT v.id, v.code, v.name, v.legal_name, v.npwp, v.contact_email, v.contact_phone, v.hq_address, v.is_active, v.deleted_at,
        v.kind,
-       dp.id AS director_id, dp.name AS director_name, dp.phone AS director_phone, dp.email AS director_email,
-       ap.id AS pks_id, ap.pks_name, ap.effective_date AS pks_effective_date, ap.expiry_date AS pks_expiry_date,
-       COALESCE(vendor_pks_validity_months(ap.effective_date, ap.expiry_date), 0)::int AS pks_validity_months,
-       COALESCE(ap.expiry_date - sqlc.arg('today')::date, 0)::int AS pks_remaining_days,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int), '')::text AS pks_status
+       (SELECT count(*) FROM vendor_pks p WHERE p.vendor_id = v.id AND p.replaced_at IS NULL)::int AS pks_count,
+       dp.id AS director_id, dp.name AS director_name, dp.phone AS director_phone, dp.email AS director_email
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
 LEFT JOIN vendor_pics dp ON dp.vendor_id = v.id AND dp.is_director AND dp.deleted_at IS NULL
 WHERE (sqlc.narg('q')::text IS NULL
         OR v.code ILIKE '%' || sqlc.narg('q')::text || '%'
@@ -28,8 +20,7 @@ WHERE (sqlc.narg('q')::text IS NULL
         OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
         OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND (sqlc.narg('pks_status')::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text)
+  AND (sqlc.narg('kind')::text IS NULL OR v.kind = sqlc.narg('kind')::text)
 ORDER BY v.name ASC, v.id ASC
 LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 
@@ -37,7 +28,6 @@ LIMIT sqlc.arg('page_limit')::bigint OFFSET sqlc.arg('page_offset')::bigint;
 -- Same joins and filters as ListVendorsAdmin, no LIMIT/OFFSET — pagination total (Req 6.6).
 SELECT COUNT(*)
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
 WHERE (sqlc.narg('q')::text IS NULL
         OR v.code ILIKE '%' || sqlc.narg('q')::text || '%'
         OR v.name ILIKE '%' || sqlc.narg('q')::text || '%')
@@ -46,8 +36,7 @@ WHERE (sqlc.narg('q')::text IS NULL
         OR (sqlc.arg('status')::text = 'active' AND v.deleted_at IS NULL)
         OR (sqlc.arg('status')::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND (sqlc.narg('pks_status')::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, sqlc.arg('today')::date, sqlc.arg('renewal_months')::int) = sqlc.narg('pks_status')::text);
+  AND (sqlc.narg('kind')::text IS NULL OR v.kind = sqlc.narg('kind')::text);
 
 -- name: GetVendorDirectorPic :one
 -- Active Director_PIC (Direktur Utama) of one vendor, or no row (vendor-pks

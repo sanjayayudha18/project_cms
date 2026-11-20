@@ -71,6 +71,25 @@ func (r *RegionAdminRepository) CountActiveLocations(ctx context.Context, region
 	return r.db.CountActiveLocationsByRegion(ctx, regionID)
 }
 
+// LockForUpdateTx takes the region row lock that starts the disable guard
+// (region-standardization Req 7.3); it blocks behind / ahead of a vendor
+// branch apply holding FOR SHARE on the same row.
+func (r *RegionAdminRepository) LockForUpdateTx(ctx context.Context, tx pgx.Tx, id int64) error {
+	_, err := db.New(tx).LockRegionForUpdate(ctx, id)
+	return err
+}
+
+// CountActiveLocationsTx is CountActiveLocations inside the disable tx.
+func (r *RegionAdminRepository) CountActiveLocationsTx(ctx context.Context, tx pgx.Tx, regionID int64) (int64, error) {
+	return db.New(tx).CountActiveLocationsByRegion(ctx, regionID)
+}
+
+// CountActiveVendorBranchesTx counts active vendor branches whose
+// region_code is the region's code (Req 7.2), inside the disable tx.
+func (r *RegionAdminRepository) CountActiveVendorBranchesTx(ctx context.Context, tx pgx.Tx, regionCode string) (int64, error) {
+	return db.New(tx).CountActiveVendorBranchesByRegionCode(ctx, &regionCode)
+}
+
 // CreateTx inserts a new region inside the caller's transaction (primary
 // pool). The caller (service layer) is responsible for beginning/committing/
 // rolling back tx and for writing the audit entry in the same transaction

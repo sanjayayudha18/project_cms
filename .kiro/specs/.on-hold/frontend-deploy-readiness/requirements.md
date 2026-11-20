@@ -1,7 +1,7 @@
 # Requirements Document
 
 > Status: **requirements disetujui PO 2026-11-04** (D1–D7 mengikuti saran Kiro). Acceptance criteria yang bergantung pada keputusan diberi tanda *(D#)*. Design: `design.md`.
-> Item rencana: **X.15** di tabel cross-cutting `.kiro/steering/development-plan.md` (ditambahkan 2026-11-04 atas persetujuan PO, scope guard rule 1).
+> Item rencana: **X.15** di tabel cross-cutting `.claude/dev-plan/dev-plan.md` (ditambahkan 2026-11-04 atas persetujuan PO, scope guard rule 1).
 
 ## Introduction
 
@@ -36,7 +36,7 @@ Fakta lain yang memengaruhi keputusan:
 - `frontend/docker-compose.yml` (env dengan default lokal) dan file baru `frontend/docker-compose.prod.yml`.
 - `frontend/VendorPortal-Vite/docker-compose.yml` *(D5)*.
 - Job CI image frontend di `.github/workflows/ci.yml` *(D6)*.
-- `.claude/docs/deployment.md` dan `.kiro/steering/development-plan.md`.
+- `.claude/docs/deployment.md` dan `.claude/dev-plan/dev-plan.md`.
 
 ### Tidak termasuk
 
@@ -78,7 +78,7 @@ Fakta lain yang memengaruhi keputusan:
 - **CI_Workflow**: `.github/workflows/ci.yml`.
 - **Dev_Proxy**: `frontend/CompanyPortal-Vite/vite.config.ts`, `frontend/VendorPortal-Vite/vite.config.ts`, `frontend/dev.ps1`.
 - **DeploymentDoc**: `.claude/docs/deployment.md`.
-- **DevelopmentPlan**: `.kiro/steering/development-plan.md`.
+- **DevelopmentPlan**: `.claude/dev-plan/dev-plan.md`.
 
 ## Requirements
 

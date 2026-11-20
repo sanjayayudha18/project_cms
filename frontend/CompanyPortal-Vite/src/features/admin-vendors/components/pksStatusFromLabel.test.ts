@@ -26,4 +26,8 @@ describe("pksStatusFromLabel", () => {
   it.each(["", "aktif", "AKTIF", "Entah"])("tak dikenal %j -> undefined", (label) => {
     expect(pksStatusFromLabel(label)).toBeUndefined();
   });
+
+  it("memetakan label 'Tidak ada' juga ke belum_diisi", () => {
+    expect(pksStatusFromLabel("Tidak ada")).toBe("belum_diisi");
+  });
 });

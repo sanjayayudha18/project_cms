@@ -79,6 +79,9 @@ func (f *t61Fix) cleanup() {
 		`DELETE FROM dsr_location_vault_maps WHERE vendor_id IN (SELECT id FROM vendors WHERE code LIKE {LIKE})`,
 		`DELETE FROM vendor_vaults WHERE vault_code LIKE {LIKE}`,
 		`DELETE FROM vendor_branches WHERE branch_code LIKE {LIKE}`,
+		// MDN is created by seedDSR only when the DB has no such region (migration 042 FK).
+		`DELETE FROM regions r WHERE r.code = 'MDN' AND r.region = 'T61 Region'
+		   AND NOT EXISTS (SELECT 1 FROM vendor_branches b WHERE b.region_code = r.code)`,
 		`DELETE FROM vendors WHERE code LIKE {LIKE}`,
 		`DELETE FROM users WHERE username LIKE {LIKE}`, // last: vendor_requests.created_by restricts it
 	}
@@ -165,6 +168,8 @@ func (f *t61Fix) seedDSR() {
 			VALUES ($1, $2, $3, $4, '2026-01-01') RETURNING id`, f.v1, code, name, region)
 	}
 	mdn := "MDN"
+	// vendor_branches.region_code is an FK to regions.code since migration 042.
+	f.exec(`INSERT INTO regions (code, region) VALUES ('MDN', 'T61 Region') ON CONFLICT (code) DO NOTHING`)
 	a := branch("T61_BA", "+Cabang Ñ", &mdn)
 	b := branch("T61_BB", `Cab, "Koma"`, nil)
 	vault := func(branchID int64, code, label string) {
@@ -274,7 +279,7 @@ func (f *t61Fix) run(kind Kind, q url.Values, start *time.Time, asOf time.Time, 
 	if reader == nil {
 		reader = pgReader{pool: f.pool}
 	}
-	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, reader, NewProducers(start, 9), WorkerConfig{})
+	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, reader, NewProducers(start), WorkerConfig{})
 	w.now = func() time.Time { return asOf }
 	st, err := w.produce(ctx, job)
 	if err != nil {

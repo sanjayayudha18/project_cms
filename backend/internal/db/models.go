@@ -214,6 +214,74 @@ type BranchCoverageArea struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type CashCountAnomalyCategory struct {
+	ID          int64              `json:"id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	IsActive    bool               `json:"is_active"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountArea struct {
+	ID        int64              `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountAreaRegion struct {
+	RegionCode string             `json:"region_code"`
+	AreaID     int64              `json:"area_id"`
+	CreatedBy  int64              `json:"created_by"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+// Set ambang kategori vault H/M/L cash count (5.1). saldo < medium_min -> LOW; medium_min <= saldo <= medium_max -> MEDIUM; saldo > medium_max -> HIGH. onsite_* = kunjungan onsite per period_months (6). Berversi: superseded_at NULL = set aktif. Migrasi 041.
+type CashCountCategoryParam struct {
+	ID              int64              `json:"id"`
+	MediumMinAmount pgtype.Numeric     `json:"medium_min_amount"`
+	MediumMaxAmount pgtype.Numeric     `json:"medium_max_amount"`
+	CurrencyCode    string             `json:"currency_code"`
+	OnsiteHigh      int16              `json:"onsite_high"`
+	OnsiteMedium    int16              `json:"onsite_medium"`
+	OnsiteLow       int16              `json:"onsite_low"`
+	PeriodMonths    int16              `json:"period_months"`
+	CreatedBy       int64              `json:"created_by"`
+	EffectiveFrom   pgtype.Timestamptz `json:"effective_from"`
+	SupersededAt    pgtype.Timestamptz `json:"superseded_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type CashCountChecklistItem struct {
+	ID        int64              `json:"id"`
+	Category  string             `json:"category"`
+	Day       *string            `json:"day"`
+	PointNo   int16              `json:"point_no"`
+	ItemText  string             `json:"item_text"`
+	IsActive  bool               `json:"is_active"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CashCountPic struct {
+	ID         int64              `json:"id"`
+	PicRole    string             `json:"pic_role"`
+	UserID     int64              `json:"user_id"`
+	RegionCode *string            `json:"region_code"`
+	AreaID     *int64             `json:"area_id"`
+	IsActive   bool               `json:"is_active"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
 // Kantor cabang CIMB tempat ATM internal berdiri. Diisi dari 300 baris ROH_0xx di vendor_branches (migrasi 010). Bukan cabang vendor. Migrasi 009.
 type CimbBranch struct {
 	ID         int64  `json:"id"`
@@ -640,6 +708,13 @@ type MenuFeature struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+// Temporary: pre-042 values for the documented rollback of 042_region_standardization.sql. Drop in a later migration once the release is confirmed.
+type Migration042Backup struct {
+	Entity    string `json:"entity"`
+	EntityKey string `json:"entity_key"`
+	Payload   []byte `json:"payload"`
+}
+
 // Notifikasi in-app, satu baris per user penerima. Dibaca hanya oleh penerimanya. Dihapus setelah 90 hari (retensi). Migrasi 025.
 type Notification struct {
 	ID              int64              `json:"id"`
@@ -688,6 +763,18 @@ type Region struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	IsActive  bool               `json:"is_active"`
 	// Soft-disable timestamp (set with is_active=false). Never hard-delete: locations.region_id references this table.
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+// Kota di bawah tepat satu region baku (spec region-standardization Q1). Tabel saja: belum ada layar/API/CSV.
+type RegionCity struct {
+	ID        int64              `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	RegionID  int64              `json:"region_id"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }
 
@@ -848,17 +935,11 @@ type VendorBranch struct {
 	IsActive   bool               `json:"is_active"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	// Vendor regional grouping from MASTER_ATM_ESQ.FLMVendorRegion (e.g. "Jakarta Timur"). Distinct from regions.region (ATM geographic area) and branch_name (vendor sub-region). See migration 030.
-	Region    *string            `json:"region"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 	// Tipe cabang: ATM, CASH, or ATM_CASH -- mirrors vendor_vaults.category. Added per .claude/sdlc/vendor-branch-tipe/plan.md; existing rows default to ATM pending re-seed.
 	Category string `json:"category"`
-	// Kode region vendor cabang untuk nomor request REP-<vendor>-<region_code>-<YYYYMMDD>-<NNN>. NULL = request ditolak.
+	// Region baku cabang (FK regions.code, migration 042). Nama region dibaca dari regions.region. Segmen nomor request REP-<vendor>-<region_code>-...
 	RegionCode *string `json:"region_code"`
-	// Limit CIS (= Limit Asuransi) area vault vendor, dalam cis_limit_currency. NULL = belum diisi. Master-data maker-checker. Migrasi 038.
-	CisLimitAmount pgtype.Numeric `json:"cis_limit_amount"`
-	// Mata uang cis_limit_amount (ISO 4217). Hanya IDR untuk sekarang (vendor-cis-limit S4). Migrasi 038.
-	CisLimitCurrency string `json:"cis_limit_currency"`
 }
 
 // Harga kontrak vendor FLM, tiga tingkat dalam satu tabel (PT / cabang / ATM), effective-dated dengan riwayat. Unit INTERNAL tidak pernah punya baris di sini. Perubahan lewat maker-checker (master_data_change_requests). Akses: role finance/admin internal, dan vendor hanya harganya sendiri. Migrasi 009.
@@ -933,7 +1014,7 @@ type VendorPic struct {
 	Roles []string `json:"roles"`
 }
 
-// PKS (perjanjian kerja sama) per vendor dengan riwayat (D1). Satu PKS aktif per vendor (replaced_at IS NULL, vendor_pks_active_uq). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks). pks_name/effective_date/expiry_date tidak pernah di-UPDATE; tidak pernah di-hard-delete. Riwayat batalkan terminate hanya di audit_logs.
+// PKS (perjanjian kerja sama) per vendor per type dengan riwayat (D1; 043). Satu PKS aktif per (vendor, type) (replaced_at IS NULL, vendor_pks_active_uq); vendor boleh punya subset type. Create/ganti/terminasi hanya lewat maker-checker master data (entity_type vendor_pks). Kolom yang boleh di-UPDATE hanya renewal_days (044, langsung + audit di tx yang sama), replaced_at/replaced_by_pks_id, dan kolom terminate; pks_name/effective_date/expiry_date/pks_type_id/wod_number tidak pernah di-UPDATE; tidak pernah di-hard-delete. Status dihitung oleh vendor_pks_record_status() (044). Riwayat batalkan terminate hanya di audit_logs.
 type VendorPk struct {
 	ID            int64       `json:"id"`
 	VendorID      int64       `json:"vendor_id"`
@@ -942,7 +1023,7 @@ type VendorPk struct {
 	ExpiryDate    pgtype.Date `json:"expiry_date"`
 	// Maker change create (users.id).
 	CreatedBy int64 `json:"created_by"`
-	// NULL = PKS aktif vendor. Diisi saat PKS baru disetujui dan menggantikannya (D17).
+	// NULL = PKS aktif vendor untuk type ini. Diisi saat PKS baru dengan type sama disetujui dan menggantikannya (D17; 043).
 	ReplacedAt pgtype.Timestamptz `json:"replaced_at"`
 	// PKS yang menggantikan baris ini; hanya terisi bila replaced_at terisi.
 	ReplacedByPksID *int64 `json:"replaced_by_pks_id"`
@@ -952,6 +1033,25 @@ type VendorPk struct {
 	TerminationReason *string            `json:"termination_reason"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	// Type PKS (vendor_pks_types). Wajib; tidak pernah di-UPDATE (Req 2.9). Migrasi 043.
+	PksTypeID int64 `json:"pks_type_id"`
+	// No. WOD, teks bebas 1-100 tanpa spasi tepi. Unik global case-insensitive termasuk riwayat (vendor_pks_wod_uq); tidak pernah di-UPDATE (Req 2.9). Migrasi 043.
+	WodNumber string `json:"wod_number"`
+	// Ambang Need Renewal dalam hari: need_renewal bila expiry_date < hari ini + renewal_days. 30-3666 dan <= expiry_date - effective_date. Diisi saat create (maker-checker); diubah langsung oleh ADMIN/ADMIN_PARAM dari Daftar PKS dengan audit vendor_pks_reminder_updated di tx yang sama, juga untuk PKS diganti/terminated. Satu-satunya kolom isi PKS yang boleh di-UPDATE. Default 270 hanya untuk binary lama selama jendela deploy. Migrasi 044.
+	RenewalDays int32 `json:"renewal_days"`
+}
+
+// Master type PKS (FLM, CIT, ...). Ditulis hanya lewat maker-checker master data (entity_type vendor_pks_type, ADMIN/ADMIN_PARAM). Tidak pernah di-hard-delete: disable = is_active false, diblok selama ada vendor_pks aktif (replaced_at IS NULL, termasuk terminated) dengan type ini. Bukan vendors.kind. Migrasi 043.
+type VendorPksType struct {
+	ID int64 `json:"id"`
+	// Kode type, ^[A-Z0-9]{2,10}$, unik (upper). Tidak berubah setelah dibuat; update hanya name.
+	Code string `json:"code"`
+	// Nama tampilan type, 1-100 karakter setelah trim.
+	Name string `json:"name"`
+	// false = type nonaktif: tidak bisa dipilih untuk PKS baru dan tidak tampil sebagai kolom/filter daftar vendor.
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 // Cash replenishment request to a CIT vendor, composed from DMAA forecast rows; state machine + maker-checker.
@@ -1166,10 +1266,12 @@ type VendorVault struct {
 	VendorBranchID int64  `json:"vendor_branch_id"`
 	VaultCode      string `json:"vault_code"`
 	// Type of vault (e.g. main, transit, buffer)
-	Type              string         `json:"type"`
-	Amount            pgtype.Numeric `json:"amount"`
-	MaxCapacityAmount pgtype.Numeric `json:"max_capacity_amount"`
-	MinCapacityAmount pgtype.Numeric `json:"min_capacity_amount"`
+	Type   string         `json:"type"`
+	Amount pgtype.Numeric `json:"amount"`
+	// Saldo maksimum vault dalam currency_code (numeric(20,2), tanpa float). Rename dari max_capacity_amount pada migrasi 040.
+	MaxBalance pgtype.Numeric `json:"max_balance"`
+	// Saldo minimum vault dalam currency_code (numeric(20,2), tanpa float). Rename dari min_capacity_amount pada migrasi 040.
+	MinBalance pgtype.Numeric `json:"min_balance"`
 	// ISO 4217 currency code (e.g. IDR, USD)
 	CurrencyCode   string             `json:"currency_code"`
 	IsActive       bool               `json:"is_active"`
@@ -1182,6 +1284,16 @@ type VendorVault struct {
 	// ATM, CASH, atau ATM_CASH (melayani keduanya). Diisi dari daftar master vendor di migrasi 008; sebelumnya biner dengan seluruh baris di-backfill ke ATM.
 	Category  string             `json:"category"`
 	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-	// Nomor rekening escrow vault (12 digit, teks). Opsional, tidak unik: satu escrow bisa dikelola beberapa vendor. Master-data maker-checker. Migrasi 038.
-	EscrowAccount *string `json:"escrow_account"`
+	// Nama tampilan/identitas vault pada cabang (format default <vendorPrefix>_<area>_V<3-digit>, contoh: ABA_Bali_V001). Unik per cabang. Migrasi 040.
+	VaultName string `json:"vault_name"`
+	// Alamat fisik vault vendor (opsional). Master-data maker-checker. Migrasi 040.
+	Alamat *string `json:"alamat"`
+	// Limit CIS (= Limit Asuransi) per vault dalam cis_limit_currency (numeric(20,2) > 0, NULL = belum diisi). Dipindahkan dari vendor_branches pada migrasi 040.
+	CisLimitAmount pgtype.Numeric `json:"cis_limit_amount"`
+	// Mata uang cis_limit_amount (ISO 4217, default IDR). Dipindahkan dari vendor_branches pada migrasi 040.
+	CisLimitCurrency string `json:"cis_limit_currency"`
+	// Nomor rekening escrow Cash vault (12 digit angka, opsional, tidak unik). Master-data maker-checker. Migrasi 040.
+	EscrowCash *string `json:"escrow_cash"`
+	// Nomor rekening escrow ATM vault (12 digit angka, opsional, tidak unik). Master-data maker-checker. Migrasi 040.
+	EscrowAtm *string `json:"escrow_atm"`
 }

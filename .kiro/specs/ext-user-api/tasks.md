@@ -144,7 +144,7 @@ Referensi pola yang dipakai ulang:
     - _Requirements: 13.1, 13.2, 13.3, 13.4_
   - [x] 11.2 `.claude/docs/deployment.md`: "Release checklist: first `backend-extapi` deployment" (urutan migrasi `039` → `backend` baru → start `backend-extapi` → `extclient create` → serahkan paket IDM), menyalakan/mematikan service, rotasi secret, `TRUSTED_PROXIES`, jalur jaringan sebagai placeholder D7, dan skrip GRANT opsional untuk login DB terbatas (service dan CLI).
     - _Requirements: 12.2_
-  - [x] 11.3 Perbarui `.claude/CLAUDE.md` (Sec 3: tabel `api_clients`, role `EXT-CLIENT`, `auth_source=service`; Sec 12: deviasi GR#3 dan topologi), `.kiro/steering/structure.md`, `tech.md`, `project-context.md` (modul workspace ketiga, port 8082, aturan tidak saling import), `development-plan.md` (X.17 status, nomor migrasi bebas berikutnya), dan `.claude/development-progress.md`.
+  - [x] 11.3 Perbarui `.claude/CLAUDE.md` (Sec 3: tabel `api_clients`, role `EXT-CLIENT`, `auth_source=service`; Sec 12: deviasi GR#3 dan topologi), `.kiro/steering/structure.md`, `tech.md`, `project-context.md` (modul workspace ketiga, port 8082, aturan tidak saling import), `.claude/dev-plan/dev-plan.md` (X.17 status, nomor migrasi bebas berikutnya), dan `.claude/development-progress.md`.
     - _Requirements: 12.2_
   - _Model: Sonnet, Medium — 11.1 harus akurat terhadap kontrak; 11.3 Haiku, Low (pembaruan dokumen mekanis; lihat Model Split)._
 

@@ -211,6 +211,8 @@ func (h *ApprovalHandler) handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "conflict", service.ErrVendorVaultCodeConflict.Error())
 	case errors.Is(err, service.ErrVendorBranchHasActiveChildren):
 		writeError(w, http.StatusConflict, "conflict", service.ErrVendorBranchHasActiveChildren.Error())
+	case errors.Is(err, service.ErrPksTypeInUse):
+		writeError(w, http.StatusConflict, "conflict", service.ErrPksTypeInUse.Error())
 	case errors.Is(err, service.ErrATMNotFound), errors.Is(err, service.ErrATMInvalidReference):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, service.ErrMasterDataForbidden):

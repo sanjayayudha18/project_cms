@@ -24,61 +24,50 @@ import (
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
-// vendor-pks 9.3 (Property 4 and Property 10, export part) on real Postgres. The vendor_pks producer runs
-// through the real worker path (Service.Create -> worker.produce: REPEATABLE READ READ ONLY snapshot,
-// ChunkWriter, csvexport.Writer). Every vendor the test inserts has a code starting with T93 and every
-// request filters `q` on a T93 fragment, so real dev rows never reach the output. All rows (vendors, PKS,
-// PICs, users, export_jobs, audit_logs) are removed in t.Cleanup; a last step fails the test on leftovers.
+// vendor-pks-list 6.3 on real Postgres: the Daftar PKS export (one line per vendor_pks row, history included,
+// filter {status, pks_type, vendor, q}). The producer runs through the real worker path (Service.Create ->
+// worker.produce: REPEATABLE READ READ ONLY snapshot through pgReader, ChunkWriter, csvexport.Writer).
+// Every vendor the test inserts has a code starting with T93 and every request filters `q` on "T93", so real
+// dev rows never reach the output. All rows are removed in t.Cleanup; a last step fails on leftovers.
 // Skips when DATABASE_URL is empty (p11Pool).
 
-// t93Header is the literal header of Req 10.3 (written out, not read from pkg/reports).
+// t93Header is the literal 13-column header (written out, not read from pkg/reports).
 var t93Header = []string{"Kode Vendor", "Nama Perusahaan", "Nama Direktur Utama", "Telepon Direktur Utama",
-	"Email Direktur Utama", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS", "Masa Berlaku (bulan)",
-	"Monitoring PKS (hari)", "Status PKS"}
+	"Email Direktur Utama", "Type PKS", "No. WOD", "Nama PKS", "Tanggal Efektif PKS", "Tanggal Expired PKS",
+	"Masa Berlaku (hari)", "Reminder (hari)", "Status PKS"}
 
-var t93Labels = map[string]string{"aktif": "Aktif", "need_renewal": "Need Renewal", "expired": "Expired",
-	"terminated": "Terminated", "belum_diisi": "Belum diisi"}
+var t93Types = []string{"CIT", "FLM"}
 
-// ---- reference model (same rules as vendor_pks_status / vendor_pks_validity_months, Req 6.2-6.6, 7) ----
+var t93Labels = map[string]string{"aktif": "Aktif", "need_renewal": "Need Renewal", "belum_berlaku": "Belum Berlaku",
+	"expired": "Expired", "terminated": "Terminated", "diganti": "Diganti"}
 
-func t93AddMonths(d time.Time, n int) time.Time {
-	total := d.Year()*12 + int(d.Month()) - 1 + n
-	y, m := total/12, time.Month(total%12+1)
-	last := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
-	return time.Date(y, m, min(d.Day(), last), 0, 0, 0, 0, time.UTC)
+var t93StatusKeys = []string{"terkini", "semua", "aktif", "need_renewal", "belum_berlaku", "expired", "terminated", "diganti"}
+
+const t93Day = "2006-01-02"
+
+// ---- reference model (vendor_pks_record_status, Req 3.1-3.4) ----
+
+type t93Pks struct {
+	typ, name            string
+	eff, exp             time.Time
+	renewal              int
+	replaced, terminated bool
 }
 
-// t93Status: "" = no status (INTERNAL vendor).
-func t93Status(v t93Vendor, today time.Time, months int) string {
+func (p t93Pks) status(today time.Time) string {
 	switch {
-	case v.kind == "INTERNAL":
-		return ""
-	case v.pks == nil:
-		return "belum_diisi"
-	case v.pks.terminated:
+	case p.replaced:
+		return "diganti"
+	case p.terminated:
 		return "terminated"
-	case v.pks.expiry.Before(today):
+	case p.eff.After(today):
+		return "belum_berlaku"
+	case p.exp.Before(today):
 		return "expired"
-	case v.pks.expiry.Before(t93AddMonths(today, months)):
+	case p.exp.Before(today.AddDate(0, 0, p.renewal)):
 		return "need_renewal"
 	}
 	return "aktif"
-}
-
-func t93ValidityMonths(eff, exp time.Time) int {
-	end, n := exp.AddDate(0, 0, 1), 0
-	for !t93AddMonths(eff, n+1).After(end) {
-		n++
-	}
-	return n
-}
-
-type t93Pks struct {
-	name        string
-	effective   time.Time
-	expiry      time.Time
-	terminated  bool
-	hasReplaced bool // an older, replaced PKS row exists: it must never show up
 }
 
 type t93Dir struct {
@@ -91,46 +80,77 @@ type t93Vendor struct {
 	idx      int
 	kind     string
 	disabled bool
-	pks      *t93Pks
+	pks      []t93Pks
 	dir      *t93Dir
 }
 
 func (v t93Vendor) code() string { return fmt.Sprintf("T93V%02d", v.idx) }
 func (v t93Vendor) name() string { return fmt.Sprintf("T93 Vendor %02d Ü", v.idx) }
-
-type t93Filter struct {
-	q, status, pksStatus string // q is never empty (it scopes the export to the fixture); pksStatus "" = none
+func (v t93Vendor) wod(k int) string {
+	return fmt.Sprintf("T93-WOD-%02d-%d", v.idx, k)
 }
 
+type t93Filter struct{ status, pksType, vendor, q string }
+
 func (f t93Filter) values() url.Values {
-	v := url.Values{"q": {f.q}, "status": {f.status}}
-	if f.pksStatus != "" {
-		v.Set("pks_status", f.pksStatus)
+	v := url.Values{"status": {f.status}, "q": {f.q}}
+	if f.pksType != "" {
+		v.Set("pks_type", f.pksType)
+	}
+	if f.vendor != "" {
+		v.Set("vendor", f.vendor)
 	}
 	return v
 }
 
-// t93Expected is the model of the file: rows in name order, filtered like the vendor list screen.
-func t93Expected(vs []t93Vendor, f t93Filter, today time.Time, months int) [][]string {
+// t93Expected is the model of the file: FLM vendors only, one line per vendor_pks row that passes the filter,
+// ordered by vendor code, type code, effective date desc, id asc (the id follows the insert order k).
+func t93Expected(vs []t93Vendor, f t93Filter, today time.Time) [][]string {
 	var out [][]string
 	for _, v := range vs {
-		hay := strings.ToLower(v.code() + "\x00" + v.name())
-		if !strings.Contains(hay, strings.ToLower(f.q)) {
+		if v.kind != "FLM_VENDOR" || (f.vendor != "" && f.vendor != v.code()) {
 			continue
 		}
-		if (f.status == "active" && v.disabled) || (f.status == "disabled" && !v.disabled) {
-			continue
+		type ent struct {
+			k int
+			p t93Pks
 		}
-		st := t93Status(v, today, months)
-		if f.pksStatus != "" && st != f.pksStatus {
-			continue
+		var ents []ent
+		for k, p := range v.pks {
+			st := p.status(today)
+			switch {
+			case f.status == "semua":
+			case f.status == "terkini" && !p.replaced:
+			case f.status == st:
+			default:
+				continue
+			}
+			if f.pksType != "" && f.pksType != p.typ {
+				continue
+			}
+			hay := strings.ToLower(p.name + "\x00" + v.wod(k))
+			if !strings.Contains(hay, strings.ToLower(f.q)) {
+				continue
+			}
+			ents = append(ents, ent{k, p})
 		}
-		out = append(out, t93Cells(v, st, today))
+		slices.SortFunc(ents, func(a, b ent) int {
+			if c := strings.Compare(a.p.typ, b.p.typ); c != 0 {
+				return c
+			}
+			if c := b.p.eff.Compare(a.p.eff); c != 0 {
+				return c
+			}
+			return a.k - b.k // keyset ties break on id ASC (insert order)
+		})
+		for _, e := range ents {
+			out = append(out, t93Cells(v, e.k, e.p, today))
+		}
 	}
 	return out
 }
 
-func t93Cells(v t93Vendor, st string, today time.Time) []string {
+func t93Cells(v t93Vendor, k int, p t93Pks, today time.Time) []string {
 	row := make([]string, len(t93Header))
 	row[0], row[1] = csvexport.CSVSafe(v.code()), csvexport.CSVSafe(v.name())
 	if d := v.dir; d != nil {
@@ -142,13 +162,11 @@ func t93Cells(v t93Vendor, st string, today time.Time) []string {
 			row[4] = csvexport.CSVSafe(*d.email)
 		}
 	}
-	if p := v.pks; p != nil {
-		row[5] = csvexport.CSVSafe(p.name)
-		row[6], row[7] = p.effective.Format("2006-01-02"), p.expiry.Format("2006-01-02")
-		row[8] = strconv.Itoa(t93ValidityMonths(p.effective, p.expiry))
-		row[9] = strconv.Itoa(int(p.expiry.Sub(today).Hours() / 24)) // may be negative
-	}
-	row[10] = t93Labels[st] // "" for INTERNAL
+	row[5], row[6], row[7] = p.typ, csvexport.CSVSafe(v.wod(k)), csvexport.CSVSafe(p.name)
+	row[8], row[9] = p.eff.Format(t93Day), p.exp.Format(t93Day)
+	row[10] = strconv.Itoa(int(p.exp.Sub(p.eff).Hours() / 24))
+	row[11] = strconv.Itoa(p.renewal)
+	row[12] = t93Labels[p.status(today)]
 	return row
 }
 
@@ -222,7 +240,7 @@ func (f *t93Fix) cleanup() {
 func (f *t93Fix) assertNoLeftovers() {
 	for _, q := range []string{
 		`SELECT count(*) FROM vendors WHERE code LIKE 'T93%'`,
-		`SELECT count(*) FROM vendor_pks WHERE pks_name LIKE 'T93%'`,
+		`SELECT count(*) FROM vendor_pks WHERE wod_number LIKE 'T93%'`,
 		`SELECT count(*) FROM vendor_pics WHERE name LIKE 'T93%'`,
 		`SELECT count(*) FROM users WHERE username LIKE 'T93%'`,
 		`SELECT count(*) FROM export_jobs WHERE requested_by = ` + fmt.Sprint(f.userID),
@@ -258,23 +276,19 @@ func (f *t93Fix) insertVendor(v t93Vendor) {
 	}
 	vid := f.id(`INSERT INTO vendors (code, name, kind, is_active, deleted_at) VALUES ($1, $2, $3, $4, $5::timestamptz) RETURNING id`,
 		v.code(), v.name(), v.kind, !v.disabled, deleted)
-	if p := v.pks; p != nil {
-		insert := func(name string, eff, exp time.Time, replaced, terminated bool) {
-			var repl, term, by, reason any
-			if replaced {
-				repl = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-			}
-			if terminated {
-				term, by, reason = time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), f.userID, "T93 reason"
-			}
-			f.exec(`INSERT INTO vendor_pks (vendor_id, pks_name, effective_date, expiry_date, created_by, replaced_at, terminated_at, terminated_by, termination_reason)
-				VALUES ($1, $2, $3::date, $4::date, $5, $6::timestamptz, $7::timestamptz, $8, $9)`,
-				vid, name, eff, exp, f.userID, repl, term, by, reason)
+	for k, p := range v.pks { // insert order = id order
+		var repl, term, by, reason any
+		if p.replaced {
+			repl = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		}
-		if p.hasReplaced { // an older PKS with other data, already replaced by the active one
-			insert("T93 old PKS", p.effective.AddDate(-3, 0, 0), p.effective.AddDate(-1, 0, 0), true, false)
+		if p.terminated {
+			term, by, reason = time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), f.userID, "T93 reason"
 		}
-		insert(p.name, p.effective, p.expiry, false, p.terminated)
+		f.exec(`INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by,
+				renewal_days, replaced_at, terminated_at, terminated_by, termination_reason)
+			VALUES ($1, (SELECT id FROM vendor_pks_types WHERE code = $2), $3, $4, $5::date, $6::date, $7,
+				$8, $9::timestamptz, $10::timestamptz, $11, $12)`,
+			vid, p.typ, v.wod(k), p.name, p.eff, p.exp, f.userID, p.renewal, repl, term, by, reason)
 	}
 	if d := v.dir; d != nil {
 		pic := func(name string, phone, email *string, deleted bool) {
@@ -299,7 +313,7 @@ func sptr(s string) *string { return &s }
 
 // run creates the job through the service (as the ADMIN user), produces it with the real worker whose
 // clock is asOf, and returns the parsed CSV (header + data records) and the raw file.
-func (f *t93Fix) run(filter t93Filter, months int, asOf time.Time) (records [][]string, raw string) {
+func (f *t93Fix) run(filter t93Filter, asOf time.Time) (records [][]string, raw string) {
 	f.t.Helper()
 	ctx := context.Background()
 	p, err := ParseReportParams(KindVendorPks, filter.values(), time.Now())
@@ -315,7 +329,7 @@ func (f *t93Fix) run(filter t93Filter, months int, asOf time.Time) (records [][]
 		f.exec(`DELETE FROM export_jobs WHERE id = $1`, job.ID)
 	}()
 	f.exec(`UPDATE export_jobs SET status = 'running', started_at = now() WHERE id = $1`, job.ID)
-	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, pgReader{pool: f.pool}, NewProducers(nil, months), WorkerConfig{})
+	w := newWorker(pgStore{pool: f.pool, q: repository.New(f.pool)}, pgReader{pool: f.pool}, NewProducers(nil), WorkerConfig{})
 	w.now = func() time.Time { return asOf }
 	st, err := w.produce(ctx, job)
 	if err != nil {
@@ -335,132 +349,272 @@ func (f *t93Fix) run(filter t93Filter, months int, asOf time.Time) (records [][]
 	return records, string(data)
 }
 
+// ---- random data ----
+
+// drawT93Vendors draws 0-6 vendors with 0-4 PKS rows each. At most one non-replaced row per (vendor, type)
+// (vendor_pks_active_uq); expiries cluster around today and the renewal boundary.
+func drawT93Vendors(rt *rapid.T, today time.Time) []t93Vendor {
+	n := rapid.IntRange(0, 6).Draw(rt, "vendors")
+	vs := make([]t93Vendor, 0, n)
+	for i := 1; i <= n; i++ {
+		v := t93Vendor{idx: i,
+			kind:     rapid.SampledFrom([]string{"FLM_VENDOR", "FLM_VENDOR", "INTERNAL"}).Draw(rt, "kind"),
+			disabled: rapid.IntRange(0, 3).Draw(rt, "disabled") == 0,
+		}
+		activeUsed := map[string]bool{}
+		for k := range rapid.IntRange(0, 4).Draw(rt, "pks_count") {
+			typ := rapid.SampledFrom(t93Types).Draw(rt, "typ")
+			replaced := rapid.Bool().Draw(rt, "replaced")
+			if !replaced {
+				if activeUsed[typ] {
+					replaced = true
+				}
+				activeUsed[typ] = true
+			}
+			term := rapid.IntRange(30, 1200).Draw(rt, "term_days")
+			renewal := rapid.IntRange(30, term).Draw(rt, "renewal")
+			var exp time.Time
+			switch rapid.IntRange(0, 2).Draw(rt, "expiry_mode") {
+			case 0:
+				exp = today.AddDate(0, 0, rapid.IntRange(-400, 700).Draw(rt, "exp_off"))
+			case 1:
+				exp = today.AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, "exp_today"))
+			default: // around the renewal boundary
+				exp = today.AddDate(0, 0, renewal+rapid.IntRange(-2, 2).Draw(rt, "exp_renew"))
+			}
+			v.pks = append(v.pks, t93Pks{typ: typ, name: fmt.Sprintf("T93 PKS %d-%d %s =x", i, k, typ),
+				eff: exp.AddDate(0, 0, -term), exp: exp, renewal: renewal, replaced: replaced,
+				terminated: rapid.IntRange(0, 3).Draw(rt, "terminated") == 0})
+		}
+		if rapid.Bool().Draw(rt, "has_director") {
+			d := &t93Dir{name: fmt.Sprintf("T93 Direktur %d", i), deletedExtra: rapid.Bool().Draw(rt, "deleted_dir")}
+			if rapid.Bool().Draw(rt, "has_phone") {
+				d.phone = sptr(fmt.Sprintf("+62%d", 800+i))
+			}
+			if rapid.Bool().Draw(rt, "has_email") {
+				d.email = sptr(fmt.Sprintf("d%d@t93.test", i))
+			}
+			v.dir = d
+		}
+		vs = append(vs, v)
+	}
+	return vs
+}
+
+func drawT93Filter(rt *rapid.T, vs []t93Vendor) t93Filter {
+	f := t93Filter{
+		status: rapid.SampledFrom(t93StatusKeys).Draw(rt, "status"),
+		q:      rapid.SampledFrom([]string{"T93", "t93 pks", "T93 PKS 1-", "-WOD-02", "=x"}).Draw(rt, "q"),
+	}
+	if rapid.Bool().Draw(rt, "filter_type") {
+		f.pksType = rapid.SampledFrom(t93Types).Draw(rt, "pks_type")
+	}
+	if len(vs) > 0 && rapid.Bool().Draw(rt, "filter_vendor") {
+		f.vendor = rapid.SampledFrom(vs).Draw(rt, "vendor").code()
+	}
+	return f
+}
+
+func drawT93AsOf(rt *rapid.T) time.Time {
+	return time.Date(2026, 1, 1, 0, 0, 0, 0, reports.WIB).AddDate(0, 0, rapid.IntRange(0, 1000).Draw(rt, "day")).
+		Add(time.Duration(rapid.IntRange(0, 23*60+59).Draw(rt, "minute_of_day")) * time.Minute)
+}
+
 // ---- tests ----
 
-// Property 4 (export part): for random vendors/PKS/directors and random filters, each exported line equals
-// the reference model: vendor code, PKS status label, validity (months), remaining days, director, order.
+// Export columns: for random vendors x PKS rows and random filters, the exported lines equal the reference
+// model (columns, labels, CSVSafe, order, history, FLM only, director cells).
 func TestVendorPksExportMatchesModel(t *testing.T) {
 	f := newT93Fix(t)
-	qs := []string{"T93", "t93v", "T93V01", "93 vendor", "T93V0"}
-
 	rapid.Check(t, func(rt *rapid.T) {
 		f.clearVendors()
 		defer f.clearVendors()
-
-		asOf := time.Date(2026, 1, 1, 0, 0, 0, 0, reports.WIB).AddDate(0, 0, rapid.IntRange(0, 1000).Draw(rt, "day")).
-			Add(time.Duration(rapid.IntRange(0, 23*60+59).Draw(rt, "minute_of_day")) * time.Minute)
+		asOf := drawT93AsOf(rt)
 		today := reports.TodayWIB(asOf)
-		months := rapid.IntRange(1, 24).Draw(rt, "renewal_months")
-
-		n := rapid.IntRange(0, 6).Draw(rt, "vendors")
-		vs := make([]t93Vendor, 0, n)
-		for i := 1; i <= n; i++ {
-			v := t93Vendor{idx: i,
-				kind:     rapid.SampledFrom([]string{"FLM_VENDOR", "FLM_VENDOR", "INTERNAL"}).Draw(rt, "kind"),
-				disabled: rapid.IntRange(0, 3).Draw(rt, "disabled") == 0,
-			}
-			if rapid.Bool().Draw(rt, "has_pks") {
-				var exp time.Time
-				switch rapid.IntRange(0, 2).Draw(rt, "expiry_mode") {
-				case 0:
-					exp = today.AddDate(0, 0, rapid.IntRange(-400, 700).Draw(rt, "exp_off"))
-				case 1: // around today
-					exp = today.AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, "exp_today"))
-				default: // around the renewal boundary
-					exp = t93AddMonths(today, months).AddDate(0, 0, rapid.IntRange(-2, 2).Draw(rt, "exp_renew"))
-				}
-				eff := exp.AddDate(0, 0, -rapid.IntRange(0, 1200).Draw(rt, "span"))
-				v.pks = &t93Pks{name: fmt.Sprintf("T93 PKS %d =x", i), effective: eff, expiry: exp,
-					terminated: rapid.IntRange(0, 3).Draw(rt, "terminated") == 0, hasReplaced: rapid.Bool().Draw(rt, "replaced")}
-			}
-			if rapid.Bool().Draw(rt, "has_director") {
-				d := &t93Dir{name: fmt.Sprintf("T93 Direktur %d", i), deletedExtra: rapid.Bool().Draw(rt, "deleted_dir")}
-				if rapid.Bool().Draw(rt, "has_phone") {
-					d.phone = sptr(fmt.Sprintf("+62%d", 800+i))
-				}
-				if rapid.Bool().Draw(rt, "has_email") {
-					d.email = sptr(fmt.Sprintf("d%d@t93.test", i))
-				}
-				v.dir = d
-			}
+		vs := drawT93Vendors(rt, today)
+		for _, v := range vs {
 			f.insertVendor(v)
-			vs = append(vs, v)
 		}
+		filter := drawT93Filter(rt, vs)
 
-		filter := t93Filter{
-			q:      rapid.SampledFrom(qs).Draw(rt, "q"),
-			status: rapid.SampledFrom([]string{"active", "disabled", "all"}).Draw(rt, "status"),
-		}
-		if rapid.Bool().Draw(rt, "filter_pks") {
-			filter.pksStatus = rapid.SampledFrom([]string{"aktif", "need_renewal", "expired", "terminated", "belum_diisi"}).Draw(rt, "pks_status")
-		}
-
-		records, _ := f.run(filter, months, asOf)
+		records, _ := f.run(filter, asOf)
 		if !slices.Equal(records[0], t93Header) {
 			rt.Fatalf("header = %q, want %q", records[0], t93Header)
 		}
-		want := t93Expected(vs, filter, today, months)
+		want := t93Expected(vs, filter, today)
 		got := records[1:]
 		if len(got) != len(want) {
-			rt.Fatalf("filter=%+v today=%s months=%d: %d rows, want %d\ngot:  %q\nwant: %q", filter, today.Format("2006-01-02"), months, len(got), len(want), got, want)
+			rt.Fatalf("filter=%+v today=%s: %d rows, want %d\ngot:  %q\nwant: %q", filter, today.Format(t93Day), len(got), len(want), got, want)
 		}
 		for i := range want {
 			if !slices.Equal(got[i], want[i]) {
-				rt.Fatalf("filter=%+v today=%s months=%d row %d\ngot:  %q\nwant: %q", filter, today.Format("2006-01-02"), months, i, got[i], want[i])
+				rt.Fatalf("filter=%+v today=%s row %d\ngot:  %q\nwant: %q", filter, today.Format(t93Day), i, got[i], want[i])
 			}
 		}
 	})
 }
 
-// Fixed boundary cases that pin the empty-cell contract (no PKS, INTERNAL) and the WIB day (Req 10.2).
-func TestVendorPksExportEmptyCellsAndWIBDay(t *testing.T) {
+// t93ListRef is the reference for Property 6: the SELECT/WHERE of backend ListPksAdmin
+// (backend/queries/vendor_pks_list.sql) copied minus paging and ordering. backend-exq cannot import backend,
+// so the same SQL is run directly on the pool.
+const t93ListRef = `
+SELECT p.wod_number,
+       vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                p.renewal_days, $1::date)::text AS status,
+       (p.expiry_date - $1::date)::int AS remaining_days
+FROM vendor_pks p
+JOIN vendors v ON v.id = p.vendor_id
+JOIN vendor_pks_types t ON t.id = p.pks_type_id
+WHERE v.kind = 'FLM_VENDOR'
+  AND ($2::text = 'semua'
+        OR ($2::text = 'terkini' AND p.replaced_at IS NULL)
+        OR vendor_pks_record_status(p.replaced_at, p.terminated_at, p.effective_date, p.expiry_date,
+                                    p.renewal_days, $1::date) = $2::text)
+  AND ($3::text IS NULL OR t.code = $3::text)
+  AND ($4::text IS NULL OR v.code = $4::text)
+  AND ($5::text IS NULL
+        OR p.pks_name ILIKE '%' || $5::text || '%'
+        OR p.wod_number ILIKE '%' || $5::text || '%')`
+
+func nilIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// Property 6: for random data and filter, the set of (PKS, status, remaining days) in the export equals what
+// the Daftar PKS list query returns for the same filter. The export has no remaining-days column, so it is
+// derived from the Tanggal Expired cell and the job's WIB day; the PKS identity is the unique WOD number.
+func TestVendorPksExportEqualsListQuery(t *testing.T) {
+	f := newT93Fix(t)
+	rapid.Check(t, func(rt *rapid.T) {
+		f.clearVendors()
+		defer f.clearVendors()
+		asOf := drawT93AsOf(rt)
+		today := reports.TodayWIB(asOf)
+		vs := drawT93Vendors(rt, today)
+		for _, v := range vs {
+			f.insertVendor(v)
+		}
+		filter := drawT93Filter(rt, vs)
+
+		rows, err := f.pool.Query(context.Background(), t93ListRef, today, filter.status,
+			nilIfEmpty(filter.pksType), nilIfEmpty(filter.vendor), nilIfEmpty(filter.q))
+		if err != nil {
+			rt.Fatalf("reference query: %v", err)
+		}
+		want := map[string]string{}
+		for rows.Next() {
+			var wod, st string
+			var rem int
+			if err := rows.Scan(&wod, &st, &rem); err != nil {
+				rt.Fatalf("scan: %v", err)
+			}
+			want[wod] = st + "|" + strconv.Itoa(rem)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			rt.Fatal(err)
+		}
+
+		records, _ := f.run(filter, asOf)
+		got := map[string]string{}
+		for _, r := range records[1:] {
+			exp, err := time.Parse(t93Day, r[9])
+			if err != nil {
+				rt.Fatalf("expiry cell %q: %v", r[9], err)
+			}
+			key := ""
+			for k, l := range t93Labels {
+				if l == r[12] {
+					key = k
+				}
+			}
+			if _, dup := got[r[6]]; dup {
+				rt.Fatalf("WOD %q exported twice", r[6])
+			}
+			got[r[6]] = key + "|" + strconv.Itoa(int(exp.Sub(today).Hours()/24))
+		}
+		if len(got) != len(want) {
+			rt.Fatalf("filter=%+v today=%s: export %d rows, list %d\nexport: %v\nlist:   %v", filter, today.Format(t93Day), len(got), len(want), got, want)
+		}
+		for wod, w := range want {
+			if got[wod] != w {
+				rt.Fatalf("filter=%+v WOD %s: export %q, list %q", filter, wod, got[wod], w)
+			}
+		}
+	})
+}
+
+// Fixed cases: "terkini" skips replaced rows and "semua" keeps them (newest effective first); INTERNAL vendors
+// are absent; CSVSafe neutralises a formula-looking text; director cells are empty without a director; the WIB
+// day (Req 10.2) decides the status; the reminder cell is renewal_days.
+func TestVendorPksExportTerkiniSemuaAndCells(t *testing.T) {
 	f := newT93Fix(t)
 	// 2026-06-30 18:00 UTC is 2026-07-01 01:00 WIB: "today" is July 1, not June 30.
 	asOf := time.Date(2026, 6, 30, 18, 0, 0, 0, time.UTC)
 	today := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	pk := func(typ, name string, effYears, expDays int, replaced bool) t93Pks {
+		return t93Pks{typ: typ, name: name, eff: today.AddDate(effYears, 0, 0), exp: today.AddDate(0, 0, expDays),
+			renewal: 30, replaced: replaced}
+	}
+	formula := "=T93 Direktur"
 	vs := []t93Vendor{
-		{idx: 1, kind: "FLM_VENDOR"}, // no PKS, no director -> belum_diisi, empty cells
-		{idx: 2, kind: "INTERNAL"},   // no PKS, INTERNAL -> empty status
-		{idx: 3, kind: "FLM_VENDOR", pks: &t93Pks{name: "T93 PKS 3", effective: today.AddDate(-1, 0, 0), expiry: today}},                   // expires today: still valid
-		{idx: 4, kind: "FLM_VENDOR", pks: &t93Pks{name: "T93 PKS 4", effective: today.AddDate(-1, 0, 0), expiry: today.AddDate(0, 0, -1)}}, // expired yesterday
+		{idx: 1, kind: "FLM_VENDOR", dir: &t93Dir{name: formula, phone: sptr("0812")}, pks: []t93Pks{
+			pk("FLM", "T93 lama", -3, -400, true), pk("FLM", "T93 baru", -1, 400, false), pk("CIT", "T93 cit", -1, 0, false)}},
+		{idx: 2, kind: "FLM_VENDOR", pks: []t93Pks{pk("FLM", "T93 expired", -2, -1, false)}},
+		{idx: 3, kind: "INTERNAL", pks: []t93Pks{pk("FLM", "T93 internal", -1, 400, false)}},
 	}
 	for _, v := range vs {
 		f.insertVendor(v)
 	}
-	filter := t93Filter{q: "T93V", status: "active"}
-	records, raw := f.run(filter, 9, asOf)
-	want := t93Expected(vs, filter, today, 9)
-	if len(records) != 1+len(want) || len(want) != 4 {
-		t.Fatalf("rows = %d, want %d\n%s", len(records)-1, len(want), raw)
+
+	records, raw := f.run(t93Filter{status: "terkini", q: "T93"}, asOf)
+	if len(records)-1 != 3 {
+		t.Fatalf("terkini rows = %d, want 3 (replaced and INTERNAL absent)\n%s", len(records)-1, raw)
 	}
-	for i := range want {
-		if !slices.Equal(records[1+i], want[i]) {
-			t.Errorf("row %d\ngot:  %q\nwant: %q", i, records[1+i], want[i])
-		}
+	// T93V01 CIT: expires today (WIB) -> still valid, inside the 30-day reminder window.
+	r := records[1]
+	if r[0] != "T93V01" || r[5] != "CIT" || r[10] != "365" || r[11] != "30" || r[12] != "Need Renewal" || r[3] != "0812" || r[4] != "" {
+		t.Errorf("CIT row: %q", r)
 	}
-	// Literal spot checks, independent of the model.
-	if r := records[1]; r[8] != "" || r[9] != "" || r[10] != "Belum diisi" || r[5] != "" {
-		t.Errorf("FLM vendor without PKS: %q", r)
+	if r[2] == formula || r[2] != csvexport.CSVSafe(formula) {
+		t.Errorf("director cell %q must be CSVSafe(%q) = %q", r[2], formula, csvexport.CSVSafe(formula))
 	}
-	if r := records[2]; r[8] != "" || r[9] != "" || r[10] != "" {
-		t.Errorf("INTERNAL vendor without PKS: %q", r)
+	if r := records[2]; r[0] != "T93V01" || r[5] != "FLM" || r[7] != "T93 baru" || r[12] != "Aktif" {
+		t.Errorf("FLM current row: %q", r)
 	}
-	if r := records[3]; r[9] != "0" || r[10] == "Expired" {
-		t.Errorf("PKS expiring today (WIB day): remaining %q status %q", r[9], r[10])
+	if r := records[3]; r[0] != "T93V02" || r[12] != "Expired" || r[2] != "" || r[3] != "" || r[4] != "" {
+		t.Errorf("expired yesterday (WIB day), no director: %q", r)
 	}
-	if r := records[4]; r[9] != "-1" || r[10] != "Expired" {
-		t.Errorf("PKS expired yesterday: remaining %q status %q", r[9], r[10])
+
+	records, _ = f.run(t93Filter{status: "semua", q: "T93"}, asOf)
+	if len(records)-1 != 4 {
+		t.Fatalf("semua rows = %d, want 4", len(records)-1)
+	}
+	if records[2][7] != "T93 baru" || records[3][7] != "T93 lama" || records[3][12] != "Diganti" {
+		t.Errorf("semua keeps history, newest effective first: %q", records[2:4])
+	}
+
+	records, _ = f.run(t93Filter{status: "diganti", q: "T93"}, asOf)
+	if len(records)-1 != 1 || records[1][12] != "Diganti" {
+		t.Errorf("status=diganti: %q", records)
 	}
 }
 
-// Keyset paging over more than one page, with equal names straddling the page boundary: no row lost or doubled.
+// Keyset paging over more than one page: no row lost or doubled (vendor code order).
 func TestVendorPksExportKeysetPaging(t *testing.T) {
 	f := newT93Fix(t)
 	total := PageSize + 37
 	f.exec(`INSERT INTO vendors (code, name, kind, is_active)
-		SELECT 'T93P' || lpad(i::text, 5, '0'), 'T93 Page ' || lpad(((i + 1) / 2)::text, 5, '0'), 'FLM_VENDOR', true
-		FROM generate_series(1, $1::int) i`, total) // pairs share a name, so a page can end inside a pair
-	records, _ := f.run(t93Filter{q: "T93P", status: "active"}, 9, time.Date(2026, 7, 1, 8, 0, 0, 0, reports.WIB))
+		SELECT 'T93P' || lpad(i::text, 5, '0'), 'T93 Page ' || lpad(i::text, 5, '0'), 'FLM_VENDOR', true
+		FROM generate_series(1, $1::int) i`, total)
+	f.exec(`INSERT INTO vendor_pks (vendor_id, pks_type_id, wod_number, pks_name, effective_date, expiry_date, created_by)
+		SELECT v.id, (SELECT id FROM vendor_pks_types WHERE code = 'FLM'), 'T93-' || v.code, 'T93 pks ' || v.code,
+		       DATE '2025-01-01', DATE '2030-01-01', $1
+		FROM vendors v WHERE v.code LIKE 'T93P%'`, f.userID)
+	records, _ := f.run(t93Filter{status: "terkini", q: "T93"}, time.Date(2026, 7, 1, 8, 0, 0, 0, reports.WIB))
 	got := records[1:]
 	if len(got) != total {
 		t.Fatalf("rows = %d, want %d", len(got), total)
@@ -472,17 +626,20 @@ func TestVendorPksExportKeysetPaging(t *testing.T) {
 	}
 }
 
-// Role gate and audit (Req 6.8, 10.5, 10.6): a non master-data role is refused with no job row and no audit;
-// the allowed role gets export_requested at create and report_exported at download.
+// Role gate and audit (Req 10.4-10.6): ATM-SPV and ADMIN_PARAM may create the job; other roles are refused
+// with no job row and no audit; the allowed actor gets export_requested at create and report_exported at the
+// one download. The producer reads through pgReader (REPEATABLE READ READ ONLY snapshot on the replica pool),
+// the same path every run() above uses.
 func TestVendorPksExportRoleAndAudit(t *testing.T) {
 	f := newT93Fix(t)
 	ctx := context.Background()
-	p, err := ParseReportParams(KindVendorPks, t93Filter{q: "T93", status: "active"}.values(), time.Now())
+	filter := t93Filter{status: "terkini", q: "T93"}
+	p, err := ParseReportParams(KindVendorPks, filter.values(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, role := range []string{"ATM-SPV", "BRANCH-ATM-SPV", "VENDOR-USER", "ATM-USER", ""} {
+	for _, role := range []string{"BRANCH-ATM-SPV", "VENDOR-USER", "ATM-USER", "ACM-SPV", ""} {
 		_, _, err := f.svc.Create(ctx, Actor{UserID: f.otherUID, Username: "T93_spv", Role: role}, p)
 		if !errors.Is(err, ErrForbidden) {
 			t.Errorf("Create as %q: err = %v, want ErrForbidden", role, err)
@@ -495,39 +652,44 @@ func TestVendorPksExportRoleAndAudit(t *testing.T) {
 		t.Errorf("audit rows after refused creates = %d, want 0", n)
 	}
 
-	a := Actor{UserID: f.userID, Username: "T93_admin", Role: "ADMIN", IP: "127.0.0.1"}
-	job, created, err := f.svc.Create(ctx, a, p)
+	spv := Actor{UserID: f.otherUID, Username: "T93_spv", Role: "ATM-SPV", IP: "127.0.0.1"}
+	job, created, err := f.svc.Create(ctx, spv, p)
 	if err != nil || !created {
-		t.Fatalf("Create: created=%v err=%v", created, err)
+		t.Fatalf("Create as ATM-SPV: created=%v err=%v", created, err)
 	}
 	if !strings.HasPrefix(job.FileName, "vendor-pks-") || !strings.HasSuffix(job.FileName, ".csv") {
 		t.Errorf("file name = %q", job.FileName)
 	}
 	auditN := func(action string) int {
-		return f.count(`SELECT count(*) FROM audit_logs WHERE actor_id = $1 AND action = $2 AND entity_type = 'vendor_pks_report'`, f.userID, action)
+		return f.count(`SELECT count(*) FROM audit_logs WHERE actor_id = $1 AND action = $2 AND entity_type = 'vendor_pks_report'`, f.otherUID, action)
 	}
 	if auditN(ActionExportRequested) != 1 || auditN(ActionReportExported) != 0 {
 		t.Fatalf("after create: export_requested=%d report_exported=%d, want 1/0", auditN(ActionExportRequested), auditN(ActionReportExported))
 	}
 	var status string
-	if err := f.pool.QueryRow(ctx, `SELECT after->'filter'->>'status' FROM audit_logs WHERE actor_id = $1 AND action = $2`, f.userID, ActionExportRequested).Scan(&status); err != nil || status != "active" {
-		t.Errorf("audit filter.status = %q err=%v, want active", status, err)
+	if err := f.pool.QueryRow(ctx, `SELECT after->'filter'->>'status' FROM audit_logs WHERE actor_id = $1 AND action = $2`, f.otherUID, ActionExportRequested).Scan(&status); err != nil || status != "terkini" {
+		t.Errorf("audit filter.status = %q err=%v, want terkini", status, err)
 	}
 
 	// Mark it ready (same way as the other service tests) and download once.
 	f.exec(`UPDATE export_jobs SET status = 'succeeded', row_count = 0, byte_size = 5, chunk_count = 1,
 		finished_at = now(), expires_at = now() + interval '10 minutes' WHERE id = $1`, job.ID)
 	f.exec(`INSERT INTO export_job_chunks (export_job_id, seq, data) VALUES ($1, 0, $2)`, job.ID, []byte("a,b\n1\n"))
-	if _, err := f.svc.StartDownload(ctx, a, job.ID); err != nil {
+	if _, err := f.svc.StartDownload(ctx, spv, job.ID); err != nil {
 		t.Fatalf("StartDownload: %v", err)
 	}
 	if auditN(ActionReportExported) != 1 {
 		t.Errorf("report_exported after download = %d, want 1", auditN(ActionReportExported))
 	}
-	if _, err := f.svc.StartDownload(ctx, a, job.ID); !errors.Is(err, ErrNotReady) {
+	if _, err := f.svc.StartDownload(ctx, spv, job.ID); !errors.Is(err, ErrNotReady) {
 		t.Errorf("second StartDownload: err = %v, want ErrNotReady", err)
 	}
 	if auditN(ActionReportExported) != 1 {
 		t.Errorf("a refused second download wrote audit: %d", auditN(ActionReportExported))
+	}
+
+	// ADMIN_PARAM is allowed too (PksViewerRoles).
+	if _, _, err := f.svc.Create(ctx, Actor{UserID: f.userID, Username: "T93_admin", Role: "ADMIN_PARAM"}, p); err != nil {
+		t.Errorf("Create as ADMIN_PARAM: %v", err)
 	}
 }

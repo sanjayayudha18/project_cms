@@ -57,6 +57,11 @@ vi.mock("./api", () => ({
   useAcmAreaMutation: () => ({ mutate, isPending: false }),
 }));
 vi.mock("@/lib/hooks/useToast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 
 describe("AdminAcmAreasPage", () => {
   it("shows areas and the requests waiting for an area (FR1.4)", () => {

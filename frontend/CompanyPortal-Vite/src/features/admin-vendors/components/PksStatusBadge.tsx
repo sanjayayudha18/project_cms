@@ -7,15 +7,15 @@ const PKS_BADGES: Record<PksStatus, Pick<BadgeProps, "variant" | "icon" | "label
   need_renewal: { variant: "warning", icon: AlarmClock, label: "Need Renewal" },
   expired: { variant: "danger", icon: XCircle, label: "Expired" },
   terminated: { variant: "neutral", icon: Ban, label: "Terminated" },
-  belum_diisi: { variant: "neutral", icon: CircleDashed, label: "Belum diisi" },
+  belum_diisi: { variant: "neutral", icon: CircleDashed, label: "Tidak ada" },
 };
 
-const PKS_STATUS_BY_LABEL = new Map<string, PksStatus>(
-  (Object.entries(PKS_BADGES) as [PksStatus, { label: string }][]).map(([status, b]) => [
-    b.label,
-    status,
-  ]),
-);
+const PKS_STATUS_BY_LABEL = new Map<string, PksStatus>([
+  ...(Object.entries(PKS_BADGES) as [PksStatus, { label: string }][]).map(
+    ([status, b]) => [b.label, status] as [string, PksStatus],
+  ),
+  ["Belum diisi", "belum_diisi"],
+]);
 
 /** Kebalikan label badge: label teks (mis. dari ekspor/pratinjau) -> PksStatus; tak dikenal -> undefined. */
 export function pksStatusFromLabel(label: string): PksStatus | undefined {

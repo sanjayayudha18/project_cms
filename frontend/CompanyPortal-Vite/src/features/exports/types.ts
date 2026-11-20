@@ -7,9 +7,10 @@ export type StatusFilter = components["schemas"]["StatusFilter"];
 export type ExportPreview = components["schemas"]["ExportPreview"];
 export type PriceLevel = components["schemas"]["PriceLevel"];
 
-// vendor-pks adds q + pks_status, which the generated ReportParams does not list yet.
+// vendor-pks adds q + pks_status, vendor-pks-type adds pks_type, which the generated ReportParams does not list yet.
 export type ReportParams = components["schemas"]["ReportParams"] & {
   q?: string;
+  pks_type?: string;
   pks_status?: string;
 };
 /** URL segment of `POST /exports/reports/{report}`. */
@@ -20,8 +21,14 @@ export type ReportKey =
   | "replenishment-trips"
   | "vendor-pks";
 
-export type MasterDataEntity = components["parameters"]["MasterDataEntity"];
-export type VendorEntity = "vendor" | "branches" | "vaults" | "pics" | "dsr-location-maps";
+export type MasterDataEntity = components["parameters"]["MasterDataEntity"] | "vendor-pks";
+export type VendorEntity =
+  | "vendor"
+  | "branches"
+  | "vaults"
+  | "pics"
+  | "dsr-location-maps"
+  | "vendor-pks";
 export type BranchEntity = "vaults" | "pics" | "dsr-location-maps";
 
 export type ListExportJobsResponse =
@@ -45,6 +52,8 @@ export type ExportRequestParams =
       status?: StatusFilter;
     }
   | { kind: "master_data_global"; entity: MasterDataEntity; status?: StatusFilter }
+  // Cash count PIC mapping (CC-CWM only): POST /exports/cash-count-pics, not under /master-data.
+  | { kind: "cash_count_pics"; status?: StatusFilter }
   | { kind: "report"; report: ReportKey; params: ReportParams };
 
 /** Every export kind except `report` (those have their own screens, no preview). */

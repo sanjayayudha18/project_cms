@@ -15,6 +15,15 @@ Template:
 
 ---
 
+## 2026-11-18 — Backend-exq: tes integrasi P11/P33 `exportjob` merah setelah migrasi 040
+- **Symptom**: 8 tes integrasi `backend-exq/internal/exportjob` (`TestP11ProducersProperties`, `TestP11GlobalProducersFixtureOnce`, `TestP11ChunksEndToEnd`, `TestP11SnapshotIsRepeatableReadReadOnly`, `TestP33CountEqualsProducedRows`, `TestP33PicScopes`, `TestP33PagingWalkMatchesProduce`, `TestP33CountAndPageShareOneSnapshot`) FAIL di dev: `kolom « min_capacity_amount » dari relasi « vendor_vaults » tidak ada`. Ditemukan saat task 6.4 spec `vendor-pks-type`. Hanya tes, tanpa kode produksi.
+- **Root cause**: fixture P11 (`newP11Fix`) masih memakai skema dan layout CSV sebelum `vendor-vaults-export-revamp` (`dde5cfc`, migrasi `040`): kolom `min/max_capacity_amount` sudah di-rename jadi `min_balance`/`max_balance`, dan CSV vault (`no, branch_name, vault_name, …`) serta vendor (`name, legal_name, …`) tidak lagi punya kolom `id`/kode di depan, padahal helper tes membaca id dari sel 0.
+- **Fix**: hanya `producers_integration_test.go` dan `preview_integration_test.go`. Insert fixture memakai `min_balance`/`max_balance` dan mengisi `vault_name` = kode bertag; helper baru `(*p11Fix).cellIDs(entity, rows)` memetakan baris vault (lewat `vault_name`, plus cek `no` = 1..N) dan vendor (lewat `name` = kode bertag) kembali ke id, baris non-fixture di ekspor global dilewati; `checkCells` mengecek vault `branch_name`/`min_balance`/`max_balance` (sel 1/8/9) dan vendor `name` (sel 0); Property 8 membaca `min_balance`/`max_balance`.
+- **Tests**: `go test -tags integration ./internal/exportjob/...` (DATABASE_URL `localhost:5432`, 3× seed acak): 7 dari 8 tes di atas PASS. Sisa: `TestP33CountEqualsProducedRows` FAIL hanya pada kasus `vendor/vendor-pks` (`Count=1, model=0`): producer `vendor-pks` yang sedang diubah spec `vendor-pks-type` (belum di-commit) kini mengeluarkan satu baris per vendor, sedangkan model P33 belum punya baris `vendor-pks`; diserahkan ke spec itu (tes PKS tidak diubah di sini). Cek browser: tidak relevan. Catatan: preview vault halaman ke-2 dst. memulai `no` lagi dari 1 (`tableProducer.Page` memakai `startNo=1`), belum diputuskan apakah bug.
+- **Commit**: <sha>
+
+---
+
 ## 2026-11-04 — Frontend: `pnpm audit --prod` merah (zod, seroval) di kedua portal
 - **Symptom**: `pnpm audit --prod` melaporkan 3 advisory di CompanyPortal (`zod` <4.6.6 GHSA-mrhx-c7xc-m3w5; `seroval` GHSA-f86p-h4j2-7qgj + GHSA-9wx9-5pv9-3349) dan 6 di VendorPortal (zod + 5 seroval). Sudah merah sebelum upgrade pnpm 12 (spec `pnpm-12-upgrade`, D7). User memilih jalur bugfix.
 - **Root cause**: `zod` ^3.24 (patch hanya ada di 4.6.6+). `seroval` ikut `@tanstack/router-core` (range `^1.6.7`); lockfile CP masih mengunci 1.6.9, lockfile VP memakai router lama (1.170.32).

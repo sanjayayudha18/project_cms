@@ -22,15 +22,18 @@ func (e Entity) ExportHeader() []string {
 	return slices.Concat(e.Header, e.ReadOnlyColumns)
 }
 
-// VendorReadOnlyColumns are the director + active-PKS columns appended to the
-// vendor export. Returns a fresh slice so callers cannot mutate the contract.
+// VendorReadOnlyColumns are the three director columns that follow the profile
+// columns in a vendor export (PKS columns left the vendor CSV, vendor-pks-type
+// Req 7). Returns a fresh slice so callers cannot mutate the contract.
 func VendorReadOnlyColumns() []string { return slices.Clone(vendorReadOnlyColumns) }
 
-var vendorReadOnlyColumns = []string{
-	"director_name", "director_phone", "director_email",
-	"pks_name", "pks_effective_date", "pks_expiry_date",
-	"pks_validity_months", "pks_remaining_days", "pks_status",
-}
+var vendorReadOnlyColumns = []string{"director_name", "director_phone", "director_email"}
+
+// legacyVendorReadOnlyColumns is the pre-vendor-pks-type nine-column tail
+// (director + active PKS). Still accepted on import; the vendor-pks export entity
+// keeps it until its own header moves to pkg/reports (task 6.3).
+var legacyVendorReadOnlyColumns = slices.Concat(vendorReadOnlyColumns,
+	[]string{"pks_name", "pks_effective_date", "pks_expiry_date", "pks_validity_months", "pks_remaining_days", "pks_status"})
 
 func (e Entity) clone() Entity {
 	e.Header = slices.Clone(e.Header)
@@ -48,28 +51,47 @@ func (e Entity) clone() Entity {
 
 var importable = map[string]Entity{
 	Vendors: {
-		Name:            Vendors,
-		Header:          []string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-		ReadOnlyColumns: vendorReadOnlyColumns,
+		Name:   Vendors,
+		Header: []string{"name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		// Older files still carry id and code (and, from vendor-export-pks, the nine read-only PKS columns).
+		LegacyHeaders: [][]string{
+			{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+			slices.Concat([]string{"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}, legacyVendorReadOnlyColumns),
+			// Previous Export_Header: seven profile columns + nine read-only columns.
+			slices.Concat([]string{"name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"}, legacyVendorReadOnlyColumns),
+		},
 	},
 	VendorBranches: {
 		Name:   VendorBranches,
-		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "cis_limit_amount", "is_active"},
-		// Older files have no cis_limit_amount (before migration 038), no category (and, before
-		// migration 026, no region_code): keep the branch's current value instead of clearing it.
+		Header: []string{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
+		// Older files may still carry cis_limit_amount (migration 038..039, now moved to vendor_vaults),
+		// or lack category / region_code (before migration 026): keep the branch's current value instead of clearing it.
 		LegacyHeaders: [][]string{
-			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
+			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "cis_limit_amount", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "location_id", "is_active"},
 			{"id", "vendor_code", "branch_code", "branch_name", "region", "location_id", "is_active"},
 		},
-		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell, "cis_limit_amount": KeepCurrentCell},
+		LegacyFill: map[string]string{"region_code": KeepCurrentCell, "category": KeepCurrentCell},
 	},
 	VendorVaults: {
-		Name:   VendorVaults,
-		Header: []string{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "escrow_account", "is_active"},
-		// Older files have no escrow_account (before migration 038): keep the vault's current value.
-		LegacyHeaders: [][]string{{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"}},
-		LegacyFill:    map[string]string{"escrow_account": KeepCurrentCell},
+		Name: VendorVaults,
+		Header: []string{
+			"no", "branch_name", "vault_name", "category", "operating_hours", "currency_code",
+			"region", "alamat", "min_balance", "max_balance", "cis_limit_amount",
+			"escrow_cash", "escrow_atm", "is_active",
+		},
+		// Pre-040 files carry id/vendor_code/branch_code/vault_code/min_capacity_amount/max_capacity_amount
+		// (with or without escrow_account from migration 038); missing 040 columns keep their current values.
+		LegacyHeaders: [][]string{
+			{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "escrow_account", "is_active"},
+			{"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "is_active"},
+		},
+		LegacyFill: map[string]string{
+			"alamat":           KeepCurrentCell,
+			"cis_limit_amount": KeepCurrentCell,
+			"escrow_cash":      KeepCurrentCell,
+			"escrow_atm":       KeepCurrentCell,
+		},
 	},
 	VendorPICs: {
 		Name:   VendorPICs,
@@ -90,6 +112,12 @@ var importable = map[string]Entity{
 		LegacyHeaders: [][]string{{"id", "terminal_id", "vendor_code", "branch_code", "package_code", "effective_start_date", "effective_end_date", "is_active"}},
 		LegacyFill:    map[string]string{"package_source": AssignmentSourceBranch},
 	},
+	// Mapping PIC cash count (ScDD 5.1): upload = replace-all, export via backend-exq kind
+	// cash_count_pics only (never the global master-data kind).
+	CashCountPICs: {
+		Name:   CashCountPICs,
+		Header: []string{"pic_role", "username", "region_code", "area_code"},
+	},
 }
 
 var exportOnly = map[string]Entity{
@@ -101,6 +129,10 @@ var exportOnly = map[string]Entity{
 		Name: PackagePrices,
 		Header: []string{"id", "vendor_code", "price_level", "branch_code", "terminal_id", "package", "package_code", "machine_group",
 			"price_class", "tier_min", "tier_max", "base_price", "currency", "sla_note", "effective_start_date", "effective_end_date"},
+	},
+	VendorPks: {
+		Name:   VendorPks,
+		Header: slices.Concat([]string{"vendor_code", "vendor_name"}, legacyVendorReadOnlyColumns),
 	},
 }
 

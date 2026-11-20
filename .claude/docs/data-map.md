@@ -120,6 +120,69 @@ Spec: `.kiro/specs/vendor-pks/` (design "Data Models", D1–D32). Migrations `02
 *   **Export**: `export_jobs.kind = 'vendor_pks'` (migration 037), report params `q`, `status`, `pks_status`. Served by `backend-exq` at `POST /exports/reports/vendor-pks`.
 *   **Query note (sqlc v1.31.1)**: `ListVendorsAdmin` and `ExportVendorPksBatch` wrap `validity_months` and `remaining_days` in COALESCE to 0, and `pks_status` to `''`, because sqlc types these function/cast results as NOT NULL. A NULL meaning is "no active PKS" (`pks_id IS NULL`) or an INTERNAL vendor. The status filter uses the raw function, not the COALESCEd column.
 
+## Daftar PKS + reminder (migration 044)
+
+Spec: `.kiro/specs/vendor-pks-list/` (design "Data Models"). Migration `044_vendor_pks_list.sql` applied to dev DB 2026-11-19 via `go run ./cmd/migrate up` (`migrate status`: 43 applied, 0 pending). One tx; guard aborts if any PKS has a masa under 30 days.
+
+*   **`vendor_pks.renewal_days`**: `integer NOT NULL DEFAULT 270`; CHECK 30–3666; CHECK `renewal_days` ≤ masa PKS (`expiry_date - effective_date`). Backfill only updates rows whose value is not 270: `LEAST(270, expiry - effective)`.
+*   **Status function**: new `vendor_pks_record_status(replaced_at, terminated_at, effective, expiry, renewal_days, today)`. `vendor_pks_status` and `vendor_pks_validity_months` are kept until migration `045` (task 10).
+*   **Menu/access**: menu `settings.pks` (`sort_order` 2). `role_permissions`: ADMIN and ADMIN_PARAM → `settings.pks`; ATM-SPV → `settings` + `settings.pks` (read only; write routes stay ADMIN/ADMIN_PARAM).
+*   **Reminder writes**: `PUT /api/v1/admin/pks/{pksID}/reminder` writes directly (GR#3 deviation, CLAUDE.md Sec 12) with audit `vendor_pks_reminder_updated` in the same tx. Only `renewal_days` changes; no other PKS content column is updated.
+*   **Deploy window**: a pre-044 binary that approves a PKS under 270 days after the migration hits CHECK `vendor_pks_renewal_days_le_term_chk`. Deploy `backend` + `backend-exq` + CompanyPortal in one release.
+
+## Vendor PKS per Type (migration 043)
+
+<a id="vendor-pks-type-migration-043"></a>
+
+Spec: `.kiro/specs/vendor-pks-type/` (design "Data Models", Q1–Q9, DD1–DD10). Migration `043_vendor_pks_type.sql` applied to dev DB 2026-11-18 via `go run ./cmd/migrate up` (`migrate status`: 42 applied, 0 pending, no MISMATCH). Guard: migrasi 043 menolak dijalankan jika terdapat data `vendor_pks` atau change request `vendor_pks` berstatus `pending` (pada dev DB diverifikasi 0 baris).
+
+*   **`vendor_pks_types`**: identity PK. Master-data maker-checker entity `vendor_pks_type`.
+    *   `code` text UNIQUE NOT NULL, CHECK `code ~ '^[A-Z0-9_]{2,20}$'`.
+    *   `name` text NOT NULL, CHECK `length(btrim(name)) BETWEEN 1 AND 100`.
+    *   `is_active` boolean NOT NULL DEFAULT true.
+    *   `created_by` FK → `users(id)`, `created_at`, `updated_at` (trigger), `deleted_at`.
+    *   Seeded with `CIT` ("Cash in Transit") dan `FLM` ("First Line Maintenance") aktif.
+    *   Aturan disable: penonaktifan type diblokir jika type tersebut sedang dipakai oleh PKS aktif atau PKS terminated (`LockPksType` + cek penggunaan; melempar `ErrPksTypeInUse` yang menghasilkan HTTP 409 `pks_type_in_use`).
+*   **Perubahan pada `vendor_pks`**:
+    *   `pks_type_id` bigint NOT NULL FK → `vendor_pks_types(id)` ON DELETE RESTRICT.
+    *   `wod_number` text NOT NULL, CHECK `length(btrim(wod_number)) BETWEEN 1 AND 100`.
+    *   Index `vendor_pks_active_uq` diubah menjadi UNIQUE `(vendor_id, pks_type_id) WHERE replaced_at IS NULL` (satu PKS aktif per vendor per type).
+    *   Index `vendor_pks_wod_uq` baru: UNIQUE `(lower(btrim(wod_number))) WHERE replaced_at IS NULL` (No. WOD unik global di antara seluruh PKS aktif lintas vendor dan lintas type).
+    *   Index `vendor_pks_type_active_idx`: `(pks_type_id) WHERE replaced_at IS NULL`.
+*   **Maker-checker & Change Requests**:
+    *   Index `master_data_change_requests_vendor_pks_pending_uq` diubah menjadi UNIQUE `(cast(payload->>'vendor_id' as bigint), cast(payload->>'pks_type_id' as bigint)) WHERE entity_type = 'vendor_pks' AND status = 'pending'`.
+    *   Payload change request `vendor_pks` kini menyertakan `pks_type_id` dan `wod_number`. Terminate/unterminate change request menyertakan `pks_type_id`.
+    *   Index baru `master_data_change_requests_vendor_pks_wod_pending_uq`: partial unique pada `lower(btrim(payload->>'wod_number')) WHERE entity_type = 'vendor_pks' AND op = 'create' AND status = 'pending'` untuk mencegah race condition pengajuan No. WOD duplikat.
+    *   Index baru `master_data_change_requests_pks_type_code_pending_uq`: partial unique pada `upper(payload->>'code') WHERE entity_type = 'vendor_pks_type' AND op = 'create' AND status = 'pending'`.
+*   **Ekspor**:
+    *   CSV vendor master data: 6 kolom PKS (`pks_status`, `pks_name`, `effective_date`, `expiry_date`, `validity_months`, `remaining_days`) dihapus (header kini 7 kolom).
+    *   Ekspor `vendor_pks` (`backend-exq`): setiap baris mewakili satu PKS per type aktif. Menambahkan kolom `pks_type`, `pks_type_name`, dan `wod_number`. Filter kini mendukung pasangan `pks_type` dan `pks_status` (termasuk status netral `belum_diisi`).
+
+## Cash count parameters (migration 041)
+
+Source: ScDD phase 5.1 `.claude/dev-plan/plan-perscope/dev-phase-perscope/5-cash-count/5.1-parameter.md` (gate 1 accepted 2026-11-12). File: `backend/migrations/041_cash_count_parameters.sql` (one tx, forward-only). Applied to dev 2026-11-13 via `go run ./cmd/migrate up` (40 applied, 0 pending). Next free number: `042`. The shapes below replace the draft in section B (items 2–3) of the FSD proposal.
+
+- **Roles and menus**: 7 roles `CC-CWM`, `CC-COORDINATOR`, `CC-EXECUTOR`, `CC-CCR`, `CC-RECON`, `CC-D3`, `CC-D2`. Menus `cash-count.parameters` ("Parameter Cash Count") and `cash-count.pic-mapping` ("Mapping PIC") sit under the existing `cash-count` menu (id 7).
+- **`cash_count_category_params`**: one row = one whole set, not one row per category, so the H/M/L boundaries cannot gap or overlap. Columns: `medium_min_amount`, `medium_max_amount` numeric(20,2); `currency_code` fixed `IDR`; `onsite_high`/`onsite_medium`/`onsite_low` smallint 0–6; `period_months` fixed 6; `created_by`, `effective_from`, `superseded_at`. CHECK min > 0 and min < max. Partial unique on `superseded_at IS NULL` = exactly one active set. Seed: 5.000.000.000,00 / 15.000.000.000,00, onsite 3/2/1. Versioned, so it is excluded from `no_hard_delete_test.go`.
+- **`cash_count_anomaly_categories`**: `code` unique (`^[A-Z0-9_]{2,20}$`), `name` 1–100, `description` optional ≤ 500, soft delete.
+- **`cash_count_checklist_items`**: `category` `SELECTED_MACHINE` | `NON_MACHINE`; `day` `DAY1` | `DAY2`, required only for `SELECTED_MACHINE`; `point_no` > 0; `item_text` 1–500. Partial unique on (category, day, point_no) WHERE active. **No seed rows** (AC-07): the table is empty until the user fills it.
+- **`cash_count_areas`** + **`cash_count_area_regions`**: `region_code` is the PK of the link table, so one region belongs to at most one area. The link table is rewritten by the area applier and is excluded from `no_hard_delete_test.go` (same as `branch_coverage_areas`). Region source = `vendor_branches.region_code`, not `regions`. Disabling an area also deletes its link rows.
+- **`cash_count_pics`**: `pic_role` `COORDINATOR` (needs `region_code`, no `area_id`) or `EXECUTOR` (needs `area_id`, no `region_code`), enforced by CHECK. Partial unique on active (role, user, region/area).
+- **`export_jobs`**: kind `cash_count_pics` added to `export_jobs_kind_chk`.
+- Extra FKs/indexes/triggers beyond the design: `region_code` format CHECK on `cash_count_pics` (same as `vendor_branches`), `superseded_at >= effective_from`, FK indexes, `set_updated_at` trigger, `btrim` on names and codes.
+
+## Region standardization (migration 042)
+
+Source: Kiro spec `.kiro/specs/region-standardization/` (requirements, `region-mapping.md`, design, tasks accepted 2026-11-18). File: `backend/migrations/042_region_standardization.sql` (one tx, forward-only; temp mapping tables are created through `DO … EXECUTE` so sqlc does not model them). Applied to dev 2026-11-18 via `go run ./cmd/migrate up` (41 applied, 0 pending). Next free number: `043`.
+
+- **`regions`** is the single region list for ATMs (`atms.location_id → locations.region_id`) and vendor branches. The 13 rows were renamed in place (same `id`, so no `locations`/`atms` row moved): `BALI_NUSRA→BALNUS`, `JKT_CENTRAL→JKTPST`, `JKT_EAST→JKTTIM`, `JKT_NORTH→JKTUTR`, `JKT_SOUTH→JKTSEL`, `JKT_WEST→JKTBAR`, `KALIMANTAN→KAL`, `TANGERANG→TGR`; `INDTIM`, `JABAR`, `JATENG`, `JATIM`, `SUMATERA` kept. Names = ESQ names (`Jakarta Barat`, `Indonesia Timur`, …). Code rule for new regions = `^[A-Z0-9]{2,10}$`, same as `vendor_branches_region_code_chk` (no DB CHECK on `regions.code`; enforced in `region_admin.go`).
+- **`vendor_branches`**: `region_code` is an FK to `regions.code` (`vendor_branches_region_code_fk`, ON UPDATE/DELETE RESTRICT). The free-text **`region` column is dropped**; every reader joins `regions` for the name (`ListVendorBranchesAdmin`, vault admin list/get, master-data CSV export, forecast/summary `flm_vendor_region`, `ListDistinctVendorBranchRegions`). The CSV `region` column stays in exports and is ignored on import. The 34 old codes, 51 branches without a code, and 16 INDTIM branches in Kalimantan cities were mapped per `region-mapping.md` (decisions M1–M4); afterwards no active branch is without a code.
+- **`region_cities`** (new): `id`, `code` UNIQUE (`^[A-Z0-9]{2,10}$`), `name`, `region_id` FK `regions(id)`, `is_active`, `created_at`, `updated_at` (trigger), `deleted_at`. Seeded with the 22 former city-level branch codes (ACEH, AMBON, BALI, BJM, BPN, JAMBI, JEMBER, KDI, KUPANG, LAMPUNG, MADIUN, MDN, MDO, MKS, MTR, PGK, PKU, PKY, PLG, PNK, SMD, TNJ). Table only: no screen, API or CSV yet.
+- **`acm_area_regions`, `cash_count_area_regions`, `cash_count_pics.region_code`**: values remapped to the standard codes (merged codes collapsed to one row; the migration refuses to merge codes of different areas). **No FK** to `regions` on these tables yet. `TGR` had no Area ACM after the migration (ADMIN maps it).
+- **Behaviour**: region disable is refused while a `locations` row or an active vendor branch uses it (inside the disable tx, after `FOR UPDATE` on the region). Vendor branch submit, CSV dry-run and apply accept only an active region; apply takes `FOR SHARE` on the region row, so a racing disable waits and then sees the branch. Admin Region list/get return `atm_count` (active ATMs) and `vendor_branch_count` (active branches) instead of `location_count`.
+- **`migration_042_backup`** (temporary): `(entity, entity_key, payload jsonb)` with the pre-042 values of `regions`, `vendor_branches` (`region`, `region_code`), `acm_area_regions`, `cash_count_area_regions`, `cash_count_pics`. Input for `backend/scripts/dev/rollback_042_region_standardization.sql` (exercised once on dev 2026-11-18). Drop it in a later migration once the release is confirmed.
+- **Not touched**: `vendor_requests` (incl. `region_code` snapshots), tickets, `vendor_request_number_seq`. The migration stops if any Vendor Request is not `completed`/`cancelled`/`failed`; on dev the 10 open requests were soft-cancelled first (user OK).
+
 ## Proposed — FSD v1.0 (2026-10-01) — NOT approved, NOT migrated
 
 > **Update 2026-11-05**: the PKS rows in section A below (`vendors.director_*`, `vendors.pks_*`) are superseded by `vendor_pks` and `vendor_pics.is_director` (section above, D32). The `vendor_branches.cis_limit_*` and `vendor_vaults.escrow_account` rows are not migrated yet; they belong to the split-off `vendor-cis-limit` intent.

@@ -55,8 +55,8 @@ func (f *fakeExportRepo) VendorBranches(_ context.Context, after int64, status s
 }
 
 func (f *fakeExportRepo) VendorVaults(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorVaultsBatchRow, error) {
-	return []db.ExportVendorVaultsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "B", VaultCode: "VL", Category: "ATM", CurrencyCode: "IDR",
-		MinCapacityAmount: "1.00", MaxCapacityAmount: "2.00", Latitude: "-6.2", Longitude: "106.8", OperatingHours: "24h", LocationID: "9", IsActive: true}}, f.record(after, status, limit)
+	return []db.ExportVendorVaultsBatchRow{{ID: 1, VendorCode: "V", BranchCode: "B", BranchName: "Cab", VaultCode: "VL", VaultName: "VL", Category: "ATM", CurrencyCode: "IDR",
+		Region: "R", Alamat: "Jl. Test", MinBalance: "1.00", MaxBalance: "2.00", CisLimitAmount: "10.00", Latitude: "-6.2", Longitude: "106.8", OperatingHours: "24h", LocationID: "9", EscrowCash: "001234567890", EscrowAtm: "001234567891", IsActive: true}}, f.record(after, status, limit)
 }
 
 func (f *fakeExportRepo) VendorPICs(_ context.Context, after int64, status string, limit int32) ([]db.ExportVendorPicsBatchRow, error) {
@@ -109,9 +109,9 @@ func export(t *testing.T, e *MasterDataExporter, entity, status string) (header 
 // it). Pinned literally so an accidental reorder or rename fails loudly.
 func TestExport_HeaderContract(t *testing.T) {
 	want := map[string][]string{
-		ExportVendors:        {"id", "code", "name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
-		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "cis_limit_amount", "is_active"},
-		ExportVendorVaults:   {"id", "vendor_code", "branch_code", "vault_code", "category", "currency_code", "min_capacity_amount", "max_capacity_amount", "latitude", "longitude", "operating_hours", "location_id", "escrow_account", "is_active"},
+		ExportVendors:        {"name", "legal_name", "npwp", "contact_email", "contact_phone", "hq_address", "is_active"},
+		ExportVendorBranches: {"id", "vendor_code", "branch_code", "branch_name", "region", "region_code", "category", "location_id", "is_active"},
+		ExportVendorVaults:   {"no", "branch_name", "vault_name", "category", "operating_hours", "currency_code", "region", "alamat", "min_balance", "max_balance", "cis_limit_amount", "escrow_cash", "escrow_atm", "is_active"},
 		ExportVendorPICs:     {"id", "vendor_code", "branch_code", "name", "position", "phone", "email", "is_notification_recipient", "is_active", "roles", "is_director"},
 		ExportATMs:           {"id", "terminal_id", "location_id", "machine_type", "brand", "model", "operation_hours", "deployment_type", "capacity_amount", "low_threshold_amount", "critical_threshold_amount", "blacklisted", "escrow_account", "priority_class", "is_active"},
 		ExportATMAssignments: {"id", "terminal_id", "vendor_code", "branch_code", "package_source", "package_code", "effective_start_date", "effective_end_date", "is_active"},
@@ -139,8 +139,12 @@ func TestExport_CellsAlignWithHeader(t *testing.T) {
 			if len(rows[0]) != len(header) {
 				t.Errorf("%s row has %d cells, header has %d", entity, len(rows[0]), len(header))
 			}
-			if rows[0][0] != "1" {
-				t.Errorf("first column must be the id, got %q", rows[0][0])
+			wantFirst := "1"
+			if entity == ExportVendors {
+				wantFirst = "Vendor 1"
+			}
+			if rows[0][0] != wantFirst {
+				t.Errorf("first column = %q, want %q", rows[0][0], wantFirst)
 			}
 		})
 	}
@@ -158,9 +162,9 @@ func TestExport_KeysetPaging(t *testing.T) {
 		if !reflect.DeepEqual(repo.calls, wantCalls) {
 			t.Errorf("calls = %+v, want keyset cursor advancing to the last id of each page: %+v", repo.calls, wantCalls)
 		}
-		for i, id := range []string{"10", "20", "30", "40", "50"} {
-			if rows[i][0] != id {
-				t.Errorf("row %d id = %s, want %s (ordered, no gaps or duplicates)", i, rows[i][0], id)
+		for i, name := range []string{"Vendor 10", "Vendor 20", "Vendor 30", "Vendor 40", "Vendor 50"} {
+			if rows[i][0] != name {
+				t.Errorf("row %d name = %s, want %s (ordered, no gaps or duplicates)", i, rows[i][0], name)
 			}
 		}
 	})
@@ -175,7 +179,7 @@ func TestExport_KeysetPaging(t *testing.T) {
 
 	t.Run("empty table still yields BOM + header", func(t *testing.T) {
 		header, rows, n := export(t, newTestExporter(&fakeExportRepo{}, 1000), ExportVendors, "active")
-		if n != 0 || len(rows) != 0 || header[0] != "id" {
+		if n != 0 || len(rows) != 0 || header[0] != "name" {
 			t.Errorf("want header only, got header=%v rows=%d n=%d", header, len(rows), n)
 		}
 	})
@@ -239,16 +243,16 @@ func TestExport_InjectionDefusedAndAwkwardValuesRoundTrip(t *testing.T) {
 	}}
 	_, rows, _ := export(t, newTestExporter(repo, 1000), ExportVendors, "all")
 
-	if rows[0][2] != `'=HYPERLINK("http://evil","x")` {
-		t.Errorf("formula name not defused, got %q", rows[0][2])
+	if rows[0][0] != `'=HYPERLINK("http://evil","x")` {
+		t.Errorf("formula name not defused, got %q", rows[0][0])
 	}
-	if rows[0][7] != "Jl. A, No. 1\nLt. \"3\"" {
-		t.Errorf("address with comma/newline/quotes must round-trip, got %q", rows[0][7])
+	if rows[0][5] != "Jl. A, No. 1\nLt. \"3\"" {
+		t.Errorf("address with comma/newline/quotes must round-trip, got %q", rows[0][5])
 	}
-	if rows[0][6] != "+62 812-3456" {
-		t.Errorf("phone starting with + must be left alone, got %q", rows[0][6])
+	if rows[0][4] != "+62 812-3456" {
+		t.Errorf("phone starting with + must be left alone, got %q", rows[0][4])
 	}
-	if rows[1][2] != "PT Sinar Jaya — Cabang Utama ✓" || rows[1][3] != "  spaced  " || rows[1][8] != "false" {
+	if rows[1][0] != "PT Sinar Jaya — Cabang Utama ✓" || rows[1][1] != "  spaced  " || rows[1][6] != "false" {
 		t.Errorf("unicode/whitespace/bool cells wrong: %q", rows[1])
 	}
 }
@@ -348,7 +352,7 @@ func TestExport_VendorPICDirectorColumn(t *testing.T) {
 		}
 	}
 	vh, _, _ := export(t, newTestExporter(&fakeExportRepo{vendors: vendorRows(1)}, 1000), ExportVendors, "all")
-	if slices.Contains(vh, "is_director") || len(vh) != 9 {
+	if slices.Contains(vh, "is_director") || len(vh) != 7 {
 		t.Errorf("vendor header changed: %v", vh)
 	}
 }

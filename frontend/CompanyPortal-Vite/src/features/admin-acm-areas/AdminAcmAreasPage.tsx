@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/BackLink";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
@@ -108,6 +109,9 @@ export function AdminAcmAreasPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <div className="self-start">
+        <BackLink to="/settings" label="Kembali ke Pengaturan" />
+      </div>
       <PageHeader
         eyebrow="Pengaturan"
         title="Area ACM"

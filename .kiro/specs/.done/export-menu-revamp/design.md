@@ -415,4 +415,4 @@ Pratinjau tidak menulis apa pun, jadi tidak ada keadaan setengah jadi untuk dipu
 - Ubah: `features/exports/{api,hooks,types,index}.ts`, `components/ExportProgressDialog.tsx`, `routes/exports.tsx`, `routes/settings/admin/exports.tsx`, `routeTree.ts`, `lib/config/navigation.ts`, `rbac-settings/components/SettingsHubPage.tsx`, `master-data-io/components/MasterDataIOPage.tsx`, `lib/api/exq-schema.d.ts` (generate)
 - Hapus: `ExportDataPage.tsx`, `VendorExportForm.tsx`, `PackagePriceExportForm.tsx`, `ExportForms.test.tsx`, `MyExportsPage.tsx`, `MyExportsPage.test.tsx`
 
-**Dokumen**: `development-plan.md` (X.9), `.claude/development-progress.md`, `ui_design.md` tidak berubah (tidak ada deviasi).
+**Dokumen**: `.claude/dev-plan/dev-plan.md` (X.9), `.claude/development-progress.md`, `ui_design.md` tidak berubah (tidak ada deviasi).

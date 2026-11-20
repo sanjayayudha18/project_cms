@@ -34,7 +34,7 @@ import { type DatasetId, findMasterDataset, parseFilterSearch } from "../dataset
 import type { ExportPreview } from "../types";
 import { ExportPreviewPage } from "./ExportPreviewPage";
 
-const COLUMNS = ["id", "vault_code", "min_capacity_amount", "is_active"];
+const COLUMNS = ["no", "vault_name", "min_balance", "is_active"];
 const PAGE1: ExportPreview = {
   columns: COLUMNS,
   rows: [
@@ -113,9 +113,9 @@ describe("ExportPreviewPage table", () => {
     const money = screen.getByText("1000000");
     expect(money).toHaveClass("font-mono");
     expect(money.closest("td")).toHaveClass("text-right", "tabular-nums");
-    const header = screen.getByRole("columnheader", { name: "min_capacity_amount" });
+    const header = screen.getByRole("columnheader", { name: "min_balance" });
     expect(header).toHaveClass("text-right");
-    expect(screen.getByRole("columnheader", { name: "vault_code" })).toHaveClass("text-left");
+    expect(screen.getByRole("columnheader", { name: "vault_name" })).toHaveClass("text-left");
   });
 
   it("pages with cursors: Berikutnya sends next_after, Sebelumnya goes back", async () => {

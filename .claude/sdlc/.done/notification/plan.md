@@ -80,7 +80,7 @@ context yang dibatalkan saat shutdown. `.env.example`: buka blok SMTP + var inte
 ### D — Docs
 CLAUDE.md Sec 3 (Core: tambah `notification_emails`, catat migrasi `025`), Sec 12 (deviasi: hard delete retensi 90 hari,
 tanpa audit per notifikasi), `docs/data-map.md` (kolom), `development-progress.md`, `sdlc/README.md`,
-`development-plan.md` 0.3.
+`.claude/dev-plan/dev-plan.md` 0.3.
 
 ## Tests (TDD — ditulis sebelum implementasi tiap langkah)
 | Tes | Jenis | Membuktikan |

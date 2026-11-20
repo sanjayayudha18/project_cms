@@ -25,14 +25,18 @@ func NewMasterDataExportRepository(dbConn db.DBTX) *MasterDataExportRepository {
 	return &MasterDataExportRepository{queries: db.New(dbConn)}
 }
 
+// Vendors returns one keyset page of vendor profile rows (revamped in migration 040).
 func (r *MasterDataExportRepository) Vendors(ctx context.Context, afterID int64, status string, limit int32) ([]db.ExportVendorsBatchRow, error) {
 	return r.queries.ExportVendorsBatch(ctx, db.ExportVendorsBatchParams{AfterID: afterID, Status: status, BatchSize: limit})
 }
 
+// VendorBranches returns one keyset page of vendor branch rows (without cis_limit_amount, moved to vendor_vaults in migration 040).
 func (r *MasterDataExportRepository) VendorBranches(ctx context.Context, afterID int64, status string, limit int32) ([]db.ExportVendorBranchesBatchRow, error) {
 	return r.queries.ExportVendorBranchesBatch(ctx, db.ExportVendorBranchesBatchParams{AfterID: afterID, Status: status, BatchSize: limit})
 }
 
+// VendorVaults returns one keyset page of vendor vault rows including vault_name, region, alamat,
+// min_balance, max_balance, cis_limit_amount, escrow_cash, and escrow_atm (migration 040).
 func (r *MasterDataExportRepository) VendorVaults(ctx context.Context, afterID int64, status string, limit int32) ([]db.ExportVendorVaultsBatchRow, error) {
 	return r.queries.ExportVendorVaultsBatch(ctx, db.ExportVendorVaultsBatchParams{AfterID: afterID, Status: status, BatchSize: limit})
 }
@@ -64,4 +68,9 @@ func (r *MasterDataExportRepository) PackageKeys(ctx context.Context) ([]db.Impo
 
 func (r *MasterDataExportRepository) LocationIDs(ctx context.Context) ([]int64, error) {
 	return r.queries.ImportLocationIDs(ctx)
+}
+
+// ActiveRegionCodes lists active standard region codes (vendor branch CSV dry-run, region-standardization Req 3.5).
+func (r *MasterDataExportRepository) ActiveRegionCodes(ctx context.Context) ([]string, error) {
+	return r.queries.ImportActiveRegionCodes(ctx)
 }

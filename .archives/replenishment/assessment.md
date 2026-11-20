@@ -1,8 +1,8 @@
 # Assessment — ATM Replenishment Development
 
 > Development-readiness assessment for the **ATM Replenishment** module (`internal/replenishment`).
-> Status: draft assessment · Date: 2026-09-28 · Target phase: **Phase 2.2** (`development-plan.md`).
-> Sources: URS v0.3 Phase 1, `feature-flows/04` & `06`, `project-context.md`, `development-plan.md`, and inspection of the actual code.
+> Status: draft assessment · Date: 2026-09-28 · Target phase: **Phase 2.2** (`.claude/dev-plan/dev-plan.md`).
+> Sources: URS v0.3 Phase 1, `feature-flows/04` & `06`, `project-context.md`, `.claude/dev-plan/dev-plan.md`, and inspection of the actual code.
 
 ---
 
@@ -12,7 +12,7 @@ Replenishment is the daily transactional core of ATM operations: it turns order 
 
 **Current state:** the module is **not built yet**. The backend `internal/replenishment` does not exist (only generic layers are present: handler/service/repository/db/approval/audit/rolemgmt/auth). The frontend `features/replenishment` is still **mock** (reads from `src/data/replenishment-schedules.json`, not API-backed). What exists so far is the business requirements, two feature-flow diagrams, and the roadmap items.
 
-**Readiness to start:** ⚠️ **Not ready to work on now.** Per `development-plan.md`, replenishment (2.2) depends on the **2.1 forecast engine** and several Phase 0 infrastructure foundations. Neither is complete.
+**Readiness to start:** ⚠️ **Not ready to work on now.** Per `.claude/dev-plan/dev-plan.md`, replenishment (2.2) depends on the **2.1 forecast engine** and several Phase 0 infrastructure foundations. Neither is complete.
 
 ---
 
@@ -112,7 +112,7 @@ realization:    pending -> classified (on_schedule/early/late/not_done/without_o
 
 ## 8. Recommendations & Model per Stage
 
-Suggested order (aligned with `development-plan.md`):
+Suggested order (aligned with `.claude/dev-plan/dev-plan.md`):
 
 1. **Clear the blockers first** — Phase 1 (in-flight) → Phase 0.2/0.3/0.4 → 2.1 forecast. Do not start 2.2 before this.
 2. **Write a formal spec** for `internal/replenishment` (requirements → design → tasks) after the open questions are answered.

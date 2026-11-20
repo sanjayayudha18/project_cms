@@ -371,4 +371,4 @@ Disetujui PO 2026-10-23 (D2, D4, D5, D6), dicatat ke `.kiro/steering/design.md` 
 | `src/features/notifications/NotificationBell.tsx` | styling tombol |
 | `src/components/layout/{AppShell,Sidebar,Topbar,CommandPalette,useNavBadges}.tsx`, `sidebar/*`, `topbar/*`, `index.ts` | rebuild; `Header.tsx` dihapus |
 | Test layout (lihat Testing Strategy) | update/baru |
-| `.kiro/steering/design.md`, `.kiro/steering/development-plan.md`, `.claude/development-progress.md` | deviasi + status |
+| `.kiro/steering/design.md`, `.claude/dev-plan/dev-plan.md`, `.claude/development-progress.md` | deviasi + status |

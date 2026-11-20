@@ -13,7 +13,7 @@ Menyentuh Sec 4 #7: **uang (nominal realisasi vs order)** + **skema baru** (tabe
 
 ## Problem
 Kata user (2026-10-08): *"rapikan dokumen lain juga, lalu mulai intent 2.2"* — 2.2 = `internal/replenishment` di
-`.kiro/steering/development-plan.md`, setelah Phase 2.1 ditutup (*"untuk saat angka DMAA sudah final"*).
+`.claude/dev-plan/dev-plan.md`, setelah Phase 2.1 ditutup (*"untuk saat angka DMAA sudah final"*).
 
 Kebutuhan bisnis dari URS v0.3 / FSD v1.0 (`.claude/docs/requirements.md`, `feature-flows/06-replenishment-validation-reports`):
 - *"Replenishment result is classified (holiday-adjusted): on-schedule · early (1–2 days) · late (1–2 days) · not done

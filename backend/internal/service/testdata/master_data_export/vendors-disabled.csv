@@ -1,2 +1,2 @@
-﻿id,code,name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active
-2,VB,'=SUM(A1),,,,,,false
+﻿name,legal_name,npwp,contact_email,contact_phone,hq_address,is_active
+'=SUM(A1),,,,,,false

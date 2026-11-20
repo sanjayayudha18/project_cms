@@ -130,21 +130,31 @@ describe("vendorPicFormSchema", () => {
 
 describe("vendorVaultFormSchema", () => {
   const vault = {
-    vault_code: "VLT-JKT-1",
+    vault_name: "ABA_Bali_V001",
     category: "CASH",
     currency_code: "IDR",
-    min_capacity_amount: "",
-    max_capacity_amount: "",
-    latitude: "",
-    longitude: "",
+    alamat: "",
+    min_balance: "",
+    max_balance: "",
+    cis_limit_amount: "",
+    escrow_cash: "",
+    escrow_atm: "",
     operating_hours: "",
-    location_id: "",
   };
 
-  it("accepts ATM, CASH and ATM_CASH vaults", () => {
+  it("accepts ATM, CASH and ATM_CASH vaults (including empty vault_name for auto-generation)", () => {
     for (const category of ["ATM", "CASH", "ATM_CASH"]) {
       expect(vendorVaultFormSchema.safeParse({ ...vault, category }).success).toBe(true);
     }
+    expect(vendorVaultFormSchema.safeParse({ ...vault, vault_name: "" }).success).toBe(true);
+    expect(
+      vendorVaultFormSchema.safeParse({
+        ...vault,
+        cis_limit_amount: "2500000000.00",
+        escrow_cash: "001234567890",
+        escrow_atm: "998877665544",
+      }).success,
+    ).toBe(true);
   });
 
   it.each([
@@ -152,8 +162,21 @@ describe("vendorVaultFormSchema", () => {
     [{ currency_code: "" }, "currency_code", "Wajib diisi"],
     [{ currency_code: "ID1" }, "currency_code", "Hanya huruf"],
     [{ currency_code: "IDRX" }, "currency_code", "Wajib 3 huruf"],
-    [{ vault_code: "" }, "vault_code", "Wajib diisi"],
-    [{ location_id: "x".repeat(21) }, "location_id", "Maksimal 20 karakter"],
+    [{ vault_name: "x".repeat(101) }, "vault_name", "Maksimal 100 karakter"],
+    [{ alamat: "x".repeat(501) }, "alamat", "Maksimal 500 karakter"],
+    [{ cis_limit_amount: "0" }, "cis_limit_amount", "Harus angka desimal > 0, maksimal 2 desimal"],
+    [
+      { cis_limit_amount: "-100" },
+      "cis_limit_amount",
+      "Harus angka desimal > 0, maksimal 2 desimal",
+    ],
+    [
+      { cis_limit_amount: "100.123" },
+      "cis_limit_amount",
+      "Harus angka desimal > 0, maksimal 2 desimal",
+    ],
+    [{ escrow_cash: "12345678901" }, "escrow_cash", "Harus tepat 12 digit angka"],
+    [{ escrow_atm: "12345678901A" }, "escrow_atm", "Harus tepat 12 digit angka"],
   ])("rejects %j", (patch, field, message) => {
     expect(issues(vendorVaultFormSchema.safeParse({ ...vault, ...patch }))[field]).toBe(message);
   });

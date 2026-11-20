@@ -9,24 +9,22 @@ import (
 // (NULL is already "" in SQL; amounts/dates are text).
 
 type VendorRow struct {
-	ID                                                                 int64
-	Code, Name, LegalName, Npwp, ContactEmail, ContactPhone, HqAddress string
-	IsActive                                                           bool
+	Name, LegalName, Npwp, ContactEmail, ContactPhone, HqAddress string
+	IsActive                                                     bool
 }
 
 type VendorBranchRow struct {
 	ID                                                                           int64
 	VendorCode, BranchCode, BranchName, Region, RegionCode, Category, LocationID string
-	CisLimitAmount                                                               string
 	IsActive                                                                     bool
 }
 
 type VendorVaultRow struct {
-	ID                                                                                    int64
-	VendorCode, BranchCode, VaultCode, Category, CurrencyCode                             string
-	MinCapacityAmount, MaxCapacityAmount, Latitude, Longitude, OperatingHours, LocationID string
-	EscrowAccount                                                                         string
-	IsActive                                                                              bool
+	No                                                            int64
+	BranchName, VaultName, Category, OperatingHours, CurrencyCode string
+	Region, Alamat, MinBalance, MaxBalance, CisLimitAmount        string
+	EscrowCash, EscrowAtm                                         string
+	IsActive                                                      bool
 }
 
 type VendorPICRow struct {
@@ -68,16 +66,19 @@ func PICRolesCell(roles []string) string {
 }
 
 func VendorCells(r VendorRow) []string {
-	return []string{id(r.ID), r.Code, r.Name, r.LegalName, r.Npwp, r.ContactEmail, r.ContactPhone, r.HqAddress, boolCell(r.IsActive)}
+	return []string{r.Name, r.LegalName, r.Npwp, r.ContactEmail, r.ContactPhone, r.HqAddress, boolCell(r.IsActive)}
 }
 
 func VendorBranchCells(r VendorBranchRow) []string {
-	return []string{id(r.ID), r.VendorCode, r.BranchCode, r.BranchName, r.Region, r.RegionCode, r.Category, r.LocationID, r.CisLimitAmount, boolCell(r.IsActive)}
+	return []string{id(r.ID), r.VendorCode, r.BranchCode, r.BranchName, r.Region, r.RegionCode, r.Category, r.LocationID, boolCell(r.IsActive)}
 }
 
 func VendorVaultCells(r VendorVaultRow) []string {
-	return []string{id(r.ID), r.VendorCode, r.BranchCode, r.VaultCode, r.Category, r.CurrencyCode,
-		r.MinCapacityAmount, r.MaxCapacityAmount, r.Latitude, r.Longitude, r.OperatingHours, r.LocationID, r.EscrowAccount, boolCell(r.IsActive)}
+	return []string{
+		id(r.No), r.BranchName, r.VaultName, r.Category, r.OperatingHours, r.CurrencyCode,
+		r.Region, r.Alamat, r.MinBalance, r.MaxBalance, r.CisLimitAmount,
+		r.EscrowCash, r.EscrowAtm, boolCell(r.IsActive),
+	}
 }
 
 func VendorPICCells(r VendorPICRow) []string {

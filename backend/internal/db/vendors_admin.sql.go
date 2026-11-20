@@ -27,7 +27,6 @@ func (q *Queries) CountActiveUsersByVendor(ctx context.Context, vendorID *int64)
 const countVendorsAdmin = `-- name: CountVendorsAdmin :one
 SELECT COUNT(*)
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
 WHERE ($1::text IS NULL
         OR v.code ILIKE '%' || $1::text || '%'
         OR v.name ILIKE '%' || $1::text || '%')
@@ -36,27 +35,18 @@ WHERE ($1::text IS NULL
         OR ($2::text = 'active' AND v.deleted_at IS NULL)
         OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND ($3::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $4::date, $5::int) = $3::text)
+  AND ($3::text IS NULL OR v.kind = $3::text)
 `
 
 type CountVendorsAdminParams struct {
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
+	Q      *string `json:"q"`
+	Status string  `json:"status"`
+	Kind   *string `json:"kind"`
 }
 
 // Same joins and filters as ListVendorsAdmin, no LIMIT/OFFSET — pagination total (Req 6.6).
 func (q *Queries) CountVendorsAdmin(ctx context.Context, arg CountVendorsAdminParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVendorsAdmin,
-		arg.Q,
-		arg.Status,
-		arg.PksStatus,
-		arg.Today,
-		arg.RenewalMonths,
-	)
+	row := q.db.QueryRow(ctx, countVendorsAdmin, arg.Q, arg.Status, arg.Kind)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -222,80 +212,61 @@ const listVendorsAdmin = `-- name: ListVendorsAdmin :many
 
 SELECT v.id, v.code, v.name, v.legal_name, v.npwp, v.contact_email, v.contact_phone, v.hq_address, v.is_active, v.deleted_at,
        v.kind,
-       dp.id AS director_id, dp.name AS director_name, dp.phone AS director_phone, dp.email AS director_email,
-       ap.id AS pks_id, ap.pks_name, ap.effective_date AS pks_effective_date, ap.expiry_date AS pks_expiry_date,
-       COALESCE(vendor_pks_validity_months(ap.effective_date, ap.expiry_date), 0)::int AS pks_validity_months,
-       COALESCE(ap.expiry_date - $1::date, 0)::int AS pks_remaining_days,
-       COALESCE(vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $1::date, $2::int), '')::text AS pks_status
+       (SELECT count(*) FROM vendor_pks p WHERE p.vendor_id = v.id AND p.replaced_at IS NULL)::int AS pks_count,
+       dp.id AS director_id, dp.name AS director_name, dp.phone AS director_phone, dp.email AS director_email
 FROM vendors v
-LEFT JOIN vendor_pks ap ON ap.vendor_id = v.id AND ap.replaced_at IS NULL
 LEFT JOIN vendor_pics dp ON dp.vendor_id = v.id AND dp.is_director AND dp.deleted_at IS NULL
-WHERE ($3::text IS NULL
-        OR v.code ILIKE '%' || $3::text || '%'
-        OR v.name ILIKE '%' || $3::text || '%')
+WHERE ($1::text IS NULL
+        OR v.code ILIKE '%' || $1::text || '%'
+        OR v.name ILIKE '%' || $1::text || '%')
   AND (
-        $4::text = 'all'
-        OR ($4::text = 'active' AND v.deleted_at IS NULL)
-        OR ($4::text = 'disabled' AND v.deleted_at IS NOT NULL)
+        $2::text = 'all'
+        OR ($2::text = 'active' AND v.deleted_at IS NULL)
+        OR ($2::text = 'disabled' AND v.deleted_at IS NOT NULL)
       )
-  AND ($5::text IS NULL
-        OR vendor_pks_status(v.kind, ap.expiry_date, ap.terminated_at, $1::date, $2::int) = $5::text)
+  AND ($3::text IS NULL OR v.kind = $3::text)
 ORDER BY v.name ASC, v.id ASC
-LIMIT $7::bigint OFFSET $6::bigint
+LIMIT $5::bigint OFFSET $4::bigint
 `
 
 type ListVendorsAdminParams struct {
-	Today         pgtype.Date `json:"today"`
-	RenewalMonths int32       `json:"renewal_months"`
-	Q             *string     `json:"q"`
-	Status        string      `json:"status"`
-	PksStatus     *string     `json:"pks_status"`
-	PageOffset    int64       `json:"page_offset"`
-	PageLimit     int64       `json:"page_limit"`
+	Q          *string `json:"q"`
+	Status     string  `json:"status"`
+	Kind       *string `json:"kind"`
+	PageOffset int64   `json:"page_offset"`
+	PageLimit  int64   `json:"page_limit"`
 }
 
 type ListVendorsAdminRow struct {
-	ID                int64              `json:"id"`
-	Code              string             `json:"code"`
-	Name              string             `json:"name"`
-	LegalName         *string            `json:"legal_name"`
-	Npwp              *string            `json:"npwp"`
-	ContactEmail      *string            `json:"contact_email"`
-	ContactPhone      *string            `json:"contact_phone"`
-	HqAddress         *string            `json:"hq_address"`
-	IsActive          bool               `json:"is_active"`
-	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
-	Kind              string             `json:"kind"`
-	DirectorID        *int64             `json:"director_id"`
-	DirectorName      *string            `json:"director_name"`
-	DirectorPhone     *string            `json:"director_phone"`
-	DirectorEmail     *string            `json:"director_email"`
-	PksID             *int64             `json:"pks_id"`
-	PksName           *string            `json:"pks_name"`
-	PksEffectiveDate  pgtype.Date        `json:"pks_effective_date"`
-	PksExpiryDate     pgtype.Date        `json:"pks_expiry_date"`
-	PksValidityMonths int32              `json:"pks_validity_months"`
-	PksRemainingDays  int32              `json:"pks_remaining_days"`
-	PksStatus         string             `json:"pks_status"`
+	ID            int64              `json:"id"`
+	Code          string             `json:"code"`
+	Name          string             `json:"name"`
+	LegalName     *string            `json:"legal_name"`
+	Npwp          *string            `json:"npwp"`
+	ContactEmail  *string            `json:"contact_email"`
+	ContactPhone  *string            `json:"contact_phone"`
+	HqAddress     *string            `json:"hq_address"`
+	IsActive      bool               `json:"is_active"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+	Kind          string             `json:"kind"`
+	PksCount      int32              `json:"pks_count"`
+	DirectorID    *int64             `json:"director_id"`
+	DirectorName  *string            `json:"director_name"`
+	DirectorPhone *string            `json:"director_phone"`
+	DirectorEmail *string            `json:"director_email"`
 }
 
 // Admin User & Vendor Management (Task 2): sqlc queries for the admin vendor
 // CRUD endpoints (Req 6-8). Vendors have no admin queries anywhere yet.
-// COALESCE keeps these non-null for sqlc/pgx (a NULL scan into int32 fails): 0/” means
-// "no active PKS" (pks_id IS NULL) or, for pks_status, an INTERNAL vendor. Filter below uses the raw function.
-// Admin vendor list (Req 6) + PKS/direktur (vendor-pks 8.1-8.5). Filters: q
-// (case-insensitive substring across code/name), status — the caller resolves
-// absent status to 'active' before calling (Resolved Decision 5), so this
-// query only ever sees 'active' | 'disabled' | 'all' — and pks_status (NULL =
-// no filter). PKS status is computed by vendor_pks_status() from today
-// (Asia/Jakarta, from Go) and renewal_months. Ordered name ASC, id ASC (Req 6.5).
+// Admin vendor list (Req 6) + direktur (vendor-pks 8.x). Filters: q (case-insensitive substring across
+// code/name), status — the caller resolves absent status to 'active' before calling (Resolved Decision 5),
+// so this query only sees 'active' | 'disabled' | 'all'. No PKS filter/join any more (vendor-pks-list Req 7.1):
+// pks_count = current (not replaced) PKS rows of the vendor, 0 for INTERNAL. Ordered name ASC, id ASC (Req 6.5).
 func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminParams) ([]ListVendorsAdminRow, error) {
 	rows, err := q.db.Query(ctx, listVendorsAdmin,
-		arg.Today,
-		arg.RenewalMonths,
 		arg.Q,
 		arg.Status,
-		arg.PksStatus,
+		arg.Kind,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -318,17 +289,11 @@ func (q *Queries) ListVendorsAdmin(ctx context.Context, arg ListVendorsAdminPara
 			&i.IsActive,
 			&i.DeletedAt,
 			&i.Kind,
+			&i.PksCount,
 			&i.DirectorID,
 			&i.DirectorName,
 			&i.DirectorPhone,
 			&i.DirectorEmail,
-			&i.PksID,
-			&i.PksName,
-			&i.PksEffectiveDate,
-			&i.PksExpiryDate,
-			&i.PksValidityMonths,
-			&i.PksRemainingDays,
-			&i.PksStatus,
 		); err != nil {
 			return nil, err
 		}

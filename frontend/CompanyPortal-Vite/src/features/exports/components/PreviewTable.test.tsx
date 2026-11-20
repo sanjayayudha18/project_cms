@@ -4,7 +4,7 @@ import { type MasterDataset, findMasterDataset } from "../datasets";
 import type { ExportPreview } from "../types";
 import { PreviewTable } from "./PreviewTable";
 
-const dataset = findMasterDataset("vendors") as MasterDataset;
+const dataset = findMasterDataset("vendor-pks") as MasterDataset;
 
 const COLUMNS = ["id", "name", "pks_status", "pks_validity_months", "pks_remaining_days"];
 
@@ -31,15 +31,18 @@ const cellsOf = (rowIndex: number) =>
   within(screen.getAllByRole("row")[rowIndex + 1]).getAllByRole("cell");
 
 describe("PreviewTable pks_status", () => {
-  it.each(["Aktif", "Need Renewal", "Expired", "Terminated", "Belum diisi"])(
-    "label %s tampil sebagai badge dengan ikon",
-    (label) => {
-      renderTable([["1", "PT A", label, "12", "30"]]);
-      const cell = cellsOf(0)[2];
-      expect(within(cell).getByText(label)).toBeInTheDocument();
-      expect(cell.querySelector("svg")).not.toBeNull();
-    },
-  );
+  it.each([
+    ["Aktif", "Aktif"],
+    ["Need Renewal", "Need Renewal"],
+    ["Expired", "Expired"],
+    ["Terminated", "Terminated"],
+    ["Belum diisi", "Tidak ada"],
+  ])("label %s tampil sebagai badge dengan ikon (%s)", (label, expectedText) => {
+    renderTable([["1", "PT A", label, "12", "30"]]);
+    const cell = cellsOf(0)[2];
+    expect(within(cell).getByText(expectedText)).toBeInTheDocument();
+    expect(cell.querySelector("svg")).not.toBeNull();
+  });
 
   it("sel kosong tetap kosong", () => {
     renderTable([["1", "PT A", "", "", ""]]);

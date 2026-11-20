@@ -14,8 +14,8 @@ import (
 )
 
 // VendorPksAdminServicer is the subset of service.VendorPksAdminService the handler needs.
+// The PKS list (incl. a vendor's PKS tab) is GET /api/v1/admin/pks (AdminPksHandler).
 type VendorPksAdminServicer interface {
-	Get(ctx context.Context, vendorID int64) (*service.VendorPksDetail, error)
 	SubmitNew(ctx context.Context, makerID, vendorID int64, req service.SubmitVendorPksRequest, ip string) (db.MasterDataChangeRequest, error)
 	SubmitTerminate(ctx context.Context, makerID, vendorID, pksID int64, reason, ip string) (db.MasterDataChangeRequest, error)
 	SubmitUnterminate(ctx context.Context, makerID, vendorID, pksID int64, reason, ip string) (db.MasterDataChangeRequest, error)
@@ -41,29 +41,13 @@ func NewAdminVendorPksHandler(svc VendorPksAdminServicer) *AdminVendorPksHandler
 // Routes returns the router for the PKS endpoints.
 func (h *AdminVendorPksHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Get("/", h.Get)
 	r.Post("/", h.Create)
 	r.Post("/{pksID}/terminate", h.Terminate)
 	r.Post("/{pksID}/unterminate", h.Unterminate)
 	return r
 }
 
-// Get handles GET / -- active PKS, history and pending change.
-func (h *AdminVendorPksHandler) Get(w http.ResponseWriter, r *http.Request) {
-	vendorID, err := parsePathID(r, "vendorID")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
-		return
-	}
-	detail, err := h.svc.Get(r.Context(), vendorID)
-	if err != nil {
-		handleVendorPksError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, detail)
-}
-
-// Create handles POST / {pks_name, effective_date, expiry_date} -- 202 pending approval.
+// Create handles POST / {pks_type, wod_number, pks_name, effective_date, expiry_date, renewal_days} -- 202 pending approval.
 func (h *AdminVendorPksHandler) Create(w http.ResponseWriter, r *http.Request) {
 	authCtx, vendorID, ok := h.authAndVendor(w, r)
 	if !ok {
@@ -141,8 +125,14 @@ func handleVendorPksError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not_found", "Vendor tidak ditemukan")
 	case errors.Is(err, service.ErrVendorPksNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "PKS tidak ditemukan")
+	case errors.Is(err, service.ErrVendorPksWodTaken):
+		writeJSON(w, http.StatusConflict, ErrorResponse{
+			Error:   "conflict",
+			Message: service.ErrVendorPksWodTaken.Error(),
+			Details: []FieldError{{Field: "wod_number", Message: service.ErrVendorPksWodTaken.Error()}},
+		})
 	case errors.Is(err, service.ErrMasterDataChangePending):
-		writeError(w, http.StatusConflict, "conflict", "Masih ada perubahan PKS yang menunggu persetujuan")
+		writeError(w, http.StatusConflict, "conflict", "Masih ada perubahan PKS (type ini) yang menunggu persetujuan")
 	case errors.Is(err, service.ErrVendorPksVendorInactive):
 		writeError(w, http.StatusConflict, "conflict", "Vendor nonaktif. Aktifkan vendor dulu")
 	case errors.Is(err, service.ErrVendorPksNotActive):

@@ -1,9 +1,15 @@
+import { useAuthStore } from "@/lib/auth/store";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VendorDetailPage } from "../components/VendorDetailPage";
 
+let searchState: Record<string, unknown> = {};
+const navigateMock = vi.fn();
+
 vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => searchState,
+  useNavigate: () => navigateMock,
   Link: ({
     children,
     to,
@@ -44,27 +50,32 @@ const VENDOR = {
 const defaultVendor = () => ({ isError: false, data: VENDOR });
 const useVendorMock = vi.fn(defaultVendor);
 
+const setRole = (role: "ADMIN" | "ATM-SPV") =>
+  useAuthStore.setState({
+    user: {
+      id: 1,
+      username: "u",
+      fullName: "U",
+      email: "u@x",
+      role,
+      isKaryawan: true,
+      vendorId: null,
+    },
+  });
+
+beforeEach(() => {
+  searchState = {};
+  navigateMock.mockReset();
+  setRole("ADMIN");
+});
+
 afterEach(() => {
   useVendorMock.mockImplementation(defaultVendor);
 });
 
 vi.mock("../hooks", () => ({
   useVendor: (...args: unknown[]) => useVendorMock(...args),
-  useVendorPks: () => ({
-    isLoading: false,
-    isError: false,
-    data: {
-      today: "2026-09-16",
-      renewal_months: 6,
-      pks_status: "belum_diisi",
-      active: null,
-      history: [],
-      pending: null,
-    },
-  }),
-  useSubmitVendorPks: () => noopMutation,
-  useTerminateVendorPks: () => noopMutation,
-  useUnterminateVendorPks: () => noopMutation,
+  usePksTypesList: () => ({ data: [], isLoading: false }),
   useVendorBranches: () => ({
     isLoading: false,
     isError: false,
@@ -100,14 +111,17 @@ vi.mock("../hooks", () => ({
           id: 20,
           vendor_branch_id: 10,
           vault_code: "VLT-A",
+          vault_name: "VLT-A",
+          region: "Jakarta",
           category: "ATM",
           currency_code: "IDR",
-          min_capacity_amount: null,
-          max_capacity_amount: "1000000.00",
-          latitude: null,
-          longitude: null,
+          alamat: null,
+          min_balance: null,
+          max_balance: "1000000.00",
+          cis_limit_amount: null,
+          escrow_cash: null,
+          escrow_atm: null,
           operating_hours: "24 jam",
-          location_id: null,
           is_active: true,
           deleted_at: null,
         },
@@ -162,6 +176,15 @@ vi.mock("../hooks", () => ({
   useDisableVendorPackagePrice: () => noopMutation,
 }));
 
+vi.mock("../../admin-pks/hooks", () => ({
+  usePksList: () => ({
+    isLoading: false,
+    isError: false,
+    data: { items: [], total: 0, page: 1, page_size: 100 },
+    refetch: vi.fn(),
+  }),
+}));
+
 describe("VendorDetailPage", () => {
   it("shows legal name and NPWP on Info", () => {
     render(<VendorDetailPage vendorId={1} />);
@@ -169,19 +192,19 @@ describe("VendorDetailPage", () => {
     expect(screen.getByText("012345678901000")).toBeTruthy();
   });
 
-  it("lists branches on the Cabang tab, each linking to its own detail page", async () => {
+  it("lists branches on the Cabang tab, each linking to its own detail page", () => {
+    searchState = { tab: "branches" };
     render(<VendorDetailPage vendorId={1} />);
 
-    await userEvent.click(screen.getByRole("tab", { name: "Cabang" }));
     expect(screen.getByText("Cabang Satu")).toBeTruthy();
 
     const branchLink = screen.getByRole("link", { name: "BR1" });
     expect(branchLink.getAttribute("href")).toBe("/settings/admin/vendors/1/branches/10");
   });
 
-  it("shows vendor-wide PIC tab independent of branch selection", async () => {
+  it("shows vendor-wide PIC tab independent of branch selection", () => {
+    searchState = { tab: "vendorWidePics" };
     render(<VendorDetailPage vendorId={1} />);
-    await userEvent.click(screen.getByRole("tab", { name: "PIC Vendor-wide" }));
     expect(screen.getByText("Belum ada PIC vendor-wide")).toBeTruthy();
   });
 
@@ -208,20 +231,44 @@ describe("VendorDetailPage", () => {
     expect(tabs).toEqual(["Info", "Cabang", "PIC Vendor-wide", "Harga Paket", "Mapping DSR"]);
   });
 
-  it("opens the PKS panel from the PKS tab", async () => {
+  it("opens the read-only PKS tab via ?tab=pks (no write button, link only for ADMIN)", () => {
+    searchState = { tab: "pks" };
     render(<VendorDetailPage vendorId={1} />);
-    await userEvent.click(screen.getByRole("tab", { name: "PKS" }));
-    expect(screen.getByRole("region", { name: "PKS aktif" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Catat PKS baru" })).toBeTruthy();
+    expect(screen.getByText("Vendor ini belum memiliki PKS")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Catat PKS baru" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Kelola di Daftar PKS" })).toBeTruthy();
   });
 
-  it("shows only the selected tab's panel when switching tabs", async () => {
+  it("clicking a tab writes it to ?tab=", async () => {
     render(<VendorDetailPage vendorId={1} />);
+    await userEvent.click(screen.getByRole("tab", { name: "PKS" }));
+    expect(navigateMock).toHaveBeenCalledWith({ to: ".", search: { tab: "pks" } });
+  });
 
-    // Info panel content is visible by default.
-    expect(screen.getByText("Vendor Satu")).toBeTruthy();
+  it("ATM-SPV sees only the PKS tab, no summary strip and no manage link (Req 8.4)", () => {
+    setRole("ATM-SPV");
+    render(<VendorDetailPage vendorId={1} />);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["PKS"]);
+    expect(screen.getByText("Vendor ini belum memiliki PKS")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Kelola di Daftar PKS" })).toBeNull();
+    expect(screen.queryByText("012345678901000")).toBeNull();
+  });
 
-    await userEvent.click(screen.getByRole("tab", { name: "Cabang" }));
+  it("ATM-SPV cannot reach another tab through ?tab=", () => {
+    setRole("ATM-SPV");
+    searchState = { tab: "branches" };
+    render(<VendorDetailPage vendorId={1} />);
+    expect(screen.queryByText("Cabang Satu")).toBeNull();
+    expect(screen.getByText("Vendor ini belum memiliki PKS")).toBeTruthy();
+  });
+
+  it("shows only the selected tab's panel (Info by default, ?tab= otherwise)", () => {
+    const { unmount } = render(<VendorDetailPage vendorId={1} />);
+    expect(screen.getByText("012345678901000")).toBeTruthy();
+    unmount();
+
+    searchState = { tab: "branches" };
+    render(<VendorDetailPage vendorId={1} />);
     expect(screen.getByText("Cabang Satu")).toBeTruthy();
     expect(screen.queryByText("012345678901000")).toBeNull();
   });

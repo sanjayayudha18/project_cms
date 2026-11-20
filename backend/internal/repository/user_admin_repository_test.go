@@ -338,4 +338,47 @@ func TestUserAdminRepository(t *testing.T) {
 			t.Errorf("SupervisorExists(userC, soft-disabled) = true, want false")
 		}
 	})
+
+	t.Run("VendorBranchBelongsToVendor and ListVendorOptions and ListVendorBranchOptions", func(t *testing.T) {
+		var branchID int64
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO vendor_branches (vendor_id, branch_code, branch_name, is_active) VALUES ($1, $2, $3, true) RETURNING id`,
+			vendorID, "UBR_"+tag, "User Branch "+tag,
+		).Scan(&branchID); err != nil {
+			t.Fatalf("seed branch: %v", err)
+		}
+
+		belongs, err := repo.VendorBranchBelongsToVendor(ctx, branchID, vendorID)
+		if err != nil {
+			t.Fatalf("VendorBranchBelongsToVendor: %v", err)
+		}
+		if !belongs {
+			t.Errorf("VendorBranchBelongsToVendor = false, want true")
+		}
+
+		notBelongs, err := repo.VendorBranchBelongsToVendor(ctx, branchID, -999)
+		if err != nil {
+			t.Fatalf("VendorBranchBelongsToVendor(-999): %v", err)
+		}
+		if notBelongs {
+			t.Errorf("VendorBranchBelongsToVendor(-999) = true, want false")
+		}
+
+		vOpts, err := repo.ListVendorOptions(ctx)
+		if err != nil {
+			t.Fatalf("ListVendorOptions: %v", err)
+		}
+		if len(vOpts) == 0 {
+			t.Errorf("ListVendorOptions returned empty list")
+		}
+
+		vbOpts, err := repo.ListVendorBranchOptions(ctx)
+		if err != nil {
+			t.Fatalf("ListVendorBranchOptions: %v", err)
+		}
+		if len(vbOpts) == 0 {
+			t.Errorf("ListVendorBranchOptions returned empty list")
+		}
+	})
 }
+

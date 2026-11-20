@@ -295,4 +295,34 @@ func TestRegionAdminRepository(t *testing.T) {
 			t.Errorf("Region = %v, want %q", updated.Region, "Renamed "+tag)
 		}
 	})
+
+	t.Run("LockForUpdateTx, CountActiveLocationsTx and CountActiveVendorBranchesTx", func(t *testing.T) {
+		name := "TxOps " + tag
+		regCode := code + "TX"
+		created, err := repo.CreateTx(ctx, tx, db.CreateRegionAdminParams{Code: regCode, Region: &name})
+		if err != nil {
+			t.Fatalf("CreateTx: %v", err)
+		}
+
+		if err := repo.LockForUpdateTx(ctx, tx, created.ID); err != nil {
+			t.Fatalf("LockForUpdateTx: %v", err)
+		}
+
+		locCount, err := repo.CountActiveLocationsTx(ctx, tx, created.ID)
+		if err != nil {
+			t.Fatalf("CountActiveLocationsTx: %v", err)
+		}
+		if locCount != 0 {
+			t.Errorf("CountActiveLocationsTx = %d, want 0", locCount)
+		}
+
+		vbCount, err := repo.CountActiveVendorBranchesTx(ctx, tx, regCode)
+		if err != nil {
+			t.Fatalf("CountActiveVendorBranchesTx: %v", err)
+		}
+		if vbCount != 0 {
+			t.Errorf("CountActiveVendorBranchesTx = %d, want 0", vbCount)
+		}
+	})
 }
+

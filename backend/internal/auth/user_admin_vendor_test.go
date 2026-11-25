@@ -56,7 +56,7 @@ func TestUserAdminService_Create_VendorMatrix(t *testing.T) {
 		{name: "branch of other vendor or inactive", role: "VENDOR-ATM-USER", authSource: "local", vendorID: ptrInt64(5), branchID: ptrInt64(8), wantField: "vendor_branch_id", wantRef: true, wantCheck: []branchCall{{8, 5}}},
 		{name: "internal ldap role with branch", role: "APPACCESS", authSource: "ldap", branchID: ptrInt64(7), wantField: "vendor_branch_id", wantRef: true},
 		{name: "internal local role with branch", role: "OPERATOR", authSource: "local", vendorID: ptrInt64(5), branchID: ptrInt64(7), wantField: "vendor_branch_id", wantRef: true},
-		{name: "internal local role without branch", role: "OPERATOR", authSource: "local", vendorID: ptrInt64(5)},
+		{name: "internal local role with vendor (Req 2.5)", role: "OPERATOR", authSource: "local", vendorID: ptrInt64(5), wantField: "vendor_id", wantRef: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestUserAdminService_Update_VendorBranch(t *testing.T) {
 		{name: "new branch checked", before: vendorUserRow, role: "VENDOR-VAULT-USER", vendorID: ptrInt64(5), branchSet: true, branchID: ptrInt64(9), belongs: true, wantBranch: ptrInt64(9), wantCheck: []branchCall{{9, 5}}},
 		{name: "vendor changed, branch kept -> rejected", before: vendorUserRow, role: "VENDOR-ATM-USER", vendorID: ptrInt64(6), wantField: "vendor_branch_id", wantRef: true, wantCheck: []branchCall{{7, 6}}},
 		{name: "role to internal with kept branch -> rejected", before: vendorUserRow, role: "OPERATOR", vendorID: ptrInt64(5), wantField: "vendor_branch_id", wantRef: true},
-		{name: "role to internal clearing branch", before: vendorUserRow, role: "OPERATOR", vendorID: ptrInt64(5), branchSet: true},
+		{name: "role to internal on vendor user (Req 2.5)", before: vendorUserRow, role: "OPERATOR", vendorID: ptrInt64(5), branchSet: true, wantField: "vendor_id", wantRef: true},
 		{name: "vendor role on ldap user", before: func() *db.GetUserAdminByIDRow { return activeUserRow(1, "ldap.user", "ldap", "vendor.user@example.com") }, role: "VENDOR-USER", vendorID: ptrInt64(5), wantField: "auth_source"},
 		{name: "vendor role without vendor", before: vendorUserRow, role: "VENDOR-ATM-USER", branchSet: true, wantField: "vendor_id"},
 	}

@@ -23,7 +23,7 @@ export {
   delegationSchema,
   leaveSchema,
   policySchema,
-  ROLE_BADGE_VARIANT,
+  roleBadgeVariant,
 } from "./types";
 export type {
   BadgeVariant,

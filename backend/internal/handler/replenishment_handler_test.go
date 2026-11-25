@@ -109,7 +109,7 @@ func TestVendorOrderHandler_ListRealizations(t *testing.T) {
 	ts := testTokenService()
 	fake := &fakeVendorOrderServicer{}
 	r := chi.NewRouter()
-	r.With(custommw.RequireAuth(ts)).Mount("/v", NewVendorOrderHandler(fake).RealizationRoutes())
+	r.With(custommw.RequireAuth(ts)).Mount("/v", NewVendorOrderHandler(fake, allowVendorPerm).RealizationRoutes())
 	// vendor_id / region_code / only_diff are internal-only: ignored for the vendor.
 	rec := doRequest(r, http.MethodGet, "/v?date_from=2026-10-01&date_to=2026-10-14&vendor_id=99&only_diff=true", tokenForVendor(t, ts, 9, 42), "")
 	if rec.Code != http.StatusOK {

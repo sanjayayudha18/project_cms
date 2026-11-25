@@ -17,7 +17,7 @@ import {
   User,
   UserCog,
 } from "lucide-react";
-import { ROLE_BADGE_VARIANT } from "../types";
+import { roleBadgeVariant } from "../types";
 
 const ROLE_ICON: Record<string, LucideIcon> = {
   ADMIN: ShieldCheck,
@@ -29,20 +29,18 @@ const ROLE_ICON: Record<string, LucideIcon> = {
   "BRANCH-SPV": Building2,
   "BRANCH-ATM-USER": Building2,
   "BRANCH-ATM-SPV": Building2,
-  "VENDOR-USER": Truck,
-  "VENDOR-ATM-USER": Truck,
-  "VENDOR-VAULT-USER": Truck,
 };
 
 interface RoleBadgeProps {
   role: string;
 }
 
+/** Unknown roles: neutral variant + generic icon; the role name is always shown. */
 export function RoleBadge({ role }: RoleBadgeProps) {
   return (
     <Badge
-      variant={ROLE_BADGE_VARIANT[role] ?? "neutral"}
-      icon={ROLE_ICON[role] ?? User}
+      variant={roleBadgeVariant(role)}
+      icon={ROLE_ICON[role] ?? (role.startsWith("VENDOR-") ? Truck : User)}
       label={role}
     />
   );

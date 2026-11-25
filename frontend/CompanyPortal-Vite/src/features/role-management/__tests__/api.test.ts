@@ -32,7 +32,20 @@ describe("role-management api", () => {
     client.post.mockResolvedValue({ data: { id: 11, role: "AUDITOR" } });
 
     await expect(createRole(values)).resolves.toEqual({ id: 11, role: "AUDITOR" });
-    expect(client.post).toHaveBeenCalledWith("/admin/roles", values);
+    expect(client.post).toHaveBeenCalledWith("/admin/roles", { portal: "main", ...values });
+  });
+
+  it("sends portal and party_scope for a vendor role", async () => {
+    const body = {
+      role: "VENDOR-CIT",
+      description: "",
+      portal: "vendor" as const,
+      party_scope: ["replenish" as const, "vault" as const],
+    };
+    client.post.mockResolvedValue({ data: { id: 12, role: "VENDOR-CIT" } });
+
+    await createRole(body);
+    expect(client.post).toHaveBeenCalledWith("/admin/roles", body);
   });
 
   it("replaces a role's permissions with menu_feature_ids", async () => {

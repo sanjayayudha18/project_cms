@@ -64,9 +64,10 @@ func (c Client) AllowsIP(ip netip.Addr) bool {
 }
 
 // CanAssign reports whether the client may give role to a user: never a
-// privileged role, even if the allowlist somehow holds one.
+// privileged role and never a vendor role (LDAP users only, Req 2.5), even if
+// the allowlist somehow holds one.
 func (c Client) CanAssign(role string) bool {
-	return !userrules.IsPrivileged(role) && slices.Contains(c.AssignableRoles, role)
+	return !userrules.IsPrivileged(role) && !userrules.IsVendorRole(role) && slices.Contains(c.AssignableRoles, role)
 }
 
 // HasScope reports whether the client is allowed scope s.

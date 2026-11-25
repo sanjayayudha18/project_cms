@@ -175,6 +175,62 @@ func TestRoleMgmtHandler_UpdateRolePermissions_HappyPath(t *testing.T) {
 	}
 }
 
+func TestRoleMgmtHandler_CreateRole_SendsPortalAndScope(t *testing.T) {
+	svc := &captureRoleMgmtServicer{}
+	router, tokenSvc := mountRoleMgmtHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodPost, "/api/v1/admin/roles", token,
+		`{"role":"VENDOR-X","portal":"vendor","party_scope":["vault"]}`)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if svc.got.Portal != "vendor" || len(svc.got.PartyScope) != 1 || svc.got.PartyScope[0] != "vault" {
+		t.Errorf("portal/party_scope not forwarded: %+v", svc.got)
+	}
+}
+
+func TestRoleMgmtHandler_ListRoles_IncludesPortalScopeAndCount(t *testing.T) {
+	svc := &fakeRoleMgmtServicer{listRolesResult: []db.ListRolesWithPermissionsRow{
+		{RoleID: 1, Role: "VENDOR-X", Portal: "vendor", PartyScope: []string{"replenish"}, ActiveUserCount: 3},
+	}}
+	router, tokenSvc := mountRoleMgmtHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodGet, "/api/v1/admin/roles", token, "")
+
+	body := rec.Body.String()
+	for _, want := range []string{`"portal":"vendor"`, `"party_scope":["replenish"]`, `"active_user_count":3`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %s in body, got: %s", want, body)
+		}
+	}
+}
+
+func TestRoleMgmtHandler_UpdateRolePermissions_UnknownField_422(t *testing.T) {
+	svc := &fakeRoleMgmtServicer{}
+	router, tokenSvc := mountRoleMgmtHandler(svc)
+	token := tokenForRole(t, tokenSvc, 1, "ADMIN")
+
+	rec := doRequest(router, http.MethodPut, "/api/v1/admin/roles/7/permissions", token, `{"menu_feature_ids":[1],"portal":"vendor"}`)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// captureRoleMgmtServicer records the CreateRole request it receives.
+type captureRoleMgmtServicer struct {
+	fakeRoleMgmtServicer
+	got rolemgmt.CreateRoleRequest
+}
+
+func (c *captureRoleMgmtServicer) CreateRole(_ context.Context, _ int64, _ string, req rolemgmt.CreateRoleRequest, _ string) (db.Role, error) {
+	c.got = req
+	return db.Role{ID: 9, Role: req.Role}, nil
+}
+
 func TestRoleMgmtHandler_UpdateRolePermissions_ErrorMapping(t *testing.T) {
 	cases := []struct {
 		name       string

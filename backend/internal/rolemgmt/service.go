@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -69,10 +70,26 @@ func NewPermissionService(repo Repo, pool Pool) *PermissionService {
 	return &PermissionService{repo: repo, pool: pool}
 }
 
-// CreateRoleRequest holds the data for a POST /api/v1/admin/roles request (Req 2.1).
+// Role portals a role can be created in (roles.portal, migration 047).
+// "service" (EXT-CLIENT) exists in the DB but is never created here.
+const (
+	PortalMain   = "main"
+	PortalVendor = "vendor"
+)
+
+// vendorRolePrefix mirrors roles_portal_prefix_chk: portal vendor <=> VENDOR-%.
+const vendorRolePrefix = "VENDOR-"
+
+// validPartyScopes are the allowed roles.party_scope values (roles_party_scope_values_chk).
+var validPartyScopes = map[string]bool{"replenish": true, "vault": true}
+
+// CreateRoleRequest holds the data for a POST /api/v1/admin/roles request
+// (Req 2.1; Portal + PartyScope: role-management-revamp Req 2.2, 7.1, 7.3).
 type CreateRoleRequest struct {
 	Role        string
 	Description string
+	Portal      string
+	PartyScope  []string
 }
 
 // isAuthorizedActor reports whether actorRole is APPACCESS or ADMIN,
@@ -109,6 +126,10 @@ func (s *PermissionService) CreateRole(ctx context.Context, actorID int64, actor
 	if !roleNameRe.MatchString(role) {
 		return db.Role{}, &ValidationError{Field: "role", Message: "gunakan huruf kapital, angka, dan tanda hubung"}
 	}
+	scope, err := validatePortalScope(role, req.Portal, req.PartyScope)
+	if err != nil {
+		return db.Role{}, err
+	}
 
 	existing, err := s.repo.FindRoleByName(ctx, role)
 	if err != nil {
@@ -127,6 +148,8 @@ func (s *PermissionService) CreateRole(ctx context.Context, actorID int64, actor
 	created, err := db.New(tx).CreateRole(ctx, db.CreateRoleParams{
 		Role:        role,
 		Description: nilIfEmpty(strings.TrimSpace(req.Description)),
+		Portal:      req.Portal,
+		PartyScope:  scope,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -189,7 +212,7 @@ func (s *PermissionService) UpdateRolePermissions(ctx context.Context, actorID i
 	if err != nil {
 		return nil, fmt.Errorf("loading catalog: %w", err)
 	}
-	final, err := resolvePermissionSet(role.Role, featureIDs, before, catalog)
+	final, err := resolvePermissionSet(*role, featureIDs, before, catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -224,15 +247,21 @@ func (s *PermissionService) UpdateRolePermissions(ctx context.Context, actorID i
 
 // resolvePermissionSet computes the set to store for a permission update
 // (spec permission-catalog-coverage Req 3.5, 3.6):
+//
 //   - Always_On/Locked catalog ids are dropped from the submitted set and the
 //     ones already stored are kept, so the editor can neither grant nor
 //     revoke them (e.g. 002's settings.roles grant for ADMIN survives);
+//
 //   - a newly added id whose assignable_roles excludes roleName fails with
 //     *RoleNotAssignableError. Grants the role already holds are not
 //     re-checked, so a legacy grant never blocks saving other changes.
 //
+//   - a submitted id whose catalog portal differs from the role's portal fails
+//     with *RoleNotAssignableError, held or not (role-management-revamp
+//     Req 2.4); assignable_roles applies to the main catalog only.
+//
 // Ids missing from catalog (inactive entries) carry no rule and pass through.
-func resolvePermissionSet(roleName string, submitted, before []int64, catalog []db.MenuFeature) ([]int64, error) {
+func resolvePermissionSet(role db.Role, submitted, before []int64, catalog []db.MenuFeature) ([]int64, error) {
 	byID := make(map[int64]db.MenuFeature, len(catalog))
 	for _, f := range catalog {
 		byID[f.ID] = f
@@ -250,15 +279,59 @@ func resolvePermissionSet(roleName string, submitted, before []int64, catalog []
 		}
 	}
 	for _, id := range distinctInt64s(submitted) {
+		f, ok := byID[id]
+		if ok && f.Portal != role.Portal {
+			return nil, &RoleNotAssignableError{Label: f.Label, Roles: []string{"portal " + f.Portal}}
+		}
 		if protected(id) {
 			continue
 		}
-		if f, ok := byID[id]; ok && !held[id] && f.AssignableRoles != nil && !containsFold(f.AssignableRoles, roleName) {
+		if ok && f.Portal == PortalMain && !held[id] && f.AssignableRoles != nil && !containsFold(f.AssignableRoles, role.Role) {
 			return nil, &RoleNotAssignableError{Label: f.Label, Roles: f.AssignableRoles}
 		}
 		final = append(final, id)
 	}
 	return final, nil
+}
+
+// validatePortalScope enforces the create-time portal rules (design.md
+// rolemgmt CreateRole; Req 2.2, 7.1, 7.3) ahead of the DB CHECKs so the
+// caller gets a 422 instead of a 500:
+//   - portal must be main or vendor;
+//   - vendor: name has the VENDOR- prefix and party_scope is a non-empty
+//     subset of {replenish, vault};
+//   - main: name has no VENDOR- prefix and party_scope is empty.
+//
+// Returns the scope to store: sorted + deduplicated for vendor, nil for main.
+func validatePortalScope(role, portal string, partyScope []string) ([]string, error) {
+	isVendorName := strings.HasPrefix(role, vendorRolePrefix)
+	switch portal {
+	case PortalVendor:
+		if !isVendorName {
+			return nil, &ValidationError{Field: "role", Message: "peran Portal Cabang wajib berawalan VENDOR-"}
+		}
+		if len(partyScope) == 0 {
+			return nil, &ValidationError{Field: "party_scope", Message: "pilih cakupan pihak: replenish, vault, atau keduanya"}
+		}
+		scope := slices.Clone(partyScope)
+		for _, v := range scope {
+			if !validPartyScopes[v] {
+				return nil, &ValidationError{Field: "party_scope", Message: "cakupan pihak hanya boleh replenish atau vault"}
+			}
+		}
+		slices.Sort(scope)
+		return slices.Compact(scope), nil
+	case PortalMain:
+		if isVendorName {
+			return nil, &ValidationError{Field: "role", Message: "awalan VENDOR- hanya untuk peran Portal Cabang"}
+		}
+		if len(partyScope) > 0 {
+			return nil, &ValidationError{Field: "party_scope", Message: "cakupan pihak hanya untuk peran Portal Cabang"}
+		}
+		return nil, nil
+	default:
+		return nil, &ValidationError{Field: "portal", Message: "portal wajib main atau vendor"}
+	}
 }
 
 func containsFold(list []string, s string) bool {

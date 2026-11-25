@@ -97,15 +97,12 @@ interface ApiErrorResponse {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const VENDOR_ROLES: ReadonlySet<string> = new Set([
-  "VENDOR-USER",
-  "VENDOR-ATM-USER",
-  "VENDOR-VAULT-USER",
-]);
-
-/** Ketiga role vendor hanya boleh masuk VendorPortal (vendor-party-scope Req 8.2). */
+/**
+ * Peran vendor = prefix `VENDOR-` (role-management-revamp; sama dengan backend
+ * `vendorrole.IsVendor`). Hanya boleh masuk VendorPortal (vendor-party-scope Req 8.2).
+ */
 export function isVendorRole(role: string): boolean {
-  return VENDOR_ROLES.has(role);
+  return role.startsWith("VENDOR-");
 }
 
 function mapUserResponse(raw: LoginSuccessResponse["user"]): AuthUser {

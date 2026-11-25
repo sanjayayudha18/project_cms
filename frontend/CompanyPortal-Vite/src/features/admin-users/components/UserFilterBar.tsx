@@ -1,6 +1,6 @@
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { useVendorOptions } from "../hooks";
-import { ROLE_OPTIONS, roleLabel } from "../lib/userFormSchema";
+import { useRoleOptions } from "../lib/useRoleOptions";
 import type { AdminUsersUrlParams } from "../useAdminUsersUrlState";
 
 const STATUS_OPTIONS = [
@@ -24,6 +24,7 @@ export function UserFilterBar({
   onParamsChange,
 }: UserFilterBarProps) {
   const optionsQuery = useVendorOptions();
+  const { options: roleOptions } = useRoleOptions(null);
   const vendorOptions = (optionsQuery.data?.vendors ?? []).map((v) => ({
     value: String(v.id),
     label: v.name,
@@ -51,7 +52,7 @@ export function UserFilterBar({
 
       <FilterSelect
         label="Role"
-        options={ROLE_OPTIONS.map((r) => ({ value: r, label: roleLabel(r) }))}
+        options={roleOptions}
         value={params.role ?? null}
         onChange={(value) => onParamsChange({ role: value ?? undefined, page: 1 })}
       />

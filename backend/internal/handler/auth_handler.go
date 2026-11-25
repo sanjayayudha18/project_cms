@@ -7,12 +7,14 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
 	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
@@ -34,6 +36,7 @@ type AuthHandler struct {
 	rateLimiter       *middleware.RateLimiter
 	changePasswordSvc ChangePasswordService
 	permKeys          PermissionKeyReader
+	partyScope        vendorrole.ScopeReader
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
@@ -79,6 +82,30 @@ func (h *AuthHandler) WithPermissions(p PermissionKeyReader) *AuthHandler {
 	return h
 }
 
+// WithPartyScope enables party_scope in GET /me (role-management-revamp 5.3).
+// Unset → party_scope stays null.
+func (h *AuthHandler) WithPartyScope(p vendorrole.ScopeReader) *AuthHandler {
+	h.partyScope = p
+	return h
+}
+
+// vendorKeyPrefix marks Portal_Cabang catalog keys.
+const vendorKeyPrefix = "vendor-"
+
+// vendorPermissionKeys = the role's vendor-* grants ∪ VendorAlwaysOnKeys
+// (non-vendor-* grants on a vendor role are stale and never leak).
+func vendorPermissionKeys(granted []string) []string {
+	keys := []string{}
+	seen := map[string]bool{}
+	for _, k := range append(append([]string{}, granted...), rolemgmt.VendorAlwaysOnKeys...) {
+		if !seen[k] && (strings.HasPrefix(k, vendorKeyPrefix)) {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
 // MyPermissions handles GET /me/permissions (spec permission-catalog-coverage
 // Req 4): grants ∪ Always_On ∪ (Locked for APPACCESS/ADMIN); non-internal
 // roles get an empty list. ponytail: Always_On/Locked keys are appended after
@@ -90,7 +117,15 @@ func (h *AuthHandler) MyPermissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	keys := []string{}
-	if rolemgmt.IsInternalRole(authCtx.Role) {
+	if vendorrole.IsVendor(authCtx.Role) {
+		granted, err := h.permKeys.ListRoleFeatureKeys(r.Context(), authCtx.Role)
+		if err != nil {
+			slog.Error("my permissions: list keys", "role", authCtx.Role, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+			return
+		}
+		keys = vendorPermissionKeys(granted)
+	} else if rolemgmt.IsInternalRole(authCtx.Role) {
 		granted, err := h.permKeys.ListRoleFeatureKeys(r.Context(), authCtx.Role)
 		if err != nil {
 			slog.Error("my permissions: list keys", "role", authCtx.Role, "error", err)
@@ -258,6 +293,19 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var scope []string // null for non-vendor roles
+	if h.partyScope != nil && vendorrole.IsVendor(user.Role) {
+		scope, err = h.partyScope.PartyScope(r.Context(), user.Role)
+		if err != nil {
+			slog.Error("me: party scope", "role", user.Role, "error", err)
+			writeServiceUnavailable(w, "Gagal mengambil profil")
+			return
+		}
+		if scope == nil {
+			scope = []string{} // vendor role without scope = no access, not null
+		}
+	}
+
 	writeJSON(w, http.StatusOK, meResponse{
 		UserProfile: auth.UserProfile{
 			ID:         user.ID,
@@ -271,6 +319,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		VendorName:       user.VendorName,
 		VendorBranchID:   user.VendorBranchID,
 		VendorBranchName: user.VendorBranchName,
+		PartyScope:       scope,
 	})
 }
 
@@ -279,9 +328,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 // empty (no omitempty); existing fields are unchanged.
 type meResponse struct {
 	auth.UserProfile
-	VendorName       *string `json:"vendor_name"`
-	VendorBranchID   *int64  `json:"vendor_branch_id"`
-	VendorBranchName *string `json:"vendor_branch_name"`
+	VendorName       *string  `json:"vendor_name"`
+	VendorBranchID   *int64   `json:"vendor_branch_id"`
+	VendorBranchName *string  `json:"vendor_branch_name"`
+	PartyScope       []string `json:"party_scope"` // vendor roles only; null otherwise
 }
 
 // changePasswordRequest is the expected JSON body for POST /change-password.

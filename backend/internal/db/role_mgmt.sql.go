@@ -23,20 +23,29 @@ func (q *Queries) CountCatalogEntriesByIDs(ctx context.Context, ids []int64) (in
 }
 
 const createRole = `-- name: CreateRole :one
-INSERT INTO roles (role, description)
-VALUES ($1, $2)
-RETURNING id, role, description, created_at, updated_at
+INSERT INTO roles (role, description, portal, party_scope)
+VALUES ($1, $2, $3, $4)
+RETURNING id, role, description, created_at, updated_at, portal, party_scope
 `
 
 type CreateRoleParams struct {
-	Role        string  `json:"role"`
-	Description *string `json:"description"`
+	Role        string   `json:"role"`
+	Description *string  `json:"description"`
+	Portal      string   `json:"portal"`
+	PartyScope  []string `json:"party_scope"`
 }
 
 // New role is inserted with no role_permissions rows — zero access by
 // default (Req 2.2, 5.1). Caller grants access via ReplaceRolePermissions.
+// portal/party_scope are validated by the service and backed by roles_portal_prefix_chk +
+// roles_party_scope_portal_chk (migration 047).
 func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error) {
-	row := q.db.QueryRow(ctx, createRole, arg.Role, arg.Description)
+	row := q.db.QueryRow(ctx, createRole,
+		arg.Role,
+		arg.Description,
+		arg.Portal,
+		arg.PartyScope,
+	)
 	var i Role
 	err := row.Scan(
 		&i.ID,
@@ -44,6 +53,8 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, e
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Portal,
+		&i.PartyScope,
 	)
 	return i, err
 }
@@ -73,7 +84,7 @@ func (q *Queries) FindRoleByName(ctx context.Context, role string) (int64, error
 }
 
 const getRole = `-- name: GetRole :one
-SELECT id, role, description, created_at, updated_at FROM roles WHERE id = $1
+SELECT id, role, description, created_at, updated_at, portal, party_scope FROM roles WHERE id = $1
 `
 
 // Read-after-write on the primary pool (Req 8.3).
@@ -86,8 +97,22 @@ func (q *Queries) GetRole(ctx context.Context, id int64) (Role, error) {
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Portal,
+		&i.PartyScope,
 	)
 	return i, err
+}
+
+const getRolePartyScope = `-- name: GetRolePartyScope :one
+SELECT party_scope FROM roles WHERE role = $1
+`
+
+// Backs vendorrole.ScopeReader (replica). Unknown role -> no rows; non-vendor role -> NULL.
+func (q *Queries) GetRolePartyScope(ctx context.Context, role string) ([]string, error) {
+	row := q.db.QueryRow(ctx, getRolePartyScope, role)
+	var party_scope []string
+	err := row.Scan(&party_scope)
+	return party_scope, err
 }
 
 const hasAnyRolePermission = `-- name: HasAnyRolePermission :one
@@ -159,7 +184,7 @@ func (q *Queries) InsertRolePermission(ctx context.Context, arg InsertRolePermis
 }
 
 const listCatalog = `-- name: ListCatalog :many
-SELECT id, parent_id, key, label, kind, sort_order, is_active, created_at, updated_at, assignable_roles
+SELECT id, parent_id, key, label, kind, sort_order, is_active, created_at, updated_at, assignable_roles, portal
 FROM menu_features
 WHERE is_active = true
 ORDER BY sort_order ASC, id ASC
@@ -187,6 +212,7 @@ func (q *Queries) ListCatalog(ctx context.Context) ([]MenuFeature, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AssignableRoles,
+			&i.Portal,
 		); err != nil {
 			return nil, err
 		}
@@ -257,7 +283,9 @@ func (q *Queries) ListRolePermissionIDs(ctx context.Context, roleID int64) ([]in
 }
 
 const listRolesWithPermissions = `-- name: ListRolesWithPermissions :many
-SELECT r.id AS role_id, r.role, r.description,
+SELECT r.id AS role_id, r.role, r.description, r.portal, r.party_scope,
+       (SELECT COUNT(*) FROM users u
+         WHERE u.role_id = r.id AND u.is_active = true AND u.deleted_at IS NULL)::bigint AS active_user_count,
        mf.id AS menu_feature_id, mf.parent_id AS menu_feature_parent_id,
        mf.key AS menu_feature_key, mf.label AS menu_feature_label, mf.kind AS menu_feature_kind
 FROM roles r
@@ -267,19 +295,23 @@ ORDER BY r.id ASC, mf.sort_order ASC NULLS LAST, mf.id ASC
 `
 
 type ListRolesWithPermissionsRow struct {
-	RoleID              int64   `json:"role_id"`
-	Role                string  `json:"role"`
-	Description         *string `json:"description"`
-	MenuFeatureID       *int64  `json:"menu_feature_id"`
-	MenuFeatureParentID *int64  `json:"menu_feature_parent_id"`
-	MenuFeatureKey      *string `json:"menu_feature_key"`
-	MenuFeatureLabel    *string `json:"menu_feature_label"`
-	MenuFeatureKind     *string `json:"menu_feature_kind"`
+	RoleID              int64    `json:"role_id"`
+	Role                string   `json:"role"`
+	Description         *string  `json:"description"`
+	Portal              string   `json:"portal"`
+	PartyScope          []string `json:"party_scope"`
+	ActiveUserCount     int64    `json:"active_user_count"`
+	MenuFeatureID       *int64   `json:"menu_feature_id"`
+	MenuFeatureParentID *int64   `json:"menu_feature_parent_id"`
+	MenuFeatureKey      *string  `json:"menu_feature_key"`
+	MenuFeatureLabel    *string  `json:"menu_feature_label"`
+	MenuFeatureKind     *string  `json:"menu_feature_kind"`
 }
 
 // Flat role x permission rows for the Role Management list (Req 3.5); the
 // repository groups rows by role_id into RoleWithPermissions. A role with no
 // grants yields one row with all MenuFeature* fields NULL (LEFT JOIN).
+// active_user_count = active, non-deleted users holding the role (role-management-revamp Req 6.3).
 func (q *Queries) ListRolesWithPermissions(ctx context.Context) ([]ListRolesWithPermissionsRow, error) {
 	rows, err := q.db.Query(ctx, listRolesWithPermissions)
 	if err != nil {
@@ -293,6 +325,9 @@ func (q *Queries) ListRolesWithPermissions(ctx context.Context) ([]ListRolesWith
 			&i.RoleID,
 			&i.Role,
 			&i.Description,
+			&i.Portal,
+			&i.PartyScope,
+			&i.ActiveUserCount,
 			&i.MenuFeatureID,
 			&i.MenuFeatureParentID,
 			&i.MenuFeatureKey,
@@ -302,6 +337,33 @@ func (q *Queries) ListRolesWithPermissions(ctx context.Context) ([]ListRolesWith
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVendorRolesForParty = `-- name: ListVendorRolesForParty :many
+SELECT role FROM roles
+WHERE portal = 'vendor' AND $1::text = ANY(party_scope)
+ORDER BY role
+`
+
+// Vendor roles whose party_scope contains the party (replenish|vault); replaces vendorrole.ForParty.
+func (q *Queries) ListVendorRolesForParty(ctx context.Context, party string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVendorRolesForParty, party)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

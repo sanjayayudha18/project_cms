@@ -24,7 +24,7 @@ import (
 // primary per call (FR5.2) and applied in SQL; anything outside it is
 // ErrVendorOrderNotFound (404), never 403 (FR5.3).
 // vendor-party-scope Req 3: the scope also narrows to the party roles the
-// account's role may see (vendorrole.PartyRoles).
+// account's role may see (roles.party_scope via vendorrole.ScopeReader).
 
 var ErrVendorOrderNotFound = errors.New("vendor order not found")
 
@@ -43,18 +43,20 @@ type VendorActor struct {
 type vendorScope struct {
 	vendorID   int64
 	branchID   *int64
-	partyRoles []string // vendorrole.PartyRoles of the account role; never empty
+	partyRoles []string // roles.party_scope of the account role; never empty
 }
 
 type VendorOrderService struct {
 	pool     *pgxpool.Pool
 	read     *db.Queries
+	scopes   vendorrole.ScopeReader
 	notifier Notifier
 }
 
-// NewVendorOrderService: list on the replica (NFR2), scope/detail/actions on the primary.
-func NewVendorOrderService(pool, readPool *pgxpool.Pool) *VendorOrderService {
-	return &VendorOrderService{pool: pool, read: db.New(readPool)}
+// NewVendorOrderService: list on the replica (NFR2), scope/detail/actions on the primary;
+// scopes reads the account role's party scope (roles.party_scope).
+func NewVendorOrderService(pool, readPool *pgxpool.Pool, scopes vendorrole.ScopeReader) *VendorOrderService {
+	return &VendorOrderService{pool: pool, read: db.New(readPool), scopes: scopes}
 }
 
 func (s *VendorOrderService) WithNotifier(n Notifier) *VendorOrderService {
@@ -114,8 +116,11 @@ type VendorOrderList struct {
 // no longer matches the row is not authorized: a role changed after login is
 // refused at once, not when the token expires (vendor-party-scope Req 3.8).
 func (s *VendorOrderService) scope(ctx context.Context, q *db.Queries, va VendorActor) (vendorScope, error) {
-	partyRoles := vendorrole.PartyRoles(va.Role)
-	if partyRoles == nil {
+	partyRoles, err := s.scopes.PartyScope(ctx, va.Role)
+	if err != nil { // fail closed: no scope read, no access
+		return vendorScope{}, fmt.Errorf("load party scope of role %q: %w", va.Role, err)
+	}
+	if len(partyRoles) == 0 { // unknown or non-vendor role
 		return vendorScope{}, ErrNotAuthorized
 	}
 	row, err := q.GetUserVendorScope(ctx, va.UserID)

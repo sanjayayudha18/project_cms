@@ -240,7 +240,7 @@ func TestIntegration_SendVaultPartyScopesToRoleAndPIC(t *testing.T) {
 
 	msg := Message{Type: testType, Title: "Uji pihak vault", Email: true}
 	to := Recipients{VendorParties: []VendorPartyTarget{{
-		BranchID: branchA, UserRoles: vendorrole.ForParty("vault"), PicRole: "vault",
+		BranchID: branchA, UserRoles: []string{vendorrole.User, vendorrole.VaultUser}, PicRole: "vault",
 	}}}
 	if err := NewService(true).Send(ctx, db.New(tx), msg, to); err != nil {
 		t.Fatal(err)

@@ -11,8 +11,6 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
-	"github.com/cimb-niaga/cms/pkg/middleware"
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
@@ -173,11 +171,12 @@ func (h *ReplenishmentHandler) Trips(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// RealizationRoutes: GET / on /api/v1/vendor/replenish-realizations (FR5.2), vendor roles only;
-// the service refuses VENDOR-VAULT-USER (vendor-party-scope Req 4.2).
+// RealizationRoutes: GET / on /api/v1/vendor/replenish-realizations (FR5.2), any VENDOR-* role
+// (key "vendor-realizations" is checked at the mount in main.go); the service refuses a role
+// whose party_scope lacks replenish (vendor-party-scope Req 4.2).
 func (h *VendorOrderHandler) RealizationRoutes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles(vendorrole.All...))
+	r.Use(rolemgmt.RequireVendorRole())
 	r.Get("/", h.ListRealizations)
 	return r
 }

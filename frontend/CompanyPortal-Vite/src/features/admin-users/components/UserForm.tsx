@@ -5,12 +5,8 @@ import { applyServerFieldError } from "@/lib/utils/applyServerFieldError";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { useCreateUser, useUpdateUser, useVendorOptions } from "../hooks";
-import {
-  ROLE_OPTIONS,
-  type UserFormValues,
-  buildUserFormSchema,
-  roleLabel,
-} from "../lib/userFormSchema";
+import { useRoleOptions } from "../lib/useRoleOptions";
+import { type UserFormValues, buildUserFormSchema } from "../lib/userFormSchema";
 import type { AdminUser, CreateUserPayload, UpdateUserPayload } from "../types";
 
 interface UserFormProps {
@@ -76,6 +72,11 @@ export function UserForm({ user, onSaved, onCancel }: UserFormProps) {
   const role = form.watch("role");
   const vendorId = form.watch("vendor_id");
   const branchOptions = (optionsQuery.data?.branches ?? []).filter((b) => b.vendor_id === vendorId);
+  // Vendor user -> vendor roles, internal user -> main roles (Req 8.1).
+  const { options: roleOptions } = useRoleOptions(
+    authSource === "local" ? "vendor" : "main",
+    user?.role,
+  );
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   async function onSubmit(values: UserFormValues): Promise<void> {
@@ -147,16 +148,23 @@ export function UserForm({ user, onSaved, onCancel }: UserFormProps) {
       <Field label="Role" error={form.formState.errors.role?.message}>
         <select {...form.register("role")} className={inputClass}>
           <option value="">Pilih role</option>
-          {ROLE_OPTIONS.map((r) => (
-            <option key={r} value={r}>
-              {roleLabel(r)}
+          {roleOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
       </Field>
 
       <Field label="Auth Source" error={form.formState.errors.auth_source?.message}>
-        <select {...form.register("auth_source")} disabled={mode === "edit"} className={inputClass}>
+        <select
+          {...form.register("auth_source", {
+            // A role from the other portal no longer applies (Req 8.1).
+            onChange: () => form.setValue("role", ""),
+          })}
+          disabled={mode === "edit"}
+          className={inputClass}
+        >
           <option value="ldap">LDAP (internal)</option>
           <option value="local">Local (vendor)</option>
         </select>

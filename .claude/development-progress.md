@@ -10,6 +10,7 @@ Branch: `dev1` ahead of `main` (`main` at `87b2d78`; `dev1` latest `8b9bf11` —
 
 | Feature | SDLC folder | Stage | Status | Outstanding |
 |---------|-------------|-------|--------|-------------|
+| Role management revamp (deskripsi rusak, Portal Utama/Cabang, UI) | `.kiro/specs/role-management-revamp/` (Kiro) | 4 Test — requirements, design, tasks accepted 2026-11-25; task 1–10 `[x]`, migrasi `047` diterapkan ke dev (46 applied, 0 pending); gate kualitas (task 9) hijau | — | cek browser manual (task 11) outstanding (user); review belum; commit oleh user; `048` = nomor migrasi berikutnya |
 | Permission catalog coverage (sidebar, route, API) | `.kiro/specs/permission-catalog-coverage/` (Kiro) | 4 Test done → 5 Deploy (`review.md`) outstanding | ✅ build + tests done: tasks 1–8 hijau 2026-11-24; migrasi `046` applied to dev 2026-11-24 (45 applied, 0 pending) | review stage 5 incl. `/security-review` outstanding; cek browser manual (user, task 10); commit (user) |
 | Vendor upload DSR | `vendor-upload-dsr/` | 6 Maintain | ✅ implemented (`4d4e261`); `tests.md` re-verified vs two-phase flow 2026-10-07 (Phase 1.3): T1/T3/T5/T7 pass, T4 removed, T6 obsolete | T2 live-DB integration test; manual browser check (user); `intent.md` PO sign-off (headers still `draft`) |
 | Master data (vendor, vault, PIC, ATM, kelolaan) | `master-data/` | 5 Deploy | ✅ implemented, Fase 0–6 (43/43) | Retry-apply has no UI button |

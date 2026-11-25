@@ -180,10 +180,12 @@ func TestUserAdminService_Create_Validation(t *testing.T) {
 			r.TemporaryPassword = "Passw0rd1"
 		}, "vendor_id"},
 		{"local without temporary_password", func(r *CreateUserRequest) {
+			r.Role = "VENDOR-USER"
 			r.AuthSource = "local"
 			r.VendorID = ptrInt64(1)
 		}, "temporary_password"},
 		{"local with weak temporary_password remaps to temporary_password field", func(r *CreateUserRequest) {
+			r.Role = "VENDOR-USER"
 			r.AuthSource = "local"
 			r.VendorID = ptrInt64(1)
 			r.TemporaryPassword = "short"
@@ -250,6 +252,7 @@ func TestUserAdminService_Create_Local_HashesPasswordAndForcesChange(t *testing.
 	svc := NewUserAdminService(repo, nil, auditW)
 
 	req := validCreateReq()
+	req.Role = "VENDOR-USER"
 	req.AuthSource = "local"
 	req.VendorID = ptrInt64(1)
 	req.TemporaryPassword = "Passw0rd1"
@@ -377,6 +380,7 @@ func TestUserAdminService_Create_ReferenceErrors(t *testing.T) {
 				vendorExistsFunc: func(ctx context.Context, vendorID int64) (bool, error) { return false, nil },
 			}, func() CreateUserRequest {
 				r := validCreateReq()
+				r.Role = "VENDOR-USER"
 				r.AuthSource = "local"
 				r.VendorID = ptrInt64(99)
 				r.TemporaryPassword = "Passw0rd1"
@@ -414,6 +418,7 @@ func TestUserAdminService_Create_Success_AuditsOnce_NoPasswordInPayload(t *testi
 	svc := NewUserAdminService(repo, nil, auditW)
 
 	req := validCreateReq()
+	req.Role = "VENDOR-USER"
 	req.AuthSource = "local"
 	req.VendorID = ptrInt64(1)
 	req.TemporaryPassword = "Passw0rd1"
@@ -713,10 +718,13 @@ func TestUserAdminService_Update_ReferenceErrors(t *testing.T) {
 
 	t.Run("unknown vendor_id", func(t *testing.T) {
 		repo := base()
+		repo.getByIDFunc = func(ctx context.Context, id int64) (*db.GetUserAdminByIDRow, error) {
+			return activeUserRow(id, "u", "local", "u@example.com"), nil
+		}
 		repo.vendorExistsFunc = func(ctx context.Context, vendorID int64) (bool, error) { return false, nil }
 		svc := NewUserAdminService(repo, nil, &fakeAuditWriter{})
 
-		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "APPACCESS", VendorID: ptrInt64(99)}, "10.0.0.1")
+		_, err := svc.Update(context.Background(), 1, "APPACCESS", 1, UpdateUserRequest{FullName: "X", Email: "u@example.com", Role: "VENDOR-USER", VendorID: ptrInt64(99)}, "10.0.0.1")
 		var refErr *ReferenceError
 		if !errors.As(err, &refErr) || refErr.Field != "vendor_id" {
 			t.Fatalf("err = %v, want *ReferenceError{Field: vendor_id}", err)
@@ -791,5 +799,50 @@ func TestUserAdminService_Get_PassesThroughToRepo(t *testing.T) {
 	}
 	if got != nil {
 		t.Errorf("Get(missing) = %+v, want nil", got)
+	}
+}
+
+// --- vendorFields: role × auth_source × vendor_id (Req 2.5) ---------------
+
+func TestVendorFields_RoleAuthSourceVendorID(t *testing.T) {
+	vid := ptrInt64(7)
+	tests := []struct {
+		name, role, source string
+		vendorID, branchID *int64
+		wantField          string // "" = accepted
+	}{
+		{"main role ldap", "ATM-USER", "ldap", nil, nil, ""},
+		{"main role with vendor_id", "ATM-USER", "local", vid, nil, "vendor_id"},
+		{"main role ldap with vendor_id (left to localCredentials)", "ATM-USER", "ldap", vid, nil, ""},
+		{"main role with branch", "ATM-USER", "ldap", nil, vid, "vendor_branch_id"},
+		{"vendor role local", "VENDOR-USER", "local", vid, nil, ""},
+		{"new prefixed vendor role local", "VENDOR-NEW-ROLE", "local", vid, vid, ""},
+		{"vendor role ldap", "VENDOR-USER", "ldap", nil, nil, "auth_source"},
+		{"vendor role without vendor_id", "VENDOR-ATM-USER", "local", nil, nil, "vendor_id"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := vendorFields(tt.role, tt.source, tt.vendorID, tt.branchID)
+			if tt.wantField == "" {
+				if err != nil {
+					t.Fatalf("err = %v, want nil", err)
+				}
+				return
+			}
+			var refErr *ReferenceError
+			var valErr *pkgauth.ValidationError
+			switch {
+			case errors.As(err, &refErr):
+				if refErr.Field != tt.wantField {
+					t.Errorf("field = %q, want %q", refErr.Field, tt.wantField)
+				}
+			case errors.As(err, &valErr):
+				if valErr.Field != tt.wantField {
+					t.Errorf("field = %q, want %q", valErr.Field, tt.wantField)
+				}
+			default:
+				t.Fatalf("err = %v, want field error on %q", err, tt.wantField)
+			}
+		})
 	}
 }

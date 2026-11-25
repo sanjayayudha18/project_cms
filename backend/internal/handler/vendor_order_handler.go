@@ -10,16 +10,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor) FR9 / API: VendorPortal replenish
-// orders. Mounted under RequireAuth; every route also RequireRoles of the
-// three vendor roles (vendorrole.All, vendor-party-scope Req 3.1), and the
-// service re-checks role + scope (FR5.4). The URL id is
-// a party id, so one URL is exactly one scope check.
+// orders. Mounted under RequireAuth + RequireVendorPermission("vendor-orders")
+// (main.go); every route also RequireVendorRole (any VENDOR-* role,
+// role-management-revamp), POST /{id}/realization also needs
+// "vendor-realizations", and the service re-checks role + scope (FR5.4). The
+// URL id is a party id, so one URL is exactly one scope check.
 
 // VendorOrderServicer is the slice of service.VendorOrderService behind these routes.
 type VendorOrderServicer interface {
@@ -33,22 +34,32 @@ type VendorOrderServicer interface {
 
 var vendorPartyStatuses = map[string]bool{"": true, "pending": true, "accepted": true, "rejected": true, "withdrawn": true}
 
+// VendorPermFunc builds the vendor screen-key guard for one key
+// (rolemgmt.RequireVendorPermission bound to the evaluator in main.go).
+type VendorPermFunc func(key string) func(http.Handler) http.Handler
+
 type VendorOrderHandler struct {
-	svc VendorOrderServicer
+	svc  VendorOrderServicer
+	perm VendorPermFunc
 }
 
-func NewVendorOrderHandler(svc VendorOrderServicer) *VendorOrderHandler {
-	return &VendorOrderHandler{svc: svc}
+// NewVendorOrderHandler panics on a nil perm: the realization route must never
+// mount without its key check (fail closed at startup, not at request time).
+func NewVendorOrderHandler(svc VendorOrderServicer, perm VendorPermFunc) *VendorOrderHandler {
+	if perm == nil {
+		panic("handler: NewVendorOrderHandler needs a vendor permission guard")
+	}
+	return &VendorOrderHandler{svc: svc, perm: perm}
 }
 
 func (h *VendorOrderHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles(vendorrole.All...))
+	r.Use(rolemgmt.RequireVendorRole())
 	r.Get("/", h.List)
 	r.Get("/{id}", h.Get)
 	r.Post("/{id}/accept", h.Accept)
 	r.Post("/{id}/reject", h.Reject)
-	r.Post("/{id}/realization", h.SubmitRealization)
+	r.With(h.perm("vendor-realizations")).Post("/{id}/realization", h.SubmitRealization)
 	return r
 }
 

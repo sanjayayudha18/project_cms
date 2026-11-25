@@ -68,9 +68,9 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: unreadCount = 0 } = useUnreadCount();
 
-  const hideRealizations = user?.role === "VENDOR-VAULT-USER";
+  const permissions = user?.permissions ?? [];
   const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.hiddenFromNav && !(hideRealizations && item.path === ROUTES.REALIZATIONS),
+    (item) => !item.hiddenFromNav && (!item.key || permissions.includes(item.key)),
   );
 
   const closeMobileSidebar = useCallback(() => {
@@ -191,7 +191,7 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
               <Building2 className="size-4 shrink-0" aria-hidden="true" />
               <span>
                 {user.vendorName ?? "Vendor"} · {user.vendorBranchName ?? "Semua cabang"} ·{" "}
-                {partyScopeLabel(user.role)}
+                {partyScopeLabel(user.partyScope)}
               </span>
             </p>
           )}

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
@@ -94,6 +95,70 @@ func RequirePermission(e *PermissionEvaluator, keys ...string) func(http.Handler
 				return
 			}
 
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireVendorPermission is chi middleware for a Portal_Cabang mount (spec
+// role-management-revamp Req 4.4-4.7). Mount it after RequireAuth:
+//   - no auth context -> 401;
+//   - non-vendor role -> passes without a query (Req 4.6; existing guards decide);
+//   - vendor role (prefix VENDOR-) -> one replica query for key; no grant -> 403;
+//   - query error -> 500 and slog.Error with role + key (fail closed).
+//
+// No cache, so a revoked grant is denied on the next request (Req 4.7). It
+// panics on an empty key, so a bad mount fails at startup.
+func RequireVendorPermission(e *PermissionEvaluator, key string) func(http.Handler) http.Handler {
+	if key == "" {
+		panic("rolemgmt.RequireVendorPermission: key is required")
+	}
+	keys := []string{key}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authCtx, ok := middleware.GetAuthContext(r.Context())
+			if !ok {
+				writeJSONError(w, http.StatusUnauthorized, "token_invalid", "Token tidak valid")
+				return
+			}
+			if !vendorrole.IsVendor(authCtx.Role) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			allowed, err := e.HasAnyPermission(r.Context(), authCtx.Role, keys)
+			if err != nil {
+				slog.ErrorContext(r.Context(), "vendor permission check failed",
+					"role", authCtx.Role, "key", key, "error", err)
+				writeJSONError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan")
+				return
+			}
+			if !allowed {
+				writeForbidden(w)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireVendorRole replaces RequireRoles(vendorrole.All...) on vendor
+// handlers: any VENDOR-* role passes, everything else gets 403 with the same
+// body as pkg/middleware.RequireRoles; no auth context -> 401.
+func RequireVendorRole() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authCtx, ok := middleware.GetAuthContext(r.Context())
+			if !ok {
+				writeJSONError(w, http.StatusUnauthorized, "token_invalid", "Token tidak valid")
+				return
+			}
+			if !vendorrole.IsVendor(authCtx.Role) {
+				writeForbidden(w)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}

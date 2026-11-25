@@ -63,14 +63,18 @@ var routePolicies = []routePolicy{
 	{"/api/v1/replenishment", "replenish.schedule", 0},
 	{"/api/v1/admin/holidays", "forecasting.holidays", 0},
 
+	// VendorPortal keys (role-management-revamp): RequireVendorPermission at the
+	// mount; it only gates VENDOR-* roles, internal roles pass to the handler guards.
+	{"/api/v1/dsr", "vendor-dsr", 2},
+	{"/api/v1/vendor/replenish-orders", "vendor-orders", 2},
+	{"/api/v1/vendor/replenish-realizations", "vendor-realizations", 2},
+
 	// Explicitly excluded (design table): no RequirePermission by design.
 	{"/api/v1/admin/users", "-", 0},   // static APPACCESS/ADMIN (D8)
 	{"/api/v1/admin/roles", "-", 0},   // static APPACCESS/ADMIN (D8)
 	{"/api/v1/approvals", "-", 0},     // always-on / infrastructure
 	{"/api/v1/notifications", "-", 0}, // always-on
 	{"/api/v1/auth", "-", 0},          // auth
-	{"/api/v1/dsr", "-", 0},           // used by VendorPortal
-	{"/api/v1/vendor", "-", 0},        // vendorrole.All (D6)
 	{"/health", "-", 0},               // public
 	{"/ready", "-", 0},                // public
 }

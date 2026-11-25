@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -74,8 +75,10 @@ func (h *RoleMgmtHandler) ListCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 type createRoleRequestBody struct {
-	Role        string `json:"role"`
-	Description string `json:"description"`
+	Role        string   `json:"role"`
+	Description string   `json:"description"`
+	Portal      string   `json:"portal"`
+	PartyScope  []string `json:"party_scope"`
 }
 
 // CreateRole handles POST / (Req 2.1-2.5).
@@ -93,7 +96,7 @@ func (h *RoleMgmtHandler) CreateRole(w http.ResponseWriter, r *http.Request) {
 	}
 
 	created, err := h.svc.CreateRole(r.Context(), authCtx.UserID, authCtx.Role, rolemgmt.CreateRoleRequest{
-		Role: body.Role, Description: body.Description,
+		Role: body.Role, Description: body.Description, Portal: body.Portal, PartyScope: body.PartyScope,
 	}, extractClientIP(r))
 	if err != nil {
 		h.handleRoleMgmtError(w, err)
@@ -123,7 +126,13 @@ func (h *RoleMgmtHandler) UpdateRolePermissions(w http.ResponseWriter, r *http.R
 	}
 
 	var body updateRolePermissionsRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields() // field asing → 422 (Req 5.2)
+	if err := dec.Decode(&body); err != nil {
+		if strings.HasPrefix(err.Error(), "json: unknown field") {
+			writeValidationError(w, "body", err.Error())
+			return
+		}
 		writeError(w, http.StatusBadRequest, "bad_request", "Body tidak valid")
 		return
 	}
@@ -164,13 +173,16 @@ func (h *RoleMgmtHandler) handleRoleMgmtError(w http.ResponseWriter, err error) 
 // --- response mapping ------------------------------------------------------
 
 func roleToResponse(r db.Role) map[string]any {
-	return map[string]any{"id": r.ID, "role": r.Role, "description": r.Description}
+	return map[string]any{
+		"id": r.ID, "role": r.Role, "description": r.Description,
+		"portal": r.Portal, "party_scope": r.PartyScope,
+	}
 }
 
 func catalogEntryToResponse(r db.MenuFeature) map[string]any {
 	return map[string]any{
 		"id": r.ID, "parent_id": r.ParentID, "key": r.Key, "label": r.Label,
-		"kind": r.Kind, "sort_order": r.SortOrder,
+		"kind": r.Kind, "sort_order": r.SortOrder, "portal": r.Portal,
 	}
 }
 
@@ -188,7 +200,9 @@ func rolesWithPermissionsToResponse(rows []db.ListRolesWithPermissionsRow) []map
 		if !ok {
 			entry = map[string]any{
 				"id": row.RoleID, "role": row.Role, "description": row.Description,
-				"permissions": []map[string]any{},
+				"portal": row.Portal, "party_scope": row.PartyScope,
+				"active_user_count": row.ActiveUserCount,
+				"permissions":       []map[string]any{},
 			}
 			byRole[row.RoleID] = entry
 			order = append(order, row.RoleID)

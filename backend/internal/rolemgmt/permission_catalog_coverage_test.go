@@ -129,7 +129,7 @@ func TestProperty6_ProtectedKeysImmuneToEditor(t *testing.T) {
 	id := int64(0)
 	add := func(key string) int64 {
 		id++
-		catalog = append(catalog, db.MenuFeature{ID: id, Key: key, Label: key})
+		catalog = append(catalog, db.MenuFeature{ID: id, Key: key, Label: key, Portal: PortalMain})
 		return id
 	}
 	for _, k := range AlwaysOnKeys {
@@ -173,7 +173,7 @@ func TestProperty6_ProtectedKeysImmuneToEditor(t *testing.T) {
 					payload = append(payload, catalog[i].ID)
 				}
 			}
-			got, err := resolvePermissionSet("ADMIN", payload, before, catalog)
+			got, err := resolvePermissionSet(db.Role{Role: "ADMIN", Portal: PortalMain}, payload, before, catalog)
 			if err != nil {
 				t.Fatalf("before=%v payload=%v: %v", before, payload, err)
 			}
@@ -194,14 +194,14 @@ func TestProperty6_ProtectedKeysImmuneToEditor(t *testing.T) {
 // 422 assignable_roles: every role outside the list is rejected for a new
 // grant; every listed role (any case) is accepted.
 func TestAssignableRoles_Rejection(t *testing.T) {
-	catalog := []db.MenuFeature{{ID: 1, Key: "settings.atms", Label: "ATM", AssignableRoles: []string{"ADMIN", "ADMIN_PARAM"}}}
+	catalog := []db.MenuFeature{{ID: 1, Key: "settings.atms", Label: "ATM", AssignableRoles: []string{"ADMIN", "ADMIN_PARAM"}, Portal: PortalMain}}
 	for _, tt := range []struct {
 		role string
 		ok   bool
 	}{
 		{"ADMIN", true}, {"admin_param", true}, {"ATM-USER", false}, {"CC-CWM", false}, {"ATM-SPV", false},
 	} {
-		_, err := resolvePermissionSet(tt.role, []int64{1}, nil, catalog)
+		_, err := resolvePermissionSet(db.Role{Role: tt.role, Portal: PortalMain}, []int64{1}, nil, catalog)
 		if (err == nil) != tt.ok {
 			t.Errorf("role %s: err=%v, want ok=%v", tt.role, err, tt.ok)
 		}

@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -103,7 +102,7 @@ func TestVendorOrderHandler(t *testing.T) {
 			ts := testTokenService()
 			fake := &fakeVendorOrderServicer{err: tc.svcErr}
 			r := chi.NewRouter()
-			r.With(custommw.RequireAuth(ts)).Mount(base, NewVendorOrderHandler(fake).Routes())
+			r.With(custommw.RequireAuth(ts)).Mount(base, NewVendorOrderHandler(fake, allowVendorPerm).Routes())
 			token := tokenForRole(t, ts, 1, "ATM-SPV")
 			if tc.vendor {
 				token = tokenForVendor(t, ts, 9, 42)
@@ -142,7 +141,7 @@ func TestVendorOrderHandler_Realization(t *testing.T) {
 			ts := testTokenService()
 			fake := &fakeVendorOrderServicer{err: tc.svcErr}
 			r := chi.NewRouter()
-			r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake).Routes())
+			r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake, allowVendorPerm).Routes())
 			rec := doRequest(r, http.MethodPost, path, tokenForVendor(t, ts, 9, 42), tc.body)
 			if rec.Code != tc.wantCode {
 				t.Fatalf("code = %d, want %d: %s", rec.Code, tc.wantCode, rec.Body.String())
@@ -162,7 +161,7 @@ func TestVendorOrderHandler_ListParsesFilter(t *testing.T) {
 	ts := testTokenService()
 	fake := &fakeVendorOrderServicer{}
 	r := chi.NewRouter()
-	r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake).Routes())
+	r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake, allowVendorPerm).Routes())
 	rec := doRequest(r, http.MethodGet, "/o?party_status=accepted&request_status=sent_to_vendor&from=2026-10-01&to=2026-10-09&page=3&page_size=50",
 		tokenForVendor(t, ts, 9, 42), "")
 	if rec.Code != http.StatusOK {
@@ -233,16 +232,17 @@ func TestVendorRequestHandler_VendorSide(t *testing.T) {
 	}
 }
 
-// vendor-party-scope Req 3.1: all three vendor roles pass both route guards (the
-// service narrows the scope); internal roles stay 403.
+// vendor-party-scope Req 3.1 + role-management-revamp: every VENDOR-* role (a new
+// one included) passes both route guards (the service narrows the scope); internal
+// roles stay 403.
 func TestVendorOrderHandler_RouteGuardAllVendorRoles(t *testing.T) {
 	ts := testTokenService()
 	r := chi.NewRouter()
-	h := NewVendorOrderHandler(&fakeVendorOrderServicer{})
+	h := NewVendorOrderHandler(&fakeVendorOrderServicer{}, allowVendorPerm)
 	r.With(custommw.RequireAuth(ts)).Mount("/o", h.Routes())
 	r.With(custommw.RequireAuth(ts)).Mount("/v", h.RealizationRoutes())
 	vid := int64(42)
-	for _, role := range append(slices.Clone(vendorrole.All), "ATM-SPV", "ADMIN") {
+	for _, role := range []string{vendorrole.User, vendorrole.ATMUser, vendorrole.VaultUser, "VENDOR-AUDIT", "ATM-SPV", "ADMIN"} {
 		access, _, err := ts.GenerateTokenPair(&pkgauth.AuthIdentity{UserID: 9, Username: "u", Role: role, VendorID: &vid})
 		if err != nil {
 			t.Fatal(err)
@@ -257,4 +257,54 @@ func TestVendorOrderHandler_RouteGuardAllVendorRoles(t *testing.T) {
 			}
 		}
 	}
+}
+
+// allowVendorPerm stands in for rolemgmt.RequireVendorPermission in handler tests.
+func allowVendorPerm(string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler { return next }
+}
+
+// role-management-revamp 5.2: POST /{id}/realization is the only order route that
+// asks the injected guard for "vendor-realizations"; a guard that refuses it
+// blocks that route before the service, and leaves the others alone.
+func TestVendorOrderHandler_RealizationNeedsKey(t *testing.T) {
+	var asked []string
+	denyRealizations := func(key string) func(http.Handler) http.Handler {
+		asked = append(asked, key)
+		return func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if key == "vendor-realizations" {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+				next.ServeHTTP(w, r)
+			})
+		}
+	}
+	ts := testTokenService()
+	fake := &fakeVendorOrderServicer{}
+	r := chi.NewRouter()
+	r.With(custommw.RequireAuth(ts)).Mount("/o", NewVendorOrderHandler(fake, denyRealizations).Routes())
+	if len(asked) != 1 || asked[0] != "vendor-realizations" {
+		t.Fatalf("guard keys = %v, want [vendor-realizations]", asked)
+	}
+	token := tokenForVendor(t, ts, 9, 42)
+	if rec := doRequest(r, http.MethodPost, "/o/7/realization", token, `{"realizations":[]}`); rec.Code != http.StatusForbidden {
+		t.Fatalf("realization code = %d, want 403", rec.Code)
+	}
+	if fake.rows != nil {
+		t.Errorf("service reached despite the refused key: rows = %+v", fake.rows)
+	}
+	if rec := doRequest(r, http.MethodPost, "/o/7/accept", token, ""); rec.Code != http.StatusOK {
+		t.Errorf("accept code = %d, want 200", rec.Code)
+	}
+}
+
+func TestNewVendorOrderHandler_NilPermPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("want panic on nil perm")
+		}
+	}()
+	NewVendorOrderHandler(&fakeVendorOrderServicer{}, nil)
 }

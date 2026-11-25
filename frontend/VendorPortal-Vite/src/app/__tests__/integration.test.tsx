@@ -77,6 +77,12 @@ beforeEach(() => {
         { status: 200 },
       );
     }
+    if (typeof url === "string" && url.includes("/me/permissions")) {
+      return new Response(
+        JSON.stringify({ permissions: ["vendor-dsr", "vendor-orders", "vendor-realizations"] }),
+        { status: 200 },
+      );
+    }
     if (typeof url === "string" && url.includes("/logout")) {
       return new Response(null, { status: 200 });
     }

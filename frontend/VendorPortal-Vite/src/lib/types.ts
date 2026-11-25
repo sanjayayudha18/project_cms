@@ -16,6 +16,10 @@ export interface AuthUser {
   readonly vendorName: string | null;
   readonly vendorBranchId: number | null;
   readonly vendorBranchName: string | null;
+  // `party_scope` from /auth/me (role-management-revamp 8.3): replenish/vault; null = unknown.
+  readonly partyScope: readonly string[] | null;
+  // Catalog keys from /auth/me/permissions (role-management-revamp 8.1); [] = fail closed.
+  readonly permissions: readonly string[];
 }
 
 export interface AuthState {

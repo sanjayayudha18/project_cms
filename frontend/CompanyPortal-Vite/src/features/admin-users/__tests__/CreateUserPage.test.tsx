@@ -8,6 +8,10 @@ import { CreateUserPage } from "../components/CreateUserPage";
 const createMutateAsync = vi.fn();
 const navigate = vi.fn();
 
+vi.mock("@/features/role-management", async () =>
+  (await import("./roleOptionsMock")).roleManagementMock(),
+);
+
 vi.mock("../hooks", () => ({
   useCreateUser: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useUpdateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),

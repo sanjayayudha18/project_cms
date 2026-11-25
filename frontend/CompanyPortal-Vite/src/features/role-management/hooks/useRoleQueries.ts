@@ -8,9 +8,12 @@ import type { ApiError } from "@/lib/api/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRole, getCatalog, getRoles, updateRolePermissions } from "../api";
 import type {
+  CatalogEntry,
   CatalogResponse,
-  CreateRoleFormValues,
+  CreateRoleRequest,
   CreatedRole,
+  Portal,
+  RoleWithPermissions,
   RolesResponse,
   UpdateRolePermissionsResult,
 } from "../types";
@@ -37,11 +40,30 @@ export function useCatalog() {
   });
 }
 
+// The API returns every portal in one response; split client-side so each tab
+// loads only its own catalog (Req 2.4, 5.3). Shares the cache with useCatalog.
+export function useCatalogForPortal(portal: Portal) {
+  return useQuery<CatalogResponse, ApiError, CatalogEntry[]>({
+    queryKey: roleKeys.catalog(),
+    queryFn: getCatalog,
+    select: (d) => d.catalog.filter((e) => e.portal === portal),
+  });
+}
+
+/** Roles of one portal; `service` roles (EXT-CLIENT) never appear in a tab (Req 2.6). */
+export function useRolesForPortal(portal: Portal) {
+  return useQuery<RolesResponse, ApiError, RoleWithPermissions[]>({
+    queryKey: roleKeys.roles(),
+    queryFn: getRoles,
+    select: (d) => d.roles.filter((r) => r.portal === portal),
+  });
+}
+
 // ─── Writes ────────────────────────────────────────────────────────────────
 
 export function useCreateRole() {
   const queryClient = useQueryClient();
-  return useMutation<CreatedRole, ApiError, CreateRoleFormValues>({
+  return useMutation<CreatedRole, ApiError, CreateRoleRequest>({
     mutationFn: createRole,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: roleKeys.roles() }),
   });

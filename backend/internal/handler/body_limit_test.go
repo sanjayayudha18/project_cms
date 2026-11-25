@@ -43,11 +43,12 @@ func TestBodyLimit_Router(t *testing.T) {
 	roles.Use(limit)
 	roles.Mount("/", rolesRouter)
 
-	// The padding sits inside the JSON value: json.Decoder stops after the first
-	// value, so bytes trailing it are never read and never hit the cap.
+	// The padding is whitespace inside the JSON object: json.Decoder stops after
+	// the first value, so bytes trailing it are never read and never hit the cap.
+	// Whitespace (not an extra field) because the PUT decoder rejects unknown fields.
 	jsonOfSize := func(n int) string {
-		head, tail := `{"menu_feature_ids":[1],"pad":"`, `"}`
-		return head + strings.Repeat("a", n-len(head)-len(tail)) + tail
+		head, tail := `{"menu_feature_ids":[1]`, `}`
+		return head + strings.Repeat(" ", n-len(head)-len(tail)) + tail
 	}
 	body := jsonOfSize(JSONBodyLimit + 1)
 	rec := doRequest(roles, http.MethodPut, "/api/v1/admin/roles/7/permissions", tokenForRole(t, rolesTokens, 1, "ADMIN"), body)

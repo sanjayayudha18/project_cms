@@ -74,24 +74,19 @@ export interface RbacPoliciesResponse {
 
 export type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral";
 
+const ADMIN_ROLES: ReadonlySet<string> = new Set(["ADMIN", "ADMIN_PARAM", "APPACCESS"]);
+
 /**
- * role -> badge variant. All 10 seeded roles (backend/migrations/002, 027).
- * Icon pairing lives in RoleBadge.tsx (Task 8.2) so status is never color-only.
+ * role -> badge variant. Roles can be created at runtime, so no fixed list:
+ * admin trio = info, any `VENDOR-` role = warning, everything else (incl.
+ * unknown roles) = neutral. Icon pairing lives in RoleBadge.tsx so status is
+ * never color-only.
  */
-export const ROLE_BADGE_VARIANT: Record<string, BadgeVariant> = {
-  ADMIN: "info",
-  ADMIN_PARAM: "info",
-  APPACCESS: "info",
-  "ATM-USER": "neutral",
-  "ATM-SPV": "neutral",
-  "BRANCH-USER": "neutral",
-  "BRANCH-SPV": "neutral",
-  "BRANCH-ATM-USER": "neutral",
-  "BRANCH-ATM-SPV": "neutral",
-  "VENDOR-USER": "warning",
-  "VENDOR-ATM-USER": "warning",
-  "VENDOR-VAULT-USER": "warning",
-};
+export function roleBadgeVariant(role: string): BadgeVariant {
+  if (ADMIN_ROLES.has(role)) return "info";
+  if (role.startsWith("VENDOR-")) return "warning";
+  return "neutral";
+}
 
 // ─── Role hierarchy helpers ──────────────────────────────────────────────────
 

@@ -136,7 +136,7 @@ func TestIntegration_Completion_Guards(t *testing.T) {
 
 	t.Run("vendor user is refused on the internal path", func(t *testing.T) {
 		id := f.approvedRequest(t, term)
-		for _, role := range vendorrole.All { // vendor-party-scope: every vendor role, not only VENDOR-USER
+		for _, role := range []string{vendorrole.User, vendorrole.ATMUser, vendorrole.VaultUser, "VENDOR-AUDIT"} { // every VENDOR-* role, a new one included
 			vendor := Actor{UserID: f.maker.UserID, Role: role}
 			if _, err := f.vr.SubmitCompletion(ctx, vendor, id, results); !errors.Is(err, ErrNotAuthorized) {
 				t.Fatalf("%s: err = %v, want ErrNotAuthorized", role, err)

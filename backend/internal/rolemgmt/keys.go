@@ -12,6 +12,11 @@ var AlwaysOnKeys = []string{"dashboard", "approvals"}
 // cannot grant or revoke them.
 var LockedKeys = []string{"settings.roles", "settings.roles.create", "settings.roles.edit", "settings.users"}
 
+// VendorAlwaysOnKeys are VendorPortal keys every vendor role always holds
+// (spec role-management-revamp Req 3.2). Not in the catalog and not guarded:
+// MyPermissions adds them for vendor roles.
+var VendorAlwaysOnKeys = []string{"vendor-notifications"}
+
 // IsInternalRole reports whether role is a CompanyPortal (internal) role,
 // i.e. anything except VENDOR-* and EXT-CLIENT.
 func IsInternalRole(role string) bool {

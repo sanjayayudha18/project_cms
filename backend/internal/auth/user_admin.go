@@ -408,6 +408,11 @@ func vendorFields(role, authSource string, vendorID, branchID *int64) error {
 		if branchID != nil {
 			return &ReferenceError{Field: "vendor_branch_id", Message: "hanya untuk role vendor"}
 		}
+		// A vendor user (local, vendor_id set) may not hold a main-portal role (Req 2.5).
+		// LDAP + vendor_id keeps its own error (ErrLdapFieldsNotAllowed in localCredentials).
+		if vendorID != nil && authSource != userrules.AuthSourceLDAP {
+			return &ReferenceError{Field: "vendor_id", Message: "hanya untuk role vendor"}
+		}
 		return nil
 	}
 	if authSource != "local" {

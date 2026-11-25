@@ -6,34 +6,8 @@
  * create mode -- edit mode never renders/sends it (Req 11.3a).
  */
 
-import { type DbRole, isVendorRole } from "@/lib/auth/store";
+import { isVendorRole } from "@/lib/auth/store";
 import { z } from "zod";
-
-export const ROLE_OPTIONS: DbRole[] = [
-  "ADMIN",
-  "ADMIN_PARAM",
-  "APPACCESS",
-  "ATM-USER",
-  "ATM-SPV",
-  "BRANCH-USER",
-  "BRANCH-SPV",
-  "BRANCH-ATM-USER",
-  "BRANCH-ATM-SPV",
-  "VENDOR-USER",
-  "VENDOR-ATM-USER",
-  "VENDOR-VAULT-USER",
-];
-
-/** Penjelasan peran pihak untuk role vendor (vendor-party-scope Req 2.8). */
-export const ROLE_LABELS: Partial<Record<string, string>> = {
-  "VENDOR-USER": "VENDOR-USER — Pengisian ATM + Penyedia uang",
-  "VENDOR-ATM-USER": "VENDOR-ATM-USER — Pengisian ATM saja",
-  "VENDOR-VAULT-USER": "VENDOR-VAULT-USER — Penyedia uang saja",
-};
-
-export function roleLabel(role: string): string {
-  return ROLE_LABELS[role] ?? role;
-}
 
 export type UserFormMode = "create" | "edit";
 

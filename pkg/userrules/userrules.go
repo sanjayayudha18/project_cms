@@ -51,6 +51,16 @@ func IsPrivileged(role string) bool {
 	return false
 }
 
+// VendorRolePrefix marks a VendorPortal role (same rule as backend vendorrole.IsVendor).
+const VendorRolePrefix = "VENDOR-"
+
+// IsVendorRole reports whether role is a VendorPortal role (prefix "VENDOR-",
+// trim + case-insensitive). The external API manages LDAP users only, so it
+// never assigns one (Req 2.5).
+func IsVendorRole(role string) bool {
+	return strings.HasPrefix(strings.ToUpper(strings.TrimSpace(role)), VendorRolePrefix)
+}
+
 // ValidateProfile checks the fields create and update share, in the order the
 // form shows them (first failing field wins). Inputs must already be trimmed.
 func ValidateProfile(fullName, email, role string) error {

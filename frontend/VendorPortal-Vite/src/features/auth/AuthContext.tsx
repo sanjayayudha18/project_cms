@@ -54,6 +54,7 @@ interface MeVendorContext {
   vendor_name?: string | null;
   vendor_branch_id?: number | null;
   vendor_branch_name?: string | null;
+  party_scope?: string[] | null;
 }
 
 // Login/refresh responses carry only the profile; the vendor name + cabang for the scope
@@ -70,9 +71,28 @@ async function fetchVendorContext(token: string): Promise<MeVendorContext> {
   }
 }
 
+// Sidebar/route keys (vendor-dsr, vendor-orders, ...). A failure yields no keys, so the
+// portal shows only Notifikasi; the backend enforces the same catalog regardless.
+async function fetchPermissions(token: string): Promise<readonly string[]> {
+  try {
+    const response = await fetch(`${AUTH_API_BASE}/me/permissions`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { permissions?: string[] };
+    return body.permissions ?? [];
+  } catch {
+    return [];
+  }
+}
+
 async function buildUser(data: LoginSuccessResponse): Promise<AuthUser> {
   const raw = data.user;
-  const me = await fetchVendorContext(data.access_token);
+  const [me, permissions] = await Promise.all([
+    fetchVendorContext(data.access_token),
+    fetchPermissions(data.access_token),
+  ]);
   return {
     id: raw.id,
     username: raw.username,
@@ -84,6 +104,8 @@ async function buildUser(data: LoginSuccessResponse): Promise<AuthUser> {
     vendorName: me.vendor_name ?? null,
     vendorBranchId: me.vendor_branch_id ?? null,
     vendorBranchName: me.vendor_branch_name ?? null,
+    partyScope: me.party_scope ?? null,
+    permissions,
   };
 }
 

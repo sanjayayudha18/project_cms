@@ -1,5 +1,5 @@
 import type { AuthUser, DbRole } from "@/lib/types";
-import { VENDOR_ROLES, isVendorRole, partyRolesOf, partyScopeLabel } from "@/lib/vendorRoles";
+import { VENDOR_ROLES, isVendorRole, partyScopeLabel } from "@/lib/vendorRoles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -47,6 +47,18 @@ function makeUser(role: DbRole, over: Partial<AuthUser> = {}): AuthUser {
     vendorName: "Gardanet",
     vendorBranchId: null,
     vendorBranchName: null,
+    // party_scope as /auth/me returns it (role-management-revamp 5.3).
+    partyScope:
+      role === "VENDOR-ATM-USER"
+        ? ["replenish"]
+        : role === "VENDOR-VAULT-USER"
+          ? ["vault"]
+          : ["replenish", "vault"],
+    // Initial catalog grants (migration 047): the vault role has no Realisasi.
+    permissions:
+      role === "VENDOR-VAULT-USER"
+        ? ["vendor-dsr", "vendor-orders"]
+        : ["vendor-dsr", "vendor-orders", "vendor-realizations"],
     ...over,
   };
 }
@@ -90,13 +102,13 @@ describe("vendorRoles", () => {
     for (const r of ["ATM-USER", "ADMIN", "", "vendor-user"]) expect(isVendorRole(r)).toBe(false);
   });
 
-  it("maps each role to its parties and scope label (Req 8.4)", () => {
-    expect(partyRolesOf("VENDOR-USER")).toEqual(["replenish", "vault"]);
-    expect(partyRolesOf("VENDOR-ATM-USER")).toEqual(["replenish"]);
-    expect(partyRolesOf("VENDOR-VAULT-USER")).toEqual(["vault"]);
-    expect(partyScopeLabel("VENDOR-USER")).toBe("Pengisian ATM + Penyedia uang");
-    expect(partyScopeLabel("VENDOR-ATM-USER")).toBe("Pengisian ATM");
-    expect(partyScopeLabel("VENDOR-VAULT-USER")).toBe("Penyedia uang");
+  it("labels the scope from party_scope, not the role name (Req 7.6)", () => {
+    expect(partyScopeLabel(["replenish", "vault"])).toBe("Pengisian ATM + Penyedia uang");
+    expect(partyScopeLabel(["vault", "replenish"])).toBe("Pengisian ATM + Penyedia uang");
+    expect(partyScopeLabel(["replenish"])).toBe("Pengisian ATM");
+    expect(partyScopeLabel(["vault"])).toBe("Penyedia uang");
+    expect(partyScopeLabel([])).toBe("");
+    expect(partyScopeLabel(null)).toBe("");
   });
 });
 
@@ -242,6 +254,14 @@ describe("AppShell scope line and Realisasi gating", () => {
       "Gardanet · Semua cabang · Pengisian ATM + Penyedia uang",
     );
     expect(screen.getByRole("link", { name: /Realisasi/ })).toBeInTheDocument();
+  });
+
+  it("takes the scope label from party_scope even when the role name says otherwise", async () => {
+    mockUser = makeUser("VENDOR-USER", { partyScope: ["vault"] });
+    renderShell();
+    expect(await screen.findByTestId("scope-line")).toHaveTextContent(
+      "Gardanet · Semua cabang · Penyedia uang",
+    );
   });
 
   it("shows the cabang for a branch-scoped ATM user", async () => {

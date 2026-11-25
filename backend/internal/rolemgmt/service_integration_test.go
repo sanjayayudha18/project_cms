@@ -77,7 +77,7 @@ func TestPermissionService_ListRoles_And_ListCatalog(t *testing.T) {
 	ctx := context.Background()
 	roleName := "TROLE-LIST-" + tag
 
-	created, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	created, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestCreateRole_NewRoleHasZeroAccessAndAuditTrail(t *testing.T) {
 	ctx := context.Background()
 	roleName := "TROLE-" + tag
 
-	created, err := svc.CreateRole(ctx, adminUserID, "APPACCESS", CreateRoleRequest{Role: roleName, Description: "test role"}, "127.0.0.1")
+	created, err := svc.CreateRole(ctx, adminUserID, "APPACCESS", CreateRoleRequest{Role: roleName, Description: "test role", Portal: PortalMain}, "127.0.0.1")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -145,12 +145,12 @@ func TestCreateRole_NameConflictRejectsAndCreatesNoRow(t *testing.T) {
 	ctx := context.Background()
 	roleName := "TROLE-DUP-" + tag
 
-	if _, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, ""); err != nil {
+	if _, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, ""); err != nil {
 		t.Fatalf("first CreateRole: %v", err)
 	}
 
 	// Property 2: duplicate name is rejected and creates no new row.
-	_, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	_, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if !errors.Is(err, ErrRoleNameConflict) {
 		t.Fatalf("second CreateRole error = %v, want ErrRoleNameConflict", err)
 	}
@@ -179,7 +179,7 @@ func TestCreateRole_ValidationRejectsEmptyAndBadFormatNames(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: tc.role}, "")
+			_, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: tc.role, Portal: PortalMain}, "")
 			var ve *ValidationError
 			if !errors.As(err, &ve) {
 				t.Fatalf("CreateRole(%q) error = %v, want *ValidationError", tc.role, err)
@@ -210,7 +210,7 @@ func TestCreateRole_AuthorizationMatrix(t *testing.T) {
 	for i, tc := range cases {
 		t.Run(tc.role, func(t *testing.T) {
 			roleName := "TROLE-AUTH-" + tag + "-" + string(rune('A'+i))
-			_, err := svc.CreateRole(ctx, adminUserID, tc.role, CreateRoleRequest{Role: roleName}, "")
+			_, err := svc.CreateRole(ctx, adminUserID, tc.role, CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 			if tc.allowed {
 				if err != nil {
 					t.Fatalf("actor role %q: CreateRole error = %v, want nil", tc.role, err)
@@ -240,7 +240,7 @@ func TestCreateRole_AuditFailureRollsBack(t *testing.T) {
 	roleName := "TROLE-NOAUDIT-" + tag
 	const nonExistentActorID = int64(999999999)
 
-	_, err := svc.CreateRole(ctx, nonExistentActorID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	_, err := svc.CreateRole(ctx, nonExistentActorID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err == nil {
 		t.Fatal("CreateRole with a non-existent actor_id succeeded, want an error (audit FK violation)")
 	}
@@ -261,7 +261,7 @@ func TestUpdateRolePermissions_FullSetReplace(t *testing.T) {
 	ctx := context.Background()
 	roleName := "TROLE-PERM-" + tag
 
-	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestUpdateRolePermissions_InvalidCatalogRefLeavesMappingUnchanged(t *testin
 	roleName := "TROLE-BADREF-" + tag
 	const nonExistentCatalogID = int64(999999999)
 
-	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestUpdateRolePermissions_AuthorizationMatrix(t *testing.T) {
 	svc, adminUserID, catalogIDs, tag := harness(t)
 	ctx := context.Background()
 	roleName := "TROLE-PERMAUTH-" + tag
-	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestUpdateRolePermissions_AuditFailureRollsBack(t *testing.T) {
 	roleName := "TROLE-PERMNOAUDIT-" + tag
 	const nonExistentActorID = int64(999999999)
 
-	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}
@@ -438,12 +438,12 @@ func TestCreateRole_ConcurrentDuplicateCaughtByUniqueConstraint(t *testing.T) {
 	ctx := context.Background()
 	roleName := "TROLE-RACE-" + tag
 
-	if _, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, ""); err != nil {
+	if _, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, ""); err != nil {
 		t.Fatalf("first CreateRole: %v", err)
 	}
 
 	racing := NewPermissionService(staleNameCheck{svc.repo}, svc.pool)
-	if _, err := racing.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, ""); !errors.Is(err, ErrRoleNameConflict) {
+	if _, err := racing.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, ""); !errors.Is(err, ErrRoleNameConflict) {
 		t.Fatalf("racing CreateRole error = %v, want ErrRoleNameConflict", err)
 	}
 

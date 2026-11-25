@@ -83,7 +83,7 @@ func TestOpenAPIContract_RouteCoverage(t *testing.T) {
 	doc, _ := loadContract(t)
 	mounted := map[string]chi.Router{
 		"/vendor-requests":              contractVRHandler(&fakeVendorRequestServicer{}, &fakeVaultReviewer{}, contractPartyReader{}).Routes(),
-		"/vendor/replenish-orders":      NewVendorOrderHandler(&contractOrderSvc{}).Routes(),
+		"/vendor/replenish-orders":      NewVendorOrderHandler(&contractOrderSvc{}, allowVendorPerm).Routes(),
 		"/dsr-late-reports":             NewDsrLateHandler(&contractDsrLate{}).Routes(),
 		"/admin/vendors/{vendorID}/pks": NewAdminVendorPksHandler(&contractPksSvc{}).Routes(),
 		"/admin/pks-types":              NewAdminPksTypeHandler(&contractPksTypeSvc{}).Routes(),
@@ -229,7 +229,7 @@ func serveContractCase(t *testing.T, tc contractCase) (*httptest.ResponseRecorde
 	}
 	r := chi.NewRouter()
 	r.With(custommw.RequireAuth(ts)).Mount(contractVRBase, contractVRHandler(vr, vault, tc.parties).Routes())
-	r.With(custommw.RequireAuth(ts)).Mount(contractVOBase, NewVendorOrderHandler(orders).Routes())
+	r.With(custommw.RequireAuth(ts)).Mount(contractVOBase, NewVendorOrderHandler(orders, allowVendorPerm).Routes())
 	dsrLate := tc.dsrLate
 	if dsrLate == nil {
 		dsrLate = &contractDsrLate{}

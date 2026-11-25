@@ -17,7 +17,7 @@ func TestHasPermission_DecisionComesOnlyFromMapping(t *testing.T) {
 	evaluator := NewPermissionEvaluator(svc.repo.(ReplicaReader))
 
 	roleName := "TROLE-EVAL-" + tag
-	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName}, "")
+	role, err := svc.CreateRole(ctx, adminUserID, "ADMIN", CreateRoleRequest{Role: roleName, Portal: PortalMain}, "")
 	if err != nil {
 		t.Fatalf("CreateRole: %v", err)
 	}

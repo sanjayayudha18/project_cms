@@ -278,7 +278,9 @@ paths:
       description: >-
         VENDOR-USER, VENDOR-ATM-USER, or VENDOR-VAULT-USER, scoped to the caller's vendor (+ branch).
         VENDOR-ATM-USER sees only replenish parties; VENDOR-VAULT-USER sees only vault parties;
-        VENDOR-USER sees both.
+        VENDOR-USER sees both. 403 when the vendor role lacks the `vendor-orders` permission
+        (checked per request, so a revoked grant applies without re-login); this applies to every
+        `/vendor/replenish-orders*` route.
       parameters:
         - { name: party_status, in: query, schema: { type: string, enum: [pending, accepted, rejected, withdrawn] } }
         - { name: request_status, in: query, schema: { type: string } }
@@ -334,7 +336,8 @@ paths:
       tags: [vendor-order]
       description: >-
         Replenish party only; every ATM of the request at once. Callable by VENDOR-ATM-USER and
-        VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope).
+        VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope). 403 when the role lacks
+        `vendor-orders` or `vendor-realizations`.
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/RealizationPayload' } } }
@@ -829,7 +832,7 @@ components:
   responses:
     BadRequest: { description: 'Malformed id, query or body', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     Unauthorized: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-    Forbidden: { description: Role or four-eyes rule denies the action, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Forbidden: { description: Role or four-eyes rule denies the action (on vendor routes also a missing permission key), content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     NotFound: { description: Not found or outside the caller's scope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     Conflict: { description: Status does not allow the action, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
     Unprocessable: { description: Field validation failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }

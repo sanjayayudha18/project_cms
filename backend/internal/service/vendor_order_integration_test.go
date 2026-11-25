@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cimb-niaga/cms/backend/internal/notification"
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
@@ -73,7 +74,7 @@ func newVendorOrderFixture(t *testing.T) *vendorOrderFixture {
 	f.wideUser = f.vendorUser(t, f.vendorID, nil)
 	f.branchUser = f.vendorUser(t, f.vendorID, &f.branchID)
 	f.cash2User = f.vendorUser(t, f.vendor2, &f.cash2)
-	f.orders = NewVendorOrderService(f.pool, f.pool).WithNotifier(notification.NewService(false))
+	f.orders = NewVendorOrderService(f.pool, f.pool, rolemgmt.NewRepository(f.pool, f.pool)).WithNotifier(notification.NewService(false))
 	f.reqID = f.sentToVendor(t)
 	return f
 }

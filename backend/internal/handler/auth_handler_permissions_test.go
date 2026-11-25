@@ -59,10 +59,11 @@ func getMyPermissions(t *testing.T, router http.Handler, token string) (int, []s
 // non-internal roles get [].
 func TestAuthHandler_MyPermissions(t *testing.T) {
 	grants := map[string][]string{
-		"ADMIN":       {"settings.vendors"},
-		"APPACCESS":   {},
-		"ATM-USER":    {"replenish.vendor-requests"},
-		"VENDOR-USER": {"settings.vendors"}, // stale grant must never leak
+		"ADMIN":             {"settings.vendors"},
+		"APPACCESS":         {},
+		"ATM-USER":          {"replenish.vendor-requests"},
+		"VENDOR-USER":       {"settings.vendors", "vendor-orders"}, // stale grant must never leak
+		"VENDOR-VAULT-USER": {},
 	}
 	alwaysOn := []string{"dashboard", "approvals"}
 	locked := []string{"settings.roles", "settings.roles.create", "settings.roles.edit", "settings.users"}
@@ -81,7 +82,9 @@ func TestAuthHandler_MyPermissions(t *testing.T) {
 		{"ADMIN", cat(grants["ADMIN"], alwaysOn, locked)},
 		{"APPACCESS", cat(alwaysOn, locked)},
 		{"ATM-USER", cat(grants["ATM-USER"], alwaysOn)},
-		{"VENDOR-USER", []string{}},
+		{"VENDOR-USER", []string{"vendor-orders", "vendor-notifications"}},
+		{"VENDOR-VAULT-USER", []string{"vendor-notifications"}},
+		{"EXT-CLIENT", []string{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.role, func(t *testing.T) {
@@ -122,5 +125,53 @@ func TestAuthHandler_MyPermissions_RepoError_500(t *testing.T) {
 	router, ts := mountMyPermissions(&fakePermKeys{err: errors.New("db down")})
 	if code, _ := getMyPermissions(t, router, tokenForRole(t, ts, 7, "ATM-USER")); code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", code)
+	}
+}
+
+type fakeScope struct {
+	scope []string
+	err   error
+}
+
+func (f fakeScope) PartyScope(context.Context, string) ([]string, error) { return f.scope, f.err }
+
+func TestAuthHandler_Me_PartyScope(t *testing.T) {
+	ts := pkgauth.NewTokenService(pkgauth.TokenConfig{
+		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
+		AccessTokenExpiry:  15 * time.Minute,
+		SessionMaxLifetime: time.Hour,
+	}, noopBlacklist{})
+	tests := []struct {
+		name  string
+		role  string
+		scope fakeScope
+		want  string // JSON of party_scope
+		code  int
+	}{
+		{"vendor with scope", "VENDOR-USER", fakeScope{scope: []string{"replenish", "vault"}}, `["replenish","vault"]`, 200},
+		{"vendor without scope", "VENDOR-X-USER", fakeScope{}, `[]`, 200},
+		{"internal", "ATM-USER", fakeScope{scope: []string{"vault"}}, `null`, 200},
+		{"scope error", "VENDOR-USER", fakeScope{err: errors.New("db down")}, "", 503},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := (&AuthHandler{tokenService: ts, userRepo: fakeMeRepo{user: &pkgauth.UserRecord{ID: 7, Username: "u", Role: tt.role}}}).WithPartyScope(tt.scope)
+			r := chi.NewRouter()
+			r.Mount("/api/v1/auth", h.Routes())
+			rec := doRequest(r, http.MethodGet, "/api/v1/auth/me", tokenForRole(t, ts, 7, tt.role), "")
+			if rec.Code != tt.code {
+				t.Fatalf("status %d; body %s", rec.Code, rec.Body.String())
+			}
+			if tt.code != 200 {
+				return
+			}
+			var body map[string]json.RawMessage
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if got := string(body["party_scope"]); got != tt.want {
+				t.Errorf("party_scope = %s; want %s", got, tt.want)
+			}
+		})
 	}
 }

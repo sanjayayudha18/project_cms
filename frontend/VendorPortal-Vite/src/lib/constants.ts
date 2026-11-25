@@ -17,13 +17,20 @@ export interface NavItem {
   readonly label: string;
   readonly path: string;
   readonly icon: LucideIcon;
+  /** Catalog key (menu_features); items without one are always on. */
+  readonly key?: string;
   readonly hiddenFromNav?: boolean;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { label: "DSR Menu", path: ROUTES.DSR, icon: Activity },
-  { label: "CIT Orders", path: ROUTES.ORDERS, icon: ClipboardList },
-  { label: "Realisasi", path: ROUTES.REALIZATIONS, icon: ClipboardCheck },
+  { label: "DSR Menu", path: ROUTES.DSR, icon: Activity, key: "vendor-dsr" },
+  { label: "CIT Orders", path: ROUTES.ORDERS, icon: ClipboardList, key: "vendor-orders" },
+  {
+    label: "Realisasi",
+    path: ROUTES.REALIZATIONS,
+    icon: ClipboardCheck,
+    key: "vendor-realizations",
+  },
   { label: "Notifications", path: ROUTES.NOTIFICATIONS, icon: Bell },
 ] as const;
 

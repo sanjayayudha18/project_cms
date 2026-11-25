@@ -8,6 +8,10 @@ import type { AdminUser } from "../types";
 const createMutateAsync = vi.fn();
 const updateMutateAsync = vi.fn();
 
+vi.mock("@/features/role-management", async () =>
+  (await import("./roleOptionsMock")).roleManagementMock(),
+);
+
 vi.mock("../hooks", () => ({
   useCreateUser: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useUpdateUser: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
@@ -137,6 +141,7 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
 
     await fillCommon(user);
     await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Role"), "VENDOR-USER");
     await user.click(screen.getByRole("button", { name: "Simpan" }));
 
     expect(await screen.findAllByText("Wajib diisi untuk auth_source local")).toHaveLength(2);
@@ -150,6 +155,7 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
 
     await fillCommon(user);
     await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Role"), "VENDOR-USER");
     await user.type(control("Password Sementara"), "Temp#12345");
     await user.selectOptions(control("Vendor"), "1");
     await user.click(screen.getByRole("button", { name: "Simpan" }));
@@ -217,8 +223,8 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
 
     expect(screen.queryByText("Cabang", { selector: "span" })).not.toBeInTheDocument();
 
-    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
     await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
     expect(control("Cabang")).toBeDisabled();
 
     await user.selectOptions(control("Vendor"), "1");
@@ -232,8 +238,8 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
     const user = userEvent.setup();
     render(<UserFormDialog open onClose={vi.fn()} user={null} />);
 
-    await user.selectOptions(control("Role"), "VENDOR-VAULT-USER");
     await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Role"), "VENDOR-VAULT-USER");
     await user.selectOptions(control("Vendor"), "1");
     await user.selectOptions(control("Cabang"), "10");
     expect(control("Cabang")).toHaveValue("10");
@@ -250,9 +256,9 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
     await user.type(control("Nama Pengguna"), "abacus.mdn");
     await user.type(control("Nama Lengkap"), "Abacus Medan");
     await user.type(control("Email"), "mdn@abacus.test");
-    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
     await user.type(control("Employee ID"), "V9");
     await user.selectOptions(control("Auth Source"), "local");
+    await user.selectOptions(control("Role"), "VENDOR-ATM-USER");
     await user.type(control("Password Sementara"), "Temp#12345");
     await user.selectOptions(control("Vendor"), "1");
     await user.selectOptions(control("Cabang"), "10");
@@ -278,16 +284,32 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
     expect(createMutateAsync.mock.calls[0]?.[0]).toMatchObject({ vendor_branch_id: null });
   });
 
-  it("rejects a vendor role with LDAP auth source before submitting", async () => {
+  it("offers only main roles for LDAP users and only vendor roles for local users", async () => {
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={vi.fn()} user={null} />);
+    const roles = () =>
+      Array.from(control("Role").querySelectorAll("option"))
+        .map((o) => o.getAttribute("value"))
+        .filter(Boolean);
+
+    expect(roles()).toEqual(["ADMIN", "ATM-USER"]);
+
+    await user.selectOptions(control("Auth Source"), "local");
+    expect(roles()).toEqual([
+      "VENDOR-USER",
+      "VENDOR-ATM-USER",
+      "VENDOR-VAULT-USER",
+      "VENDOR-NEW-USER",
+    ]);
+  });
+
+  it("clears the chosen role when Auth Source switches portal", async () => {
     const user = userEvent.setup();
     render(<UserFormDialog open onClose={vi.fn()} user={null} />);
 
-    await fillCommon(user);
-    await user.selectOptions(control("Role"), "VENDOR-USER");
-    await user.click(screen.getByRole("button", { name: "Simpan" }));
-
-    expect(await screen.findByText("Role vendor wajib memakai auth_source local")).toBeVisible();
-    expect(createMutateAsync).not.toHaveBeenCalled();
+    await user.selectOptions(control("Role"), "ATM-USER");
+    await user.selectOptions(control("Auth Source"), "local");
+    expect(control("Role")).toHaveValue("");
   });
 
   it("keeps the stored branch when editing a vendor user (payload carries vendor_branch_id)", async () => {
@@ -303,6 +325,23 @@ describe("UserFormDialog — submit (fe-coverage C2)", () => {
       payload: Record<string, unknown>;
     };
     expect(payload).toMatchObject({ vendor_id: 1, vendor_branch_id: 10 });
+  });
+
+  it("shows a backend portal-mismatch 422 on the Role field and keeps the dialog open", async () => {
+    createMutateAsync.mockRejectedValue({
+      status: 422,
+      message: "Validasi gagal",
+      details: [{ field: "role", message: "Peran tidak sesuai dengan jenis pengguna" }],
+    });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(<UserFormDialog open onClose={onClose} user={null} />);
+
+    await fillCommon(user);
+    await user.click(screen.getByRole("button", { name: "Simpan" }));
+
+    expect(await screen.findByText("Peran tidak sesuai dengan jenis pengguna")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("shows a toast for a non-field server error and keeps the dialog open", async () => {

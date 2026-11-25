@@ -26,6 +26,20 @@ Template:
 
 ---
 
+## 2026-11-25 — Tombol "Kembali ke Pengaturan" rata kiri
+- **Request**: "perbaiki juga button 'kembali ke pengaturan' pada beberapa menu, jangan ditengah seperti ini. sangat tidak estetik tolong rapihkan." (dipecah dari revamp Manajemen Peran; sisanya di `.kiro/specs/role-management-revamp/`)
+- **Fit check**: pass — CompanyPortal saja, satu komponen bersama (`components/ui/BackLink.tsx`), tanpa schema/endpoint/aturan bisnis, bukan Sec 4 #7, bukan redesign layar. Akar masalah: `BackLink` adalah `inline-flex` di dalam kontainer `flex flex-col`, sehingga melebar penuh (`align-items: stretch`) dan `justify-center` menaruh teks di tengah dengan latar merah muda selebar halaman saat hover.
+- **AC**:
+  1. Di semua halaman yang memakai `BackLink` (15 halaman: admin-*, rbac/*, Manajemen Peran, master-data-io, dll.), tombol kembali rata kiri dan lebarnya hanya selebar isinya; latar hover tidak lagi memanjang selebar halaman.
+  2. Perbaikan cukup di `BackLink` (satu tempat), tidak di tiap halaman.
+  3. Target sentuh tetap ≥ 44×44 px, fokus keyboard tetap terlihat, teks dan tujuan link tidak berubah.
+  4. Tes `BackLink.test.tsx` menegaskan link tidak melebar (kelas `self-start`).
+- **Change**: —
+- **Tests**: —; manual browser verification: outstanding (user)
+- **Commit**: —
+
+---
+
 ## 2026-11-20 — Tambah Pengguna jadi halaman sendiri
 - **Request**: "saya ingin tambah pengguna punya form halaman sendiri tidak digabung di manajemen pengguna" — hanya Tambah; Edit tetap dialog. Skill UI: `ui-ux-pro-max`.
 - **Fit check**: pass — CompanyPortal saja, endpoint sama (`POST /api/v1/admin/users`, `openapi.yaml` tidak berubah), tanpa schema, tanpa aturan bisnis baru, bukan Sec 4 #7 (guard `APPACCESS` tetap sama), bukan redesign layar.

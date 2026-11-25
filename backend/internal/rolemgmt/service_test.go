@@ -59,7 +59,7 @@ func (p *failingPool) Begin(context.Context) (pgx.Tx, error) {
 func TestPermissionService_DependencyErrorsArePropagated(t *testing.T) {
 	ctx := context.Background()
 	create := func(s *PermissionService) error {
-		_, err := s.CreateRole(ctx, 1, "ADMIN", CreateRoleRequest{Role: "NEW-ROLE"}, "")
+		_, err := s.CreateRole(ctx, 1, "ADMIN", CreateRoleRequest{Role: "NEW-ROLE", Portal: PortalMain}, "")
 		return err
 	}
 	update := func(s *PermissionService) error {
@@ -134,10 +134,10 @@ func (failAll) ReplaceRolePermissions(context.Context, pgx.Tx, int64, []int64, i
 // Property 6 table lives in task 2.5.
 func TestResolvePermissionSet(t *testing.T) {
 	catalog := []db.MenuFeature{
-		{ID: 1, Key: "dashboard", Label: "Dashboard"},
-		{ID: 2, Key: "settings.roles", Label: "Manajemen Peran", AssignableRoles: []string{"APPACCESS", "ADMIN"}},
-		{ID: 3, Key: "monitoring.audit-logs", Label: "Audit Log"},
-		{ID: 4, Key: "settings.atms", Label: "ATM", AssignableRoles: []string{"ADMIN", "ADMIN_PARAM"}},
+		{ID: 1, Key: "dashboard", Label: "Dashboard", Portal: PortalMain},
+		{ID: 2, Key: "settings.roles", Label: "Manajemen Peran", Portal: PortalMain, AssignableRoles: []string{"APPACCESS", "ADMIN"}},
+		{ID: 3, Key: "monitoring.audit-logs", Label: "Audit Log", Portal: PortalMain},
+		{ID: 4, Key: "settings.atms", Label: "ATM", Portal: PortalMain, AssignableRoles: []string{"ADMIN", "ADMIN_PARAM"}},
 	}
 	tests := []struct {
 		name      string
@@ -157,7 +157,7 @@ func TestResolvePermissionSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolvePermissionSet(tt.role, tt.submitted, tt.before, catalog)
+			got, err := resolvePermissionSet(db.Role{Role: tt.role, Portal: PortalMain}, tt.submitted, tt.before, catalog)
 			if tt.wantErr {
 				var nae *RoleNotAssignableError
 				if !errors.As(err, &nae) || !errors.Is(err, ErrRoleNotAssignable) || !strings.Contains(err.Error(), "ATM") {
@@ -191,6 +191,96 @@ func TestIsUniqueViolation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isUniqueViolation(tt.err); got != tt.want {
 				t.Fatalf("isUniqueViolation(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+// role-management-revamp task 3.2 (Req 2.2, 7.1, 7.3): portal x prefix x scope.
+func TestValidatePortalScope(t *testing.T) {
+	tests := []struct {
+		name      string
+		role      string
+		portal    string
+		scope     []string
+		want      []string
+		wantField string // "" = valid
+	}{
+		{"main, no scope", "NEW-ROLE", PortalMain, nil, nil, ""},
+		{"main with scope", "NEW-ROLE", PortalMain, []string{"vault"}, nil, "party_scope"},
+		{"main with VENDOR- prefix", "VENDOR-X", PortalMain, nil, nil, "role"},
+		{"vendor replenish", "VENDOR-X", PortalVendor, []string{"replenish"}, []string{"replenish"}, ""},
+		{"vendor both, sorted + deduped", "VENDOR-X", PortalVendor, []string{"vault", "replenish", "vault"}, []string{"replenish", "vault"}, ""},
+		{"vendor without prefix", "ROLE-X", PortalVendor, []string{"vault"}, nil, "role"},
+		{"vendor without scope", "VENDOR-X", PortalVendor, nil, nil, "party_scope"},
+		{"vendor unknown scope", "VENDOR-X", PortalVendor, []string{"cashcount"}, nil, "party_scope"},
+		{"empty portal", "NEW-ROLE", "", nil, nil, "portal"},
+		{"service portal", "NEW-ROLE", "service", nil, nil, "portal"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validatePortalScope(tt.role, tt.portal, tt.scope)
+			if tt.wantField == "" {
+				if err != nil || !slices.Equal(got, tt.want) {
+					t.Fatalf("got %v, %v; want %v, nil", got, err, tt.want)
+				}
+				return
+			}
+			var ve *ValidationError
+			if !errors.As(err, &ve) || ve.Field != tt.wantField {
+				t.Fatalf("error = %v, want ValidationError on %q", err, tt.wantField)
+			}
+		})
+	}
+}
+
+// Invalid portal/scope fails before any repo call or transaction.
+func TestCreateRole_InvalidPortalTouchesNothing(t *testing.T) {
+	pool := &failingPool{}
+	svc := NewPermissionService(failAll{}, pool)
+	_, err := svc.CreateRole(context.Background(), 1, "ADMIN", CreateRoleRequest{Role: "VENDOR-X", Portal: PortalVendor}, "")
+	var ve *ValidationError
+	if !errors.As(err, &ve) || pool.begins != 0 {
+		t.Fatalf("error = %v, begins = %d; want ValidationError, 0", err, pool.begins)
+	}
+}
+
+// Property 4 (service part, Req 2.4): a grant from another portal's catalog is
+// rejected, held or not; assignable_roles is ignored for the vendor catalog.
+func TestResolvePermissionSet_CrossPortal(t *testing.T) {
+	catalog := []db.MenuFeature{
+		{ID: 1, Key: "monitoring.audit-logs", Label: "Audit Log", Portal: PortalMain},
+		{ID: 2, Key: "vendor-orders", Label: "CIT Orders", Portal: PortalVendor, AssignableRoles: []string{"ADMIN"}},
+		{ID: 3, Key: "dashboard", Label: "Dashboard", Portal: PortalMain},
+	}
+	mainRole := db.Role{Role: "ATM-USER", Portal: PortalMain}
+	vendorRole := db.Role{Role: "VENDOR-NEW", Portal: PortalVendor}
+	tests := []struct {
+		name      string
+		role      db.Role
+		submitted []int64
+		before    []int64
+		want      []int64
+		wantErr   bool
+	}{
+		{"vendor role gets vendor key", vendorRole, []int64{2}, nil, []int64{2}, false},
+		{"vendor role gets main key", vendorRole, []int64{1}, nil, nil, true},
+		{"vendor role gets main Always_On key", vendorRole, []int64{3}, nil, nil, true},
+		{"held cross-portal grant still rejected", vendorRole, []int64{1}, []int64{1}, nil, true},
+		{"main role gets vendor key", mainRole, []int64{2}, nil, nil, true},
+		{"service role gets anything", db.Role{Role: "EXT-CLIENT", Portal: "service"}, []int64{1}, nil, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolvePermissionSet(tt.role, tt.submitted, tt.before, catalog)
+			if tt.wantErr {
+				if !errors.Is(err, ErrRoleNotAssignable) {
+					t.Fatalf("error = %v, want ErrRoleNotAssignable", err)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, %v; want %v", got, err, tt.want)
 			}
 		})
 	}

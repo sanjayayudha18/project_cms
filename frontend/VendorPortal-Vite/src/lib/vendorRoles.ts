@@ -14,26 +14,18 @@ export function isVendorRole(role: string): role is DbRole {
   return (VENDOR_ROLES as readonly string[]).includes(role);
 }
 
-/** Which order parties (replenish / vault) an account role may see. */
-export function partyRolesOf(role: DbRole): readonly PartyRoleName[] {
-  switch (role) {
-    case "VENDOR-ATM-USER":
-      return ["replenish"];
-    case "VENDOR-VAULT-USER":
-      return ["vault"];
-    default:
-      return ["replenish", "vault"];
-  }
-}
-
 const PARTY_SCOPE_LABEL: Record<PartyRoleName, string> = {
   replenish: "Pengisian ATM",
   vault: "Penyedia uang",
 };
 
-/** "Pengisian ATM" | "Penyedia uang" | "Pengisian ATM + Penyedia uang" (Req 8.4). */
-export function partyScopeLabel(role: DbRole): string {
-  return partyRolesOf(role)
+/**
+ * Label from `party_scope` of /auth/me (role-management-revamp 8.3, Req 7.6) — never from the
+ * role name. null/unknown/empty scope → "" (the scope line then shows no party label).
+ */
+export function partyScopeLabel(scope: readonly string[] | null | undefined): string {
+  return (["replenish", "vault"] as const)
+    .filter((p) => scope?.includes(p))
     .map((p) => PARTY_SCOPE_LABEL[p])
     .join(" + ");
 }

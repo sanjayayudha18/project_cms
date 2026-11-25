@@ -364,7 +364,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description VENDOR-USER, VENDOR-ATM-USER, or VENDOR-VAULT-USER, scoped to the caller's vendor (+ branch). VENDOR-ATM-USER sees only replenish parties; VENDOR-VAULT-USER sees only vault parties; VENDOR-USER sees both. */
+        /** @description VENDOR-USER, VENDOR-ATM-USER, or VENDOR-VAULT-USER, scoped to the caller's vendor (+ branch). VENDOR-ATM-USER sees only replenish parties; VENDOR-VAULT-USER sees only vault parties; VENDOR-USER sees both. 403 when the vendor role lacks the `vendor-orders` permission (checked per request, so a revoked grant applies without re-login); this applies to every `/vendor/replenish-orders*` route. */
         get: operations["listVendorOrders"];
         put?: never;
         post?: never;
@@ -443,7 +443,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Replenish party only; every ATM of the request at once. Callable by VENDOR-ATM-USER and VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope). */
+        /** @description Replenish party only; every ATM of the request at once. Callable by VENDOR-ATM-USER and VENDOR-USER; VENDOR-VAULT-USER gets 404 (party outside scope). 403 when the role lacks `vendor-orders` or `vendor-realizations`. */
         post: operations["submitVendorRealization"];
         delete?: never;
         options?: never;
@@ -2010,7 +2010,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Role or four-eyes rule denies the action */
+        /** @description Role or four-eyes rule denies the action (on vendor routes also a missing permission key) */
         Forbidden: {
             headers: {
                 [name: string]: unknown;

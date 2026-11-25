@@ -7,6 +7,16 @@
 *   `menu_features` — Menu_Feature_Catalog. `id` bigint identity PK · `parent_id` bigint self-FK → `menu_features(id)` ON DELETE RESTRICT, nullable (NULL = top-level menu, non-NULL = feature under a menu) · `key` text UNIQUE (stable machine key, e.g. `settings.roles`) · `label` text · `kind` text CHECK IN ('menu','feature') + CHECK hierarchy (`menu`⇔`parent_id IS NULL`) · `sort_order` integer default 0 · `is_active` boolean default true · `created_at`/`updated_at` timestamptz default now(). Index on `parent_id`.
 *   `role_permissions` — Role_Permission_Mapping (many-to-many `roles`↔`menu_features`; row presence = grant). `id` bigint identity PK · `role_id` bigint FK → `roles(id)` ON DELETE CASCADE · `menu_feature_id` bigint FK → `menu_features(id)` ON DELETE CASCADE · `granted_by` bigint FK → `users(id)` · `created_at` timestamptz default now(). UNIQUE `(role_id, menu_feature_id)`; indexes on `role_id` and `menu_feature_id`.
 
+## Role portal (migration 047)
+
+Spec `.kiro/specs/role-management-revamp/`, applied to dev 2026-11-25 (46 applied, 0 pending). Source: `backend/migrations/047_role_portal.sql`; dev rollback: `backend/scripts/dev/rollback_047_role_portal.sql` (not reversed: the text fixes; `VENDOR-*` roles created through the screen after 047).
+
+*   `roles.portal` text NOT NULL DEFAULT `main`, CHECK `roles_portal_chk` (`main` | `vendor` | `service`), CHECK `roles_portal_prefix_chk` (`portal = 'vendor'` ⇔ `role LIKE 'VENDOR-%'`). Backfill: `VENDOR-%` → `vendor`, `EXT-CLIENT` → `service`. Cannot change after create.
+*   `roles.party_scope` text[] NULL, CHECK `roles_party_scope_values_chk` (`party_scope <@ {replenish, vault}`), CHECK `roles_party_scope_portal_chk` (required and non-empty for `vendor`, NULL otherwise). Backfill: `VENDOR-USER` = {replenish, vault}, `VENDOR-ATM-USER` = {replenish}, `VENDOR-VAULT-USER` = {vault}. Cannot change after create.
+*   `menu_features.portal` text NOT NULL DEFAULT `main`, CHECK `menu_features_portal_chk` (`main` | `vendor`). New keys `vendor-dsr`, `vendor-orders`, `vendor-realizations` (`portal = vendor`).
+*   Initial grants (D6, same access as before): `VENDOR-USER` and `VENDOR-ATM-USER` get all three keys; `VENDOR-VAULT-USER` gets `vendor-dsr` and `vendor-orders` (no Realisasi). `granted_by` = first ADMIN user.
+*   Text fixes (only matching rows, idempotent): `roles.description` `â€”` → `—` (9 rows); `locations` `Ã¢â‚¬â€œ` → `–` on ids 911, 1450, 1692 (name and address_line1). 13 other dev `locations` rows with other broken patterns are **left unchanged** (user decision 2026-11-25).
+
 ## Permission catalog coverage (migration 046)
 
 *   `menu_features.assignable_roles` `text[]` NULL (DQ1). NULL = any internal role may be granted; non-NULL = only those roles may get a **new** grant (`422 role_not_assignable`). Filled only for keys whose read endpoint has a fixed role guard: `settings.atms/.regions/.pks-types/.master-data-io` {ADMIN, ADMIN_PARAM}; `settings.rbac-*` {ADMIN, ADMIN_PARAM, APPACCESS}; `settings.acm-areas` + `forecasting.holidays` {ADMIN}; `cash-count.parameters` {ADMIN, CC-CWM, CC-CCR}; `cash-count.pic-mapping` {ADMIN, CC-CWM}; Locked keys {APPACCESS, ADMIN}. NULL for keys guarded only by action routes (e.g. `replenish.vendor-requests`, `settings.pks`, `cit.vault-plan`).

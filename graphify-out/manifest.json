@@ -36,9 +36,9 @@
     "semantic_hash": "82d6233f201596051331a58620326b46"
   },
   "backend/cmd/api/main.go": {
-    "mtime": 1795492955.910551,
-    "seen": 1795512760.5431647,
-    "ast_hash": "c4b49d31904a45487f138d5280ff9bfc",
+    "mtime": 1795582244.2375686,
+    "seen": 1795596104.6219683,
+    "ast_hash": "5dfd56d932468765ec08770849704539",
     "semantic_hash": ""
   },
   "backend/cmd/hashpw/main.go": {
@@ -90,33 +90,33 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atm_portal.sql.go": {
-    "mtime": 1795490798.255103,
-    "seen": 1795512760.5432255,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220365,
     "ast_hash": "6016bd25aead9817c981cce9350d58a3",
     "semantic_hash": "6016bd25aead9817c981cce9350d58a3"
   },
   "backend/internal/db/auth.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432315,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.6220424,
     "ast_hash": "c2db2904461edcc8041541ea61dd3637",
     "semantic_hash": ""
   },
   "backend/internal/db/db.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432386,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220508,
     "ast_hash": "4b34a92b2dfb13d5f66298ff39484334",
     "semantic_hash": "4b34a92b2dfb13d5f66298ff39484334"
   },
   "backend/internal/db/dmaa_forecast.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432396,
+    "mtime": 1795581316.7743733,
+    "seen": 1795596104.622052,
     "ast_hash": "4bcbe86de9c9fde4f60e500afe602ac9",
     "semantic_hash": "4bcbe86de9c9fde4f60e500afe602ac9"
   },
   "backend/internal/db/models.go": {
-    "mtime": 1795490806.4022658,
-    "seen": 1795512760.543249,
-    "ast_hash": "6d4bb0d72e6ff40e48d936efd9fe5556",
+    "mtime": 1795581317.1396134,
+    "seen": 1795596104.6220636,
+    "ast_hash": "ba1b608db720ac558a6ab91a8e191c97",
     "semantic_hash": ""
   },
   "backend/internal/handler/atm_portal_cashpos_test.go": {
@@ -144,9 +144,9 @@
     "semantic_hash": "6f122944973d8a280c5ba2ec7331cf61"
   },
   "backend/internal/handler/auth_handler.go": {
-    "mtime": 1795492511.843532,
-    "seen": 1795512760.543349,
-    "ast_hash": "8ef1e64d476977f5161fe8f389c2a42c",
+    "mtime": 1795581865.2384605,
+    "seen": 1795596104.6221957,
+    "ast_hash": "3c1d2baa4d00c043ea231055e0cc3f46",
     "semantic_hash": ""
   },
   "backend/internal/handler/dmaa_forecast_handler.go": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/package.json": {
-    "mtime": 1794372109.4057963,
-    "seen": 1794382559.9009824,
-    "ast_hash": "b947a0efea90eeb543fef056bf6b1324",
+    "mtime": 1795593643.7475464,
+    "seen": 1795596104.622918,
+    "ast_hash": "812a22e5346974071d4a9ed63b77ce67",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/__tests__/import-alias-compliance.property.test.ts": {
@@ -1206,9 +1206,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/auth/store.ts": {
-    "mtime": 1795147039.1001284,
-    "seen": 1795148663.291149,
-    "ast_hash": "d8dc6ace644f125f456e39d671e963b3",
+    "mtime": 1795591515.7855732,
+    "seen": 1795596104.6237109,
+    "ast_hash": "fda34ef107db06224e836b7560665544",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/config/navigation.property.test.ts": {
@@ -1434,10 +1434,10 @@
     "semantic_hash": "44bcf22ec010bafd75eb1c4f15d6f65f"
   },
   "frontend/CompanyPortal-Vite/src/test/setup.ts": {
-    "mtime": 1787231931.934487,
-    "seen": 1787823339.656243,
-    "ast_hash": "3709e3aa95abf0544678f0f2d9b46702",
-    "semantic_hash": "3709e3aa95abf0544678f0f2d9b46702"
+    "mtime": 1795593669.5167787,
+    "seen": 1795596104.6238475,
+    "ast_hash": "b58291cbaf3dc464e2902dbc6016fcba",
+    "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/vite-env.d.ts": {
     "mtime": 1793688386.9379065,
@@ -1482,15 +1482,15 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/app/AppShell.tsx": {
-    "mtime": 1793688386.9879935,
-    "seen": 1793795879.1128986,
-    "ast_hash": "d2fa1971ced20acd3103166936d76722",
+    "mtime": 1795595297.7818298,
+    "seen": 1795596104.6238616,
+    "ast_hash": "200cbbe778274c93e766541f9222b155",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/app/__tests__/integration.test.tsx": {
-    "mtime": 1793688386.9925575,
-    "seen": 1793795879.1128998,
-    "ast_hash": "23c1c1399dec7706e6bf77752f623b3c",
+    "mtime": 1795580690.9086618,
+    "seen": 1795596104.6238627,
+    "ast_hash": "db55b9a61239af0c164e4df379f949f3",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/components/NotFound.tsx": {
@@ -1620,9 +1620,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/features/auth/AuthContext.tsx": {
-    "mtime": 1793688387.027387,
-    "seen": 1793795879.11293,
-    "ast_hash": "5af8ae3b67a51daebc3565124fc2aff0",
+    "mtime": 1795595297.7978754,
+    "seen": 1795596104.623895,
+    "ast_hash": "f6876b9837ba3cf1b942af20f9674c4c",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/features/auth/LoginPage.tsx": {
@@ -1776,9 +1776,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/lib/constants.ts": {
-    "mtime": 1793688387.167953,
-    "seen": 1793795879.1129923,
-    "ast_hash": "04f3d5ddeae4b5a2a3d63bc02ea408ee",
+    "mtime": 1795580728.484329,
+    "seen": 1795596104.6239626,
+    "ast_hash": "d0f5116be7b3d203644a112461e39c86",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/lib/formatters.ts": {
@@ -1794,9 +1794,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/lib/types.ts": {
-    "mtime": 1793688387.1748273,
-    "seen": 1793795879.112996,
-    "ast_hash": "43eee7942dbb34698953435f555f0451",
+    "mtime": 1795595297.845518,
+    "seen": 1795596104.6239665,
+    "ast_hash": "021d17f4416338d4c2d73f569a6b77f6",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/main.tsx": {
@@ -1962,9 +1962,9 @@
     "semantic_hash": ""
   },
   ".claude/CLAUDE.md": {
-    "mtime": 1795168464.7385995,
-    "seen": 1795170900.3255477,
-    "ast_hash": "96af75cc0638c1eff874d38b315bbf1c",
+    "mtime": 1795595972.22797,
+    "seen": 1795596104.6243012,
+    "ast_hash": "bc768885734802e42421e6cfa904aafa",
     "semantic_hash": ""
   },
   ".claude/eli5.md": {
@@ -2502,8 +2502,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/dsr.sql.go": {
-    "mtime": 1795490798.2525308,
-    "seen": 1795512760.5432413,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220536,
     "ast_hash": "1c8bbb4a3ded3f0a7820f5586549887d",
     "semantic_hash": ""
   },
@@ -2850,9 +2850,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/dsr.tsx": {
-    "mtime": 1788443693.8714678,
-    "seen": 1788494375.8594658,
-    "ast_hash": "b66a4f2cbafd811154c860a80da470d6",
+    "mtime": 1795581008.3080935,
+    "seen": 1795596104.6239824,
+    "ast_hash": "1912bf14ca6b846dfa1737daa91b65fe",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/forecasting.tsx": {
@@ -2880,9 +2880,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/orders.tsx": {
-    "mtime": 1788443693.8714678,
-    "seen": 1788494375.8594723,
-    "ast_hash": "637dde0fcae490569b0bcd530f839a47",
+    "mtime": 1795581008.3101003,
+    "seen": 1795596104.62399,
+    "ast_hash": "b166c0771bd12400eb5b4772feb9cbbc",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/reconciliation.tsx": {
@@ -3078,26 +3078,26 @@
     "semantic_hash": ""
   },
   "backend/internal/db/approval.sql.go": {
-    "mtime": 1795490820.5838256,
-    "seen": 1795512760.5432227,
+    "mtime": 1795581316.8466542,
+    "seen": 1795596104.6220334,
     "ast_hash": "248fcca501c0f12da89398e08dad7c85",
     "semantic_hash": ""
   },
   "backend/internal/db/audit.sql.go": {
-    "mtime": 1795490798.2525308,
-    "seen": 1795512760.5432293,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220403,
     "ast_hash": "70936856744444da4c25e37a433912a0",
     "semantic_hash": ""
   },
   "backend/internal/db/audit_log.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432305,
+    "mtime": 1795581316.775111,
+    "seen": 1795596104.6220412,
     "ast_hash": "a388c1cd48015e7586417c5094ed9340",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_request.sql.go": {
-    "mtime": 1795490798.264145,
-    "seen": 1795512760.5432732,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220891,
     "ast_hash": "7d9b8c14a7fca9a79be3339ce8d9f05a",
     "semantic_hash": ""
   },
@@ -3528,38 +3528,38 @@
     "semantic_hash": ""
   },
   "backend/internal/auth/user_admin.go": {
-    "mtime": 1794372109.3341086,
-    "seen": 1794382559.8994415,
-    "ast_hash": "ac034ede04356e6712a1beda736fb61e",
+    "mtime": 1795582104.9168963,
+    "seen": 1795596104.6220229,
+    "ast_hash": "3f5bbd20dc48661e71eca486d093159f",
     "semantic_hash": ""
   },
   "backend/internal/auth/user_admin_test.go": {
-    "mtime": 1793688385.862735,
-    "seen": 1793795879.111206,
-    "ast_hash": "202113e1e2987b5278e455364be646a1",
+    "mtime": 1795582106.9673524,
+    "seen": 1795596104.6220276,
+    "ast_hash": "ffddf4b0ee63121b321b189440589cbd",
     "semantic_hash": ""
   },
   "backend/internal/db/atms_admin.sql.go": {
-    "mtime": 1795490798.2571638,
-    "seen": 1795512760.5432284,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.622039,
     "ast_hash": "e090843c50ab87c99199bb8b3ecc528f",
     "semantic_hash": ""
   },
   "backend/internal/db/role_mgmt.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432546,
-    "ast_hash": "f8093c141bb67b5c886e1f79f66997a3",
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.622069,
+    "ast_hash": "92830bd1c72a7d3320d860507362e0ed",
     "semantic_hash": ""
   },
   "backend/internal/db/users_admin.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432553,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220703,
     "ast_hash": "6108206aea4501b80d0cb1a2660f3e75",
     "semantic_hash": ""
   },
   "backend/internal/db/vendors_admin.sql.go": {
-    "mtime": 1795490798.271651,
-    "seen": 1795512760.543275,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220915,
     "ast_hash": "709f96594fe4d8ab0e3431c6075e9d24",
     "semantic_hash": ""
   },
@@ -3600,15 +3600,15 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/role_mgmt_handler.go": {
-    "mtime": 1795491823.360723,
-    "seen": 1795512760.543403,
-    "ast_hash": "da4c351a2c9fd84791f6138218ec9c18",
+    "mtime": 1795581896.9029794,
+    "seen": 1795596104.6222546,
+    "ast_hash": "081b633778212c38a8bafd4d847e0d7d",
     "semantic_hash": ""
   },
   "backend/internal/handler/role_mgmt_handler_test.go": {
-    "mtime": 1795491881.3379471,
-    "seen": 1795512760.5434039,
-    "ast_hash": "c014c7e4cb2747171949064fe6516a9d",
+    "mtime": 1795581896.0114136,
+    "seen": 1795596104.6222556,
+    "ast_hash": "5a832a0bdeebe9fa5b38af72bfa84943",
     "semantic_hash": ""
   },
   "backend/internal/repository/approval_policy_store.go": {
@@ -3684,15 +3684,15 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/evaluator.go": {
-    "mtime": 1795491045.5425737,
-    "seen": 1795512760.543502,
-    "ast_hash": "691162b2f2daf4f919bde2da63b3dd07",
+    "mtime": 1795581532.5648239,
+    "seen": 1795596104.6223764,
+    "ast_hash": "d85b472d8d50196229e0194469186235",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/evaluator_integration_test.go": {
-    "mtime": 1795491890.6624138,
-    "seen": 1795512760.543503,
-    "ast_hash": "481d1dc9e41ca01fe8dfdc6d1bac393c",
+    "mtime": 1795581529.831461,
+    "seen": 1795596104.6223776,
+    "ast_hash": "192bd64f84d9e67b5dc4ff2893c29f82",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/evaluator_middleware_test.go": {
@@ -3702,9 +3702,9 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/repository.go": {
-    "mtime": 1795492489.3216496,
-    "seen": 1795512760.5435083,
-    "ast_hash": "62658ba3a715efadf85104795b754749",
+    "mtime": 1795581331.4772172,
+    "seen": 1795596104.6223848,
+    "ast_hash": "3e84055247061573f892e70bf45cf398",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/repository_topology_test.go": {
@@ -3714,15 +3714,15 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/service.go": {
-    "mtime": 1795491822.4200883,
-    "seen": 1795512760.54351,
-    "ast_hash": "a5ac33acaf872f9ef23085d70f74edfd",
+    "mtime": 1795581505.915548,
+    "seen": 1795596104.62239,
+    "ast_hash": "fb09cff99eb4bf8f739708945d9a91e5",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/service_integration_test.go": {
-    "mtime": 1795491890.1970913,
-    "seen": 1795512760.5435112,
-    "ast_hash": "58dd2847c986752ca8ff478e0f92df64",
+    "mtime": 1795581515.283278,
+    "seen": 1795596104.622391,
+    "ast_hash": "f0478296f9a019a8e80b0f3cdff99e2f",
     "semantic_hash": ""
   },
   "backend/internal/service/atm_admin.go": {
@@ -3930,15 +3930,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/__tests__/AdminUsersPage.test.tsx": {
-    "mtime": 1795170676.1625524,
-    "seen": 1795170900.3243,
-    "ast_hash": "e5e957c7c106d849f3dfbe4115fd1677",
+    "mtime": 1795591747.1077328,
+    "seen": 1795596104.623104,
+    "ast_hash": "325b62a370bd428d1e1ad30cc6c5e07c",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/__tests__/UserFormDialog.test.tsx": {
-    "mtime": 1795170690.4924378,
-    "seen": 1795170900.3243148,
-    "ast_hash": "963e733f9493237a363fcda0ca6b26ea",
+    "mtime": 1795592405.0162518,
+    "seen": 1795596104.6231067,
+    "ast_hash": "00ca56cf39398e40b4e8ba4151888523",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/__tests__/UsersTable.test.tsx": {
@@ -3972,9 +3972,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/components/UserFilterBar.tsx": {
-    "mtime": 1793688386.0869129,
-    "seen": 1793795879.1122415,
-    "ast_hash": "7fbaf7880e12c3e89d82c94f066f7d01",
+    "mtime": 1795591728.307012,
+    "seen": 1795596104.6231186,
+    "ast_hash": "6a260a09632180a20a5f451992055d9f",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/components/UserFormDialog.tsx": {
@@ -4008,9 +4008,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/lib/userFormSchema.ts": {
-    "mtime": 1793688386.0902464,
-    "seen": 1793795879.11225,
-    "ast_hash": "5c76e8decb3caae62493b223370fb3cf",
+    "mtime": 1795591661.6276746,
+    "seen": 1795596104.6231287,
+    "ast_hash": "b1a370e700d472befd45e03235846ff1",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/types.ts": {
@@ -4176,9 +4176,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/components/RoleBadge.tsx": {
-    "mtime": 1793688386.324543,
-    "seen": 1793795879.1126454,
-    "ast_hash": "43137b3ad8bb6564f0522442870698d3",
+    "mtime": 1795591554.1787953,
+    "seen": 1795596104.6235838,
+    "ast_hash": "98db94aecaf1b8e196621ed075d9e567",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/components/SettingsHubPage.tsx": {
@@ -4206,21 +4206,21 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/index.ts": {
-    "mtime": 1791369185.6517332,
-    "seen": 1791380962.9988654,
-    "ast_hash": "343bd9730425c41ef2f7c399f2fd1774",
+    "mtime": 1795591517.845972,
+    "seen": 1795596104.623591,
+    "ast_hash": "a3d0e36deaa2c0bdec32529140608750",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/rbac-settings/types.ts": {
-    "mtime": 1794372109.4483593,
-    "seen": 1794382559.9021409,
-    "ast_hash": "0170b18d515cce060136172f5c1aefd1",
+    "mtime": 1795591516.8691652,
+    "seen": 1795596104.623592,
+    "ast_hash": "1708bfe065744a0c69f1ab807f254ba6",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/CreateRoleDialog.test.tsx": {
-    "mtime": 1791369185.656749,
-    "seen": 1791380962.9988801,
-    "ast_hash": "08699aa152ba3a264a543ea9c09fd001",
+    "mtime": 1795593685.9010024,
+    "seen": 1795596104.6236103,
+    "ast_hash": "e1ac7eee1536c30055bc7361c25a5c07",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/PermissionEditor.test.tsx": {
@@ -4236,51 +4236,51 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/hooks.test.tsx": {
-    "mtime": 1791369185.659759,
-    "seen": 1791380962.9988835,
-    "ast_hash": "8283c8a4435a5f2483143bd2fcf6749e",
+    "mtime": 1795590584.5303338,
+    "seen": 1795596104.623617,
+    "ast_hash": "c77af36bd52dba6bf78f1a9352d9c909",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/api.ts": {
-    "mtime": 1791369185.6607666,
-    "seen": 1791380962.9988847,
-    "ast_hash": "75f6d889a3f2a94807cd7fbb026823b0",
+    "mtime": 1795590548.1284244,
+    "seen": 1795596104.6236193,
+    "ast_hash": "0b0d56971ba21311ab22e3f1cb34a521",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/components/CreateRoleDialog.tsx": {
-    "mtime": 1791369185.6619742,
-    "seen": 1791380962.9988856,
-    "ast_hash": "7ca7484ea1e8cb390ee5667115caaf12",
+    "mtime": 1795595345.7024982,
+    "seen": 1795596104.6236205,
+    "ast_hash": "a7c075bbd0cedf8bef72dc3ed442027d",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/components/PermissionEditor.tsx": {
-    "mtime": 1795492511.900364,
-    "seen": 1795512760.5445216,
-    "ast_hash": "8c9b60ec0dd4a0a00f456d4f24b63d47",
+    "mtime": 1795592319.589869,
+    "seen": 1795596104.6236217,
+    "ast_hash": "93a82c198fd5292cff2b04403eb90de5",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/components/RoleManagementPage.tsx": {
-    "mtime": 1795147039.0975287,
-    "seen": 1795148663.2910728,
-    "ast_hash": "d2b65b9ae3dcf7b45097792d7e0fd797",
+    "mtime": 1795592349.884974,
+    "seen": 1795596104.6236248,
+    "ast_hash": "464872a1ee4d4db1655cf4e40c6c051a",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/hooks/useRoleQueries.ts": {
-    "mtime": 1791369185.6647847,
-    "seen": 1791380962.9988887,
-    "ast_hash": "509ce5b0ba05c9cd3e170946d876b1ea",
+    "mtime": 1795591875.3778367,
+    "seen": 1795596104.623626,
+    "ast_hash": "87bf89405b0d93c5e65c466cd20a16c0",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/index.ts": {
-    "mtime": 1791369185.6657772,
-    "seen": 1791380962.9988897,
-    "ast_hash": "e1db02379f5e04d5d5e7a7140d7f0a1b",
+    "mtime": 1795590560.5966682,
+    "seen": 1795596104.623627,
+    "ast_hash": "9499e85f5d1e4f9db076beebc0e22c47",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/types.ts": {
-    "mtime": 1795492492.1384604,
-    "seen": 1795512760.5445256,
-    "ast_hash": "21625f731e69d2d36017813f0695bb2a",
+    "mtime": 1795591535.7734392,
+    "seen": 1795596104.6236284,
+    "ast_hash": "53fd6673e1ddd7b0849a9edaa147010c",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/utils/applyServerFieldError.test.ts": {
@@ -4368,44 +4368,44 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atm_assignments_admin.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432243,
+    "mtime": 1795581316.7722366,
+    "seen": 1795596104.6220353,
     "ast_hash": "9e4c191fb3b1b6548ce7b031e903aab8",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data.sql.go": {
-    "mtime": 1795490798.2676778,
-    "seen": 1795512760.543246,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220598,
     "ast_hash": "75b8a45cc29999bfa9fcb6fe2b96a18c",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data_export.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432472,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220613,
     "ast_hash": "f0ab35c3f684e3053be187cd29896e8c",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_branches_admin.sql.go": {
-    "mtime": 1795490798.262596,
-    "seen": 1795512760.5432606,
+    "mtime": 1795581316.7757103,
+    "seen": 1795596104.6220765,
     "ast_hash": "752d66929f4ab4faea83abbe9c32a723",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_packages_admin.sql.go": {
-    "mtime": 1795490798.2525308,
-    "seen": 1795512760.543263,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.622079,
     "ast_hash": "3a078cdbed69d4eb236ca5fc7ede073a",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pics_admin.sql.go": {
-    "mtime": 1795490798.2732875,
-    "seen": 1795512760.543266,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220815,
     "ast_hash": "a90c9ca220fb137ce90e761d4ec10189",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_vaults_admin.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.543274,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220906,
     "ast_hash": "4e935710a2d86dd4b75f2928c87d0307",
     "semantic_hash": ""
   },
@@ -4938,9 +4938,9 @@
     "semantic_hash": ""
   },
   ".claude/development-progress.md": {
-    "mtime": 1795172636.9034276,
-    "seen": 1795512760.54509,
-    "ast_hash": "a2152b5e7715bff15dffd942a6a2f7ae",
+    "mtime": 1795596010.2208333,
+    "seen": 1795596104.6243374,
+    "ast_hash": "44eadd474dc7032dcd83bc68c3e703bc",
     "semantic_hash": ""
   },
   ".claude/feature-flows/01-master-data/feature-flow.md": {
@@ -5094,8 +5094,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_package_prices_admin.sql.go": {
-    "mtime": 1795490798.2676778,
-    "seen": 1795512760.5432622,
+    "mtime": 1795581316.7722366,
+    "seen": 1795596104.622078,
     "ast_hash": "3144a0127408d192c8682fe47fc0c160",
     "semantic_hash": ""
   },
@@ -5280,14 +5280,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/regions_admin.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432518,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220663,
     "ast_hash": "894060fd9c350a3dd6f066038a98156a",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_branch_atms.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432599,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220753,
     "ast_hash": "09700a3681ceb296855a38c46fa67ce0",
     "semantic_hash": ""
   },
@@ -5622,15 +5622,15 @@
     "semantic_hash": ""
   },
   ".claude/docs/data-map.md": {
-    "mtime": 1795147038.7735775,
-    "seen": 1795148663.2916596,
-    "ast_hash": "6289983e9486b392daa3d8228aa616a4",
+    "mtime": 1795595999.5132775,
+    "seen": 1795596104.6243417,
+    "ast_hash": "ac3de62e2b74533a66202a220c2f41c9",
     "semantic_hash": ""
   },
   ".claude/docs/decisions.md": {
-    "mtime": 1795147038.774645,
-    "seen": 1795148663.2916608,
-    "ast_hash": "9cb22fd44fb03b7b69f6989d5aa2c5ea",
+    "mtime": 1795595981.33401,
+    "seen": 1795596104.6243434,
+    "ast_hash": "259efdf2331c291f39b640012d1b1d61",
     "semantic_hash": ""
   },
   ".claude/docs/deployment.md": {
@@ -5712,8 +5712,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/atm_visit_quota.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432274,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.6220381,
     "ast_hash": "3bcffbf00633c4681d832439c3829939",
     "semantic_hash": ""
   },
@@ -5838,8 +5838,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/notifications.sql.go": {
-    "mtime": 1795490798.2571638,
-    "seen": 1795512760.5432503,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.622065,
     "ast_hash": "0b464ab04f8e62a132a2bf17e91a9b53",
     "semantic_hash": ""
   },
@@ -5856,9 +5856,9 @@
     "semantic_hash": ""
   },
   "backend/internal/notification/integration_test.go": {
-    "mtime": 1793688385.9116156,
-    "seen": 1793795879.1114955,
-    "ast_hash": "ac4fdcc59b072c1522fd5c857ee1072f",
+    "mtime": 1795581971.3348155,
+    "seen": 1795596104.622282,
+    "ast_hash": "d5c7bd37ec23c5eb9492ea820768576f",
     "semantic_hash": ""
   },
   "backend/internal/notification/notification.go": {
@@ -6006,20 +6006,20 @@
     "semantic_hash": ""
   },
   "backend/internal/db/acm_areas_admin.sql.go": {
-    "mtime": 1795490798.2631218,
-    "seen": 1795512760.5432215,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220322,
     "ast_hash": "234caf6dd1d05c5b243ac0c4688b57e3",
     "semantic_hash": ""
   },
   "backend/internal/db/dsr_location_maps_admin.sql.go": {
-    "mtime": 1795490798.2525308,
-    "seen": 1795512760.5432432,
+    "mtime": 1795581316.7722366,
+    "seen": 1795596104.6220565,
     "ast_hash": "48e5ede852ec7b2e90909c6a5e3aee1a",
     "semantic_hash": ""
   },
   "backend/internal/db/vault_plans.sql.go": {
-    "mtime": 1795490798.271651,
-    "seen": 1795512760.543258,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.622073,
     "ast_hash": "576f34523e107101103addbe3127e1b0",
     "semantic_hash": ""
   },
@@ -6264,21 +6264,21 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_parties.sql.go": {
-    "mtime": 1795490798.256614,
-    "seen": 1795512760.5432646,
+    "mtime": 1795581316.775111,
+    "seen": 1795596104.6220803,
     "ast_hash": "a98023daf94ee58341d6ac95710f8d66",
     "semantic_hash": ""
   },
   "backend/internal/handler/vendor_order_handler.go": {
-    "mtime": 1793688385.9050715,
-    "seen": 1793795879.1114833,
-    "ast_hash": "66038690a843ea5747cd7abfef3ce0f8",
+    "mtime": 1795581917.3680274,
+    "seen": 1795596104.6222677,
+    "ast_hash": "d1032a67e00b44a2f6265abd9e782fc4",
     "semantic_hash": ""
   },
   "backend/internal/handler/vendor_order_handler_test.go": {
-    "mtime": 1793688385.9050715,
-    "seen": 1793795879.111485,
-    "ast_hash": "c8bf0e7be68d7a1c28fe3c262f8d8399",
+    "mtime": 1795581971.3342972,
+    "seen": 1795596104.622269,
+    "ast_hash": "271dbd4cff43fb0149c4608f6e5deab9",
     "semantic_hash": ""
   },
   "backend/internal/handler/vendor_request_vendor_handler.go": {
@@ -6288,21 +6288,21 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_order.go": {
-    "mtime": 1793688385.984365,
-    "seen": 1793795879.111767,
-    "ast_hash": "2a203083a58b0e2a34eca217daa6ae17",
+    "mtime": 1795581510.2088013,
+    "seen": 1795596104.6226027,
+    "ast_hash": "073cdb306242237d8fb8f1e64cb8d772",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_order_integration_test.go": {
-    "mtime": 1793688385.9863713,
-    "seen": 1793795879.1117685,
-    "ast_hash": "0425f85b3aafb9b0d173aa8e18305870",
+    "mtime": 1795581510.5778508,
+    "seen": 1795596104.622604,
+    "ast_hash": "854d420f5d24e491cfd4bbe511fd367b",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_party.go": {
-    "mtime": 1793688385.990402,
-    "seen": 1793795879.1117806,
-    "ast_hash": "916d81079272e6ccfff4475227390332",
+    "mtime": 1795581510.5778508,
+    "seen": 1795596104.6226144,
+    "ast_hash": "b0e7e9ba08753d0dbf9e753bec466b92",
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_party_integration_test.go": {
@@ -6366,9 +6366,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/orders.$id.tsx": {
-    "mtime": 1793688387.1899204,
-    "seen": 1793795879.1130197,
-    "ast_hash": "e87aa5578acfd1d2d37310074bc8411e",
+    "mtime": 1795581008.3101003,
+    "seen": 1795596104.6239886,
+    "ast_hash": "0db42692778e47881a377f3213a49122",
     "semantic_hash": ""
   },
   "backend/internal/handler/page_bound_test.go": {
@@ -6582,14 +6582,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vault_allocations.sql.go": {
-    "mtime": 1795490798.2726674,
-    "seen": 1795512760.5432565,
+    "mtime": 1795581316.7743733,
+    "seen": 1795596104.6220717,
     "ast_hash": "8598fab0577d7e02d483630d21b92231",
     "semantic_hash": ""
   },
   "backend/internal/db/vault_tickets.sql.go": {
-    "mtime": 1795490798.2615914,
-    "seen": 1795512760.543259,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.6220741,
     "ast_hash": "4b0c3842dabbb94dc3cc73a6e3e05c7a",
     "semantic_hash": ""
   },
@@ -6654,14 +6654,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/holidays_admin.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432448,
+    "mtime": 1795581316.775111,
+    "seen": 1795596104.6220584,
     "ast_hash": "0c0e8e65ece649c37b8aab5d8799e33e",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_realizations.sql.go": {
-    "mtime": 1795490798.2615914,
-    "seen": 1795512760.5432723,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220882,
     "ast_hash": "0235f14fa83c3c1e01d43653464f59d1",
     "semantic_hash": ""
   },
@@ -6720,8 +6720,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/replenish_classifications.sql.go": {
-    "mtime": 1795490798.2686973,
-    "seen": 1795512760.5432532,
+    "mtime": 1795581316.7743733,
+    "seen": 1795596104.622068,
     "ast_hash": "ccdbabbadc2e2678186497fc76072912",
     "semantic_hash": ""
   },
@@ -6738,15 +6738,15 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/replenishment_handler.go": {
-    "mtime": 1795492524.686437,
-    "seen": 1795512760.543395,
-    "ast_hash": "1b67f9ad8d712477917b69564301ea03",
+    "mtime": 1795581927.0857396,
+    "seen": 1795596104.6222453,
+    "ast_hash": "8e47fb246e1e133249fb31c7726cef17",
     "semantic_hash": ""
   },
   "backend/internal/handler/replenishment_handler_test.go": {
-    "mtime": 1793688385.8994684,
-    "seen": 1793795879.1114647,
-    "ast_hash": "1036692f6d5c88d6c27303ba39d5b151",
+    "mtime": 1795581952.2860136,
+    "seen": 1795596104.6222467,
+    "ast_hash": "71d38e27c6439c47a3cbbb21775e048a",
     "semantic_hash": ""
   },
   "backend/internal/service/holiday_admin.go": {
@@ -6876,9 +6876,9 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/routes/realizations.tsx": {
-    "mtime": 1793688387.1915083,
-    "seen": 1793795879.113022,
-    "ast_hash": "d4a3b4278397ed844b5c4ccb9614f436",
+    "mtime": 1795581008.3080935,
+    "seen": 1795596104.6239913,
+    "ast_hash": "79050bdb3a5228a2b75a07bcc5f2e608",
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
@@ -6900,9 +6900,9 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/service_test.go": {
-    "mtime": 1795491822.890585,
-    "seen": 1795512760.543512,
-    "ast_hash": "c47d7d24c8d09bb93383e5cc05078792",
+    "mtime": 1795581548.787459,
+    "seen": 1795596104.6223927,
+    "ast_hash": "b5470e8205804ee7fc0ceace6c5e7eca",
     "semantic_hash": ""
   },
   "backend/internal/approval/orchestrator_rules_test.go": {
@@ -6924,9 +6924,9 @@
     "semantic_hash": ""
   },
   "backend/internal/service/vendor_request_rules_integration_test.go": {
-    "mtime": 1793688386.0037272,
-    "seen": 1793795879.1118186,
-    "ast_hash": "6ea6f808dc7f793b4d6cb8da7d7308e1",
+    "mtime": 1795581971.3348155,
+    "seen": 1795596104.6226578,
+    "ast_hash": "2ae484e2907454567307bee2400ff666",
     "semantic_hash": ""
   },
   "backend/internal/service/vault_plan_rbac_integration_test.go": {
@@ -6972,9 +6972,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/body_limit_test.go": {
-    "mtime": 1793688385.8932004,
-    "seen": 1793795879.1114318,
-    "ast_hash": "e52a20a9478eac233fc0f6ad4fb32e1c",
+    "mtime": 1795582245.0200255,
+    "seen": 1795596104.6222026,
+    "ast_hash": "f22cf339b4aa11f5db524486d0d77d4a",
     "semantic_hash": ""
   },
   "pkg/middleware/body_limit.go": {
@@ -7140,15 +7140,15 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/RoleManagementPage.test.tsx": {
-    "mtime": 1795147039.0934927,
-    "seen": 1795148663.2910635,
-    "ast_hash": "4adbb82ac619229b94f8e048c60ed0b8",
+    "mtime": 1795593685.6904519,
+    "seen": 1795596104.6236129,
+    "ast_hash": "83f1e107638d875b45bda7fe79e82516",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/api.test.ts": {
-    "mtime": 1793688386.358153,
-    "seen": 1793795879.1126766,
-    "ast_hash": "b37772ed4284f67dfee53bc6b9b98383",
+    "mtime": 1795590583.9165392,
+    "seen": 1795596104.6236155,
+    "ast_hash": "b21c3e10054971b6dcefeb1cd7c40ae5",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-holidays/__tests__/import-refresh.test.ts": {
@@ -7386,21 +7386,21 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/openapi_contract_test.go": {
-    "mtime": 1795147038.9118042,
-    "seen": 1795148663.289779,
-    "ast_hash": "e10771327be22a2052b5ab725f1edc4f",
+    "mtime": 1795581952.2860136,
+    "seen": 1795596104.6222365,
+    "ast_hash": "bc6037acac92fa75afb2c701a53450ae",
     "semantic_hash": ""
   },
   "backend/api/openapi.yaml": {
-    "mtime": 1795147038.8631415,
-    "seen": 1795148663.2920623,
-    "ast_hash": "1213d8bde0df98b08c1f2b0e660410e2",
+    "mtime": 1795590525.966354,
+    "seen": 1795596104.6247633,
+    "ast_hash": "69f4549278dd4008e59fe3a7f530461d",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/schema.d.ts": {
-    "mtime": 1795147039.1001284,
-    "seen": 1795148663.2911437,
-    "ast_hash": "d9e7d64d4666df0702a00187d5b64590",
+    "mtime": 1795590535.5539243,
+    "seen": 1795596104.623698,
+    "ast_hash": "182c23a845410380e879bbf8f01f3c18",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/lib/api/schema.test.ts": {
@@ -7482,15 +7482,15 @@
     "semantic_hash": ""
   },
   "backend/internal/vendorrole/vendorrole.go": {
-    "mtime": 1793688386.0080504,
-    "seen": 1793795879.1118345,
-    "ast_hash": "26e48c274da059c3c2d1d6edd91607c4",
+    "mtime": 1795581901.9923177,
+    "seen": 1795596104.6226718,
+    "ast_hash": "0532c0f3ed6c732c7158f4e41bb8722a",
     "semantic_hash": ""
   },
   "backend/internal/vendorrole/vendorrole_test.go": {
-    "mtime": 1793688386.0080504,
-    "seen": 1793795879.1118364,
-    "ast_hash": "91500201961b8813d6d1100e145ebc8b",
+    "mtime": 1795581901.9923177,
+    "seen": 1795596104.6226735,
+    "ast_hash": "72dde30a6eedbf691f5a4a710e11c7ff",
     "semantic_hash": ""
   },
   "backend/migrations/032_vendor_party_scope.sql": {
@@ -8112,9 +8112,9 @@
     "semantic_hash": ""
   },
   "backend/internal/auth/user_admin_vendor_test.go": {
-    "mtime": 1793688385.862735,
-    "seen": 1793795879.1112092,
-    "ast_hash": "6ea5a933075ebaadac577777fa6b74cd",
+    "mtime": 1795582106.9673524,
+    "seen": 1795596104.6220286,
+    "ast_hash": "dbaed53fffc65485db16feccc16b6374",
     "semantic_hash": ""
   },
   "backend/internal/handler/admin_user_handler_vendor_test.go": {
@@ -8166,15 +8166,15 @@
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/features/auth/__tests__/vendorScope.test.tsx": {
-    "mtime": 1793688387.0504503,
-    "seen": 1793795879.1129375,
-    "ast_hash": "813efaf4bea9bfbb07dc01eecd5f9d4a",
+    "mtime": 1795595297.8519704,
+    "seen": 1795596104.623906,
+    "ast_hash": "9e9182da3608b22a054dfd2113441867",
     "semantic_hash": ""
   },
   "frontend/VendorPortal-Vite/src/lib/vendorRoles.ts": {
-    "mtime": 1793688387.1769495,
-    "seen": 1793795879.1129992,
-    "ast_hash": "8d3ebcff589184308ac6f9fc8a433a67",
+    "mtime": 1795595297.845518,
+    "seen": 1795596104.623969,
+    "ast_hash": "9da17351cd7bb47d760a71c57cea204b",
     "semantic_hash": ""
   },
   "backend-exq/api/embed.go": {
@@ -8562,14 +8562,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/dsr_late_report.sql.go": {
-    "mtime": 1795490798.2571638,
-    "seen": 1795512760.5432422,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220546,
     "ast_hash": "386088b8728b24b4a18548a7c5b6e644",
     "semantic_hash": ""
   },
   "backend/internal/db/master_data_import.sql.go": {
-    "mtime": 1795490798.2615914,
-    "seen": 1795512760.543248,
+    "mtime": 1795581316.7757103,
+    "seen": 1795596104.6220627,
     "ast_hash": "c457cf73e6ae4b21f4d4b3262437fc1c",
     "semantic_hash": ""
   },
@@ -10404,14 +10404,14 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks.sql.go": {
-    "mtime": 1795490798.255103,
-    "seen": 1795512760.543267,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220827,
     "ast_hash": "9656b7e76520da48d4b850895c255442",
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks_report.sql.go": {
-    "mtime": 1795490798.2525308,
-    "seen": 1795512760.5432699,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220853,
     "ast_hash": "5d0e80a796a4d3f28cacc7294e8e9653",
     "semantic_hash": ""
   },
@@ -11556,15 +11556,15 @@
     "semantic_hash": ""
   },
   "backend-extapi/internal/extauth/client.go": {
-    "mtime": 1794372109.2911582,
-    "seen": 1794382559.8992321,
-    "ast_hash": "52a5fd4a065275206ddc77b113351169",
+    "mtime": 1795581926.270684,
+    "seen": 1795596104.6219013,
+    "ast_hash": "c1279f3dac1b60b1892c6b1998dd1862",
     "semantic_hash": ""
   },
   "backend-extapi/internal/extauth/client_test.go": {
-    "mtime": 1794372109.2938101,
-    "seen": 1794382559.899234,
-    "ast_hash": "c7f456ac90a797cdf3edac7ae6189221",
+    "mtime": 1795581927.1896513,
+    "seen": 1795596104.6219134,
+    "ast_hash": "c0a504a8807a29e1ec1a4b0f57609ebc",
     "semantic_hash": ""
   },
   "backend-extapi/internal/extauth/middleware.go": {
@@ -11814,9 +11814,9 @@
     "semantic_hash": ""
   },
   "pkg/userrules/userrules.go": {
-    "mtime": 1794372109.5941527,
-    "seen": 1794382559.9033136,
-    "ast_hash": "d5dc7f13017ed8cc93d71cd0300b9e86",
+    "mtime": 1795581924.6880758,
+    "seen": 1795596104.6240728,
+    "ast_hash": "3df6d2a902c0f1cf3c076e2acd559135",
     "semantic_hash": ""
   },
   "pkg/userrules/userrules_property_test.go": {
@@ -11826,9 +11826,9 @@
     "semantic_hash": ""
   },
   "pkg/userrules/userrules_test.go": {
-    "mtime": 1794372109.597872,
-    "seen": 1794382559.9033186,
-    "ast_hash": "3971b178396943b74255a23ce80761bb",
+    "mtime": 1795581925.400324,
+    "seen": 1795596104.6240754,
+    "ast_hash": "93d46a50e848b4f99ef21ee25912717d",
     "semantic_hash": ""
   },
   ".agents/skills/db-migration-sqlc/SKILL.md": {
@@ -11940,32 +11940,32 @@
     "semantic_hash": ""
   },
   "backend/internal/db/cash_count_anomaly_categories_admin.sql.go": {
-    "mtime": 1795490798.255103,
-    "seen": 1795512760.5432327,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220436,
     "ast_hash": "e3a01eb4ea7a6b31bf750a38c27bfe0d",
     "semantic_hash": ""
   },
   "backend/internal/db/cash_count_areas_admin.sql.go": {
-    "mtime": 1795490798.271651,
-    "seen": 1795512760.5432339,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220453,
     "ast_hash": "1c6e40cf6329fa44a9bfa4580c8a5184",
     "semantic_hash": ""
   },
   "backend/internal/db/cash_count_category_params_admin.sql.go": {
-    "mtime": 1795490798.264145,
-    "seen": 1795512760.5432353,
+    "mtime": 1795581316.7722366,
+    "seen": 1795596104.6220467,
     "ast_hash": "a9122d5fc679c8676cf7dceb5da2c3af",
     "semantic_hash": ""
   },
   "backend/internal/db/cash_count_checklist_items_admin.sql.go": {
-    "mtime": 1795490798.255103,
-    "seen": 1795512760.5432363,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.622048,
     "ast_hash": "8c21d3835f20392a691f90b5e55fbdc2",
     "semantic_hash": ""
   },
   "backend/internal/db/cash_count_pics_admin.sql.go": {
-    "mtime": 1795490798.262596,
-    "seen": 1795512760.5432374,
+    "mtime": 1795581316.7729607,
+    "seen": 1795596104.6220493,
     "ast_hash": "ab7e0db7433717857d682f7156d694ee",
     "semantic_hash": ""
   },
@@ -12570,8 +12570,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks_types.sql.go": {
-    "mtime": 1795490798.2651517,
-    "seen": 1795512760.5432715,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.622087,
     "ast_hash": "db6e712ea3eae0585343806d497c8fa4",
     "semantic_hash": ""
   },
@@ -12726,8 +12726,8 @@
     "semantic_hash": ""
   },
   "backend/internal/db/vendor_pks_list.sql.go": {
-    "mtime": 1795490798.2631218,
-    "seen": 1795512760.543269,
+    "mtime": 1795581316.7655003,
+    "seen": 1795596104.6220841,
     "ast_hash": "cae112cb29321fe7dcb54c7ecd7bf098",
     "semantic_hash": ""
   },
@@ -13770,9 +13770,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/__tests__/CreateUserPage.test.tsx": {
-    "mtime": 1795170720.189031,
-    "seen": 1795170900.3243077,
-    "ast_hash": "9fc88301dd5b9a30b90e4a1f7671c39b",
+    "mtime": 1795591747.1077328,
+    "seen": 1795596104.6231055,
+    "ast_hash": "9b5f6db09a6ad38018a6f5cdd6f39b2f",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/components/CreateUserPage.tsx": {
@@ -13782,9 +13782,9 @@
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/features/admin-users/components/UserForm.tsx": {
-    "mtime": 1795170812.6041758,
-    "seen": 1795170900.3243296,
-    "ast_hash": "96e444c95af8a2afaa4f877d5d4c93e7",
+    "mtime": 1795591747.1077328,
+    "seen": 1795596104.6231196,
+    "ast_hash": "1ae7aa17b98e6f0c45d22710b8d361f7",
     "semantic_hash": ""
   },
   "frontend/CompanyPortal-Vite/src/routes/settings/admin/users-new.tsx": {
@@ -13794,15 +13794,15 @@
     "semantic_hash": ""
   },
   ".claude/small-works.md": {
-    "mtime": 1795170918.355385,
-    "seen": 1795512760.545334,
-    "ast_hash": "7fbc0450569cba2cd433d2203c66d639",
+    "mtime": 1795577244.0652742,
+    "seen": 1795596104.624641,
+    "ast_hash": "db65e1b6dc37128a89ac92774819adfc",
     "semantic_hash": ""
   },
   "backend/cmd/api/route_permissions_test.go": {
-    "mtime": 1795510762.032694,
-    "seen": 1795512760.5431678,
-    "ast_hash": "67d30b0a7e7586c4d26eda381f858cb0",
+    "mtime": 1795581971.3337467,
+    "seen": 1795596104.6219711,
+    "ast_hash": "352aa784c146fe8c657a6f8f965cceb7",
     "semantic_hash": ""
   },
   "backend/cmd/api/route_rbac_integration_test.go": {
@@ -13812,9 +13812,9 @@
     "semantic_hash": ""
   },
   "backend/internal/handler/auth_handler_permissions_test.go": {
-    "mtime": 1795510551.4587283,
-    "seen": 1795512760.5433497,
-    "ast_hash": "9e2235641b22ca8987b3dc904ae86a84",
+    "mtime": 1795581865.2384605,
+    "seen": 1795596104.6221967,
+    "ast_hash": "8d3ea07efd7d9fff154cadda82435fdb",
     "semantic_hash": ""
   },
   "backend/internal/handler/permission_guard_test.go": {
@@ -13830,9 +13830,9 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/keys.go": {
-    "mtime": 1795490454.8340652,
-    "seen": 1795512760.5435052,
-    "ast_hash": "0b9ec65aa756d3b5cb4e8ee392dc5ca5",
+    "mtime": 1795581519.8609083,
+    "seen": 1795596104.6223803,
+    "ast_hash": "c14db98fe43eb85464d0fde1faadb4e8",
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/keys_test.go": {
@@ -13842,9 +13842,9 @@
     "semantic_hash": ""
   },
   "backend/internal/rolemgmt/permission_catalog_coverage_test.go": {
-    "mtime": 1795492464.000664,
-    "seen": 1795512760.543507,
-    "ast_hash": "5a32f72588600362d28383490c694624",
+    "mtime": 1795581529.831461,
+    "seen": 1795596104.6223836,
+    "ast_hash": "ea74eb0540070ff3c097d6cd84c94f8e",
     "semantic_hash": ""
   },
   "backend/migrations/046_permission_catalog_coverage.sql": {
@@ -13854,9 +13854,9 @@
     "semantic_hash": ""
   },
   "backend/queries/role_mgmt.sql": {
-    "mtime": 1795490792.0458815,
-    "seen": 1795512760.5438395,
-    "ast_hash": "0e9442995b00a4003484d892fec2699f",
+    "mtime": 1795581309.3199615,
+    "seen": 1795596104.6227753,
+    "ast_hash": "eff78efbeb042d6db4b3dd92a9d11c21",
     "semantic_hash": ""
   },
   "backend/scripts/dev/rollback_046_permission_catalog_coverage.sql": {
@@ -13911,6 +13911,120 @@
     "mtime": 1795491201.0724502,
     "seen": 1795512760.5446992,
     "ast_hash": "f61311a64820bdbc0b430078179c9784",
+    "semantic_hash": ""
+  },
+  "backend/internal/auth/user_admin_vendorfields_test.go": {
+    "mtime": 1795590613.3586464,
+    "seen": 1795596104.6220303,
+    "ast_hash": "c1d081dbaa3780c84536046b7b968035",
+    "semantic_hash": ""
+  },
+  "backend/internal/rolemgmt/role_portal_migration_integration_test.go": {
+    "mtime": 1795581191.6016264,
+    "seen": 1795596104.6223872,
+    "ast_hash": "a22ee82b8624ef6c616c75f451ba1c8b",
+    "semantic_hash": ""
+  },
+  "backend/internal/rolemgmt/role_revamp_integration_test.go": {
+    "mtime": 1795590549.03552,
+    "seen": 1795596104.6223888,
+    "ast_hash": "02ecc2c48bf3f73180cb08927edf1d68",
+    "semantic_hash": ""
+  },
+  "backend/internal/rolemgmt/vendor_enforcement_integration_test.go": {
+    "mtime": 1795590553.980893,
+    "seen": 1795596104.6223936,
+    "ast_hash": "fb75337c48f3bb56f92677722a6436d2",
+    "semantic_hash": ""
+  },
+  "backend/internal/rolemgmt/vendor_middleware_test.go": {
+    "mtime": 1795581491.829472,
+    "seen": 1795596104.622395,
+    "ast_hash": "2c8f28ce5659500f390bf7778770cd91",
+    "semantic_hash": ""
+  },
+  "backend/internal/service/vendor_party_scope_integration_test.go": {
+    "mtime": 1795590752.8717642,
+    "seen": 1795596104.622617,
+    "ast_hash": "32e714be7879d28e08ff046070394a76",
+    "semantic_hash": ""
+  },
+  "backend/migrations/047_role_portal.sql": {
+    "mtime": 1795580546.2808533,
+    "seen": 1795596104.6227388,
+    "ast_hash": "9e22507e116dbcd7b551dc7416c9735c",
+    "semantic_hash": ""
+  },
+  "backend/scripts/dev/rollback_047_role_portal.sql": {
+    "mtime": 1795580993.0459416,
+    "seen": 1795596104.62281,
+    "ast_hash": "3382e5625f14f11da666029104623268",
+    "semantic_hash": ""
+  },
+  "backend_python/dsr/make_template.py": {
+    "mtime": 1795592431.2372403,
+    "seen": 1795596104.6228218,
+    "ast_hash": "a6b00e1719b6c1b723da272f6ef9bee3",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-users/__tests__/roleOptionsMock.ts": {
+    "mtime": 1795591682.2455792,
+    "seen": 1795596104.6231117,
+    "ast_hash": "9cb337e8f8efe41d9f542bd015f7ad38",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/admin-users/lib/useRoleOptions.ts": {
+    "mtime": 1795595324.298752,
+    "seen": 1795596104.623126,
+    "ast_hash": "f99215f861a9d53f5a2fe53812a35c48",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/rbac-settings/__tests__/RoleBadge.test.tsx": {
+    "mtime": 1795592426.520275,
+    "seen": 1795596104.6235628,
+    "ast_hash": "56f30635aafa8cd3d232bc191c885224",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/role-management/__tests__/useRoleManagementUrlState.test.ts": {
+    "mtime": 1795593093.958822,
+    "seen": 1795596104.6236181,
+    "ast_hash": "d5397e73d864ae31a559b540cc0408a6",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/role-management/components/PortalTabs.tsx": {
+    "mtime": 1795591562.8972163,
+    "seen": 1795596104.623623,
+    "ast_hash": "0f750cceb00622e7a5bfd5805e31744a",
+    "semantic_hash": ""
+  },
+  "frontend/CompanyPortal-Vite/src/features/role-management/useRoleManagementUrlState.ts": {
+    "mtime": 1795591548.8329618,
+    "seen": 1795596104.6236293,
+    "ast_hash": "f936b3e421ad62745c6659162895fd02",
+    "semantic_hash": ""
+  },
+  "frontend/VendorPortal-Vite/src/app/__tests__/sidebarPermissions.test.tsx": {
+    "mtime": 1795592419.5324943,
+    "seen": 1795596104.6238642,
+    "ast_hash": "03cc8f2d1d1b92ca0f708e51a23377cc",
+    "semantic_hash": ""
+  },
+  "frontend/VendorPortal-Vite/src/components/NoAccess.tsx": {
+    "mtime": 1795580996.7059286,
+    "seen": 1795596104.6238651,
+    "ast_hash": "e6968ae716036a4d7022552583d28cc7",
+    "semantic_hash": ""
+  },
+  "frontend/VendorPortal-Vite/src/features/auth/RequirePermission.tsx": {
+    "mtime": 1795580996.679911,
+    "seen": 1795596104.623899,
+    "ast_hash": "7a9092f87ff03f82c32e569883502b75",
+    "semantic_hash": ""
+  },
+  "frontend/VendorPortal-Vite/src/features/auth/__tests__/requirePermission.test.tsx": {
+    "mtime": 1795581007.0913298,
+    "seen": 1795596104.623903,
+    "ast_hash": "3a63dd890b10c6cc7a87aaed0b0ce1a1",
     "semantic_hash": ""
   }
 }

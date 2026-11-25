@@ -7,7 +7,10 @@ import type { CatalogEntry, RoleWithPermissions } from "../types";
 
 interface PermissionEditorProps {
   role: RoleWithPermissions;
+  /** Only the active portal tab's catalog — the page filters before passing it. */
   catalog: CatalogEntry[];
+  /** Reports unsaved changes so the page can confirm before switching roles/tabs. */
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 interface MenuNode {
@@ -55,7 +58,8 @@ function buildTree(catalog: CatalogEntry[]): MenuNode[] {
  * grants/revokes (design property 5). No maker-checker UI: the change
  * applies immediately once saved (documented Golden Rule #3 deviation).
  */
-export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
+export function PermissionEditor({ role, catalog, onDirtyChange }: PermissionEditorProps) {
+  const [saveError, setSaveError] = useState<string | null>(null);
   const { toast } = useToast();
   const updateMutation = useUpdateRolePermissions();
   const tree = useMemo(() => buildTree(catalog), [catalog]);
@@ -84,6 +88,15 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
     return next.some((id) => !current.has(id));
   }, [role.permissions, selected, fixedIds]);
 
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  function handleCancel(): void {
+    setSelected(new Set(role.permissions.map((p) => p.menu_feature_id)));
+    setSaveError(null);
+  }
+
   function toggle(id: number): void {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -94,13 +107,16 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
   }
 
   async function handleSave(): Promise<void> {
+    setSaveError(null);
     try {
       const menuFeatureIds = Array.from(selected).filter((id) => !fixedIds.has(id));
       await updateMutation.mutateAsync({ id: role.id, menuFeatureIds });
       toast({ type: "success", message: `Izin peran "${role.role}" berhasil diperbarui` });
       if (role.role === ownRole) await usePermissionStore.getState().load();
     } catch (err) {
-      toast({ type: "error", message: errorMessage(err) });
+      const message = errorMessage(err);
+      setSaveError(message);
+      toast({ type: "error", message });
     }
   }
 
@@ -133,7 +149,20 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      {saveError && (
+        <p role="alert" className="text-sm text-[var(--danger-fg)]">
+          {saveError}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-3">
+        <Button
+          variant="secondary"
+          disabled={!isDirty || updateMutation.isPending}
+          onClick={handleCancel}
+        >
+          Batalkan
+        </Button>
         <Button disabled={!isDirty || updateMutation.isPending} onClick={handleSave}>
           Simpan Izin
         </Button>

@@ -28,6 +28,10 @@ const useUsersListMock = vi.fn();
 const disableMutate = vi.fn();
 const enableMutate = vi.fn();
 
+vi.mock("@/features/role-management", async () =>
+  (await import("./roleOptionsMock")).roleManagementMock(),
+);
+
 vi.mock("../hooks", () => ({
   useUsersList: (...args: unknown[]) => useUsersListMock(...args),
   useDisableUser: () => ({ mutate: disableMutate, isPending: false }),

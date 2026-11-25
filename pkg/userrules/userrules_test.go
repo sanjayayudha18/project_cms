@@ -18,6 +18,17 @@ func TestIsPrivileged(t *testing.T) {
 	}
 }
 
+func TestIsVendorRole(t *testing.T) {
+	for role, want := range map[string]bool{
+		"VENDOR-USER": true, "vendor-atm-user": true, " VENDOR-NEW ": true, "VENDOR-": true,
+		"ATM-USER": false, "": false, "VENDOR": false, "XVENDOR-USER": false, "EXT-CLIENT": false,
+	} {
+		if got := IsVendorRole(role); got != want {
+			t.Errorf("IsVendorRole(%q) = %v; want %v", role, got, want)
+		}
+	}
+}
+
 func TestValidateProfile(t *testing.T) {
 	tests := []struct {
 		name, fullName, email, role string

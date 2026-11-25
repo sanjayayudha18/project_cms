@@ -9,8 +9,13 @@ import { z } from "zod";
 
 // ─── Entities ──────────────────────────────────────────────────────────────
 
+/** Portal a role/catalog entry belongs to (tabs: main = Portal Utama, vendor = Portal Cabang). */
+export type Portal = "main" | "vendor";
+export type PartyScope = "replenish" | "vault";
+
 export interface CatalogEntry {
   id: number;
+  portal: Portal;
   parent_id: number | null;
   key: string;
   label: string;
@@ -33,6 +38,10 @@ export interface RoleWithPermissions {
   id: number;
   role: string;
   description: string | null;
+  portal: Portal;
+  /** Non-empty for vendor roles, null for main roles. */
+  party_scope: PartyScope[] | null;
+  active_user_count: number;
   permissions: GrantedPermission[];
 }
 
@@ -48,6 +57,8 @@ export interface CreatedRole {
   id: number;
   role: string;
   description: string | null;
+  portal?: Portal;
+  party_scope?: PartyScope[] | null;
 }
 
 export interface UpdateRolePermissionsResult {
@@ -70,6 +81,16 @@ export const createRoleSchema = z.object({
 });
 
 export type CreateRoleFormValues = z.infer<typeof createRoleSchema>;
+
+/**
+ * POST /admin/roles body. `portal` defaults to "main" in api.createRole so the
+ * pre-revamp dialog keeps working until task 6.3; vendor roles must pass
+ * `party_scope` (non-empty subset of replenish/vault), main roles must not.
+ */
+export type CreateRoleRequest = CreateRoleFormValues & {
+  portal?: Portal;
+  party_scope?: PartyScope[];
+};
 
 export const permissionsSchema = z.object({
   menu_feature_ids: z.array(z.number().int().positive()),

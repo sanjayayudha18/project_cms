@@ -74,9 +74,10 @@ func TestClientAllowsIP(t *testing.T) {
 
 func TestClientCanAssign(t *testing.T) {
 	// ADMIN in the allowlist only happens if the DB CHECK is bypassed; still refused.
-	c := Client{AssignableRoles: []string{"ATM-USER", "ACM-SPV", "ADMIN"}}
+	// VENDOR-* is not blocked by the DB CHECK (039), so it can reach the allowlist; refused here.
+	c := Client{AssignableRoles: []string{"ATM-USER", "ACM-SPV", "ADMIN", "VENDOR-USER", "VENDOR-NEW"}}
 	tests := map[string]bool{
-		"ATM-USER": true, "ACM-SPV": true,
+		"ATM-USER": true, "ACM-SPV": true, "VENDOR-USER": false, "VENDOR-NEW": false,
 		"ADMIN": false, "APPACCESS": false, "ADMIN_PARAM": false, "EXT-CLIENT": false, " admin ": false,
 		"ATM-SPV": false, "atm-user": false, "": false,
 	}

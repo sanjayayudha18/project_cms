@@ -19,7 +19,47 @@ const mockApi = vi.hoisted(() => ({
 
 vi.mock("../api", () => mockApi);
 
-import { roleKeys, useCreateRole, useUpdateRolePermissions } from "../hooks/useRoleQueries";
+import {
+  roleKeys,
+  useCatalogForPortal,
+  useCreateRole,
+  useRolesForPortal,
+  useUpdateRolePermissions,
+} from "../hooks/useRoleQueries";
+
+function queryWrapper() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+}
+
+describe("portal-filtered reads", () => {
+  it("useRolesForPortal keeps only roles of that portal", async () => {
+    mockApi.getRoles.mockResolvedValue({
+      roles: [
+        { id: 1, role: "ADMIN", portal: "main" },
+        { id: 2, role: "VENDOR-USER", portal: "vendor" },
+        { id: 3, role: "EXT-CLIENT", portal: "service" },
+      ],
+    });
+    const { result } = renderHook(() => useRolesForPortal("vendor"), { wrapper: queryWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.map((r) => r.role)).toEqual(["VENDOR-USER"]);
+  });
+
+  it("useCatalogForPortal keeps only catalog entries of that portal", async () => {
+    mockApi.getCatalog.mockResolvedValue({
+      catalog: [
+        { id: 1, key: "dashboard", portal: "main" },
+        { id: 2, key: "vendor-orders", portal: "vendor" },
+      ],
+    });
+    const { result } = renderHook(() => useCatalogForPortal("main"), { wrapper: queryWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.map((e) => e.key)).toEqual(["dashboard"]);
+  });
+});
 
 function renderMutation<THookResult extends { mutate: (v: never) => unknown }>(
   hook: () => THookResult,

@@ -1,7 +1,7 @@
 -- name: ListCatalog :many
 -- Full active menu/feature catalog for the Role Management editor (Req 1.1).
 -- Includes assignable_roles (NULL = all internal roles; migration 046).
-SELECT id, parent_id, key, label, kind, sort_order, is_active, created_at, updated_at, assignable_roles
+SELECT id, parent_id, key, label, kind, sort_order, is_active, created_at, updated_at, assignable_roles, portal
 FROM menu_features
 WHERE is_active = true
 ORDER BY sort_order ASC, id ASC;
@@ -53,19 +53,24 @@ SELECT id FROM roles WHERE role = $1;
 -- name: CreateRole :one
 -- New role is inserted with no role_permissions rows — zero access by
 -- default (Req 2.2, 5.1). Caller grants access via ReplaceRolePermissions.
-INSERT INTO roles (role, description)
-VALUES ($1, $2)
-RETURNING id, role, description, created_at, updated_at;
+-- portal/party_scope are validated by the service and backed by roles_portal_prefix_chk +
+-- roles_party_scope_portal_chk (migration 047).
+INSERT INTO roles (role, description, portal, party_scope)
+VALUES ($1, $2, $3, $4)
+RETURNING id, role, description, created_at, updated_at, portal, party_scope;
 
 -- name: GetRole :one
 -- Read-after-write on the primary pool (Req 8.3).
-SELECT id, role, description, created_at, updated_at FROM roles WHERE id = $1;
+SELECT id, role, description, created_at, updated_at, portal, party_scope FROM roles WHERE id = $1;
 
 -- name: ListRolesWithPermissions :many
 -- Flat role x permission rows for the Role Management list (Req 3.5); the
 -- repository groups rows by role_id into RoleWithPermissions. A role with no
 -- grants yields one row with all MenuFeature* fields NULL (LEFT JOIN).
-SELECT r.id AS role_id, r.role, r.description,
+-- active_user_count = active, non-deleted users holding the role (role-management-revamp Req 6.3).
+SELECT r.id AS role_id, r.role, r.description, r.portal, r.party_scope,
+       (SELECT COUNT(*) FROM users u
+         WHERE u.role_id = r.id AND u.is_active = true AND u.deleted_at IS NULL)::bigint AS active_user_count,
        mf.id AS menu_feature_id, mf.parent_id AS menu_feature_parent_id,
        mf.key AS menu_feature_key, mf.label AS menu_feature_label, mf.kind AS menu_feature_kind
 FROM roles r
@@ -89,3 +94,13 @@ DELETE FROM role_permissions WHERE role_id = $1;
 INSERT INTO role_permissions (role_id, menu_feature_id, granted_by)
 VALUES ($1, $2, $3)
 ON CONFLICT (role_id, menu_feature_id) DO NOTHING;
+
+-- name: GetRolePartyScope :one
+-- Backs vendorrole.ScopeReader (replica). Unknown role -> no rows; non-vendor role -> NULL.
+SELECT party_scope FROM roles WHERE role = $1;
+
+-- name: ListVendorRolesForParty :many
+-- Vendor roles whose party_scope contains the party (replenish|vault); replaces vendorrole.ForParty.
+SELECT role FROM roles
+WHERE portal = 'vendor' AND @party::text = ANY(party_scope)
+ORDER BY role;

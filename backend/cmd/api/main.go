@@ -238,7 +238,8 @@ func buildRouter(d routerDeps) (chi.Router, error) {
 	// Create and mount auth handler
 	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbReadPool)
 	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService).
-		WithPermissions(roleMgmtRepo) // GET /auth/me/permissions (primary read)
+		WithPermissions(roleMgmtRepo). // GET /auth/me/permissions (primary read)
+		WithPartyScope(roleMgmtRepo)   // party_scope in GET /auth/me (role-management-revamp 5.3)
 	r.Mount("/api/v1/auth", authHandler.Routes())
 
 	// Screen permissions (permission-catalog-coverage): perm(keys...) passes
@@ -248,6 +249,11 @@ func buildRouter(d routerDeps) (chi.Router, error) {
 	permEval := rolemgmt.NewPermissionEvaluator(roleMgmtRepo)
 	perm := func(keys ...string) func(http.Handler) http.Handler {
 		return rolemgmt.RequirePermission(permEval, keys...)
+	}
+	// VendorPortal screen keys (role-management-revamp): VENDOR-* roles need
+	// the vendor-* key (replica read, error -> 500); other roles pass untouched.
+	vendorPerm := func(key string) func(http.Handler) http.Handler {
+		return rolemgmt.RequireVendorPermission(permEval, key)
 	}
 	authed := custommw.RequireAuth(tokenService)
 
@@ -311,7 +317,8 @@ func buildRouter(d routerDeps) (chi.Router, error) {
 	// just wrote (read-after-write across services).
 	dsrService := service.NewDsrService(db.New(dbPool), redisClient, dsrHTTPClient, dsrUploadDir, dsrRetryBaseURL, dsrProcessAuth)
 	dsrHandler := handler.NewDsrUploadHandler(dsrService)
-	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr", dsrHandler.Routes())
+	// vendor-dsr gates VENDOR-* roles only; internal roles keep the handler's own guards.
+	r.With(authed, vendorPerm("vendor-dsr")).Mount("/api/v1/dsr", dsrHandler.Routes())
 
 	// Build the master-data maker-checker engine (plan.md Fase 2) ahead of
 	// the approval handler below, since the approval handler now routes
@@ -614,13 +621,14 @@ func buildRouter(d routerDeps) (chi.Router, error) {
 	r.With(authed, perm("cit.vault-plan")).Mount("/api/v1/vault-plans", handler.NewVaultPlanHandler(vaultPlanService).Routes())
 	// Kirim ke vendor (cit-send-vendor): VendorPortal orders for VENDOR-USER
 	// (scope re-read from users in the service); list on the replica.
-	vendorOrderService := service.NewVendorOrderService(dbPool, dbReadPool).WithNotifier(notificationService)
+	vendorOrderService := service.NewVendorOrderService(dbPool, dbReadPool, roleMgmtRepo).WithNotifier(notificationService)
 	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService).WithVaultReview(vaultPlanService).
 		WithVendorSide(vendorOrderService, vendorRequestService).WithPermissions(permEval)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
-	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-orders", handler.NewVendorOrderHandler(vendorOrderService).Routes())
+	vendorOrderHandler := handler.NewVendorOrderHandler(vendorOrderService, vendorPerm)
+	r.With(authed, vendorPerm("vendor-orders")).Mount("/api/v1/vendor/replenish-orders", vendorOrderHandler.Routes())
 	// replenishment-realisasi FR4-FR6: classifications written by the Python job; reads on the replica.
-	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-realizations", handler.NewVendorOrderHandler(vendorOrderService).RealizationRoutes())
+	r.With(authed, vendorPerm("vendor-realizations")).Mount("/api/v1/vendor/replenish-realizations", vendorOrderHandler.RealizationRoutes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/replenishment",
 		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbReadPool)).WithPermissions(permEval).Routes())
 	// dsr-late-report FR4: monthly late/missing DSR per vendor branch, read on the replica; DSR_LATE_START_DATE

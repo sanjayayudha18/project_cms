@@ -10,7 +10,6 @@ import (
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
 	"github.com/cimb-niaga/cms/backend/internal/notification"
-	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Phase 2.2b (.claude/sdlc/cit-send-vendor): one party per (request, vendor
@@ -331,11 +330,15 @@ func notifyParties(ctx context.Context, n Notifier, q *db.Queries, req db.Vendor
 			return fmt.Errorf("no notification text for party event %q", nt.event)
 		}
 		id := nt.partyID
+		userRoles, err := q.ListVendorRolesForParty(ctx, nt.role)
+		if err != nil {
+			return fmt.Errorf("list vendor roles for party %q: %w", nt.role, err)
+		}
 		if err := n.Send(ctx, q, notification.Message{
 			Type: "vendor_order." + nt.event, Title: text[0], Body: fmt.Sprintf(text[1], req.RequestNumber, date),
 			Link: fmt.Sprintf("/orders/%d", id), EntityType: vendorPartyEntity, EntityID: &id, Email: true,
 		}, notification.Recipients{VendorParties: []notification.VendorPartyTarget{{
-			BranchID: nt.branchID, UserRoles: vendorrole.ForParty(nt.role), PicRole: nt.role,
+			BranchID: nt.branchID, UserRoles: userRoles, PicRole: nt.role,
 		}}}); err != nil {
 			return fmt.Errorf("notify party %d: %w", id, err)
 		}

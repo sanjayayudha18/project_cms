@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/db"
+	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 )
 
 // Repository is the repository backing Role Management (Req 8: writes +
@@ -68,6 +69,26 @@ func (r *Repository) CatalogEntriesExist(ctx context.Context, ids []int64) (bool
 // grants yields one row with all MenuFeature* fields nil (replica read, Req 3.5).
 func (r *Repository) ListRolesWithPermissions(ctx context.Context) ([]db.ListRolesWithPermissionsRow, error) {
 	return r.dbRead.ListRolesWithPermissions(ctx)
+}
+
+// PartyScope implements vendorrole.ScopeReader (replica read): the role's
+// party_scope, or nil, nil for an unknown role or a non-vendor role (NULL).
+// Callers treat an empty result as "no access" (fail closed).
+func (r *Repository) PartyScope(ctx context.Context, role string) ([]string, error) {
+	scope, err := r.dbRead.GetRolePartyScope(ctx, role)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return scope, nil
+}
+
+// ListVendorRolesForParty returns vendor roles whose party_scope contains
+// party ("replenish" | "vault"); replica read.
+func (r *Repository) ListVendorRolesForParty(ctx context.Context, party string) ([]string, error) {
+	return r.dbRead.ListVendorRolesForParty(ctx, party)
 }
 
 // FindRoleByName returns the id of the role with the given name, or nil if
@@ -148,3 +169,5 @@ func distinctInt64s(ids []int64) []int64 {
 	}
 	return out
 }
+
+var _ vendorrole.ScopeReader = (*Repository)(nil)

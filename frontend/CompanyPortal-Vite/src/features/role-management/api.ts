@@ -7,7 +7,7 @@
 import { api } from "@/lib/api/client";
 import type {
   CatalogResponse,
-  CreateRoleFormValues,
+  CreateRoleRequest,
   CreatedRole,
   RolesResponse,
   UpdateRolePermissionsResult,
@@ -29,8 +29,8 @@ export async function getCatalog(): Promise<CatalogResponse> {
 
 // ─── Writes ────────────────────────────────────────────────────────────────
 
-export async function createRole(values: CreateRoleFormValues): Promise<CreatedRole> {
-  const { data } = await api.post<CreatedRole>(BASE, values);
+export async function createRole(values: CreateRoleRequest): Promise<CreatedRole> {
+  const { data } = await api.post<CreatedRole>(BASE, { portal: "main", ...values });
   return data;
 }
 

@@ -6,7 +6,8 @@
 
 import type { AuthUser, DbRole } from "@/lib/auth";
 import { useAuthStore } from "@/lib/auth/store";
-import { GROUP_LABELS, findActiveNavItem, getVisibleNav } from "@/lib/config/navigation";
+import { GROUP_LABELS, findActiveNavItem } from "@/lib/config/navigation";
+import { getVisibleNavForRole as getVisibleNav } from "@/test/visibleNavForRole";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as fc from "fast-check";

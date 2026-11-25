@@ -141,10 +141,13 @@ func (h *RoleMgmtHandler) UpdateRolePermissions(w http.ResponseWriter, r *http.R
 // responses per design.md's "Error -> HTTP mapping" table.
 func (h *RoleMgmtHandler) handleRoleMgmtError(w http.ResponseWriter, err error) {
 	var validationErr *rolemgmt.ValidationError
+	var notAssignableErr *rolemgmt.RoleNotAssignableError
 
 	switch {
 	case errors.As(err, &validationErr):
 		writeValidationError(w, validationErr.Field, validationErr.Message)
+	case errors.As(err, &notAssignableErr):
+		writeError(w, http.StatusUnprocessableEntity, "role_not_assignable", notAssignableErr.Error())
 	case errors.Is(err, rolemgmt.ErrRoleNameConflict):
 		writeError(w, http.StatusConflict, "conflict", rolemgmt.ErrRoleNameConflict.Error())
 	case errors.Is(err, rolemgmt.ErrCatalogEntryNotFound):

@@ -1,7 +1,7 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { MASTER_DATA_IO_SEARCH_SCHEMA } from "@/features/master-data-io/searchSchema";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../../_protected";
+import { protectedRoute, requirePermission } from "../../_protected";
 
 // Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
 const MasterDataIOPage = lazyRouteComponent(
@@ -13,7 +13,7 @@ export const adminMasterDataIORoute = createRoute({
   path: "/settings/admin/master-data-io",
   getParentRoute: () => protectedRoute,
   validateSearch: MASTER_DATA_IO_SEARCH_SCHEMA,
-  beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
+  beforeLoad: requirePermission("settings.master-data-io"),
   loader: () => MasterDataIOPage.preload?.(),
   component: AdminMasterDataIORouteComponent,
 });

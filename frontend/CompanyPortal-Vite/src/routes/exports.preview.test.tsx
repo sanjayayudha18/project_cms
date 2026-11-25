@@ -1,6 +1,7 @@
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import type { DbRole } from "@/lib/auth/store";
 import { useAuthStore } from "@/lib/auth/store";
-import { getVisibleNav } from "@/lib/config/navigation";
+import { getVisibleNavForRole as getVisibleNav } from "@/test/visibleNavForRole";
 import {
   RouterProvider,
   createMemoryHistory,
@@ -10,14 +11,17 @@ import {
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../routeTree";
+import { ForbiddenError } from "./_protected";
 import { exportPreviewRoute } from "./exports";
 import { adminExportsRoute } from "./settings/admin/exports";
 
-type Guard = () => { forbidden?: boolean } | undefined;
+type Guard = () => Promise<void>;
 const options = (r: unknown) => (r as { options: Record<string, unknown> }).options;
 const previewGuard = options(exportPreviewRoute).beforeLoad as Guard;
 
-function as(role: DbRole) {
+function as(role: DbRole, keys: string[] = ["exports"]) {
+  // No-op load: signing in triggers the store's auto-load, which would overwrite these keys.
+  usePermissionStore.setState({ keys: new Set(keys), status: "ready", load: async () => {} });
   useAuthStore.setState({
     user: {
       id: 1,
@@ -40,14 +44,22 @@ describe("/exports/$dataset route", () => {
   it("is mounted at /exports/$dataset", () =>
     expect(options(exportPreviewRoute).path).toBe("/exports/$dataset"));
 
-  it.each<DbRole>(["ADMIN", "ADMIN_PARAM"])("allows %s", (role) => {
+  it.each<DbRole>(["ADMIN", "ADMIN_PARAM"])("allows %s", async (role) => {
     as(role);
-    expect(previewGuard()?.forbidden).toBeUndefined();
+    await expect(previewGuard()).resolves.toBeUndefined();
   });
 
-  it.each<DbRole>(["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ACM-USER"])("forbids %s", (role) => {
-    as(role);
-    expect(previewGuard()).toEqual({ forbidden: true });
+  it.each<DbRole>(["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ACM-USER"])(
+    "forbids %s",
+    async (role) => {
+      as(role);
+      await expect(previewGuard()).rejects.toBeInstanceOf(ForbiddenError);
+    },
+  );
+
+  it("forbids ADMIN without the exports key", async () => {
+    as("ADMIN", []);
+    await expect(previewGuard()).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("keeps only filter keys from the search", () => {

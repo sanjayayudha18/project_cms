@@ -4,6 +4,7 @@ import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/lib/hooks/useToast";
+import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useDisableUser, useEnableUser, useUsersList, useVendorOptions } from "../hooks";
@@ -13,11 +14,11 @@ import { UserFilterBar } from "./UserFilterBar";
 import { UserFormDialog } from "./UserFormDialog";
 import { UsersTable } from "./UsersTable";
 
-/** Admin Users screen (Req 2-5): filterable/paginated table + create/edit/disable/enable. */
+/** Admin Users screen (Req 2-5): filterable/paginated table + edit/disable/enable; create lives at /settings/admin/users/new. */
 export function AdminUsersPage() {
-  const { params, searchInput, setSearchInput, setParams, shouldOpenCreate } =
-    useAdminUsersUrlState();
+  const { params, searchInput, setSearchInput, setParams } = useAdminUsersUrlState();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const usersQuery = useUsersList(params);
   const optionsQuery = useVendorOptions();
@@ -27,7 +28,7 @@ export function AdminUsersPage() {
   const enableMutation = useEnableUser();
 
   const [formUser, setFormUser] = useState<AdminUser | null>(null);
-  const [isFormOpen, setFormOpen] = useState(shouldOpenCreate);
+  const [isFormOpen, setFormOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
     type: "disable" | "enable";
     user: AdminUser;
@@ -37,14 +38,8 @@ export function AdminUsersPage() {
   const total = usersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / params.page_size));
 
-  function openCreate(): void {
-    setFormUser(null);
-    setFormOpen(true);
-  }
-
   function closeForm(): void {
     setFormOpen(false);
-    if (shouldOpenCreate) setParams({}); // drop ?create so refresh/back doesn't reopen it
   }
 
   function openEdit(user: AdminUser): void {
@@ -75,7 +70,11 @@ export function AdminUsersPage() {
       <PageHeader
         eyebrow="Pengaturan"
         title="Manajemen Pengguna"
-        actions={<Button onClick={openCreate}>Tambah Pengguna</Button>}
+        actions={
+          <Button onClick={() => navigate({ to: "/settings/admin/users/new" })}>
+            Tambah Pengguna
+          </Button>
+        }
       />
 
       <UserFilterBar

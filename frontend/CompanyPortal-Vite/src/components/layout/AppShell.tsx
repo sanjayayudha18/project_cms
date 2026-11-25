@@ -2,7 +2,7 @@ import { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_RAIL, Sidebar } from "@/component
 import { Topbar } from "@/components/layout/Topbar";
 import { useNavBadges } from "@/components/layout/useNavBadges";
 import { useAuthStore } from "@/lib/auth/store";
-import { type NavItem, findActiveNavItem, getVisibleNav } from "@/lib/config/navigation";
+import { type NavItem, findActiveNavItem, useVisibleNav } from "@/lib/config/navigation";
 import { useShellPrefs } from "@/lib/shell/prefs";
 import { useShellShortcuts } from "@/lib/shell/shortcuts";
 import { useRouter, useRouterState } from "@tanstack/react-router";
@@ -13,7 +13,6 @@ import {
   lazy,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -72,7 +71,7 @@ export function AppShell({ children, notifications }: AppShellProps) {
   const prefs = useShellPrefs();
   const isNarrow = useIsNarrow();
   const router = useRouter();
-  const visible = useMemo(() => getVisibleNav(role), [role]);
+  const { visible, permissionError, retry } = useVisibleNav();
   const badges = useNavBadges(visible, role);
 
   // Move focus to main content on route change for keyboard users
@@ -132,6 +131,8 @@ export function AppShell({ children, notifications }: AppShellProps) {
       <div className="row-span-2 min-h-0" style={{ gridRow: "1 / span 2" }}>
         <Sidebar
           visible={visible}
+          permissionError={permissionError}
+          onRetryPermissions={retry}
           active={active}
           badges={badges}
           rail={rail}
@@ -168,6 +169,8 @@ export function AppShell({ children, notifications }: AppShellProps) {
           <Suspense fallback={null}>
             <CommandPalette
               items={visible.all}
+              permissionError={permissionError}
+              onRetry={retry}
               activeId={active?.id}
               onSelect={selectItem}
               onClose={closePalette}

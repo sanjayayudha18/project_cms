@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../_protected";
+import { protectedRoute, requirePermission } from "../_protected";
 
 // Page chunks load on navigation; each loader preloads its page so the guard wrapper never suspends (FE-04).
 const VaultPlanList = lazyRouteComponent(
@@ -13,7 +13,7 @@ const VaultPlanDetail = lazyRouteComponent(
 );
 
 // Penetapan vault (cit-acm-plan): same roles as the backend /api/v1/vault-plans guard.
-const VAULT_PLAN_ROLES = requireRoles(["ACM-USER", "ACM-SPV", "ADMIN"]);
+const VAULT_PLAN_ROLES = requirePermission("cit.vault-plan");
 
 export const vaultPlanListRoute = createRoute({
   path: "/cit/vault-plans",

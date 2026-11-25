@@ -83,6 +83,11 @@ func TestRepository_WriteReadTopology(t *testing.T) {
 			call:     func() { _, _ = repo.HasPermission(ctx, "ADMIN", "dashboard") },
 		},
 		{
+			name:     "HasAnyPermission (RequirePermission any-of) is a read -> replica",
+			wantPool: "replica",
+			call:     func() { _, _ = repo.HasAnyPermission(ctx, "ADMIN", []string{"dashboard", "approvals"}) },
+		},
+		{
 			name:     "FindRoleByName is a uniqueness pre-check ahead of a write -> primary (avoids replica lag masking a duplicate)",
 			wantPool: "primary",
 			call:     func() { _, _ = repo.FindRoleByName(ctx, "X") },

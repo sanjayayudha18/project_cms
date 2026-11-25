@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../_protected";
+import { protectedRoute, requirePermission } from "../_protected";
 
 const CashCountPicsPage = lazyRouteComponent(
   () => import("@/features/cash-count-pics/CashCountPicsPage"),
@@ -11,7 +11,7 @@ const CashCountPicsPage = lazyRouteComponent(
 export const cashCountPicsRoute = createRoute({
   path: "/cash-count/pics",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN", "CC-CWM"]),
+  beforeLoad: requirePermission("cash-count.pic-mapping"),
   loader: () => CashCountPicsPage.preload?.(),
   component: CashCountPicsRouteComponent,
 });

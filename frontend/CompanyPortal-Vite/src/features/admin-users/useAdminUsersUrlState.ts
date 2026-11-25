@@ -17,8 +17,6 @@ export const ADMIN_USERS_SEARCH_SCHEMA = z.object({
   vendor_id: z.number().int().optional(),
   role: z.string().optional(),
   q: z.string().max(100).optional(),
-  /** Opens the Tambah Pengguna dialog on arrival (link from the Settings hub). */
-  create: z.boolean().optional(),
 });
 
 export type AdminUsersSearchParams = z.infer<typeof ADMIN_USERS_SEARCH_SCHEMA>;
@@ -98,8 +96,5 @@ export function useAdminUsersUrlState() {
     navigate({ to: ".", search: next });
   }
 
-  // omitDefaults never carries `create`, so any setParams call drops it from the URL.
-  const shouldOpenCreate = rawSearch.create === true;
-
-  return { params, searchInput, setSearchInput, setParams, shouldOpenCreate };
+  return { params, searchInput, setSearchInput, setParams };
 }

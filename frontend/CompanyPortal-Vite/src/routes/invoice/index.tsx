@@ -1,11 +1,12 @@
 import { ModuleCard, type ModuleCardProps } from "@/components/ui/ModuleCard";
 import { createRoute } from "@tanstack/react-router";
 import { Calculator, FileOutput, GitCompare, Receipt } from "lucide-react";
-import { protectedRoute } from "../_protected";
+import { protectedRoute, requirePermission } from "../_protected";
 
 export const invoiceRoute = createRoute({
   path: "/invoice",
   getParentRoute: () => protectedRoute,
+  beforeLoad: requirePermission("invoice"),
   component: InvoicePage,
 });
 

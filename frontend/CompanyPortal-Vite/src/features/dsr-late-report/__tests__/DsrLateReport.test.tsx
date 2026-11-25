@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "@/lib/auth/store";
-import { NAV_CONFIG, filterNavByRoles } from "@/lib/config/navigation";
+import { NAV_CONFIG, filterNavByPermissions } from "@/lib/config/navigation";
 import { DsrLateReportScreen } from "../DsrLateReportScreen";
 import type { DsrLateDailyRow, DsrLateStatus, DsrLateSummaryRow, DsrLateWarnings } from "../api";
 
@@ -307,15 +307,18 @@ describe("DsrLateReportScreen", () => {
 });
 
 describe("menu Laporan DSR Telat", () => {
-  const visible = (role: Parameters<typeof filterNavByRoles>[1]) =>
-    filterNavByRoles(NAV_CONFIG, role).some((i) => i.id === "dsr-late-report");
+  const visible = (granted: string[]) =>
+    filterNavByPermissions(NAV_CONFIG, (k) => granted.includes(k)).some(
+      (i) => i.id === "dsr-late-report",
+    );
 
-  it.each(["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"] as const)("visible for %s", (r) => {
-    expect(visible(r)).toBe(true);
+  it("visible with monitoring.dsr-late-report", () => {
+    expect(visible(["monitoring.dsr-late-report"])).toBe(true);
   });
 
-  it.each(["VENDOR-USER", "ACM-USER", "BRANCH-ATM-USER"] as const)("hidden for %s", (r) => {
-    expect(visible(r)).toBe(false);
+  it("hidden without it (no role bypass)", () => {
+    expect(visible([])).toBe(false);
+    expect(visible(["monitoring.audit-logs"])).toBe(false);
   });
 
   it("sits in the monitoring group at /dsr-late-report", () => {

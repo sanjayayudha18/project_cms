@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/backend/internal/vendorrole"
 	"github.com/cimb-niaga/cms/pkg/middleware"
@@ -27,7 +28,15 @@ type ReplenishmentReader interface {
 }
 
 type ReplenishmentHandler struct {
-	svc ReplenishmentReader
+	svc  ReplenishmentReader
+	perm *rolemgmt.PermissionEvaluator // nil = role guard only
+}
+
+// WithPermissions replaces the viewer role guard of Routes with replenish.schedule
+// (the service still re-checks the role). VendorRoutes/RealizationRoutes are unchanged.
+func (h *ReplenishmentHandler) WithPermissions(e *rolemgmt.PermissionEvaluator) *ReplenishmentHandler {
+	h.perm = e
+	return h
 }
 
 func NewReplenishmentHandler(svc ReplenishmentReader) *ReplenishmentHandler {
@@ -36,7 +45,7 @@ func NewReplenishmentHandler(svc ReplenishmentReader) *ReplenishmentHandler {
 
 func (h *ReplenishmentHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles(reports.ReplenishmentViewerRoles...))
+	r.Use(viewGuard(h.perm, []string{"replenish.schedule"}, reports.ReplenishmentViewerRoles)...)
 	r.Get("/classifications", h.List)
 	r.Get("/summary", h.Summary)
 	r.Get("/reports/amount-mismatch", h.AmountMismatch)

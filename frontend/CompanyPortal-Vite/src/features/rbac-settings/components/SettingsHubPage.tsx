@@ -1,24 +1,25 @@
 /**
  * Settings hub landing page (/settings): links to the RBAC and admin sub-pages.
- * Tabs filter by category (access, master data, export & import), a search box filters by
- * title/description, "Hierarki Pengguna" is featured with an org-chart
- * illustration since it is the foundational entity every approval flow
- * depends on, and the rest render as list-row panels grouped by section
- * (design.md ban on repeated identical card grids).
+ * A vertical category rail (access, master data, export & import) picks the
+ * category shown; inside it, modules are grouped under small headings and
+ * rendered as uniform tiles. The search box filters by title/description and
+ * the rail counts follow the search so users can see where matches live.
+ * Cards the user lacks the permission key for are hidden here, and a category with no
+ * visible cards drops out of the rail. Design: Settings Hub Revamp artifact.
  */
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { useAuthStore } from "@/lib/auth/store";
-import { cn } from "@/lib/utils/cn";
+import type { ScreenKey } from "@/lib/auth/permissionKeys";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowDownUp,
-  ArrowRight,
-  ArrowUpRight,
   Building2,
   CalendarDays,
   CalendarOff,
+  ChevronRight,
+  Database,
   Download,
   FileSpreadsheet,
   FileText,
@@ -26,13 +27,12 @@ import {
   HelpCircle,
   KeyRound,
   Landmark,
-  Lock,
   Map as MapIcon,
   MapPinned,
   Scale,
   Search,
   Shield,
-  ShieldCheck,
+  Tags,
   UserCog,
   UserPlus,
   Users,
@@ -48,497 +48,415 @@ interface HubCard {
   description: string;
   href: string;
   icon: LucideIcon;
-  category: SettingsCategory;
+  /** Catalog key that makes this card visible. */
+  permission: ScreenKey;
+  /** Search params for the target route (e.g. open a dialog on arrival). */
+  search?: Record<string, unknown>;
 }
 
-const FEATURED_CARD: HubCard = {
-  id: "rbac-users",
-  title: "Hierarki Pengguna",
-  description:
-    "Susun hubungan atasan, peran, dan level persetujuan. Fondasi alur otorisasi yang terarah.",
-  href: "/settings/rbac/users",
-  icon: Users,
-  category: "access",
-};
+interface HubGroup {
+  id: string;
+  label: string;
+  cards: HubCard[];
+}
 
-const RBAC_CARDS: HubCard[] = [
-  {
-    id: "rbac-delegations",
-    title: "Delegasi Persetujuan",
-    description: "Alihkan wewenang saat approver tidak tersedia.",
-    href: "/settings/rbac/delegations",
-    icon: GitBranch,
-    category: "access",
-  },
-  {
-    id: "rbac-leaves",
-    title: "Cuti Pengguna",
-    description: "Atur periode cuti dan alur persetujuan cadangan.",
-    href: "/settings/rbac/leaves",
-    icon: CalendarOff,
-    category: "access",
-  },
-  {
-    id: "rbac-policies",
-    title: "Kebijakan Persetujuan",
-    description: "Tentukan batas nominal dan level per jenis dokumen.",
-    href: "/settings/rbac/policies",
-    icon: Scale,
-    category: "access",
-  },
-  {
-    id: "role-management",
-    title: "Manajemen Peran",
-    description: "Buat peran baru dan atur menu/fitur yang dapat diakses tiap peran.",
-    href: "/settings/roles",
-    icon: KeyRound,
-    category: "access",
-  },
-];
+interface HubCategory {
+  id: SettingsCategory;
+  label: string;
+  icon: LucideIcon;
+  groups: HubGroup[];
+}
 
-const MASTER_DATA_CARDS: HubCard[] = [
+const CATEGORIES: HubCategory[] = [
   {
-    id: "admin-users",
-    title: "Manajemen Pengguna",
-    description: "Kelola akun, peran, dan status aktif pengguna.",
-    href: "/settings/admin/users",
-    icon: UserCog,
-    category: "master",
+    id: "access",
+    label: "Akses & persetujuan",
+    icon: Shield,
+    groups: [
+      {
+        id: "people",
+        label: "Pengguna & peran",
+        cards: [
+          {
+            id: "rbac-users",
+            permission: "settings.rbac-users",
+            title: "Hierarki Pengguna",
+            description: "Susun hubungan atasan, peran, dan level persetujuan.",
+            href: "/settings/rbac/users",
+            icon: Users,
+          },
+          {
+            id: "admin-users",
+            permission: "settings.users",
+            title: "Manajemen Pengguna",
+            description: "Kelola akun, peran, sumber login, dan status aktif.",
+            href: "/settings/admin/users",
+            icon: UserCog,
+          },
+          {
+            id: "add-user",
+            permission: "settings.users",
+            title: "Tambah Pengguna",
+            description: "Buat akun pengguna baru beserta peran dan sumber login.",
+            href: "/settings/admin/users/new",
+            icon: UserPlus,
+          },
+          {
+            id: "role-management",
+            permission: "settings.roles",
+            title: "Manajemen Peran",
+            description: "Buat peran baru dan atur menu/fitur yang dapat diakses tiap peran.",
+            href: "/settings/roles",
+            icon: KeyRound,
+          },
+        ],
+      },
+      {
+        id: "approval-flow",
+        label: "Alur persetujuan",
+        cards: [
+          {
+            id: "rbac-policies",
+            permission: "settings.rbac-policies",
+            title: "Kebijakan Persetujuan",
+            description: "Tentukan batas nominal dan level per jenis dokumen.",
+            href: "/settings/rbac/policies",
+            icon: Scale,
+          },
+          {
+            id: "rbac-delegations",
+            permission: "settings.rbac-delegations",
+            title: "Delegasi Persetujuan",
+            description: "Alihkan wewenang saat approver tidak tersedia.",
+            href: "/settings/rbac/delegations",
+            icon: GitBranch,
+          },
+          {
+            id: "rbac-leaves",
+            permission: "settings.rbac-leaves",
+            title: "Cuti Pengguna",
+            description: "Atur periode cuti dan alur persetujuan cadangan.",
+            href: "/settings/rbac/leaves",
+            icon: CalendarOff,
+          },
+        ],
+      },
+    ],
   },
   {
-    id: "admin-vendors",
-    title: "Manajemen Vendor",
-    description: "Kelola data mitra penyedia layanan CIT.",
-    href: "/settings/admin/vendors",
-    icon: Building2,
-    category: "master",
+    id: "master",
+    label: "Data master",
+    icon: Database,
+    groups: [
+      {
+        id: "vendor",
+        label: "Vendor & kontrak",
+        cards: [
+          {
+            id: "admin-vendors",
+            permission: "settings.vendors",
+            title: "Manajemen Vendor",
+            description: "Data mitra penyedia layanan CIT, cabang, vault, dan PIC.",
+            href: "/settings/admin/vendors",
+            icon: Building2,
+          },
+          {
+            id: "admin-pks",
+            permission: "settings.pks",
+            title: "Daftar PKS",
+            description: "Pantau masa berlaku PKS semua vendor dan atur reminder perpanjangan.",
+            href: "/settings/admin/pks",
+            icon: FileText,
+          },
+          {
+            id: "admin-pks-types",
+            permission: "settings.pks-types",
+            title: "Type PKS",
+            description: "Master type perjanjian kerja sama vendor (CIT, FLM, …).",
+            href: "/settings/admin/pks-types",
+            icon: Tags,
+          },
+        ],
+      },
+      {
+        id: "atm",
+        label: "Jaringan ATM & wilayah",
+        cards: [
+          {
+            id: "admin-atms",
+            permission: "settings.atms",
+            title: "Manajemen ATM",
+            description: "Data master ATM, kelolaan vendor, dan status aktif.",
+            href: "/settings/admin/atms",
+            icon: Landmark,
+          },
+          {
+            id: "admin-regions",
+            permission: "settings.regions",
+            title: "Manajemen Region",
+            description: "Daftar region baku untuk ATM dan cabang vendor.",
+            href: "/settings/admin/regions",
+            icon: MapIcon,
+          },
+          {
+            id: "admin-acm-areas",
+            permission: "settings.acm-areas",
+            title: "Area ACM",
+            description: "Petakan region ke Area ACM dan atur anggota tim per area.",
+            href: "/settings/admin/acm-areas",
+            icon: MapPinned,
+          },
+        ],
+      },
+      {
+        id: "calendar",
+        label: "Kalender operasional",
+        cards: [
+          {
+            id: "admin-holidays",
+            permission: "forecasting.holidays",
+            title: "Hari Libur",
+            description: "Kalender libur untuk hitung hari kerja realisasi pengisian ATM.",
+            href: "/settings/admin/holidays",
+            icon: CalendarDays,
+          },
+        ],
+      },
+    ],
   },
   {
-    id: "admin-pks",
-    title: "Daftar PKS",
-    description: "Pantau masa berlaku PKS semua vendor dan atur reminder perpanjangan.",
-    href: "/settings/admin/pks",
-    icon: FileText,
-    category: "master",
+    id: "io",
+    label: "Export & Import",
+    icon: ArrowDownUp,
+    groups: [
+      {
+        id: "bulk",
+        label: "Data massal",
+        cards: [
+          {
+            id: "admin-master-data-io",
+            permission: "settings.master-data-io",
+            title: "Impor CSV Data Master",
+            description:
+              "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
+            href: "/settings/admin/master-data-io",
+            icon: FileSpreadsheet,
+          },
+          {
+            id: "admin-exports",
+            permission: "exports",
+            title: "Export Data",
+            description:
+              "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
+            href: "/exports",
+            icon: Download,
+          },
+        ],
+      },
+    ],
   },
-  {
-    id: "admin-atms",
-    title: "Manajemen ATM",
-    description: "Pelihara data master dan status aktif ATM.",
-    href: "/settings/admin/atms",
-    icon: Landmark,
-    category: "master",
-  },
-  {
-    id: "admin-regions",
-    title: "Manajemen Region",
-    description: "Kelola region dan status aktifnya.",
-    href: "/settings/admin/regions",
-    icon: MapIcon,
-    category: "master",
-  },
-  {
-    id: "admin-pks-types",
-    title: "Type PKS",
-    description: "Kelola master type perjanjian kerja sama vendor.",
-    href: "/settings/admin/pks-types",
-    icon: FileText,
-    category: "master",
-  },
-  {
-    id: "admin-holidays",
-    title: "Hari Libur",
-    description: "Kalender libur untuk hitung hari kerja realisasi pengisian ATM.",
-    href: "/settings/admin/holidays",
-    icon: CalendarDays,
-    category: "master",
-  },
-  {
-    id: "admin-acm-areas",
-    title: "Area ACM",
-    description: "Kelompokkan cabang vendor dan anggota tim ACM per area.",
-    href: "/settings/admin/acm-areas",
-    icon: MapPinned,
-    category: "master",
-  },
-];
-
-/** Shown on its own "Export & Import" tab. */
-const IMPORT_EXPORT_CARDS: HubCard[] = [
-  {
-    id: "admin-master-data-io",
-    title: "Impor CSV Data Master",
-    description: "Impor perubahan massal data master vendor dan ATM, lalu pantau persetujuannya.",
-    href: "/settings/admin/master-data-io",
-    icon: FileSpreadsheet,
-    category: "io",
-  },
-  {
-    id: "admin-exports",
-    title: "Export Data",
-    description: "Ekspor data master dan laporan: lihat pratinjau tabel, lalu unduh sebagai CSV.",
-    href: "/exports",
-    icon: Download,
-    category: "io",
-  },
-];
-
-const TABS: { id: SettingsCategory; label: string }[] = [
-  { id: "access", label: "Akses & persetujuan" },
-  { id: "master", label: "Data master" },
-  { id: "io", label: "Export & Import" },
 ];
 
 function matchesQuery(card: HubCard, query: string): boolean {
   if (!query) return true;
-  const haystack = `${card.title} ${card.description}`.toLowerCase();
-  return haystack.includes(query);
+  return `${card.title} ${card.description}`.toLowerCase().includes(query);
 }
 
-function FeaturedCard({ card }: { card: HubCard }) {
-  return (
-    <div
-      className="flex flex-col gap-5 rounded-[var(--radius-lg)] border-l-4 p-[var(--space-6)]"
-      style={{
-        backgroundColor: "var(--n-0)",
-        borderColor: "var(--n-200)",
-        borderLeftColor: "var(--red-500)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
-          style={{ backgroundColor: "var(--red-50)" }}
-        >
-          <card.icon size={26} style={{ color: "var(--red-500)" }} aria-hidden="true" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span
-            className="text-[0.7rem] font-[800] uppercase tracking-[0.09em]"
-            style={{ color: "var(--red-500)" }}
-          >
-            Struktur Organisasi
-          </span>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--n-900)" }}>
-            {card.title}
-          </h2>
-          <p className="text-sm" style={{ color: "var(--n-600)" }}>
-            {card.description}
-          </p>
-        </div>
-      </div>
-
-      <Link
-        to={card.href}
-        className="flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-[var(--space-5)] py-3 text-sm font-semibold text-white transition-colors duration-200 hover:brightness-95"
-        style={{ backgroundColor: "var(--red-600)" }}
-      >
-        Kelola hierarki
-        <ArrowRight size={16} aria-hidden="true" />
-      </Link>
-
-      <div className="flex flex-col items-center pt-1">
-        <div
-          className="flex items-center gap-2 rounded-[var(--radius-md)] border px-4 py-2"
-          style={{ backgroundColor: "var(--n-50)", borderColor: "var(--n-200)" }}
-        >
-          <ShieldCheck size={16} style={{ color: "var(--red-500)" }} aria-hidden="true" />
-          <span className="text-sm font-medium" style={{ color: "var(--n-800)" }}>
-            Supervisor
-          </span>
-          <span className="text-xs" style={{ color: "var(--n-500)" }}>
-            Level persetujuan
-          </span>
-        </div>
-
-        <div className="h-4 w-px" style={{ backgroundColor: "var(--n-300)" }} />
-        <div className="flex w-full max-w-[260px]">
-          <div
-            className="h-4 flex-1 rounded-tr-md border-t border-r"
-            style={{ borderColor: "var(--n-300)" }}
-          />
-          <div
-            className="h-4 flex-1 rounded-tl-md border-t border-l"
-            style={{ borderColor: "var(--n-300)" }}
-          />
-        </div>
-        <div className="flex w-full max-w-[260px] justify-between gap-4">
-          {["Pengguna A", "Pengguna B"].map((name) => (
-            <div
-              key={name}
-              className="flex flex-1 items-center gap-2 rounded-[var(--radius-md)] border px-3 py-2"
-              style={{ borderColor: "var(--n-200)" }}
-            >
-              <Users size={14} style={{ color: "var(--n-500)" }} aria-hidden="true" />
-              <span className="text-xs font-medium" style={{ color: "var(--n-700)" }}>
-                {name}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+/**
+ * Categories with their groups filtered to the cards the user's permission set
+ * covers and the query matches. Hiding a card is UX only; every target route
+ * enforces its own requirePermission guard and the API its own checks.
+ */
+function filterCategories(has: (key: string) => boolean, query: string) {
+  return CATEGORIES.map((category) => {
+    const allowed = category.groups.map((group) => ({
+      ...group,
+      cards: group.cards.filter((card) => has(card.permission)),
+    }));
+    const groups = allowed
+      .map((group) => ({ ...group, cards: group.cards.filter((c) => matchesQuery(c, query)) }))
+      .filter((group) => group.cards.length > 0);
+    return {
+      ...category,
+      hasAccess: allowed.some((group) => group.cards.length > 0),
+      groups,
+      count: groups.reduce((sum, group) => sum + group.cards.length, 0),
+    };
+  }).filter((category) => category.hasAccess);
 }
 
-function SectionRow({ card }: { card: HubCard }) {
+function HubTile({ card }: { card: HubCard }) {
   return (
     <Link
       to={card.href}
-      className="group flex items-center gap-4 p-[var(--space-4)] transition-colors duration-200 hover:bg-[var(--n-50)]"
+      search={card.search}
+      className="group flex min-h-[44px] items-start gap-3.5 rounded-[var(--radius-lg)] border p-[var(--space-4)] shadow-[var(--shadow-sm)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-[var(--n-300)] hover:shadow-[var(--shadow-md)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--red-400)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+      style={{ backgroundColor: "var(--n-0)", borderColor: "var(--n-200)" }}
     >
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] transition-colors duration-200 group-hover:bg-[var(--red-50)]"
-        style={{ backgroundColor: "var(--n-100)" }}
-      >
-        <card.icon
-          size={18}
-          className="transition-colors duration-200 group-hover:text-[var(--red-500)]"
-          style={{ color: "var(--n-700)" }}
-          aria-hidden="true"
-        />
-      </div>
-      <div className="flex flex-1 flex-col gap-0.5">
-        <h3
-          className="text-sm font-semibold transition-colors duration-200 group-hover:text-[var(--red-600)]"
-          style={{ color: "var(--n-900)" }}
-        >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--n-100)] text-[var(--n-700)] transition-colors duration-150 group-hover:bg-[var(--red-50)] group-hover:text-[var(--red-500)]">
+        <card.icon size={18} aria-hidden="true" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="text-sm font-semibold text-[var(--n-900)] transition-colors duration-150 group-hover:text-[var(--red-600)]">
           {card.title}
-        </h3>
-        <p className="text-xs" style={{ color: "var(--n-600)" }}>
-          {card.description}
-        </p>
-      </div>
-      <ArrowUpRight
+        </span>
+        <span className="text-[13px] leading-[1.45] text-[var(--n-600)]">{card.description}</span>
+      </span>
+      <ChevronRight
         size={16}
-        className="shrink-0 transition-colors duration-200 group-hover:text-[var(--red-500)]"
-        style={{ color: "var(--n-400)" }}
+        className="mt-0.5 shrink-0 text-[var(--n-400)] transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-[var(--red-500)]"
         aria-hidden="true"
       />
     </Link>
   );
 }
 
-function SectionPanel({
-  icon: Icon,
-  title,
-  description,
-  cards,
+function CategoryPanel({
+  category,
 }: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  cards: HubCard[];
+  category: { label: string; count: number; groups: HubGroup[] };
 }) {
   const headingId = useId();
-  if (cards.length === 0) return null;
-
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-[var(--space-3)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-2">
-          <Icon size={18} className="mt-0.5" style={{ color: "var(--n-700)" }} aria-hidden="true" />
-          <div className="flex flex-col gap-0.5">
-            <h2 id={headingId} className="text-sm font-semibold" style={{ color: "var(--n-900)" }}>
-              {title}
-            </h2>
-            <p className="text-xs" style={{ color: "var(--n-600)" }}>
-              {description}
-            </p>
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id={headingId} className="text-lg font-bold text-[var(--n-900)]">
+          {category.label}
+        </h2>
+        <span className="text-[13px] tabular-nums text-[var(--n-600)]">{category.count} modul</span>
+      </div>
+      {category.groups.map((group) => (
+        <div key={group.id} className="flex flex-col gap-2.5">
+          <h3 className="text-xs font-bold uppercase tracking-[0.06em] text-[var(--n-600)]">
+            {group.label}
+          </h3>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+            {group.cards.map((card) => (
+              <HubTile key={card.id} card={card} />
+            ))}
           </div>
         </div>
-        <span className="shrink-0 text-xs" style={{ color: "var(--n-500)" }}>
-          {cards.length} modul
-        </span>
-      </div>
-
-      <div
-        className="flex flex-col divide-y rounded-[var(--radius-lg)] border"
-        style={{
-          backgroundColor: "var(--n-0)",
-          borderColor: "var(--n-200)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        {cards.map((card) => (
-          <SectionRow key={card.id} card={card} />
-        ))}
-      </div>
+      ))}
     </section>
   );
 }
 
-/**
- * Role Management's card is hidden for anyone but APPACCESS/ADMIN (Req 4.5,
- * 7.1), matching the backend's RequireRoles("APPACCESS", "ADMIN") guard on
- * /api/v1/admin/roles. Scoped to just this one card rather than adding a
- * roles field to HubCard: every other card here relies solely on its own
- * route's beforeLoad guard today (a broader gap, not introduced by this
- * change) — see roles.tsx's doc comment on the shared requireRoles()
- * ADMIN_PARAM bypass this still inherits once the user clicks through.
- */
-function canSeeRoleManagementCard(role: string | undefined): boolean {
-  return role === "APPACCESS" || role === "ADMIN";
-}
-
-/**
- * Manajemen Pengguna: backend /api/v1/admin/users hanya APPACCESS + ADMIN
- * (ADMIN_PARAM dicabut, vendor-party-scope D8); kartu disembunyikan untuk ADMIN_PARAM.
- */
-function canSeeAdminUsersCard(role: string | undefined): boolean {
-  return role !== "ADMIN_PARAM";
-}
-
-/** ATM-SPV is read-only on PKS: only Daftar PKS and Manajemen Vendor (Req 9.3). */
-const ATM_SPV_CARD_IDS = ["admin-pks", "admin-vendors"];
-
 export function SettingsHubPage() {
-  const userRole = useAuthStore((s) => s.user?.role);
-  const isAtmSpv = userRole === "ATM-SPV";
-  const [activeTab, setActiveTab] = useState<SettingsCategory>(isAtmSpv ? "master" : "access");
+  const keys = usePermissionStore((s) => s.keys);
+  const status = usePermissionStore((s) => s.status);
+  const [selected, setSelected] = useState<SettingsCategory>("access");
   const [query, setQuery] = useState("");
-  const tabs = isAtmSpv ? TABS.filter((t) => t.id === "master") : TABS;
 
-  const normalizedQuery = query.trim().toLowerCase();
-  const showAccess = activeTab === "access";
-  const showMaster = activeTab === "master";
-  const showIO = activeTab === "io";
-
-  const showFeatured = showAccess && matchesQuery(FEATURED_CARD, normalizedQuery);
-  const rbacCards = showAccess
-    ? RBAC_CARDS.filter(
-        (c) =>
-          matchesQuery(c, normalizedQuery) &&
-          (c.id !== "role-management" || canSeeRoleManagementCard(userRole)),
-      )
-    : [];
-  const masterCards = showMaster
-    ? MASTER_DATA_CARDS.filter(
-        (c) =>
-          matchesQuery(c, normalizedQuery) &&
-          (c.id !== "admin-acm-areas" || userRole === "ADMIN") &&
-          (c.id !== "admin-users" || canSeeAdminUsersCard(userRole)) &&
-          (!isAtmSpv || ATM_SPV_CARD_IDS.includes(c.id)),
-      )
-    : [];
-  const importExportCards = showIO
-    ? IMPORT_EXPORT_CARDS.filter((c) => matchesQuery(c, normalizedQuery))
-    : [];
-
-  const hasResults =
-    showFeatured || rbacCards.length > 0 || masterCards.length > 0 || importExportCards.length > 0;
+  // No hub card is Always_On, so nothing shows until the permission set is ready.
+  const has = (key: string) => status === "ready" && keys.has(key);
+  const trimmedQuery = query.trim();
+  const categories = filterCategories(has, trimmedQuery.toLowerCase());
+  // Fall back to the first category this role can see (ATM-SPV: Data master).
+  const active = categories.find((c) => c.id === selected) ?? categories[0];
+  const resultText = trimmedQuery
+    ? `${active?.count ?? 0} hasil untuk “${trimmedQuery}”`
+    : `${active?.count ?? 0} modul tersedia`;
 
   return (
-    <div className="flex max-w-[960px] flex-col gap-6">
+    <div className="flex max-w-[1200px] flex-col gap-6">
       <PageHeader
         eyebrow="Administrasi"
         title="Pengaturan"
-        description="Kelola akses, alur persetujuan, dan data master CMS."
+        description="Kelola akses, alur persetujuan, dan data master CROWN dari satu tempat."
         actions={
-          <div className="flex items-center gap-3">
-            {canSeeRoleManagementCard(userRole) && (
-              // Same roles as backend /api/v1/admin/users (APPACCESS + ADMIN).
-              <Link
-                to="/settings/admin/users"
-                search={{ create: true }}
-                className="flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] px-[var(--space-5)] text-sm font-semibold text-white transition-colors duration-200 hover:brightness-95"
-                style={{ backgroundColor: "var(--red-600)" }}
-              >
-                <UserPlus size={16} aria-hidden="true" />
-                Tambah Pengguna
-              </Link>
-            )}
-            <button
-              type="button"
-              title="Bantuan"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 hover:bg-[var(--n-50)]"
-              style={{ borderColor: "var(--n-200)", color: "var(--n-600)" }}
-            >
-              <HelpCircle size={20} aria-hidden="true" />
-              <span className="sr-only">Bantuan</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            title="Bantuan"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 hover:bg-[var(--n-50)]"
+            style={{
+              borderColor: "var(--n-200)",
+              color: "var(--n-600)",
+              backgroundColor: "var(--n-0)",
+            }}
+          >
+            <HelpCircle size={20} aria-hidden="true" />
+            <span className="sr-only">Bantuan</span>
+          </button>
         }
       />
 
-      <div
-        className="flex w-fit gap-1 rounded-full p-1"
-        style={{ backgroundColor: "var(--n-100)" }}
-        role="tablist"
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200",
-              activeTab === tab.id ? "shadow-[var(--shadow-sm)]" : "hover:text-[var(--n-800)]",
-            )}
-            style={{
-              backgroundColor: activeTab === tab.id ? "var(--n-0)" : "transparent",
-              color: activeTab === tab.id ? "var(--n-900)" : "var(--n-600)",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="relative">
-        <Search
-          size={16}
-          className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2"
-          style={{ color: "var(--n-400)" }}
-          aria-hidden="true"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cari pengaturan..."
-          className="min-h-[44px] w-full rounded-[var(--radius-md)] border py-2.5 pr-4 pl-11 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-100)] focus-visible:border-[var(--red-400)]"
-          style={{
-            borderColor: "var(--n-200)",
-            backgroundColor: "var(--n-0)",
-            color: "var(--n-800)",
-          }}
-        />
-      </div>
-
-      {!hasResults && <EmptyState icon={Search} message="Tidak ada pengaturan yang cocok." />}
-
-      {showFeatured && <FeaturedCard card={FEATURED_CARD} />}
-
-      <SectionPanel
-        icon={Shield}
-        title="Akses & persetujuan"
-        description="Jaga otorisasi tetap berjalan."
-        cards={rbacCards}
-      />
-
-      <SectionPanel
-        icon={Building2}
-        title="Data master & admin"
-        description="Satu tempat untuk data operasional."
-        cards={masterCards}
-      />
-
-      <SectionPanel
-        icon={ArrowDownUp}
-        title="Export & Import"
-        description="Unggah perubahan massal atau unduh data sebagai CSV."
-        cards={importExportCards}
-      />
-
-      <div className="flex items-center justify-center gap-2 pt-2 pb-4">
-        <Lock size={14} style={{ color: "var(--n-400)" }} aria-hidden="true" />
-        <p className="text-xs" style={{ color: "var(--n-500)" }}>
-          Pengaturan tersedia sesuai peran dan hak akses.
+      <div className="flex flex-wrap items-center gap-3">
+        <label
+          className="flex min-h-12 flex-[1_1_320px] items-center gap-2.5 rounded-[var(--radius-lg)] border bg-[var(--n-0)] px-3.5 shadow-[var(--shadow-sm)] focus-within:border-[var(--red-400)] focus-within:ring-2 focus-within:ring-[var(--red-100)]"
+          style={{ borderColor: "var(--n-200)" }}
+        >
+          <Search size={18} className="shrink-0 text-[var(--n-500)]" aria-hidden="true" />
+          <span className="sr-only">Cari pengaturan</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari modul, mis. PKS, ATM, delegasi…"
+            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--n-900)] focus-visible:outline-none"
+          />
+        </label>
+        <p aria-live="polite" className="text-[13px] tabular-nums text-[var(--n-600)]">
+          {resultText}
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-start gap-8">
+        <div
+          role="tablist"
+          aria-label="Kategori pengaturan"
+          aria-orientation="vertical"
+          className="flex flex-[1_1_220px] flex-col gap-1"
+        >
+          {categories.map((category) => {
+            const isActive = category.id === active?.id;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setSelected(category.id)}
+                className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2 text-left text-sm font-semibold transition-colors duration-150 hover:bg-[var(--n-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--red-400)]"
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: "var(--n-0)",
+                        borderColor: "var(--n-200)",
+                        color: "var(--n-900)",
+                        boxShadow: "var(--shadow-sm)",
+                      }
+                    : { borderColor: "transparent", color: "var(--n-600)" }
+                }
+              >
+                <category.icon
+                  size={18}
+                  className="shrink-0"
+                  style={{ color: isActive ? "var(--red-500)" : "var(--n-500)" }}
+                  aria-hidden="true"
+                />
+                <span className="flex-1">{category.label}</span>
+                <span
+                  aria-hidden="true"
+                  className="min-w-6 rounded-full px-2 py-px text-center text-xs font-semibold tabular-nums"
+                  style={{
+                    backgroundColor: isActive ? "var(--red-50)" : "var(--n-100)",
+                    color: isActive ? "var(--red-700)" : "var(--n-600)",
+                  }}
+                >
+                  {category.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div role="tabpanel" className="flex min-w-0 flex-[999_1_560px] flex-col gap-8">
+          {active && active.count > 0 ? (
+            <CategoryPanel category={active} />
+          ) : (
+            <EmptyState icon={Search} message="Tidak ada pengaturan yang cocok." />
+          )}
+        </div>
       </div>
     </div>
   );

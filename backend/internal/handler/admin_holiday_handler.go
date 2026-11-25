@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
 // Hari libur admin (replenishment-realisasi FR1): ADMIN only at the route and in the service.
@@ -30,7 +30,15 @@ type HolidayAdminer interface {
 }
 
 type AdminHolidayHandler struct {
-	svc HolidayAdminer
+	svc  HolidayAdminer
+	perm *rolemgmt.PermissionEvaluator // nil = ADMIN guard only
+}
+
+// WithPermissions puts forecasting.holidays in front of the ADMIN guard, which
+// stays (documented GR#3 deviation).
+func (h *AdminHolidayHandler) WithPermissions(e *rolemgmt.PermissionEvaluator) *AdminHolidayHandler {
+	h.perm = e
+	return h
 }
 
 func NewAdminHolidayHandler(svc HolidayAdminer) *AdminHolidayHandler {
@@ -39,7 +47,7 @@ func NewAdminHolidayHandler(svc HolidayAdminer) *AdminHolidayHandler {
 
 func (h *AdminHolidayHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles("ADMIN"))
+	r.Use(actionGuard(h.perm, []string{"forecasting.holidays"}, []string{"ADMIN"})...)
 	r.Get("/", h.List)
 	r.Post("/", h.Create)
 	r.Post("/import", h.Import)

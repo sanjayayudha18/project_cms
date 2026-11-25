@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../../_protected";
+import { protectedRoute, requirePermission } from "../../_protected";
 
 // Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
 const RbacPoliciesPage = lazyRouteComponent(
@@ -11,7 +11,7 @@ const RbacPoliciesPage = lazyRouteComponent(
 export const rbacPoliciesRoute = createRoute({
   path: "/settings/rbac/policies",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM", "APPACCESS"]),
+  beforeLoad: requirePermission("settings.rbac-policies"),
   loader: () => RbacPoliciesPage.preload?.(),
   component: RbacPoliciesRouteComponent,
 });

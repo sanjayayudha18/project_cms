@@ -84,7 +84,7 @@ describe("UserFormDialog — Password Sementara visibility (Task 8)", () => {
 
 // ─── fe-coverage C2: submit paths ────────────────────────────────────────────
 
-/** Field labels are <span>s (not <label>), so find the control next to the label text. */
+/** Find the control inside the Field <label> by its label text. */
 function control(label: string): HTMLInputElement | HTMLSelectElement {
   const el = screen
     .getByText(label, { selector: "span" })

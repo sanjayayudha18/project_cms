@@ -1,5 +1,11 @@
 // Feature: user-login, Property 13: Navigation Filtering by Role
+import { ALWAYS_ON_KEYS, SCREEN_KEYS } from "@/lib/auth/permissionKeys";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import type { DbRole } from "@/lib/auth/store";
+import {
+  getVisibleNavForRole as getVisibleNav,
+  permissionsForRole,
+} from "@/test/visibleNavForRole";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,10 +13,10 @@ import {
   NAV_CONFIG,
   type NavItem,
   SIDEBAR_GROUP_ORDER,
-  filterNavByRoles,
+  filterNavByPermissions,
   filterPaletteItems,
   findActiveNavItem,
-  getVisibleNav,
+  getVisibleNav as getVisibleNavByKeys,
 } from "./navigation";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -27,169 +33,91 @@ const ALL_DB_ROLES: DbRole[] = [
   "VENDOR-USER",
 ];
 
-const ADMIN_ROLES: DbRole[] = ["ADMIN", "ADMIN_PARAM"];
-const NON_ADMIN_ROLES: DbRole[] = ALL_DB_ROLES.filter((r) => !ADMIN_ROLES.includes(r));
-
 // ─── Arbitraries ──────────────────────────────────────────────────────────────
 
-/** Generates any single DbRole */
-const arbDbRole: fc.Arbitrary<DbRole> = fc.constantFrom(...ALL_DB_ROLES);
+const arbKeySet: fc.Arbitrary<Set<string>> = fc
+  .subarray([...SCREEN_KEYS])
+  .map((ks) => new Set<string>(ks));
 
-/** Generates a non-admin DbRole */
-const arbNonAdminRole: fc.Arbitrary<DbRole> = fc.constantFrom(...NON_ADMIN_ROLES);
+const itemKeys = (i: NavItem): readonly string[] =>
+  typeof i.permission === "string" ? [i.permission] : i.permission;
 
-/** Generates an admin DbRole (ADMIN or ADMIN_PARAM) */
-const arbAdminRole: fc.Arbitrary<DbRole> = fc.constantFrom(...ADMIN_ROLES);
+// ─── Property 8: nav visibility follows the permission set ───────────────────
+// Feature: permission-catalog-coverage, Property 8
+// **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
 
-/** Generates an arbitrary NavItem with random DB role assignments */
-const arbNavItem: fc.Arbitrary<NavItem> = fc
-  .record({
-    id: fc.string({ minLength: 1, maxLength: 20 }),
-    label: fc.string({ minLength: 1, maxLength: 30 }),
-    href: fc.string({ minLength: 1, maxLength: 50 }).map((s) => `/${s}`),
-    roles: fc.oneof(
-      fc.constant(["*"] as (DbRole | "*")[]),
-      fc
-        .subarray(ALL_DB_ROLES, { minLength: 1, maxLength: ALL_DB_ROLES.length })
-        .map((r) => r as (DbRole | "*")[]),
-    ),
-    group: fc.constantFrom(
-      "general" as const,
-      "monitoring" as const,
-      "forecasting" as const,
-      "invoice" as const,
-      "cash-count" as const,
-    ),
-    disabled: fc.boolean(),
-  })
-  .map((record) => ({
-    ...record,
-    icon: (() => null) as unknown as NavItem["icon"],
-  }));
+const ALWAYS_ON = new Set<string>(ALWAYS_ON_KEYS);
+const enabledWith = (has: (k: string) => boolean) =>
+  NAV_CONFIG.filter((i) => !i.disabled && itemKeys(i).some(has));
 
-/** Generates an arbitrary array of NavItems */
-const arbNavItems: fc.Arbitrary<NavItem[]> = fc.array(arbNavItem, {
-  minLength: 1,
-  maxLength: 25,
-});
+function setStore(status: "ready" | "loading" | "error" | "idle", keys: Set<string>) {
+  usePermissionStore.setState({ status, keys });
+}
 
-// ─── Property 13: Navigation Filtering by Role ───────────────────────────────
-
-/**
- * **Validates: Requirements 11.2, 11.4, 11.5, 11.6**
- *
- * For any user role R and navigation configuration, the filterNavByRoles
- * function SHALL return only items where R is in the item's allowed roles list
- * or the item has wildcard "*" access. For ADMIN and ADMIN_PARAM roles, all
- * items SHALL be returned regardless of their allowed roles list.
- */
-describe("Property 13: Navigation Filtering by Role", () => {
-  it("for any role R, returned items have R in allowed list or wildcard '*'", () => {
+describe("Property 8: filterNavByPermissions / getVisibleNav", () => {
+  it("item visible ⇔ one of its keys is granted (no role bypass)", () => {
     fc.assert(
-      fc.property(arbNavItems, arbNonAdminRole, (items, userRole) => {
-        const result = filterNavByRoles(items, userRole);
-
-        for (const item of result) {
-          const hasWildcard = item.roles.includes("*");
-          const hasRole = item.roles.includes(userRole);
-          expect(hasWildcard || hasRole).toBe(true);
-        }
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("ADMIN and ADMIN_PARAM see all items (admin override)", () => {
-    fc.assert(
-      fc.property(arbNavItems, arbAdminRole, (items, adminRole) => {
-        const result = filterNavByRoles(items, adminRole);
-        expect(result).toEqual(items);
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("no permitted item is ever omitted (completeness)", () => {
-    fc.assert(
-      fc.property(arbNavItems, arbDbRole, (items, userRole) => {
-        const result = filterNavByRoles(items, userRole);
-        const isAdmin = ADMIN_ROLES.includes(userRole);
-
-        for (const item of items) {
-          const shouldBeIncluded =
-            isAdmin || item.roles.includes("*") || item.roles.includes(userRole);
-
-          if (shouldBeIncluded) {
-            expect(result).toContain(item);
-          }
-        }
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("no unpermitted item is ever included (soundness)", () => {
-    fc.assert(
-      fc.property(arbNavItems, arbNonAdminRole, (items, userRole) => {
-        const result = filterNavByRoles(items, userRole);
-
-        for (const item of items) {
-          const shouldBeExcluded = !item.roles.includes("*") && !item.roles.includes(userRole);
-
-          if (shouldBeExcluded) {
-            expect(result).not.toContain(item);
-          }
-        }
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("wildcard items are always included for any role", () => {
-    fc.assert(
-      fc.property(arbDbRole, (userRole) => {
-        const wildcardItem: NavItem = {
-          id: "wildcard-test",
-          label: "Wildcard",
-          icon: (() => null) as unknown as NavItem["icon"],
-          href: "/wildcard",
-          roles: ["*"],
-          group: "general",
-        };
-        const result = filterNavByRoles([wildcardItem], userRole);
-        expect(result).toContain(wildcardItem);
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it("works correctly against the real NAV_CONFIG", () => {
-    fc.assert(
-      fc.property(arbDbRole, (userRole) => {
-        const result = filterNavByRoles(NAV_CONFIG, userRole);
-        const isAdmin = ADMIN_ROLES.includes(userRole);
-
-        if (isAdmin) {
-          expect(result).toEqual(NAV_CONFIG);
-          return;
-        }
-
-        // Every returned item is justified
-        for (const item of result) {
-          const justified = item.roles.includes("*") || item.roles.includes(userRole);
-          expect(justified).toBe(true);
-        }
-
-        // No missing items
+      fc.property(arbKeySet, (granted) => {
+        const has = (k: string) => granted.has(k);
+        const result = filterNavByPermissions(NAV_CONFIG, has);
         for (const item of NAV_CONFIG) {
-          const shouldBeIn = item.roles.includes("*") || item.roles.includes(userRole);
-          if (shouldBeIn) {
-            expect(result).toContain(item);
-          }
+          expect(result.includes(item)).toBe(itemKeys(item).some(has));
         }
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("getVisibleNav = exactly the granted, enabled items; sidebar/footer partition them", () => {
+    fc.assert(
+      fc.property(arbKeySet, (granted) => {
+        const nav = getVisibleNavByKeys((k) => granted.has(k));
+        const expected = enabledWith((k) => granted.has(k));
+        expect(nav.all).toEqual(expected);
+        const footer = expected.filter((i) => i.placement === "sidebar-footer");
+        expect(nav.settings).toBe(footer[0]);
+        const sidebarIds = [...nav.sidebar.values()].flat().map((i) => i.id);
+        const expectedSidebar = expected
+          .filter((i) => i.placement !== "sidebar-footer" && SIDEBAR_GROUP_ORDER.includes(i.group))
+          .map((i) => i.id);
+        expect([...sidebarIds].sort()).toEqual([...expectedSidebar].sort());
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("empty set → nothing visible; full set → every enabled item", () => {
+    expect(getVisibleNavByKeys(() => false).all).toEqual([]);
+    expect(getVisibleNavByKeys(() => true).all).toEqual(NAV_CONFIG.filter((i) => !i.disabled));
+  });
+
+  it("store ready: the store's keys decide", () => {
+    fc.assert(
+      fc.property(arbKeySet, (granted) => {
+        setStore("ready", granted);
+        const nav = getVisibleNavByKeys((k) => usePermissionStore.getState().has(k));
+        expect(nav.all).toEqual(enabledWith((k) => granted.has(k)));
       }),
       { numRuns: 100 },
     );
+    usePermissionStore.getState().reset();
+  });
+
+  it("store loading/error/idle: only Always_On items, whatever keys were held", () => {
+    fc.assert(
+      fc.property(
+        arbKeySet,
+        fc.constantFrom<"loading" | "error" | "idle">("loading", "error", "idle"),
+        (granted, status) => {
+          setStore(status, granted);
+          const nav = getVisibleNavByKeys((k) => usePermissionStore.getState().has(k));
+          expect(nav.all).toEqual(enabledWith((k) => ALWAYS_ON.has(k)));
+          expect(nav.all.length).toBeGreaterThan(0);
+        },
+      ),
+      { numRuns: 100 },
+    );
+    usePermissionStore.getState().reset();
   });
 });
 
@@ -214,7 +142,7 @@ const mkItem = (id: string, href: string, label = id): NavItem => ({
   label,
   icon: stubIcon,
   href,
-  roles: ["*"],
+  permission: "dashboard",
   group: "general",
 });
 
@@ -223,11 +151,12 @@ const mkItem = (id: string, href: string, label = id): NavItem => ({
  * **Validates: Requirements 2.1, 2.4, 12.3**
  */
 describe("Property 1: getVisibleNav visibility", () => {
-  it("all ⊆ filterNavByRoles, tanpa disabled; null role → kosong", () => {
+  it("all ⊆ filterNavByPermissions, tanpa disabled; null role → kosong", () => {
     fc.assert(
       fc.property(arbShellRole, (role) => {
         const nav = getVisibleNav(role);
-        const allowed = role ? filterNavByRoles(NAV_CONFIG, role) : [];
+        const keys = permissionsForRole(role);
+        const allowed = filterNavByPermissions(NAV_CONFIG, (k) => keys.has(k));
         for (const item of nav.all) {
           expect(allowed).toContain(item);
           expect(item.disabled).toBeFalsy();

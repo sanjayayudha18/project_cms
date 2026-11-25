@@ -340,7 +340,9 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith({ to: "/" });
     });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // Login also triggers GET /auth/me/permissions (permission store), so count only the login POST.
+    const loginCalls = mockFetch.mock.calls.filter(([url]) => String(url).includes("/auth/login"));
+    expect(loginCalls).toHaveLength(1);
   });
 
   it("toggles password visibility while preserving value", async () => {

@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../../_protected";
+import { protectedRoute, requirePermission } from "../../_protected";
 
 // Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
 const AdminHolidaysPage = lazyRouteComponent(
@@ -12,7 +12,7 @@ const AdminHolidaysPage = lazyRouteComponent(
 export const adminHolidaysRoute = createRoute({
   path: "/settings/admin/holidays",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN"]),
+  beforeLoad: requirePermission("forecasting.holidays"),
   loader: () => AdminHolidaysPage.preload?.(),
   component: AdminHolidaysRouteComponent,
 });

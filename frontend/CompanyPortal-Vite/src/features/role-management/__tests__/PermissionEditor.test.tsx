@@ -1,3 +1,4 @@
+import { useAuthStore, usePermissionStore } from "@/lib/auth";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,12 +12,12 @@ vi.mock("../hooks/useRoleQueries", () => ({
 }));
 
 const CATALOG: CatalogEntry[] = [
-  { id: 1, parent_id: null, key: "dashboard", label: "Dashboard", kind: "menu", sort_order: 0 },
+  { id: 1, parent_id: null, key: "monitoring", label: "Dashboard", kind: "menu", sort_order: 0 },
   { id: 2, parent_id: null, key: "settings", label: "Pengaturan", kind: "menu", sort_order: 1 },
   {
     id: 3,
     parent_id: 2,
-    key: "settings.roles",
+    key: "settings.vendors",
     label: "Manajemen Peran",
     kind: "feature",
     sort_order: 0,
@@ -28,12 +29,21 @@ const ROLE: RoleWithPermissions = {
   role: "AUDITOR-VIEW",
   description: null,
   permissions: [
-    { menu_feature_id: 1, parent_id: null, key: "dashboard", label: "Dashboard", kind: "menu" },
+    { menu_feature_id: 1, parent_id: null, key: "monitoring", label: "Dashboard", kind: "menu" },
   ],
 };
 
+const toastMock = vi.fn();
+vi.mock("@/lib/hooks/useToast", () => ({ useToast: () => ({ toast: toastMock }) }));
+
+const loadMock = vi.fn();
+
 beforeEach(() => {
   updateMutateAsync.mockReset();
+  toastMock.mockReset();
+  loadMock.mockReset().mockResolvedValue(undefined);
+  usePermissionStore.setState({ load: loadMock });
+  useAuthStore.setState({ user: null });
 });
 
 describe("PermissionEditor", () => {
@@ -79,5 +89,151 @@ describe("PermissionEditor", () => {
     await waitFor(() =>
       expect(updateMutateAsync).toHaveBeenCalledWith({ id: 10, menuFeatureIds: [] }),
     );
+  });
+
+  describe("permission catalog coverage (spec 7.2)", () => {
+    const FIXED_CATALOG: CatalogEntry[] = [
+      ...CATALOG,
+      {
+        id: 4,
+        parent_id: 2,
+        key: "approvals",
+        label: "Persetujuan",
+        kind: "feature",
+        sort_order: 1,
+      },
+      {
+        id: 5,
+        parent_id: 2,
+        key: "settings.roles",
+        label: "Peran Terkunci",
+        kind: "feature",
+        sort_order: 2,
+      },
+      {
+        id: 6,
+        parent_id: 2,
+        key: "settings.pks",
+        label: "Daftar PKS",
+        kind: "feature",
+        sort_order: 3,
+        assignable_roles: ["ADMIN", "ATM-SPV"],
+      },
+    ];
+
+    it("shows Always_On as checked + disabled with badge, Locked disabled with badge", () => {
+      render(<PermissionEditor role={ROLE} catalog={FIXED_CATALOG} />);
+
+      const alwaysOn = screen.getByRole("checkbox", { name: /Persetujuan/ });
+      expect(alwaysOn).toBeChecked();
+      expect(alwaysOn).toBeDisabled();
+      expect(screen.getByText("Selalu aktif")).toBeInTheDocument();
+
+      const locked = screen.getByRole("checkbox", { name: /Peran Terkunci/ });
+      expect(locked).not.toBeChecked();
+      expect(locked).toBeDisabled();
+      expect(screen.getByText("Hanya APPACCESS/ADMIN")).toBeInTheDocument();
+    });
+
+    it("disables a key outside assignable_roles and lists the allowed roles in the tooltip", () => {
+      render(<PermissionEditor role={ROLE} catalog={FIXED_CATALOG} />);
+
+      const box = screen.getByRole("checkbox", { name: /Daftar PKS/ });
+      expect(box).toBeDisabled();
+      expect(screen.getByText("Hanya: ADMIN, ATM-SPV")).toBeInTheDocument();
+      expect(box.closest("label")).toHaveAttribute(
+        "title",
+        expect.stringContaining("ADMIN, ATM-SPV"),
+      );
+    });
+
+    it("enables a key whose assignable_roles includes the role", () => {
+      render(<PermissionEditor role={{ ...ROLE, role: "ATM-SPV" }} catalog={FIXED_CATALOG} />);
+      expect(screen.getByRole("checkbox", { name: /Daftar PKS/ })).toBeEnabled();
+    });
+
+    it("PUT payload never contains Always_On/Locked ids, even when the role holds them", async () => {
+      updateMutateAsync.mockResolvedValue({});
+      const role: RoleWithPermissions = {
+        ...ROLE,
+        permissions: [
+          ...ROLE.permissions,
+          {
+            menu_feature_id: 4,
+            parent_id: 2,
+            key: "approvals",
+            label: "Persetujuan",
+            kind: "feature",
+          },
+          {
+            menu_feature_id: 5,
+            parent_id: 2,
+            key: "settings.roles",
+            label: "Peran Terkunci",
+            kind: "feature",
+          },
+        ],
+      };
+      const user = userEvent.setup();
+      render(<PermissionEditor role={role} catalog={FIXED_CATALOG} />);
+
+      // Fixed keys never make the set dirty.
+      expect(screen.getByRole("button", { name: "Simpan Izin" })).toBeDisabled();
+
+      await user.click(screen.getByRole("checkbox", { name: "Manajemen Peran" }));
+      await user.click(screen.getByRole("button", { name: "Simpan Izin" }));
+
+      await waitFor(() =>
+        expect(updateMutateAsync).toHaveBeenCalledWith({ id: 10, menuFeatureIds: [1, 3] }),
+      );
+    });
+
+    it("shows the 422 role_not_assignable message as an error toast and skips the reload", async () => {
+      updateMutateAsync.mockRejectedValue({
+        code: "role_not_assignable",
+        message: "Layar Daftar PKS hanya untuk ADMIN",
+      });
+      useAuthStore.setState({ user: { role: "AUDITOR-VIEW" } as never });
+      const user = userEvent.setup();
+      render(<PermissionEditor role={ROLE} catalog={FIXED_CATALOG} />);
+
+      await user.click(screen.getByRole("checkbox", { name: "Manajemen Peran" }));
+      await user.click(screen.getByRole("button", { name: "Simpan Izin" }));
+
+      await waitFor(() =>
+        expect(toastMock).toHaveBeenCalledWith({
+          type: "error",
+          message: expect.stringContaining("Layar Daftar PKS hanya untuk ADMIN"),
+        }),
+      );
+      expect(loadMock).not.toHaveBeenCalled();
+    });
+
+    it("reloads own permissions after saving the signed-in user's role", async () => {
+      updateMutateAsync.mockResolvedValue({});
+      useAuthStore.setState({ user: { role: "AUDITOR-VIEW" } as never });
+      const user = userEvent.setup();
+      render(<PermissionEditor role={ROLE} catalog={FIXED_CATALOG} />);
+
+      await user.click(screen.getByRole("checkbox", { name: "Manajemen Peran" }));
+      await user.click(screen.getByRole("button", { name: "Simpan Izin" }));
+
+      await waitFor(() => expect(loadMock).toHaveBeenCalledTimes(1));
+    });
+
+    it("does not reload permissions after saving another role", async () => {
+      updateMutateAsync.mockResolvedValue({});
+      useAuthStore.setState({ user: { role: "ADMIN" } as never });
+      const user = userEvent.setup();
+      render(<PermissionEditor role={ROLE} catalog={FIXED_CATALOG} />);
+
+      await user.click(screen.getByRole("checkbox", { name: "Manajemen Peran" }));
+      await user.click(screen.getByRole("button", { name: "Simpan Izin" }));
+
+      await waitFor(() =>
+        expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ type: "success" })),
+      );
+      expect(loadMock).not.toHaveBeenCalled();
+    });
   });
 });

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/cimb-niaga/cms/backend/internal/auth"
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 
 	pkgauth "github.com/cimb-niaga/cms/pkg/auth"
@@ -31,6 +33,7 @@ type AuthHandler struct {
 	userRepo          pkgauth.UserRepository
 	rateLimiter       *middleware.RateLimiter
 	changePasswordSvc ChangePasswordService
+	permKeys          PermissionKeyReader
 }
 
 // NewAuthHandler creates a new AuthHandler with the given dependencies.
@@ -58,7 +61,58 @@ func (h *AuthHandler) Routes() chi.Router {
 	r.Post("/logout", h.Logout)
 	r.With(middleware.RequireAuth(h.tokenService)).Get("/me", h.Me)
 	r.With(middleware.RequireAuth(h.tokenService)).Post("/change-password", h.ChangePassword)
+	if h.permKeys != nil {
+		r.With(middleware.RequireAuth(h.tokenService)).Get("/me/permissions", h.MyPermissions)
+	}
 	return r
+}
+
+// PermissionKeyReader lists the catalog keys granted to a role (primary read).
+type PermissionKeyReader interface {
+	ListRoleFeatureKeys(ctx context.Context, role string) ([]string, error)
+}
+
+// WithPermissions enables GET /me/permissions. Kept off the constructor so
+// existing NewAuthHandler callers are unchanged.
+func (h *AuthHandler) WithPermissions(p PermissionKeyReader) *AuthHandler {
+	h.permKeys = p
+	return h
+}
+
+// MyPermissions handles GET /me/permissions (spec permission-catalog-coverage
+// Req 4): grants ∪ Always_On ∪ (Locked for APPACCESS/ADMIN); non-internal
+// roles get an empty list. ponytail: Always_On/Locked keys are appended after
+// the grants (not merged by sort_order); the FE treats the list as a set.
+func (h *AuthHandler) MyPermissions(w http.ResponseWriter, r *http.Request) {
+	authCtx, ok := middleware.GetAuthContext(r.Context())
+	if !ok {
+		writeUnauthorized(w, "Token tidak valid")
+		return
+	}
+	keys := []string{}
+	if rolemgmt.IsInternalRole(authCtx.Role) {
+		granted, err := h.permKeys.ListRoleFeatureKeys(r.Context(), authCtx.Role)
+		if err != nil {
+			slog.Error("my permissions: list keys", "role", authCtx.Role, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Terjadi kesalahan internal")
+			return
+		}
+		seen := make(map[string]bool, len(granted))
+		keys = append(keys, granted...)
+		for _, k := range granted {
+			seen[k] = true
+		}
+		extra := append([]string{}, rolemgmt.AlwaysOnKeys...)
+		if authCtx.Role == "APPACCESS" || authCtx.Role == "ADMIN" {
+			extra = append(extra, rolemgmt.LockedKeys...)
+		}
+		for _, k := range extra {
+			if !seen[k] {
+				keys = append(keys, k)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string][]string{"permissions": keys})
 }
 
 // loginRequest is the expected JSON body for POST /login.

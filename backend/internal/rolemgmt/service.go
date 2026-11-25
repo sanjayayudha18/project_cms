@@ -185,13 +185,22 @@ func (s *PermissionService) UpdateRolePermissions(ctx context.Context, actorID i
 		return nil, fmt.Errorf("loading current permissions: %w", err)
 	}
 
+	catalog, err := s.repo.ListCatalog(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("loading catalog: %w", err)
+	}
+	final, err := resolvePermissionSet(role.Role, featureIDs, before, catalog)
+	if err != nil {
+		return nil, err
+	}
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := s.repo.ReplaceRolePermissions(ctx, tx, roleID, featureIDs, actorID); err != nil {
+	if err := s.repo.ReplaceRolePermissions(ctx, tx, roleID, final, actorID); err != nil {
 		return nil, fmt.Errorf("replacing role permissions: %w", err)
 	}
 
@@ -201,7 +210,7 @@ func (s *PermissionService) UpdateRolePermissions(ctx context.Context, actorID i
 		EntityType: "role",
 		EntityID:   roleID,
 		Before:     map[string]any{"menu_feature_ids": before},
-		After:      map[string]any{"menu_feature_ids": featureIDs},
+		After:      map[string]any{"menu_feature_ids": final},
 		IP:         actorIP,
 	}); err != nil {
 		return nil, fmt.Errorf("write audit log: %w", err)
@@ -210,7 +219,55 @@ func (s *PermissionService) UpdateRolePermissions(ctx context.Context, actorID i
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit update role permissions: %w", err)
 	}
-	return featureIDs, nil
+	return final, nil
+}
+
+// resolvePermissionSet computes the set to store for a permission update
+// (spec permission-catalog-coverage Req 3.5, 3.6):
+//   - Always_On/Locked catalog ids are dropped from the submitted set and the
+//     ones already stored are kept, so the editor can neither grant nor
+//     revoke them (e.g. 002's settings.roles grant for ADMIN survives);
+//   - a newly added id whose assignable_roles excludes roleName fails with
+//     *RoleNotAssignableError. Grants the role already holds are not
+//     re-checked, so a legacy grant never blocks saving other changes.
+//
+// Ids missing from catalog (inactive entries) carry no rule and pass through.
+func resolvePermissionSet(roleName string, submitted, before []int64, catalog []db.MenuFeature) ([]int64, error) {
+	byID := make(map[int64]db.MenuFeature, len(catalog))
+	for _, f := range catalog {
+		byID[f.ID] = f
+	}
+	protected := func(id int64) bool {
+		f, ok := byID[id]
+		return ok && (IsAlwaysOn(f.Key) || IsLocked(f.Key))
+	}
+	held := make(map[int64]bool, len(before))
+	final := make([]int64, 0, len(submitted)+len(before))
+	for _, id := range before {
+		held[id] = true
+		if protected(id) {
+			final = append(final, id)
+		}
+	}
+	for _, id := range distinctInt64s(submitted) {
+		if protected(id) {
+			continue
+		}
+		if f, ok := byID[id]; ok && !held[id] && f.AssignableRoles != nil && !containsFold(f.AssignableRoles, roleName) {
+			return nil, &RoleNotAssignableError{Label: f.Label, Roles: f.AssignableRoles}
+		}
+		final = append(final, id)
+	}
+	return final, nil
+}
+
+func containsFold(list []string, s string) bool {
+	for _, v := range list {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func nilIfEmpty(s string) *string {

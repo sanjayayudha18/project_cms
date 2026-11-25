@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { ALWAYS_ON_KEYS, LOCKED_KEYS, useAuthStore, usePermissionStore } from "@/lib/auth";
 import { useToast } from "@/lib/hooks/useToast";
 import { useEffect, useMemo, useState } from "react";
 import { useUpdateRolePermissions } from "../hooks/useRoleQueries";
@@ -12,6 +13,28 @@ interface PermissionEditorProps {
 interface MenuNode {
   menu: CatalogEntry;
   features: CatalogEntry[];
+}
+
+const ALWAYS_ON = new Set<string>(ALWAYS_ON_KEYS);
+const LOCKED = new Set<string>(LOCKED_KEYS);
+
+type Fixed = "always-on" | "locked" | null;
+
+function fixedKind(entry: CatalogEntry): Fixed {
+  if (ALWAYS_ON.has(entry.key)) return "always-on";
+  if (LOCKED.has(entry.key)) return "locked";
+  return null;
+}
+
+function errorMessage(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as { code?: string; message?: unknown };
+    if (e.code === "role_not_assignable") {
+      return `Izin tidak dapat diberikan ke peran ini. ${String(e.message ?? "")}`.trim();
+    }
+    if ("message" in e) return String(e.message);
+  }
+  return "Terjadi kesalahan yang tidak diketahui";
 }
 
 function buildTree(catalog: CatalogEntry[]): MenuNode[] {
@@ -36,6 +59,12 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
   const { toast } = useToast();
   const updateMutation = useUpdateRolePermissions();
   const tree = useMemo(() => buildTree(catalog), [catalog]);
+  const ownRole = useAuthStore((s) => s.user?.role);
+  // Always_On/Locked keys are never sent (backend keeps them as stored) — the dirty check ignores them too.
+  const fixedIds = useMemo(
+    () => new Set(catalog.filter((c) => fixedKind(c) !== null).map((c) => c.id)),
+    [catalog],
+  );
 
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(role.permissions.map((p) => p.menu_feature_id)),
@@ -47,13 +76,13 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
   }, [role.permissions]);
 
   const isDirty = useMemo(() => {
-    const current = new Set(role.permissions.map((p) => p.menu_feature_id));
-    if (current.size !== selected.size) return true;
-    for (const id of selected) {
-      if (!current.has(id)) return true;
-    }
-    return false;
-  }, [role.permissions, selected]);
+    const current = new Set(
+      role.permissions.map((p) => p.menu_feature_id).filter((id) => !fixedIds.has(id)),
+    );
+    const next = Array.from(selected).filter((id) => !fixedIds.has(id));
+    if (current.size !== next.length) return true;
+    return next.some((id) => !current.has(id));
+  }, [role.permissions, selected, fixedIds]);
 
   function toggle(id: number): void {
     setSelected((prev) => {
@@ -66,14 +95,12 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
 
   async function handleSave(): Promise<void> {
     try {
-      await updateMutation.mutateAsync({ id: role.id, menuFeatureIds: Array.from(selected) });
+      const menuFeatureIds = Array.from(selected).filter((id) => !fixedIds.has(id));
+      await updateMutation.mutateAsync({ id: role.id, menuFeatureIds });
       toast({ type: "success", message: `Izin peran "${role.role}" berhasil diperbarui` });
+      if (role.role === ownRole) await usePermissionStore.getState().load();
     } catch (err) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: unknown }).message)
-          : "Terjadi kesalahan yang tidak diketahui";
-      toast({ type: "error", message });
+      toast({ type: "error", message: errorMessage(err) });
     }
   }
 
@@ -82,30 +109,23 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
       <div className="flex flex-col gap-3 max-h-[420px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--n-200)] p-4">
         {tree.map(({ menu, features }) => (
           <div key={menu.id} className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-2 text-sm font-medium text-[var(--n-800)]">
-              <input
-                type="checkbox"
-                checked={selected.has(menu.id)}
-                onChange={() => toggle(menu.id)}
-                className="size-4 accent-[var(--red-500)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-              />
-              {menu.label}
-            </label>
+            <EntryRow
+              entry={menu}
+              role={role.role}
+              checked={selected.has(menu.id)}
+              onToggle={toggle}
+              strong
+            />
             {features.length > 0 && (
               <div className="ml-6 flex flex-col gap-1.5">
                 {features.map((feature) => (
-                  <label
+                  <EntryRow
                     key={feature.id}
-                    className="flex items-center gap-2 text-sm text-[var(--n-700)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(feature.id)}
-                      onChange={() => toggle(feature.id)}
-                      className="size-4 accent-[var(--red-500)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
-                    />
-                    {feature.label}
-                  </label>
+                    entry={feature}
+                    role={role.role}
+                    checked={selected.has(feature.id)}
+                    onToggle={toggle}
+                  />
                 ))}
               </div>
             )}
@@ -119,5 +139,53 @@ export function PermissionEditor({ role, catalog }: PermissionEditorProps) {
         </Button>
       </div>
     </div>
+  );
+}
+
+interface EntryRowProps {
+  entry: CatalogEntry;
+  role: string;
+  checked: boolean;
+  onToggle: (id: number) => void;
+  strong?: boolean;
+}
+
+/** One checkbox row; fixed/restricted entries are disabled and say why in text (not colour alone). */
+function EntryRow({ entry, role, checked, onToggle, strong }: EntryRowProps) {
+  const fixed = fixedKind(entry);
+  const allowed = entry.assignable_roles ?? null;
+  const outsideList = fixed === null && allowed !== null && !allowed.includes(role);
+  // A legacy grant outside the list stays revocable; only new grants are blocked.
+  const disabled = fixed !== null || (outsideList && !checked);
+  const note =
+    fixed === "always-on"
+      ? "Selalu aktif"
+      : fixed === "locked"
+        ? "Hanya APPACCESS/ADMIN"
+        : outsideList
+          ? `Hanya: ${(allowed ?? []).join(", ")}`
+          : null;
+
+  return (
+    <label
+      title={outsideList ? `Hanya dapat diberikan ke: ${(allowed ?? []).join(", ")}` : undefined}
+      className={`flex items-center gap-2 text-sm ${
+        strong ? "font-medium text-[var(--n-800)]" : "text-[var(--n-700)]"
+      } ${disabled ? "cursor-not-allowed opacity-80" : ""}`}
+    >
+      <input
+        type="checkbox"
+        checked={fixed === "always-on" ? true : checked}
+        disabled={disabled}
+        onChange={() => onToggle(entry.id)}
+        className="size-4 accent-[var(--red-500)] focus-visible:ring-2 focus-visible:ring-[var(--red-100)]"
+      />
+      {entry.label}
+      {note && (
+        <span className="rounded-[var(--radius-sm)] border border-[var(--n-200)] bg-[var(--n-50)] px-1.5 py-0.5 text-xs font-normal text-[var(--n-600)]">
+          {note}
+        </span>
+      )}
+    </label>
   );
 }

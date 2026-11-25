@@ -29,6 +29,20 @@ func (r *Repository) HasPermission(ctx context.Context, roleName, featureKey str
 	return r.dbRead.HasRolePermission(ctx, db.HasRolePermissionParams{Role: roleName, Key: featureKey})
 }
 
+// HasAnyPermission reports whether roleName is mapped to at least one of the
+// catalog keys (replica read; any-of for RequirePermission, spec
+// permission-catalog-coverage Req 7.1, 7.2).
+func (r *Repository) HasAnyPermission(ctx context.Context, roleName string, keys []string) (bool, error) {
+	return r.dbRead.HasAnyRolePermission(ctx, db.HasAnyRolePermissionParams{Role: roleName, Keys: keys})
+}
+
+// ListRoleFeatureKeys returns the active catalog keys granted to roleName in
+// menu order. Primary read: GET /auth/me/permissions must see a PUT at once
+// (spec permission-catalog-coverage Req 8.3).
+func (r *Repository) ListRoleFeatureKeys(ctx context.Context, roleName string) ([]string, error) {
+	return r.db.ListRoleFeatureKeys(ctx, roleName)
+}
+
 // ListCatalog returns the full active menu/feature catalog (replica read, Req 1.1).
 func (r *Repository) ListCatalog(ctx context.Context) ([]db.MenuFeature, error) {
 	return r.dbRead.ListCatalog(ctx)

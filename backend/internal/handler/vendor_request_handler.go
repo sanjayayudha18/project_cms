@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
 	"github.com/cimb-niaga/cms/pkg/middleware"
 )
@@ -36,8 +37,42 @@ var (
 // VendorRequestHandler handles Vendor Request HTTP endpoints.
 type VendorRequestHandler struct {
 	service service.VendorRequestServicer
-	vault   VendorRequestVaultReviewer // nil = vault routes not mounted
-	vendor  *vendorSide                // nil = cit-send-vendor routes not mounted
+	vault   VendorRequestVaultReviewer    // nil = vault routes not mounted
+	vendor  *vendorSide                   // nil = cit-send-vendor routes not mounted
+	perm    *rolemgmt.PermissionEvaluator // nil = role guards only (before permission-catalog-coverage 4.2)
+}
+
+// Screen keys guarding Vendor Request routes (permission-catalog-coverage design mount table).
+var (
+	vendorRequestViewKeys   = []string{"replenish.vendor-requests", "replenish.forecast-browser"}
+	vendorRequestActionKeys = []string{"replenish.vendor-requests"}
+)
+
+// WithPermissions guards viewer routes with any-of replenish.vendor-requests /
+// replenish.forecast-browser (replacing the viewer role guard) and puts
+// replenish.vendor-requests in front of the unchanged action role guards.
+func (h *VendorRequestHandler) WithPermissions(e *rolemgmt.PermissionEvaluator) *VendorRequestHandler {
+	h.perm = e
+	return h
+}
+
+type routeMW = func(http.Handler) http.Handler
+
+// viewGuard: RequirePermission(keys) replaces the role guard; nil e keeps RequireRoles(roles).
+func viewGuard(e *rolemgmt.PermissionEvaluator, keys, roles []string) []routeMW {
+	if e == nil {
+		return []routeMW{middleware.RequireRoles(roles...)}
+	}
+	return []routeMW{rolemgmt.RequirePermission(e, keys...)}
+}
+
+// actionGuard: RequirePermission(keys) in front of the role guard, which stays (design D2/D4);
+// nil e keeps RequireRoles(roles) alone.
+func actionGuard(e *rolemgmt.PermissionEvaluator, keys, roles []string) []routeMW {
+	if e == nil {
+		return []routeMW{middleware.RequireRoles(roles...)}
+	}
+	return []routeMW{rolemgmt.RequirePermission(e, keys...), middleware.RequireRoles(roles...)}
 }
 
 // NewVendorRequestHandler creates a new VendorRequestHandler with the given service.
@@ -51,33 +86,35 @@ func NewVendorRequestHandler(svc service.VendorRequestServicer) *VendorRequestHa
 // per endpoint (design.md "API Contract").
 func (h *VendorRequestHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/forecast", h.BrowseForecast)
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/forecast/summary", h.ForecastSummary)
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/vendors", h.ListVendorOptions)
-	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/", h.Create)
-	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Put("/{id}/items", h.UpdateItems)
-	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/{id}/submit", h.Submit)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/approve", h.Approve)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/reject", h.Reject)
-	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/{id}/revise", h.Revise)
-	r.With(middleware.RequireRoles(vendorRequestCancelRoles...)).Post("/{id}/cancel", h.Cancel)
+	view := viewGuard(h.perm, vendorRequestViewKeys, vendorRequestViewerRoles)
+	act := func(roles []string) []routeMW { return actionGuard(h.perm, vendorRequestActionKeys, roles) }
+	r.With(view...).Get("/forecast", h.BrowseForecast)
+	r.With(view...).Get("/forecast/summary", h.ForecastSummary)
+	r.With(view...).Get("/vendors", h.ListVendorOptions)
+	r.With(act(vendorRequestMakerRoles)...).Post("/", h.Create)
+	r.With(act(vendorRequestMakerRoles)...).Put("/{id}/items", h.UpdateItems)
+	r.With(act(vendorRequestMakerRoles)...).Post("/{id}/submit", h.Submit)
+	r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/approve", h.Approve)
+	r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/reject", h.Reject)
+	r.With(act(vendorRequestMakerRoles)...).Post("/{id}/revise", h.Revise)
+	r.With(act(vendorRequestCancelRoles)...).Post("/{id}/cancel", h.Cancel)
 	// atm-visit-quota (spec FR5): laporan selesai replenish.
-	r.With(middleware.RequireRoles(vendorRequestMakerRoles...)).Post("/{id}/complete", h.SubmitCompletion)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/complete/approve", h.ApproveCompletion)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/complete/reject", h.RejectCompletion)
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/", h.List)
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}", h.Get)
-	r.With(middleware.RequireRoles(vendorRequestAuditRoles...)).Get("/{id}/audit-log", h.AuditLog)
+	r.With(act(vendorRequestMakerRoles)...).Post("/{id}/complete", h.SubmitCompletion)
+	r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/complete/approve", h.ApproveCompletion)
+	r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/complete/reject", h.RejectCompletion)
+	r.With(view...).Get("/", h.List)
+	r.With(view...).Get("/{id}", h.Get)
+	r.With(act(vendorRequestAuditRoles)...).Get("/{id}/audit-log", h.AuditLog)
 	if h.vault != nil {
 		// cit-acm-plan FR5: ATM-SPV review of the ACM vault recommendation.
-		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vault-assignments", h.VaultAssignments)
-		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-approve", h.VaultApprove)
-		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vault-reject", h.VaultReject)
+		r.With(view...).Get("/{id}/vault-assignments", h.VaultAssignments)
+		r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/vault-approve", h.VaultApprove)
+		r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/vault-reject", h.VaultReject)
 	}
 	if h.vendor != nil {
 		// cit-send-vendor FR6.1/FR6.6: vendor status panel + return to maker.
-		r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/{id}/vendor-parties", h.VendorParties)
-		r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/{id}/vendor-return", h.VendorReturn)
+		r.With(view...).Get("/{id}/vendor-parties", h.VendorParties)
+		r.With(act(vendorRequestCheckerRoles)...).Post("/{id}/vendor-return", h.VendorReturn)
 	}
 	return r
 }

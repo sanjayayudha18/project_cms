@@ -5,12 +5,8 @@
 
 import type { DbRole } from "@/lib/auth/store";
 import { APP_VERSION, ENV_LABEL } from "@/lib/config/appEnv";
-import {
-  GROUP_LABELS,
-  type NavGroup,
-  SIDEBAR_GROUP_ORDER,
-  getVisibleNav,
-} from "@/lib/config/navigation";
+import { GROUP_LABELS, type NavGroup, SIDEBAR_GROUP_ORDER } from "@/lib/config/navigation";
+import { getVisibleNavForRole as getVisibleNav } from "@/test/visibleNavForRole";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as fc from "fast-check";

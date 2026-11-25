@@ -3,7 +3,7 @@ import { findMasterDataset, parseFilterSearch } from "@/features/exports/dataset
 import { EXPORTS_PAGE_ROLES } from "@/lib/config/exportRoles";
 import { Link, createRoute, lazyRouteComponent, useNavigate } from "@tanstack/react-router";
 import { SearchX } from "lucide-react";
-import { protectedRoute, requireRoles } from "./_protected";
+import { protectedRoute, requirePermission } from "./_protected";
 
 export { EXPORTS_PAGE_ROLES };
 
@@ -19,7 +19,7 @@ const ExportPreviewPage = lazyRouteComponent(
 export const myExportsRoute = createRoute({
   path: "/exports",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles([...EXPORTS_PAGE_ROLES]),
+  beforeLoad: requirePermission("exports"),
   loader: () => ExportCatalogPage.preload?.(),
   component: ExportCatalogRouteComponent,
 });
@@ -43,7 +43,7 @@ function pickFilterSearch(search: Record<string, unknown>): Record<string, unkno
 export const exportPreviewRoute = createRoute({
   path: "/exports/$dataset",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
+  beforeLoad: requirePermission("exports", { roles: ["ADMIN", "ADMIN_PARAM"] }),
   validateSearch: pickFilterSearch,
   loader: () => ExportPreviewPage.preload?.(),
   component: ExportPreviewRouteComponent,

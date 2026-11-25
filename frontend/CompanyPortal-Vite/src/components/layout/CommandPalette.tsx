@@ -7,6 +7,8 @@ interface CommandPaletteProps {
   items: NavItem[];
   /** Item menu yang sedang aktif; kotak ikonnya ditandai merah (Req 12.5). */
   activeId?: string;
+  permissionError?: boolean;
+  onRetry?: () => void;
   onSelect: (item: NavItem) => void;
   onClose: () => void;
 }
@@ -24,6 +26,8 @@ export function nextIndex(i: number, delta: number, n: number): number {
 export default function CommandPalette({
   items,
   activeId,
+  permissionError,
+  onRetry,
   onSelect,
   onClose,
 }: CommandPaletteProps) {
@@ -100,6 +104,22 @@ export default function CommandPalette({
             Esc
           </kbd>
         </div>
+
+        {permissionError ? (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 border-b border-[var(--shell-topbar-line)] px-4 py-2 text-sm text-[var(--shell-ink)]"
+          >
+            <span>Menu gagal dimuat</span>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="shell-focus rounded-md px-2 py-1 font-semibold underline"
+            >
+              Coba lagi
+            </button>
+          </div>
+        ) : null}
 
         {results.length === 0 ? (
           // biome-ignore lint/a11y/useSemanticElements: <output> tidak cocok untuk pesan kosong

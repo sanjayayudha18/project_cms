@@ -34,6 +34,7 @@ import { adminPksRoute } from "./routes/settings/admin/pks";
 import { adminPksTypesRoute } from "./routes/settings/admin/pks-types";
 import { adminRegionsRoute } from "./routes/settings/admin/regions";
 import { adminUsersRoute } from "./routes/settings/admin/users";
+import { adminUsersNewRoute } from "./routes/settings/admin/users-new";
 import { adminVendorBranchDetailRoute } from "./routes/settings/admin/vendor-branch-detail";
 import { adminVendorBranchEditRoute } from "./routes/settings/admin/vendor-branch-edit";
 import { adminVendorDetailRoute } from "./routes/settings/admin/vendor-detail";
@@ -71,6 +72,7 @@ export const routeTree = rootRoute.addChildren([
     auditLogsRoute,
     settingsRoute,
     adminUsersRoute,
+    adminUsersNewRoute,
     adminVendorsRoute,
     adminVendorDetailRoute,
     adminVendorBranchDetailRoute,

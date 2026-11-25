@@ -6,7 +6,10 @@
 // audit-only, no maker-checker).
 package rolemgmt
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Sentinel errors. Handlers map these to HTTP status codes per design.md's
 // error table (Req 2-4): ErrRoleNameConflict -> 409, ErrCatalogEntryNotFound
@@ -16,7 +19,24 @@ var (
 	ErrCatalogEntryNotFound = fmt.Errorf("one or more catalog entries do not exist")
 	ErrRoleNotFound         = fmt.Errorf("role not found")
 	ErrNotAuthorized        = fmt.Errorf("actor is not authorized for role management")
+	ErrRoleNotAssignable    = fmt.Errorf("role is not assignable to this screen")
 )
+
+// RoleNotAssignableError is returned when a permission update grants a
+// screen key to a role outside that key's menu_features.assignable_roles
+// (spec permission-catalog-coverage Req 3.6). Handlers map it to 422
+// role_not_assignable; errors.Is(err, ErrRoleNotAssignable) matches it.
+type RoleNotAssignableError struct {
+	Label string
+	Roles []string
+}
+
+func (e *RoleNotAssignableError) Error() string {
+	return fmt.Sprintf("Layar %q hanya untuk role: %s", e.Label, strings.Join(e.Roles, ", "))
+}
+
+// Is lets errors.Is(err, ErrRoleNotAssignable) match.
+func (e *RoleNotAssignableError) Is(target error) bool { return target == ErrRoleNotAssignable }
 
 // ValidationError represents a structured field-level validation error.
 // Mirrors service.ValidationError's shape (internal/service/atm_portal.go)

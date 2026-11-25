@@ -1,12 +1,16 @@
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import type { DbRole } from "@/lib/auth/store";
 import { useAuthStore } from "@/lib/auth/store";
 import { describe, expect, it } from "vitest";
+import { ForbiddenError } from "./_protected";
 import { myExportsRoute } from "./exports";
 
-type Guard = () => { forbidden?: boolean } | undefined;
+type Guard = () => Promise<void>;
 const guard = (myExportsRoute as unknown as { options: { beforeLoad: Guard } }).options.beforeLoad;
 
-function as(role: DbRole) {
+function as(role: DbRole, keys: string[] = []) {
+  // No-op load: signing in triggers the store's auto-load, which would overwrite these keys.
+  usePermissionStore.setState({ keys: new Set(keys), status: "ready", load: async () => {} });
   useAuthStore.setState({
     user: {
       id: 1,
@@ -36,13 +40,16 @@ describe("/exports route guard", () => {
     "BRANCH-ATM-SPV",
     "ADMIN",
     "ADMIN_PARAM",
-  ])("allows %s", (role) => {
-    as(role);
-    expect(guard()?.forbidden).toBeUndefined();
+  ])("allows %s holding the exports key", async (role) => {
+    as(role, ["exports"]);
+    await expect(guard()).resolves.toBeUndefined();
   });
 
-  it.each<DbRole>(["BRANCH-USER", "VENDOR-USER", "ACM-USER"])("forbids %s", (role) => {
-    as(role);
-    expect(guard()).toEqual({ forbidden: true });
-  });
+  it.each<DbRole>(["BRANCH-USER", "VENDOR-USER", "ACM-USER", "ADMIN"])(
+    "forbids %s without the exports key",
+    async (role) => {
+      as(role);
+      await expect(guard()).rejects.toBeInstanceOf(ForbiddenError);
+    },
+  );
 });

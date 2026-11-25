@@ -11,10 +11,11 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 ├── skills.json                  # Manifest pendaftaran path skills
 ├── plugins.json                 # Manifest pendaftaran path plugins
 ├── bugfixes.md                  # Log bugfix yang dikerjakan oleh Gemini
+├── changes.md                   # Log perubahan kecil bukan bug (Small Work Dev)
 ├── development-progress.md      # Tracking status fitur yang dikerjakan oleh Gemini
 ├── lessons-learned.md           # Catatan pembelajaran dari review/insiden
 ├── agents/
-│   ├── gemini-cms-devplanner.md # Agent perancang & pengawal AI-Native SDLC (Spec, Scope, Bugfix, Small Change)
+│   ├── gemini-cms-devplanner.md # Agent perancang & pengawal AI-Native SDLC (5 Metode Pengembangan)
 │   ├── gemini-cms-orchestrator.md # Orchestrator pembuka session baru sesuai task & model di dokumen
 │   ├── cms-task-runner.md       # Instruksi dasar eksekutor task per wave
 │   ├── db-sqlc-architect.md     # Subagent spesialis PostgreSQL, migrasi & sqlc v1.31.1
@@ -29,7 +30,11 @@ Folder `.agents/` adalah pusat konfigurasi, aturan (*rules*), *skills*, *plugins
 │       ├── backend.md           # Go workspace (go.work), Flat vs Envelope JSON, Python EOD, deploy GCP
 │       ├── security-compliance.md # Maker-checker, audit logs atomik, deviasi GR#3, RBAC, LDAP vs lokal
 │       ├── frontend.md          # Dual portal CompanyPortal vs VendorPortal, brand, OpenAPI sync, 4 UI state
-│       └── sdlc-protocols.md    # 4 Metode SDLC, sequential human gate, the leash Sec 4, tech-debt
+│       └── sdlc-protocols.md    # 5 Metode SDLC, sequential human gate, the leash Sec 4, tech-debt
+├── scopes/                      # Scope-Driven Dev (scope.md & tasks.md untuk target MVP/Timebox)
+│   └── done/
+├── ui-revamps/                  # UI Revamp Dev (audit.md, design-artifact.md, ui-spec.md, tasks.md)
+│   └── done/
 ├── skills/
 │   ├── cms2-sdlc/
 │   │   └── SKILL.md             # Driver 6-tahap AI-Native SDLC

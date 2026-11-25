@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -183,6 +184,7 @@ func TestRoleMgmtHandler_UpdateRolePermissions_ErrorMapping(t *testing.T) {
 	}{
 		{"invalid catalog ref", rolemgmt.ErrCatalogEntryNotFound, http.StatusBadRequest, "invalid_reference"},
 		{"role not found", rolemgmt.ErrRoleNotFound, http.StatusNotFound, "not_found"},
+		{"role not assignable", fmt.Errorf("wrap: %w", &rolemgmt.RoleNotAssignableError{Label: "ATM", Roles: []string{"ADMIN"}}), http.StatusUnprocessableEntity, "role_not_assignable"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,5 +1,6 @@
 import { SettingsHubPage } from "@/features/rbac-settings";
-import { useAuthStore } from "@/lib/auth/store";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
+import { SETTINGS_HUB_KEYS } from "@/routes/settings";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -11,22 +12,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 }));
 
 function loginAsAdmin(): void {
-  useAuthStore.setState({
-    user: {
-      id: 1,
-      username: "a",
-      fullName: "A",
-      email: "a@b.c",
-      role: "ADMIN",
-      isKaryawan: true,
-      vendorId: null,
-    },
-    accessToken: "t",
-    isAuthenticated: true,
-    isAuthLoading: false,
-    error: null,
-    rateLimitRetryAfter: null,
-  });
+  usePermissionStore.setState({ keys: new Set(SETTINGS_HUB_KEYS), status: "ready" });
 }
 
 async function openTab(name: string): Promise<void> {
@@ -55,7 +41,7 @@ it("shows only the import and export cards on the Export & Import tab", async ()
     expect(within(io).getByRole("link", { name })).toBeInTheDocument();
   }
   expect(within(io).getAllByRole("link")).toHaveLength(2);
-  expect(screen.queryByRole("region", { name: "Data master & admin" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Data master" })).toBeNull();
 });
 
 it("no longer shows the import and export cards on the Data master tab", async () => {
@@ -63,12 +49,14 @@ it("no longer shows the import and export cards on the Data master tab", async (
   expect(screen.queryByRole("region", { name: "Export & Import" })).toBeNull();
   expect(screen.queryByRole("link", { name: /Impor CSV Data Master/ })).toBeNull();
   expect(screen.queryByRole("link", { name: /Export Data/ })).toBeNull();
-  expect(screen.getByRole("region", { name: "Data master & admin" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Data master" })).toBeInTheDocument();
 });
 
 it("hides the Export & Import section when the search matches neither card", async () => {
   await openTab("Export & Import");
-  await userEvent.setup().type(screen.getByPlaceholderText("Cari pengaturan..."), "region");
+  await userEvent
+    .setup()
+    .type(screen.getByRole("searchbox", { name: "Cari pengaturan" }), "region");
   expect(screen.queryByRole("region", { name: "Export & Import" })).toBeNull();
   expect(screen.getByText("Tidak ada pengaturan yang cocok.")).toBeInTheDocument();
 });

@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../../_protected";
+import { protectedRoute, requirePermission } from "../../_protected";
 
 // Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends.
 const AdminPksTypesPage = lazyRouteComponent(
@@ -11,7 +11,7 @@ const AdminPksTypesPage = lazyRouteComponent(
 export const adminPksTypesRoute = createRoute({
   path: "/settings/admin/pks-types",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN", "ADMIN_PARAM"]),
+  beforeLoad: requirePermission("settings.pks-types"),
   loader: () => AdminPksTypesPage.preload?.(),
   component: AdminPksTypesRouteComponent,
 });

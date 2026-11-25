@@ -17,7 +17,7 @@ const ITEMS: NavItem[] = [
     label: "Dashboard",
     icon: LayoutGrid,
     href: "/",
-    roles: ["*"],
+    permission: "dashboard",
     group: "general",
   },
   {
@@ -25,7 +25,7 @@ const ITEMS: NavItem[] = [
     label: "Vendor Request",
     icon: Truck,
     href: "/replenishment/vendor-requests",
-    roles: ["*"],
+    permission: "replenish.vendor-requests",
     group: "replenish",
   },
   {
@@ -33,7 +33,7 @@ const ITEMS: NavItem[] = [
     label: "Pengaturan",
     icon: Settings2,
     href: "/settings",
-    roles: ["*"],
+    permission: "settings.users",
     group: "system",
     placement: "sidebar-footer",
   },

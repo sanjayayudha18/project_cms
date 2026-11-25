@@ -9,9 +9,11 @@
  * (the hub opens on "Akses & persetujuan"), so those tests switch tab first.
  */
 
+import { usePermissionStore } from "@/lib/auth/permissionStore";
+import { SETTINGS_HUB_KEYS } from "@/routes/settings";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsHubPage } from "../components/SettingsHubPage";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
@@ -34,6 +36,10 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
+beforeEach(() => {
+  usePermissionStore.setState({ keys: new Set(SETTINGS_HUB_KEYS), status: "ready" });
+});
+
 function renderMasterTab() {
   render(<SettingsHubPage />);
   fireEvent.click(screen.getByRole("tab", { name: "Data master" }));
@@ -41,7 +47,6 @@ function renderMasterTab() {
 
 describe("SettingsHubPage — admin cards (Task 10)", () => {
   it.each([
-    ["Manajemen Pengguna", "/settings/admin/users"],
     ["Manajemen Vendor", "/settings/admin/vendors"],
     ["Manajemen ATM", "/settings/admin/atms"],
     ["Manajemen Region", "/settings/admin/regions"],
@@ -56,12 +61,21 @@ describe("SettingsHubPage — admin cards (Task 10)", () => {
     expect(screen.queryByRole("link", { name: /Manajemen Region/ })).not.toBeInTheDocument();
   });
 
-  it("keeps the existing Hierarki Pengguna card distinct (read-only hierarchy vs CRUD)", () => {
+  it.each([
+    ["Hierarki Pengguna", "/settings/rbac/users"],
+    ["Manajemen Pengguna", "/settings/admin/users"],
+  ])("links %s to %s on the default Akses & persetujuan tab", (name, href) => {
     render(<SettingsHubPage />);
-    expect(screen.getByText("Hierarki Pengguna")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Kelola hierarki/ })).toHaveAttribute(
-      "href",
-      "/settings/rbac/users",
+    expect(screen.getByRole("tab", { name: "Akses & persetujuan" })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
+    expect(screen.getByRole("link", { name: new RegExp(name) })).toHaveAttribute("href", href);
+  });
+
+  it("shows only the three categories in the rail (no 'Semua')", () => {
+    render(<SettingsHubPage />);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.queryByRole("tab", { name: "Semua" })).toBeNull();
   });
 });

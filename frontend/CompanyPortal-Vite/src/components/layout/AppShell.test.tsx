@@ -4,6 +4,8 @@
  * Req 4.1, 4.2, 4.6, 4.7, 6.1, 6.3, 6.4, 8.2, 12.7, 12.8, 15.4, 16.1–16.3, 16.5.
  */
 
+import { SCREEN_KEYS } from "@/lib/auth/permissionKeys";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { useAuthStore } from "@/lib/auth/store";
 import { DEFAULT_SHELL_PREFS, SHELL_PREFS_KEY, useShellPrefs } from "@/lib/shell/prefs";
 import {
@@ -94,6 +96,7 @@ beforeEach(() => {
   setViewport(false);
   // jsdom tidak punya scrollIntoView; CommandPalette memanggilnya di effect.
   Element.prototype.scrollIntoView = vi.fn();
+  usePermissionStore.setState({ keys: new Set(SCREEN_KEYS), status: "ready" });
   useAuthStore.setState({
     user: {
       id: 1,

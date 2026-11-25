@@ -1,12 +1,10 @@
 /**
- * vendor-party-scope Req 2.13 / D8: /api/v1/admin/users is APPACCESS + ADMIN only, so the
- * "Manajemen Pengguna" card (Data master tab) is hidden for ADMIN_PARAM. The frontend
- * requireRoles() still lets ADMIN_PARAM through to the route; the backend 403 is the real guard.
+ * permission-catalog-coverage task 6.2: hub cards are shown per catalog key
+ * (permissionStore), not per role. Hiding is UX only; routes/API still guard.
  */
 
 import { SettingsHubPage } from "@/features/rbac-settings";
-import { useAuthStore } from "@/lib/auth/store";
-import type { DbRole } from "@/lib/auth/store";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -32,23 +30,8 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-function setUser(role: DbRole) {
-  useAuthStore.setState({
-    user: {
-      id: 1,
-      username: "test.user",
-      fullName: "Test User",
-      email: "test@cimb.local",
-      role,
-      isKaryawan: true,
-      vendorId: null,
-    },
-    accessToken: "test-token",
-    isAuthenticated: true,
-    isAuthLoading: false,
-    error: null,
-    rateLimitRetryAfter: null,
-  });
+function grant(...keys: string[]) {
+  usePermissionStore.setState({ keys: new Set(keys), status: "ready" });
 }
 
 async function openMasterTab() {
@@ -56,73 +39,60 @@ async function openMasterTab() {
 }
 
 beforeEach(() => {
-  useAuthStore.setState({
-    user: null,
-    accessToken: null,
-    isAuthenticated: false,
-    isAuthLoading: false,
-    error: null,
-    rateLimitRetryAfter: null,
-  });
+  usePermissionStore.setState({ keys: new Set(), status: "idle" });
 });
 
-describe("SettingsHubPage — Manajemen Pengguna card visibility", () => {
-  it.each(["APPACCESS", "ADMIN"] as const)("is visible for %s", async (role) => {
-    setUser(role);
+describe("SettingsHubPage — cards per permission key", () => {
+  it("shows Manajemen Pengguna and Tambah Pengguna with settings.users", () => {
+    grant("settings.users");
     render(<SettingsHubPage />);
-    await openMasterTab();
 
     expect(screen.getByRole("link", { name: /Manajemen Pengguna/ })).toHaveAttribute(
       "href",
       "/settings/admin/users",
     );
+    expect(screen.getByRole("link", { name: /Tambah Pengguna/ })).toHaveAttribute(
+      "href",
+      "/settings/admin/users/new",
+    );
   });
 
-  it("is hidden for ADMIN_PARAM, while other master-data cards stay", async () => {
-    setUser("ADMIN_PARAM");
+  it("hides user cards without settings.users, while other granted cards stay", async () => {
+    grant("settings.vendors");
     render(<SettingsHubPage />);
-    await openMasterTab();
 
     expect(screen.queryByRole("link", { name: /Manajemen Pengguna/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Tambah Pengguna/ })).not.toBeInTheDocument();
+    await openMasterTab();
     expect(screen.getByRole("link", { name: /Manajemen Vendor/ })).toBeInTheDocument();
   });
-});
 
-describe("SettingsHubPage — Daftar PKS card per role (Req 9.3)", () => {
-  it("ATM-SPV sees only Daftar PKS and Manajemen Vendor", async () => {
-    setUser("ATM-SPV");
+  it("read-only PKS access shows only Daftar PKS and Manajemen Vendor", () => {
+    grant("settings.pks", "settings.vendors");
     render(<SettingsHubPage />);
 
+    // Only the Data master category is visible, so the hub falls back to it.
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
     expect(screen.getByRole("link", { name: /Daftar PKS/ })).toHaveAttribute(
       "href",
       "/settings/admin/pks",
     );
     expect(screen.getByRole("link", { name: /Manajemen Vendor/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Manajemen Pengguna/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Manajemen ATM/ })).not.toBeInTheDocument();
   });
 
-  it("ADMIN sees Daftar PKS on the Data master tab", async () => {
-    setUser("ADMIN");
+  it("shows Area ACM and Manajemen Peran only with their own keys", async () => {
+    grant("settings.acm-areas", "settings.roles");
     render(<SettingsHubPage />);
+    expect(screen.getByRole("link", { name: /Manajemen Peran/ })).toBeInTheDocument();
     await openMasterTab();
-    expect(screen.getByRole("link", { name: /Daftar PKS/ })).toBeInTheDocument();
-  });
-});
-
-describe("SettingsHubPage — Tambah Pengguna button", () => {
-  it.each(["APPACCESS", "ADMIN"] as const)("links to the users page for %s", (role) => {
-    setUser(role);
-    render(<SettingsHubPage />);
-    expect(screen.getByRole("link", { name: /Tambah Pengguna/ })).toHaveAttribute(
-      "href",
-      "/settings/admin/users",
-    );
+    expect(screen.getByRole("link", { name: /Area ACM/ })).toBeInTheDocument();
   });
 
-  it.each(["ADMIN_PARAM", "ATM-SPV"] as const)("is hidden for %s", (role) => {
-    setUser(role);
+  it.each(["idle", "loading", "error"] as const)("shows no cards while status is %s", (status) => {
+    usePermissionStore.setState({ keys: new Set(["settings.users"]), status });
     render(<SettingsHubPage />);
-    expect(screen.queryByRole("link", { name: /Tambah Pengguna/ })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
   });
 });

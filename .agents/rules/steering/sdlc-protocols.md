@@ -1,6 +1,6 @@
 # Steering: AI Collaboration Rules, AI-Native SDLC & Scope-Driven Dev
 
-> **Scope**: AI Collaboration Rules ("the leash" Sec 4), 4 Metode Pengembangan di `.agents/`, 6 Tahap AI-Native SDLC (Sec 4a), Scope-Driven Development (ScDD), Gerbang Sec 4 #7, Graphify navigation, dan Tech-Debt backlog.  
+> **Scope**: AI Collaboration Rules ("the leash" Sec 4), 5 Metode Pengembangan di `.agents/`, 6 Tahap AI-Native SDLC (Sec 4a), UI Revamp Dev, Scope-Driven Development (ScDD), Gerbang Sec 4 #7, Graphify navigation, dan Tech-Debt backlog.  
 > **Source of Truth**: Disinkronkan dari `.claude/CLAUDE.md` (Sec 1a, 4, 4a, 15) & standar `.agents/`.  
 > **Referenced by**: [GEMINI.md](file:///c:/Users/RB%20Yudha%20Rangga/OneDrive/Documents/Development/CMS2/.agents/rules/GEMINI.md)
 
@@ -22,16 +22,17 @@
 
 ---
 
-## 2. Langkah 0: Pemilihan 4 Metode Pengembangan (Wajib Tanya Dahulu)
+## 2. Langkah 0: Pemilihan 5 Metode Pengembangan (Wajib Tanya Dahulu)
 
-Sebelum menulis kode atau membuat artefak apa pun, agen **wajib bertanya terlebih dahulu** kepada user dengan menyajikan **4 pilihan metode pengembangan** beserta evaluasi checklist dan rekomendasinya:
+Sebelum menulis kode atau membuat artefak apa pun, agen **wajib bertanya terlebih dahulu** kepada user dengan menyajikan **5 pilihan metode pengembangan** beserta evaluasi checklist dan rekomendasinya:
 
 | # | Metode | Lokasi Artefak (Gemini `.agents/`) | Kapan Digunakan |
 |---|---|---|---|
 | **1** | **Spec-Driven Dev (6-Stage Spec)** | `.agents/specs/<feature>/` *(Selesai: `.agents/specs/done/<feature>/`)* | Fitur baru yang besar/kompleks, persyaratan belum tertulis utuh di FSD/URS, atau menyentuh **Sec 4 #7** (auth, money, recon, migrasi DB, delete). |
 | **2** | **Scope-Driven Dev (ScDD)** | `.agents/scopes/<feature>/` *(Selesai: `.agents/scopes/done/<feature>/`)* | Fitur yang persyaratannya sudah jelas di dokumen sumber resmi (DSR/FSD/URS) atau batasan MVP/MoSCoW yang terdefinisi jelas. |
-| **3** | **Bug Fix** | `.agents/bugfixes.md` *(urutan terbaru di atas)* | Perbaikan bug/error/failing test/lint finding. Wajib mengikuti alur: *diagnosa → tulis failing test → minimal fix → verifikasi → catat di `bugfixes.md`* (skill `cms2-bugfix`). |
-| **4** | **Small Change Dev** | `.agents/changes.md` | Perubahan kecil (<2 file, tweak UI minor, typo, copy text) yang **tidak** menyentuh Sec 4 #7 atau skema DB. |
+| **3** | **UI Revamp Dev** | `.agents/ui-revamps/<screen>/` *(Selesai: `.agents/ui-revamps/done/<screen>/`)* | Perombakan visual & UX (`audit.md` → `desain artifact` → `ui-spec.md` → `tasks.md`): redesain layar, table overhaul, filter toolbar, responsive layout, 4 status UI, dan brand alignment tanpa migrasi DB. |
+| **4** | **Bug Fix** | `.agents/bugfixes.md` *(urutan terbaru di atas)* | Perbaikan bug/error/failing test/lint finding. Wajib mengikuti alur: *diagnosa → tulis failing test → minimal fix → verifikasi → catat di `bugfixes.md`* (skill `cms2-bugfix`). |
+| **5** | **Small Work Dev** | `.agents/changes.md` | Perubahan kecil **bukan bug** (ubah label/teks, tambah/sembunyikan/urutkan elemen UI, tweak perilaku yang ada, docs/tooling/config): satu concern, ≤5 file, tanpa skema/migrasi, tanpa endpoint baru/berubah, tanpa aturan bisnis baru, di luar Sec 4 #7, bukan redesain layar. **Gate**: user OK AC sebelum koding. |
 
 > **Interoperabilitas Lintas Direktori**: Artefak yang dikerjakan di Antigravity/Gemini dicatat di dalam `.agents/` agar rapi dan terpisah. Namun jika user secara eksplisit meminta melanjutkan spec/scope yang sudah dimulai di `.kiro/specs/<feature>/`, `.claude/dev-plan/plan-perscope/dev-phase-perscope/<n>-<scope>/`, atau `.claude/sdlc/<feature>/` (legacy), kerjakan langsung di lokasi yang diminta user tersebut tanpa memigrasikan foldernya.
 

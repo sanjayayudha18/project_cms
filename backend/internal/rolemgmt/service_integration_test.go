@@ -47,7 +47,7 @@ func harness(t *testing.T) (*PermissionService, int64, []int64, string) {
 		t.Fatalf("loading seeded admin user: %v", err)
 	}
 
-	rows, err := tx.Query(ctx, `SELECT id FROM menu_features WHERE key IN ('dashboard', 'cash-flow') ORDER BY key`)
+	rows, err := tx.Query(ctx, `SELECT id FROM menu_features WHERE key IN ('monitoring.audit-logs', 'cash-flow') ORDER BY key`)
 	if err != nil {
 		t.Fatalf("loading seeded catalog entries: %v", err)
 	}
@@ -61,7 +61,7 @@ func harness(t *testing.T) (*PermissionService, int64, []int64, string) {
 	}
 	rows.Close()
 	if len(catalogIDs) != 2 {
-		t.Fatalf("expected 2 seeded catalog entries (dashboard, cash-flow), got %d — is migration 040 applied?", len(catalogIDs))
+		t.Fatalf("expected 2 seeded catalog entries (monitoring.audit-logs, cash-flow; dashboard is Always_On since 046), got %d — is migration 040 applied?", len(catalogIDs))
 	}
 
 	repo := NewRepository(tx, tx)

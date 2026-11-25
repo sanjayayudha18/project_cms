@@ -13,6 +13,7 @@ import {
 } from "@/lib/config/navigation";
 import type { SidebarTheme } from "@/lib/shell/prefs";
 import { cn } from "@/lib/utils/cn";
+import { RefreshCw } from "lucide-react";
 import { type CSSProperties, type KeyboardEvent, useRef, useState } from "react";
 
 export const SIDEBAR_WIDTH_EXPANDED = "264px";
@@ -20,6 +21,9 @@ export const SIDEBAR_WIDTH_RAIL = "76px";
 
 export interface SidebarProps {
   visible: VisibleNav;
+  /** Izin gagal dimuat: tampil banner + "Coba lagi" (Req 5.5). */
+  permissionError?: boolean;
+  onRetryPermissions?: () => void;
   active?: NavItem;
   badges: Partial<Record<NavBadgeSource, NavBadge>>;
   /** Rail efektif (prefs.rail || viewport sempit), dihitung AppShell. */
@@ -33,6 +37,8 @@ export interface SidebarProps {
 /** Sidebar CROWN: merakit brand, grup menu, dan footer; semua data datang lewat props (Req 2.1, 4.1, 6.1). */
 export function Sidebar({
   visible,
+  permissionError,
+  onRetryPermissions,
   active,
   badges,
   rail,
@@ -96,6 +102,24 @@ export function Sidebar({
       )}
     >
       <SidebarBrand rail={rail} />
+      {permissionError ? (
+        <div
+          role="alert"
+          className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-[var(--shell-sb-line)] px-2 py-2 text-xs text-[var(--shell-sb-ink,inherit)]"
+        >
+          {rail ? null : <span className="min-w-0 flex-1">Menu gagal dimuat</span>}
+          <button
+            type="button"
+            onClick={onRetryPermissions}
+            aria-label="Coba lagi memuat menu"
+            title="Coba lagi memuat menu"
+            className="shell-focus inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1 rounded-md px-2 font-semibold underline"
+          >
+            <RefreshCw aria-hidden="true" className="size-3.5" />
+            {rail ? null : "Coba lagi"}
+          </button>
+        </div>
+      ) : null}
       <nav
         ref={navRef}
         aria-label="Menu navigasi"

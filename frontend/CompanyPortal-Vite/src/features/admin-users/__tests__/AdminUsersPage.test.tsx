@@ -193,13 +193,13 @@ describe("AdminUsersPage — states and navigation (fe-coverage C2)", () => {
     expect(enableMutate).toHaveBeenCalledWith(8, expect.anything());
   });
 
-  it("opens the user form for create and for edit", async () => {
+  it("Tambah Pengguna goes to its own page; Ubah opens the edit dialog", async () => {
     const user = userEvent.setup();
     render(<AdminUsersPage />);
 
     await user.click(screen.getByRole("button", { name: "Tambah Pengguna" }));
-    expect(screen.getByRole("dialog", { name: "Tambah Pengguna" })).toBeInTheDocument();
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Batal" }));
+    expect(nav.navigate).toHaveBeenCalledWith({ to: "/settings/admin/users/new" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Ubah" }));
     expect(await screen.findByRole("dialog", { name: "Ubah Pengguna" })).toBeInTheDocument();
@@ -213,25 +213,5 @@ describe("AdminUsersPage — states and navigation (fe-coverage C2)", () => {
     await userEvent.setup().selectOptions(screen.getByLabelText("Status"), "all");
 
     expect(nav.navigate).toHaveBeenLastCalledWith({ to: ".", search: { status: "all" } });
-  });
-});
-
-describe("AdminUsersPage — ?create=true from the Settings hub", () => {
-  it("opens the Tambah Pengguna dialog on arrival and drops ?create on close", async () => {
-    nav.search = { create: true };
-    render(<AdminUsersPage />);
-
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("Tambah Pengguna")).toBeInTheDocument();
-
-    await userEvent.setup().click(within(dialog).getByRole("button", { name: "Batal" }));
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(nav.navigate).toHaveBeenCalledWith({ to: ".", search: {} });
-  });
-
-  it("keeps the dialog closed without ?create", () => {
-    render(<AdminUsersPage />);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

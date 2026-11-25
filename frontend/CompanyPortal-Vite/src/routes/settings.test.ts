@@ -1,49 +1,44 @@
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { useAuthStore } from "@/lib/auth/store";
-import type { DbRole } from "@/lib/auth/store";
 import { beforeEach, describe, expect, it } from "vitest";
-import { settingsRoute } from "./settings";
+import { ForbiddenError } from "./_protected";
 import { rbacDelegationsRoute } from "./settings/rbac/delegations";
 import { rbacLeavesRoute } from "./settings/rbac/leaves";
 import { rbacPoliciesRoute } from "./settings/rbac/policies";
 import { rbacUsersRoute } from "./settings/rbac/users";
 
 /**
- * Route guards for /settings and /settings/rbac/* (Task 16.3, Requirements
- * 1.2, 1.3, 1.4, 3.2). Unlike audit-logs.test.ts (which duplicates the role
- * list), this calls each registered route's actual beforeLoad so a role-list
- * regression in any route file fails here directly. requireRoles' generic
- * behavior is exhaustively covered by _protected.property.test.ts.
+ * Route guards for /settings/rbac/* (permission-catalog-coverage task 6.3): each route
+ * calls requirePermission(<its screen key>). The hub itself is covered by settings.guard.test.ts.
  */
 
-type GuardResult = { forbidden?: boolean } | undefined;
-type Guard = () => GuardResult;
+type Guard = () => Promise<void>;
 
 function guardOf(route: unknown): Guard {
-  const beforeLoad = (route as { options: { beforeLoad: unknown } }).options.beforeLoad;
-  return beforeLoad as Guard;
+  return (route as { options: { beforeLoad: Guard } }).options.beforeLoad;
 }
 
-const SETTINGS_ROUTES: { path: string; route: unknown }[] = [
-  { path: "/settings", route: settingsRoute },
-  { path: "/settings/rbac/users", route: rbacUsersRoute },
-  { path: "/settings/rbac/delegations", route: rbacDelegationsRoute },
-  { path: "/settings/rbac/leaves", route: rbacLeavesRoute },
-  { path: "/settings/rbac/policies", route: rbacPoliciesRoute },
+const SETTINGS_ROUTES = [
+  { path: "/settings/rbac/users", route: rbacUsersRoute, key: "settings.rbac-users" },
+  {
+    path: "/settings/rbac/delegations",
+    route: rbacDelegationsRoute,
+    key: "settings.rbac-delegations",
+  },
+  { path: "/settings/rbac/leaves", route: rbacLeavesRoute, key: "settings.rbac-leaves" },
+  { path: "/settings/rbac/policies", route: rbacPoliciesRoute, key: "settings.rbac-policies" },
 ];
 
-const NON_AUTHORIZED_ROLES: DbRole[] = ["ATM-USER", "BRANCH-USER", "VENDOR-USER"];
-const AUTHORIZED_ROLES: DbRole[] = ["ADMIN", "ADMIN_PARAM", "APPACCESS"];
-
-function setUser(role: DbRole) {
+function signIn() {
   useAuthStore.setState({
     user: {
       id: 1,
       username: "test.user",
       fullName: "Test User",
       email: "test@cimb.local",
-      role,
-      isKaryawan: role !== "VENDOR-USER",
-      vendorId: role === "VENDOR-USER" ? 1 : null,
+      role: "ADMIN",
+      isKaryawan: true,
+      vendorId: null,
     },
     accessToken: "test-token",
     isAuthenticated: true,
@@ -53,29 +48,23 @@ function setUser(role: DbRole) {
   });
 }
 
-describe.each(SETTINGS_ROUTES)("settings route guard: $path", ({ route }) => {
+describe.each(SETTINGS_ROUTES)("settings route guard: $path", ({ route, key }) => {
   beforeEach(() => {
-    useAuthStore.setState({
-      user: null,
-      accessToken: null,
-      isAuthenticated: false,
-      isAuthLoading: false,
-      error: null,
-      rateLimitRetryAfter: null,
-    });
+    signIn();
+    usePermissionStore.setState({ keys: new Set(), status: "ready" });
   });
 
-  it.each(NON_AUTHORIZED_ROLES)("denies non-authorized role %s", (role) => {
-    setUser(role);
-    expect(guardOf(route)()).toEqual({ forbidden: true });
+  it("allows a user holding the screen key", async () => {
+    usePermissionStore.setState({ keys: new Set([key]), status: "ready" });
+    await expect(guardOf(route)()).resolves.toBeUndefined();
   });
 
-  it.each(AUTHORIZED_ROLES)("allows authorized role %s", (role) => {
-    setUser(role);
-    expect(guardOf(route)()).toBeUndefined();
+  it("denies a user without the screen key, even as ADMIN (no bypass)", async () => {
+    await expect(guardOf(route)()).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it("redirects to /login when unauthenticated", () => {
-    expect(() => guardOf(route)()).toThrow();
+  it("redirects to /login when unauthenticated", async () => {
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+    await expect(guardOf(route)()).rejects.toBeDefined();
   });
 });

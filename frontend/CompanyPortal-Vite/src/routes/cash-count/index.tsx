@@ -10,11 +10,12 @@ import {
   Table,
   Users,
 } from "lucide-react";
-import { protectedRoute } from "../_protected";
+import { protectedRoute, requirePermission } from "../_protected";
 
 export const cashCountRoute = createRoute({
   path: "/cash-count",
   getParentRoute: () => protectedRoute,
+  beforeLoad: requirePermission("cash-count"),
   component: CashCountPage,
 });
 

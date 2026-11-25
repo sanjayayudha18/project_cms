@@ -16,6 +16,8 @@ export interface CatalogEntry {
   label: string;
   kind: "menu" | "feature";
   sort_order: number;
+  /** Roles allowed to hold this key; null/absent = every internal role (migration 046). */
+  assignable_roles?: string[] | null;
 }
 
 /** One granted catalog entry, as embedded in RoleWithPermissions.permissions. */

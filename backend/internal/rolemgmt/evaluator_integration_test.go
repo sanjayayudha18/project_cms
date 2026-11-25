@@ -23,8 +23,8 @@ func TestHasPermission_DecisionComesOnlyFromMapping(t *testing.T) {
 	}
 
 	// New role: no grants yet, so no permission for any key -- including a
-	// key that exists in the catalog (dashboard) and one that doesn't.
-	allowed, err := evaluator.HasPermission(ctx, roleName, "dashboard")
+	// key that exists in the catalog (monitoring.audit-logs) and one that doesn't.
+	allowed, err := evaluator.HasPermission(ctx, roleName, "monitoring.audit-logs")
 	if err != nil {
 		t.Fatalf("HasPermission (before grant): %v", err)
 	}
@@ -42,7 +42,7 @@ func TestHasPermission_DecisionComesOnlyFromMapping(t *testing.T) {
 	// A role name that has never existed at all must also be false, not
 	// error -- proves the decision is a plain mapping lookup, not a role
 	// existence/hardcoded-list check.
-	allowed, err = evaluator.HasPermission(ctx, "NEVER-EXISTED-ROLE-"+tag, "dashboard")
+	allowed, err = evaluator.HasPermission(ctx, "NEVER-EXISTED-ROLE-"+tag, "monitoring.audit-logs")
 	if err != nil {
 		t.Fatalf("HasPermission (nonexistent role): %v", err)
 	}
@@ -50,14 +50,14 @@ func TestHasPermission_DecisionComesOnlyFromMapping(t *testing.T) {
 		t.Fatal("HasPermission returned true for a role that was never created")
 	}
 
-	// catalogIDs is ordered by key ASC ("cash-flow" < "dashboard"), so index
-	// 1 is dashboard's id -- grant that one to match the "dashboard" key
+	// catalogIDs is ordered by key ASC ("cash-flow" < "monitoring.audit-logs"), so index
+	// 1 is monitoring.audit-logs id -- grant that one to match the "monitoring.audit-logs" key
 	// assertions below.
 	if _, err := svc.UpdateRolePermissions(ctx, adminUserID, "ADMIN", role.ID, []int64{catalogIDs[1]}, ""); err != nil {
 		t.Fatalf("UpdateRolePermissions: %v", err)
 	}
 
-	allowed, err = evaluator.HasPermission(ctx, roleName, "dashboard")
+	allowed, err = evaluator.HasPermission(ctx, roleName, "monitoring.audit-logs")
 	if err != nil {
 		t.Fatalf("HasPermission (after grant): %v", err)
 	}

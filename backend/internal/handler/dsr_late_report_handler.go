@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	"github.com/cimb-niaga/cms/pkg/middleware"
 	"github.com/cimb-niaga/cms/pkg/reports"
 )
 
@@ -24,14 +24,22 @@ type DsrLateReader interface {
 }
 
 type DsrLateHandler struct {
-	svc DsrLateReader
+	svc  DsrLateReader
+	perm *rolemgmt.PermissionEvaluator // nil = role guard only
+}
+
+// WithPermissions replaces the viewer role guard with monitoring.dsr-late-report
+// (the service still re-checks the role).
+func (h *DsrLateHandler) WithPermissions(e *rolemgmt.PermissionEvaluator) *DsrLateHandler {
+	h.perm = e
+	return h
 }
 
 func NewDsrLateHandler(svc DsrLateReader) *DsrLateHandler { return &DsrLateHandler{svc: svc} }
 
 func (h *DsrLateHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Use(middleware.RequireRoles(reports.DsrLateViewerRoles...))
+	r.Use(viewGuard(h.perm, []string{"monitoring.dsr-late-report"}, reports.DsrLateViewerRoles)...)
 	r.Get("/daily", h.Daily)
 	r.Get("/summary", h.Summary)
 	r.Get("/warnings", h.Warnings)

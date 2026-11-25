@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "./_protected";
+import { protectedRoute, requirePermission } from "./_protected";
 
 const DsrLateReportScreen = lazyRouteComponent(
   () => import("@/features/dsr-late-report"),
@@ -10,7 +10,7 @@ const DsrLateReportScreen = lazyRouteComponent(
 export const dsrLateReportRoute = createRoute({
   path: "/dsr-late-report",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"]),
+  beforeLoad: requirePermission("monitoring.dsr-late-report"),
   loader: () => DsrLateReportScreen.preload?.(),
   component: DsrLateReportRouteComponent,
 });

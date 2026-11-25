@@ -1,8 +1,11 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { Forbidden } from "@/components/pages/Forbidden";
 import { NotificationBell } from "@/features/notifications";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { useAuthStore } from "@/lib/auth/store";
 import type { DbRole } from "@/lib/auth/store";
-import { Navigate, Outlet, createRoute, redirect } from "@tanstack/react-router";
+import { ErrorComponent, Navigate, Outlet, createRoute, redirect } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 
 /**
@@ -11,7 +14,7 @@ import { rootRoute } from "./__root";
  * beforeLoad checks (in order):
  * 1. isAuthLoading → allow through (component handles loading state)
  * 2. Not authenticated → redirect to /login?redirect={currentPath}
- * 3. Role check delegated to child routes via requireRoles()
+ * 3. Access check delegated to child routes via requirePermission()
  */
 export const protectedRoute = createRoute({
   id: "_protected",
@@ -31,7 +34,27 @@ export const protectedRoute = createRoute({
     }
   },
   component: ProtectedLayout,
+  errorComponent: ProtectedError,
 });
+
+/** Thrown by requirePermission; protectedRoute's errorComponent renders the 403 page. */
+export class ForbiddenError extends Error {
+  constructor() {
+    super("Forbidden");
+    this.name = "ForbiddenError";
+  }
+}
+
+function ProtectedError(props: ErrorComponentProps) {
+  if (props.error instanceof ForbiddenError) {
+    return (
+      <AppShell notifications={<NotificationBell />}>
+        <Forbidden />
+      </AppShell>
+    );
+  }
+  return <ErrorComponent {...props} />;
+}
 
 function ProtectedLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -54,39 +77,25 @@ function ProtectedLayout() {
   );
 }
 
-// ─── RBAC Helper ──────────────────────────────────────────────────────────────
+// ─── Permission guard (spec permission-catalog-coverage) ──────────────────────
 
 /**
- * Creates a beforeLoad guard that checks user role against required roles.
- * Use in child routes that need role-specific access control.
- *
- * Behavior:
- * - If user is not authenticated → redirect to /login
- * - If user role is ADMIN or ADMIN_PARAM → bypass role check (access granted)
- * - If user role is in allowedRoles → access granted
- * - Otherwise → return { forbidden: true } to signal component to show 403 page
+ * beforeLoad guard: the user needs at least one of `key` in their role's permission set.
+ * No ADMIN/ADMIN_PARAM bypass. `opts.roles` narrows further (e.g. exports dataset).
+ * Waits for session restore and the permission load; no key → throws ForbiddenError.
  */
-export function requireRoles(allowedRoles: DbRole[]) {
-  return () => {
+export function requirePermission(key: string | readonly string[], opts?: { roles?: DbRole[] }) {
+  const keys = typeof key === "string" ? [key] : key;
+  return async () => {
     const { user, isAuthLoading } = useAuthStore.getState();
-
-    // Hard load: the session is still being restored from the refresh cookie, so `user` is
-    // null for a moment. Redirecting now would bounce a signed-in user to /login -> /.
-    // RootComponent re-runs the guards (router.invalidate) once auth has resolved.
+    // Session still restoring; RootComponent re-runs guards once it resolves.
     if (isAuthLoading) return;
+    if (!user) throw redirect({ to: "/login" });
 
-    if (!user) {
-      throw redirect({ to: "/login" });
-    }
+    const perms = usePermissionStore.getState();
+    if (perms.status === "idle" || perms.status === "loading") await perms.load();
 
-    // ADMIN and ADMIN_PARAM bypass all role checks
-    if (user.role === "ADMIN" || user.role === "ADMIN_PARAM") return;
-
-    const hasRequiredRole = allowedRoles.includes(user.role);
-
-    if (!hasRequiredRole) {
-      // Signal to the route component to show 403 Forbidden page
-      return { forbidden: true };
-    }
+    if (opts?.roles && !opts.roles.includes(user.role)) throw new ForbiddenError();
+    if (!usePermissionStore.getState().hasAny(keys)) throw new ForbiddenError();
   };
 }

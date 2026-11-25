@@ -1,9 +1,13 @@
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { useAuthStore } from "@/lib/auth/store";
 import type { AuthUser } from "@/lib/auth/store";
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { rootRoute } from "./__root";
-import { requireRoles } from "./_protected";
+import { ForbiddenError, requirePermission } from "./_protected";
+
+const getMock = vi.fn();
+vi.mock("@/lib/api/client", () => ({ api: { get: (...a: unknown[]) => getMock(...a) } }));
 
 /**
  * Hard-load regression: on a refresh / pasted URL the session is still being restored from the
@@ -41,25 +45,27 @@ function setAuth(partial: Partial<ReturnType<typeof useAuthStore.getState>>) {
 
 beforeEach(() => invalidateMock.mockReset());
 
-describe("requireRoles while the session is being restored", () => {
-  it("neither redirects nor blocks while auth is loading, even though user is still null", () => {
+describe("requirePermission while the session is being restored", () => {
+  beforeEach(() => usePermissionStore.getState().reset());
+
+  it("neither redirects nor blocks while auth is loading, even though user is still null", async () => {
     setAuth({ isAuthLoading: true });
 
-    expect(() => requireRoles(["ADMIN"])()).not.toThrow();
-    expect(requireRoles(["ADMIN"])()).toBeUndefined();
+    await expect(requirePermission("settings.atms")()).resolves.toBeUndefined();
   });
 
-  it("still redirects an unauthenticated user once loading has finished", () => {
+  it("still redirects an unauthenticated user once loading has finished", async () => {
     setAuth({ isAuthLoading: false });
 
-    expect(() => requireRoles(["ADMIN"])()).toThrow();
+    await expect(requirePermission("settings.atms")()).rejects.toBeDefined();
   });
 
-  it("applies the role rules unchanged once the user is restored", () => {
+  it("applies the permission rules unchanged once the user is restored", async () => {
+    getMock.mockResolvedValue({ data: { permissions: ["replenish.schedule"] } });
     setAuth({ user: ATM_USER, isAuthenticated: true });
 
-    expect(requireRoles(["ATM-USER"])()).toBeUndefined();
-    expect(requireRoles(["BRANCH-USER"])()).toEqual({ forbidden: true });
+    await expect(requirePermission("replenish.schedule")()).resolves.toBeUndefined();
+    await expect(requirePermission("settings.atms")()).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 

@@ -22,9 +22,13 @@ import (
 type fakeReplicaReader struct {
 	allowed bool
 	err     error
+	calls   int
+	gotKeys []string
 }
 
-func (f *fakeReplicaReader) HasPermission(context.Context, string, string) (bool, error) {
+func (f *fakeReplicaReader) HasAnyPermission(_ context.Context, _ string, keys []string) (bool, error) {
+	f.calls++
+	f.gotKeys = keys
 	return f.allowed, f.err
 }
 
@@ -36,6 +40,10 @@ func (noopBlacklist) IsBlacklisted(context.Context, string) (bool, error) {
 }
 
 func mountRequirePermission(reader ReplicaReader) (http.Handler, *pkgauth.TokenService) {
+	return mountRequirePermissionKeys(reader, "monitoring.audit-logs")
+}
+
+func mountRequirePermissionKeys(reader ReplicaReader, keys ...string) (http.Handler, *pkgauth.TokenService) {
 	tokenSvc := pkgauth.NewTokenService(pkgauth.TokenConfig{
 		SecretKey:          []byte("test-secret-minimum-32-bytes-long!!"),
 		AccessTokenExpiry:  15 * time.Minute,
@@ -46,7 +54,7 @@ func mountRequirePermission(reader ReplicaReader) (http.Handler, *pkgauth.TokenS
 	r := chi.NewRouter()
 	r.With(
 		custommw.RequireAuth(tokenSvc),
-		RequirePermission(evaluator, "dashboard"),
+		RequirePermission(evaluator, keys...),
 	).Get("/protected", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -123,6 +131,54 @@ func TestRequirePermission_Mapped_PassesThrough(t *testing.T) {
 	if rec.Body.String() != "ok" {
 		t.Fatalf("expected passthrough handler body, got: %s", rec.Body.String())
 	}
+}
+
+// Basic any-of / always-on / non-internal wiring (task 2.3). The full
+// Property 4/5 tables are task 2.5.
+func TestRequirePermission_Rules(t *testing.T) {
+	tests := []struct {
+		name      string
+		keys      []string
+		role      string
+		allowed   bool
+		wantCode  int
+		wantCalls int
+	}{
+		{"any-of passes all keys to one query", []string{"settings.vendors", "settings.pks"}, "ATM-SPV", true, http.StatusOK, 1},
+		{"any-of no match -> 403", []string{"settings.vendors", "settings.pks"}, "ATM-SPV", false, http.StatusForbidden, 1},
+		{"always-on key, internal role -> allowed without query", []string{"approvals"}, "ATM-USER", false, http.StatusOK, 0},
+		{"always-on key among others -> allowed without query", []string{"settings.pks", "dashboard"}, "CC-CWM", false, http.StatusOK, 0},
+		{"vendor role -> 403 without query even if granted", []string{"monitoring.audit-logs"}, "VENDOR-USER", true, http.StatusForbidden, 0},
+		{"vendor role on always-on key -> 403", []string{"dashboard"}, "VENDOR-ATM-USER", true, http.StatusForbidden, 0},
+		{"EXT-CLIENT -> 403 without query", []string{"dashboard"}, "EXT-CLIENT", true, http.StatusForbidden, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := &fakeReplicaReader{allowed: tt.allowed}
+			router, ts := mountRequirePermissionKeys(reader, tt.keys...)
+
+			rec := doTestRequest(router, tokenForTestRole(t, ts, tt.role))
+
+			if rec.Code != tt.wantCode {
+				t.Fatalf("code = %d, want %d: %s", rec.Code, tt.wantCode, rec.Body.String())
+			}
+			if reader.calls != tt.wantCalls {
+				t.Fatalf("repo calls = %d, want %d", reader.calls, tt.wantCalls)
+			}
+			if tt.wantCalls > 0 && strings.Join(reader.gotKeys, ",") != strings.Join(tt.keys, ",") {
+				t.Fatalf("repo keys = %v, want %v", reader.gotKeys, tt.keys)
+			}
+		})
+	}
+}
+
+func TestRequirePermission_NoKeys_Panics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for RequirePermission with no keys")
+		}
+	}()
+	RequirePermission(NewPermissionEvaluator(&fakeReplicaReader{}))
 }
 
 var errBoom = &boomError{}

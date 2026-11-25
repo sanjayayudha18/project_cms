@@ -1,4 +1,4 @@
-/** Union of the DSR-late and replenishment report viewers; ADMIN/ADMIN_PARAM bypass in requireRoles. */
+/** Union of the DSR-late and replenishment report viewers; no ADMIN/ADMIN_PARAM bypass (requirePermission). */
 export const EXPORTS_PAGE_ROLES = [
   "ADMIN",
   "ATM-USER",

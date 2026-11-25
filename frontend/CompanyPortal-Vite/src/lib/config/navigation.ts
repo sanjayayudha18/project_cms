@@ -17,8 +17,10 @@ import {
   Table,
   Truck,
 } from "lucide-react";
+import { useMemo } from "react";
 
-import type { DbRole } from "@/lib/auth/store";
+import { SCREEN_KEYS, type ScreenKey } from "@/lib/auth/permissionKeys";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +42,8 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   href: string;
-  roles: (DbRole | "*")[];
+  /** Kunci katalog izin (menu_features.key); array = any-of. */
+  permission: ScreenKey | readonly ScreenKey[];
   group: NavGroup;
   disabled?: boolean;
   /** Default "sidebar". */
@@ -73,6 +76,11 @@ export const SIDEBAR_GROUP_ORDER: NavGroup[] = [
 
 // ─── Navigation Configuration ─────────────────────────────────────────────────
 
+/** Item Pengaturan terlihat bila user punya salah satu layar `settings.*` (hub). */
+const SETTINGS_HUB_KEYS: readonly ScreenKey[] = SCREEN_KEYS.filter((k) =>
+  k.startsWith("settings."),
+);
+
 export const NAV_CONFIG: NavItem[] = [
   // General
   {
@@ -80,7 +88,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Dashboard",
     icon: LayoutGrid,
     href: "/",
-    roles: ["*"],
+    permission: "dashboard",
     group: "general",
   },
   {
@@ -88,7 +96,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Cash Flow Monitoring",
     icon: Activity,
     href: "/cash-flow",
-    roles: ["ATM-USER", "ATM-SPV"],
+    permission: "cash-flow",
     group: "general",
   },
   {
@@ -96,7 +104,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Persetujuan",
     icon: ClipboardCheck,
     href: "/approvals",
-    roles: ["*"],
+    permission: "approvals",
     group: "general",
     badge: "approvals-inbox",
   },
@@ -105,7 +113,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pengaturan",
     icon: Settings2,
     href: "/settings",
-    roles: ["ADMIN", "ADMIN_PARAM", "APPACCESS"],
+    permission: SETTINGS_HUB_KEYS,
     group: "system",
     placement: "sidebar-footer",
   },
@@ -116,7 +124,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Rekomendasi CIT",
     icon: Search,
     href: "/replenishment/forecast-browser",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    permission: "replenish.forecast-browser",
     group: "replenish",
   },
   {
@@ -124,7 +132,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Request CIT",
     icon: ClipboardList,
     href: "/replenishment/vendor-requests",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    permission: "replenish.vendor-requests",
     group: "replenish",
     badge: "cit-requests",
   },
@@ -133,7 +141,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Jadwal CIT",
     icon: Truck,
     href: "/replenishment",
-    roles: ["ATM-USER", "ATM-SPV"],
+    permission: "replenish.schedule",
     group: "replenish",
   },
   // CIT (cit-acm-plan): tim ACM menetapkan branch vault per ATM.
@@ -142,7 +150,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Penetapan Vault",
     icon: Landmark,
     href: "/cit/vault-plans",
-    roles: ["ACM-USER", "ACM-SPV"],
+    permission: "cit.vault-plan",
     group: "cit",
   },
   // Monitoring
@@ -151,7 +159,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "ATM Portal",
     icon: Monitor,
     href: "/atm-portal",
-    roles: ["ATM-USER", "ATM-SPV"],
+    permission: "monitoring.atm-portal",
     group: "monitoring",
   },
   {
@@ -159,7 +167,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Laporan DSR Telat",
     icon: FileClock,
     href: "/dsr-late-report",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-SPV", "ADMIN"],
+    permission: "monitoring.dsr-late-report",
     group: "monitoring",
   },
   {
@@ -167,7 +175,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "EOD Monitoring",
     icon: HeartPulse,
     href: "/eod-monitoring",
-    roles: ["ADMIN", "ADMIN_PARAM"],
+    permission: "monitoring.eod-monitoring",
     group: "monitoring",
     badge: "eod-health",
   },
@@ -176,7 +184,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Log Audit",
     icon: ScrollText,
     href: "/audit-logs",
-    roles: ["ADMIN", "ADMIN_PARAM"],
+    permission: "monitoring.audit-logs",
     group: "monitoring",
   },
 
@@ -185,7 +193,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "DMAA Forecast",
     icon: BarChart3,
     href: "/forecasting/dmaa-forecast",
-    roles: ["ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV"],
+    permission: "forecasting.dmaa-forecast",
     group: "forecasting",
   },
   /*  {
@@ -238,7 +246,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Kalender Libur",
     icon: CalendarDays,
     href: "/settings/admin/holidays",
-    roles: ["ADMIN"],
+    permission: "forecasting.holidays",
     group: "forecasting",
   },
 
@@ -248,7 +256,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Unggah Invoice",
     icon: Receipt,
     href: "/invoice/upload",
-    roles: ["VENDOR-USER", "BRANCH-USER"],
+    permission: "invoice",
     group: "invoice",
     disabled: true,
   },
@@ -278,7 +286,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Penjadwalan",
     icon: CalendarDays,
     href: "/cash-count/scheduling",
-    roles: ["BRANCH-ATM-SPV", "BRANCH-ATM-USER"],
+    permission: "cash-count",
     group: "cash-count",
     disabled: true,
   },
@@ -298,7 +306,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Pelaksanaan (BA)",
     icon: ClipboardCheck,
     href: "/cash-count/execution",
-    roles: ["BRANCH-ATM-USER"],
+    permission: "cash-count",
     group: "cash-count",
     disabled: true,
   },
@@ -327,7 +335,7 @@ export const NAV_CONFIG: NavItem[] = [
     label: "Rekapitulasi",
     icon: Table,
     href: "/cash-count/recapitulation",
-    roles: ["BRANCH-ATM-SPV"],
+    permission: "cash-count",
     group: "cash-count",
     disabled: true,
   },
@@ -335,20 +343,14 @@ export const NAV_CONFIG: NavItem[] = [
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-/**
- * Filters navigation items based on user role.
- * Items with `roles: ['*']` are visible to all authenticated users.
- * Users with 'ADMIN' or 'ADMIN_PARAM' role see all navigation items.
- * Items are included if the user's role is in the item's allowed list.
- */
-export function filterNavByRoles(items: NavItem[], userRole: DbRole): NavItem[] {
-  // ADMIN and ADMIN_PARAM see everything
-  if (userRole === "ADMIN" || userRole === "ADMIN_PARAM") return items;
-
-  return items.filter((item) => {
-    if (item.roles.includes("*")) return true;
-    return item.roles.includes(userRole);
-  });
+/** Item terlihat bila `has` meluluskan salah satu key izinnya. Tanpa bypass role (D5). */
+export function filterNavByPermissions(
+  items: NavItem[],
+  has: (key: ScreenKey) => boolean,
+): NavItem[] {
+  return items.filter((item) =>
+    typeof item.permission === "string" ? has(item.permission) : item.permission.some(has),
+  );
 }
 
 export interface VisibleNav {
@@ -357,9 +359,9 @@ export interface VisibleNav {
   settings?: NavItem;
 }
 
-/** Item yang terlihat untuk role (tanpa `disabled`), dikelompokkan untuk sidebar; grup kosong dibuang. */
-export function getVisibleNav(role: DbRole | null): VisibleNav {
-  const all = (role ? filterNavByRoles(NAV_CONFIG, role) : []).filter((i) => !i.disabled);
+/** Item yang terlihat untuk izin user (tanpa `disabled`), dikelompokkan untuk sidebar; grup kosong dibuang. */
+export function getVisibleNav(has: (key: ScreenKey) => boolean): VisibleNav {
+  const all = filterNavByPermissions(NAV_CONFIG, has).filter((i) => !i.disabled);
   const sidebar = new Map<NavGroup, NavItem[]>();
   for (const group of SIDEBAR_GROUP_ORDER) {
     const items = all.filter((i) => i.group === group && i.placement !== "sidebar-footer");
@@ -391,4 +393,21 @@ export function filterPaletteItems(items: NavItem[], query: string): NavItem[] {
       i.label.toLocaleLowerCase("id-ID").includes(q) ||
       GROUP_LABELS[i.group].toLocaleLowerCase("id-ID").includes(q),
   );
+}
+
+/** Hook: nav terlihat dari store izin; saat loading/error store hanya meloloskan Always_On. */
+export function useVisibleNav(): {
+  visible: VisibleNav;
+  permissionError: boolean;
+  retry: () => void;
+} {
+  const keys = usePermissionStore((s) => s.keys);
+  const status = usePermissionStore((s) => s.status);
+  const load = usePermissionStore((s) => s.load);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keys/status adalah pemicu hitung ulang `has`
+  const visible = useMemo(
+    () => getVisibleNav((k) => usePermissionStore.getState().has(k)),
+    [keys, status],
+  );
+  return { visible, permissionError: status === "error", retry: () => void load() };
 }

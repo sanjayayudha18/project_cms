@@ -14,12 +14,13 @@ Sumber kebenaran: `.agents/rules/GEMINI.md` dan `.agents/agents/gemini-cms-devpl
 
 ## Langkah 0 — Selalu Jalankan Sebelum Menulis Kode
 
-1. Sajikan 4 metode pengembangan kepada user dengan analisis & rekomendasi (Opsi B):
+1. Sajikan 5 metode pengembangan kepada user dengan analisis & rekomendasi (Opsi B):
    - **1. Spec-Driven Dev** (`.agents/specs/<feature>/`): 6-Tahap formal untuk fitur kritis (skema DB, finansial, auth, maker-checker).
    - **2. Scope-Driven Dev** (`.agents/scopes/<feature>/`): Batasan MVP & MoSCoW (`scope.md` -> `tasks.md`) untuk rilis cepat/timebox.
-   - **3. Bug Fix** (`.agents/bugfixes.md`): Perbaikan error/kegagalan sistem menggunakan failing test terlebih dahulu.
-   - **4. Small Change Dev** (`.agents/changes.md`): Perubahan minor <2 file (tweak UI, ubah text, tanpa migrasi DB).
-2. Periksa folder terkait (`.agents/specs/`, `.agents/scopes/`, atau file log). Jika sudah ada, cari **file terakhir dengan `> Status: accepted`** lalu lanjutkan dari tahap berikutnya.
+   - **3. UI Revamp Dev** (`.agents/ui-revamps/<screen>/`): 4-Tahap khusus antarmuka (`audit.md` -> `desain artifact` -> `ui-spec.md` -> `tasks.md`) untuk redesain layar, visual preview, arsitektur komponen & UX.
+   - **4. Bug Fix** (`.agents/bugfixes.md`): Perbaikan error/kegagalan sistem menggunakan failing test terlebih dahulu.
+   - **5. Small Work Dev** (`.agents/changes.md`): Perubahan kecil **bukan bug** (ubah label/teks, tambah/sembunyikan/urutkan elemen UI, tweak perilaku yang ada, docs/tooling/config): satu concern, ≤5 file, tanpa skema/migrasi, tanpa endpoint baru/berubah, tanpa aturan bisnis baru, di luar Sec 4 #7, bukan redesain layar. **Gate**: user OK AC sebelum koding.
+2. Periksa folder terkait (`.agents/specs/`, `.agents/scopes/`, `.agents/ui-revamps/`, atau file log). Jika sudah ada, cari **file terakhir dengan `> Status: accepted`** lalu lanjutkan dari tahap berikutnya.
    Jika kode dan artefak tidak sinkron -> **BERHENTI** dan tanyakan ke user.
 3. Nama folder menggunakan format `kebab-case` (misalnya `vendor-pks`, `vendor-export-pks`).
 

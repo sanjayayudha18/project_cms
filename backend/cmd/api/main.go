@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -98,6 +99,80 @@ func main() {
 	}
 	slog.Info("connected to Redis")
 
+	smtpMailer, notifyInterval := loadNotificationConfig()
+	r, err := buildRouter(routerDeps{
+		Cfg:        cfg,
+		DB:         dbPool,
+		DBRead:     dbReadPool,
+		Redis:      redisClient,
+		SMTPMailer: smtpMailer,
+	})
+	if err != nil {
+		slog.Error("failed to build router", "error", err)
+		os.Exit(1)
+	}
+
+	// Start HTTP server
+	addr := ":" + cfg.Port
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Graceful shutdown
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		slog.Info("starting HTTP server", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("HTTP server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	workerCtx, stopWorker := context.WithCancel(ctx)
+	var mailer notification.Mailer // stays a nil interface when SMTP is off
+	if smtpMailer != nil {
+		mailer = smtpMailer
+	}
+	go notification.NewWorker(dbPool, mailer, notifyInterval).Run(workerCtx)
+
+	<-done
+	slog.Info("shutting down server...")
+	stopWorker()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("server shutdown error", "error", err)
+		os.Exit(1)
+	}
+
+	slog.Info("server stopped gracefully")
+}
+
+// routerDeps is everything buildRouter needs from main: config, the primary
+// and replica pools, Redis and the (nil when SMTP is off) mailer. Kept as a
+// struct so route-walking tests can build the same router (spec
+// permission-catalog-coverage task 4.1; no behaviour change).
+type routerDeps struct {
+	Cfg        *config.Config
+	DB         *pgxpool.Pool
+	DBRead     *pgxpool.Pool
+	Redis      *redis.Client
+	SMTPMailer *notification.SMTPMailer
+}
+
+// buildRouter wires every service and mounts every route. Moved verbatim out
+// of main().
+func buildRouter(d routerDeps) (chi.Router, error) {
+	cfg, dbPool, dbReadPool, redisClient := d.Cfg, d.DB, d.DBRead, d.Redis
+
 	// Set up Chi router
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -161,8 +236,20 @@ func main() {
 	changePasswordService := auth.NewChangePasswordService(userRepo, auditWriter)
 
 	// Create and mount auth handler
-	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService)
+	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbReadPool)
+	authHandler := handler.NewAuthHandler(authService, tokenService, userRepo, rateLimiter, changePasswordService).
+		WithPermissions(roleMgmtRepo) // GET /auth/me/permissions (primary read)
 	r.Mount("/api/v1/auth", authHandler.Routes())
+
+	// Screen permissions (permission-catalog-coverage): perm(keys...) passes
+	// when the role holds any of the catalog keys (replica read). Mounts with a
+	// fixed role guard (master data, GR#3 deviations, RBAC config) keep their
+	// RequireRoles after it: the catalog can only narrow those, never widen.
+	permEval := rolemgmt.NewPermissionEvaluator(roleMgmtRepo)
+	perm := func(keys ...string) func(http.Handler) http.Handler {
+		return rolemgmt.RequirePermission(permEval, keys...)
+	}
+	authed := custommw.RequireAuth(tokenService)
 
 	// APPACCESS/ADMIN (ADMIN_PARAM removed, vendor-party-scope D8): set a
 	// target user's initial password, forcing a change on their next login (Auth-Local-Lifecycle Task 6),
@@ -194,7 +281,6 @@ func main() {
 	// project-context.md Sec 12).
 	// List/catalog/permission reads hit the replica (spec Req 8); writes +
 	// read-after-write use the primary.
-	roleMgmtRepo := rolemgmt.NewRepository(dbPool, dbReadPool)
 	roleMgmtService := rolemgmt.NewPermissionService(roleMgmtRepo, dbPool)
 	roleMgmtHandler := handler.NewRoleMgmtHandler(roleMgmtService)
 	r.With(
@@ -206,15 +292,13 @@ func main() {
 	// (read-only monitoring -> replica).
 	atmPortalService := service.NewAtmPortalService(db.New(dbReadPool))
 	atmPortalHandler := handler.NewAtmPortalHandler(atmPortalService)
-	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-portal", atmPortalHandler.Routes())
+	// Tightened from RequireAuth only (DQ3): VENDOR-* roles are now 403.
+	r.With(authed, perm("monitoring.atm-portal")).Mount("/api/v1/atm-portal", atmPortalHandler.Routes())
 
 	// Create and mount DMAA Forecast handler (read-only viewer -> replica).
 	dmaaForecastService := service.NewDmaaForecastService(db.New(dbReadPool))
 	dmaaForecastHandler := handler.NewDmaaForecastHandler(dmaaForecastService)
-	r.With(
-		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("ATM-USER", "ATM-SPV", "BRANCH-ATM-USER", "BRANCH-ATM-SPV", "ADMIN", "ADMIN_PARAM"),
-	).Mount("/api/v1/dmaa-forecast", dmaaForecastHandler.Routes())
+	r.With(authed, perm("forecasting.dmaa-forecast")).Mount("/api/v1/dmaa-forecast", dmaaForecastHandler.Routes())
 
 	// Create and mount DSR upload handler. ATM-specific env vars are read
 	// directly here (not via pkg/config.Config) since that struct is shared
@@ -277,8 +361,7 @@ func main() {
 	// Notifications (.claude/sdlc/notification): Send runs inside the business
 	// tx; the worker below sends the email outbox and purges after 90 days.
 	// Built here (moved up) because the import notifier needs it.
-	smtpMailer, notifyInterval := loadNotificationConfig()
-	notificationService := notification.NewService(smtpMailer != nil)
+	notificationService := notification.NewService(d.SMTPMailer != nil)
 	importBatchRepo := repository.NewMasterDataImportBatchRepository(dbPool, dbPool)
 	importNotifier := service.NewImportNotifier(notificationService, dbPool)
 	masterDataApprovalService := service.NewMasterDataApprovalService(approvalOrchestrator, masterDataChangeRepo, dbPool, masterDataApplierRegistry, auditWriter).WithImportNotifier(importNotifier)
@@ -290,25 +373,24 @@ func main() {
 	// with payload/before for diff display.
 	masterDataChangeService := service.NewMasterDataChangeService(masterDataChangeRepo, approvalOrchestrator, auditWriter)
 	adminMasterDataChangeHandler := handler.NewAdminMasterDataChangeHandler(masterDataChangeService)
-	// masterDataAdmin is the single route guard for every master-data admin
-	// mount below (plan.md T3.6): authenticated + ADMIN/ADMIN_PARAM. The same
-	// role set is re-checked in MasterDataChangeService.Submit for every write,
-	// so a mount that forgets this group still can't stage a change.
-	masterDataAdmin := r.With(
-		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
-	)
+	// masterDataAdmin(key) is the route guard for every master-data admin
+	// mount below (plan.md T3.6): authenticated + the screen key + ADMIN/
+	// ADMIN_PARAM. The same role set is re-checked in
+	// MasterDataChangeService.Submit for every write, so a mount that forgets
+	// this guard still can't stage a change.
+	masterDataAdmin := func(key string) chi.Router {
+		return r.With(authed, perm(key), custommw.RequireRoles("ADMIN", "ADMIN_PARAM"))
+	}
+	mdATMs := masterDataAdmin("settings.atms")
+	mdVendors := masterDataAdmin("settings.vendors")
+	mdIO := masterDataAdmin("settings.master-data-io")
 
-	// vendorRead (vendor-pks-list Req 9.2): ADMIN, ADMIN_PARAM, ATM-SPV. Only the
-	// vendor list/detail and Daftar PKS are mounted here; their handlers narrow
-	// every write (vendor create/update/disable/enable, PKS reminder) to
-	// ADMIN/ADMIN_PARAM, and the services re-check the role. Every vendor
-	// sub-resource (branches, PICs, prices, vaults, DSR mapping, PKS writes)
-	// stays in masterDataAdmin below.
-	vendorRead := r.With(
-		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles(reports.PksViewerRoles...),
-	)
+	// vendorRead (vendor-pks-list Req 9.2): screen key only. Only the vendor
+	// list/detail is mounted here (Daftar PKS below has its own key); the
+	// handler narrows every write (create/update/disable/enable) to
+	// ADMIN/ADMIN_PARAM, and the service re-checks reports.PksViewerRoles.
+	// Every vendor sub-resource stays in masterDataAdmin below.
+	vendorRead := r.With(authed, perm("settings.vendors", "settings.pks"))
 
 	// Vendor CRUD (Admin User & Vendor Management spec, retrofitted onto
 	// maker-checker by plan.md T4.1): reads are direct, but
@@ -329,9 +411,9 @@ func main() {
 	atmAdminRepo := repository.NewATMAdminRepository(dbPool, dbReadPool)
 	atmAdminService := service.NewATMAdminService(atmAdminRepo, masterDataChangeService)
 	adminATMHandler := handler.NewAdminATMHandler(atmAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/atms", adminATMHandler.Routes())
+	mdATMs.Mount("/api/v1/admin/atms", adminATMHandler.Routes())
 
-	masterDataAdmin.Mount("/api/v1/admin/master-data/changes", adminMasterDataChangeHandler.Routes())
+	mdIO.Mount("/api/v1/admin/master-data/changes", adminMasterDataChangeHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: region master-data CRUD (.kiro/specs/region-management).
 	// Unlike the maker-checker flows above, region mutations apply
@@ -342,7 +424,7 @@ func main() {
 	regionAdminRepo := repository.NewRegionAdminRepository(dbPool, dbReadPool)
 	regionAdminService := service.NewRegionAdminService(regionAdminRepo, dbPool)
 	adminRegionHandler := handler.NewAdminRegionHandler(regionAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/regions", adminRegionHandler.Routes())
+	masterDataAdmin("settings.regions").Mount("/api/v1/admin/regions", adminRegionHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor vault CRUD (plan.md T3.2), same
 	// maker-checker-native flow as branches below. Built before the branch
@@ -351,40 +433,40 @@ func main() {
 	vendorVaultAdminRepo := repository.NewVendorVaultAdminRepository(dbPool, dbReadPool)
 	vendorVaultAdminService := service.NewVendorVaultAdminService(vendorVaultAdminRepo, masterDataChangeService)
 	adminVendorVaultHandler := handler.NewAdminVendorVaultHandler(vendorVaultAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/vaults", adminVendorVaultHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/vaults", adminVendorVaultHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: Mapping DSR lokasi -> vault (cit-acm-plan FR2),
 	// maker-checker-native; lists read from the replica.
 	dsrLocationMapAdminService := service.NewDsrLocationMapAdminService(repository.NewDsrLocationMapAdminRepository(dbPool, dbReadPool), masterDataChangeService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/dsr-location-maps", handler.NewAdminDsrLocationMapHandler(dsrLocationMapAdminService).Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/dsr-location-maps", handler.NewAdminDsrLocationMapHandler(dsrLocationMapAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor PIC CRUD (plan.md T3.3), same
 	// maker-checker-native flow; list also returns non-blocking warnings.
 	vendorPicAdminRepo := repository.NewVendorPicAdminRepository(dbPool, dbReadPool)
 	vendorPicAdminService := service.NewVendorPicAdminService(vendorPicAdminRepo, masterDataChangeService)
 	adminVendorPicHandler := handler.NewAdminVendorPicHandler(vendorPicAdminService, service.NewVendorPicRoleService(dbPool))
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/pics", adminVendorPicHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: PKS vendor writes (spec vendor-pks 8.1), maker-checker.
 	// pool = primary for the reminder tx (vendor-pks-list 4.2).
 	vendorPksAdminService := service.NewVendorPksAdminService(repository.NewVendorPksAdminRepository(dbPool), masterDataChangeService, dbPool)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/pks", handler.NewAdminVendorPksHandler(vendorPksAdminService).Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/pks", handler.NewAdminVendorPksHandler(vendorPksAdminService).Routes())
 
 	pksTypeRepo := repository.NewPksTypeRepository(dbPool, dbReadPool)
 	// Daftar PKS (vendor-pks-list): list on the replica for PksViewerRoles; reminder PUT
 	// ADMIN/ADMIN_PARAM only (route + service), immediate + audit in tx (GR#3 deviation D9).
 	pksListService := service.NewPksListService(repository.NewPksListRepository(dbReadPool), pksTypeRepo, vendorAdminRepo)
-	vendorRead.Mount("/api/v1/admin/pks", handler.NewAdminPksHandler(pksListService, vendorPksAdminService).Routes())
+	r.With(authed, perm("settings.pks")).Mount("/api/v1/admin/pks", handler.NewAdminPksHandler(pksListService, vendorPksAdminService).Routes())
 
 	pksTypeAdminService := service.NewPksTypeAdminService(pksTypeRepo, masterDataChangeService)
-	masterDataAdmin.Mount("/api/v1/admin/pks-types", handler.NewAdminPksTypeHandler(pksTypeAdminService).Routes())
+	masterDataAdmin("settings.pks-types").Mount("/api/v1/admin/pks-types", handler.NewAdminPksTypeHandler(pksTypeAdminService).Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package CRUD (plan.md T3.4), same
 	// maker-checker-native flow; price is a decimal string (numeric(20,2)).
 	vendorPackageAdminRepo := repository.NewVendorPackageAdminRepository(dbPool, dbReadPool)
 	vendorPackageAdminService := service.NewVendorPackageAdminService(vendorPackageAdminRepo, masterDataChangeService)
 	adminVendorPackageHandler := handler.NewAdminVendorPackageHandler(vendorPackageAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/packages", adminVendorPackageHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/packages", adminVendorPackageHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor package price CRUD (vendor-pricing
 	// plan.md P20), same maker-checker-native flow. Prices are decimal
@@ -394,7 +476,7 @@ func main() {
 	vendorPackagePriceAdminRepo := repository.NewVendorPackagePriceAdminRepository(dbPool, dbReadPool)
 	vendorPackagePriceAdminService := service.NewVendorPackagePriceAdminService(vendorPackagePriceAdminRepo, masterDataChangeService)
 	adminVendorPackagePriceHandler := handler.NewAdminVendorPackagePriceHandler(vendorPackagePriceAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/package-prices", adminVendorPackagePriceHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/package-prices", adminVendorPackagePriceHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: vendor branch CRUD (plan.md T3.1) -- staged via
 	// masterDataChangeService.Submit (maker-checker-native, D1), applied by
@@ -405,7 +487,7 @@ func main() {
 	branchChildCounter := branchChildCounterAdapter{vaults: vendorVaultAdminRepo, pics: vendorPicAdminRepo, packages: vendorPackageAdminRepo}
 	vendorBranchAdminService := service.NewVendorBranchAdminService(vendorBranchAdminRepo, masterDataChangeService, branchChildCounter)
 	adminVendorBranchHandler := handler.NewAdminVendorBranchHandler(vendorBranchAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches", adminVendorBranchHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/branches", adminVendorBranchHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: read-only "ATM" sub-tab on the vendor branch
 	// detail page (.kiro/specs/vendor-branch-atms). Display-only, no
@@ -413,7 +495,7 @@ func main() {
 	branchATMRepo := repository.NewBranchATMRepository(dbReadPool)
 	branchATMService := service.NewBranchATMService(branchATMRepo)
 	adminBranchATMHandler := handler.NewAdminBranchATMHandler(branchATMService)
-	masterDataAdmin.Mount("/api/v1/admin/vendors/{vendorID}/branches/{branchID}/atms", adminBranchATMHandler.Routes())
+	mdVendors.Mount("/api/v1/admin/vendors/{vendorID}/branches/{branchID}/atms", adminBranchATMHandler.Routes())
 
 	// ADMIN/ADMIN_PARAM-only: ATM assignment (kelolaan) CRUD (plan.md T3.5),
 	// same maker-checker-native flow; overlap is a clean 409 at submit time and
@@ -423,8 +505,8 @@ func main() {
 	atmAssignmentAdminRepo := repository.NewATMAssignmentAdminRepository(dbPool, dbReadPool)
 	atmAssignmentAdminService := service.NewATMAssignmentAdminService(atmAssignmentAdminRepo, masterDataChangeService)
 	adminATMAssignmentHandler := handler.NewAdminATMAssignmentHandler(atmAssignmentAdminService)
-	masterDataAdmin.Mount("/api/v1/admin/atms/{atmID}/assignments", adminATMAssignmentHandler.Routes())
-	masterDataAdmin.Get("/api/v1/admin/atms/{atmID}/assignment-package-options", adminATMAssignmentHandler.PackageOptions)
+	mdATMs.Mount("/api/v1/admin/atms/{atmID}/assignments", adminATMAssignmentHandler.Routes())
+	mdATMs.Get("/api/v1/admin/atms/{atmID}/assignment-package-options", adminATMAssignmentHandler.PackageOptions)
 
 	// CSV import of master data (plan.md T5.3 dry-run, T5.4 confirm). It validates
 	// and stages a write flow, so it reads the PRIMARY (dbPool), never the
@@ -449,26 +531,31 @@ func main() {
 			}
 		},
 	})
-	masterDataAdmin.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).WithHistory(service.NewMasterDataImportHistoryService(importBatchRepo)).Routes())
+	mdIO.Mount("/api/v1/admin/master-data/import", handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).WithHistory(service.NewMasterDataImportHistoryService(importBatchRepo)).Routes())
 
 	// ScDD 5.1 cash count parameters + mapping PIC. Read: maker role + ADMIN;
 	// change: the service re-checks the maker role per entity type (CC-CWM /
 	// CC-CCR only — ADMIN is rejected as maker, AC-5.1-14).
-	cashCountCWM := r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CWM", "ADMIN"))
-	cashCountCCR := r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CCR", "ADMIN"))
-	cashCountCWM.Mount("/api/v1/cash-count/category-params", handler.NewCashCountCategoryParamsHandler(
+	// Screen key first: cash-count.parameters / cash-count.pic-mapping.
+	cashCount := func(key string, roles ...string) chi.Router {
+		return r.With(authed, perm(key), custommw.RequireRoles(roles...))
+	}
+	ccParamsCWM := cashCount("cash-count.parameters", "CC-CWM", "ADMIN")
+	ccParamsCCR := cashCount("cash-count.parameters", "CC-CCR", "ADMIN")
+	ccPicMapCWM := cashCount("cash-count.pic-mapping", "CC-CWM", "ADMIN")
+	ccParamsCWM.Mount("/api/v1/cash-count/category-params", handler.NewCashCountCategoryParamsHandler(
 		service.NewCashCountCategoryParamsAdminService(repository.NewCashCountCategoryParamsAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
-	cashCountCCR.Mount("/api/v1/cash-count/anomaly-categories", handler.NewCashCountAnomalyCategoryHandler(
+	ccParamsCCR.Mount("/api/v1/cash-count/anomaly-categories", handler.NewCashCountAnomalyCategoryHandler(
 		service.NewCashCountAnomalyCategoryAdminService(repository.NewCashCountAnomalyCategoryAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
-	cashCountCCR.Mount("/api/v1/cash-count/checklist-items", handler.NewCashCountChecklistItemHandler(
+	ccParamsCCR.Mount("/api/v1/cash-count/checklist-items", handler.NewCashCountChecklistItemHandler(
 		service.NewCashCountChecklistItemAdminService(repository.NewCashCountChecklistItemAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
-	cashCountCWM.Mount("/api/v1/cash-count/areas", handler.NewCashCountAreaHandler(
+	ccPicMapCWM.Mount("/api/v1/cash-count/areas", handler.NewCashCountAreaHandler(
 		service.NewCashCountAreaAdminService(repository.NewCashCountAreaAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
-	cashCountCWM.Mount("/api/v1/cash-count/pics", handler.NewCashCountPicHandler(
+	ccPicMapCWM.Mount("/api/v1/cash-count/pics", handler.NewCashCountPicHandler(
 		service.NewCashCountPicAdminService(repository.NewCashCountPicAdminRepository(dbPool, dbReadPool), masterDataChangeService)).Routes())
 	// CSV import of mapping PIC (AC-5.1-11): same importer, reachable by CC-CWM;
 	// the service accepts only cash-count-pics from CC-CWM. No history here.
-	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("CC-CWM")).Mount("/api/v1/cash-count/import",
+	cashCount("cash-count.pic-mapping", "CC-CWM").Mount("/api/v1/cash-count/import",
 		handler.NewAdminMasterDataImportHandler(masterDataImporter).WithRateLimit(redisClient).Routes())
 
 	// Admin-only: hierarchy/delegation/leave management (RBAC-Setup Task 8),
@@ -486,21 +573,24 @@ func main() {
 	// path). Register each handler's routes directly on the shared router
 	// instead — chi resolves the static "/users/hierarchy" ahead of the
 	// "/users/{id}/hierarchy" param route, so both sets coexist correctly.
-	r.With(
-		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM", "APPACCESS"),
-	).Route("/api/v1/admin/approval", func(ar chi.Router) {
-		ar.Put("/users/{id}/hierarchy", adminApprovalHandler.SetHierarchy)
-		ar.Post("/delegations", adminApprovalHandler.CreateDelegation)
-		ar.Delete("/delegations/{id}", adminApprovalHandler.RevokeDelegation)
-		ar.Post("/leaves", adminApprovalHandler.CreateLeave)
+	// Per-route screen key (settings.rbac-*) in front of the fixed role guard.
+	r.With(authed).Route("/api/v1/admin/approval", func(ar chi.Router) {
+		rbac := func(key string) chi.Router {
+			return ar.With(perm(key), custommw.RequireRoles("ADMIN", "ADMIN_PARAM", "APPACCESS"))
+		}
+		users, delegations, leaves, policies := rbac("settings.rbac-users"), rbac("settings.rbac-delegations"), rbac("settings.rbac-leaves"), rbac("settings.rbac-policies")
 
-		ar.Get("/users/hierarchy", rbacListHandler.ListUserHierarchy)
-		ar.Get("/delegations", rbacListHandler.ListDelegations)
-		ar.Get("/leaves", rbacListHandler.ListLeaves)
-		ar.Get("/policies", rbacListHandler.ListPolicies)
-		ar.Post("/policies", rbacListHandler.CreatePolicy)
-		ar.Put("/policies/{id}", rbacListHandler.UpdatePolicy)
+		users.Put("/users/{id}/hierarchy", adminApprovalHandler.SetHierarchy)
+		delegations.Post("/delegations", adminApprovalHandler.CreateDelegation)
+		delegations.Delete("/delegations/{id}", adminApprovalHandler.RevokeDelegation)
+		leaves.Post("/leaves", adminApprovalHandler.CreateLeave)
+
+		users.Get("/users/hierarchy", rbacListHandler.ListUserHierarchy)
+		delegations.Get("/delegations", rbacListHandler.ListDelegations)
+		leaves.Get("/leaves", rbacListHandler.ListLeaves)
+		policies.Get("/policies", rbacListHandler.ListPolicies)
+		policies.Post("/policies", rbacListHandler.CreatePolicy)
+		policies.Put("/policies/{id}", rbacListHandler.UpdatePolicy)
 	})
 
 	// Create and mount the Vendor Request handler (DMAA forecast -> CIT
@@ -516,40 +606,39 @@ func main() {
 	// same documented GR#3 deviation as regions; role re-checked in the service.
 	// Built after notificationService: assigning branches creates vault plans and notifies (FR7.3).
 	adminAcmAreaHandler := handler.NewAdminAcmAreaHandler(service.NewAcmAreaAdminService(dbPool, dbReadPool).WithNotifier(notificationService))
-	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ADMIN")).Mount("/api/v1/admin/acm-areas", adminAcmAreaHandler.Routes())
+	r.With(authed, perm("settings.acm-areas"), custommw.RequireRoles("ADMIN")).Mount("/api/v1/admin/acm-areas", adminAcmAreaHandler.Routes())
 	// CIT -> Penetapan Vault (cit-acm-plan FR3-FR6): ACM area plans; membership +
 	// per-action role re-checked in the service (ADMIN read-only). The same service
 	// backs the ATM-SPV vault review routes on Vendor Request.
 	vaultPlanService := service.NewVaultPlanService(dbPool, dbReadPool).WithNotifier(notificationService)
-	r.With(custommw.RequireAuth(tokenService), custommw.RequireRoles("ACM-USER", "ACM-SPV", "ADMIN")).Mount("/api/v1/vault-plans", handler.NewVaultPlanHandler(vaultPlanService).Routes())
+	r.With(authed, perm("cit.vault-plan")).Mount("/api/v1/vault-plans", handler.NewVaultPlanHandler(vaultPlanService).Routes())
 	// Kirim ke vendor (cit-send-vendor): VendorPortal orders for VENDOR-USER
 	// (scope re-read from users in the service); list on the replica.
 	vendorOrderService := service.NewVendorOrderService(dbPool, dbReadPool).WithNotifier(notificationService)
 	vendorRequestHandler := handler.NewVendorRequestHandler(vendorRequestService).WithVaultReview(vaultPlanService).
-		WithVendorSide(vendorOrderService, vendorRequestService)
+		WithVendorSide(vendorOrderService, vendorRequestService).WithPermissions(permEval)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor-requests", vendorRequestHandler.Routes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-orders", handler.NewVendorOrderHandler(vendorOrderService).Routes())
 	// replenishment-realisasi FR4-FR6: classifications written by the Python job; reads on the replica.
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/vendor/replenish-realizations", handler.NewVendorOrderHandler(vendorOrderService).RealizationRoutes())
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/replenishment",
-		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbReadPool)).Routes())
+		handler.NewReplenishmentHandler(service.NewReplenishmentReadService(dbReadPool)).WithPermissions(permEval).Routes())
 	// dsr-late-report FR4: monthly late/missing DSR per vendor branch, read on the replica; DSR_LATE_START_DATE
 	// (same value as the Python RETRY_DSR_LATE_START_DATE) empty = report off.
 	dsrLateStart, err := reports.ParseDsrLateStartDate(getenvDefault("DSR_LATE_START_DATE", ""))
 	if err != nil {
-		slog.Error("invalid DSR_LATE_START_DATE", "error", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("invalid DSR_LATE_START_DATE: %w", err)
 	}
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/dsr-late-reports",
-		handler.NewDsrLateHandler(service.NewDsrLateReportService(dbReadPool, dsrLateStart)).Routes())
+		handler.NewDsrLateHandler(service.NewDsrLateReportService(dbReadPool, dsrLateStart)).WithPermissions(permEval).Routes())
 	// Hari libur (FR1): ADMIN only (route + service), immediate apply + audit in the same tx (GR#3 deviation).
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/admin/holidays",
-		handler.NewAdminHolidayHandler(service.NewHolidayAdminService(dbPool, dbReadPool)).Routes())
+		handler.NewAdminHolidayHandler(service.NewHolidayAdminService(dbPool, dbReadPool)).WithPermissions(permEval).Routes())
 
 	// Kuota kunjungan replenish per ATM (.claude/sdlc/atm-visit-quota): read
 	// for viewers, reset/cancel-visit for checkers (re-checked in service).
 	// Primary pool (plan D1: read right after approve/reset/cancel).
-	atmVisitQuotaHandler := handler.NewAtmVisitQuotaHandler(service.NewAtmVisitQuotaService(dbPool))
+	atmVisitQuotaHandler := handler.NewAtmVisitQuotaHandler(service.NewAtmVisitQuotaService(dbPool)).WithPermissions(permEval)
 	r.With(custommw.RequireAuth(tokenService)).Mount("/api/v1/atm-visit-quotas", atmVisitQuotaHandler.Routes())
 
 	// Every authenticated role (VENDOR-USER too) reads only its own
@@ -561,53 +650,9 @@ func main() {
 	auditLogRepo := repository.NewAuditLogRepository(dbReadPool)
 	auditLogService := service.NewAuditLogReadService(auditLogRepo)
 	auditLogHandler := handler.NewAuditLogHandler(auditLogService)
-	r.With(
-		custommw.RequireAuth(tokenService),
-		custommw.RequireRoles("ADMIN", "ADMIN_PARAM"),
-	).Mount("/api/v1/audit-logs", auditLogHandler.Routes())
+	r.With(authed, perm("monitoring.audit-logs")).Mount("/api/v1/audit-logs", auditLogHandler.Routes())
 
-	// Start HTTP server
-	addr := ":" + cfg.Port
-	srv := &http.Server{
-		Addr:         addr,
-		Handler:      r,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	// Graceful shutdown
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		slog.Info("starting HTTP server", "addr", addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("HTTP server error", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	workerCtx, stopWorker := context.WithCancel(ctx)
-	var mailer notification.Mailer // stays a nil interface when SMTP is off
-	if smtpMailer != nil {
-		mailer = smtpMailer
-	}
-	go notification.NewWorker(dbPool, mailer, notifyInterval).Run(workerCtx)
-
-	<-done
-	slog.Info("shutting down server...")
-	stopWorker()
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		slog.Error("server shutdown error", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("server stopped gracefully")
+	return r, nil
 }
 
 // branchChildCounterAdapter composes the vault/pic/package admin repos into

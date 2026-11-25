@@ -706,6 +706,8 @@ type MenuFeature struct {
 	IsActive  bool               `json:"is_active"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	// Role yang boleh diberi izin key ini lewat PUT /api/v1/admin/roles/{id}/permissions. NULL = semua role internal. Terisi untuk key yang endpoint baca layarnya punya guard role tetap (data master, deviasi GR#3, auth) dan untuk Locked_Key; grant di luar daftar ditolak 422 role_not_assignable. Katalog hanya bisa mencabut akses di layar itu, tidak memperluasnya. Migrasi 046.
+	AssignableRoles []string `json:"assignable_roles"`
 }
 
 // Temporary: pre-042 values for the documented rollback of 042_region_standardization.sql. Drop in a later migration once the release is confirmed.

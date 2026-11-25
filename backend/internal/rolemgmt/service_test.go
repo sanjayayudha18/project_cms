@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -75,6 +77,7 @@ func TestPermissionService_DependencyErrorsArePropagated(t *testing.T) {
 		{"update: role lookup fails", "GetRole", update, 0},
 		{"update: catalog check fails", "CatalogEntriesExist", update, 0},
 		{"update: current permissions fail", "ListRolePermissionIDs", update, 0},
+		{"update: catalog load fails", "ListCatalog", update, 0},
 		{"update: begin tx fails", "", update, 1},
 	}
 	for _, tt := range tests {
@@ -124,6 +127,52 @@ func (failAll) GetRole(context.Context, int64) (*db.Role, error)              { 
 func (failAll) ListRolePermissionIDs(context.Context, int64) ([]int64, error) { return nil, errBoom }
 func (failAll) ReplaceRolePermissions(context.Context, pgx.Tx, int64, []int64, int64) error {
 	return errBoom
+}
+
+// Task 2.4 (Req 3.5, 3.6). Catalog: 1 dashboard (Always_On), 2 settings.roles
+// (Locked), 3 free key, 4 settings.atms {ADMIN, ADMIN_PARAM}. The full
+// Property 6 table lives in task 2.5.
+func TestResolvePermissionSet(t *testing.T) {
+	catalog := []db.MenuFeature{
+		{ID: 1, Key: "dashboard", Label: "Dashboard"},
+		{ID: 2, Key: "settings.roles", Label: "Manajemen Peran", AssignableRoles: []string{"APPACCESS", "ADMIN"}},
+		{ID: 3, Key: "monitoring.audit-logs", Label: "Audit Log"},
+		{ID: 4, Key: "settings.atms", Label: "ATM", AssignableRoles: []string{"ADMIN", "ADMIN_PARAM"}},
+	}
+	tests := []struct {
+		name      string
+		role      string
+		submitted []int64
+		before    []int64
+		want      []int64
+		wantErr   bool
+	}{
+		{"protected keys in payload are dropped", "ATM-USER", []int64{1, 2, 3}, nil, []int64{3}, false},
+		{"stored Locked grant survives a payload without it", "ADMIN", []int64{3}, []int64{2, 3}, []int64{2, 3}, false},
+		{"stored Locked grant survives an empty payload", "ADMIN", nil, []int64{2, 3}, []int64{2}, false},
+		{"assignable role may be granted", "admin_param", []int64{4}, nil, []int64{4}, false},
+		{"grant outside assignable_roles is rejected", "ATM-USER", []int64{4}, nil, nil, true},
+		{"grant already held is not re-checked", "ATM-USER", []int64{4}, []int64{4}, []int64{4}, false},
+		{"id outside the active catalog passes through", "ATM-USER", []int64{99}, nil, []int64{99}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolvePermissionSet(tt.role, tt.submitted, tt.before, catalog)
+			if tt.wantErr {
+				var nae *RoleNotAssignableError
+				if !errors.As(err, &nae) || !errors.Is(err, ErrRoleNotAssignable) || !strings.Contains(err.Error(), "ATM") {
+					t.Fatalf("error = %v, want RoleNotAssignableError naming the screen", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestIsUniqueViolation(t *testing.T) {

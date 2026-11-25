@@ -1,10 +1,10 @@
-// Feature: app-shell-revamp, Property 9: Badge hanya untuk item terlihat dan nilai positif
 import { useInbox } from "@/features/approvals/hooks";
 import { useEodSummary } from "@/features/eod-monitoring/hooks/useEodQueries";
 import { useVendorRequests } from "@/features/vendor-request/hooks";
 import type { DbRole } from "@/lib/auth/store";
-import { getVisibleNav } from "@/lib/config/navigation";
 import { formatBadgeCount } from "@/lib/utils/formatters";
+// Feature: app-shell-revamp, Property 9: Badge hanya untuk item terlihat dan nilai positif
+import { getVisibleNavForRole as getVisibleNav } from "@/test/visibleNavForRole";
 import * as fc from "fast-check";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { badgeRequestStatuses, useNavBadges } from "./useNavBadges";

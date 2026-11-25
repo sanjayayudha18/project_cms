@@ -1,7 +1,6 @@
 /**
  * Design property 8 (Nav renders exactly the mapped menus/features), scoped
- * to the "Manajemen Peran" card: visible to APPACCESS/ADMIN, hidden for
- * every other role (Req 1.4, 4.5). Lives under role-management's own
+ * to the "Manajemen Peran" card: visible when the role holds the settings.roles permission (APPACCESS/ADMIN get it as a Locked key), hidden otherwise (Req 1.4, 4.5). Lives under role-management's own
  * __tests__ (not rbac-settings) since it exercises this feature's specific
  * card, and rbac-settings/__tests__/SettingsHubPage.test.tsx has a
  * pre-existing, unrelated failure (tab-default mismatch from an in-progress
@@ -9,6 +8,7 @@
  */
 
 import { SettingsHubPage } from "@/features/rbac-settings";
+import { usePermissionStore } from "@/lib/auth/permissionStore";
 import { useAuthStore } from "@/lib/auth/store";
 import type { DbRole } from "@/lib/auth/store";
 import { render, screen } from "@testing-library/react";
@@ -35,7 +35,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-function setUser(role: DbRole) {
+function setUser(role: DbRole, keys: string[] = []) {
+  // No-op load: signing in triggers the store's auto-load, which would overwrite these keys.
+  usePermissionStore.setState({ keys: new Set(keys), status: "ready", load: async () => {} });
   useAuthStore.setState({
     user: {
       id: 1,
@@ -55,6 +57,7 @@ function setUser(role: DbRole) {
 }
 
 beforeEach(() => {
+  usePermissionStore.setState({ keys: new Set(), status: "ready" });
   useAuthStore.setState({
     user: null,
     accessToken: null,
@@ -67,7 +70,7 @@ beforeEach(() => {
 
 describe("SettingsHubPage — Manajemen Peran card visibility", () => {
   it("is visible for APPACCESS", () => {
-    setUser("APPACCESS");
+    setUser("APPACCESS", ["settings.roles"]);
     render(<SettingsHubPage />);
     expect(screen.getByRole("link", { name: /Manajemen Peran/ })).toHaveAttribute(
       "href",
@@ -76,7 +79,7 @@ describe("SettingsHubPage — Manajemen Peran card visibility", () => {
   });
 
   it("is visible for ADMIN", () => {
-    setUser("ADMIN");
+    setUser("ADMIN", ["settings.roles"]);
     render(<SettingsHubPage />);
     expect(screen.getByRole("link", { name: /Manajemen Peran/ })).toHaveAttribute(
       "href",

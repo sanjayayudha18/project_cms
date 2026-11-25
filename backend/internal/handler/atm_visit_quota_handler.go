@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cimb-niaga/cms/backend/internal/rolemgmt"
 	"github.com/cimb-niaga/cms/backend/internal/service"
-	"github.com/cimb-niaga/cms/pkg/middleware"
 )
 
 // AtmVisitQuotaServicer is the service surface AtmVisitQuotaHandler needs
@@ -28,6 +28,14 @@ type AtmVisitQuotaServicer interface {
 // service re-checks the checker role (Sec 5: RBAC at route and service).
 type AtmVisitQuotaHandler struct {
 	service AtmVisitQuotaServicer
+	perm    *rolemgmt.PermissionEvaluator // nil = role guards only
+}
+
+// WithPermissions guards every route with replenish.vendor-requests: GET replaces
+// the viewer role guard, reset/cancel keep the checker role guard behind it.
+func (h *AtmVisitQuotaHandler) WithPermissions(e *rolemgmt.PermissionEvaluator) *AtmVisitQuotaHandler {
+	h.perm = e
+	return h
 }
 
 func NewAtmVisitQuotaHandler(svc AtmVisitQuotaServicer) *AtmVisitQuotaHandler {
@@ -36,10 +44,12 @@ func NewAtmVisitQuotaHandler(svc AtmVisitQuotaServicer) *AtmVisitQuotaHandler {
 
 func (h *AtmVisitQuotaHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.With(middleware.RequireRoles(vendorRequestViewerRoles...)).Get("/atms/{terminalId}", h.Get)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/atms/{terminalId}/reset", h.ResetATM)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/vendors/{vendorId}/reset", h.ResetVendor)
-	r.With(middleware.RequireRoles(vendorRequestCheckerRoles...)).Post("/visits/{visitId}/cancel", h.CancelVisit)
+	view := viewGuard(h.perm, vendorRequestActionKeys, vendorRequestViewerRoles)
+	act := actionGuard(h.perm, vendorRequestActionKeys, vendorRequestCheckerRoles)
+	r.With(view...).Get("/atms/{terminalId}", h.Get)
+	r.With(act...).Post("/atms/{terminalId}/reset", h.ResetATM)
+	r.With(act...).Post("/vendors/{vendorId}/reset", h.ResetVendor)
+	r.With(act...).Post("/visits/{visitId}/cancel", h.CancelVisit)
 	return r
 }
 

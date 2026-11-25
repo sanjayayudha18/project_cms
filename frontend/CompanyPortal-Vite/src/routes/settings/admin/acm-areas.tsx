@@ -1,6 +1,6 @@
 import { Forbidden } from "@/components/pages/Forbidden";
 import { createRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { protectedRoute, requireRoles } from "../../_protected";
+import { protectedRoute, requirePermission } from "../../_protected";
 
 // Page chunk loads on navigation; the loader preloads it so the guard wrapper never suspends (FE-04).
 const AdminAcmAreasPage = lazyRouteComponent(
@@ -12,7 +12,7 @@ const AdminAcmAreasPage = lazyRouteComponent(
 export const adminAcmAreasRoute = createRoute({
   path: "/settings/admin/acm-areas",
   getParentRoute: () => protectedRoute,
-  beforeLoad: requireRoles(["ADMIN"]),
+  beforeLoad: requirePermission("settings.acm-areas"),
   loader: () => AdminAcmAreasPage.preload?.(),
   component: AdminAcmAreasRouteComponent,
 });
